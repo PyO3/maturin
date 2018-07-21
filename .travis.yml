@@ -1,0 +1,60 @@
+# Derived from japaric/trust and burtnsushi/ripgrep
+
+language: rust
+
+matrix:
+  fast_finish: true
+  include:
+    # These craete deployments
+    - os: linux
+      rust: stable
+      env: TARGET=i686-unknown-linux-gnu
+    - os: linux
+      rust: stable
+      env: TARGET=x86_64-unknown-linux-gnu
+    - os: osx
+      rust: stable
+      env: TARGET=x86_64-apple-darwin
+
+    # Those are only tested
+    - os: linux
+      rust: beta
+      env: TARGET=x86_64-unknown-linux-gnu
+    - os: linux
+      rust: nightly
+      env: TARGET=x86_64-unknown-linux-gnu
+
+    # Minimum Rust supported channel
+    - os: linux
+      rust: 1.27.0
+      env: TARGET=x86_64-unknown-linux-gnu
+
+branches:
+  only:
+    # Pushes and PR to the master branch
+    - master
+    # Ruby regex to match tags. Required, or travis won't trigger deploys when
+    # a new tag is pushed.
+    - /^\d+\.\d+\.\d+.*$/
+
+install: ci/install.sh
+script: ci/script.sh
+
+before_deploy: ci/before_deploy.sh
+deploy:
+  provider: releases
+  file_glob: true
+  file: stage/pyo3-pack-${TRAVIS_TAG}-${TARGET}.tar.gz
+  skip_cleanup: true
+  on:
+    condition: $TRAVIS_RUST_VERSION = stable
+    tags: true
+  # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
+  # - Encrypt it: `travis encrypt 0123456789012345678901234567890123456789
+  # - Paste the output down here
+  api_key:
+    secure: "TBD"
+
+notifications:
+  email:
+      on_success: never

@@ -1,0 +1,55 @@
+[package]
+authors = ["konstin <konstin@mailbox.org>"]
+name = "pyo3-pack"
+version = "0.1.0"
+description = "Build and publish python packages from crates with pyo3 bindings"
+exclude = ["get_fourtytwo/**/*", "integration-test/**/*"]
+readme = "Readme.md"
+repository = "https://github.com/pyo3/pyo3-pack"
+license = "MIT OR Apache-2.0"
+keywords = ["python", "ffi", "packaging", "pypi", "pyo3"]
+categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
+
+[[bin]]
+name = "pyo3-pack"
+
+[lib]
+name = "pyo3_pack"
+
+[dependencies]
+base64 = "0.9.1"
+cargo_metadata = "0.5.6"
+digest = {version = "0.7.2", features = ["std"]}
+failure = "0.1.1"
+# Keyring depends on secret-service, which depends on libdbus-1.so.3 and libgmp.so.10, which are both not manylinux
+# compatible, so you must only use keyring in main.rs
+keyring = "0.6.0"
+reqwest = "0.8.5"
+rpassword = "2.0.0"
+serde_derive = "1.0.47"
+serde_json = "1.0.22"
+sha2 = "0.7.1"
+structopt = "0.2.8"
+target_info = "0.1.0"
+toml = "0.4.6"
+zip = "0.4.2"
+serde = "1.0.66"
+elfkit = { git = "https://github.com/aep/elfkit", rev = "42c2097c3e507cb9f144e8e3492dd0ba3f1019b5", optional = true }
+capybara = { git = "https://github.com/konstin/capybara", rev = "6d8052b8d4dd06de02de05e65e1a40fec8489b2e", features = ["python"], optional = true }
+tar = { version = "0.4.16", optional = true }
+libflate = { version = "0.1.16", optional = true }
+human-panic = "1.0.0"
+
+[dev-dependencies]
+tempfile = "3.0.2"
+indoc = "0.2.6"
+
+[features]
+default = ["auditwheel"]
+auditwheel = ["elfkit"]
+sdist = ["capybara", "tar", "libflate"] # sdist can be written, but those can not be installed
+
+[workspace]
+members = [
+    "get_fourtytwo"
+]

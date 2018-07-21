@@ -75,4 +75,4 @@ OPTIONS:
 
 This repository consists of the main pyo3-pack crate, which is a library with a single binary target that is mostly handling username and password for the pypi upload, a `get_fourtytwo` crate with python bindings and some dummy functionally (such as returning 42) and the integration test folder with some basic testing utilities.
 
-You might want to have look into my [blog post](1https://blog.schuetze.link/python/rust/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains all the nitty-gritty details on building python packages.
+You might want to have look into my [blog post](https://blog.schuetze.link/python/rust/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains all the nitty-gritty details on building python packages.

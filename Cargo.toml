@@ -3,7 +3,7 @@ authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pack"
 version = "0.0.2"
 description = "Build and publish python packages from crates with pyo3 bindings"
-exclude = ["get_fourtytwo/**/*", "integration-test/**/*"]
+exclude = ["get_fourtytwo/**/*", "integration-test/**/*", "ci/*"]
 readme = "Readme.md"
 repository = "https://github.com/pyo3/pyo3-pack"
 license = "MIT OR Apache-2.0"
@@ -19,7 +19,7 @@ name = "pyo3_pack"
 [dependencies]
 base64 = "0.9.1"
 cargo_metadata = "0.5.6"
-digest = {version = "0.7.2", features = ["std"]}
+digest = { version = "0.7.2", features = ["std"] }
 failure = "0.1.1"
 # Keyring depends on secret-service, which depends on libdbus-1.so.3 and libgmp.so.10, which are both not manylinux
 # compatible, so you must only use keyring in main.rs

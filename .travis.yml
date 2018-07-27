@@ -39,7 +39,7 @@ branches:
     - master
     # Ruby regex to match tags. Required, or travis won't trigger deploys when
     # a new tag is pushed.
-    - /^\d+\.\d+\.\d+.*$/
+    - /^v\d+\.\d+\.\d+.*$/
 
 install: ci/install.sh
 script: ci/script.sh

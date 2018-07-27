@@ -1,10 +1,10 @@
 # Pyo3-pack
 
 [![Build Status](https://img.shields.io/travis/PyO3/pyo3-pack.svg?style=flat-square)](https://travis-ci.org/PyO3/pyo3-pack)
-[![Crates.io](https://img.shields.io/crates/v/pyo3-pack.svg)](https://crates.io/crates/pyo3-pack)
+[![Crates.io](https://img.shields.io/crates/v/pyo3-pack.svg?style=flat-square)](https://crates.io/crates/pyo3-pack)
 [![API Documentation on docs.rs](https://docs.rs/pyo3-pack/badge.svg)](https://docs.rs/pyo3-pack)
 [![Snap Status](https://build.snapcraft.io/badge/PyO3/pyo3-pack.svg)](https://build.snapcraft.io/user/PyO3/pyo3-pack)
-[![Join the dev chat](https://img.shields.io/gitter/room/nwjs/nw.js.svg)](https://gitter.im/PyO3/Lobby)
+[![Join the dev chat](https://img.shields.io/gitter/room/nwjs/nw.js.svg?style=flat-square)](https://gitter.im/PyO3/Lobby)
 
 Build and publish crates with pyo3 bindings as python packages.
 

@@ -1,5 +1,5 @@
 name: pyo3-pack
-version: 0.0.1
+version: 0.0.2
 summary: Build and publish python packages from crates with pyo3 bindings
 description: Build and publish crates with pyo3 bindings as python packages.
 
@@ -9,8 +9,7 @@ confinement: strict
 parts:
   pyo3-pack:
     plugin: rust
-    source: ..
-    rust-revision: 1.27.2
+    source: .
     build-attributes: [no-system-libraries]
     stage-packages: [libgmp10, libssl1.0.0, liblzma5, libgcrypt20, libgpg-error0]
 

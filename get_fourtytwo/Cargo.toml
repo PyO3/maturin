@@ -1,6 +1,6 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
-name = "get_fourtytwo"
+name = "get-fourtytwo"
 version = "1.7.0"
 description = "This implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
 readme = "Readme.md"
@@ -9,6 +9,7 @@ readme = "Readme.md"
 pyo3 = { version = "0.3", features = ["extension-module"]}
 
 [lib]
+name = "get_fourtytwo"
 crate-type = ["cdylib"]
 
 [package.metadata.pyo3-pack.scripts]

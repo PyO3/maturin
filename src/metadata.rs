@@ -12,6 +12,10 @@ pub struct WheelMetadata {
     pub metadata21: Metadata21,
     /// The `[console_scripts]` for the entry_points.txt
     pub scripts: HashMap<String, String>,
+    /// The name of the module can be distinct from the package name, mostly because
+    /// package names normally contain minuses while module names have underscores.
+    /// The package name is part of metadata21
+    pub module_name: String,
 }
 
 /// Python Package Metadata 2.1 as specified in
@@ -77,12 +81,7 @@ impl Metadata21 {
 
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
-            name: cargo_toml
-                .lib
-                .name
-                .clone()
-                .unwrap_or_else(|| cargo_toml.package.name.clone())
-                .to_owned(),
+            name: cargo_toml.package.name.to_owned(),
             version: cargo_toml.package.version.to_owned(),
             platform: Vec::new(),
             supported_platform: Vec::new(),
@@ -236,7 +235,7 @@ mod test {
             r#"
             [package]
             authors = ["konstin <konstin@mailbox.org>"]
-            name = "info"
+            name = "info-project"
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
@@ -260,7 +259,7 @@ mod test {
         let expected = indoc!(
             r#"
             Metadata-Version: 2.1
-            Name: get_fourtytwo
+            Name: info-project
             Version: 0.1.0
             Summary: A test project
             Keywords: ffi test

@@ -157,7 +157,7 @@ pub fn build_wheel(
         &metadata.metadata21.name, &metadata.metadata21.version
     ));
 
-    let so_filename = PathBuf::from(get_library_name(&metadata.metadata21.name, &python_version));
+    let so_filename = PathBuf::from(get_library_name(&metadata.module_name, &python_version));
 
     let mut builder = WheelBuilder::new(&wheel_path)?;
     builder.add_file(&so_filename, &artifact)?;

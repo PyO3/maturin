@@ -45,7 +45,7 @@ pub struct BuildContext {
         parse(from_os_str),
         default_value = "."
     )]
-    /// The path to the Cargo.toml or the directory containing it
+    /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
     /// The directory to store the built wheels in. Defaults to a new "wheels" directory in the
     /// project's target directory
@@ -67,7 +67,7 @@ impl Default for BuildContext {
         BuildContext {
             interpreter: PYTHON_INTERPRETER.iter().map(ToString::to_string).collect(),
             binding_crate: "pyo3".to_string(),
-            manifest_path: PathBuf::from("."),
+            manifest_path: PathBuf::from("Cargo.toml"),
             wheel_dir: None,
             use_cached: false,
             debug: false,
@@ -89,15 +89,7 @@ impl BuildContext {
         let manifest_dir;
         let manifest_file;
 
-        // Manifest paths come in two flavors: Pointing to the file or pointing to the directory
-        if self.manifest_path.is_dir() {
-            manifest_dir = self.manifest_path.canonicalize().unwrap();
-            manifest_file = self
-                .manifest_path
-                .join("Cargo.toml")
-                .canonicalize()
-                .unwrap();
-        } else if self.manifest_path.is_file() {
+        if self.manifest_path.is_file() {
             manifest_dir = self
                 .manifest_path
                 .parent()
@@ -106,6 +98,8 @@ impl BuildContext {
                 .unwrap()
                 .to_path_buf();
             manifest_file = self.manifest_path.clone().canonicalize().unwrap();
+        } else if self.manifest_path.is_dir() {
+            bail!("The manifest-path must be a path to a Cargo.toml file");
         } else {
             bail!(
                 "The manifest path {} is neither is directory nor a file",
@@ -133,9 +127,19 @@ impl BuildContext {
             _ => HashMap::new(),
         };
 
+        // If the package name contains minuses, you must declare a module with underscores
+        // as lib name
+        let module_name = cargo_toml
+            .lib
+            .name
+            .clone()
+            .unwrap_or_else(|| cargo_toml.package.name.clone())
+            .to_owned();
+
         let metadata = WheelMetadata {
             metadata21,
             scripts,
+            module_name,
         };
 
         let available_version = if !self.interpreter.is_empty() {
@@ -186,7 +190,7 @@ impl BuildContext {
             }
 
             let artifact = build_rust(
-                &metadata.metadata21.name,
+                &metadata.module_name,
                 &manifest_file,
                 &self,
                 &python_version,

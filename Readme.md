@@ -18,7 +18,7 @@ cargo install pyo3-pack
 
 There are two subsommands: `publish` builds the crate into python packages and publishes the wheels to pypi. The `build` subcommand builds the packages and stores them in a folder, but doesn't upload them. By default, the wheels are stored in `target/wheels`
 
-The name of the package will be the name field of the `[lib]` section in the Cargot.toml, which defaults to the name of the package.
+The name of the package will be the name of the cargo project, i.e. the name field in the `[package]` section of Cargo.toml. The name of the module, which you are using when importing, will be the `name` value in the `[lib]` section, which defaults to the name of the package.
 
 You can add console scripts in a section `[package.metadata.pyo3-pack.scripts]`. The keys are the script names while the values are the path to the function in the format `some.module.path:class.function`, where the `class` part is optional. Example:
 
@@ -46,7 +46,7 @@ OPTIONS:
     -b, --bindings-crate <binding_crate>    The crate providing the python bindings [default: pyo3]
     -i, --interpreter <interpreter>...      The python versions to build wheels for, given as the names of the
                                             interpreters. Uses a built-in list if not explicitly set.
-    -m, --manifest-path <manifest_path>     The path to the Cargo.toml or the directory containing it [default: .]
+    -m, --manifest-path <manifest_path>     The path to the Cargo.toml [default: .]
     -w, --wheel-dir <wheel_dir>             The directory to store the built wheels in. Defaults to a new "wheels"
                                             directory in the project's target directory
 ```
@@ -68,7 +68,7 @@ OPTIONS:
     -b, --bindings-crate <binding_crate>    The crate providing the python bindings [default: pyo3]
     -i, --interpreter <interpreter>...      The python versions to build wheels for, given as the names of the
                                             interpreters. Uses a built-in list if not explicitly set.
-    -m, --manifest-path <manifest_path>     The path to the Cargo.toml or the directory containing it [default: .]
+    -m, --manifest-path <manifest_path>     The path to the Cargo.toml [default: .]
     -p, --password <password>               Password for pypi or your custom registry
     -r, --repository-url <registry>         The url of registry where the wheels are uploaded to [default:
                                             https://upload.pypi.org/legacy/]
@@ -81,4 +81,4 @@ OPTIONS:
 
 This repository consists of the main pyo3-pack crate, which is a library with a single binary target that is mostly handling username and password for the pypi upload, a `get_fourtytwo` crate with python bindings and some dummy functionally (such as returning 42) and the integration test folder with some basic testing utilities.
 
-You might want to have look into my [blog post](https://blog.schuetze.link/python/rust/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains all the nitty-gritty details on building python packages.
+You might want to have look into my [blog post](https://blog.schuetze.link/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains all the nitty-gritty details on building python packages.

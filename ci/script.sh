@@ -1,8 +1,9 @@
+#!/usr/bin/env bash
 set -ex
 
 main() {
-    cargo test --target $TARGET --all
-    cargo build --target $TARGET --all
+    cargo test --target $TARGET
+    cargo build --target $TARGET
 }
 
 main

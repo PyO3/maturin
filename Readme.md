@@ -1,5 +1,11 @@
 # Pyo3-pack
 
+[![Build Status](https://img.shields.io/travis/PyO3/pyo3-pack.svg?style=flat-square)](https://travis-ci.org/PyO3/pyo3-pack)
+[![Crates.io](https://img.shields.io/crates/v/pyo3-pack.svg)](https://crates.io/crates/pyo3-pack)
+[![API Documentation on docs.rs](https://docs.rs/pyo3-pack/badge.svg)](https://docs.rs/pyo3-pack)
+[![Snap Status](https://build.snapcraft.io/badge/PyO3/pyo3-pack.svg)](https://build.snapcraft.io/user/PyO3/pyo3-pack)
+[![Join the dev chat](https://img.shields.io/gitter/room/nwjs/nw.js.svg)](https://gitter.im/PyO3/Lobby)
+
 Build and publish crates with pyo3 bindings as python packages.
 
 ### Usage
@@ -10,7 +16,7 @@ You can install pyo3-pack with
 cargo install pyo3-pack
 ```
 
-The `publish` subcommand builds the crate into python packages and publishes the wheels to pypi. The `build` subcommand builds the packages and stores them in a folder, but doesn't upload them.
+There are two subsommands: `publish` builds the crate into python packages and publishes the wheels to pypi. The `build` subcommand builds the packages and stores them in a folder, but doesn't upload them. By default, the wheels are stored in `target/wheels`
 
 The name of the package will be the name field of the `[lib]` section in the Cargot.toml, which defaults to the name of the package.
 
@@ -21,7 +27,7 @@ You can add console scripts in a section `[package.metadata.pyo3-pack.scripts]`.
 get_42 = "get_fourtytwo:DummyClass.get_42"
 ```
 
-pyo3-pack can only build packages for installed python versions, so you might need to use e.g. deadsnakes or docker for building.
+pyo3-pack can only build packages for installed python versions, so you might want to use e.g. deadsnakes or docker for building.
 
 ### Build
 

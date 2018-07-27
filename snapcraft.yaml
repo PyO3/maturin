@@ -9,8 +9,10 @@ confinement: strict
 parts:
   pyo3-pack:
     plugin: rust
-    source: .
-    stage-packages: [libgmp10, libssl1.0.0, liblzma5. libgcrypt20, libgpg-error0]
+    source: ..
+    rust-revision: 1.27.2
+    build-attributes: [no-system-libraries]
+    stage-packages: [libgmp10, libssl1.0.0, liblzma5, libgcrypt20, libgpg-error0]
 
 apps:
   pyo3-pack:

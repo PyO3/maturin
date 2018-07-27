@@ -48,7 +48,7 @@ before_deploy: ci/before_deploy.sh
 deploy:
   provider: releases
   file_glob: true
-  file: stage/pyo3-pack-${TRAVIS_TAG}-${TARGET}.tar.gz
+  file: pyo3-pack-${TRAVIS_TAG}-${TARGET}.tar.gz
   skip_cleanup: true
   on:
     condition: $TRAVIS_RUST_VERSION = stable

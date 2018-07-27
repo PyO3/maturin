@@ -2,7 +2,7 @@
 set -ex
 
 main() {
-    cross build --bin pyo3-pack --target $TARGET --release
+    cargo build --bin pyo3-pack --target $TARGET --release
 
     mkdir stage
 

@@ -1,20 +1,6 @@
-# Inspired from https://github.com/habitat-sh/habitat/blob/master/appveyor.yml
-cache:
-  - c:\cargo\registry
-  - c:\cargo\git
-  - c:\projects\pyo3-pack\target
-
-init:
-  - mkdir c:\cargo
-  - mkdir c:\rustup
-  - SET PATH=c:\cargo\bin;c:\MinGW\bin;C:\mingw-w64\x86_64-7.3.0-posix-seh-rt_v5-rev0;%PATH%
-
-clone_folder: c:\projects\pyo3-pack
-
 environment:
   CARGO_HOME: "c:\\cargo"
   RUSTUP_HOME: "c:\\rustup"
-  CARGO_TARGET_DIR: "c:\\projects\\pyo3-pack\\target"
   BINARY_NAME: "pyo3-pack.exe"
   global:
     PROJECT_NAME: pyo3-pack
@@ -32,44 +18,64 @@ environment:
 matrix:
   fast_finish: true
 
+build: off
+
+cache:
+  - '%CARGO_HOME%\registry'
+  - target
+  - '%RUSTUP_HOME%'
+
+clone_folder: 'c:\projects\%PROJECT_NAME%'
+
 # Install Rust and Cargo
 # (Based on from https://github.com/rust-lang/libc/blob/master/appveyor.yml)
 install:
-  - curl -sSf -o rustup-init.exe https://win.rustup.rs/
-  - rustup-init.exe -y --default-host %TARGET% --no-modify-path
-  - if defined MSYS2_BITS set PATH=%PATH%;C:\msys64\mingw%MSYS2_BITS%\bin
+  - ps: |
+      # For the gnu target we need gcc, provided by mingw. mingw which is already preinstalled,
+      # but we need the right version (32-bit or 64-bit) to the PATH.
+      # See https://www.appveyor.com/docs/build-environment/#mingw-msys-cygwin
+      if ($env:target -like "*-gnu") {
+        if ($env:target -like "x86_64-*") { # x86_64-pc-windows-gnu
+          $env:path = "C:\msys64\mingw64\bin;" + $env:path
+        } else { # i686-pc-windows-gnu
+          $env:path = "C:\mingw\bin;" + $env:path
+        }
+        gcc --version
+      }
+  - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
+  - rustup-init.exe -yv --default-host %TARGET% --no-modify-path
+  - SET PATH=%PATH%;%CARGO_HOME%\bin
   - rustc -V
   - cargo -V
 
-build: false
-
-# Equivalent to Travis' `script` phase
 test_script:
   - cargo test
 
 before_deploy:
-  # Generate artifacts for release
   - cargo build --release
+  # Grab the binary and pack it into a zip archive
   - mkdir staging
   - copy target\release\%BINARY_NAME% staging
+  # You can add more file to the archive with `ps: copy some\path\to\file staging`
   - cd staging
-    # release zipfile will look like 'rust-everywhere-v1.2.3-x86_64-pc-windows-msvc'
+  # The file will have a name like "rust-everywhere-v1.2.3-x86_64-pc-windows-msvc.zip"
   - 7z a ../%PROJECT_NAME%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip *
   - appveyor PushArtifact ../%PROJECT_NAME%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip
 
 deploy:
-  description: 'Automatically deployed release'
-  # All the zipped artifacts will be deployed
-  artifact: /.*\.zip/
-  auth_token:
-    secure: PQ91ezDbGmow+5tjZCAQ2/Y/2bHFffmQZoa5lr09JQIwARsAa2jHtucVn9826lWG
-  provider: GitHub
-  # deploy when a new tag is pushed and only on the stable channel
-  on:
-    # channel to use to produce the release artifacts
-    # NOTE make sure you only release *once* per target
-    CHANNEL: stable
-    appveyor_repo_tag: true
+  # Add zipped binary to the github release
+  - artifact: /*.zip/
+    # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
+    # - Encrypt it: `travis encrypt 0123456789012345678901234567890123456789
+    # - Paste the output down here
+    auth_token:
+      secure: PQ91ezDbGmow+5tjZCAQ2/Y/2bHFffmQZoa5lr09JQIwARsAa2jHtucVn9826lWG
+    provider: GitHub
+    on:
+      # Deploy when a new tag is pushed and only on the stable channel
+      # NOTE make sure you only release *once* per target
+      CHANNEL: stable
+      appveyor_repo_tag: true
 
 branches:
   only:

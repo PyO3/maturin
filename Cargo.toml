@@ -10,6 +10,10 @@ license = "MIT OR Apache-2.0"
 keywords = ["python", "ffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 
+[badges]
+travis-ci = { repository = "PyO3/pyo3-pack" }
+appveyor = { repository = "konstin/pyo3" }
+
 [[bin]]
 name = "pyo3-pack"
 

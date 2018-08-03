@@ -1,4 +1,5 @@
 use failure::{Error, ResultExt};
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::Path;
@@ -201,6 +202,12 @@ impl Metadata21 {
 
         out
     }
+
+    /// Returns the distribution name according to PEP 427, Section "Escaping and Unicode"
+    pub fn get_distribution_escaped(&self) -> String {
+        let re = Regex::new(r"[^\w\d.]+").unwrap();
+        re.replace_all(&self.name, "_").to_string()
+    }
 }
 
 #[cfg(test)]
@@ -208,12 +215,12 @@ mod test {
     extern crate indoc;
     extern crate tempfile;
 
+    use cargo_toml::CargoTomlMetadata;
+    use cargo_toml::CargoTomlMetadataPyo3Pack;
     // Macro scoping
     #[allow(unused_imports)]
     use self::indoc::*;
     use super::*;
-    use cargo_toml::CargoTomlMetadata;
-    use cargo_toml::CargoTomlMetadataPyo3Pack;
     use std::io::Write;
     use toml;
 
@@ -228,6 +235,13 @@ mod test {
         );
 
         let mut readme_md = tempfile::NamedTempFile::new().unwrap();
+
+        let readme_path;
+        if cfg!(windows) {
+            readme_path = readme_md.path().to_str().unwrap().replace("\\", "/");
+        } else {
+            readme_path = readme_md.path().to_str().unwrap().to_string();
+        }
 
         readme_md.write_all(readme.as_bytes()).unwrap();
 
@@ -249,7 +263,7 @@ mod test {
             [package.metadata.pyo3-pack.scripts]
             ph = "pyo3_pack:print_hello"
         "#
-        ).replace("readme.md", readme_md.path().to_str().unwrap());
+        ).replace("readme.md", &readme_path);
 
         let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
 

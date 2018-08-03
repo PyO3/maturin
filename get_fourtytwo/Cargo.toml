@@ -5,12 +5,12 @@ version = "1.7.0"
 description = "This implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
 readme = "Readme.md"
 
+[package.metadata.pyo3-pack.scripts]
+get_42 = "get_fourtytwo:DummyClass.get_42"
+
 [dependencies]
-pyo3 = { version = "0.3", features = ["extension-module"]}
+pyo3 = { version = "0.4.0", features = ["extension-module"] }
 
 [lib]
 name = "get_fourtytwo"
 crate-type = ["cdylib"]
-
-[package.metadata.pyo3-pack.scripts]
-get_42 = "get_fourtytwo:DummyClass.get_42"

@@ -144,9 +144,9 @@ fn main() -> Result<(), Error> {
                         }
 
                         let username = get_username();
-                        let password = rpassword::prompt_password_stdout(
-                            "Please enter your password: ",
-                        ).unwrap();
+                        let password =
+                            rpassword::prompt_password_stdout("Please enter your password: ")
+                                .unwrap();
 
                         registry = Registry::new(username, password, registry.url);
                         println!("Retrying")

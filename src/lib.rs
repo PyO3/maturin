@@ -18,11 +18,11 @@
     feature(proc_macro, spezialization, concat_idents)
 )]
 #![deny(missing_docs)]
-
 extern crate base64;
 extern crate cargo_metadata;
 #[cfg(feature = "auditwheel")]
 extern crate elfkit;
+extern crate regex;
 #[macro_use]
 extern crate failure;
 extern crate reqwest;

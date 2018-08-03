@@ -28,6 +28,9 @@ const PYTHON_INTERPRETER: &[&str] = &[
     "python3.9",
 ];
 
+/// The successful return type of [build_wheels]
+pub type Wheels = (Vec<(PathBuf, Option<PythonInterpreter>)>, WheelMetadata);
+
 /// High level API for building wheels from a crate which can be also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
@@ -83,9 +86,7 @@ impl BuildContext {
     /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if not python versions are given and silently
     /// ignores all non-existent python versions. Runs [auditwheel_rs()].if the auditwheel feature
     /// isn't deactivated
-    pub fn build_wheels(
-        self,
-    ) -> Result<(Vec<(PathBuf, Option<PythonInterpreter>)>, WheelMetadata), Error> {
+    pub fn build_wheels(self) -> Result<Wheels, Error> {
         let manifest_dir;
         let manifest_file;
 
@@ -152,6 +153,10 @@ impl BuildContext {
             PythonInterpreter::find_all(&default_vec)?
         };
 
+        if available_version.is_empty() {
+            bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+        }
+
         println!(
             "Found {}",
             available_version
@@ -172,13 +177,14 @@ impl BuildContext {
             }
         }
 
-        create_dir_all(&wheel_dir).context("Failed to create the target directory for the wheels")?;
+        create_dir_all(&wheel_dir)
+            .context("Failed to create the target directory for the wheels")?;
 
         let mut wheels = Vec::new();
         for python_version in available_version {
             let wheel_path = wheel_dir.join(format!(
                 "{}-{}-{}.whl",
-                &metadata.metadata21.name,
+                &metadata.metadata21.get_distribution_escaped(),
                 &metadata.metadata21.version,
                 python_version.get_tag()
             ));

@@ -10,7 +10,6 @@ use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::str;
-use target_info::Target;
 use zip::{self, ZipWriter};
 use PythonInterpreter;
 
@@ -58,7 +57,8 @@ impl WheelBuilder {
     pub fn finish(mut self, record_file: &Path) -> Result<(), io::Error> {
         let options =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
-        self.zip.start_file(record_file.to_str().unwrap(), options)?;
+        self.zip
+            .start_file(record_file.to_str().unwrap(), options)?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
@@ -93,56 +93,6 @@ fn entry_points_txt(entrypoints: &HashMap<String, String>) -> String {
         })
 }
 
-/// Generates the correct filename for the current platform and the given python version
-///
-/// Note that PEP 3149 is only valid for 3.2 - 3.4 for mac and linux and the 3.5 release notes
-/// are wrong. The syntax is adapted from the (also incorrect) release notes of python 3.5:
-/// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
-///
-/// Examples for x86 on Python 3.5m:
-/// Linux:   steinlaus.cpython-35m-x86_64-linux-gnu.so
-/// Windows: steinlaus.cp35-win_amd64.pyd
-/// Mac:     steinlaus.cpython-35m-darwin.so
-fn get_library_name(basename: &str, python_version: &PythonInterpreter) -> String {
-    if python_version.major == 2 {
-        return format!("{basename}.so", basename = basename);
-    }
-
-    assert!(python_version.major == 3 && python_version.minor >= 5);
-    assert_eq!(python_version.has_u, false);
-
-    match Target::os() {
-        "linux" => format!(
-            "{basename}.cpython-{major}{minor}{abiflags}-{architecture}-{os}.so",
-            basename = basename,
-            major = python_version.major,
-            minor = python_version.minor,
-            abiflags = "m",
-            architecture = Target::arch(),
-            os = format!("{}-{}", Target::os(), Target::env()),
-        ),
-        "macos" => format!(
-            "{basename}.cpython-{major}{minor}{abiflags}-darwin.so",
-            basename = basename,
-            major = python_version.major,
-            minor = python_version.minor,
-            abiflags = "m",
-        ),
-        "windows" => format!(
-            "{basename}.cp{major}{minor}-{platform}.pyd",
-            basename = basename,
-            major = python_version.major,
-            minor = python_version.minor,
-            platform = if Target::pointer_width() == "64" {
-                "win_amd64"
-            } else {
-                "win32"
-            },
-        ),
-        _ => panic!("This platform is not supported"),
-    }
-}
-
 /// Creates the complete wheel after the compilation finished
 pub fn build_wheel(
     metadata: &WheelMetadata,
@@ -154,10 +104,15 @@ pub fn build_wheel(
 
     let dist_info_dir = PathBuf::from(format!(
         "{}-{}.dist-info",
-        &metadata.metadata21.name, &metadata.metadata21.version
+        &metadata.metadata21.get_distribution_escaped(),
+        &metadata.metadata21.version
     ));
 
-    let so_filename = PathBuf::from(get_library_name(&metadata.module_name, &python_version));
+    let so_filename = PathBuf::from(format!(
+        "{}{}",
+        &metadata.module_name,
+        python_version.get_library_extension()
+    ));
 
     let mut builder = WheelBuilder::new(&wheel_path)?;
     builder.add_file(&so_filename, &artifact)?;

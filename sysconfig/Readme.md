@@ -1,0 +1,1 @@
+This folder contains all the sysconfigs (`python -m sysconfig`) I came across. I collected those because they differ highly across versions and operating systems, but are essential for naming wheels and libraries.

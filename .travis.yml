@@ -1,13 +1,15 @@
-# Derived from japaric/trust and burtnsushi/ripgrep
 language: rust
 
-cache: cargo
+env:
+  global:
+    # Change this to the name of your binary
+    - BINARY_NAME="pyo3-pack"
 
 addons:
   apt:
     packages:
+      # If your project needs any system packages add them here
       - libdbus-1-dev
-      - libc6-dev-i386
 
 matrix:
   fast_finish: true
@@ -33,31 +35,39 @@ matrix:
       rust: 1.27.0
       env: TARGET=x86_64-unknown-linux-gnu
 
-branches:
-  only:
-    # Pushes and PR to the master branch
-    - master
-    # Ruby regex to match tags. Required, or travis won't trigger deploys when
-    # a new tag is pushed.
-    - /^v\d+\.\d+\.\d+.*$/
+script:
+  - cargo test --target $TARGET
 
-install: ci/install.sh
-script: ci/script.sh
+before_deploy:
+  - cargo build --release
+  - cd target/release/
+  # You can add more file to the archive by adding them to this line
+  - tar czf ../../${BINARY_NAME}-$TRAVIS_TAG-$TARGET.tar.gz ${BINARY_NAME}
+  - cd ../..
 
-before_deploy: ci/before_deploy.sh
 deploy:
+  # Add zipped binary to the github release
   provider: releases
-  file_glob: true
-  file: pyo3-pack-${TRAVIS_TAG}-${TARGET}.tar.gz
+  file: ${BINARY_NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz
   skip_cleanup: true
   on:
     condition: $TRAVIS_RUST_VERSION = stable
     tags: true
-  # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
-  # - Encrypt it: `travis encrypt 0123456789012345678901234567890123456789
+  # - Create a `public_repo` GitHub token at https://github.com/settings/tokens/new
+  # . If you haven't already, install the travis gem: `gem install TRAVIS_TAG`
+  # - Encrypt it with `travis encrypt 0123456789012345678901234567890123456789`
   # - Paste the output down here
   api_key:
     secure: "bKY3J8FBwgit9inzp2CMxQC3icBVco+COcRnqM6NhaOWX3KefXYG/yWQ7htBkeTRAfQERlOkZZOPsOto2dAD49/Mo4Uin9wbRPjPDGPJpFcQofX5aKHqK1Xd1k96rtZKZRIEG5k5J2IKAzPso3GnA0FESAZlZbxEShSCBD6aOlVmjFXwB2kKzJDo9zECxCg84GSvR/7wQg4hwMaMBa79y3VJRCohGTMaISL22QJ0haG+gqZgTv/r9K8P9lwSMBIiTXX3wFJU871sqUNTSSwkmHlVLhVUOwluv+KQ2DI/V/gWfx2CuiZ/7OQlz4zkOB/Y56msH0G7vOwqbSHLwkMYC+zgDWvF0oI/Eb/mdY5VliQdsLDOkKwWm3EuoEUvCgyV9UB1POxxogIx1sAU+Vt9QUj5/cRIJc1zrtA3LdNlbg9M9rYG8jJ6JMbeYTFDTL6YNoHc2lPAdmAqQAZQy6vyR515vm76JfS7yDcLRXKKhLE4dEPUEpv0qU8vCA/FdaZaiW+GJZSS5rJoE0vHaMRsWkgFLqCNSDpUZBd2x60E+n6dQ7XX4DrJ1JmzcG+IZ6AfuIWyRD9s3jQBxRjtyM61ZGo3Nb4zwX2ML1PftNURNAo8rPlgIrqPaveic45hP6PAeX+iMIWzTckq8shlYngjBTw/3UmA8Z18udrRyKCbygs="
+
+cache: cargo
+
+branches:
+  only:
+    # Pushes to the master branch
+    - master
+    # Match release tags with a regex
+    - /^v\d+\.\d+\.\d+.*$/
 
 notifications:
   email:

@@ -1,15 +1,17 @@
 environment:
   CARGO_HOME: "c:\\cargo"
   RUSTUP_HOME: "c:\\rustup"
+  # Change this to the name of your binary
   BINARY_NAME: "pyo3-pack.exe"
   global:
-    PROJECT_NAME: pyo3-pack
     RUST_BACKTRACE: full
   matrix:
+    # 32-bit
     - TARGET: i686-pc-windows-gnu
       CHANNEL: stable
     - TARGET: i686-pc-windows-msvc
       CHANNEL: stable
+    # 64-bit
     - TARGET: x86_64-pc-windows-gnu
       CHANNEL: stable
     - TARGET: x86_64-pc-windows-msvc
@@ -17,15 +19,6 @@ environment:
 
 matrix:
   fast_finish: true
-
-build: off
-
-cache:
-  - '%CARGO_HOME%\registry'
-  - target
-  - '%RUSTUP_HOME%'
-
-clone_folder: 'c:\projects\%PROJECT_NAME%'
 
 # Install Rust and Cargo
 # (Based on from https://github.com/rust-lang/libc/blob/master/appveyor.yml)
@@ -36,9 +29,9 @@ install:
       # See https://www.appveyor.com/docs/build-environment/#mingw-msys-cygwin
       if ($env:target -like "*-gnu") {
         if ($env:target -like "x86_64-*") { # x86_64-pc-windows-gnu
-          $env:path = "C:\msys64\mingw64\bin;" + $env:path
+          $env:path += ";C:\msys64\mingw64\bin"
         } else { # i686-pc-windows-gnu
-          $env:path = "C:\mingw\bin;" + $env:path
+          $env:path += ";C:\msys64\mingw32\bin"
         }
         gcc --version
       }
@@ -54,30 +47,36 @@ test_script:
 before_deploy:
   - cargo build --release
   # Grab the binary and pack it into a zip archive
-  - mkdir staging
-  - copy target\release\%BINARY_NAME% staging
-  # You can add more file to the archive with `ps: copy some\path\to\file staging`
-  - cd staging
-  # The file will have a name like "rust-everywhere-v1.2.3-x86_64-pc-windows-msvc.zip"
-  - 7z a ../%PROJECT_NAME%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip *
-  - appveyor PushArtifact ../%PROJECT_NAME%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip
+  - cd target\release\
+  # You can add more file to the archive by adding them to this line
+  - 7z a ../../%APPVEYOR_PROJECT_SLUG%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip %BINARY_NAME%
+  - appveyor PushArtifact ../../%APPVEYOR_PROJECT_SLUG%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip
 
 deploy:
   # Add zipped binary to the github release
-  - artifact: /*.zip/
-    # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
-    # - Encrypt it: `travis encrypt 0123456789012345678901234567890123456789
+  - artifact: /.*\.zip/
+    # - Create a `public_repo` GitHub token at https://github.com/settings/tokens/new
+    # - Encrypt it at https://ci.appveyor.com/tools/encrypt
     # - Paste the output down here
     auth_token:
       secure: PQ91ezDbGmow+5tjZCAQ2/Y/2bHFffmQZoa5lr09JQIwARsAa2jHtucVn9826lWG
     provider: GitHub
     on:
       # Deploy when a new tag is pushed and only on the stable channel
-      # NOTE make sure you only release *once* per target
+      # Make sure you only release *once* per target
       CHANNEL: stable
       appveyor_repo_tag: true
 
+cache:
+  - '%CARGO_HOME%\registry'
+  - target
+  - '%RUSTUP_HOME%'
+
 branches:
   only:
-    - /v\d+\.\d+\.\d+/
+    # Pushes to the master branch
     - master
+    # Match release tags with a regex
+    - /^v\d+\.\d+\.\d+.*$/
+
+build: off # Otherwise appveyor assumes we're building a .NET project

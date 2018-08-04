@@ -46,7 +46,7 @@ pub struct BuildContext {
         short = "m",
         long = "manifest-path",
         parse(from_os_str),
-        default_value = "."
+        default_value = "Cargo.toml"
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
@@ -83,28 +83,16 @@ impl BuildContext {
     /// Builds wheels for a Cargo project for all given python versions. Returns the paths where
     /// the wheels are saved and the Python metadata describing the cargo project
     ///
-    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if not python versions are given and silently
+    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given and silently
     /// ignores all non-existent python versions. Runs [auditwheel_rs()].if the auditwheel feature
     /// isn't deactivated
     pub fn build_wheels(self) -> Result<Wheels, Error> {
-        let manifest_dir;
-        let manifest_file;
+        let manifest_file= self.manifest_path.canonicalize().unwrap();
 
-        if self.manifest_path.is_file() {
-            manifest_dir = self
-                .manifest_path
-                .parent()
-                .unwrap()
-                .canonicalize()
-                .unwrap()
-                .to_path_buf();
-            manifest_file = self.manifest_path.clone().canonicalize().unwrap();
-        } else if self.manifest_path.is_dir() {
-            bail!("The manifest-path must be a path to a Cargo.toml file");
-        } else {
+        if !manifest_file.is_file() {
             bail!(
-                "The manifest path {} is neither is directory nor a file",
-                self.manifest_path.display()
+                "{} must be a path to a Cargo.toml",
+                manifest_file.display()
             );
         };
 
@@ -115,8 +103,9 @@ impl BuildContext {
 
         let cargo_toml: CargoToml =
             toml::from_str(&contents).context("Failed to parse Cargo.toml")?;
+        let manifest_dir = manifest_file.parent().unwrap();
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-            .context("Failed to transform Cargo metadata into python metadata")?;
+            .context("Failed to parse Cargo.toml into python metadata")?;
 
         let scripts = match cargo_toml.package.metadata {
             Some(CargoTomlMetadata {

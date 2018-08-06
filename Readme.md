@@ -8,7 +8,7 @@
 
 Build and publish crates with pyo3 bindings as python packages.
 
-This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 2.7 and 3.5+ on windows, linux and mac and can upload them to pypi.
+This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 2.7 and 3.5+ on windows, linux and mac and can uploads them to pypi.
 
 ## Usage
 
@@ -18,7 +18,7 @@ You can either download binaries from the [latest release](https://github.com/Py
 cargo install pyo3-pack
 ```
 
-There are two subsommands: `publish` builds the crate into wheels and publishes them to pypi. The `build` subcommand builds the packages and stores them in a folder, but doesn't upload them. By default the target folder is `target/wheels`
+There are two subsommands: `publish` builds the crate into wheels and publishes them to pypi. The `build` subcommand builds the packages and stores them in a folder (`target/wheels` by default), but doesn't upload them. pyo3-pack runs directly on a crate, with no extra files needed, and also doesn't clash with an existing setuptools-rust configuration.
 
 The name of the package will be the name of the cargo project, i.e. the name field in the `[package]` section of Cargo.toml. The name of the module, which you are using when importing, will be the `name` value in the `[lib]` section (which defaults to the name of the package).
 

@@ -105,7 +105,8 @@ pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
 
     let mut offenders = Vec::new();
     for dep in deps {
-        // I'm not 100% about the exact, but auditwheel also seems to skip everything with ld-linux
+        // I'm not 100% what exactely this line does, but auditwheel also seems to skip everything
+        // with ld-linux in its name
         if dep == "ld-linux-x86-64.so.2" {
             continue;
         }

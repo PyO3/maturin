@@ -3,14 +3,14 @@
 //! Run with --help for usage information
 
 extern crate failure;
+#[macro_use]
+extern crate human_panic;
 extern crate keyring;
 extern crate pyo3_pack;
 extern crate reqwest;
 extern crate rpassword;
 #[macro_use]
 extern crate structopt;
-#[macro_use]
-extern crate human_panic;
 
 use failure::Error;
 use keyring::{Keyring, KeyringError};
@@ -98,9 +98,7 @@ enum Opt {
     },
 }
 
-fn main() -> Result<(), Error> {
-    setup_panic!();
-
+fn run() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     match opt {
@@ -158,4 +156,14 @@ fn main() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn main() {
+    setup_panic!();
+
+    if let Err(e) = run() {
+        for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {
+            println!("{}", cause);
+        }
+    }
 }

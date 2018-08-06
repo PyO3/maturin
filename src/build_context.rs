@@ -87,13 +87,10 @@ impl BuildContext {
     /// ignores all non-existent python versions. Runs [auditwheel_rs()].if the auditwheel feature
     /// isn't deactivated
     pub fn build_wheels(self) -> Result<Wheels, Error> {
-        let manifest_file= self.manifest_path.canonicalize().unwrap();
+        let manifest_file = self.manifest_path.canonicalize().unwrap();
 
         if !manifest_file.is_file() {
-            bail!(
-                "{} must be a path to a Cargo.toml",
-                manifest_file.display()
-            );
+            bail!("{} must be a path to a Cargo.toml", manifest_file.display());
         };
 
         let contents = read_to_string(&manifest_file).context(format!(
@@ -135,10 +132,7 @@ impl BuildContext {
         let available_version = if !self.interpreter.is_empty() {
             PythonInterpreter::find_all(&self.interpreter)?
         } else {
-            let default_vec = PYTHON_INTERPRETER
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>();
+            let default_vec: Vec<_> = PYTHON_INTERPRETER.iter().map(ToString::to_string).collect();
             PythonInterpreter::find_all(&default_vec)?
         };
 
@@ -190,7 +184,7 @@ impl BuildContext {
                 &self,
                 &python_version,
             ).context("Failed to build a native library through cargo")?;
-            if !self.skip_auditwheel {
+            if !self.skip_auditwheel && python_version.target == "linux" {
                 #[cfg(feature = "auditwheel")]
                 auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
             }

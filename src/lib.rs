@@ -40,6 +40,7 @@ extern crate zip;
 #[cfg(feature = "sdist")]
 #[macro_use]
 extern crate capybara;
+extern crate indicatif;
 #[cfg(feature = "sdist")]
 extern crate libflate;
 #[cfg(feature = "sdist")]

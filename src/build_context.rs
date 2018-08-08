@@ -129,22 +129,22 @@ impl BuildContext {
             module_name,
         };
 
-        let available_version = if !self.interpreter.is_empty() {
+        let available_versions = if !self.interpreter.is_empty() {
             PythonInterpreter::find_all(&self.interpreter)?
         } else {
             let default_vec: Vec<_> = PYTHON_INTERPRETER.iter().map(ToString::to_string).collect();
             PythonInterpreter::find_all(&default_vec)?
         };
 
-        if available_version.is_empty() {
+        if available_versions.is_empty() {
             bail!("Couldn't find any python interpreters. Please specify at least one with -i");
         }
 
         println!(
             "Found {}",
-            available_version
+            available_versions
                 .iter()
-                .map(|v| v.to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<String>>()
                 .join(", ")
         );
@@ -164,7 +164,7 @@ impl BuildContext {
             .context("Failed to create the target directory for the wheels")?;
 
         let mut wheels = Vec::new();
-        for python_version in available_version {
+        for python_version in available_versions {
             let wheel_path = wheel_dir.join(format!(
                 "{}-{}-{}.whl",
                 &metadata.metadata21.get_distribution_escaped(),

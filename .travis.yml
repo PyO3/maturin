@@ -50,7 +50,7 @@ deploy:
   provider: releases
   file: ${BINARY_NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz
   skip_cleanup: true
-  on:
+  on: # Create downloads only with stable rust and only for stable releases
     condition: $TRAVIS_RUST_VERSION = stable
     tags: true
   # - Create a `public_repo` GitHub token at https://github.com/settings/tokens/new

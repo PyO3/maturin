@@ -30,14 +30,14 @@ failure = "0.1.2"
 keyring = "0.6.0"
 reqwest = "0.8.7"
 rpassword = "2.0.0"
-serde_derive = "1.0.70"
+serde_derive = "1.0.71"
 serde_json = "1.0.24"
 sha2 = "0.7.1"
 structopt = "0.2.10"
 target_info = "0.1.0"
 toml = "0.4.6"
 zip = "0.4.2"
-serde = "1.0.70"
+serde = "1.0.71"
 elfkit = { version = "0.0.6", optional = true }
 # crates.io doesn't like git dependencies:
 #capybara = { git = "https://github.com/konstin/capybara", rev = "6d8052b8d4dd06de02de05e65e1a40fec8489b2e", features = ["python"], optional = true }
@@ -45,6 +45,7 @@ tar = { version = "0.4.16", optional = true }
 libflate = { version = "0.1.16", optional = true }
 human-panic = "1.0.0"
 regex = "1.0.2"
+indicatif = "0.9.0"
 
 [dev-dependencies]
 tempfile = "3.0.3"

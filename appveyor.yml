@@ -36,7 +36,7 @@ install:
         gcc --version
       }
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init.exe -yv --default-host %TARGET% --no-modify-path
+  - rustup-init.exe -y --default-host %TARGET%
   - SET PATH=%PATH%;%CARGO_HOME%\bin
   - rustc -V
   - cargo -V
@@ -63,7 +63,7 @@ deploy:
     provider: GitHub
     on:
       # Deploy when a new tag is pushed and only on the stable channel
-      # Make sure you only release *once* per target
+      # Make sure you only release once per target
       CHANNEL: stable
       appveyor_repo_tag: true
 

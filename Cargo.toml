@@ -25,8 +25,6 @@ base64 = "0.9.2"
 cargo_metadata = "0.6.0"
 digest = { version = "0.7.5", features = ["std"] }
 failure = "0.1.2"
-# Keyring depends on secret-service, which depends on libdbus-1.so.3 and libgmp.so.10, which are both not manylinux
-# compatible, so you must only use keyring in main.rs
 keyring = "0.6.0"
 reqwest = "0.8.7"
 rpassword = "2.0.0"
@@ -39,7 +37,7 @@ toml = "0.4.6"
 zip = "0.4.2"
 serde = "1.0.71"
 elfkit = { version = "0.0.6", optional = true }
-# crates.io doesn't like git dependencies:
+# crates.io doesn't like git dependencies, but it's not that bad because that feature is blocked on pip anyway (see #2)
 #capybara = { git = "https://github.com/konstin/capybara", rev = "6d8052b8d4dd06de02de05e65e1a40fec8489b2e", features = ["python"], optional = true }
 tar = { version = "0.4.16", optional = true }
 libflate = { version = "0.1.16", optional = true }

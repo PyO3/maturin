@@ -16,12 +16,13 @@ environment:
       CHANNEL: stable
     - TARGET: x86_64-pc-windows-msvc
       CHANNEL: stable
+    # For the integration test
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: nightly
 
 matrix:
   fast_finish: true
 
-# Install Rust and Cargo
-# (Based on from https://github.com/rust-lang/libc/blob/master/appveyor.yml)
 install:
   - ps: |
       # For the gnu target we need gcc, provided by mingw. mingw which is already preinstalled,
@@ -42,7 +43,11 @@ install:
   - cargo -V
 
 test_script:
-  - cargo test
+  - SET PATH=%PATH%;C:\Python36-x64
+  - ps: |
+      if ($env:channel -like "nightly") {
+        cargo test
+      }
 
 before_deploy:
   - cargo build --release

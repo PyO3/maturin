@@ -1,15 +1,16 @@
 #[cfg(feature = "auditwheel")]
 use auditwheel_rs;
-use build_rust;
 use cargo_metadata;
 use cargo_toml::CargoTomlMetadata;
 use cargo_toml::CargoTomlMetadataPyo3Pack;
+use compile;
 use failure::{Error, ResultExt};
 use metadata::WheelMetadata;
 use std::collections::HashMap;
 use std::fs::create_dir_all;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use target_info::Target;
 use toml;
 use wheel::build_wheel;
 use CargoToml;
@@ -19,14 +20,25 @@ use PythonInterpreter;
 /// Since there is no known way to list the installed python versions platform independent (or just
 /// generally to list all binaries in $PATH, which could then be filtered down),
 /// this is a workaround (which works until python 4 is released, which won't be too soon)
-const PYTHON_INTERPRETER: &[&str] = &[
-    "python2.7",
-    "python3.5",
-    "python3.6",
-    "python3.7",
-    "python3.8",
-    "python3.9",
-];
+fn python_interpreter_defaults(target: &str) -> Vec<String> {
+    let interpreter = &[
+        "python2.7",
+        "python3.5",
+        "python3.6",
+        "python3.7",
+        "python3.8",
+        "python3.9",
+    ];
+
+    if target == "windows" {
+        interpreter
+            .iter()
+            .map(|python| format!("{}.exe", python))
+            .collect()
+    } else {
+        interpreter.iter().map(ToString::to_string).collect()
+    }
+}
 
 /// The successful return type of [build_wheels]
 pub type Wheels = (Vec<(PathBuf, Option<PythonInterpreter>)>, WheelMetadata);
@@ -68,7 +80,7 @@ pub struct BuildContext {
 impl Default for BuildContext {
     fn default() -> Self {
         BuildContext {
-            interpreter: PYTHON_INTERPRETER.iter().map(ToString::to_string).collect(),
+            interpreter: vec![],
             binding_crate: "pyo3".to_string(),
             manifest_path: PathBuf::from("Cargo.toml"),
             wheel_dir: None,
@@ -132,8 +144,7 @@ impl BuildContext {
         let available_versions = if !self.interpreter.is_empty() {
             PythonInterpreter::find_all(&self.interpreter)?
         } else {
-            let default_vec: Vec<_> = PYTHON_INTERPRETER.iter().map(ToString::to_string).collect();
-            PythonInterpreter::find_all(&default_vec)?
+            PythonInterpreter::find_all(&python_interpreter_defaults(&Target::os()))?
         };
 
         if available_versions.is_empty() {
@@ -178,7 +189,7 @@ impl BuildContext {
                 continue;
             }
 
-            let artifact = build_rust(
+            let artifact = compile(
                 &metadata.module_name,
                 &manifest_file,
                 &self,

@@ -49,10 +49,10 @@ extern crate tar;
 #[cfg(feature = "auditwheel")]
 pub use auditwheel::{auditwheel_rs, AuditWheelError};
 pub use build_context::BuildContext;
-pub use build_rust::build_rust;
 #[cfg(feature = "sdist")]
 use capybara::prelude::*;
 pub use cargo_toml::CargoToml;
+pub use compile::compile;
 pub use metadata::{Metadata21, WheelMetadata};
 pub use python_interpreter::PythonInterpreter;
 pub use registry::Registry;
@@ -62,7 +62,7 @@ pub use upload::{upload, upload_wheels, UploadError};
 pub use wheel::build_wheel;
 
 mod build_context;
-mod build_rust;
+mod compile;
 
 #[cfg(feature = "auditwheel")]
 mod auditwheel;

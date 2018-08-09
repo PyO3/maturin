@@ -22,21 +22,34 @@ matrix:
       rust: stable
       env: TARGET=x86_64-apple-darwin
 
-    # Those are only tested
-    - os: linux
-      rust: beta
-      env: TARGET=x86_64-unknown-linux-gnu
+    # Those are tested
     - os: linux
       rust: nightly
       env: TARGET=x86_64-unknown-linux-gnu
+    - os: osx
+      rust: nightly
+      env: TARGET=x86_64-apple-darwin
 
-    # Minimum Rust supported channel
+    # Other rust versions to check
     - os: linux
       rust: 1.27.0
       env: TARGET=x86_64-unknown-linux-gnu
+    - os: linux
+      rust: beta
+      env: TARGET=x86_64-unknown-linux-gnu
+
+install:
+  - |
+    if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+      brew update
+      brew upgrade pyenv
+      pyenv install 2.7
+      pyenv install 3.6.6
+    fi
+  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then pyenv global system 2.7 3.6.6; else pyenv global system 2.7 3.6; fi
 
 script:
-  - cargo test --target $TARGET
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test --target $TARGET; fi
 
 before_deploy:
   - cargo build --release

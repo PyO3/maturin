@@ -57,8 +57,31 @@ struct CompilerTargetMessage {
     name: String,
 }
 
+/// Queries the number of tasks through the build plan. This only works on nightly, but that isn't
+/// a problem, since pyo3 also only works on nightly
+fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
+    let build_plan = Command::new("cargo")
+        .arg("build")
+        .args(shared_args)
+        .args(&["-Z", "unstable-options", "--build-plan"])
+        .stderr(Stdio::inherit()) // Forward any error to the user
+        .output()
+        .context("Failed to run cargo")?;
+
+    if !build_plan.status.success() {
+        bail!("Failed to get a build plan from cargo");
+    }
+
+    let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
+        .context("The build plan has an invalid format")?;
+    let tasks = plan.invocations.len();
+    Ok(tasks)
+}
+
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a specific python version
-pub fn build_rust(
+///
+/// Shows a progress bar on nightly
+pub fn compile(
     lib_name: &str,
     manifest_file: &Path,
     context: &BuildContext,
@@ -88,26 +111,12 @@ pub fn build_rust(
         shared_args.push("--release");
     }
 
-    let build_plan = Command::new("cargo")
-        .arg("build")
-        .args(&shared_args)
-        .args(&["-Z", "unstable-options", "--build-plan"])
-        .stderr(Stdio::inherit()) // Forward any error to the user
-        .output()
-        .context("Failed to run cargo")?;
-
-    if !build_plan.status.success() {
-        bail!("Failed to get a build plan from cargo");
-    };
-
-    let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
-        .context("The build plan has an invalid format")?;
-    let tasks = plan.invocations.len();
+    let tasks = get_tasks(&shared_args)?;
 
     let mut cargo_build = Command::new("cargo")
         .arg("build")
         .args(&shared_args)
-        .args(&["--message-format", "json" ])
+        .args(&["--message-format", "json"])
         .env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable)
         .stdout(Stdio::piped()) // We need to capture the json messages
         .spawn()

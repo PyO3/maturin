@@ -1,3 +1,5 @@
+use atty;
+use atty::Stream;
 use failure::{Context, Error, ResultExt};
 use indicatif::ProgressBar;
 use serde_json;
@@ -80,7 +82,7 @@ fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a specific python version
 ///
-/// Shows a progress bar on nightly
+/// Shows a progress bar on a tty
 pub fn compile(
     lib_name: &str,
     manifest_file: &Path,
@@ -98,14 +100,17 @@ pub fn compile(
         // The lib is also built without that flag, but then the json doesn't contain the
         // message we need
         "--lib",
-        // Makes cargo only print to stderr on error
-        "--quiet",
         "--manifest-path",
         manifest_file.to_str().unwrap(),
         // This is a workaround for a bug in pyo3's build.rs
         "--features",
         &python_version_feature,
     ];
+
+    if atty::is(Stream::Stderr) {
+        // Makes cargo only print to stderr on error
+        shared_args.push("--quiet");
+    }
 
     if !context.debug {
         shared_args.push("--release");
@@ -119,15 +124,23 @@ pub fn compile(
         .args(&["--message-format", "json"])
         .env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable)
         .stdout(Stdio::piped()) // We need to capture the json messages
+        .stderr(Stdio::inherit()) // We want to show error messages
         .spawn()
         .context("Failed to run cargo")?;
 
-    let progress_bar = ProgressBar::new(tasks as u64);
+    let progress_bar = if atty::is(Stream::Stderr) {
+        Some(ProgressBar::new(tasks as u64))
+    } else {
+        None
+    };
+
     let mut binding_lib = None;
     let mut artifact = None;
     let reader = BufReader::new(cargo_build.stdout.take().unwrap());
     for line in reader.lines().map(|line| line.unwrap()) {
-        progress_bar.inc(1);
+        if let Some(ref progress_bar) = progress_bar {
+            progress_bar.inc(1);
+        }
 
         // Extract the pyo3 config from the output
         if let Ok(message) = serde_json::from_str::<CargoBuildOutput>(&line) {
@@ -144,7 +157,9 @@ pub fn compile(
         }
     }
 
-    progress_bar.finish_and_clear();
+    if let Some(ref progress_bar) = progress_bar {
+        progress_bar.finish_and_clear();
+    }
 
     let status = cargo_build
         .wait()

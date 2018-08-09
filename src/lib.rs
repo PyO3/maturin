@@ -25,6 +25,7 @@ extern crate elfkit;
 extern crate regex;
 #[macro_use]
 extern crate failure;
+extern crate atty;
 extern crate reqwest;
 extern crate rpassword;
 extern crate serde;

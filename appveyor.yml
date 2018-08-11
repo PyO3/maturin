@@ -6,6 +6,9 @@ environment:
   global:
     RUST_BACKTRACE: full
   matrix:
+    # For the integration test
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: nightly
     # 32-bit
     - TARGET: i686-pc-windows-gnu
       CHANNEL: stable
@@ -16,9 +19,6 @@ environment:
       CHANNEL: stable
     - TARGET: x86_64-pc-windows-msvc
       CHANNEL: stable
-    # For the integration test
-    - TARGET: x86_64-pc-windows-msvc
-      CHANNEL: nightly
 
 matrix:
   fast_finish: true
@@ -37,7 +37,7 @@ install:
         gcc --version
       }
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init.exe -y --default-host %TARGET%
+  - rustup-init.exe -y --default-host %TARGET% --default-toolchain %CHANNEL%
   - SET PATH=%PATH%;%CARGO_HOME%\bin
   - rustc -V
   - cargo -V

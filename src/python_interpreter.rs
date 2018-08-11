@@ -18,15 +18,28 @@ fn find_all_windows() -> Result<Vec<String>, Error> {
     let execution = Command::new("py").arg("-0").output();
     let output =
         execution.context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
-    let expr = Regex::new(" (-.*)(?: .*)?").unwrap();
+    let expr = Regex::new(r" -(\d).(\d)(.*)(?: .*)?").unwrap();
     let lines = str::from_utf8(&output.stdout).unwrap().lines();
     let mut interpreter = vec![];
     for line in lines {
         if let Some(capture) = expr.captures(line) {
             let code = "import sys; print(sys.executable or '')";
-            let version = capture.get(1).unwrap().as_str();
+            let context = "Expected a digit";
+
+            let major = capture.get(1).unwrap().as_str().parse::<usize>().context(context)?;
+            let minor = capture.get(2).unwrap().as_str().parse::<usize>().context(context)?;
+            let suffix = capture.get(3).unwrap().as_str();
+
+            if major == 2 && minor != 7 {
+                continue
+            } else if major == 3 && minor < 5 {
+                continue
+            }
+
+            let version = format!("-{}.{}{}", major, minor, suffix);
+
             let output = Command::new("py")
-                .args(&[version, "-c", code])
+                .args(&[&version, "-c", code])
                 .output()
                 .unwrap();
             let path = str::from_utf8(&output.stdout).unwrap().trim();
@@ -296,6 +309,10 @@ impl PythonInterpreter {
         };
         let message: IntepreterMetadataMessage =
             serde_json::from_slice(&output.stdout).context(err_msg)?;
+
+        if !((message.major == 2 && message.minor == 7) || (message.major == 3 && message.minor >= 5)) {
+            return Ok(None);
+        }
 
         check_platform_sanity(&message)?;
 

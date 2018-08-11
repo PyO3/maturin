@@ -14,14 +14,6 @@ addons:
 matrix:
   fast_finish: true
   include:
-    # These create deployments
-    - os: linux
-      rust: stable
-      env: TARGET=x86_64-unknown-linux-gnu
-    - os: osx
-      rust: stable
-      env: TARGET=x86_64-apple-darwin
-
     # Those are tested
     - os: linux
       rust: nightly
@@ -31,9 +23,17 @@ matrix:
     #  rust: nightly
     #  env: TARGET=x86_64-apple-darwin
 
+    # These create deployments
+    - os: linux
+      rust: stable
+      env: TARGET=x86_64-unknown-linux-gnu
+    - os: osx
+      rust: stable
+      env: TARGET=x86_64-apple-darwin
+
     # Other rust versions to check
     - os: linux
-      rust: 1.27.0
+      rust: 1.28.0
       env: TARGET=x86_64-unknown-linux-gnu
     - os: linux
       rust: beta

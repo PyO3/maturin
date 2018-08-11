@@ -63,7 +63,9 @@ struct CompilerTargetMessage {
 /// a problem, since pyo3 also only works on nightly
 fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
     let build_plan = Command::new("cargo")
-        .arg("build")
+        // Eventually we want to get rid of the nightly, but for now it's required because
+        // the rust-toolchain file is ignored
+        .args(&["+nightly", "build"])
         .args(shared_args)
         .args(&["-Z", "unstable-options", "--build-plan"])
         .stderr(Stdio::inherit()) // Forward any error to the user
@@ -74,8 +76,8 @@ fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
         bail!("Failed to get a build plan from cargo");
     }
 
-    let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
-        .context("The build plan has an invalid format")?;
+    let plan: SerializedBuildPlan =
+        serde_json::from_slice(&build_plan.stdout).context("The build plan has an invalid format")?;
     let tasks = plan.invocations.len();
     Ok(tasks)
 }
@@ -119,7 +121,7 @@ pub fn compile(
     let tasks = get_tasks(&shared_args)?;
 
     let mut cargo_build = Command::new("cargo")
-        .arg("build")
+        .args(&["+nightly", "build"])
         .args(&shared_args)
         .args(&["--message-format", "json"])
         .env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable)

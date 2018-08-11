@@ -11,14 +11,16 @@ extern crate reqwest;
 extern crate rpassword;
 #[macro_use]
 extern crate structopt;
+extern crate target_info;
 
 use failure::Error;
 use keyring::{Keyring, KeyringError};
-use pyo3_pack::{upload_wheels, BuildContext, Registry, UploadError};
+use pyo3_pack::{upload_wheels, BuildContext, PythonInterpreter, Registry, UploadError};
 use reqwest::Url;
 use std::env;
 use std::io;
 use structopt::StructOpt;
+use target_info::Target;
 
 /// Precedence:
 /// 1. PYO3_PACK_PASSWORD
@@ -64,9 +66,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry, Error> {
 #[derive(Debug, StructOpt)]
 struct PublishOpt {
     #[structopt(
-        short = "r",
-        long = "repository-url",
-        default_value = "https://upload.pypi.org/legacy/"
+        short = "r", long = "repository-url", default_value = "https://upload.pypi.org/legacy/"
     )]
     /// The url of registry where the wheels are uploaded to
     registry: String,
@@ -96,6 +96,9 @@ enum Opt {
         #[structopt(flatten)]
         publish: PublishOpt,
     },
+    #[structopt(name = "list-python")]
+    /// Searches and lists the available python installations
+    ListPython,
 }
 
 fn run() -> Result<(), Error> {
@@ -142,15 +145,22 @@ fn run() -> Result<(), Error> {
                         }
 
                         let username = get_username();
-                        let password =
-                            rpassword::prompt_password_stdout("Please enter your password: ")
-                                .unwrap();
+                        let password = rpassword::prompt_password_stdout(
+                            "Please enter your password: ",
+                        ).unwrap();
 
                         registry = Registry::new(username, password, registry.url);
                         println!("Retrying")
                     }
                     Err(err) => return Err(err.into()),
                 }
+            }
+        }
+        Opt::ListPython => {
+            let found = PythonInterpreter::find_all(&Target::os())?;
+            println!("{} python interpreter found:", found.len());
+            for interpreter in found {
+                println!(" - {}", interpreter);
             }
         }
     }

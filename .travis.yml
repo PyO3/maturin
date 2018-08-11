@@ -22,7 +22,7 @@ matrix:
       rust: stable
       env: TARGET=x86_64-apple-darwin
 
-     Those are tested
+    # Those are tested
     - os: linux
       rust: nightly
       env: TARGET=x86_64-unknown-linux-gnu

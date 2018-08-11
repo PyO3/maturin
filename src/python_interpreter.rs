@@ -1,11 +1,59 @@
 use failure::{Error, Fail, ResultExt};
+use regex::Regex;
 use serde_json;
 use std::fmt;
 use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
+use std::str;
 use target_info::Target;
+
+/// Uses `py -0` to get a list of all installed python versions and then `sys.executable` to
+/// determine the path.
+///
+/// We can't use the the linux trick with trying different binary names since on windows the binary
+/// is always called "python.exe"
+fn find_all_windows() -> Result<Vec<String>, Error> {
+    let execution = Command::new("py").arg("-0").output();
+    let output =
+        execution.context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
+    let expr = Regex::new(" (-.*)(?: .*)?").unwrap();
+    let lines = str::from_utf8(&output.stdout).unwrap().lines();
+    let mut interpreter = vec![];
+    for line in lines {
+        if let Some(capture) = expr.captures(line) {
+            let code = "import sys; print(sys.executable or '')";
+            let version = capture.get(1).unwrap().as_str();
+            let output = Command::new("py")
+                .args(&[version, "-c", code])
+                .output()
+                .unwrap();
+            let path = str::from_utf8(&output.stdout).unwrap().trim();
+            if !output.status.success() || path.trim().is_empty() {
+                bail!("Couldn't determine the path to python for `py {}`", version);
+            }
+            interpreter.push(path.to_string());
+        }
+    }
+    Ok(interpreter)
+}
+
+/// Since there is no known way to list the installed python versions on unix (or just
+/// generally to list all binaries in $PATH, which could then be filtered down),
+/// this is a workaround (which works until python 4 is released, which won't be too soon)
+fn find_all_unix() -> Vec<String> {
+    let interpreter = &[
+        "python2.7",
+        "python3.5",
+        "python3.6",
+        "python3.7",
+        "python3.8",
+        "python3.9",
+    ];
+
+    interpreter.iter().map(ToString::to_string).collect()
+}
 
 /// This snippets will give us information about the python interpreter's version and abi
 /// as json through stdout
@@ -153,19 +201,30 @@ impl PythonInterpreter {
             },
             _ => panic!("This platform is not supported"),
         };
-        format!(
-            "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
-            major = self.major,
-            minor = self.minor,
-            abiflags = self.abiflags,
-            platform = platform
-        )
+
+        match self.target.as_ref() {
+            "linux" | "macos" => format!(
+                "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                major = self.major,
+                minor = self.minor,
+                abiflags = self.abiflags,
+                platform = platform
+            ),
+            "windows" => format!(
+                "cp{major}{minor}-none-{platform}",
+                major = self.major,
+                minor = self.minor,
+                platform = platform
+            ),
+            _ => unreachable!(),
+        }
     }
 
     /// Generates the correct suffix for shared libraries
     ///
-    /// Note that PEP 3149 is only valid for 3.2 - 3.4 for mac and linux and the 3.5. The templates
-    /// are adapted from the (also incorrect) release notes of python 3.5:
+    /// For python 2, it's just `.so`. For python 3, there is PEP 3149, but that is only valid for
+    /// 3.2 - 3.4. Since only 3.5+ is supported, the templates are adapted from the (also incorrect)
+    /// release notes of python 3.5:
     /// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
     ///
     /// Examples for x86 on Python 3.5m:
@@ -206,52 +265,81 @@ impl PythonInterpreter {
         }
     }
 
-    /// Checks which python version of a set of possible versions are avaible and determins whether
-    /// they are m or mu
-    pub fn find_all(python_versions: &[String]) -> Result<Vec<PythonInterpreter>, Error> {
+    /// Checks whether the given command is a python interpreter and returns a [PythonInterpreter]
+    /// if that is the case
+    pub fn check_executable(executable: &str) -> Result<Option<PythonInterpreter>, Error> {
+        let output = Command::new(&executable)
+            .args(&["-c", GET_INTERPRETER_METADATA])
+            .stderr(Stdio::inherit())
+            .output();
+
+        let err_msg = format!(
+            "Trying to get metadata from the python interpreter {} failed",
+            executable
+        );
+
+        let output = match output {
+            Ok(output) => {
+                if output.status.success() {
+                    output
+                } else {
+                    bail!(err_msg);
+                }
+            }
+            Err(err) => {
+                if err.kind() == io::ErrorKind::NotFound {
+                    return Ok(None);
+                } else {
+                    bail!(err.context(err_msg));
+                }
+            }
+        };
+        let message: IntepreterMetadataMessage =
+            serde_json::from_slice(&output.stdout).context(err_msg)?;
+
+        check_platform_sanity(&message)?;
+
+        let abiflags = fun_with_abiflags(&message)
+            .context("Failed to get information from the python interpreter")?;
+
+        Ok(Some(PythonInterpreter {
+            major: message.major,
+            minor: message.minor,
+            abiflags,
+            target: Target::os().to_string(),
+            executable: PathBuf::from(executable),
+        }))
+    }
+
+    /// Tries to find all installed python versions using the heuristic for the given platform
+    pub fn find_all(target: &str) -> Result<Vec<PythonInterpreter>, Error> {
+        let executables = if target == "windows" {
+            find_all_windows()?
+        } else {
+            find_all_unix()
+        };
         let mut available_versions = Vec::new();
-        for executable in python_versions {
-            let output = Command::new(&executable)
-                .args(&["-c", GET_INTERPRETER_METADATA])
-                .stderr(Stdio::inherit())
-                .output();
+        for executable in executables {
+            if let Some(version) = PythonInterpreter::check_executable(&executable)? {
+                available_versions.push(version);
+            }
+        }
 
-            let err_msg = format!(
-                "Trying to get metadata from the python interpreter {} failed",
-                executable
-            );
+        Ok(available_versions)
+    }
 
-            let output = match output {
-                Ok(output) => {
-                    if output.status.success() {
-                        output
-                    } else {
-                        bail!(err_msg);
-                    }
-                }
-                Err(err) => {
-                    if err.kind() == io::ErrorKind::NotFound {
-                        continue;
-                    } else {
-                        bail!(err.context(err_msg));
-                    }
-                }
-            };
-            let message: IntepreterMetadataMessage =
-                serde_json::from_slice(&output.stdout).context(err_msg)?;
-
-            check_platform_sanity(&message)?;
-
-            let abiflags = fun_with_abiflags(&message)
-                .context("Failed to get information from the python interpreter")?;
-
-            available_versions.push(PythonInterpreter {
-                major: message.major,
-                minor: message.minor,
-                abiflags,
-                target: Target::os().to_string(),
-                executable: PathBuf::from(executable),
-            });
+    /// Checks that given list of executables are al valid python intepreters, determines the
+    /// abiflags and versions of those interpreters and returns them as [PythonInterpreter]
+    pub fn check_executables(executables: &[String]) -> Result<Vec<PythonInterpreter>, Error> {
+        let mut available_versions = Vec::new();
+        for executable in executables {
+            if let Some(version) = PythonInterpreter::check_executable(executable)
+                .context(format!("{} is not a valid python interpreter", executable))?
+            {
+                available_versions.push(version);
+            } else {
+                bail!("{} doesn't exist");
+            }
         }
 
         Ok(available_versions)

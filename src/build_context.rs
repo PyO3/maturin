@@ -17,29 +17,6 @@ use CargoToml;
 use Metadata21;
 use PythonInterpreter;
 
-/// Since there is no known way to list the installed python versions platform independent (or just
-/// generally to list all binaries in $PATH, which could then be filtered down),
-/// this is a workaround (which works until python 4 is released, which won't be too soon)
-fn python_interpreter_defaults(target: &str) -> Vec<String> {
-    let interpreter = &[
-        "python2.7",
-        "python3.5",
-        "python3.6",
-        "python3.7",
-        "python3.8",
-        "python3.9",
-    ];
-
-    if target == "windows" {
-        interpreter
-            .iter()
-            .map(|python| format!("{}.exe", python))
-            .collect()
-    } else {
-        interpreter.iter().map(ToString::to_string).collect()
-    }
-}
-
 /// The successful return type of [build_wheels]
 pub type Wheels = (Vec<(PathBuf, Option<PythonInterpreter>)>, WheelMetadata);
 
@@ -55,10 +32,7 @@ pub struct BuildContext {
     #[structopt(short = "b", long = "bindings-crate", default_value = "pyo3")]
     pub binding_crate: String,
     #[structopt(
-        short = "m",
-        long = "manifest-path",
-        parse(from_os_str),
-        default_value = "Cargo.toml"
+        short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
@@ -142,9 +116,9 @@ impl BuildContext {
         };
 
         let available_versions = if !self.interpreter.is_empty() {
-            PythonInterpreter::find_all(&self.interpreter)?
+            PythonInterpreter::check_executables(&self.interpreter)?
         } else {
-            PythonInterpreter::find_all(&python_interpreter_defaults(&Target::os()))?
+            PythonInterpreter::find_all(&Target::os())?
         };
 
         if available_versions.is_empty() {
@@ -171,8 +145,7 @@ impl BuildContext {
             }
         }
 
-        create_dir_all(&wheel_dir)
-            .context("Failed to create the target directory for the wheels")?;
+        create_dir_all(&wheel_dir).context("Failed to create the target directory for the wheels")?;
 
         let mut wheels = Vec::new();
         for python_version in available_versions {

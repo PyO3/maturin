@@ -13,10 +13,7 @@
 //!   requires nightly as it uses pyo3 for bindings and setting the crate type for lib to rlib and
 //!   cdylib.
 
-#![cfg_attr(
-    feature = "sdist",
-    feature(proc_macro, spezialization, concat_idents)
-)]
+#![cfg_attr(feature = "sdist", feature(proc_macro, spezialization, concat_idents))]
 #![deny(missing_docs)]
 extern crate base64;
 extern crate cargo_metadata;

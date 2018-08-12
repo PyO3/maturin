@@ -66,7 +66,9 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry, Error> {
 #[derive(Debug, StructOpt)]
 struct PublishOpt {
     #[structopt(
-        short = "r", long = "repository-url", default_value = "https://upload.pypi.org/legacy/"
+        short = "r",
+        long = "repository-url",
+        default_value = "https://upload.pypi.org/legacy/"
     )]
     /// The url of registry where the wheels are uploaded to
     registry: String,
@@ -145,9 +147,9 @@ fn run() -> Result<(), Error> {
                         }
 
                         let username = get_username();
-                        let password = rpassword::prompt_password_stdout(
-                            "Please enter your password: ",
-                        ).unwrap();
+                        let password =
+                            rpassword::prompt_password_stdout("Please enter your password: ")
+                                .unwrap();
 
                         registry = Registry::new(username, password, registry.url);
                         println!("Retrying")

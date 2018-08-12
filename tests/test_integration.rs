@@ -31,6 +31,7 @@ fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
 fn test_integration() {
     let mut options = BuildContext::default();
     options.manifest_path = PathBuf::from("get_fourtytwo/Cargo.toml");
+    options.debug = true;
     let (wheels, _) = options.build_wheels().unwrap();
     for (filename, version) in wheels {
         let version = version.unwrap();
@@ -43,8 +44,7 @@ fn test_integration() {
                     "-p",
                     &version.executable.display().to_string(),
                     &venv_dir.display().to_string(),
-                ])
-                .stderr(Stdio::inherit())
+                ]).stderr(Stdio::inherit())
                 .output()
                 .unwrap();
             if !output.status.success() {

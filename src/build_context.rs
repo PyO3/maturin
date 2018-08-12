@@ -1,5 +1,7 @@
 #[cfg(feature = "auditwheel")]
 use auditwheel_rs;
+#[cfg(feature = "sdist")]
+use build_source_distribution;
 use cargo_metadata;
 use cargo_toml::CargoTomlMetadata;
 use cargo_toml::CargoTomlMetadataPyo3Pack;
@@ -32,7 +34,10 @@ pub struct BuildContext {
     #[structopt(short = "b", long = "bindings-crate", default_value = "pyo3")]
     pub binding_crate: String,
     #[structopt(
-        short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
+        short = "m",
+        long = "manifest-path",
+        parse(from_os_str),
+        default_value = "Cargo.toml"
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
@@ -66,30 +71,21 @@ impl Default for BuildContext {
 }
 
 impl BuildContext {
-    /// Builds wheels for a Cargo project for all given python versions. Returns the paths where
-    /// the wheels are saved and the Python metadata describing the cargo project
-    ///
-    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given and silently
-    /// ignores all non-existent python versions. Runs [auditwheel_rs()].if the auditwheel feature
-    /// isn't deactivated
-    pub fn build_wheels(self) -> Result<Wheels, Error> {
+    /// Returns the some information needed to build wheels
+    fn get_wheel_metadata(&self) -> Result<(PathBuf, WheelMetadata), Error> {
         let manifest_file = self.manifest_path.canonicalize().unwrap();
-
         if !manifest_file.is_file() {
             bail!("{} must be a path to a Cargo.toml", manifest_file.display());
         };
-
         let contents = read_to_string(&manifest_file).context(format!(
             "Can't read Cargo.toml at {}",
             manifest_file.display(),
         ))?;
-
         let cargo_toml: CargoToml =
             toml::from_str(&contents).context("Failed to parse Cargo.toml")?;
-        let manifest_dir = manifest_file.parent().unwrap();
+        let manifest_dir = manifest_file.parent().unwrap().to_path_buf();
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
-
         let scripts = match cargo_toml.package.metadata {
             Some(CargoTomlMetadata {
                 pyo3_pack:
@@ -115,6 +111,18 @@ impl BuildContext {
             module_name,
         };
 
+        Ok((manifest_file, metadata))
+    }
+
+    /// Builds wheels for a Cargo project for all given python versions. Returns the paths where
+    /// the wheels are saved and the Python metadata describing the cargo project
+    ///
+    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given and silently
+    /// ignores all non-existent python versions. Runs [auditwheel_rs()].if the auditwheel feature
+    /// isn't deactivated
+    pub fn build_wheels(self) -> Result<Wheels, Error> {
+        let (manifest_file, metadata) = self.get_wheel_metadata()?;
+
         let available_versions = if !self.interpreter.is_empty() {
             PythonInterpreter::check_executables(&self.interpreter)?
         } else {
@@ -139,13 +147,14 @@ impl BuildContext {
             Some(dir) => wheel_dir = dir,
             None => {
                 // Failure fails here since cargo_toml does some weird stuff on their side
-                let cargo_toml = cargo_metadata::metadata(Some(&manifest_file))
+                let cargo_metadata = cargo_metadata::metadata(Some(&manifest_file))
                     .map_err(|e| format_err!("Cargo metadata failed: {}", e))?;
-                wheel_dir = PathBuf::from(cargo_toml.target_directory).join("wheels");
+                wheel_dir = PathBuf::from(cargo_metadata.target_directory).join("wheels");
             }
         }
 
-        create_dir_all(&wheel_dir).context("Failed to create the target directory for the wheels")?;
+        create_dir_all(&wheel_dir)
+            .context("Failed to create the target directory for the wheels")?;
 
         let mut wheels = Vec::new();
         for python_version in available_versions {
@@ -188,7 +197,7 @@ impl BuildContext {
                 "Building the source distribution to {}",
                 sdist_path.display()
             );
-            ::build_source_distribution(&self, &metadata, &sdist_path)
+            build_source_distribution(&self, &metadata, &sdist_path)
                 .context("Failed to build the source distribution")?;
 
             wheels.push((sdist_path, None));

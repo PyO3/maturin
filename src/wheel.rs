@@ -57,7 +57,8 @@ impl WheelBuilder {
     pub fn finish(mut self, record_file: &Path) -> Result<(), io::Error> {
         let options =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
-        self.zip.start_file(record_file.to_str().unwrap(), options)?;
+        self.zip
+            .start_file(record_file.to_str().unwrap(), options)?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;

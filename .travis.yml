@@ -19,9 +19,9 @@ matrix:
       rust: nightly
       env: TARGET=x86_64-unknown-linux-gnu
     # This fails and travis won't tell my why, so this stays deactivated until I know what's happening
-    #- os: osx
-    #  rust: nightly
-    #  env: TARGET=x86_64-apple-darwin
+    - os: osx
+      rust: nightly
+      env: TARGET=x86_64-apple-darwin
 
     # These create deployments
     - os: linux

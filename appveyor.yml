@@ -43,10 +43,9 @@ install:
   - cargo -V
 
 test_script:
-  - SET PATH=%PATH%;C:\Python36-x64
   - ps: |
       if ($env:channel -like "nightly") {
-        cargo test
+        cargo test -- --nocapture
       }
 
 before_deploy:

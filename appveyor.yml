@@ -43,9 +43,10 @@ install:
   - cargo -V
 
 test_script:
+  - cargo build
   - ps: |
       if ($env:channel -like "nightly") {
-        cargo test -- --nocapture
+        cargo test
       }
 
 before_deploy:

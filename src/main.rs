@@ -9,6 +9,7 @@ extern crate keyring;
 extern crate pyo3_pack;
 extern crate reqwest;
 extern crate rpassword;
+#[macro_use]
 extern crate structopt;
 extern crate target_info;
 

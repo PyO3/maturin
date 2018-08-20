@@ -55,3 +55,8 @@ default = ["auditwheel"]
 auditwheel = ["elfkit"]
 # sdist can be written, but those can not be installed
 sdist = ["tar", "libflate"] # capybara
+
+[workspace]
+members = [
+    "get_fourtytwo"
+]

@@ -50,6 +50,7 @@ install:
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then pyenv global system 2.7 3.6.6; else pyenv global system 2.7 3.6; fi
 
 script:
+  - cargo build
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test --target $TARGET -- --nocapture; fi
 
 before_deploy:

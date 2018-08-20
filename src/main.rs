@@ -9,7 +9,6 @@ extern crate keyring;
 extern crate pyo3_pack;
 extern crate reqwest;
 extern crate rpassword;
-#[macro_use]
 extern crate structopt;
 extern crate target_info;
 
@@ -159,7 +158,12 @@ fn run() -> Result<(), Error> {
             }
         }
         Opt::ListPython => {
-            let found = PythonInterpreter::find_all(&Target::os())?;
+            let pointer_width = match Target::pointer_width() {
+                "32" => 32,
+                "64" => 64,
+                _ => panic!("{} is a pretty odd pointer width", Target::pointer_width()),
+            };
+            let found = PythonInterpreter::find_all(&Target::os(), pointer_width)?;
             println!("{} python interpreter found:", found.len());
             for interpreter in found {
                 println!(" - {}", interpreter);

@@ -126,7 +126,12 @@ impl BuildContext {
         let available_versions = if !self.interpreter.is_empty() {
             PythonInterpreter::check_executables(&self.interpreter)?
         } else {
-            PythonInterpreter::find_all(&Target::os())?
+            let pointer_width = match Target::pointer_width() {
+                "32" => 32,
+                "64" => 64,
+                _ => panic!("{} is a pretty odd pointer width", Target::pointer_width()),
+            };
+            PythonInterpreter::find_all(&Target::os(), pointer_width)?
         };
 
         if available_versions.is_empty() {

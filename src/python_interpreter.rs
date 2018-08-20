@@ -14,11 +14,11 @@ use target_info::Target;
 ///
 /// We can't use the the linux trick with trying different binary names since on windows the binary
 /// is always called "python.exe"
-fn find_all_windows() -> Result<Vec<String>, Error> {
+fn find_all_windows(target_pointer_width: usize) -> Result<Vec<String>, Error> {
     let execution = Command::new("py").arg("-0").output();
     let output = execution
         .context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
-    let expr = Regex::new(r" -(\d).(\d)(.*)(?: .*)?").unwrap();
+    let expr = Regex::new(r" -(\d).(\d)-(\d+)(?: .*)?").unwrap();
     let lines = str::from_utf8(&output.stdout).unwrap().lines();
     let mut interpreter = vec![];
     for line in lines {
@@ -38,7 +38,12 @@ fn find_all_windows() -> Result<Vec<String>, Error> {
                 .as_str()
                 .parse::<usize>()
                 .context(context)?;
-            let suffix = capture.get(3).unwrap().as_str();
+            let pointer_width = capture
+                .get(3)
+                .unwrap()
+                .as_str()
+                .parse::<usize>()
+                .context(context)?;
 
             if major == 2 && minor != 7 {
                 continue;
@@ -46,7 +51,17 @@ fn find_all_windows() -> Result<Vec<String>, Error> {
                 continue;
             }
 
-            let version = format!("-{}.{}{}", major, minor, suffix);
+            // There can be 32-bit installations on a 64-bit machine, but we can't link those
+            // for 64-bit targets
+            if pointer_width != target_pointer_width {
+                println!(
+                    "{}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
+                    major, minor, pointer_width, target_pointer_width
+                );
+                continue;
+            }
+
+            let version = format!("-{}.{}-{}", major, minor, pointer_width);
 
             let output = Command::new("py")
                 .args(&[&version, "-c", code])
@@ -250,13 +265,22 @@ impl PythonInterpreter {
     /// release notes of python 3.5:
     /// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
     ///
-    /// Examples for x86 on Python 3.5m:
+    /// Examples for 64-bit on Python 3.5m:
     /// Linux:   steinlaus.cpython-35m-x86_64-linux-gnu.so
     /// Windows: steinlaus.cp35-win_amd64.pyd
     /// Mac:     steinlaus.cpython-35m-darwin.so
+    ///
+    /// Examples for 64-bit on Python 2.7mu:
+    /// Linux:   steinlaus.so
+    /// Windows: steinlaus.pyd
+    /// Mac:     steinlaus.so
     pub fn get_library_extension(&self) -> String {
         if self.major == 2 {
-            return ".so".to_string();
+            match self.target.as_ref() {
+                "linux" | "macos" => return ".so".to_string(),
+                "windows" => return ".pyd".to_string(),
+                _ => panic!("This platform is not supported"),
+            }
         }
 
         match self.target.as_ref() {
@@ -341,9 +365,9 @@ impl PythonInterpreter {
     }
 
     /// Tries to find all installed python versions using the heuristic for the given platform
-    pub fn find_all(target: &str) -> Result<Vec<PythonInterpreter>, Error> {
+    pub fn find_all(target: &str, pointer_width: usize) -> Result<Vec<PythonInterpreter>, Error> {
         let executables = if target == "windows" {
-            find_all_windows()?
+            find_all_windows(pointer_width)?
         } else {
             find_all_unix()
         };

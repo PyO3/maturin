@@ -25,8 +25,8 @@ fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
     }
 }
 
-/// For each installed python, this builds a wheel, creates a virtualenv if it doesn't exist,
-/// installs get_fourtytwo and runs main.py
+/// For each installed python, this builds a wheel, creates a virtualenv if it
+/// doesn't exist, installs get_fourtytwo and runs main.py
 #[test]
 fn test_integration() {
     let mut options = BuildContext::default();

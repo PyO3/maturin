@@ -13,9 +13,9 @@ pub struct WheelMetadata {
     pub metadata21: Metadata21,
     /// The `[console_scripts]` for the entry_points.txt
     pub scripts: HashMap<String, String>,
-    /// The name of the module can be distinct from the package name, mostly because
-    /// package names normally contain minuses while module names have underscores.
-    /// The package name is part of metadata21
+    /// The name of the module can be distinct from the package name, mostly
+    /// because package names normally contain minuses while module names
+    /// have underscores. The package name is part of metadata21
     pub module_name: String,
 }
 
@@ -113,8 +113,9 @@ impl Metadata21 {
         })
     }
 
-    /// Formats the metadata into a list of key with multiple values have mutliple singel-valued
-    /// pairs. This format is needed for the pypi uploader and for the metadata file inside wheels
+    /// Formats the metadata into a list of key with multiple values have
+    /// mutliple singel-valued pairs. This format is needed for the pypi
+    /// uploader and for the metadata file inside wheels
     pub fn to_vec(&self) -> Vec<(String, String)> {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),
@@ -203,7 +204,8 @@ impl Metadata21 {
         out
     }
 
-    /// Returns the distribution name according to PEP 427, Section "Escaping and Unicode"
+    /// Returns the distribution name according to PEP 427, Section "Escaping
+    /// and Unicode"
     pub fn get_distribution_escaped(&self) -> String {
         let re = Regex::new(r"[^\w\d.]+").unwrap();
         re.replace_all(&self.name, "_").to_string()

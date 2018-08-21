@@ -20,8 +20,8 @@ struct SerializedBuildPlan {
     inputs: Vec<PathBuf>,
 }
 
-/// This kind of message is printed by `cargo build --message-format=json --quiet` for a build
-/// script
+/// This kind of message is printed by `cargo build --message-format=json
+/// --quiet` for a build script
 ///
 /// Example with python3.6 on ubuntu 18.04.1:
 ///
@@ -32,7 +32,7 @@ struct SerializedBuildPlan {
 ///     linked_libs: ["python3.6m"],
 ///     linked_paths: ["native=/usr/lib"],
 ///     package_id: "pyo3 0.2.5 (path+file:///home/konsti/capybara/pyo3)",
-///     reason: "build-script-executed"
+///     reason: "build-script-executed",
 /// }
 /// ```
 #[derive(Serialize, Deserialize)]
@@ -45,8 +45,8 @@ struct CargoBuildOutput {
     reason: String,
 }
 
-/// This kind of message is printed by `cargo build --message-format=json --quiet` for an artifact
-/// such as an .so/.dll
+/// This kind of message is printed by `cargo build --message-format=json
+/// --quiet` for an artifact such as an .so/.dll
 #[derive(Serialize, Deserialize)]
 struct CompilerArtifactMessage {
     filenames: Vec<PathBuf>,
@@ -70,8 +70,8 @@ struct CompilerErrorMessageMessage {
     rendered: String,
 }
 
-/// Queries the number of tasks through the build plan. This only works on nightly, but that isn't
-/// a problem, since pyo3 also only works on nightly
+/// Queries the number of tasks through the build plan. This only works on
+/// nightly, but that isn't a problem, since pyo3 also only works on nightly
 fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
     let build_plan = Command::new("cargo")
         // Eventually we want to get rid of the nightly, but for now it's required because
@@ -92,7 +92,8 @@ fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
     Ok(tasks)
 }
 
-/// Builds the rust crate into a native module (i.e. an .so or .dll) for a specific python version
+/// Builds the rust crate into a native module (i.e. an .so or .dll) for a
+/// specific python version
 ///
 /// Shows a progress bar on a tty
 pub fn compile(
@@ -119,6 +120,8 @@ pub fn compile(
         &python_version_feature,
     ];
 
+    shared_args.extend(context.cargo_extra_args.iter().map(|x| x.as_str()));
+
     if atty::is(Stream::Stderr) {
         // Makes cargo only print to stderr on error
         shared_args.push("--quiet");
@@ -130,9 +133,20 @@ pub fn compile(
 
     let tasks = get_tasks(&shared_args)?;
 
+    let mut rustc_args = context.rustc_extra_args.clone();
+    if python_interpreter.target == "macos" {
+        rustc_args.extend(
+            ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+                .iter()
+                .map(ToString::to_string),
+        );
+    }
+
     let mut cargo_build = Command::new("cargo")
-        .args(&["+nightly", "build", "--message-format", "json"])
+        .args(&["+nightly", "rustc", "--message-format", "json"])
         .args(&shared_args)
+        .arg("--")
+        .args(rustc_args)
         .env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable)
         .stdout(Stdio::piped()) // We need to capture the json messages
         .stderr(Stdio::inherit()) // We want to show error messages

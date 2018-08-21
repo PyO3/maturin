@@ -3,7 +3,8 @@ use std::fs::File;
 use std::io;
 use std::path::Path;
 
-// As specified in "PEP 513 -- A Platform Tag for Portable Linux Built Distributions"
+// As specified in "PEP 513 -- A Platform Tag for Portable Linux Built
+// Distributions"
 const MANYLINUX1: &[&str] = &[
     "libpanelw.so.5",
     "libncursesw.so.5",
@@ -66,7 +67,8 @@ pub enum AuditWheelError {
     /// Reexports elfkit parsing erorrs
     #[fail(display = "Elfkit failed to parse the elf file: {:?}", _0)]
     ElfkitError(elfkit::Error),
-    /// The elf file isn't manylinux compatible. Contains the list of offending libraries.
+    /// The elf file isn't manylinux compatible. Contains the list of offending
+    /// libraries.
     #[fail(
         display = "Your library is not manylinux compliant because it links the following forbidden libraries: {:?}",
         _0
@@ -74,7 +76,8 @@ pub enum AuditWheelError {
     ManylinuxValidationError(Vec<String>),
 }
 
-/// Similar to the `ldd` command: Returns all libraries that an elf dynamically links to
+/// Similar to the `ldd` command: Returns all libraries that an elf dynamically
+/// links to
 fn get_deps_from_elf(path: &Path) -> Result<Vec<String>, AuditWheelError> {
     let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
     let mut elf = elfkit::Elf::from_reader(&mut file).map_err(AuditWheelError::ElfkitError)?;
@@ -97,7 +100,8 @@ fn get_deps_from_elf(path: &Path) -> Result<Vec<String>, AuditWheelError> {
     Ok(deps)
 }
 
-/// An (incomplete) reimplementation of auditwheel, which checks elf files for manylinux compliance
+/// An (incomplete) reimplementation of auditwheel, which checks elf files for
+/// manylinux compliance
 ///
 /// Only checks for the libraries marked as NEEDED.
 pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
@@ -105,8 +109,8 @@ pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
 
     let mut offenders = Vec::new();
     for dep in deps {
-        // I'm not 100% what exactely this line does, but auditwheel also seems to skip everything
-        // with ld-linux in its name
+        // I'm not 100% what exactely this line does, but auditwheel also seems to skip
+        // everything with ld-linux in its name
         if dep == "ld-linux-x86-64.so.2" {
             continue;
         }

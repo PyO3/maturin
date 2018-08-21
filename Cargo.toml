@@ -37,8 +37,6 @@ toml = "0.4.6"
 zip = "0.4.2"
 serde = "1.0.71"
 elfkit = { version = "0.0.6", optional = true }
-# crates.io doesn't like git dependencies, but it's not that bad because that feature is blocked on pip anyway (see #2)
-#capybara = { git = "https://github.com/konstin/capybara", rev = "6d8052b8d4dd06de02de05e65e1a40fec8489b2e", features = ["python"], optional = true }
 tar = { version = "0.4.16", optional = true }
 libflate = { version = "0.1.16", optional = true }
 human-panic = "1.0.0"
@@ -54,7 +52,7 @@ indoc = "0.2.6"
 default = ["auditwheel"]
 auditwheel = ["elfkit"]
 # sdist can be written, but those can not be installed
-sdist = ["tar", "libflate"] # capybara
+sdist = ["tar", "libflate"]
 
 [workspace]
 members = [

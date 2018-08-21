@@ -47,14 +47,15 @@ pub(crate) struct PyprojectToolPyo3Pack {
 
 /// Builds a source distribution (sdist) for a package
 ///
-/// Besides the files that are selected `cargo package`, the source distribution will include a
-/// pyproject.toml, which contains the build instructions, and a PKG-INFO file, which has the same
-/// content as METADATA for wheels. See build_sdist in PEP 517.
+/// Besides the files that are selected `cargo package`, the source
+/// distribution will include a pyproject.toml, which contains the build
+/// instructions, and a PKG-INFO file, which has the same content as METADATA
+/// for wheels. See build_sdist in PEP 517.
 ///
-/// We want to include the same files in the source distribution as cargo includes in a published
-/// package, i.e. combine .gitignore, package.include and package.exclude. See
-/// https://docs.rs/cargo/0.28.0/cargo/sources/path/struct.PathSource.html#method.list_files for
-/// Cargo's algorithm
+/// We want to include the same files in the source distribution as cargo
+/// includes in a published package, i.e. combine .gitignore, package.include
+/// and package.exclude. See https://docs.rs/cargo/0.28.0/cargo/sources/path/struct.PathSource.html#method.list_files
+/// for Cargo's algorithm
 pub fn build_source_distribution(
     build_context: &BuildContext,
     metadata: &WheelMetadata,
@@ -69,8 +70,8 @@ pub fn build_source_distribution(
         "Failed to create source distribution at {}",
         target_file.display()
     ))?;
-    // We need some normal permission on file for the in memory files since tar otherwise does
-    // weird stuff
+    // We need some normal permission on file for the in memory files since tar
+    // otherwise does weird stuff
     let normal_metadata = file.metadata()?;
 
     let encoder = Encoder::new(file)?;

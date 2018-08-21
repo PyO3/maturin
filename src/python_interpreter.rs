@@ -9,11 +9,31 @@ use std::process::Stdio;
 use std::str;
 use target_info::Target;
 
-/// Uses `py -0` to get a list of all installed python versions and then `sys.executable` to
-/// determine the path.
+/// This snippets will give us information about the python interpreter's
+/// version and abi as json through stdout
+const GET_INTERPRETER_METADATA: &str = r##"
+import sysconfig
+import sys
+import json
+
+print(json.dumps({
+    "major": sys.version_info.major,
+    "minor": sys.version_info.minor,
+    "abiflags": sysconfig.get_config_var("ABIFLAGS"),
+    "m": sysconfig.get_config_var("WITH_PYMALLOC") == 1,
+    "u": sysconfig.get_config_var("Py_UNICODE_SIZE") == 4,
+    "d": sysconfig.get_config_var("Py_DEBUG") == 1,
+    # This one isn't technically necessary, but still very useful for sanity checks
+    "platform": sys.platform,
+}))
+"##;
+
+/// Uses `py -0` to get a list of all installed python versions and then
+/// `sys.executable` to determine the path.
 ///
-/// We can't use the the linux trick with trying different binary names since on windows the binary
-/// is always called "python.exe"
+/// We can't use the the linux trick with trying different binary names since
+/// on windows the binary is always called "python.exe". We also have to make
+/// sure that the pointer width (32-bit or 64-bit) matches across platforms
 fn find_all_windows(target_pointer_width: usize) -> Result<Vec<String>, Error> {
     let execution = Command::new("py").arg("-0").output();
     let output = execution
@@ -45,14 +65,18 @@ fn find_all_windows(target_pointer_width: usize) -> Result<Vec<String>, Error> {
                 .parse::<usize>()
                 .context(context)?;
 
+            // Don't use python 2.6
             if major == 2 && minor != 7 {
-                continue;
-            } else if major == 3 && minor < 5 {
                 continue;
             }
 
-            // There can be 32-bit installations on a 64-bit machine, but we can't link those
-            // for 64-bit targets
+            // Ignore python 3.0 - 3.4
+            if major == 3 && minor < 5 {
+                continue;
+            }
+
+            // There can be 32-bit installations on a 64-bit machine, but we can't link
+            // those for 64-bit targets
             if pointer_width != target_pointer_width {
                 println!(
                     "{}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
@@ -77,9 +101,10 @@ fn find_all_windows(target_pointer_width: usize) -> Result<Vec<String>, Error> {
     Ok(interpreter)
 }
 
-/// Since there is no known way to list the installed python versions on unix (or just
-/// generally to list all binaries in $PATH, which could then be filtered down),
-/// this is a workaround (which works until python 4 is released, which won't be too soon)
+/// Since there is no known way to list the installed python versions on unix
+/// (or just generally to list all binaries in $PATH, which could then be
+/// filtered down), this is a workaround (which works until python 4 is
+/// released, which won't be too soon)
 fn find_all_unix() -> Vec<String> {
     let interpreter = &[
         "python2.7",
@@ -92,25 +117,6 @@ fn find_all_unix() -> Vec<String> {
 
     interpreter.iter().map(ToString::to_string).collect()
 }
-
-/// This snippets will give us information about the python interpreter's version and abi
-/// as json through stdout
-const GET_INTERPRETER_METADATA: &str = r##"
-import sysconfig
-import sys
-import json
-
-print(json.dumps({
-    "major": sys.version_info.major,
-    "minor": sys.version_info.minor,
-    "abiflags": sysconfig.get_config_var("ABIFLAGS"),
-    "m": sysconfig.get_config_var("WITH_PYMALLOC") == 1,
-    "u": sysconfig.get_config_var("Py_UNICODE_SIZE") == 4,
-    "d": sysconfig.get_config_var("Py_DEBUG") == 1,
-    # This one isn't technically necessary, but still very useful for sanity checks
-    "platform": sys.platform,
-}))
-"##;
 
 /// The output format of [GET_INTERPRETER_METADATA]
 #[derive(Serialize, Deserialize)]
@@ -131,12 +137,14 @@ pub struct PythonInterpreter {
     pub major: usize,
     /// Python's minor version
     pub minor: usize,
-    /// For linux and mac, this contains the value of the abiflags, e.g. "m" for python3.5m or
-    /// "mu" for python2.7mu. On windows, the value is always "".
+    /// For linux and mac, this contains the value of the abiflags, e.g. "m"
+    /// for python3.5m or "mu" for python2.7mu. On windows, the value is
+    /// always "".
     ///
     /// See PEP 261 and PEP 393 for details
     pub abiflags: String,
-    /// Currently just the value of [Target::os()], i.e. "windows", "linux" or "macos"
+    /// Currently just the value of [Target::os()], i.e. "windows", "linux" or
+    /// "macos"
     pub target: String,
     /// The value of `sys.platform`. One of "win32"
     /// Path to the python interpreter, e.g. /usr/bin/python3.6
@@ -145,8 +153,8 @@ pub struct PythonInterpreter {
     pub executable: PathBuf,
 }
 
-/// Returns the abiflags that are assembled through the message, with some additional sanity
-/// checks.
+/// Returns the abiflags that are assembled through the message, with some
+/// additional sanity checks.
 ///
 /// The rules are as follows:
 ///  - python 2 + Unix: Assemble the individual parts (m/u/d), no ABIFLAGS
@@ -222,7 +230,8 @@ impl PythonInterpreter {
     /// Returns the supported python environment in the PEP 425 format:
     /// {python tag}-{abi tag}-{platform tag}
     pub fn get_tag(&self) -> String {
-        // Don't ask me why, this is just what setuptools uses so I'm also going to use it
+        // Don't ask me why, this is just what setuptools uses so I'm also going to use
+        // it
         let platform = match self.target.as_ref() {
             "linux" => "manylinux1_x86_64",
             "macos" => {
@@ -260,9 +269,10 @@ impl PythonInterpreter {
 
     /// Generates the correct suffix for shared libraries
     ///
-    /// For python 2, it's just `.so`. For python 3, there is PEP 3149, but that is only valid for
-    /// 3.2 - 3.4. Since only 3.5+ is supported, the templates are adapted from the (also incorrect)
-    /// release notes of python 3.5:
+    /// For python 2, it's just `.so`. For python 3, there is PEP 3149, but
+    /// that is only valid for 3.2 - 3.4. Since only 3.5+ is supported, the
+    /// templates are adapted from the (also
+    /// incorrect) release notes of python 3.5:
     /// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
     ///
     /// Examples for 64-bit on Python 3.5m:
@@ -312,8 +322,8 @@ impl PythonInterpreter {
         }
     }
 
-    /// Checks whether the given command is a python interpreter and returns a [PythonInterpreter]
-    /// if that is the case
+    /// Checks whether the given command is a python interpreter and returns a
+    /// [PythonInterpreter] if that is the case
     pub fn check_executable(executable: &str) -> Result<Option<PythonInterpreter>, Error> {
         let output = Command::new(&executable)
             .args(&["-c", GET_INTERPRETER_METADATA])
@@ -364,7 +374,8 @@ impl PythonInterpreter {
         }))
     }
 
-    /// Tries to find all installed python versions using the heuristic for the given platform
+    /// Tries to find all installed python versions using the heuristic for the
+    /// given platform
     pub fn find_all(target: &str, pointer_width: usize) -> Result<Vec<PythonInterpreter>, Error> {
         let executables = if target == "windows" {
             find_all_windows(pointer_width)?
@@ -381,8 +392,9 @@ impl PythonInterpreter {
         Ok(available_versions)
     }
 
-    /// Checks that given list of executables are al valid python intepreters, determines the
-    /// abiflags and versions of those interpreters and returns them as [PythonInterpreter]
+    /// Checks that given list of executables are al valid python intepreters,
+    /// determines the abiflags and versions of those interpreters and
+    /// returns them as [PythonInterpreter]
     pub fn check_executables(executables: &[String]) -> Result<Vec<PythonInterpreter>, Error> {
         let mut available_versions = Vec::new();
         for executable in executables {

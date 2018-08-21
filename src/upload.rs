@@ -1,5 +1,5 @@
-//! The uploading logic was mostly reverse engineered; I wrote it down as documentation at
-//! https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
+//! The uploading logic was mostly reverse engineered; I wrote it down as
+//! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
 use metadata::WheelMetadata;
 use reqwest::{self, header::ContentType, multipart::Form, Client, StatusCode};
@@ -10,10 +10,11 @@ use std::path::{Path, PathBuf};
 use PythonInterpreter;
 use Registry;
 
-/// Error type for different types of errors that can happen when uploading a wheel.
+/// Error type for different types of errors that can happen when uploading a
+/// wheel.
 ///
-/// The most interesting tpye is AuthenticationError because it allows asking the user to reenter
-/// the password
+/// The most interesting tpye is AuthenticationError because it allows asking
+/// the user to reenter the password
 #[derive(Fail, Debug)]
 #[fail(display = "Uploading to the registry failed")]
 pub enum UploadError {

@@ -13,7 +13,8 @@ use std::str;
 use zip::{self, ZipWriter};
 use PythonInterpreter;
 
-/// A glorified zip builder, mostly useful for writing the record file of a wheel
+/// A glorified zip builder, mostly useful for writing the record file of a
+/// wheel
 pub struct WheelBuilder {
     zip: ZipWriter<File>,
     record: Vec<(String, String, usize)>,

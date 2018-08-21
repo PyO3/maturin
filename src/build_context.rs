@@ -22,13 +22,14 @@ use PythonInterpreter;
 /// The successful return type of [build_wheels]
 pub type Wheels = (Vec<(PathBuf, Option<PythonInterpreter>)>, WheelMetadata);
 
-/// High level API for building wheels from a crate which can be also used for the CLI
+/// High level API for building wheels from a crate which can be also used for
+/// the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildContext {
     #[structopt(short = "i", long = "interpreter")]
-    /// The python versions to build wheels for, given as the names of the interpreters.
-    /// Uses a built-in list if not explicitly set.
+    /// The python versions to build wheels for, given as the names of the
+    /// interpreters. Uses a built-in list if not explicitly set.
     pub interpreter: Vec<String>,
     /// The crate providing the python bindings
     #[structopt(short = "b", long = "bindings-crate", default_value = "pyo3")]
@@ -41,8 +42,8 @@ pub struct BuildContext {
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
-    /// The directory to store the built wheels in. Defaults to a new "wheels" directory in the
-    /// project's target directory
+    /// The directory to store the built wheels in. Defaults to a new "wheels"
+    /// directory in the project's target directory
     #[structopt(short = "w", long = "wheel-dir", parse(from_os_str))]
     pub wheel_dir: Option<PathBuf>,
     /// Don't rebuild if a wheel with the same name is already present
@@ -54,6 +55,12 @@ pub struct BuildContext {
     /// Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
+    /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+    #[structopt(long = "cargo-extra-args")]
+    pub cargo_extra_args: Vec<String>,
+    /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+    #[structopt(long = "rustc-extra-args")]
+    pub rustc_extra_args: Vec<String>,
 }
 
 impl Default for BuildContext {
@@ -66,6 +73,8 @@ impl Default for BuildContext {
             use_cached: false,
             debug: false,
             skip_auditwheel: false,
+            cargo_extra_args: Vec::new(),
+            rustc_extra_args: Vec::new(),
         }
     }
 }
@@ -96,8 +105,8 @@ impl BuildContext {
             _ => HashMap::new(),
         };
 
-        // If the package name contains minuses, you must declare a module with underscores
-        // as lib name
+        // If the package name contains minuses, you must declare a module with
+        // underscores as lib name
         let module_name = cargo_toml
             .lib
             .name
@@ -114,12 +123,13 @@ impl BuildContext {
         Ok((manifest_file, metadata))
     }
 
-    /// Builds wheels for a Cargo project for all given python versions. Returns the paths where
-    /// the wheels are saved and the Python metadata describing the cargo project
+    /// Builds wheels for a Cargo project for all given python versions.
+    /// Returns the paths where the wheels are saved and the Python
+    /// metadata describing the cargo project
     ///
-    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given and silently
-    /// ignores all non-existent python versions. Runs [auditwheel_rs()].if the auditwheel feature
-    /// isn't deactivated
+    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given
+    /// and silently ignores all non-existent python versions. Runs
+    /// [auditwheel_rs()].if the auditwheel feature isn't deactivated
     pub fn build_wheels(self) -> Result<Wheels, Error> {
         let (manifest_file, metadata) = self.get_wheel_metadata()?;
 

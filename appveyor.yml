@@ -6,9 +6,6 @@ environment:
   global:
     RUST_BACKTRACE: full
   matrix:
-    # For the integration test
-    - TARGET: x86_64-pc-windows-msvc
-      CHANNEL: nightly
     # 32-bit
     - TARGET: i686-pc-windows-gnu
       CHANNEL: stable
@@ -19,6 +16,11 @@ environment:
       CHANNEL: stable
     - TARGET: x86_64-pc-windows-msvc
       CHANNEL: stable
+    # For the integration test
+    # The test passes, but the build still fails for an unknown reason.
+    # If this is the last entry, we still get the binaries on releases until the this cause is fixed
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: nightly
 
 matrix:
   fast_finish: true

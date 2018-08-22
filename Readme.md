@@ -8,7 +8,7 @@
 
 Build and publish crates with pyo3 bindings as python packages.
 
-This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 2.7 and 3.5+ on windows, linux and mac and can uploads them to pypi.
+This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 2.7 and 3.5+ on windows, linux and mac and can upload them to pypi.
 
 ## Usage
 
@@ -81,7 +81,7 @@ OPTIONS:
 
 ### Manylinux and auditwheel
 
-For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that is run when building, so there's no need to use external tools. If for some reason you want to disable this check, use the `--skip-auditwheel` flag.
+For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that checks the generated library, so there's no need to use external tools. If you want to disable the manylinux compliance checks for some reason, use the `--skip-auditwheel` flag.
 
 ## Code
 

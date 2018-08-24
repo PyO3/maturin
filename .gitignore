@@ -1,3 +1,11 @@
-/target
+target/
 Cargo.lock
-venv*
+venv*/
+.venv/
+.pytest_cache/
+.tox/
+*.so
+__pycache__/
+*.egg-info/
+*.egg
+dist/

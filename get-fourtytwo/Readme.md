@@ -10,5 +10,22 @@ pip install --index-url https://test.pypi.org/simple/ get_fourtytwo
 
 ```python
 import get_fourtytwo
-assert get_fourty_two.DummyClass.get_42() == 42
+assert get_fourtytwo.DummyClass.get_42() == 42
 ```
+
+## Testing
+
+Install tox:
+
+```bash
+pip install tox
+```
+
+Run it:
+
+
+```bash
+tox
+```
+
+The tests are in `test_get_gourtytwo.py`, while the configuration is in tox.ini

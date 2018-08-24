@@ -24,7 +24,7 @@ There are three main subsommands:
  * `build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them.
  * `develop` builds the crate and install it's as a python module directly in the current virtualenv
 
-pyo3-pack runs directly on a crate, with no extra files needed, and also doesn't clash with an existing setuptools-rust configuration.
+pyo3-pack runs directly on a crate, with no extra files needed, and also doesn't clash with an existing setuptools-rust configuration. You can even integrate it with testing tools such as tox (see `get-fourtytwo` for an example).
 
 The name of the package will be the name of the cargo project, i.e. the name field in the `[package]` section of Cargo.toml. The name of the module, which you are using when importing, will be the `name` value in the `[lib]` section (which defaults to the name of the package).
 

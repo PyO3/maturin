@@ -49,6 +49,7 @@ pub use build_context::BuildContext;
 use capybara::prelude::*;
 pub use cargo_toml::CargoToml;
 pub use compile::compile;
+pub use develop::develop;
 pub use metadata::{Metadata21, WheelMetadata};
 pub use python_interpreter::PythonInterpreter;
 pub use registry::Registry;
@@ -63,6 +64,7 @@ mod compile;
 #[cfg(feature = "auditwheel")]
 mod auditwheel;
 mod cargo_toml;
+mod develop;
 mod metadata;
 mod python_interpreter;
 mod registry;

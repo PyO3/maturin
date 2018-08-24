@@ -18,7 +18,13 @@ You can either download binaries from the [latest release](https://github.com/Py
 cargo install pyo3-pack
 ```
 
-There are two main subsommands: `publish` builds the crate into wheels and publishes them to pypi. The `build` subcommand builds the packages and stores them in a folder (`target/wheels` by default), but doesn't upload them. pyo3-pack runs directly on a crate, with no extra files needed, and also doesn't clash with an existing setuptools-rust configuration.
+There are three main subsommands:
+
+ * `publish` builds the crate into python packages and publishes them to pypi.
+ * `build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them.
+ * `develop` builds the crate and install it's as a python module directly in the current virtualenv
+
+pyo3-pack runs directly on a crate, with no extra files needed, and also doesn't clash with an existing setuptools-rust configuration.
 
 The name of the package will be the name of the cargo project, i.e. the name field in the `[package]` section of Cargo.toml. The name of the module, which you are using when importing, will be the `name` value in the `[lib]` section (which defaults to the name of the package).
 
@@ -79,6 +85,26 @@ OPTIONS:
                                             directory in the project's target directory
 ```
 
+### Develop
+
+```
+USAGE:
+    pyo3-pack develop [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -b, --bindings-crate <binding_crate>            The crate providing the python bindings [default: pyo3]
+        --cargo-extra-args <cargo_extra_args>...
+            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+
+    -m, --manifest-path <manifest_path>             The path to the Cargo.toml [default: Cargo.toml]
+        --rustc-extra-args <rustc_extra_args>...
+            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+```
+
 ### Manylinux and auditwheel
 
 For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that checks the generated library, so there's no need to use external tools. If you want to disable the manylinux compliance checks for some reason, use the `--skip-auditwheel` flag.
@@ -89,4 +115,4 @@ The main part is the pyo3-pack library, which is completely documented and shoul
 
 You need to install `virtualenv` (`pip install virtualenv`) to run the tests.
 
-You might want to have look into my [blog post](https://blog.schuetze.link/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains all the nitty-gritty details on building python packages.
+You might want to have look into my [blog post](https://blog.schuetze.link/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains the intricacies of building native python packages.

@@ -80,18 +80,20 @@ impl Default for BuildContext {
 }
 
 impl BuildContext {
-    /// Returns the some information needed to build wheels
-    fn get_wheel_metadata(&self) -> Result<(PathBuf, WheelMetadata), Error> {
+    /// Fills the values of [WheelMetadata]
+    pub fn get_wheel_metadata(&self) -> Result<WheelMetadata, Error> {
         let manifest_file = self.manifest_path.canonicalize().unwrap();
-        if !manifest_file.is_file() {
+        if !self.manifest_path.is_file() {
             bail!("{} must be a path to a Cargo.toml", manifest_file.display());
         };
         let contents = read_to_string(&manifest_file).context(format!(
             "Can't read Cargo.toml at {}",
             manifest_file.display(),
         ))?;
-        let cargo_toml: CargoToml =
-            toml::from_str(&contents).context("Failed to parse Cargo.toml")?;
+        let cargo_toml: CargoToml = toml::from_str(&contents).context(format!(
+            "Failed to parse Cargo.toml at {}",
+            manifest_file.display()
+        ))?;
         let manifest_dir = manifest_file.parent().unwrap().to_path_buf();
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
@@ -120,7 +122,7 @@ impl BuildContext {
             module_name,
         };
 
-        Ok((manifest_file, metadata))
+        Ok(metadata)
     }
 
     /// Builds wheels for a Cargo project for all given python versions.
@@ -130,8 +132,8 @@ impl BuildContext {
     /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given
     /// and silently ignores all non-existent python versions. Runs
     /// [auditwheel_rs()].if the auditwheel feature isn't deactivated
-    pub fn build_wheels(self) -> Result<Wheels, Error> {
-        let (manifest_file, metadata) = self.get_wheel_metadata()?;
+    pub fn build_wheels(&self) -> Result<Wheels, Error> {
+        let metadata = self.get_wheel_metadata()?;
 
         let available_versions = if !self.interpreter.is_empty() {
             PythonInterpreter::check_executables(&self.interpreter)?
@@ -162,7 +164,7 @@ impl BuildContext {
             Some(dir) => wheel_dir = dir,
             None => {
                 // Failure fails here since cargo_toml does some weird stuff on their side
-                let cargo_metadata = cargo_metadata::metadata(Some(&manifest_file))
+                let cargo_metadata = cargo_metadata::metadata(Some(&self.manifest_path))
                     .map_err(|e| format_err!("Cargo metadata failed: {}", e))?;
                 wheel_dir = PathBuf::from(cargo_metadata.target_directory).join("wheels");
             }
@@ -188,7 +190,7 @@ impl BuildContext {
 
             let artifact = compile(
                 &metadata.module_name,
-                &manifest_file,
+                &self.manifest_path,
                 &self,
                 &python_version,
             ).context("Failed to build a native library through cargo")?;

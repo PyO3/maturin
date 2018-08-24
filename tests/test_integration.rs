@@ -26,17 +26,17 @@ fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
 }
 
 /// For each installed python, this builds a wheel, creates a virtualenv if it
-/// doesn't exist, installs get_fourtytwo and runs main.py
+/// doesn't exist, installs get-fourtytwo and runs main.py
 #[test]
 fn test_integration() {
     let mut options = BuildContext::default();
-    options.manifest_path = PathBuf::from("get_fourtytwo/Cargo.toml");
+    options.manifest_path = PathBuf::from("get-fourtytwo").join("Cargo.toml");
     options.debug = true;
     let (wheels, _) = options.build_wheels().unwrap();
     for (filename, version) in wheels {
         let version = version.unwrap();
         let venv_dir =
-            PathBuf::from("get_fourtytwo").join(format!("venv{}.{}", version.major, version.minor));
+            PathBuf::from("get-fourtytwo").join(format!("venv{}.{}", version.major, version.minor));
 
         if !venv_dir.is_dir() {
             let output = Command::new("virtualenv")
@@ -51,6 +51,7 @@ fn test_integration() {
                 panic!();
             }
         }
+
         let pip = if Target::os() == "windows" {
             venv_dir.join("Scripts").join("pip.exe")
         } else {
@@ -74,7 +75,7 @@ fn test_integration() {
         };
 
         let output = Command::new(&python)
-            .arg(Path::new("get_fourtytwo").join("main.py"))
+            .arg(Path::new("get-fourtytwo").join("main.py"))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .output()

@@ -2,6 +2,7 @@
 //!
 //! Run with --help for usage information
 
+extern crate core;
 extern crate failure;
 #[macro_use]
 extern crate human_panic;
@@ -15,10 +16,11 @@ extern crate target_info;
 
 use failure::Error;
 use keyring::{Keyring, KeyringError};
-use pyo3_pack::{upload_wheels, BuildContext, PythonInterpreter, Registry, UploadError};
+use pyo3_pack::{develop, upload_wheels, BuildContext, PythonInterpreter, Registry, UploadError};
 use reqwest::Url;
 use std::env;
 use std::io;
+use std::path::PathBuf;
 use structopt::StructOpt;
 use target_info::Target;
 
@@ -101,6 +103,29 @@ enum Opt {
     #[structopt(name = "list-python")]
     /// Searches and lists the available python installations
     ListPython,
+    #[structopt(name = "develop")]
+    /// Installs the crate as module in the current virtualenv so you can import it
+    ///
+    /// Note that this command doesn't create entrypoints
+    Develop {
+        /// The crate providing the python bindings
+        #[structopt(short = "b", long = "bindings-crate", default_value = "pyo3")]
+        binding_crate: String,
+        #[structopt(
+            short = "m",
+            long = "manifest-path",
+            parse(from_os_str),
+            default_value = "Cargo.toml"
+        )]
+        /// The path to the Cargo.toml
+        manifest_path: PathBuf,
+        /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+        #[structopt(long = "cargo-extra-args")]
+        cargo_extra_args: Vec<String>,
+        /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+        #[structopt(long = "rustc-extra-args")]
+        rustc_extra_args: Vec<String>,
+    },
 }
 
 fn run() -> Result<(), Error> {
@@ -169,6 +194,19 @@ fn run() -> Result<(), Error> {
             for interpreter in found {
                 println!(" - {}", interpreter);
             }
+        }
+        Opt::Develop {
+            binding_crate,
+            manifest_path,
+            cargo_extra_args,
+            rustc_extra_args,
+        } => {
+            develop(
+                binding_crate,
+                manifest_path,
+                cargo_extra_args,
+                rustc_extra_args,
+            )?;
         }
     }
 

@@ -23,6 +23,7 @@ extern crate cargo_metadata;
 #[cfg(feature = "auditwheel")]
 extern crate elfkit;
 extern crate regex;
+extern crate tempfile;
 #[macro_use]
 extern crate failure;
 extern crate atty;
@@ -33,6 +34,7 @@ extern crate serde_json;
 extern crate sha2;
 #[macro_use]
 extern crate structopt;
+extern crate core;
 extern crate indicatif;
 #[cfg(feature = "sdist")]
 extern crate libflate;
@@ -45,6 +47,7 @@ extern crate zip;
 #[cfg(feature = "auditwheel")]
 pub use auditwheel::{auditwheel_rs, AuditWheelError};
 pub use build_context::BuildContext;
+pub use build_options::BuildOptions;
 #[cfg(feature = "sdist")]
 use capybara::prelude::*;
 pub use cargo_toml::CargoToml;
@@ -55,23 +58,24 @@ pub use python_interpreter::PythonInterpreter;
 pub use registry::Registry;
 #[cfg(feature = "sdist")]
 pub use sdist::build_source_distribution;
+pub use target::Target;
 pub use upload::{upload, upload_wheels, UploadError};
-pub use wheel::build_wheel;
-
-mod build_context;
-mod compile;
 
 #[cfg(feature = "auditwheel")]
 mod auditwheel;
+mod build_context;
+mod build_options;
 mod cargo_toml;
+mod compile;
 mod develop;
 mod metadata;
+mod module_writer;
 mod python_interpreter;
 mod registry;
 #[cfg(feature = "sdist")]
 mod sdist;
+mod target;
 mod upload;
-mod wheel;
 
 #[cfg(feature = "sdist")]
 capybara_init! {pyo3_pack, [], [install_sdist]}

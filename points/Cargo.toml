@@ -1,0 +1,12 @@
+[package]
+name = "points"
+version = "0.1.0"
+authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+build = "build.rs"
+
+[lib]
+name = "points"
+crate-type = ["cdylib"]
+
+[build-dependencies]
+cbindgen = "0.6.3"

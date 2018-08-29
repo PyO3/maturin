@@ -3,11 +3,12 @@ use regex::Regex;
 use serde_json;
 use std::fmt;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 use std::str;
-use target_info::Target;
+use Target;
 
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
@@ -34,7 +35,7 @@ print(json.dumps({
 /// We can't use the the linux trick with trying different binary names since
 /// on windows the binary is always called "python.exe". We also have to make
 /// sure that the pointer width (32-bit or 64-bit) matches across platforms
-fn find_all_windows(target_pointer_width: usize) -> Result<Vec<String>, Error> {
+fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
     let execution = Command::new("py").arg("-0").output();
     let output = execution
         .context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
@@ -77,10 +78,13 @@ fn find_all_windows(target_pointer_width: usize) -> Result<Vec<String>, Error> {
 
             // There can be 32-bit installations on a 64-bit machine, but we can't link
             // those for 64-bit targets
-            if pointer_width != target_pointer_width {
+            if pointer_width != target.pointer_width() {
                 println!(
                     "{}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
-                    major, minor, pointer_width, target_pointer_width
+                    major,
+                    minor,
+                    pointer_width,
+                    target.pointer_width()
                 );
                 continue;
             }
@@ -131,7 +135,7 @@ struct IntepreterMetadataMessage {
 }
 
 /// The location and version of an interpreter
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PythonInterpreter {
     /// Python's major version
     pub major: usize,
@@ -145,8 +149,7 @@ pub struct PythonInterpreter {
     pub abiflags: String,
     /// Currently just the value of [Target::os()], i.e. "windows", "linux" or
     /// "macos"
-    pub target: String,
-    /// The value of `sys.platform`. One of "win32"
+    pub target: Target,
     /// Path to the python interpreter, e.g. /usr/bin/python3.6
     ///
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
@@ -161,7 +164,25 @@ pub struct PythonInterpreter {
 ///  - python 2 + Windows: no ABIFLAGS, parts, return an empty string
 ///  - python 3 + Unix: Use ABIFLAGS
 ///  - python 3 + Windows: No ABIFLAGS, return an empty string
-fn fun_with_abiflags(message: &IntepreterMetadataMessage) -> Result<String, Error> {
+fn fun_with_abiflags(
+    message: &IntepreterMetadataMessage,
+    target: &Target,
+) -> Result<String, Error> {
+    let sane_platform = match message.platform.as_ref() {
+        "win32" | "win_amd64" => target.is_windows(),
+        "linux" | "linux2" | "linux3" => target.is_linux(),
+        "darwin" => target.is_macos(),
+        _ => false,
+    };
+
+    if !sane_platform {
+        bail!(
+            "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
+            message.platform,
+            target,
+        )
+    }
+
     if message.major == 2 {
         let mut abiflags = String::new();
         if message.m {
@@ -178,92 +199,54 @@ fn fun_with_abiflags(message: &IntepreterMetadataMessage) -> Result<String, Erro
             bail!("A python 2 interpreter does not define abiflags in its sysconfig ಠ_ಠ")
         }
 
-        if abiflags != "" && Target::os() == "windows" {
+        if abiflags != "" && target.is_windows() {
             bail!("A python 2 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
         }
 
         Ok(abiflags)
     } else if message.major == 3 && message.minor >= 5 {
-        if Target::os() == "windows" {
+        if target.is_windows() {
             if message.abiflags.is_some() {
                 bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
             } else {
                 Ok("".to_string())
             }
-        } else if Target::os() == "linux" || Target::os() == "macos" {
-            if let Some(ref abiflags) = message.abiflags {
-                if abiflags != "m" {
-                    bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
-                }
-                Ok(abiflags.clone())
-            } else {
-                bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
+        } else if let Some(ref abiflags) = message.abiflags {
+            if abiflags != "m" {
+                bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
             }
+            Ok(abiflags.clone())
         } else {
-            bail!("I'm running on a platform that is neither window, nor linux, nor mac os ಠ_ಠ")
+            bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
         }
     } else {
         bail!("Only python 2.7 and python 3.x are supported");
     }
 }
 
-/// Check that sys.platform and Target::os() match
-fn check_platform_sanity(message: &IntepreterMetadataMessage) -> Result<(), Error> {
-    let sane_platform = match message.platform.as_ref() {
-        "win32" | "win_amd64" => Target::os() == "windows",
-        "linux" | "linux2" | "linux3" => Target::os() == "linux",
-        "darwin" => Target::os() == "macos",
-        _ => false,
-    };
-    if !sane_platform {
-        bail!(
-            "sys.platform in python, {}, and Target::os() in rust, {}, don't match ಠ_ಠ",
-            message.platform,
-            Target::os()
-        )
-    }
-
-    Ok(())
-}
-
 impl PythonInterpreter {
     /// Returns the supported python environment in the PEP 425 format:
     /// {python tag}-{abi tag}-{platform tag}
+    ///
+    /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     pub fn get_tag(&self) -> String {
-        // Don't ask me why, this is just what setuptools uses so I'm also going to use
-        // it
-        let platform = match self.target.as_ref() {
-            "linux" => "manylinux1_x86_64",
-            "macos" => {
-                "macosx_10_6_intel.\
-                 macosx_10_9_intel.\
-                 macosx_10_9_x86_64.\
-                 macosx_10_10_intel.\
-                 macosx_10_10_x86_64"
-            }
-            "windows" => if Target::pointer_width() == "64" {
-                "win_amd64"
-            } else {
-                "win32"
-            },
-            _ => panic!("This platform is not supported"),
-        };
+        let platform = self.target.get_platform_tag();
 
-        match self.target.as_ref() {
-            "linux" | "macos" => format!(
+        if self.target.is_unix() {
+            format!(
                 "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
                 major = self.major,
                 minor = self.minor,
                 abiflags = self.abiflags,
                 platform = platform
-            ),
-            "windows" => format!(
+            )
+        } else {
+            format!(
                 "cp{major}{minor}-none-{platform}",
                 major = self.major,
                 minor = self.minor,
                 platform = platform
-            ),
-            _ => unreachable!(),
+            )
         }
     }
 
@@ -286,53 +269,46 @@ impl PythonInterpreter {
     /// Mac:     steinlaus.so
     pub fn get_library_extension(&self) -> String {
         if self.major == 2 {
-            match self.target.as_ref() {
-                "linux" | "macos" => return ".so".to_string(),
-                "windows" => return ".pyd".to_string(),
-                _ => panic!("This platform is not supported"),
+            if self.target.is_unix() {
+                return ".so".to_string();
+            } else {
+                return ".pyd".to_string();
             }
         }
+        let platform = self.target.get_shared_platform_tag();
 
-        match self.target.as_ref() {
-            "linux" => format!(
-                ".cpython-{major}{minor}{abiflags}-{architecture}-{os}.so",
+        if self.target.is_unix() {
+            format!(
+                ".cpython-{major}{minor}{abiflags}-{platform}.so",
                 major = self.major,
                 minor = self.minor,
                 abiflags = self.abiflags,
-                architecture = Target::arch(),
-                os = format!("{}-{}", Target::os(), Target::env()),
-            ),
-            "macos" => format!(
-                ".cpython-{major}{minor}{abiflags}-darwin.so",
-                major = self.major,
-                minor = self.minor,
-                abiflags = self.abiflags,
-            ),
-            "windows" => format!(
+                platform = platform,
+            )
+        } else {
+            format!(
                 ".cp{major}{minor}-{platform}.pyd",
                 major = self.major,
                 minor = self.minor,
-                platform = if Target::pointer_width() == "64" {
-                    "win_amd64"
-                } else {
-                    "win32"
-                },
-            ),
-            _ => panic!("This platform is not supported"),
+                platform = platform
+            )
         }
     }
 
     /// Checks whether the given command is a python interpreter and returns a
     /// [PythonInterpreter] if that is the case
-    pub fn check_executable(executable: &str) -> Result<Option<PythonInterpreter>, Error> {
-        let output = Command::new(&executable)
+    pub fn check_executable(
+        executable: impl AsRef<Path>,
+        target: &Target,
+    ) -> Result<Option<PythonInterpreter>, Error> {
+        let output = Command::new(&executable.as_ref())
             .args(&["-c", GET_INTERPRETER_METADATA])
             .stderr(Stdio::inherit())
             .output();
 
         let err_msg = format!(
             "Trying to get metadata from the python interpreter {} failed",
-            executable
+            executable.as_ref().display()
         );
 
         let output = match output {
@@ -354,37 +330,33 @@ impl PythonInterpreter {
         let message: IntepreterMetadataMessage =
             serde_json::from_slice(&output.stdout).context(err_msg)?;
 
-        if !((message.major == 2 && message.minor == 7)
-            || (message.major == 3 && message.minor >= 5))
-        {
+        if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
             return Ok(None);
         }
 
-        check_platform_sanity(&message)?;
-
-        let abiflags = fun_with_abiflags(&message)
+        let abiflags = fun_with_abiflags(&message, &target)
             .context("Failed to get information from the python interpreter")?;
 
         Ok(Some(PythonInterpreter {
             major: message.major,
             minor: message.minor,
             abiflags,
-            target: Target::os().to_string(),
-            executable: PathBuf::from(executable),
+            target: target.clone(),
+            executable: executable.as_ref().to_path_buf(),
         }))
     }
 
     /// Tries to find all installed python versions using the heuristic for the
     /// given platform
-    pub fn find_all(target: &str, pointer_width: usize) -> Result<Vec<PythonInterpreter>, Error> {
-        let executables = if target == "windows" {
-            find_all_windows(pointer_width)?
+    pub fn find_all(target: &Target) -> Result<Vec<PythonInterpreter>, Error> {
+        let executables = if target.is_windows() {
+            find_all_windows(&target)?
         } else {
             find_all_unix()
         };
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(&executable)? {
+            if let Some(version) = PythonInterpreter::check_executable(&executable, &target)? {
                 available_versions.push(version);
             }
         }
@@ -395,10 +367,13 @@ impl PythonInterpreter {
     /// Checks that given list of executables are al valid python intepreters,
     /// determines the abiflags and versions of those interpreters and
     /// returns them as [PythonInterpreter]
-    pub fn check_executables(executables: &[String]) -> Result<Vec<PythonInterpreter>, Error> {
+    pub fn check_executables(
+        executables: &[String],
+        target: &Target,
+    ) -> Result<Vec<PythonInterpreter>, Error> {
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(executable)
+            if let Some(version) = PythonInterpreter::check_executable(executable, &target)
                 .context(format!("{} is not a valid python interpreter", executable))?
             {
                 available_versions.push(version);

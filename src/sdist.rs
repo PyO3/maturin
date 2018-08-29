@@ -12,6 +12,8 @@ use std::str;
 use tar;
 use toml;
 use BuildContext;
+use BuildOptions;
+use Metadata21;
 
 /// A pyproject.toml file
 #[derive(Serialize, Deserialize)]
@@ -41,7 +43,7 @@ pub(crate) struct PyprojectTool {
 /// The [tool.pyo3-pack] section in a project.toml file
 #[derive(Serialize, Deserialize)]
 pub(crate) struct PyprojectToolPyo3Pack {
-    pub(crate) build_context: BuildContext,
+    pub(crate) build_context: BuildOptions,
     pub(crate) scripts: HashMap<String, String>,
 }
 
@@ -58,7 +60,8 @@ pub(crate) struct PyprojectToolPyo3Pack {
 /// for Cargo's algorithm
 pub fn build_source_distribution(
     build_context: &BuildContext,
-    metadata: &WheelMetadata,
+    metadata21: &Metadata21,
+    scripts: &HashMap<String, String>,
     target_file: &Path,
 ) -> Result<(), Error> {
     let output = Command::new("cargo")
@@ -77,10 +80,7 @@ pub fn build_source_distribution(
     let encoder = Encoder::new(file)?;
     let mut archive = tar::Builder::new(encoder);
 
-    let folder = PathBuf::from(format!(
-        "{}-{}",
-        metadata.metadata21.name, metadata.metadata21.version
-    ));
+    let folder = PathBuf::from(format!("{}-{}", metadata21.name, metadata21.version));
 
     // Add all the files from the cargo package to the zip
     for filename in str::from_utf8(&output.stdout).unwrap().lines() {
@@ -93,7 +93,7 @@ pub fn build_source_distribution(
         tool: PyprojectTool {
             pyo3_pack: PyprojectToolPyo3Pack {
                 build_context: build_context.clone(),
-                scripts: metadata.scripts.clone(),
+                scripts: scripts.clone(),
             },
         },
         build_system: PyprojectBuildSystem {
@@ -113,7 +113,7 @@ pub fn build_source_distribution(
         pyproject_toml.as_bytes(),
     )?;
 
-    let pkg_info = metadata.metadata21.to_file_contents();
+    let pkg_info = metadata21.to_file_contents();
     let mut header = tar::Header::new_gnu();
     header.set_metadata(&normal_metadata);
     header.set_size(pkg_info.as_bytes().len() as u64);

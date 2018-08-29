@@ -11,7 +11,6 @@ struct DummyClass {}
 impl DummyClass {
     #[staticmethod]
     fn get_42() -> PyResult<usize> {
-        println!("Called get_42 in rust");
         Ok(42)
     }
 }

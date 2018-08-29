@@ -26,26 +26,26 @@ cargo_metadata = "0.6.0"
 digest = { version = "0.7.5", features = ["std"] }
 failure = "0.1.2"
 keyring = "0.6.0"
-reqwest = "0.8.7"
+reqwest = "0.8.8"
 rpassword = "2.0.0"
-serde_derive = "1.0.71"
-serde_json = "1.0.24"
+serde_derive = "1.0.75"
+serde_json = "1.0.26"
 sha2 = "0.7.1"
 structopt = "0.2.10"
 target_info = "0.1.0"
 toml = "0.4.6"
 zip = "0.4.2"
-serde = "1.0.71"
+serde = "1.0.75"
 elfkit = { version = "0.0.6", optional = true }
 tar = { version = "0.4.16", optional = true }
 libflate = { version = "0.1.16", optional = true }
-human-panic = "1.0.0"
-regex = "1.0.2"
+human-panic = "1.0.1"
+regex = "1.0.4"
 indicatif = "0.9.0"
 atty = "0.2.11"
+tempfile = "3.0.3"
 
 [dev-dependencies]
-tempfile = "3.0.3"
 indoc = "0.2.6"
 
 [features]
@@ -56,5 +56,10 @@ sdist = ["tar", "libflate"]
 
 [workspace]
 members = [
-    "get-fourtytwo"
+    "get-fourtytwo",
+]
+
+# This is necessary due to https://github.com/eqrion/cbindgen/issues/203
+exclude = [
+    "points"
 ]

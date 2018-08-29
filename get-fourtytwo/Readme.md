@@ -1,6 +1,6 @@
-# Get fourty_two
+# Get fourtytwo
 
-A dummy package for testing pyo3-pack.
+A package with pyo3 bindings for testing pyo3-pack.
 
 ## Usage
 
@@ -22,7 +22,6 @@ pip install tox
 ```
 
 Run it:
-
 
 ```bash
 tox

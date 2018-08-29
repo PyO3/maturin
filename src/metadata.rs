@@ -238,12 +238,11 @@ mod test {
 
         let mut readme_md = tempfile::NamedTempFile::new().unwrap();
 
-        let readme_path;
-        if cfg!(windows) {
-            readme_path = readme_md.path().to_str().unwrap().replace("\\", "/");
+        let readme_path = if cfg!(windows) {
+            readme_md.path().to_str().unwrap().replace("\\", "/")
         } else {
-            readme_path = readme_md.path().to_str().unwrap().to_string();
-        }
+            readme_md.path().to_str().unwrap().to_string()
+        };
 
         readme_md.write_all(readme.as_bytes()).unwrap();
 

@@ -4,7 +4,7 @@ use failure::{Context, Error, ResultExt};
 use indicatif::ProgressBar;
 use serde_json;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
 use BuildContext;
@@ -97,28 +97,32 @@ fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
 ///
 /// Shows a progress bar on a tty
 pub fn compile(
-    lib_name: &str,
-    manifest_file: &Path,
     context: &BuildContext,
-    python_interpreter: &PythonInterpreter,
+    python_interpreter: Option<&PythonInterpreter>,
+    bindings_crate: Option<String>,
 ) -> Result<PathBuf, Error> {
-    println!("Building the crate for {}", python_interpreter);
-
-    let python_version_feature = format!(
-        "{}/python{}",
-        context.binding_crate, python_interpreter.major
-    );
+    // Some stringly typing to satisfy the borrow checker
+    let python_feature = match python_interpreter {
+        Some(python_interpreter) => format!(
+            "{}/python{}",
+            bindings_crate.unwrap(),
+            python_interpreter.major
+        ),
+        None => "".to_string(),
+    };
 
     let mut shared_args = vec![
         // The lib is also built without that flag, but then the json doesn't contain the
         // message we need
         "--lib",
         "--manifest-path",
-        manifest_file.to_str().unwrap(),
-        // This is a workaround for a bug in pyo3's build.rs
-        "--features",
-        &python_version_feature,
+        context.manifest_path.to_str().unwrap(),
     ];
+
+    if python_feature != "" {
+        // This is a workaround for a bug in pyo3's build.rs
+        shared_args.extend(&["--features", &python_feature]);
+    }
 
     shared_args.extend(context.cargo_extra_args.iter().map(|x| x.as_str()));
 
@@ -134,24 +138,27 @@ pub fn compile(
     let tasks = get_tasks(&shared_args)?;
 
     let mut rustc_args = context.rustc_extra_args.clone();
-    if python_interpreter.target == "macos" {
+    if context.target.is_macos() {
         rustc_args.extend(
             ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
                 .iter()
                 .map(ToString::to_string),
         );
     }
-
-    let mut cargo_build = Command::new("cargo")
+    let mut let_binding = Command::new("cargo");
+    let build_command = let_binding
         .args(&["+nightly", "rustc", "--message-format", "json"])
         .args(&shared_args)
         .arg("--")
         .args(rustc_args)
-        .env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable)
         .stdout(Stdio::piped()) // We need to capture the json messages
-        .stderr(Stdio::inherit()) // We want to show error messages
-        .spawn()
-        .context("Failed to run cargo")?;
+        .stderr(Stdio::inherit()); // We want to show error messages
+
+    if let Some(python_interpreter) = python_interpreter {
+        build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
+    }
+
+    let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
 
     let progress_bar = if atty::is(Stream::Stderr) {
         Some(ProgressBar::new(tasks as u64))
@@ -159,7 +166,6 @@ pub fn compile(
         None
     };
 
-    let mut binding_lib = None;
     let mut artifact = None;
     let reader = BufReader::new(cargo_build.stdout.take().unwrap());
     for line in reader.lines().map(|line| line.unwrap()) {
@@ -167,16 +173,9 @@ pub fn compile(
             progress_bar.inc(1);
         }
 
-        // Extract the pyo3 config from the output
-        if let Ok(message) = serde_json::from_str::<CargoBuildOutput>(&line) {
-            if message.package_id.starts_with(&context.binding_crate) {
-                binding_lib = Some(message);
-            }
-        }
-
         // Extract the location of the .so/.dll/etc. from cargo's json output
         if let Ok(message) = serde_json::from_str::<CompilerArtifactMessage>(&line) {
-            if message.target.name == lib_name {
+            if message.target.name == context.module_name {
                 artifact = Some(message);
             }
         }
@@ -200,19 +199,6 @@ pub fn compile(
     if !status.success() {
         bail!("Cargo build finished with an error")
     }
-
-    let binding_lib = binding_lib.and_then(|binding_lib| {
-        if binding_lib.linked_libs.len() == 1 {
-            Some(binding_lib.linked_libs[0].clone())
-        } else {
-            None
-        }
-    });
-
-    if let Some(_version_line) = binding_lib {
-        // TODO: Validate that the python interpreteer used by pyo3 is the expected one
-        // This is blocked on https://github.com/rust-lang/cargo/issues/5602 being released to stable
-    };
 
     let artifact = artifact
         .ok_or_else(|| Context::new("cargo build didn't return information on the cdylib"))?;

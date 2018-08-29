@@ -1,21 +1,22 @@
 extern crate pyo3_pack;
-extern crate target_info;
 
-use pyo3_pack::BuildContext;
-use std::path::{Path, PathBuf};
+use common::check_installed;
+use pyo3_pack::{BuildOptions, Target};
+use std::path::Path;
 use std::process::{Command, Stdio};
-use target_info::Target;
+
+mod common;
 
 // Y U NO accept windows path prefix, pip?
 // Anyways, here's shepmasters stack overflow solution
 // https://stackoverflow.com/a/50323079/3549270
 #[cfg(not(target_os = "windows"))]
-fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
+fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
     p.as_ref().display().to_string()
 }
 
 #[cfg(target_os = "windows")]
-fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
+fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
     const VERBATIM_PREFIX: &str = r#"\\?\"#;
     let p = p.as_ref().display().to_string();
     if p.starts_with(VERBATIM_PREFIX) {
@@ -25,24 +26,49 @@ fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
     }
 }
 
-/// For each installed python, this builds a wheel, creates a virtualenv if it
-/// doesn't exist, installs get-fourtytwo and runs main.py
 #[test]
-fn test_integration() {
-    let mut options = BuildContext::default();
-    options.manifest_path = PathBuf::from("get-fourtytwo").join("Cargo.toml");
+fn test_integration_get_fourtytwo() {
+    test_integration(Path::new("get-fourtytwo"));
+}
+
+#[test]
+fn test_integration_points() {
+    test_integration(Path::new("points"));
+}
+
+/// For each installed python version, this builds a wheel, creates a virtualenv if it
+/// doesn't exist, installs the package and runs check_installed.py
+fn test_integration(package: &Path) {
+    let target = Target::current();
+
+    let mut options = BuildOptions::default();
+    options.manifest_path = package.join("Cargo.toml");
     options.debug = true;
-    let (wheels, _) = options.build_wheels().unwrap();
+
+    let wheels = options
+        .into_build_context()
+        .unwrap()
+        .build_wheels()
+        .unwrap();
+
     for (filename, version) in wheels {
-        let version = version.unwrap();
-        let venv_dir =
-            PathBuf::from("get-fourtytwo").join(format!("venv{}.{}", version.major, version.minor));
+        let venv_dir = if let Some(ref version) = version {
+            package.join(format!("venv{}.{}", version.major, version.minor))
+        } else {
+            package.join("venv_cffi")
+        };
 
         if !venv_dir.is_dir() {
+            let venv_py_version = if let Some(ref version) = version {
+                version.executable.clone()
+            } else {
+                target.get_python()
+            };
+
             let output = Command::new("virtualenv")
                 .args(&[
                     "-p",
-                    &version.executable.display().to_string(),
+                    &venv_py_version.display().to_string(),
                     &venv_dir.display().to_string(),
                 ]).stderr(Stdio::inherit())
                 .output()
@@ -52,36 +78,30 @@ fn test_integration() {
             }
         }
 
-        let pip = if Target::os() == "windows" {
-            venv_dir.join("Scripts").join("pip.exe")
-        } else {
-            venv_dir.join("bin").join("pip")
-        };
-
-        let output = Command::new(&pip)
-            .args(&["install", "--force-reinstall"])
-            .arg(&adjust_canonicalization(filename))
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .output()
-            .unwrap();
-        if !output.status.success() {
-            panic!();
-        }
-        let python = if Target::os() == "windows" {
-            venv_dir.join("Scripts").join("python.exe")
-        } else {
-            venv_dir.join("bin").join("python")
-        };
+        let python = target.get_venv_python(&venv_dir);
 
         let output = Command::new(&python)
-            .arg(Path::new("get-fourtytwo").join("main.py"))
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
+            .args(&[
+                "-m",
+                "pip",
+                "install",
+                "--force-reinstall",
+                &adjust_canonicalization(filename),
+            ]).stderr(Stdio::inherit())
             .output()
             .unwrap();
         if !output.status.success() {
             panic!();
         }
+
+        let output = Command::new(&python)
+            .args(&["-m", "pip", "install", "cffi"])
+            .output()
+            .unwrap();
+        if !output.status.success() {
+            panic!();
+        }
+
+        check_installed(&package, &python).unwrap();
     }
 }

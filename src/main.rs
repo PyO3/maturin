@@ -3,6 +3,7 @@
 //! Run with --help for usage information
 
 extern crate core;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate human_panic;
@@ -12,17 +13,17 @@ extern crate reqwest;
 extern crate rpassword;
 #[macro_use]
 extern crate structopt;
-extern crate target_info;
 
 use failure::Error;
 use keyring::{Keyring, KeyringError};
-use pyo3_pack::{develop, upload_wheels, BuildContext, PythonInterpreter, Registry, UploadError};
+use pyo3_pack::{
+    develop, upload_wheels, BuildOptions, PythonInterpreter, Registry, Target, UploadError,
+};
 use reqwest::Url;
 use std::env;
 use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use target_info::Target;
 
 /// Precedence:
 /// 1. PYO3_PACK_PASSWORD
@@ -84,19 +85,20 @@ struct PublishOpt {
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "pyo3-pack")]
+#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 /// Build and publish crates with pyo3 bindings as python packages
 enum Opt {
     #[structopt(name = "build")]
     /// Build the crate into wheels
     Build {
         #[structopt(flatten)]
-        build: BuildContext,
+        build: BuildOptions,
     },
     #[structopt(name = "publish")]
     /// Build and publish the crate as wheels to pypi
     Publish {
         #[structopt(flatten)]
-        build: BuildContext,
+        build: BuildOptions,
         #[structopt(flatten)]
         publish: PublishOpt,
     },
@@ -108,9 +110,9 @@ enum Opt {
     ///
     /// Note that this command doesn't create entrypoints
     Develop {
-        /// The crate providing the python bindings
-        #[structopt(short = "b", long = "bindings-crate", default_value = "pyo3")]
-        binding_crate: String,
+        /// The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
+        #[structopt(short = "b", long = "bindings-crate")]
+        binding_crate: Option<String>,
         #[structopt(
             short = "m",
             long = "manifest-path",
@@ -133,17 +135,18 @@ fn run() -> Result<(), Error> {
 
     match opt {
         Opt::Build { build } => {
-            build.build_wheels()?;
+            build.into_build_context()?.build_wheels()?;
         }
         Opt::Publish { build, publish } => {
-            let (wheels, metadata) = build.build_wheels()?;
+            let build_context = build.into_build_context()?;
+            let wheels = build_context.build_wheels()?;
 
             let mut registry = complete_registry(&publish)?;
 
             loop {
                 println!("Uploading {} packages", wheels.len());
 
-                let result = upload_wheels(&registry, &wheels, &metadata);
+                let result = upload_wheels(&registry, &wheels, &build_context.metadata21);
 
                 match result {
                     Ok(()) => {
@@ -184,12 +187,8 @@ fn run() -> Result<(), Error> {
             }
         }
         Opt::ListPython => {
-            let pointer_width = match Target::pointer_width() {
-                "32" => 32,
-                "64" => 64,
-                _ => panic!("{} is a pretty odd pointer width", Target::pointer_width()),
-            };
-            let found = PythonInterpreter::find_all(&Target::os(), pointer_width)?;
+            let target = Target::current();
+            let found = PythonInterpreter::find_all(&target)?;
             println!("{} python interpreter found:", found.len());
             for interpreter in found {
                 println!(" - {}", interpreter);
@@ -201,11 +200,19 @@ fn run() -> Result<(), Error> {
             cargo_extra_args,
             rustc_extra_args,
         } => {
+            let venv_dir = match env::var_os("VIRTUAL_ENV") {
+                Some(dir) => PathBuf::from(dir),
+                None => {
+                    bail!("You need be inside a virtualenv to use develop (VIRTUAL_ENV isn't set)")
+                }
+            };
+
             develop(
-                binding_crate,
-                manifest_path,
+                &binding_crate,
+                &manifest_path,
                 cargo_extra_args,
                 rustc_extra_args,
+                &venv_dir,
             )?;
         }
     }

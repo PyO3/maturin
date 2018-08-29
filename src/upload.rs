@@ -1,12 +1,12 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use metadata::WheelMetadata;
 use reqwest::{self, header::ContentType, multipart::Form, Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
+use Metadata21;
 use PythonInterpreter;
 use Registry;
 
@@ -48,10 +48,10 @@ impl From<reqwest::Error> for UploadError {
 pub fn upload_wheels(
     regitry: &Registry,
     wheels: &[(PathBuf, Option<PythonInterpreter>)],
-    metadata: &WheelMetadata,
+    metadata21: &Metadata21,
 ) -> Result<(), UploadError> {
     for (wheel_path, python_version) in wheels {
-        upload(&regitry, &wheel_path, &metadata, &python_version)?;
+        upload(&regitry, &wheel_path, &metadata21, &python_version)?;
     }
 
     Ok(())
@@ -61,7 +61,7 @@ pub fn upload_wheels(
 pub fn upload(
     registry: &Registry,
     wheel_path: &Path,
-    metadata: &WheelMetadata,
+    metadata21: &Metadata21,
     python_version: &Option<PythonInterpreter>,
 ) -> Result<(), UploadError> {
     let mut wheel = File::open(&wheel_path)?;
@@ -84,7 +84,7 @@ pub fn upload(
 
     let joined_metadata: Vec<(String, String)> = api_metadata
         .into_iter()
-        .chain(metadata.metadata21.to_vec().clone().into_iter())
+        .chain(metadata21.to_vec().clone().into_iter())
         // All fields must be lower case and with underscores or they will be ignored by warehouse
         .map(|(key, value)| (key.to_lowercase().replace("-", "_"), value))
         .collect();

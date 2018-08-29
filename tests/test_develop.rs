@@ -1,68 +1,54 @@
 extern crate pyo3_pack;
-extern crate target_info;
 
-use pyo3_pack::develop;
-use std::env;
+use common::check_installed;
+use pyo3_pack::{develop, Target};
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::Command;
-use target_info::Target;
 
-const RUN_GET_FOURTYTWO: &str = r"
-import get_fourtytwo
+mod common;
 
-if get_fourtytwo.fourtytwo != 42:
-    raise Exception()
-";
-
-fn check_get_fourtytwo(python: &PathBuf) -> Result<(), ()> {
-    let output = Command::new(&python)
-        .args(&["-c", RUN_GET_FOURTYTWO])
-        .output()
-        .unwrap();
-    if !output.status.success() {
-        Err(())
-    } else {
-        Ok(())
-    }
+#[test]
+fn test_develop_get_fourtytwo() {
+    test_develop(Path::new("get-fourtytwo"));
 }
 
-/// Creates a virtualenv and activates it, checks that get-fourtytwo isn't installed, uses
-/// "pyo3-pack develop" on get-fourtytwo and checks it is working
 #[test]
-fn test_integration() {
-    let venv_dir = PathBuf::from("get-fourtytwo").join("venv_develop");
+fn test_develop_points() {
+    test_develop(Path::new("points"));
+}
+
+/// Creates a virtualenv and activates it, checks that the package isn't installed, uses
+/// "pyo3-pack develop" to install it and checks it is working
+fn test_develop(package: &Path) {
+    let venv_dir = package.join("venv_develop");
+    let target = Target::current();
 
     if venv_dir.is_dir() {
         fs::remove_dir_all(&venv_dir).unwrap();
     }
-    let output = Command::new("virtualenv").arg(&venv_dir).output().unwrap();
+    let output = Command::new("virtualenv").arg(&venv_dir).output().expect(
+        "You need to have virtualenv installed to run the tests (`pip install virtualenv`)",
+    );
     if !output.status.success() {
         panic!();
     }
 
-    let python = if Target::os() == "windows" {
-        venv_dir.join("Scripts").join("python.exe")
-    } else {
-        venv_dir.join("bin").join("python")
-    };
+    let python = target.get_venv_python(&venv_dir);
 
     // Ensure the test doesn't wrongly pass
-    check_get_fourtytwo(&python).unwrap_err();
+    check_installed(&package, &python).unwrap_err();
 
-    // "activate" the virtualenv
-    env::set_var("VIRTUAL_ENV", venv_dir);
-    env::set_var(
-        "PATH",
-        format!(
-            "{}:{}",
-            python.canonicalize().unwrap().parent().unwrap().display(),
-            env::var("PATH").unwrap()
-        ),
-    );
+    let output = Command::new(&python)
+        .args(&["-m", "pip", "install", "cffi"])
+        .output()
+        .unwrap();
+    if !output.status.success() {
+        panic!();
+    }
 
-    let manifest_file = PathBuf::from("get-fourtytwo").join("Cargo.toml");
-    develop("pyo3".to_string(), manifest_file, vec![], vec![]).unwrap();
+    let manifest_file = package.join("Cargo.toml");
+    develop(&None, &manifest_file, vec![], vec![], &venv_dir).unwrap();
 
-    check_get_fourtytwo(&python).unwrap();
+    check_installed(&package, &python).unwrap();
 }

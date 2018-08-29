@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import get_fourtytwo
 
 import pytest
@@ -11,6 +13,6 @@ def test_class():
     assert get_fourtytwo.DummyClass.get_42() == 42
 
 
-@pytest.mark.xfail(raises=AssertionError)
 def test_function():
-    assert get_fourtytwo.DummyClass == 42
+    with pytest.raises(AssertionError):
+        assert get_fourtytwo.DummyClass == 42

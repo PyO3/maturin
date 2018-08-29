@@ -48,6 +48,7 @@ install:
       pip install virtualenv
     fi
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then pyenv global system 2.7 3.6.6; else pyenv global system 2.7 3.6; fi
+  - python3 -m pip install cffi virtualenv
 
 script:
   - cargo build

@@ -5,6 +5,7 @@ use pyo3_pack::{develop, Target};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::process::Stdio;
 
 mod common;
 
@@ -27,9 +28,13 @@ fn test_develop(package: &Path) {
     if venv_dir.is_dir() {
         fs::remove_dir_all(&venv_dir).unwrap();
     }
-    let output = Command::new("virtualenv").arg(&venv_dir).output().expect(
-        "You need to have virtualenv installed to run the tests (`pip install virtualenv`)",
-    );
+    let output = Command::new("virtualenv")
+        .arg(&venv_dir)
+        .stderr(Stdio::inherit())
+        .output()
+        .expect(
+            "You need to have virtualenv installed to run the tests (`pip install virtualenv`)",
+        );
     if !output.status.success() {
         panic!();
     }

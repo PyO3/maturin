@@ -42,7 +42,7 @@ install:
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %CHANNEL%
   - SET PATH=%PATH%;%CARGO_HOME%\bin
   # We need python 3.x 64 bit as default in path for the develop test
-  - SET PATH=C:\Python36-x64;%PATH%
+  - SET PATH=C:\Python36-x64\bin;%PATH%
   - rustc -V
   - cargo -V
 

@@ -9,18 +9,22 @@ extern crate failure;
 extern crate human_panic;
 extern crate keyring;
 extern crate pyo3_pack;
+#[cfg(feature = "upload")]
 extern crate reqwest;
 extern crate rpassword;
 #[macro_use]
 extern crate structopt;
 
 use failure::Error;
+#[cfg(feature = "upload")]
 use keyring::{Keyring, KeyringError};
-use pyo3_pack::{
-    develop, upload_wheels, BuildOptions, PythonInterpreter, Registry, Target, UploadError,
-};
+use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
+#[cfg(feature = "upload")]
+use pyo3_pack::{upload_wheels, Registry, UploadError};
+#[cfg(feature = "upload")]
 use reqwest::Url;
 use std::env;
+#[cfg(feature = "upload")]
 use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -29,6 +33,7 @@ use structopt::StructOpt;
 /// 1. PYO3_PACK_PASSWORD
 /// 2. keyring
 /// 3. stdin
+#[cfg(feature = "upload")]
 fn get_password(username: &str) -> String {
     if let Ok(password) = env::var("PYO3_PACK_PASSWORD") {
         return password;
@@ -43,6 +48,7 @@ fn get_password(username: &str) -> String {
     rpassword::prompt_password_stdout("Please enter your password: ").unwrap()
 }
 
+#[cfg(feature = "upload")]
 fn get_username() -> String {
     println!("Please enter your username:");
     let mut line = String::new();
@@ -50,6 +56,7 @@ fn get_username() -> String {
     line.trim().to_string()
 }
 
+#[cfg(feature = "upload")]
 /// Asks for username and password for a registry account where missing.
 fn complete_registry(opt: &PublishOpt) -> Result<Registry, Error> {
     let username = opt.username.clone().unwrap_or_else(get_username);
@@ -94,6 +101,7 @@ enum Opt {
         #[structopt(flatten)]
         build: BuildOptions,
     },
+    #[cfg(feature = "upload")]
     #[structopt(name = "publish")]
     /// Build and publish the crate as wheels to pypi
     Publish {
@@ -137,6 +145,7 @@ fn run() -> Result<(), Error> {
         Opt::Build { build } => {
             build.into_build_context()?.build_wheels()?;
         }
+        #[cfg(feature = "upload")]
         Opt::Publish { build, publish } => {
             let build_context = build.into_build_context()?;
             let wheels = build_context.build_wheels()?;

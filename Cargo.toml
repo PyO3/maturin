@@ -7,7 +7,7 @@ exclude = ["get-fourtytwo/**/*", "integration-test/**/*", "sysconfig/*"]
 readme = "Readme.md"
 repository = "https://github.com/pyo3/pyo3-pack"
 license = "MIT OR Apache-2.0"
-keywords = ["python", "ffi", "packaging", "pypi", "pyo3"]
+keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 
 [badges]
@@ -26,7 +26,7 @@ cargo_metadata = "0.6.0"
 digest = { version = "0.7.5", features = ["std"] }
 failure = "0.1.2"
 keyring = "0.6.0"
-reqwest = "0.8.8"
+reqwest = { version = "0.8.8", optional = true }
 rpassword = "2.0.0"
 serde_derive = "1.0.75"
 serde_json = "1.0.26"
@@ -49,10 +49,11 @@ tempfile = "3.0.3"
 indoc = "0.2.6"
 
 [features]
-default = ["auditwheel"]
+default = ["auditwheel", "upload"]
 auditwheel = ["elfkit"]
 # sdist can be written, but those can not be installed
 sdist = ["tar", "libflate"]
+upload = ["reqwest"]
 
 [workspace]
 members = [

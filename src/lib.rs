@@ -27,6 +27,7 @@ extern crate tempfile;
 #[macro_use]
 extern crate failure;
 extern crate atty;
+#[cfg(feature = "upload")]
 extern crate reqwest;
 #[macro_use]
 extern crate serde_derive;
@@ -55,10 +56,12 @@ pub use compile::compile;
 pub use develop::develop;
 pub use metadata::{Metadata21, WheelMetadata};
 pub use python_interpreter::PythonInterpreter;
+#[cfg(feature = "upload")]
 pub use registry::Registry;
 #[cfg(feature = "sdist")]
 pub use sdist::build_source_distribution;
 pub use target::Target;
+#[cfg(feature = "upload")]
 pub use upload::{upload, upload_wheels, UploadError};
 
 #[cfg(feature = "auditwheel")]
@@ -71,10 +74,12 @@ mod develop;
 mod metadata;
 mod module_writer;
 mod python_interpreter;
+#[cfg(feature = "upload")]
 mod registry;
 #[cfg(feature = "sdist")]
 mod sdist;
 mod target;
+#[cfg(feature = "upload")]
 mod upload;
 
 #[cfg(feature = "sdist")]

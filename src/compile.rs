@@ -2,6 +2,7 @@ use atty;
 use atty::Stream;
 use failure::{Context, Error, ResultExt};
 use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 use serde_json;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -10,14 +11,17 @@ use std::str;
 use BuildContext;
 use PythonInterpreter;
 
+#[derive(Deserialize)]
+struct BuildPlanEntry {
+    package_name: String,
+}
+
 /// The (abbreviated) format of `cargo build --build-plan`
 /// For the real thing, see
 /// https://github.com/rust-lang/cargo/blob/master/src/cargo/core/compiler/build_plan.rs
 #[derive(Deserialize)]
 struct SerializedBuildPlan {
-    invocations: Vec<serde_json::Value>,
-    #[allow(dead_code)]
-    inputs: Vec<PathBuf>,
+    invocations: Vec<BuildPlanEntry>,
 }
 
 /// This kind of message is printed by `cargo build --message-format=json
@@ -72,7 +76,8 @@ struct CompilerErrorMessageMessage {
 
 /// Queries the number of tasks through the build plan. This only works on
 /// nightly, but that isn't a problem, since pyo3 also only works on nightly
-fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
+fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
+    let error_message = "Failed to get a build plan from cargo";
     let build_plan = Command::new("cargo")
         // Eventually we want to get rid of the nightly, but for now it's required because
         // the rust-toolchain file is ignored
@@ -80,16 +85,15 @@ fn get_tasks(shared_args: &[&str]) -> Result<usize, Error> {
         .args(shared_args)
         .stderr(Stdio::inherit()) // Forward any error to the user
         .output()
-        .context("Failed to run cargo")?;
+        .context(error_message)?;
 
     if !build_plan.status.success() {
-        bail!("Failed to get a build plan from cargo");
+        bail!(error_message);
     }
 
     let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
         .context("The build plan has an invalid format")?;
-    let tasks = plan.invocations.len();
-    Ok(tasks)
+    Ok(plan)
 }
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
@@ -135,7 +139,7 @@ pub fn compile(
         shared_args.push("--release");
     }
 
-    let tasks = get_tasks(&shared_args)?;
+    let build_plan = get_build_plan(&shared_args)?;
 
     let mut rustc_args = context.rustc_extra_args.clone();
     if context.target.is_macos() {
@@ -147,7 +151,7 @@ pub fn compile(
     }
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
-        .args(&["+nightly", "rustc", "--message-format", "json"])
+        .args(&["rustc", "--message-format", "json"])
         .args(&shared_args)
         .arg("--")
         .args(rustc_args)
@@ -161,22 +165,39 @@ pub fn compile(
     let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
 
     let progress_bar = if atty::is(Stream::Stderr) {
-        Some(ProgressBar::new(tasks as u64))
+        // Mimicks cargo's -Z compile-progress
+        let bar = ProgressBar::new(build_plan.invocations.len() as u64);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
+                .progress_chars("=> "),
+        );
+
+        bar.set_message(&build_plan.invocations[0].package_name);
+
+        Some(bar)
     } else {
         None
     };
 
     let mut artifact = None;
+    let mut build_plan_pos = 0;
     let reader = BufReader::new(cargo_build.stdout.take().unwrap());
     for line in reader.lines().map(|line| line.unwrap()) {
-        if let Some(ref progress_bar) = progress_bar {
-            progress_bar.inc(1);
-        }
-
-        // Extract the location of the .so/.dll/etc. from cargo's json output
         if let Ok(message) = serde_json::from_str::<CompilerArtifactMessage>(&line) {
+            // Extract the location of the .so/.dll/etc. from cargo's json output
             if message.target.name == context.module_name {
                 artifact = Some(message);
+            }
+
+            // The progress bar isn't an exact science and stuff might get out-of-sync,
+            // but that isn't big problem since the bar is only to give the user an estimate
+            if let Some(ref progress_bar) = progress_bar {
+                progress_bar.inc(1);
+                build_plan_pos += 1;
+                if let Some(package) = build_plan.invocations.get(build_plan_pos) {
+                    progress_bar.set_message(&package.package_name);
+                }
             }
         }
 

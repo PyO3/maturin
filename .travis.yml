@@ -48,7 +48,10 @@ install:
       pip install virtualenv
     fi
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then pyenv global system 2.7 3.6.6; else pyenv global system 2.7 3.6; fi
-  - python3 -m pip install cffi virtualenv
+  # Make the tests use python3.6 for creating the cffi bindings
+  - python3.6 -m venv venv
+  - source venv/bin/activate
+  - pip install cffi virtualenv
 
 script:
   - cargo build

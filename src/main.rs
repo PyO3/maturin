@@ -92,7 +92,8 @@ struct PublishOpt {
     /// Username for pypi or your custom registry
     username: Option<String>,
     #[structopt(short = "p", long = "password")]
-    /// Password for pypi or your custom registry
+    /// Password for pypi or your custom registry. Note that you can also pass the password
+    /// through PYO3_PACK_PASSWORD
     password: Option<String>,
 }
 

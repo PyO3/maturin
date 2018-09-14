@@ -92,7 +92,7 @@ impl ModuleWriter for DevelopModuleWriter {
         &mut self,
         target: impl AsRef<Path>,
         bytes: &[u8],
-        permissions: u32,
+        _permissions: u32,
     ) -> Result<(), io::Error> {
         let path = self.base_path.join(target);
 
@@ -103,12 +103,12 @@ impl ModuleWriter for DevelopModuleWriter {
                 fs::OpenOptions::new()
                     .create(true)
                     .write(true)
-                    .mode(permissions)
+                    .mode(_permissions)
                     .open(path)?
             }
             #[cfg(target_os = "windows")]
             {
-                File::create(x)?
+                File::create(path)?
             }
         };
 

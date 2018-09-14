@@ -1,6 +1,8 @@
-use elfkit;
+use goblin;
+use goblin::elf::Elf;
 use std::fs::File;
 use std::io;
+use std::io::Read;
 use std::path::Path;
 
 // As specified in "PEP 513 -- A Platform Tag for Portable Linux Built
@@ -65,8 +67,8 @@ pub enum AuditWheelError {
     #[fail(display = "Failed to read the wheel")]
     IOError(#[cause] io::Error),
     /// Reexports elfkit parsing erorrs
-    #[fail(display = "Elfkit failed to parse the elf file: {:?}", _0)]
-    ElfkitError(elfkit::Error),
+    #[fail(display = "Goblin failed to parse the elf file")]
+    GoblinError(#[cause] goblin::error::Error),
     /// The elf file isn't manylinux compatible. Contains the list of offending
     /// libraries.
     #[fail(
@@ -76,36 +78,18 @@ pub enum AuditWheelError {
     ManylinuxValidationError(Vec<String>),
 }
 
-/// Similar to the `ldd` command: Returns all libraries that an elf dynamically
-/// links to
-fn get_deps_from_elf(path: &Path) -> Result<Vec<String>, AuditWheelError> {
-    let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
-    let mut elf = elfkit::Elf::from_reader(&mut file).map_err(AuditWheelError::ElfkitError)?;
-    elf.load_all(&mut file)
-        .map_err(AuditWheelError::ElfkitError)?;
-
-    let mut deps = Vec::new();
-    for section in elf.sections {
-        if let elfkit::SectionContent::Dynamic(dynamic) = section.content {
-            for dyn in dynamic {
-                if dyn.dhtype == elfkit::types::DynamicType::NEEDED {
-                    if let elfkit::DynamicContent::String(ref name) = dyn.content {
-                        deps.push(String::from_utf8_lossy(&name.0).into_owned());
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(deps)
-}
-
 /// An (incomplete) reimplementation of auditwheel, which checks elf files for
 /// manylinux compliance
 ///
 /// Only checks for the libraries marked as NEEDED.
 pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
-    let deps = get_deps_from_elf(&path)?;
+    let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)
+        .map_err(AuditWheelError::IOError)?;
+    let elf = Elf::parse(&buffer).map_err(AuditWheelError::GoblinError)?;
+    // This returns essentially the same as ldd
+    let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
 
     let mut offenders = Vec::new();
     for dep in deps {

@@ -39,19 +39,24 @@ matrix:
       env: TARGET=x86_64-unknown-linux-gnu
 
 install:
+  # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this
+  # is the source of this mess
   - |
     if [ "$TRAVIS_OS_NAME" == "osx" ]; then
       brew update
       brew upgrade pyenv
       pyenv install 2.7
       pyenv install 3.6.6
-      pip install virtualenv
+      pyenv global system 2.7 3.6.6
+      python3.6 -m pip install cffi virtualenv
     fi
-  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then pyenv global system 2.7 3.6.6; else pyenv global system 2.7 3.6; fi
-  # Make the tests use python3.6 for creating the cffi bindings
-  - python3.6 -m venv venv
-  - source venv/bin/activate
-  - pip install cffi virtualenv
+  - |
+    if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+      pyenv global system 2.7 3.6
+      python3.6 -m venv venv
+      source venv/bin/activate
+      pip install cffi virtualenv
+    fi
 
 script:
   - cargo build

@@ -158,6 +158,8 @@ fn main() {
 
 For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that checks the generated library, so there's no need to use external tools. If you want to disable the manylinux compliance checks for some reason, use the `--skip-auditwheel` flag.
 
+To ship a completely static binary with musl, you can use `pyo3-pack build -b bin --cargo-extra-args="--target=x86_64-unknown-linux-musl"`.
+
 Note that the pyo3-pack pip package is not manylinux compliant (A compliant package could neither upload not use the keyring)
 
 ## Code

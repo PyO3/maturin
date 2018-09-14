@@ -1,0 +1,8 @@
+points
+sysconfig
+target
+*/venv*
+*/.tox
+*/.pytest_cache
+venv
+.venv

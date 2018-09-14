@@ -1,9 +1,10 @@
 use build_context::BridgeModel;
-use compile;
+use compile::compile;
 use failure::{Context, Error, ResultExt};
 use module_writer::write_bindings_module;
 use module_writer::write_cffi_module;
 use module_writer::DevelopModuleWriter;
+use std::fs;
 use std::path::Path;
 use BuildOptions;
 use PythonInterpreter;
@@ -13,11 +14,12 @@ use Target;
 ///
 /// Works only in virtualenvs.
 pub fn develop(
-    binding_crate: &Option<String>,
+    bindings: Option<String>,
     manifest_file: &Path,
     cargo_extra_args: Vec<String>,
     rustc_extra_args: Vec<String>,
     venv_dir: &Path,
+    release: bool,
 ) -> Result<(), Error> {
     let target = Target::current();
 
@@ -29,10 +31,10 @@ pub fn develop(
 
     let build_options = BuildOptions {
         interpreter: vec!["python".to_string()],
-        bindings: binding_crate.clone(),
+        bindings,
         manifest_path: manifest_file.to_path_buf(),
         out: None,
-        debug: true,
+        debug: !release,
         skip_auditwheel: false,
         cargo_extra_args,
         rustc_extra_args,
@@ -45,8 +47,20 @@ pub fn develop(
     let context = "Failed to build a native library through cargo";
 
     match build_context.bridge {
+        BridgeModel::Bin => {
+            let artifacts = compile(&build_context, None, None).context(context)?;
+
+            let artifact = artifacts
+                .get("bin")
+                .ok_or(format_err!("Cargo didn't build a binary"))?;
+
+            // Copy the artifact into the same folder as pip and python
+            let bin_name = artifact.file_name().unwrap();
+            let bin_path = target.get_venv_bin_dir(&venv_dir).join(bin_name);
+            fs::copy(artifact, bin_path)?;
+        }
         BridgeModel::Cffi => {
-            let artifact = compile(&build_context, None, None).context(context)?;
+            let artifact = build_context.compile_cdylib(None).context(context)?;
 
             write_cffi_module(
                 &mut builder,
@@ -55,14 +69,10 @@ pub fn develop(
                 &build_context.target,
             )?;
         }
-        BridgeModel::Bindings {
-            ref bindings_crate, ..
-        } => {
-            let artifact = compile(
-                &build_context,
-                Some(&interpreter),
-                Some(bindings_crate.clone()),
-            ).context(context)?;
+        BridgeModel::Bindings { .. } => {
+            let artifact = build_context
+                .compile_cdylib(Some(&interpreter))
+                .context(context)?;
 
             write_bindings_module(
                 &mut builder,

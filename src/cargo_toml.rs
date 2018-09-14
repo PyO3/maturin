@@ -4,7 +4,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct CargoTomlLib {
-    pub(crate) crate_type: Vec<String>,
+    pub(crate) crate_type: Option<Vec<String>>,
     pub(crate) name: Option<String>,
 }
 
@@ -34,7 +34,7 @@ pub(crate) struct CargoTomlPackage {
 /// See https://doc.rust-lang.org/cargo/reference/manifest.html for a specification
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct CargoToml {
-    pub(crate) lib: CargoTomlLib,
+    pub(crate) lib: Option<CargoTomlLib>,
     pub(crate) package: CargoTomlPackage,
 }
 

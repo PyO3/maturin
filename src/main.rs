@@ -5,18 +5,21 @@
 extern crate core;
 #[macro_use]
 extern crate failure;
+#[allow(unused_imports)]
 #[macro_use]
 extern crate human_panic;
+#[cfg(feature = "keyring")]
 extern crate keyring;
 extern crate pyo3_pack;
 #[cfg(feature = "upload")]
 extern crate reqwest;
 extern crate rpassword;
+#[allow(unused_imports)]
 #[macro_use]
 extern crate structopt;
 
 use failure::Error;
-#[cfg(feature = "upload")]
+#[cfg(all(feature = "upload", feature = "keyring"))]
 use keyring::{Keyring, KeyringError};
 use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
 #[cfg(feature = "upload")]
@@ -39,11 +42,14 @@ fn get_password(username: &str) -> String {
         return password;
     };
 
-    let service = env!("CARGO_PKG_NAME");
-    let keyring = Keyring::new(&service, &username);
-    if let Ok(password) = keyring.get_password() {
-        return password;
-    };
+    #[cfg(feature = "keyring")]
+    {
+        let service = env!("CARGO_PKG_NAME");
+        let keyring = Keyring::new(&service, &username);
+        if let Ok(password) = keyring.get_password() {
+            return password;
+        };
+    }
 
     rpassword::prompt_password_stdout("Please enter your password: ").unwrap()
 }
@@ -116,7 +122,7 @@ enum Opt {
     #[structopt(name = "develop")]
     /// Installs the crate as module in the current virtualenv so you can import it
     ///
-    /// Note that this command doesn't create entrypoints
+    /// Note that this command doesn't create entrypoints and compiles in debug mode by default
     Develop {
         /// The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
         #[structopt(short = "b", long = "bindings-crate")]
@@ -129,6 +135,9 @@ enum Opt {
         )]
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
+        /// Compile in release mode. This is useful e.g. for benchmarking
+        #[structopt(long = "release")]
+        release: bool,
         /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
         #[structopt(long = "cargo-extra-args")]
         cargo_extra_args: Vec<String>,
@@ -161,26 +170,33 @@ fn run() -> Result<(), Error> {
                     Ok(()) => {
                         println!("Packages uploaded succesfully");
 
-                        // We know the password is correct, so we can save it in the keyring
-                        let username = registry.username.clone();
-                        let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
-                        let password = registry.password.clone();
-                        keyring.set_password(&password).unwrap_or_else(|e| {
-                            eprintln!("Failed to store the password in the keyring: {:?}", e)
-                        });
+                        #[cfg(feature = "keyring")]
+                        {
+                            // We know the password is correct, so we can save it in the keyring
+                            let username = registry.username.clone();
+                            let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
+                            let password = registry.password.clone();
+                            keyring.set_password(&password).unwrap_or_else(|e| {
+                                eprintln!("Failed to store the password in the keyring: {:?}", e)
+                            });
+                        }
 
                         return Ok(());
                     }
                     Err(UploadError::AuthenticationError) => {
                         println!("Username and/or password are wrong");
-                        // Delete the wrong password from the keyring
-                        let old_username = registry.username.clone();
-                        let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
-                        match keyring.delete_password() {
-                            Ok(()) => {}
-                            Err(KeyringError::NoPasswordFound)
-                            | Err(KeyringError::NoBackendFound) => {}
-                            _ => eprintln!("Failed to remove password from keyring"),
+
+                        #[cfg(feature = "keyring")]
+                        {
+                            // Delete the wrong password from the keyring
+                            let old_username = registry.username.clone();
+                            let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
+                            match keyring.delete_password() {
+                                Ok(()) => {}
+                                Err(KeyringError::NoPasswordFound)
+                                | Err(KeyringError::NoBackendFound) => {}
+                                _ => eprintln!("Failed to remove password from keyring"),
+                            }
                         }
 
                         let username = get_username();
@@ -208,6 +224,7 @@ fn run() -> Result<(), Error> {
             manifest_path,
             cargo_extra_args,
             rustc_extra_args,
+            release,
         } => {
             let venv_dir = match env::var_os("VIRTUAL_ENV") {
                 Some(dir) => PathBuf::from(dir),
@@ -217,11 +234,12 @@ fn run() -> Result<(), Error> {
             };
 
             develop(
-                &binding_crate,
+                binding_crate,
                 &manifest_path,
                 cargo_extra_args,
                 rustc_extra_args,
                 &venv_dir,
+                release,
             )?;
         }
     }
@@ -230,7 +248,7 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
-    setup_panic!();
+    //setup_panic!();
 
     if let Err(e) = run() {
         for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {

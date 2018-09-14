@@ -232,7 +232,7 @@ mod test {
             r#"
             # Some test package
 
-            This is the readme for a test pacakge
+            This is the readme for a test package
         "#
         );
 
@@ -285,7 +285,7 @@ mod test {
 
             # Some test package
 
-            This is the readme for a test pacakge
+            This is the readme for a test package
         "#
         );
 

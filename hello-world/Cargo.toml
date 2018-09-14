@@ -1,0 +1,6 @@
+[package]
+name = "hello-world"
+version = "0.1.0"
+authors = ["konstin <konstin@mailbox.org>"]
+
+[dependencies]

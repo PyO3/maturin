@@ -5,10 +5,13 @@ use failure::{Context, Error};
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
+#[cfg(not(target_os = "windows"))]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
@@ -23,8 +26,22 @@ use Target;
 pub trait ModuleWriter {
     /// Adds a directory relative to the module base path
     fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), io::Error>;
+
     /// Adds a file with bytes as content in target relative to the module base path
-    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), io::Error>;
+    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), io::Error> {
+        // 0o644 is the default from the zip crate
+        self.add_bytes_with_permissions(target, bytes, 0o644)
+    }
+
+    /// Adds a file with bytes as content in target relative to the module base path while setting
+    /// the given unix permissions
+    fn add_bytes_with_permissions(
+        &mut self,
+        target: impl AsRef<Path>,
+        bytes: &[u8],
+        permissions: u32,
+    ) -> Result<(), io::Error>;
+
     /// Copies the source file the the target path relative to the module base path
     fn add_file(
         &mut self,
@@ -71,8 +88,30 @@ impl ModuleWriter for DevelopModuleWriter {
         fs::create_dir_all(self.base_path.join(path))
     }
 
-    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), io::Error> {
-        let mut file = File::create(self.base_path.join(target))?;
+    fn add_bytes_with_permissions(
+        &mut self,
+        target: impl AsRef<Path>,
+        bytes: &[u8],
+        permissions: u32,
+    ) -> Result<(), io::Error> {
+        let path = self.base_path.join(target);
+
+        // We only need to set the executable bit on unix
+        let mut file = {
+            #[cfg(not(target_os = "windows"))]
+            {
+                fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .mode(permissions)
+                    .open(path)?
+            }
+            #[cfg(target_os = "windows")]
+            {
+                File::create(x)?
+            }
+        };
+
         file.write_all(bytes)
     }
 }
@@ -90,10 +129,16 @@ impl ModuleWriter for WheelWriter {
         Ok(()) // We don't need to create directories in zip archives
     }
 
-    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), io::Error> {
+    fn add_bytes_with_permissions(
+        &mut self,
+        target: impl AsRef<Path>,
+        bytes: &[u8],
+        permissions: u32,
+    ) -> Result<(), io::Error> {
         let target_str = target.as_ref().to_str().unwrap();
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::FileOptions::default()
+            .unix_permissions(permissions)
+            .compression_method(zip::CompressionMethod::Stored);
         self.zip.start_file(target_str, options)?;
         self.zip.write_all(&bytes)?;
 
@@ -301,5 +346,28 @@ pub fn write_cffi_module(
     writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
     writer.add_file(&module.join("native.so"), &artifact)?;
 
+    Ok(())
+}
+
+/// Adds a data directory with a scripts directory with the binary inside it
+pub fn write_bin(
+    writer: &mut impl ModuleWriter,
+    artifact: &Path,
+    metadata: &Metadata21,
+    bin_name: &OsStr,
+) -> Result<(), Error> {
+    let data_dir = PathBuf::from(format!(
+        "{}-{}.data",
+        &metadata.get_distribution_escaped(),
+        &metadata.version
+    )).join("scripts");
+
+    writer.add_directory(&data_dir)?;
+
+    // We can't use add_file since we need to mark the file as executable
+    let mut file = File::open(artifact)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    writer.add_bytes_with_permissions(&data_dir.join(bin_name), &buffer, 0o755)?;
     Ok(())
 }

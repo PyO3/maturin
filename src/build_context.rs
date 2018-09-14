@@ -3,9 +3,9 @@ use auditwheel_rs;
 #[cfg(feature = "sdist")]
 use build_source_distribution;
 use compile;
-use failure::{Error, ResultExt};
+use failure::{Context, Error, ResultExt};
 use module_writer::WheelWriter;
-use module_writer::{write_bindings_module, write_cffi_module};
+use module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -17,7 +17,11 @@ use Target;
 /// pyo3/rust-cpython
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BridgeModel {
+    /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
     Cffi,
+    /// A rust binary to be shipped a python package
+    Bin,
+    /// A native module with pyo3 or rust-cpython bindings
     Bindings {
         interpreter: Vec<PythonInterpreter>,
         bindings_crate: String,
@@ -25,9 +29,10 @@ pub enum BridgeModel {
 }
 
 impl BridgeModel {
-    fn to_option(&self) -> Option<String> {
+    // TODO
+    pub fn to_option(&self) -> Option<String> {
         match self {
-            BridgeModel::Cffi => None,
+            BridgeModel::Cffi | BridgeModel::Bin => None,
             BridgeModel::Bindings { bindings_crate, .. } => Some(bindings_crate.clone()),
         }
     }
@@ -71,6 +76,7 @@ impl BuildContext {
 
         let wheels = match &self.bridge {
             BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, None)],
+            BridgeModel::Bin => vec![(self.build_bin_wheel()?, None)],
             BridgeModel::Bindings { interpreter, .. } => self.build_binding_wheels(&interpreter)?,
         };
 
@@ -90,13 +96,7 @@ impl BuildContext {
     ) -> Result<Vec<(PathBuf, Option<PythonInterpreter>)>, Error> {
         let mut wheels = Vec::new();
         for python_version in interpreter {
-            let artifact = compile(&self, Some(&python_version), self.bridge.to_option())
-                .context("Failed to build a native library through cargo")?;
-
-            if !self.skip_auditwheel && python_version.target.is_linux() {
-                #[cfg(feature = "auditwheel")]
-                auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
-            }
+            let artifact = self.compile_cdylib(Some(&python_version))?;
 
             let tag = python_version.get_tag();
 
@@ -138,25 +138,89 @@ impl BuildContext {
         Ok(wheels)
     }
 
+    /// Runs cargo build, extracts the cdylib from the output, runs auditwheel and returns the
+    /// artifact
+    pub fn compile_cdylib(
+        &self,
+        python_interpreter: Option<&PythonInterpreter>,
+    ) -> Result<PathBuf, Error> {
+        let artifacts = compile(&self, python_interpreter, self.bridge.to_option())
+            .context("Failed to build a native library through cargo")?;
+
+        let artifact = artifacts.get("cdylib").cloned().ok_or_else(|| {
+            Context::new(
+                "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
+                 in the lib section of your Cargo.toml?",
+            )
+        })?;
+
+        let target = python_interpreter
+            .map(|x| &x.target)
+            .unwrap_or(&self.target);
+
+        if !self.skip_auditwheel && target.is_linux() {
+            #[cfg(feature = "auditwheel")]
+            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
+        }
+
+        Ok(artifact)
+    }
+
+    fn get_unversal_tags(&self) -> (String, &[&'static str]) {
+        let tag = format!(
+            "py2.py3-none-{platform}",
+            platform = self.target.get_platform_tag()
+        );
+        let tags = self.target.get_cffi_tags();
+        (tag, tags)
+    }
+
     /// Builds a wheel with cffi bindings
     pub fn build_cffi_wheel(&self) -> Result<PathBuf, Error> {
-        let artifact = compile(&self, None, self.bridge.to_option())
+        let artifact = self.compile_cdylib(None)?;
+
+        let (tag, tags) = self.get_unversal_tags();
+
+        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, tags)?;
+
+        write_cffi_module(&mut builder, &self.module_name, &artifact, &self.target)?;
+
+        let wheel_path = builder.finish()?;
+
+        println!("Built wheel to {}", wheel_path.display());
+
+        Ok(wheel_path)
+    }
+
+    /// Builds a wheel that contains a rust binary and an entrypoint for that binary
+    pub fn build_bin_wheel(&self) -> Result<PathBuf, Error> {
+        let artifacts = compile(&self, None, self.bridge.to_option())
             .context("Failed to build a native library through cargo")?;
+
+        let artifact = artifacts
+            .get("bin")
+            .cloned()
+            .ok_or_else(|| Context::new("Cargo didn't build a binary."))?;
 
         if !self.skip_auditwheel && self.target.is_linux() {
             #[cfg(feature = "auditwheel")]
             auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }
 
-        let tag = format!(
-            "py2.py3-none-{platform}",
-            platform = self.target.get_platform_tag()
-        );
-        let tags = self.target.get_cffi_tags();
+        let (tag, tags) = self.get_unversal_tags();
+
+        if !self.scripts.is_empty() {
+            bail!("Defining entrypoints and working with a binary doesn't mix well");
+        }
 
         let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, tags)?;
 
-        write_cffi_module(&mut builder, &self.module_name, &artifact, &self.target)?;
+        // I wouldn't know of any case where this would be the wrong (and neither do
+        // I know a better alternative)
+        let bin_name = artifact
+            .file_name()
+            .expect("Couldn't get the filename from the binary produced by cargo");
+        write_bin(&mut builder, &artifact, &self.metadata21, bin_name)?;
 
         let wheel_path = builder.finish()?;
 

@@ -129,6 +129,24 @@ impl Target {
         }
     }
 
+    /// Returns the directory where the binaries are stored inside a venv
+    pub fn get_venv_bin_dir(&self, venv_base: impl AsRef<Path>) -> PathBuf {
+        let message = "expected the venv to contain a folder for the binaries";
+        if self.is_windows() {
+            venv_base
+                .as_ref()
+                .join("Scripts")
+                .canonicalize()
+                .expect(message)
+        } else {
+            venv_base
+                .as_ref()
+                .join("bin")
+                .canonicalize()
+                .expect(message)
+        }
+    }
+
     /// Returns the path to the python executable
     ///
     /// For windows it's always python.exe for unix it's 1. venv's python 2. python3

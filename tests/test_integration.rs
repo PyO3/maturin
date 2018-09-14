@@ -28,21 +28,27 @@ fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
 
 #[test]
 fn test_integration_get_fourtytwo() {
-    test_integration(Path::new("get-fourtytwo"));
+    test_integration(Path::new("get-fourtytwo"), None);
 }
 
 #[test]
 fn test_integration_points() {
-    test_integration(Path::new("points"));
+    test_integration(Path::new("points"), Some("cffi".to_string()));
+}
+
+#[test]
+fn test_integration_hello_world() {
+    test_integration(Path::new("hello-world"), Some("bin".to_string()));
 }
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
-fn test_integration(package: &Path) {
+fn test_integration(package: &Path, bindings: Option<String>) {
     let target = Target::current();
 
     let mut options = BuildOptions::default();
     options.manifest_path = package.join("Cargo.toml");
+    options.bindings = bindings;
     options.debug = true;
 
     let wheels = options

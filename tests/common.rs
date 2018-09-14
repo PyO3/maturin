@@ -7,6 +7,7 @@ use std::str;
 pub fn check_installed(package: &Path, python: &PathBuf) -> Result<(), ()> {
     let output = Command::new(&python)
         .arg(Path::new(package).join("check_installed.py"))
+        .env("PATH", python.parent().unwrap())
         .output()
         .unwrap();
     if !output.status.success() {

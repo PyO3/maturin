@@ -70,7 +70,10 @@ impl Default for BuildOptions {
 impl BuildOptions {
     /// Tries to fill the missing metadata in BuildContext by querying cargo and python
     pub fn into_build_context(self) -> Result<BuildContext, Error> {
-        let manifest_file = self.manifest_path.canonicalize().unwrap();
+        let manifest_file = self
+            .manifest_path
+            .canonicalize()
+            .map_err(|e| format_err!("Can't find {}: {}", self.manifest_path.display(), e))?;
 
         if !self.manifest_path.is_file() {
             bail!("{} must be a path to a Cargo.toml", manifest_file.display());
@@ -101,17 +104,10 @@ impl BuildOptions {
         // underscores as lib name
         let module_name = cargo_toml
             .lib
-            .name
             .clone()
+            .and_then(|lib| lib.name)
             .unwrap_or_else(|| cargo_toml.package.name.clone())
             .to_owned();
-
-        if module_name.contains('-') {
-            bail!(
-                "The module name must not contains a minus \
-                 (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
-            );
-        }
 
         let target = Target::current();
 
@@ -125,6 +121,15 @@ impl BuildOptions {
         };
 
         let bridge = find_bridge(&cargo_metadata, &self.bindings, &self.interpreter, &target)?;
+
+        if bridge != BridgeModel::Bin {
+            if module_name.contains('-') {
+                bail!(
+                    "The module name must not contains a minus \
+                     (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
+                );
+            }
+        }
 
         Ok(BuildContext {
             target,
@@ -159,7 +164,9 @@ pub fn find_bridge(
 
     let bridge_crate = if let Some(ref bindings) = bridge {
         if bindings == "cffi" {
-            None
+            return Ok(BridgeModel::Cffi);
+        } else if bindings == "bin" {
+            return Ok(BridgeModel::Bin);
         } else {
             if !deps.contains(bindings) {
                 bail!(
@@ -168,46 +175,41 @@ pub fn find_bridge(
                 );
             }
 
-            Some(bindings.clone())
+            bindings.clone()
         }
     } else if deps.contains("pyo3") {
         println!("Found pyo3 bindings");
-        Some("pyo3".to_string())
+        "pyo3".to_string()
     } else if deps.contains("rust-cpython") {
         println!("Found rust-python bindings");
-        Some("rust_cpython".to_string())
+        "rust_cpython".to_string()
     } else {
-        println!("Found cffi bindings");
-        None
+        bail!("Couldn't find any bindings; Please specify them with -b");
     };
 
-    if let Some(bridge_crate) = bridge_crate {
-        let available_versions = if !executables.is_empty() {
-            PythonInterpreter::check_executables(&executables, &target)?
-        } else {
-            PythonInterpreter::find_all(&Target::current())?
-        };
-
-        if available_versions.is_empty() {
-            bail!("Couldn't find any python interpreters. Please specify at least one with -i");
-        }
-
-        println!(
-            "Found {}",
-            available_versions
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<String>>()
-                .join(", ")
-        );
-
-        Ok(BridgeModel::Bindings {
-            interpreter: available_versions,
-            bindings_crate: bridge_crate,
-        })
+    let available_versions = if !executables.is_empty() {
+        PythonInterpreter::check_executables(&executables, &target)?
     } else {
-        Ok(BridgeModel::Cffi)
+        PythonInterpreter::find_all(&Target::current())?
+    };
+
+    if available_versions.is_empty() {
+        bail!("Couldn't find any python interpreters. Please specify at least one with -i");
     }
+
+    println!(
+        "Found {}",
+        available_versions
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", ")
+    );
+
+    Ok(BridgeModel::Bindings {
+        interpreter: available_versions,
+        bindings_crate: bridge_crate,
+    })
 }
 
 #[cfg(test)]
@@ -227,19 +229,20 @@ mod test {
             cargo_metadata::metadata_deps(Some(&Path::new("points").join("Cargo.toml")), true)
                 .unwrap();
 
-        assert_ne!(
-            find_bridge(&get_fourtytwo, &None, &[], &target).unwrap(),
-            BridgeModel::Cffi
-        );
-        assert_ne!(
-            find_bridge(&get_fourtytwo, &Some("pyo3".to_string()), &[], &target).unwrap(),
-            BridgeModel::Cffi
+        assert!(
+            match find_bridge(&get_fourtytwo, &None, &[], &target).unwrap() {
+                BridgeModel::Bindings { .. } => true,
+                _ => false,
+            }
         );
 
-        assert_eq!(
-            find_bridge(&points, &None, &[], &target).unwrap(),
-            BridgeModel::Cffi
+        assert!(
+            match find_bridge(&get_fourtytwo, &Some("pyo3".to_string()), &[], &target).unwrap() {
+                BridgeModel::Bindings { .. } => true,
+                _ => false,
+            }
         );
+
         assert_eq!(
             find_bridge(&points, &Some("cffi".to_string()), &[], &target).unwrap(),
             BridgeModel::Cffi

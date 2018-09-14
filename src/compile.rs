@@ -1,9 +1,9 @@
 use atty;
 use atty::Stream;
-use failure::{Context, Error, ResultExt};
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
+use failure::{Error, ResultExt};
+use indicatif::{ProgressBar, ProgressStyle};
 use serde_json;
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -77,18 +77,43 @@ struct CompilerErrorMessageMessage {
 /// Queries the number of tasks through the build plan. This only works on
 /// nightly, but that isn't a problem, since pyo3 also only works on nightly
 fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
-    let error_message = "Failed to get a build plan from cargo";
+    let build_plan_args = &[
+        "+nightly",
+        "build",
+        "-Z",
+        "unstable-options",
+        "--build-plan",
+    ];
+
+    let command_formated = ["cargo"]
+        .iter()
+        .chain(build_plan_args)
+        .chain(shared_args)
+        .map(ToString::to_string)
+        .collect::<Vec<String>>()
+        .join(" ");
+
     let build_plan = Command::new("cargo")
         // Eventually we want to get rid of the nightly, but for now it's required because
         // the rust-toolchain file is ignored
-        .args(&["+nightly", "build", "-Z", "unstable-options", "--build-plan"])
+        .args(build_plan_args)
         .args(shared_args)
         .stderr(Stdio::inherit()) // Forward any error to the user
         .output()
-        .context(error_message)?;
+        .map_err(|e| {
+            format_err!(
+                "Failed to get a build plan from cargo: {} ({})",
+                e,
+                command_formated
+            )
+        })?;
 
     if !build_plan.status.success() {
-        bail!(error_message);
+        bail!(
+            "Failed to get a build plan from cargo with '{}': `{}`",
+            build_plan.status,
+            command_formated
+        );
     }
 
     let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
@@ -104,7 +129,7 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: Option<String>,
-) -> Result<PathBuf, Error> {
+) -> Result<HashMap<String, PathBuf>, Error> {
     // Some stringly typing to satisfy the borrow checker
     let python_feature = match python_interpreter {
         Some(python_interpreter) => format!(
@@ -115,13 +140,7 @@ pub fn compile(
         None => "".to_string(),
     };
 
-    let mut shared_args = vec![
-        // The lib is also built without that flag, but then the json doesn't contain the
-        // message we need
-        "--lib",
-        "--manifest-path",
-        context.manifest_path.to_str().unwrap(),
-    ];
+    let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
     if python_feature != "" {
         // This is a workaround for a bug in pyo3's build.rs
@@ -130,28 +149,27 @@ pub fn compile(
 
     shared_args.extend(context.cargo_extra_args.iter().map(|x| x.as_str()));
 
-    if atty::is(Stream::Stderr) {
-        // Makes cargo only print to stderr on error
-        shared_args.push("--quiet");
-    }
-
     if !context.debug {
         shared_args.push("--release");
     }
 
     let build_plan = get_build_plan(&shared_args)?;
 
+    let mut cargo_args = vec!["rustc", "--message-format", "json"];
+
+    if atty::is(Stream::Stderr) {
+        // Makes cargo only print to stderr on error
+        cargo_args.push("--quiet");
+    }
+
     let mut rustc_args = context.rustc_extra_args.clone();
     if context.target.is_macos() {
-        rustc_args.extend(
-            ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
-                .iter()
-                .map(ToString::to_string),
-        );
+        let mac_args = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
+        rustc_args.extend(mac_args.iter().map(ToString::to_string));
     }
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
-        .args(&["rustc", "--message-format", "json"])
+        .args(&cargo_args)
         .args(&shared_args)
         .arg("--")
         .args(rustc_args)
@@ -166,28 +184,30 @@ pub fn compile(
 
     let progress_bar = if atty::is(Stream::Stderr) {
         // Mimicks cargo's -Z compile-progress
-        let bar = ProgressBar::new(build_plan.invocations.len() as u64);
-        bar.set_style(
+        let progress_bar = ProgressBar::new(build_plan.invocations.len() as u64);
+        progress_bar.set_style(
             ProgressStyle::default_bar()
                 .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
                 .progress_chars("=> "),
         );
 
-        bar.set_message(&build_plan.invocations[0].package_name);
+        progress_bar.set_message(&build_plan.invocations[0].package_name);
 
-        Some(bar)
+        Some(progress_bar)
     } else {
         None
     };
 
-    let mut artifact = None;
+    let mut artifact_messages = Vec::new();
     let mut build_plan_pos = 0;
     let reader = BufReader::new(cargo_build.stdout.take().unwrap());
     for line in reader.lines().map(|line| line.unwrap()) {
         if let Ok(message) = serde_json::from_str::<CompilerArtifactMessage>(&line) {
             // Extract the location of the .so/.dll/etc. from cargo's json output
-            if message.target.name == context.module_name {
-                artifact = Some(message);
+            if message.target.name == context.module_name
+                || message.target.name == context.metadata21.name
+            {
+                artifact_messages.push(message);
             }
 
             // The progress bar isn't an exact science and stuff might get out-of-sync,
@@ -221,20 +241,17 @@ pub fn compile(
         bail!("Cargo build finished with an error")
     }
 
-    let artifact = artifact
-        .ok_or_else(|| Context::new("cargo build didn't return information on the cdylib"))?;
-    let position = artifact
-        .target
-        .crate_types
-        .iter()
-        .position(|target| *target == "cdylib")
-        .ok_or_else(|| {
-            Context::new(
-                "Cargo didn't build a cdylib (Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?)",
-            )
-        })?;
-    let artifact = artifact.filenames[position].clone();
+    let mut artifacts = HashMap::new();
+    for message in artifact_messages {
+        let tuples = message
+            .target
+            .crate_types
+            .into_iter()
+            .zip(message.filenames);
+        for (crate_type, filename) in tuples {
+            artifacts.insert(crate_type, filename);
+        }
+    }
 
-    Ok(artifact)
+    Ok(artifacts)
 }

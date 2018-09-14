@@ -21,7 +21,7 @@
 extern crate base64;
 extern crate cargo_metadata;
 #[cfg(feature = "auditwheel")]
-extern crate elfkit;
+extern crate goblin;
 extern crate regex;
 extern crate tempfile;
 #[macro_use]

@@ -1,14 +1,14 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use reqwest::{self, header::ContentType, multipart::Form, Client, StatusCode};
+use Metadata21;
+use Registry;
+use reqwest::{self, Client, header::ContentType, multipart::Form, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
-use Metadata21;
 use PythonInterpreter;
-use Registry;
 
 /// Error type for different types of errors that can happen when uploading a
 /// wheel.
@@ -47,11 +47,11 @@ impl From<reqwest::Error> for UploadError {
 /// Uploads all given wheels to the registry
 pub fn upload_wheels(
     regitry: &Registry,
-    wheels: &[(PathBuf, Option<PythonInterpreter>)],
+    wheels: &[(PathBuf, String, Option<PythonInterpreter>)],
     metadata21: &Metadata21,
 ) -> Result<(), UploadError> {
-    for (wheel_path, python_version) in wheels {
-        upload(&regitry, &wheel_path, &metadata21, &python_version)?;
+    for (wheel_path, supported_versions, _) in wheels {
+        upload(&regitry, &wheel_path, &metadata21, &supported_versions)?;
     }
 
     Ok(())
@@ -62,7 +62,7 @@ pub fn upload(
     registry: &Registry,
     wheel_path: &Path,
     metadata21: &Metadata21,
-    python_version: &Option<PythonInterpreter>,
+    supported_version: &str,
 ) -> Result<(), UploadError> {
     let mut wheel = File::open(&wheel_path)?;
     let hash = format!("{:x}", Sha256::digest_reader(&mut wheel)?);
@@ -73,12 +73,11 @@ pub fn upload(
         ("protocol_version".to_string(), "1".to_string()),
     ];
 
-    if let Some(python_version) = python_version {
-        let pyversion = format!("cp{}{}", python_version.major, python_version.minor);
-        api_metadata.push(("pyversion".to_string(), pyversion));
+    api_metadata.push(("pyversion".to_string(), supported_version.to_string()));
+
+    if supported_version != "source" {
         api_metadata.push(("filetype".to_string(), "bdist_wheel".to_string()));
     } else {
-        api_metadata.push(("pyversion".to_string(), "source".to_string()));
         api_metadata.push(("filetype".to_string(), "sdist".to_string()));
     }
 

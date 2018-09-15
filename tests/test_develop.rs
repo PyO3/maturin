@@ -36,7 +36,6 @@ fn test_develop(package: &Path, bindings: Option<String>) {
     let output = Command::new("virtualenv")
         .arg(&venv_dir)
         .stderr(Stdio::inherit())
-        .stdout(Stdio::inherit())
         .output()
         .expect(
             "You need to have virtualenv installed to run the tests (`pip install virtualenv`)",

@@ -4,6 +4,7 @@ env:
   global:
     # Change this to the name of your binary
     - BINARY_NAME="pyo3-pack"
+    - secure: xxDBiPcL7jDjbnKJ3R0UzTTjaWdITGBHUB7SmjKAy5WPk8Eyx/BgYwGBv2F4/EfSOoOOF+HSUfegXV70r+UHA8OyZtb+h9RLrcBsnEvnrBo2FylQCzz8JeoTdHJikvhH8H9oEbb4jQpwy85r5xDK3+8dMkD2nDjf5vfctblMyShayNTzyMX9DkG5OqZnJ0CXaPzPrtrMXEw3hPpMpyTYBqnZhNVK5IHzXA8kR+6WKgkrf+X/48Or3TDys9ufdO3mEazgxfLJ6WHESQFONYtjT67++rkBNB0jYXf+bFjW2OaEl9Qa8ZHevbWZcJkb3dlW9ktbPnhBmjw14a6Oqhu1w5x2DGVp9196vRwPzXi5YCFXbw93OurF2cDS4NVCk5vZKKuKZvHa6LdS6zVh31uwdOYa5AUK9mYLpwsW0B8k/YyBjea9pkskyBeLXzKpYXgplbMzyqnJZMoiHimeLlHMNNSUlJqKVinDEEEukazABJvN6xcbUunvKj8nQpNVdVg0NPcmMQ2R7CLOJTkhLYqnq+CsX8nTmH5PSh/XxA7NkTfbbibxpWqHp0QDLCFltK23rGAAhs0WkvXF8lSaUSpl7DksA3CfNUn2eI2k+iWao8OD7gu0pFeVOHxND4fuT8Jy8nILySwsECyB0LECPNr++Ymz6+xMHrlaIpGBkCGQXcY=
 
 addons:
   apt:
@@ -29,6 +30,12 @@ matrix:
     - os: osx
       rust: stable
       env: TARGET=x86_64-apple-darwin
+    - os: linux
+      rust: stable
+      env: TARGET=i686-unknown-linux-gnu
+    - os: osx
+      rust: stable
+      env: TARGET=i686-apple-darwin
 
     # Other rust versions to check
     - os: linux
@@ -59,6 +66,7 @@ install:
     fi
 
 script:
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-host $TARGET --default-toolchain $TRAVIS_RUST_VERSION 
   - cargo build
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
 
@@ -70,21 +78,26 @@ before_deploy:
   - cd ../..
 
 deploy:
-  # Add zipped binary to the github release
-  provider: releases
-  file: ${BINARY_NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz
-  skip_cleanup: true
-  on: # Create downloads only with stable rust and only for stable releases
-    condition: $TRAVIS_RUST_VERSION = stable
-    tags: true
-  # - Create a `public_repo` GitHub token at https://github.com/settings/tokens/new
-  # . If you haven't already, install the travis gem: `gem install TRAVIS_TAG`
-  # - Encrypt it with `travis encrypt 0123456789012345678901234567890123456789`
-  # - Paste the output down here
-  api_key:
-    secure: "bKY3J8FBwgit9inzp2CMxQC3icBVco+COcRnqM6NhaOWX3KefXYG/yWQ7htBkeTRAfQERlOkZZOPsOto2dAD49/Mo4Uin9wbRPjPDGPJpFcQofX5aKHqK1Xd1k96rtZKZRIEG5k5J2IKAzPso3GnA0FESAZlZbxEShSCBD6aOlVmjFXwB2kKzJDo9zECxCg84GSvR/7wQg4hwMaMBa79y3VJRCohGTMaISL22QJ0haG+gqZgTv/r9K8P9lwSMBIiTXX3wFJU871sqUNTSSwkmHlVLhVUOwluv+KQ2DI/V/gWfx2CuiZ/7OQlz4zkOB/Y56msH0G7vOwqbSHLwkMYC+zgDWvF0oI/Eb/mdY5VliQdsLDOkKwWm3EuoEUvCgyV9UB1POxxogIx1sAU+Vt9QUj5/cRIJc1zrtA3LdNlbg9M9rYG8jJ6JMbeYTFDTL6YNoHc2lPAdmAqQAZQy6vyR515vm76JfS7yDcLRXKKhLE4dEPUEpv0qU8vCA/FdaZaiW+GJZSS5rJoE0vHaMRsWkgFLqCNSDpUZBd2x60E+n6dQ7XX4DrJ1JmzcG+IZ6AfuIWyRD9s3jQBxRjtyM61ZGo3Nb4zwX2ML1PftNURNAo8rPlgIrqPaveic45hP6PAeX+iMIWzTckq8shlYngjBTw/3UmA8Z18udrRyKCbygs="
-
-cache: cargo
+  - # Add zipped binary to the github release
+    provider: releases
+    file: ${BINARY_NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz
+    skip_cleanup: true
+    on: # Create downloads only with stable rust and only for stable releases
+      condition: $TRAVIS_RUST_VERSION = stable
+      tags: true
+    # - Create a `public_repo` GitHub token at https://github.com/settings/tokens/new
+    # . If you haven't already, install the travis gem: `gem install TRAVIS_TAG`
+    # - Encrypt it with `travis encrypt 0123456789012345678901234567890123456789`
+    # - Paste the output down here
+    api_key:
+      secure: "bKY3J8FBwgit9inzp2CMxQC3icBVco+COcRnqM6NhaOWX3KefXYG/yWQ7htBkeTRAfQERlOkZZOPsOto2dAD49/Mo4Uin9wbRPjPDGPJpFcQofX5aKHqK1Xd1k96rtZKZRIEG5k5J2IKAzPso3GnA0FESAZlZbxEShSCBD6aOlVmjFXwB2kKzJDo9zECxCg84GSvR/7wQg4hwMaMBa79y3VJRCohGTMaISL22QJ0haG+gqZgTv/r9K8P9lwSMBIiTXX3wFJU871sqUNTSSwkmHlVLhVUOwluv+KQ2DI/V/gWfx2CuiZ/7OQlz4zkOB/Y56msH0G7vOwqbSHLwkMYC+zgDWvF0oI/Eb/mdY5VliQdsLDOkKwWm3EuoEUvCgyV9UB1POxxogIx1sAU+Vt9QUj5/cRIJc1zrtA3LdNlbg9M9rYG8jJ6JMbeYTFDTL6YNoHc2lPAdmAqQAZQy6vyR515vm76JfS7yDcLRXKKhLE4dEPUEpv0qU8vCA/FdaZaiW+GJZSS5rJoE0vHaMRsWkgFLqCNSDpUZBd2x60E+n6dQ7XX4DrJ1JmzcG+IZ6AfuIWyRD9s3jQBxRjtyM61ZGo3Nb4zwX2ML1PftNURNAo8rPlgIrqPaveic45hP6PAeX+iMIWzTckq8shlYngjBTw/3UmA8Z18udrRyKCbygs="
+  - provider: script
+    skip_cleanup: true
+    on: # Create downloads only with stable rust and only for stable releases
+      condition: $TRAVIS_RUST_VERSION = stable
+      tags: true
+    # The password is in the travis ui config
+    script: cargo run -- publish -b bin --cargo-extra-args="--target=$TARGET" --skip-auditwheel -u konstin
 
 branches:
   only:

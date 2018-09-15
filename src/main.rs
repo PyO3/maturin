@@ -249,11 +249,10 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
-    //setup_panic!();
-
     if let Err(e) = run() {
         for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {
             println!("{}", cause);
         }
+        std::process::exit(1);
     }
 }

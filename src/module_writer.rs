@@ -164,7 +164,7 @@ impl WheelWriter {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
             metadata21.get_distribution_escaped(),
-            metadata21.version,
+            metadata21.get_version_escaped(),
             tag
         ));
 
@@ -173,7 +173,7 @@ impl WheelWriter {
         let dist_info_dir = PathBuf::from(format!(
             "{}-{}.dist-info",
             &metadata21.get_distribution_escaped(),
-            &metadata21.version
+            &metadata21.get_version_escaped()
         ));
 
         let mut builder = WheelWriter {

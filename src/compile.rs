@@ -153,14 +153,31 @@ pub fn compile(
         shared_args.push("--release");
     }
 
-    let build_plan = get_build_plan(&shared_args)?;
-
     let mut cargo_args = vec!["rustc", "--message-format", "json"];
 
-    if atty::is(Stream::Stderr) {
-        // Makes cargo only print to stderr on error
-        cargo_args.push("--quiet");
-    }
+    // Mimicks cargo's -Z compile-progress, just without the long result log
+    let progress_plan = if atty::is(Stream::Stderr) {
+        match get_build_plan(&shared_args) {
+            Ok(build_plan) => {
+                let progress_bar = ProgressBar::new(build_plan.invocations.len() as u64);
+                progress_bar.set_style(
+                    ProgressStyle::default_bar()
+                        .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
+                        .progress_chars("=> "),
+                );
+
+                progress_bar.set_message(&build_plan.invocations[0].package_name);
+
+                // We have out own progess bar, so we don't need cargo's bar
+                cargo_args.push("--quiet");
+
+                Some((progress_bar, build_plan))
+            }
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
 
     let mut rustc_args = context.rustc_extra_args.clone();
     if context.target.is_macos() {
@@ -182,22 +199,6 @@ pub fn compile(
 
     let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
 
-    let progress_bar = if atty::is(Stream::Stderr) {
-        // Mimicks cargo's -Z compile-progress
-        let progress_bar = ProgressBar::new(build_plan.invocations.len() as u64);
-        progress_bar.set_style(
-            ProgressStyle::default_bar()
-                .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
-                .progress_chars("=> "),
-        );
-
-        progress_bar.set_message(&build_plan.invocations[0].package_name);
-
-        Some(progress_bar)
-    } else {
-        None
-    };
-
     let mut artifact_messages = Vec::new();
     let mut build_plan_pos = 0;
     let reader = BufReader::new(cargo_build.stdout.take().unwrap());
@@ -212,7 +213,7 @@ pub fn compile(
 
             // The progress bar isn't an exact science and stuff might get out-of-sync,
             // but that isn't big problem since the bar is only to give the user an estimate
-            if let Some(ref progress_bar) = progress_bar {
+            if let Some((ref progress_bar, ref build_plan)) = progress_plan {
                 progress_bar.inc(1);
                 build_plan_pos += 1;
                 if let Some(package) = build_plan.invocations.get(build_plan_pos) {
@@ -229,7 +230,7 @@ pub fn compile(
         }
     }
 
-    if let Some(ref progress_bar) = progress_bar {
+    if let Some((ref progress_bar, _)) = progress_plan {
         progress_bar.finish_and_clear();
     }
 

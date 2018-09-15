@@ -57,16 +57,16 @@ fn test_integration(package: &Path, bindings: Option<String>) {
         .build_wheels()
         .unwrap();
 
-    for (filename, version) in wheels {
-        let venv_dir = if let Some(ref version) = version {
-            package.join(format!("venv{}.{}", version.major, version.minor))
-        } else {
+    for (filename, supported_version, python_interpreter) in wheels {
+        let venv_dir = if supported_version == "py2.py3" {
             package.join("venv_cffi")
+        } else {
+            package.join(format!("venv{}.{}", supported_version.chars().nth(2usize).unwrap(), supported_version.chars().nth(3usize).unwrap()))
         };
 
         if !venv_dir.is_dir() {
-            let venv_py_version = if let Some(ref version) = version {
-                version.executable.clone()
+            let venv_py_version = if let Some(ref python_interpreter) = python_interpreter {
+                python_interpreter.executable.clone()
             } else {
                 target.get_python()
             };

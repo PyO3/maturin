@@ -6,6 +6,7 @@ use std::path::Path;
 use std::str;
 use CargoToml;
 
+
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct WheelMetadata {
@@ -83,7 +84,7 @@ impl Metadata21 {
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
             name: cargo_toml.package.name.to_owned(),
-            version: cargo_toml.package.version.to_owned(),
+            version: cargo_toml.package.version.clone(),
             platform: Vec::new(),
             supported_platform: Vec::new(),
             summary: cargo_toml.package.description.clone(),
@@ -209,6 +210,13 @@ impl Metadata21 {
     pub fn get_distribution_escaped(&self) -> String {
         let re = Regex::new(r"[^\w\d.]+").unwrap();
         re.replace_all(&self.name, "_").to_string()
+    }
+
+    /// Returns the version encoded according to PEP 427, Section "Escaping
+    /// and Unicode"
+    pub fn get_version_escaped(&self) -> String {
+        let re = Regex::new(r"[^\w\d.]+").unwrap();
+        re.replace_all(&self.version, "_").to_string()
     }
 }
 

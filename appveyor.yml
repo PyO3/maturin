@@ -5,6 +5,9 @@ environment:
   BINARY_NAME: "pyo3-pack.exe"
   global:
     RUST_BACKTRACE: full
+
+  PYO3_PACK_PASSWORD:
+    secure: 3xTkaAvLd84qjLwY/quMb0w1Kh5NRXQ0a/zHtjnH4WY=
   matrix:
     # 32-bit
     - TARGET: i686-pc-windows-gnu
@@ -55,6 +58,8 @@ test_script:
 
 before_deploy:
   - cargo build --release
+  # I don't know how I can create a script deployment like in travis in appveyor, so let's hijack before_deploy
+  - cargo run -- publish -b bin --skip-auditwheel -u konstin
   # Grab the binary and pack it into a zip archive
   - cd target\release\
   # You can add more file to the archive by adding them to this line

@@ -70,13 +70,13 @@ pub struct BuildContext {
 impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon vs cffi) and calls the correct
     /// builder
-    pub fn build_wheels(&self) -> Result<Vec<(PathBuf, Option<PythonInterpreter>)>, Error> {
+    pub fn build_wheels(&self) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
         let wheels = match &self.bridge {
-            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, None)],
-            BridgeModel::Bin => vec![(self.build_bin_wheel()?, None)],
+            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py2.py3".to_string() , None)],
+            BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py2.py3".to_string(), None)],
             BridgeModel::Bindings { interpreter, .. } => self.build_binding_wheels(&interpreter)?,
         };
 
@@ -93,7 +93,7 @@ impl BuildContext {
     pub fn build_binding_wheels(
         &self,
         interpreter: &[PythonInterpreter],
-    ) -> Result<Vec<(PathBuf, Option<PythonInterpreter>)>, Error> {
+    ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         let mut wheels = Vec::new();
         for python_version in interpreter {
             let artifact = self.compile_cdylib(Some(&python_version))?;
@@ -115,14 +115,15 @@ impl BuildContext {
                 wheel_path.display()
             );
 
-            wheels.push((wheel_path, Some(python_version.clone())));
+            wheels.push((wheel_path, format!("cp{}{}", python_version.major, python_version.minor), Some(python_version.clone())));
         }
 
         #[cfg(feature = "sdist")]
         {
             let sdist_path = wheel_dir.join(format!(
                 "{}-{}.tar.gz",
-                &self.metadata21.name, &self.metadata21.version
+                &self.metadata21.get_distribution_encoded(),
+                &self.metadata21.get_version_encoded()
             ));
 
             println!(

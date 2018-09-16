@@ -75,7 +75,7 @@ impl BuildContext {
             .context("Failed to create the target directory for the wheels")?;
 
         let wheels = match &self.bridge {
-            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py2.py3".to_string() , None)],
+            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py2.py3".to_string(), None)],
             BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py2.py3".to_string(), None)],
             BridgeModel::Bindings { interpreter, .. } => self.build_binding_wheels(&interpreter)?,
         };
@@ -100,8 +100,13 @@ impl BuildContext {
 
             let tag = python_version.get_tag();
 
-            let mut builder =
-                WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &[&tag])?;
+            let mut builder = WheelWriter::new(
+                &tag,
+                &self.out,
+                &self.metadata21,
+                &self.scripts,
+                &[tag.clone()],
+            )?;
 
             write_bindings_module(&mut builder, &self.module_name, &artifact, &python_version)?;
 
@@ -115,7 +120,11 @@ impl BuildContext {
                 wheel_path.display()
             );
 
-            wheels.push((wheel_path, format!("cp{}{}", python_version.major, python_version.minor), Some(python_version.clone())));
+            wheels.push((
+                wheel_path,
+                format!("cp{}{}", python_version.major, python_version.minor),
+                Some(python_version.clone()),
+            ));
         }
 
         #[cfg(feature = "sdist")]
@@ -167,12 +176,12 @@ impl BuildContext {
         Ok(artifact)
     }
 
-    fn get_unversal_tags(&self) -> (String, &[&'static str]) {
+    fn get_unversal_tags(&self) -> (String, Vec<String>) {
         let tag = format!(
             "py2.py3-none-{platform}",
             platform = self.target.get_platform_tag()
         );
-        let tags = self.target.get_cffi_tags();
+        let tags = self.target.get_py2_and_py3_tags();
         (tag, tags)
     }
 
@@ -182,7 +191,8 @@ impl BuildContext {
 
         let (tag, tags) = self.get_unversal_tags();
 
-        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, tags)?;
+        let mut builder =
+            WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
 
         write_cffi_module(&mut builder, &self.module_name, &artifact, &self.target)?;
 
@@ -214,7 +224,8 @@ impl BuildContext {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
         }
 
-        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, tags)?;
+        let mut builder =
+            WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
 
         // I wouldn't know of any case where this would be the wrong (and neither do
         // I know a better alternative)

@@ -61,7 +61,11 @@ fn test_integration(package: &Path, bindings: Option<String>) {
         let venv_dir = if supported_version == "py2.py3" {
             package.join("venv_cffi")
         } else {
-            package.join(format!("venv{}.{}", supported_version.chars().nth(2usize).unwrap(), supported_version.chars().nth(3usize).unwrap()))
+            package.join(format!(
+                "venv{}.{}",
+                supported_version.chars().nth(2usize).unwrap(),
+                supported_version.chars().nth(3usize).unwrap()
+            ))
         };
 
         if !venv_dir.is_dir() {
@@ -76,7 +80,8 @@ fn test_integration(package: &Path, bindings: Option<String>) {
                     "-p",
                     &venv_py_version.display().to_string(),
                     &venv_dir.display().to_string(),
-                ]).stderr(Stdio::inherit())
+                ])
+                .stderr(Stdio::inherit())
                 .output()
                 .unwrap();
             if !output.status.success() {
@@ -93,7 +98,8 @@ fn test_integration(package: &Path, bindings: Option<String>) {
                 "install",
                 "--force-reinstall",
                 &adjust_canonicalization(filename),
-            ]).stderr(Stdio::inherit())
+            ])
+            .stderr(Stdio::inherit())
             .output()
             .unwrap();
         if !output.status.success() {

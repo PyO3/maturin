@@ -79,12 +79,11 @@ impl Target {
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_cffi_tags(&self) -> &[&'static str] {
-        if self.is_64_bit {
-            &["py2-none-linux_x86_64", "py3-none-linux_x86_64"]
-        } else {
-            &["py2-none-linux_i686", "py3-none-linux_i686"]
-        }
+    pub fn get_py2_and_py3_tags(&self) -> Vec<String> {
+        vec![
+            format!("py2-none-{}", self.get_platform_tag()),
+            format!("py3-none-{}", self.get_platform_tag()),
+        ]
     }
 
     /// Returns the platform for the tag in the shared libaries file name

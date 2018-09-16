@@ -51,7 +51,14 @@ fn get_password(username: &str) -> String {
         };
     }
 
-    rpassword::prompt_password_stdout("Please enter your password: ").unwrap()
+    rpassword::prompt_password_stdout("Please enter your password: ").unwrap_or_else(|_| {
+        // So we need this fallback for pycharm on windows
+        let mut password = String::new();
+        io::stdin()
+            .read_line(&mut password)
+            .expect("Failed to read line");
+        password.trim().to_string()
+    })
 }
 
 #[cfg(feature = "upload")]
@@ -82,9 +89,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry, Error> {
 #[derive(Debug, StructOpt)]
 struct PublishOpt {
     #[structopt(
-        short = "r",
-        long = "repository-url",
-        default_value = "https://upload.pypi.org/legacy/"
+        short = "r", long = "repository-url", default_value = "https://upload.pypi.org/legacy/"
     )]
     /// The url of registry where the wheels are uploaded to
     registry: String,
@@ -129,10 +134,7 @@ enum Opt {
         #[structopt(short = "b", long = "bindings-crate")]
         binding_crate: Option<String>,
         #[structopt(
-            short = "m",
-            long = "manifest-path",
-            parse(from_os_str),
-            default_value = "Cargo.toml"
+            short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
         )]
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
@@ -201,9 +203,16 @@ fn run() -> Result<(), Error> {
                         }
 
                         let username = get_username();
-                        let password =
-                            rpassword::prompt_password_stdout("Please enter your password: ")
-                                .unwrap();
+                        let password = rpassword::prompt_password_stdout(
+                            "Please enter your password: ",
+                        ).unwrap_or_else(|_| {
+                            // So we need this fallback for pycharm on windows
+                            let mut password = String::new();
+                            io::stdin()
+                                .read_line(&mut password)
+                                .expect("Failed to read line");
+                            password.trim().to_string()
+                        });
 
                         registry = Registry::new(username, password, registry.url);
                         println!("Retrying")

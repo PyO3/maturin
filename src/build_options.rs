@@ -27,10 +27,7 @@ pub struct BuildOptions {
     #[structopt(short = "b", long = "bindings-crate")]
     pub bindings: Option<String>,
     #[structopt(
-        short = "m",
-        long = "manifest-path",
-        parse(from_os_str),
-        default_value = "Cargo.toml"
+        short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,

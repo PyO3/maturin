@@ -6,7 +6,6 @@ use std::path::Path;
 use std::str;
 use CargoToml;
 
-
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct WheelMetadata {
@@ -55,7 +54,7 @@ pub struct Metadata21 {
 }
 
 impl Metadata21 {
-    /// Uses a Cargo.Toml to create the metadata for python packages
+    /// Uses a Cargo.toml to create the metadata for python packages
     ///
     /// manifest_path must be the directory, not the file
     pub fn from_cargo_toml(

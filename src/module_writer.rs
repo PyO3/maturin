@@ -63,13 +63,12 @@ pub struct DevelopModuleWriter {
 impl DevelopModuleWriter {
     /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path) -> Result<Self, Error> {
-        let interpreter =
-            PythonInterpreter::check_executable(target.get_venv_python(&venv_dir), &target)?
-                .ok_or_else(|| {
-                    Context::new(
-                        "Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ",
-                    )
-                })?;
+        let interpreter = PythonInterpreter::check_executable(
+            target.get_venv_python(&venv_dir),
+            &target,
+        )?.ok_or_else(|| {
+            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+        })?;
 
         let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
 
@@ -135,16 +134,17 @@ impl ModuleWriter for WheelWriter {
         bytes: &[u8],
         permissions: u32,
     ) -> Result<(), io::Error> {
-        let target_str = target.as_ref().to_str().unwrap();
+        // So apparently we must use unix style paths for pypi's checks to succeed; Without
+        // the replacing we get a "400 Client Error: Invalid distribution file."
+        let target = target.as_ref().to_str().unwrap().replace("\\", "/");
         let options = zip::write::FileOptions::default()
             .unix_permissions(permissions)
             .compression_method(zip::CompressionMethod::Stored);
-        self.zip.start_file(target_str, options)?;
+        self.zip.start_file(target.clone(), options)?;
         self.zip.write_all(&bytes)?;
 
         let hash = base64::encode_config(&Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
-        self.record
-            .push((target_str.to_string(), hash, bytes.len()));
+        self.record.push((target, hash, bytes.len()));
 
         Ok(())
     }
@@ -159,7 +159,7 @@ impl WheelWriter {
         wheel_dir: &Path,
         metadata21: &Metadata21,
         scripts: &HashMap<String, String>,
-        tags: &[&str],
+        tags: &[String],
     ) -> Result<WheelWriter, io::Error> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
@@ -205,8 +205,7 @@ impl WheelWriter {
         let options =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         let record_file = self.dist_info_dir.join("RECORD");
-        self.zip
-            .start_file(record_file.to_str().unwrap(), options)?;
+        self.zip.start_file(record_file.to_str().unwrap(), options)?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
@@ -219,7 +218,7 @@ impl WheelWriter {
     }
 }
 
-fn wheel_file(tags: &[&str]) -> String {
+fn wheel_file(tags: &[String]) -> String {
     let mut wheel_file = format!(
         "Wheel-Version: 1.0
 Generator: {name} ({version})

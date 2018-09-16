@@ -116,8 +116,8 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
         );
     }
 
-    let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
-        .context("The build plan has an invalid format")?;
+    let plan: SerializedBuildPlan =
+        serde_json::from_slice(&build_plan.stdout).context("The build plan has an invalid format")?;
     Ok(plan)
 }
 
@@ -179,17 +179,29 @@ pub fn compile(
         None
     };
 
-    let mut rustc_args = context.rustc_extra_args.clone();
+    let mut rustc_args: Vec<&str> = context
+        .rustc_extra_args
+        .iter()
+        .map(|x| x.as_str())
+        .collect();
     if context.target.is_macos() {
-        let mac_args = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
-        rustc_args.extend(mac_args.iter().map(ToString::to_string));
+        let mac_args = &["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
+        rustc_args.extend(mac_args);
     }
+
+    let build_args: Vec<_> = cargo_args
+        .iter()
+        .chain(&shared_args)
+        .chain(&["--"])
+        .chain(&rustc_args)
+        .collect();
+    let command_str = build_args
+        .iter()
+        .fold("cargo".to_string(), |acc, x| acc + " " + x);
+
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
-        .args(&cargo_args)
-        .args(&shared_args)
-        .arg("--")
-        .args(rustc_args)
+        .args(&build_args)
         .stdout(Stdio::piped()) // We need to capture the json messages
         .stderr(Stdio::inherit()); // We want to show error messages
 
@@ -239,7 +251,11 @@ pub fn compile(
         .expect("Failed to wait on cargo child process");
 
     if !status.success() {
-        bail!("Cargo build finished with an error")
+        bail!(
+            r#"Cargo build finished with "{}": `{}`"#,
+            status,
+            command_str
+        )
     }
 
     let mut artifacts = HashMap::new();

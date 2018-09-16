@@ -37,8 +37,8 @@ print(json.dumps({
 /// sure that the pointer width (32-bit or 64-bit) matches across platforms
 fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
     let execution = Command::new("py").arg("-0").output();
-    let output = execution
-        .context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
+    let output =
+        execution.context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
     let expr = Regex::new(r" -(\d).(\d)-(\d+)(?: .*)?").unwrap();
     let lines = str::from_utf8(&output.stdout).unwrap().lines();
     let mut interpreter = vec![];

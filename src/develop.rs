@@ -48,7 +48,7 @@ pub fn develop(
 
     match build_context.bridge {
         BridgeModel::Bin => {
-            let artifacts = compile(&build_context, None, None).context(context)?;
+            let artifacts = compile(&build_context, None, &BridgeModel::Bin).context(context)?;
 
             let artifact = artifacts
                 .get("bin")

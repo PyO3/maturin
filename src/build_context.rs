@@ -4,13 +4,13 @@ use auditwheel_rs;
 use build_source_distribution;
 use compile;
 use failure::{Context, Error, ResultExt};
-use module_writer::WheelWriter;
+use Metadata21;
 use module_writer::{write_bin, write_bindings_module, write_cffi_module};
+use module_writer::WheelWriter;
+use PythonInterpreter;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use Metadata21;
-use PythonInterpreter;
 use Target;
 
 /// The way the rust code is bridged with python, i.e. either using extern c and cffi or
@@ -22,18 +22,15 @@ pub enum BridgeModel {
     /// A rust binary to be shipped a python package
     Bin,
     /// A native module with pyo3 or rust-cpython bindings
-    Bindings {
-        interpreter: Vec<PythonInterpreter>,
-        bindings_crate: String,
-    },
+    Bindings(String),
 }
 
 impl BridgeModel {
-    // TODO
-    pub fn to_option(&self) -> Option<String> {
+    /// Returns the name of the bindings crate
+    pub fn unwrap_bindings(&self) -> &str {
         match self {
-            BridgeModel::Cffi | BridgeModel::Bin => None,
-            BridgeModel::Bindings { bindings_crate, .. } => Some(bindings_crate.clone()),
+            BridgeModel::Bindings(value) => &value,
+            _ => panic!("Expected Bindings"),
         }
     }
 }
@@ -65,6 +62,8 @@ pub struct BuildContext {
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
     pub rustc_extra_args: Vec<String>,
+    /// The available python interpreter
+    pub interpreter: Vec<PythonInterpreter>,
 }
 
 impl BuildContext {
@@ -77,7 +76,7 @@ impl BuildContext {
         let wheels = match &self.bridge {
             BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py2.py3".to_string(), None)],
             BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py2.py3".to_string(), None)],
-            BridgeModel::Bindings { interpreter, .. } => self.build_binding_wheels(&interpreter)?,
+            BridgeModel::Bindings(_) => self.build_binding_wheels()?,
         };
 
         Ok(wheels)
@@ -92,10 +91,9 @@ impl BuildContext {
     /// [auditwheel_rs()] if the auditwheel feature isn't deactivated
     pub fn build_binding_wheels(
         &self,
-        interpreter: &[PythonInterpreter],
     ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         let mut wheels = Vec::new();
-        for python_version in interpreter {
+        for python_version in &self.interpreter {
             let artifact = self.compile_cdylib(Some(&python_version))?;
 
             let tag = python_version.get_tag();
@@ -128,22 +126,22 @@ impl BuildContext {
         }
 
         #[cfg(feature = "sdist")]
-        {
-            let sdist_path = wheel_dir.join(format!(
-                "{}-{}.tar.gz",
-                &self.metadata21.get_distribution_encoded(),
-                &self.metadata21.get_version_encoded()
-            ));
+            {
+                let sdist_path = wheel_dir.join(format!(
+                    "{}-{}.tar.gz",
+                    &self.metadata21.get_distribution_encoded(),
+                    &self.metadata21.get_version_encoded()
+                ));
 
-            println!(
-                "Building the source distribution to {}",
-                sdist_path.display()
-            );
-            build_source_distribution(&self, &self.metadata21, &self.scripts, &sdist_path)
-                .context("Failed to build the source distribution")?;
+                println!(
+                    "Building the source distribution to {}",
+                    sdist_path.display()
+                );
+                build_source_distribution(&self, &self.metadata21, &self.scripts, &sdist_path)
+                    .context("Failed to build the source distribution")?;
 
-            wheels.push((sdist_path, None));
-        }
+                wheels.push((sdist_path, None));
+            }
 
         Ok(wheels)
     }
@@ -154,7 +152,7 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<PathBuf, Error> {
-        let artifacts = compile(&self, python_interpreter, self.bridge.to_option())
+        let artifacts = compile(&self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts.get("cdylib").cloned().ok_or_else(|| {
@@ -170,7 +168,7 @@ impl BuildContext {
 
         if !self.skip_auditwheel && target.is_linux() {
             #[cfg(feature = "auditwheel")]
-            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
+                auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }
 
         Ok(artifact)
@@ -205,7 +203,7 @@ impl BuildContext {
 
     /// Builds a wheel that contains a rust binary and an entrypoint for that binary
     pub fn build_bin_wheel(&self) -> Result<PathBuf, Error> {
-        let artifacts = compile(&self, None, self.bridge.to_option())
+        let artifacts = compile(&self, None, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts
@@ -215,7 +213,7 @@ impl BuildContext {
 
         if !self.skip_auditwheel && self.target.is_linux() {
             #[cfg(feature = "auditwheel")]
-            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
+                auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }
 
         let (tag, tags) = self.get_unversal_tags();

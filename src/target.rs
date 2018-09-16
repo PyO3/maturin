@@ -73,8 +73,8 @@ impl Target {
             (&OS::Linux, false) => "manylinux1_i686",
             (&OS::Windows, true) => "win_amd64",
             (&OS::Windows, false) => "win32",
-            (&OS::Macos, true) => "macosx_10_11_x86_64",
-            (&OS::Macos, false) => "macosx_10_11_i686", // TODO: Is that one correct?
+            (&OS::Macos, true) => "macosx_10_7_x86_64",
+            (&OS::Macos, false) => panic!("32-bit wheels are not supported for mac os"),
         }
     }
 

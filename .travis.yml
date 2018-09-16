@@ -4,26 +4,18 @@ env:
   global:
     # Change this to the name of your binary
     - BINARY_NAME="pyo3-pack"
+    - PKG_CONFIG_ALLOW_CROSS=1 # For openssl-sys
     - secure: xxDBiPcL7jDjbnKJ3R0UzTTjaWdITGBHUB7SmjKAy5WPk8Eyx/BgYwGBv2F4/EfSOoOOF+HSUfegXV70r+UHA8OyZtb+h9RLrcBsnEvnrBo2FylQCzz8JeoTdHJikvhH8H9oEbb4jQpwy85r5xDK3+8dMkD2nDjf5vfctblMyShayNTzyMX9DkG5OqZnJ0CXaPzPrtrMXEw3hPpMpyTYBqnZhNVK5IHzXA8kR+6WKgkrf+X/48Or3TDys9ufdO3mEazgxfLJ6WHESQFONYtjT67++rkBNB0jYXf+bFjW2OaEl9Qa8ZHevbWZcJkb3dlW9ktbPnhBmjw14a6Oqhu1w5x2DGVp9196vRwPzXi5YCFXbw93OurF2cDS4NVCk5vZKKuKZvHa6LdS6zVh31uwdOYa5AUK9mYLpwsW0B8k/YyBjea9pkskyBeLXzKpYXgplbMzyqnJZMoiHimeLlHMNNSUlJqKVinDEEEukazABJvN6xcbUunvKj8nQpNVdVg0NPcmMQ2R7CLOJTkhLYqnq+CsX8nTmH5PSh/XxA7NkTfbbibxpWqHp0QDLCFltK23rGAAhs0WkvXF8lSaUSpl7DksA3CfNUn2eI2k+iWao8OD7gu0pFeVOHxND4fuT8Jy8nILySwsECyB0LECPNr++Ymz6+xMHrlaIpGBkCGQXcY=
 
 addons:
   apt:
     packages:
-      # If your project needs any system packages add them here
       - libdbus-1-dev
 
 matrix:
   fast_finish: true
   include:
-    # Those are tested
-    - os: linux
-      rust: nightly
-      env: TARGET=x86_64-unknown-linux-gnu
-    - os: osx
-      rust: nightly
-      env: TARGET=x86_64-apple-darwin
-
-    # These create deployments
+    # These create deployments; Apparently there is not 32 bit mac os
     - os: linux
       rust: stable
       env: TARGET=x86_64-unknown-linux-gnu
@@ -33,17 +25,23 @@ matrix:
     - os: linux
       rust: stable
       env: TARGET=i686-unknown-linux-gnu
-    - os: osx
-      rust: stable
-      env: TARGET=i686-apple-darwin
+      addons:
+        apt:
+          packages:
+            - libdbus-1-dev:i386
+            - libc6-dev-i386
+            - linux-libc-dev:i386
+            - libssl-dev:i386
+            - libgmp-dev:i386
+            - gcc-multilib
 
-    # Other rust versions to check
+    # Those are tested
     - os: linux
-      rust: 1.28.0
+      rust: nightly
       env: TARGET=x86_64-unknown-linux-gnu
-    - os: linux
-      rust: beta
-      env: TARGET=x86_64-unknown-linux-gnu
+    - os: osx
+      rust: nightly
+      env: TARGET=x86_64-apple-darwin
 
 install:
   # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this
@@ -66,16 +64,17 @@ install:
     fi
 
 script:
-  - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-host $TARGET --default-toolchain $TRAVIS_RUST_VERSION 
-  - cargo build
-  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
+  - if [ "$TARGET" == "i686-unknown-linux-gnu" ]; then rustup target add $TARGET; fi
+  - cargo build --target $TARGET
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test --target $TARGET -- --nocapture; fi
 
 before_deploy:
-  - cargo build --release
-  - cd target/release/
+  - cargo build --release --target $TARGET
+  - cargo run --target $TARGET -- publish -b bin --cargo-extra-args="--target=$TARGET" --skip-auditwheel -u konstin
+  - cd target/$TARGET/release/
   # You can add more file to the archive by adding them to this line
-  - tar czf ../../${BINARY_NAME}-$TRAVIS_TAG-$TARGET.tar.gz ${BINARY_NAME}
-  - cd ../..
+  - tar czf ../../../${BINARY_NAME}-$TRAVIS_TAG-$TARGET.tar.gz ${BINARY_NAME}
+  - cd ../../..
 
 deploy:
   - # Add zipped binary to the github release
@@ -91,13 +90,6 @@ deploy:
     # - Paste the output down here
     api_key:
       secure: "bKY3J8FBwgit9inzp2CMxQC3icBVco+COcRnqM6NhaOWX3KefXYG/yWQ7htBkeTRAfQERlOkZZOPsOto2dAD49/Mo4Uin9wbRPjPDGPJpFcQofX5aKHqK1Xd1k96rtZKZRIEG5k5J2IKAzPso3GnA0FESAZlZbxEShSCBD6aOlVmjFXwB2kKzJDo9zECxCg84GSvR/7wQg4hwMaMBa79y3VJRCohGTMaISL22QJ0haG+gqZgTv/r9K8P9lwSMBIiTXX3wFJU871sqUNTSSwkmHlVLhVUOwluv+KQ2DI/V/gWfx2CuiZ/7OQlz4zkOB/Y56msH0G7vOwqbSHLwkMYC+zgDWvF0oI/Eb/mdY5VliQdsLDOkKwWm3EuoEUvCgyV9UB1POxxogIx1sAU+Vt9QUj5/cRIJc1zrtA3LdNlbg9M9rYG8jJ6JMbeYTFDTL6YNoHc2lPAdmAqQAZQy6vyR515vm76JfS7yDcLRXKKhLE4dEPUEpv0qU8vCA/FdaZaiW+GJZSS5rJoE0vHaMRsWkgFLqCNSDpUZBd2x60E+n6dQ7XX4DrJ1JmzcG+IZ6AfuIWyRD9s3jQBxRjtyM61ZGo3Nb4zwX2ML1PftNURNAo8rPlgIrqPaveic45hP6PAeX+iMIWzTckq8shlYngjBTw/3UmA8Z18udrRyKCbygs="
-  - provider: script
-    skip_cleanup: true
-    on: # Create downloads only with stable rust and only for stable releases
-      condition: $TRAVIS_RUST_VERSION = stable
-      tags: true
-    # The password is in the travis ui config
-    script: cargo run -- publish -b bin --cargo-extra-args="--target=$TARGET" --skip-auditwheel -u konstin
 
 branches:
   only:

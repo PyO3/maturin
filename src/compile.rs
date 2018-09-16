@@ -1,15 +1,16 @@
 use atty;
 use atty::Stream;
+use build_context::BridgeModel;
+use BuildContext;
 use failure::{Error, ResultExt};
 use indicatif::{ProgressBar, ProgressStyle};
+use PythonInterpreter;
 use serde_json;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
-use BuildContext;
-use PythonInterpreter;
 
 #[derive(Deserialize)]
 struct BuildPlanEntry {
@@ -128,13 +129,13 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
 pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: Option<String>,
+    bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>, Error> {
     // Some stringly typing to satisfy the borrow checker
     let python_feature = match python_interpreter {
         Some(python_interpreter) => format!(
             "{}/python{}",
-            bindings_crate.unwrap(),
+            bindings_crate.unwrap_bindings(),
             python_interpreter.major
         ),
         None => "".to_string(),
@@ -145,6 +146,17 @@ pub fn compile(
     if python_feature != "" {
         // This is a workaround for a bug in pyo3's build.rs
         shared_args.extend(&["--features", &python_feature]);
+    }
+
+    // We need this to be allows to pass rustce extra args
+    // TODO: What do we do when there are multiple bin targets?
+    match bindings_crate {
+        BridgeModel::Bin => {
+            shared_args.push("--bins")
+        }
+        BridgeModel::Cffi | BridgeModel::Bindings(_) => {
+            shared_args.push("--lib")
+        }
     }
 
     shared_args.extend(context.cargo_extra_args.iter().map(|x| x.as_str()));
@@ -219,9 +231,9 @@ pub fn compile(
             // Extract the location of the .so/.dll/etc. from cargo's json output
             if message.target.name == context.module_name
                 || message.target.name == context.metadata21.name
-            {
-                artifact_messages.push(message);
-            }
+                {
+                    artifact_messages.push(message);
+                }
 
             // The progress bar isn't an exact science and stuff might get out-of-sync,
             // but that isn't big problem since the bar is only to give the user an estimate

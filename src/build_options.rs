@@ -1,18 +1,19 @@
 use build_context::BridgeModel;
+use BuildContext;
 use cargo_metadata;
 use cargo_toml::CargoTomlMetadata;
 use cargo_toml::CargoTomlMetadataPyo3Pack;
+use CargoToml;
 use failure::{Error, ResultExt};
+use Metadata21;
+use PythonInterpreter;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use toml;
-use BuildContext;
-use CargoToml;
-use Metadata21;
-use PythonInterpreter;
 use Target;
+use failure::err_msg;
+use toml;
 
 /// High level API for building wheels from a crate which can be also used for
 /// the CLI
@@ -27,7 +28,7 @@ pub struct BuildOptions {
     #[structopt(short = "b", long = "bindings-crate")]
     pub bindings: Option<String>,
     #[structopt(
-        short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
+    short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
@@ -89,11 +90,11 @@ impl BuildOptions {
             .context("Failed to parse Cargo.toml into python metadata")?;
         let scripts = match cargo_toml.package.metadata {
             Some(CargoTomlMetadata {
-                pyo3_pack:
-                    Some(CargoTomlMetadataPyo3Pack {
-                        scripts: Some(ref scripts),
-                    }),
-            }) => scripts.clone(),
+                     pyo3_pack:
+                     Some(CargoTomlMetadataPyo3Pack {
+                              scripts: Some(ref scripts),
+                          }),
+                 }) => scripts.clone(),
             _ => HashMap::new(),
         };
 
@@ -117,7 +118,7 @@ impl BuildOptions {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
-        let bridge = find_bridge(&cargo_metadata, &self.bindings, &self.interpreter, &target)?;
+        let bridge = find_bridge(&cargo_metadata, self.bindings.as_ref().map(|x| &**x))?;
 
         if bridge != BridgeModel::Bin {
             if module_name.contains('-') {
@@ -127,6 +128,9 @@ impl BuildOptions {
                 );
             }
         }
+
+
+        let interpreter = find_interpreter(&bridge, &self.interpreter, &target)?;
 
         Ok(BuildContext {
             target,
@@ -140,15 +144,14 @@ impl BuildOptions {
             skip_auditwheel: self.skip_auditwheel,
             cargo_extra_args: self.cargo_extra_args,
             rustc_extra_args: self.rustc_extra_args,
+            interpreter,
         })
     }
 }
 
 pub fn find_bridge(
     cargo_metadata: &cargo_metadata::Metadata,
-    bridge: &Option<String>,
-    executables: &[String],
-    target: &Target,
+    bridge: Option<&str>,
 ) -> Result<BridgeModel, Error> {
     let deps: HashSet<String> = cargo_metadata
         .resolve
@@ -159,11 +162,11 @@ pub fn find_bridge(
         .map(|node| node.id.split(' ').nth(0).unwrap().to_string())
         .collect();
 
-    let bridge_crate = if let Some(ref bindings) = bridge {
+    if let Some(bindings) = bridge {
         if bindings == "cffi" {
-            return Ok(BridgeModel::Cffi);
+            Ok(BridgeModel::Cffi)
         } else if bindings == "bin" {
-            return Ok(BridgeModel::Bin);
+            Ok(BridgeModel::Bin)
         } else {
             if !deps.contains(bindings) {
                 bail!(
@@ -172,51 +175,72 @@ pub fn find_bridge(
                 );
             }
 
-            bindings.clone()
+            Ok(BridgeModel::Bindings(bindings.to_string()))
         }
     } else if deps.contains("pyo3") {
         println!("Found pyo3 bindings");
-        "pyo3".to_string()
+        Ok(BridgeModel::Bindings("pyo3".to_string()))
     } else if deps.contains("rust-cpython") {
         println!("Found rust-python bindings");
-        "rust_cpython".to_string()
+        Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {
-        bail!("Couldn't find any bindings; Please specify them with -b");
-    };
-
-    let available_versions = if !executables.is_empty() {
-        PythonInterpreter::check_executables(&executables, &target)?
-    } else {
-        PythonInterpreter::find_all(&Target::current())?
-    };
-
-    if available_versions.is_empty() {
-        bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+        bail!("Couldn't find any bindings; Please specify them with -b")
     }
+}
 
-    println!(
-        "Found {}",
-        available_versions
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<String>>()
-            .join(", ")
-    );
+pub fn find_interpreter(bridge: &BridgeModel, interpreter: &[String], target: &Target) -> Result<Vec<PythonInterpreter>, Error> {
+    Ok(match bridge {
+        BridgeModel::Bindings(_) => {
+            let interpreter = if !interpreter.is_empty() {
+                PythonInterpreter::check_executables(&interpreter, &target)?
+            } else {
+                PythonInterpreter::find_all(&Target::current())?
+            };
 
-    Ok(BridgeModel::Bindings {
-        interpreter: available_versions,
-        bindings_crate: bridge_crate,
+            if interpreter.is_empty() {
+                bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+            }
+
+            println!(
+                "Found {}",
+                interpreter
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            );
+
+            interpreter
+        }
+        BridgeModel::Cffi => {
+            let executable = if interpreter.is_empty() {
+                target.get_python()
+            } else if interpreter.len() == 1 {
+                PathBuf::from(interpreter[0].clone())
+            } else {
+                bail!("You can only specify one python interpreter for cffi compilation");
+            };
+            let err_message = "Failed to find python interpreter for generating cffi bindings";
+
+            let interpreter = PythonInterpreter::check_executable(executable, &target).context(err_msg(err_message))?.ok_or_else(|| err_msg(err_message))?;
+
+            println!("Using {} to generate the cffi bindings", interpreter);
+
+            vec![interpreter]
+        }
+        BridgeModel::Bin => {
+            vec![]
+        }
     })
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::path::Path;
+    use super::*;
 
     #[test]
     fn test_find_bridge() {
-        let target = Target::current();
         let get_fourtytwo = cargo_metadata::metadata_deps(
             Some(&Path::new("get-fourtytwo").join("Cargo.toml")),
             true,
@@ -227,34 +251,32 @@ mod test {
                 .unwrap();
 
         assert!(
-            match find_bridge(&get_fourtytwo, &None, &[], &target).unwrap() {
+            match find_bridge(&get_fourtytwo, None).unwrap() {
                 BridgeModel::Bindings { .. } => true,
                 _ => false,
             }
         );
 
         assert!(
-            match find_bridge(&get_fourtytwo, &Some("pyo3".to_string()), &[], &target).unwrap() {
+            match find_bridge(&get_fourtytwo, Some("pyo3")).unwrap() {
                 BridgeModel::Bindings { .. } => true,
                 _ => false,
             }
         );
 
         assert_eq!(
-            find_bridge(&points, &Some("cffi".to_string()), &[], &target).unwrap(),
+            find_bridge(&points, Some("cffi")).unwrap(),
             BridgeModel::Cffi
         );
 
         assert!(
             find_bridge(
                 &get_fourtytwo,
-                &Some("rust-cpython".to_string()),
-                &[],
-                &target,
+                Some("rust-cpython"),
             ).is_err()
         );
 
-        assert!(find_bridge(&points, &Some("rust-cpython".to_string()), &[], &target).is_err());
-        assert!(find_bridge(&points, &Some("pyo3".to_string()), &[], &target).is_err());
+        assert!(find_bridge(&points, Some("rust-cpython")).is_err());
+        assert!(find_bridge(&points, Some("pyo3")).is_err());
     }
 }

@@ -14,11 +14,13 @@ environment:
       CHANNEL: stable
     - TARGET: x86_64-pc-windows-msvc
       CHANNEL: stable
-    # Only check compilation
-    - TARGET: i686-pc-windows-gnu
-      CHANNEL: stable
-    - TARGET: x86_64-pc-windows-gnu
-      CHANNEL: stable
+
+    # Commented out to avoid duplicate uploads to pypi
+    #- TARGET: i686-pc-windows-gnu
+    #  CHANNEL: stable
+    #- TARGET: x86_64-pc-windows-gnu
+    #  CHANNEL: stable
+
     # For the integration test
     # The test passes, but the build still fails for an unknown reason.
     # If this is the last entry, we still get the binaries on releases until the this cause is fixed
@@ -60,10 +62,7 @@ before_deploy:
   - cargo build --release
   # I don't know how I can create a script deployment like in travis in appveyor, so let's hijack before_deploy
   # Also we only need one version for win32 and one for win_amd64, so we only deploy to pypi for msvc
-  - ps: |
-      if ($env:target -like "*-msvc") {
-        cargo run -- publish -b bin -u konstin
-      }
+  - cargo run -- publish -b bin -u konstin
   # Grab the binary and pack it into a zip archive
   - cd target\release\
   # You can add more file to the archive by adding them to this line

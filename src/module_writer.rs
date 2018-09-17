@@ -63,12 +63,13 @@ pub struct DevelopModuleWriter {
 impl DevelopModuleWriter {
     /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path) -> Result<Self, Error> {
-        let interpreter = PythonInterpreter::check_executable(
-            target.get_venv_python(&venv_dir),
-            &target,
-        )?.ok_or_else(|| {
-            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-        })?;
+        let interpreter =
+            PythonInterpreter::check_executable(target.get_venv_python(&venv_dir), &target)?
+                .ok_or_else(|| {
+                    Context::new(
+                        "Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ",
+                    )
+                })?;
 
         let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
 
@@ -205,7 +206,8 @@ impl WheelWriter {
         let options =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         let record_file = self.dist_info_dir.join("RECORD");
-        self.zip.start_file(record_file.to_str().unwrap(), options)?;
+        self.zip
+            .start_file(record_file.to_str().unwrap(), options)?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;

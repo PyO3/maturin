@@ -34,8 +34,9 @@ pub fn develop(
         bindings,
         manifest_path: manifest_file.to_path_buf(),
         out: None,
-        debug: !release,
-        skip_auditwheel: false,
+        skip_auditwheel: true,
+        target: None,
+        release,
         cargo_extra_args,
         rustc_extra_args,
     };
@@ -52,7 +53,7 @@ pub fn develop(
 
             let artifact = artifacts
                 .get("bin")
-                .ok_or(format_err!("Cargo didn't build a binary"))?;
+                .ok_or_else(|| format_err!("Cargo didn't build a binary"))?;
 
             // Copy the artifact into the same folder as pip and python
             let bin_name = artifact.file_name().unwrap();
@@ -69,7 +70,7 @@ pub fn develop(
                 &build_context.target,
             )?;
         }
-        BridgeModel::Bindings { .. } => {
+        BridgeModel::Bindings(_) => {
             let artifact = build_context
                 .compile_cdylib(Some(&interpreter))
                 .context(context)?;

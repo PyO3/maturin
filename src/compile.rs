@@ -1,16 +1,16 @@
 use atty;
 use atty::Stream;
 use build_context::BridgeModel;
-use BuildContext;
 use failure::{Error, ResultExt};
 use indicatif::{ProgressBar, ProgressStyle};
-use PythonInterpreter;
 use serde_json;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
+use BuildContext;
+use PythonInterpreter;
 
 #[derive(Deserialize)]
 struct BuildPlanEntry {
@@ -99,7 +99,6 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
         // the rust-toolchain file is ignored
         .args(build_plan_args)
         .args(shared_args)
-        .stderr(Stdio::inherit()) // Forward any error to the user
         .output()
         .map_err(|e| {
             format_err!(
@@ -117,8 +116,8 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
         );
     }
 
-    let plan: SerializedBuildPlan =
-        serde_json::from_slice(&build_plan.stdout).context("The build plan has an invalid format")?;
+    let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
+        .context("The build plan has an invalid format")?;
     Ok(plan)
 }
 
@@ -148,20 +147,16 @@ pub fn compile(
         shared_args.extend(&["--features", &python_feature]);
     }
 
-    // We need this to be allows to pass rustce extra args
+    // We need to pass --bins / --lib to set the rustc extra args later
     // TODO: What do we do when there are multiple bin targets?
     match bindings_crate {
-        BridgeModel::Bin => {
-            shared_args.push("--bins")
-        }
-        BridgeModel::Cffi | BridgeModel::Bindings(_) => {
-            shared_args.push("--lib")
-        }
+        BridgeModel::Bin => shared_args.push("--bins"),
+        BridgeModel::Cffi | BridgeModel::Bindings(_) => shared_args.push("--lib"),
     }
 
     shared_args.extend(context.cargo_extra_args.iter().map(|x| x.as_str()));
 
-    if !context.debug {
+    if context.release {
         shared_args.push("--release");
     }
 
@@ -196,9 +191,12 @@ pub fn compile(
         .iter()
         .map(|x| x.as_str())
         .collect();
+
     if context.target.is_macos() {
-        let mac_args = &["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
-        rustc_args.extend(mac_args);
+        if let BridgeModel::Bindings(_) = bindings_crate {
+            let mac_args = &["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
+            rustc_args.extend(mac_args);
+        }
     }
 
     let build_args: Vec<_> = cargo_args
@@ -231,9 +229,9 @@ pub fn compile(
             // Extract the location of the .so/.dll/etc. from cargo's json output
             if message.target.name == context.module_name
                 || message.target.name == context.metadata21.name
-                {
-                    artifact_messages.push(message);
-                }
+            {
+                artifact_messages.push(message);
+            }
 
             // The progress bar isn't an exact science and stuff might get out-of-sync,
             // but that isn't big problem since the bar is only to give the user an estimate

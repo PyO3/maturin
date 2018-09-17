@@ -41,7 +41,39 @@ Pip allows adding so called console scripts, which are shell commands that execu
 get_42 = "get_fourtytwo:DummyClass.get_42"
 ```
 
+## pyo3 and rust-cpython
+
 For pyo3 and rust-cpython, pyo3-pack can only build packages for installed python versions, so you might want to use pyenv, deadsnakes or docker for building. If you don't set your own interpreters with `-i`, a heuristic is used to search for python installations. You can get a list all found versions with the `list-python` subcommand.
+
+
+## Cffi
+
+ Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
+
+ Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need to use a build script that writes c headers to a file called `target/header.h`
+
+```rust
+extern crate cbindgen;
+
+use std::env;
+use std::path::Path;
+
+fn main() {
+    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+
+    let mut config: cbindgen::Config = Default::default();
+    config.language = cbindgen::Language::C;
+    cbindgen::generate_with_config(&crate_dir, config)
+        .expect("Unable to generate bindings")
+        .write_to_file(Path::new("target").join("header.h"));
+}
+```
+
+## Manylinux and auditwheel
+
+For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that checks the generated library, so there's no need to use external tools. If you want to disable the manylinux compliance checks for some reason, use the `--skip-auditwheel` flag.
+
+pyo3-pack itself is manylinux compliant when compiled with the `musl` feature and a musl target, which is true for the version published on pypi. The binaries on the release pages have keyring integration (though the `password-storage` feature), which is not manylinux compliant.
 
 ### Build
 
@@ -50,12 +82,14 @@ USAGE:
     pyo3-pack build [FLAGS] [OPTIONS]
 
 FLAGS:
-    -d, --debug              Do a debug build (don't pass --release to cargo)
     -h, --help               Prints help information
+        --release            Pass --release to cargo
         --skip-auditwheel    Don't check for manylinux compliance
     -V, --version            Prints version information
 
 OPTIONS:
+    -m, --manifest-path <PATH>                      The path to the Cargo.toml [default: Cargo.toml]
+        --target <TRIPLE>                           The --target option for cargo
     -b, --bindings-crate <bindings>
             The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
 
@@ -65,7 +99,6 @@ OPTIONS:
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
-    -m, --manifest-path <manifest_path>             The path to the Cargo.toml [default: Cargo.toml]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -80,12 +113,14 @@ USAGE:
     pyo3-pack publish [FLAGS] [OPTIONS]
 
 FLAGS:
-    -d, --debug              Do a debug build (don't pass --release to cargo)
     -h, --help               Prints help information
+        --release            Pass --release to cargo
         --skip-auditwheel    Don't check for manylinux compliance
     -V, --version            Prints version information
 
 OPTIONS:
+    -m, --manifest-path <PATH>                      The path to the Cargo.toml [default: Cargo.toml]
+        --target <TRIPLE>                           The --target option for cargo
     -b, --bindings-crate <bindings>
             The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
 
@@ -95,7 +130,6 @@ OPTIONS:
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
-    -m, --manifest-path <manifest_path>             The path to the Cargo.toml [default: Cargo.toml]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -119,7 +153,7 @@ USAGE:
 
 FLAGS:
     -h, --help       Prints help information
-        --release    Compile in release mode. This is useful e.g. for benchmarking
+        --release    Pass --release to cargo
     -V, --version    Prints version information
 
 OPTIONS:
@@ -133,36 +167,6 @@ OPTIONS:
         --rustc-extra-args <rustc_extra_args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 ```
-
-
-## Cffi
-
- Cffi wheels are compatible with all python versions, but they need to have `cffi` installed to build (`pip install cffi`). Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need to use a build script that writes c headers to a file called `target/header.h`
-
-```rust
-extern crate cbindgen;
-
-use std::env;
-use std::path::Path;
-
-fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-
-    let mut config: cbindgen::Config = Default::default();
-    config.language = cbindgen::Language::C;
-    cbindgen::generate_with_config(&crate_dir, config)
-        .expect("Unable to generate bindings")
-        .write_to_file(Path::new("target").join("header.h"));
-}
-```
-
-## Manylinux and auditwheel
-
-For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that checks the generated library, so there's no need to use external tools. If you want to disable the manylinux compliance checks for some reason, use the `--skip-auditwheel` flag.
-
-To ship a completely static binary with musl, you can use `pyo3-pack build -b bin --cargo-extra-args="--target=x86_64-unknown-linux-musl"`.
-
-Note that the pyo3-pack pip package is not manylinux compliant (A compliant package, which you get with `--no-default-features --features auditwheel`, can neither upload nor use the keyring)
 
 ## Code
 

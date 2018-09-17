@@ -4,13 +4,13 @@ use auditwheel_rs;
 use build_source_distribution;
 use compile;
 use failure::{Context, Error, ResultExt};
-use Metadata21;
-use module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use module_writer::WheelWriter;
-use PythonInterpreter;
+use module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use Metadata21;
+use PythonInterpreter;
 use Target;
 
 /// The way the rust code is bridged with python, i.e. either using extern c and cffi or
@@ -54,8 +54,8 @@ pub struct BuildContext {
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     pub out: PathBuf,
-    /// Do a debug build (don't pass --release to cargo)
-    pub debug: bool,
+    /// Pass --release to cargo
+    pub release: bool,
     /// Don't check for manylinux compliance
     pub skip_auditwheel: bool,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
@@ -126,22 +126,22 @@ impl BuildContext {
         }
 
         #[cfg(feature = "sdist")]
-            {
-                let sdist_path = wheel_dir.join(format!(
-                    "{}-{}.tar.gz",
-                    &self.metadata21.get_distribution_encoded(),
-                    &self.metadata21.get_version_encoded()
-                ));
+        {
+            let sdist_path = wheel_dir.join(format!(
+                "{}-{}.tar.gz",
+                &self.metadata21.get_distribution_encoded(),
+                &self.metadata21.get_version_encoded()
+            ));
 
-                println!(
-                    "Building the source distribution to {}",
-                    sdist_path.display()
-                );
-                build_source_distribution(&self, &self.metadata21, &self.scripts, &sdist_path)
-                    .context("Failed to build the source distribution")?;
+            println!(
+                "Building the source distribution to {}",
+                sdist_path.display()
+            );
+            build_source_distribution(&self, &self.metadata21, &self.scripts, &sdist_path)
+                .context("Failed to build the source distribution")?;
 
-                wheels.push((sdist_path, None));
-            }
+            wheels.push((sdist_path, None));
+        }
 
         Ok(wheels)
     }
@@ -168,7 +168,7 @@ impl BuildContext {
 
         if !self.skip_auditwheel && target.is_linux() {
             #[cfg(feature = "auditwheel")]
-                auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
+            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }
 
         Ok(artifact)
@@ -213,7 +213,7 @@ impl BuildContext {
 
         if !self.skip_auditwheel && self.target.is_linux() {
             #[cfg(feature = "auditwheel")]
-                auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
+            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }
 
         let (tag, tags) = self.get_unversal_tags();

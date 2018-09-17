@@ -1,19 +1,19 @@
 use build_context::BridgeModel;
-use BuildContext;
 use cargo_metadata;
 use cargo_toml::CargoTomlMetadata;
 use cargo_toml::CargoTomlMetadataPyo3Pack;
-use CargoToml;
+use failure::err_msg;
 use failure::{Error, ResultExt};
-use Metadata21;
-use PythonInterpreter;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use Target;
-use failure::err_msg;
 use toml;
+use BuildContext;
+use CargoToml;
+use Metadata21;
+use PythonInterpreter;
+use Target;
 
 /// High level API for building wheels from a crate which can be also used for
 /// the CLI
@@ -28,7 +28,11 @@ pub struct BuildOptions {
     #[structopt(short = "b", long = "bindings-crate")]
     pub bindings: Option<String>,
     #[structopt(
-    short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
+        short = "m",
+        long = "manifest-path",
+        parse(from_os_str),
+        default_value = "Cargo.toml",
+        name = "PATH"
     )]
     /// The path to the Cargo.toml
     pub manifest_path: PathBuf,
@@ -36,12 +40,15 @@ pub struct BuildOptions {
     /// directory in the project's target directory
     #[structopt(short = "o", long = "out", parse(from_os_str))]
     pub out: Option<PathBuf>,
-    /// Do a debug build (don't pass --release to cargo)
-    #[structopt(short = "d", long = "debug")]
-    pub debug: bool,
+    /// Pass --release to cargo
+    #[structopt(long = "release")]
+    pub release: bool,
     /// Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
+    /// The --target option for cargo
+    #[structopt(long = "target", name = "TRIPLE")]
+    pub target: Option<String>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     #[structopt(long = "cargo-extra-args")]
     pub cargo_extra_args: Vec<String>,
@@ -57,8 +64,9 @@ impl Default for BuildOptions {
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
             out: None,
-            debug: false,
+            release: false,
             skip_auditwheel: false,
+            target: None,
             cargo_extra_args: Vec::new(),
             rustc_extra_args: Vec::new(),
         }
@@ -90,11 +98,11 @@ impl BuildOptions {
             .context("Failed to parse Cargo.toml into python metadata")?;
         let scripts = match cargo_toml.package.metadata {
             Some(CargoTomlMetadata {
-                     pyo3_pack:
-                     Some(CargoTomlMetadataPyo3Pack {
-                              scripts: Some(ref scripts),
-                          }),
-                 }) => scripts.clone(),
+                pyo3_pack:
+                    Some(CargoTomlMetadataPyo3Pack {
+                        scripts: Some(ref scripts),
+                    }),
+            }) => scripts.clone(),
             _ => HashMap::new(),
         };
 
@@ -120,17 +128,19 @@ impl BuildOptions {
 
         let bridge = find_bridge(&cargo_metadata, self.bindings.as_ref().map(|x| &**x))?;
 
-        if bridge != BridgeModel::Bin {
-            if module_name.contains('-') {
-                bail!(
-                    "The module name must not contains a minus \
-                     (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
-                );
-            }
+        if bridge != BridgeModel::Bin && module_name.contains('-') {
+            bail!(
+                "The module name must not contains a minus \
+                 (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
+            );
         }
 
-
         let interpreter = find_interpreter(&bridge, &self.interpreter, &target)?;
+
+        let mut cargo_extra_args = self.cargo_extra_args.clone();
+        if let Some(target) = self.target {
+            cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
+        }
 
         Ok(BuildContext {
             target,
@@ -140,9 +150,9 @@ impl BuildOptions {
             module_name,
             manifest_path: self.manifest_path,
             out: wheel_dir,
-            debug: self.debug,
+            release: self.release,
             skip_auditwheel: self.skip_auditwheel,
-            cargo_extra_args: self.cargo_extra_args,
+            cargo_extra_args,
             rustc_extra_args: self.rustc_extra_args,
             interpreter,
         })
@@ -188,7 +198,11 @@ pub fn find_bridge(
     }
 }
 
-pub fn find_interpreter(bridge: &BridgeModel, interpreter: &[String], target: &Target) -> Result<Vec<PythonInterpreter>, Error> {
+pub fn find_interpreter(
+    bridge: &BridgeModel,
+    interpreter: &[String],
+    target: &Target,
+) -> Result<Vec<PythonInterpreter>, Error> {
     Ok(match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
@@ -222,22 +236,22 @@ pub fn find_interpreter(bridge: &BridgeModel, interpreter: &[String], target: &T
             };
             let err_message = "Failed to find python interpreter for generating cffi bindings";
 
-            let interpreter = PythonInterpreter::check_executable(executable, &target).context(err_msg(err_message))?.ok_or_else(|| err_msg(err_message))?;
+            let interpreter = PythonInterpreter::check_executable(executable, &target)
+                .context(err_msg(err_message))?
+                .ok_or_else(|| err_msg(err_message))?;
 
             println!("Using {} to generate the cffi bindings", interpreter);
 
             vec![interpreter]
         }
-        BridgeModel::Bin => {
-            vec![]
-        }
+        BridgeModel::Bin => vec![],
     })
 }
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_find_bridge() {
@@ -250,31 +264,22 @@ mod test {
             cargo_metadata::metadata_deps(Some(&Path::new("points").join("Cargo.toml")), true)
                 .unwrap();
 
-        assert!(
-            match find_bridge(&get_fourtytwo, None).unwrap() {
-                BridgeModel::Bindings { .. } => true,
-                _ => false,
-            }
-        );
+        assert!(match find_bridge(&get_fourtytwo, None).unwrap() {
+            BridgeModel::Bindings(_) => true,
+            _ => false,
+        });
 
-        assert!(
-            match find_bridge(&get_fourtytwo, Some("pyo3")).unwrap() {
-                BridgeModel::Bindings { .. } => true,
-                _ => false,
-            }
-        );
+        assert!(match find_bridge(&get_fourtytwo, Some("pyo3")).unwrap() {
+            BridgeModel::Bindings(_) => true,
+            _ => false,
+        });
 
         assert_eq!(
             find_bridge(&points, Some("cffi")).unwrap(),
             BridgeModel::Cffi
         );
 
-        assert!(
-            find_bridge(
-                &get_fourtytwo,
-                Some("rust-cpython"),
-            ).is_err()
-        );
+        assert!(find_bridge(&get_fourtytwo, Some("rust-cpython"),).is_err());
 
         assert!(find_bridge(&points, Some("rust-cpython")).is_err());
         assert!(find_bridge(&points, Some("pyo3")).is_err());

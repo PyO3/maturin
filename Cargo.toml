@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pack"
-version = "0.3.3"
+version = "0.3.4"
 description = "Build and publish crates with pyo3 bindings as python packages"
 exclude = ["get-fourtytwo/**/*", "integration-test/**/*", "sysconfig/*"]
 readme = "Readme.md"
@@ -50,13 +50,16 @@ openssl = { version = "0.10", features = ["vendored"], optional = true }
 indoc = "0.2.8"
 
 [features]
-default = ["auditwheel", "upload", "password-storage"]
+default = ["auditwheel", "upload"]
 auditwheel = ["goblin"]
-# sdists can be created, but they are currently useless (#2)
-sdist = ["tar", "libflate"]
 upload = ["reqwest"]
 password-storage = ["upload", "keyring"]
-musl_wip = ["openssl"]
+
+# This will make rewquest use a statically linked version of openssl
+musl = ["openssl"]
+
+# sdists can be created, but they are currently useless (#2)
+sdist = ["tar", "libflate"]
 
 [workspace]
 members = [

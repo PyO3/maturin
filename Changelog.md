@@ -5,8 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2018-09-18
 
-## [Unreleased]
+### Added
+
+ * A `--target` option which behaves like cargo option of the same name
+
+### Changed
+
+ * Musl and auditwheel compliance: Using the new `musl` feature combined with the musl target, you can build completely static binaries. The `password-storage`, which enables keyring integration, is now disabled by default. The Pypi packages are now statically linked with musl so that they are audtiwheel compliant.
+ * Replaced `--debug` with `--release`. All builds are now debug by default
+
+## [0.3.3] - 2018-09-17
 
 ### Added
 
@@ -16,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Fixed
  
  * Usage with stable
+ * Wrong tags in WHEEL file on non-linux platforms
+ * Uploading on windows
 
 ## [0.3.1] - 2017-09-14
 
@@ -56,8 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.1...HEAD
-[0.3.0]: https://github.com/pyo3/pyo3-pack/compare/v0.3.0...v0.3.1
+[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.3...HEAD
+[0.3.4]: https://github.com/pyo3/pyo3-pack/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/pyo3/pyo3-pack/compare/v0.3.1...v0.3.3
+[0.3.1]: https://github.com/pyo3/pyo3-pack/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/pyo3/pyo3-pack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/pyo3/pyo3-pack/compare/v0.1.0...v0.2.0
 

@@ -2,6 +2,8 @@
 //!
 //! Run with --help for usage information
 
+#![cfg_attr(feature = "cargo-clippy", feature(tool_lints))]
+
 extern crate core;
 #[macro_use]
 extern crate failure;
@@ -37,7 +39,7 @@ use structopt::StructOpt;
 /// 2. keyring
 /// 3. stdin
 #[cfg(feature = "upload")]
-fn get_password(username: &str) -> String {
+fn get_password(_username: &str) -> String {
     if let Ok(password) = env::var("PYO3_PACK_PASSWORD") {
         return password;
     };
@@ -45,7 +47,7 @@ fn get_password(username: &str) -> String {
     #[cfg(feature = "keyring")]
     {
         let service = env!("CARGO_PKG_NAME");
-        let keyring = Keyring::new(&service, &username);
+        let keyring = Keyring::new(&service, &_username);
         if let Ok(password) = keyring.get_password() {
             return password;
         };
@@ -89,7 +91,9 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry, Error> {
 #[derive(Debug, StructOpt)]
 struct PublishOpt {
     #[structopt(
-        short = "r", long = "repository-url", default_value = "https://upload.pypi.org/legacy/"
+        short = "r",
+        long = "repository-url",
+        default_value = "https://upload.pypi.org/legacy/"
     )]
     /// The url of registry where the wheels are uploaded to
     registry: String,
@@ -104,7 +108,7 @@ struct PublishOpt {
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "pyo3-pack")]
-#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3 bindings as python packages
 enum Opt {
     #[structopt(name = "build")]
@@ -134,11 +138,14 @@ enum Opt {
         #[structopt(short = "b", long = "bindings-crate")]
         binding_crate: Option<String>,
         #[structopt(
-            short = "m", long = "manifest-path", parse(from_os_str), default_value = "Cargo.toml"
+            short = "m",
+            long = "manifest-path",
+            parse(from_os_str),
+            default_value = "Cargo.toml"
         )]
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
-        /// Compile in release mode. This is useful e.g. for benchmarking
+        /// Pass --release to cargo
         #[structopt(long = "release")]
         release: bool,
         /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
@@ -160,6 +167,11 @@ fn run() -> Result<(), Error> {
         #[cfg(feature = "upload")]
         Opt::Publish { build, publish } => {
             let build_context = build.into_build_context()?;
+
+            if !build_context.release {
+                eprintln!("Warning: You're publishing debug wheels");
+            }
+
             let wheels = build_context.build_wheels()?;
 
             let mut registry = complete_registry(&publish)?;
@@ -203,16 +215,16 @@ fn run() -> Result<(), Error> {
                         }
 
                         let username = get_username();
-                        let password = rpassword::prompt_password_stdout(
-                            "Please enter your password: ",
-                        ).unwrap_or_else(|_| {
-                            // So we need this fallback for pycharm on windows
-                            let mut password = String::new();
-                            io::stdin()
-                                .read_line(&mut password)
-                                .expect("Failed to read line");
-                            password.trim().to_string()
-                        });
+                        let password =
+                            rpassword::prompt_password_stdout("Please enter your password: ")
+                                .unwrap_or_else(|_| {
+                                    // So we need this fallback for pycharm on windows
+                                    let mut password = String::new();
+                                    io::stdin()
+                                        .read_line(&mut password)
+                                        .expect("Failed to read line");
+                                    password.trim().to_string()
+                                });
 
                         registry = Registry::new(username, password, registry.url);
                         println!("Retrying")

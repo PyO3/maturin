@@ -11,6 +11,7 @@ addons:
   apt:
     packages:
       - libdbus-1-dev
+      - musl-tools
 
 matrix:
   fast_finish: true
@@ -18,22 +19,25 @@ matrix:
     # These create deployments; Apparently there is not 32 bit mac os
     - os: linux
       rust: stable
-      env: TARGET=x86_64-unknown-linux-gnu
+      env: TARGET=x86_64-unknown-linux-musl
     - os: osx
       rust: stable
       env: TARGET=x86_64-apple-darwin
     - os: linux
       rust: stable
-      env: TARGET=i686-unknown-linux-gnu
+      env: TARGET=i686-unknown-linux-musl
       addons:
         apt:
           packages:
             - libdbus-1-dev:i386
-            - libc6-dev-i386
-            - linux-libc-dev:i386
-            - libssl-dev:i386
             - libgmp-dev:i386
-            - gcc-multilib
+            - binutils:i386
+            # We actually only need musl-tools:i386 and gcc-multilib, but we need the others to get apt to install them
+            - cpp-4.8:i386
+            - musl:i386
+            - musl-tools:i386
+            - gcc-multilib:i386
+            - cpp:i386
 
     # Those are tested
     - os: linux
@@ -64,17 +68,24 @@ install:
     fi
 
 script:
-  - if [ "$TARGET" == "i686-unknown-linux-gnu" ]; then rustup target add $TARGET; fi
-  - cargo build --target $TARGET
-  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test --target $TARGET -- --nocapture; fi
+  - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
 
 before_deploy:
-  - cargo build --release --target $TARGET
-  - cargo run --target $TARGET -- publish -b bin --cargo-extra-args="--target=$TARGET" --skip-auditwheel -u konstin
+  # We don't care for manylinux compliance for the downloads, so we can use the keyring.
+  # The stack protector story is a weird one; On 32 bit, you get errors such as the following without the option
+  # /usr/bin/ld: apps/openssl: hidden symbol `__stack_chk_fail_local' isn't defined
+  # I assume that this is a musl bug fixed in 2015 that didn't make into ubuntu 14.04, but that special
+  # case seems to be documented nowhere else:
+  # http://git.musl-libc.org/cgit/musl/commit/?id=55d061f031085f24d138664c897791aebe9a2fab
+  # We can't have a more recent musl on 14.04 (there's no ppa), so we have to disable that feature
+  - CFLAGS="-fno-stack-protector" cargo build --release --target $TARGET --features "password-storage musl"
   - cd target/$TARGET/release/
   # You can add more file to the archive by adding them to this line
   - tar czf ../../../${BINARY_NAME}-$TRAVIS_TAG-$TARGET.tar.gz ${BINARY_NAME}
   - cd ../../..
+  # We do care for manylinux compliance, so we use the musl feature to get static binaries for pypi
+  - CFLAGS="-fno-stack-protector" cargo run --release --target $TARGET --features musl -- publish -u konstin --release -b bin --target $TARGET --cargo-extra-args="--features=musl"
 
 deploy:
   - # Add zipped binary to the github release
@@ -99,5 +110,4 @@ branches:
     - /^v\d+\.\d+\.\d+.*$/
 
 notifications:
-  email:
-    on_success: never
+  email: false

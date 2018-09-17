@@ -59,15 +59,16 @@ test_script:
       }
 
 before_deploy:
-  - cargo build --release
-  # I don't know how I can create a script deployment like in travis in appveyor, so let's hijack before_deploy
-  # Also we only need one version for win32 and one for win_amd64, so we only deploy to pypi for msvc
-  - cargo run -- publish -b bin -u konstin
+  - cargo build --release --features password-storage
   # Grab the binary and pack it into a zip archive
   - cd target\release\
   # You can add more file to the archive by adding them to this line
   - 7z a ../../%APPVEYOR_PROJECT_SLUG%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip %BINARY_NAME%
   - appveyor PushArtifact ../../%APPVEYOR_PROJECT_SLUG%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip
+  - cd ../..
+  # Publish pypi
+  - cargo run -- publish -b bin -u konstin --release
+
 
 deploy:
   # Add zipped binary to the github release

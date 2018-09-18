@@ -1,13 +1,22 @@
 //! Builds wheels from a crate that exposes python bindings through pyo3
 //!
-//! The high-level api is [BuildContext], which internally calls [build_rust()]
-//! and [build_wheel()].
+//! The high-level api is [BuildOptions], which can be converted into the [BuildContext], which
+//! then uses [compile()] and builds the appropriate wheels.
 //!
 //! # Cargo features
 //!
+//! - upload: Uses rewquest to add the upload command. By default this uses native openssl and
+//! is therefore not manylinux comopliant
+//!
+//! - musl: Switches from native openssl to statically linked openssl, which makes the upload
+//! feature manylinux compliant
+//!
+//! - password-storage (off by default): Uses the keyring package to store the password. keyring
+//! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
+//! for the build on the github releases page.
+//
 //! - auditwheel: Reimplements the more important part of the auditwheel
-//! package in rust. This feature is enabled by default and means that every
-//! wheel is check unless [skip_auditwheel](BuildContext.skip_auditwheel) is
+//! package in rust. Every  wheel is check unless [skip_auditwheel](BuildContext.skip_auditwheel) is
 //! set to true.
 //!
 //! - sdist: Allows creating sdist archives. Those archives can not be
@@ -18,6 +27,7 @@
 //! rlib and cdylib.
 
 #![deny(missing_docs)]
+
 extern crate base64;
 extern crate cargo_metadata;
 #[cfg(feature = "auditwheel")]
@@ -47,6 +57,7 @@ extern crate zip;
 
 #[cfg(feature = "auditwheel")]
 pub use auditwheel::{auditwheel_rs, AuditWheelError};
+pub use build_context::BridgeModel;
 pub use build_context::BuildContext;
 pub use build_options::BuildOptions;
 #[cfg(feature = "sdist")]

@@ -13,15 +13,15 @@ use Metadata21;
 use PythonInterpreter;
 use Target;
 
-/// The way the rust code is bridged with python, i.e. either using extern c and cffi or
-/// pyo3/rust-cpython
+/// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BridgeModel {
     /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
     Cffi,
     /// A rust binary to be shipped a python package
     Bin,
-    /// A native module with pyo3 or rust-cpython bindings
+    /// A native module with pyo3 or rust-cpython bindings. The String is the name of the bindings
+    /// providing crate, e.g. pyo3.
     Bindings(String),
 }
 
@@ -67,8 +67,9 @@ pub struct BuildContext {
 }
 
 impl BuildContext {
-    /// Checks which kind of bindings we have (pyo3/rust-cypthon vs cffi) and calls the correct
-    /// builder
+    /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
+    /// correct builder. Returns a Vec that contains location, python tag (e.g. py2.py3 or cp35)
+    /// and for bindings the python intepreter they bind against.
     pub fn build_wheels(&self) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
@@ -83,12 +84,12 @@ impl BuildContext {
     }
 
     /// Builds wheels for a Cargo project for all given python versions.
-    /// Returns the paths where the wheels are saved and the Python
-    /// metadata describing the cargo project
+    /// Return type is the same as [BuildContext::build_wheels()]
     ///
     /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given
-    /// and silently ignores all non-existent python versions. Runs
-    /// [auditwheel_rs()] if the auditwheel feature isn't deactivated
+    /// and silently ignores all non-existent python versions.
+    ///
+    /// Runs [auditwheel_rs()] if not deactivated
     pub fn build_binding_wheels(
         &self,
     ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
@@ -192,7 +193,12 @@ impl BuildContext {
         let mut builder =
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
 
-        write_cffi_module(&mut builder, &self.module_name, &artifact, &self.target)?;
+        write_cffi_module(
+            &mut builder,
+            &self.module_name,
+            &artifact,
+            &self.interpreter[0].executable,
+        )?;
 
         let wheel_path = builder.finish()?;
 
@@ -201,7 +207,9 @@ impl BuildContext {
         Ok(wheel_path)
     }
 
-    /// Builds a wheel that contains a rust binary and an entrypoint for that binary
+    /// Builds a wheel that contains a binary
+    ///
+    /// Runs [auditwheel_rs()] if not deactivated
     pub fn build_bin_wheel(&self) -> Result<PathBuf, Error> {
         let artifacts = compile(&self, None, &self.bridge)
             .context("Failed to build a native library through cargo")?;

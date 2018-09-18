@@ -5,8 +5,8 @@ use std::io;
 use std::io::Read;
 use std::path::Path;
 
-// As specified in "PEP 513 -- A Platform Tag for Portable Linux Built
-// Distributions"
+/// As specified in "PEP 513 -- A Platform Tag for Portable Linux Built
+/// Distributions"
 const MANYLINUX1: &[&str] = &[
     "libpanelw.so.5",
     "libncursesw.so.5",
@@ -79,7 +79,7 @@ pub enum AuditWheelError {
 }
 
 /// An (incomplete) reimplementation of auditwheel, which checks elf files for
-/// manylinux compliance
+/// manylinux compliance. Returns an error for non compliant elfs
 ///
 /// Only checks for the libraries marked as NEEDED.
 pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {

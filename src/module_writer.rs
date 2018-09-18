@@ -263,7 +263,7 @@ del os
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-fn generate_cffi_declarations(header: &Path, target: &Target) -> Result<String, Error> {
+pub fn generate_cffi_declarations(header: &Path, python: &PathBuf) -> Result<String, Error> {
     let is_include = Regex::new("#include <.*>").unwrap();
 
     // We need to remove the includes from the header because cffi can't process them and there's
@@ -295,7 +295,7 @@ recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
         header_h = header_h.display(),
     );
 
-    let output = Command::new(target.get_python())
+    let output = Command::new(python)
         .args(&["-c", &cffi_invocation])
         .stderr(Stdio::inherit())
         .output()?;
@@ -329,7 +329,7 @@ pub fn write_cffi_module(
     writer: &mut impl ModuleWriter,
     module_name: &str,
     artifact: &Path,
-    target: &Target,
+    python: &PathBuf,
 ) -> Result<(), Error> {
     let module = Path::new(module_name);
 
@@ -343,7 +343,7 @@ pub fn write_cffi_module(
 
     writer.add_directory(&module)?;
     writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
-    let cffi_declarations = generate_cffi_declarations(&header, target)?;
+    let cffi_declarations = generate_cffi_declarations(&header, python)?;
     writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
     writer.add_file(&module.join("native.so"), &artifact)?;
 

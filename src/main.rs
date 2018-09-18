@@ -1,4 +1,5 @@
-//! Build and publish crates with pyo3 bindings als python packages (CLI)
+//! Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries
+//! as python packages. This file contains the CLI and keyring integration.
 //!
 //! Run with --help for usage information
 

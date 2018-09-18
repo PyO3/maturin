@@ -67,7 +67,7 @@ pub fn develop(
                 &mut builder,
                 &build_context.module_name,
                 &artifact,
-                &build_context.target,
+                &interpreter.executable,
             )?;
         }
         BridgeModel::Bindings(_) => {

@@ -15,8 +15,7 @@ use Metadata21;
 use PythonInterpreter;
 use Target;
 
-/// High level API for building wheels from a crate which can be also used for
-/// the CLI
+/// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
@@ -159,6 +158,7 @@ impl BuildOptions {
     }
 }
 
+/// Tries to determine the [BridgeModel] for the target crate
 pub fn find_bridge(
     cargo_metadata: &cargo_metadata::Metadata,
     bridge: Option<&str>,
@@ -198,6 +198,9 @@ pub fn find_bridge(
     }
 }
 
+/// Finds the appropriate amount for python versions for each [BridgeModel].
+///
+/// This means all for bindings, one for cffi and zero for bin.
 pub fn find_interpreter(
     bridge: &BridgeModel,
     interpreter: &[String],

@@ -1,7 +1,7 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use reqwest::{self, header::ContentType, multipart::Form, Client, StatusCode};
+use reqwest::{self, multipart::Form, Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
@@ -98,14 +98,14 @@ pub fn upload(
     let client = Client::new();
     let mut response = client
         .post(registry.url.clone())
-        .header(ContentType::json())
+        .header("content-type", "application/json; charset=utf-8")
         .multipart(form)
         .basic_auth(registry.username.clone(), Some(registry.password.clone()))
         .send()?;
 
     if response.status().is_success() {
         Ok(())
-    } else if response.status() == StatusCode::Forbidden {
+    } else if response.status() == StatusCode::FORBIDDEN {
         Err(UploadError::AuthenticationError)
     } else {
         let err_text = response.text().unwrap_or_else(|e| {

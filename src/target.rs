@@ -90,9 +90,6 @@ impl Target {
     pub fn get_shared_platform_tag(&self) -> &'static str {
         match self.os {
             OS::Linux => {
-                if target_info::Target::env() != "gnu" {
-                    panic!("Expected a gnu target, musl is not supported");
-                }
                 if self.is_64_bit {
                     "x86_64-linux-gnu"
                 } else {

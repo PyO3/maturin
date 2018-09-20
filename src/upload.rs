@@ -19,17 +19,21 @@ use Registry;
 #[fail(display = "Uploading to the registry failed")]
 pub enum UploadError {
     /// Any reqwest error
-    #[fail(display = "{}", _0)]
+    #[fail(display = "Http error")]
     RewqestError(#[cause] reqwest::Error),
     /// The registry returned a "403 Forbidden"
     #[fail(display = "Username or password are incorrect")]
     AuthenticationError,
     /// Reading the wheel failed
-    #[fail(display = "{}", _0)]
+    #[fail(display = "IO Error")]
     IOError(#[cause] io::Error),
     /// The registry returned something else than 200
-    #[fail(display = "Failed to upload the wheel {}", _0)]
-    StatusCodeError(String),
+    #[fail(
+        display = "Failed to upload the wheel with status {}: {}",
+        _0,
+        _1
+    )]
+    StatusCodeError(String, String),
 }
 
 impl From<io::Error> for UploadError {
@@ -114,6 +118,9 @@ pub fn upload(
                 e
             )
         });
-        Err(UploadError::StatusCodeError(err_text))
+        Err(UploadError::StatusCodeError(
+            response.status().to_string(),
+            err_text,
+        ))
     }
 }

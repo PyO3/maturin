@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pack"
-version = "0.3.4"
+version = "0.3.5"
 description = "Build and publish crates with pyo3 bindings as python packages"
 exclude = ["get-fourtytwo/**/*", "integration-test/**/*", "sysconfig/*"]
 readme = "Readme.md"
@@ -26,7 +26,7 @@ cargo_metadata = "0.6.0"
 digest = { version = "0.7.5", features = ["std"] }
 failure = "0.1.2"
 keyring = { version = "0.6.0", optional = true }
-reqwest = { git = "https://github.com/seanmonstar/reqwest", rev = "2698148743c9ab6dcf3ca664d235b458b2cfd426", optional = true }
+reqwest = { git = "https://github.com/seanmonstar/reqwest", rev = "15857a11a43ee6782bb46b87043cb647c5f149c6", optional = true }
 rpassword = "2.0.0"
 serde_derive = "1.0.79"
 serde_json = "1.0.28"
@@ -45,15 +45,17 @@ atty = "0.2.11"
 tempfile = "3.0.4"
 goblin = { version = "0.0.17", optional = true }
 openssl = { version = "0.10.12", features = ["vendored"], optional = true }
+pretty_env_logger = { version = "0.2.4", optional = true }
 
 [dev-dependencies]
 indoc = "0.2.8"
 
 [features]
-default = ["auditwheel", "upload"]
+default = ["auditwheel", "upload", "log"]
 auditwheel = ["goblin"]
 upload = ["reqwest"]
 password-storage = ["upload", "keyring"]
+log = ["pretty_env_logger"]
 
 # This will make rewquest use a statically linked version of openssl
 musl = ["openssl"]

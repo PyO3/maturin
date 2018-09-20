@@ -12,15 +12,16 @@ use std::str;
 use BuildContext;
 use PythonInterpreter;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 struct BuildPlanEntry {
     package_name: String,
+    program: String,
 }
 
 /// The (abbreviated) format of `cargo build --build-plan`
 /// For the real thing, see
 /// https://github.com/rust-lang/cargo/blob/master/src/cargo/core/compiler/build_plan.rs
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 struct SerializedBuildPlan {
     invocations: Vec<BuildPlanEntry>,
 }
@@ -40,7 +41,7 @@ struct SerializedBuildPlan {
 ///     reason: "build-script-executed",
 /// }
 /// ```
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct CargoBuildOutput {
     cfgs: Vec<String>,
     env: Vec<String>,
@@ -52,25 +53,26 @@ struct CargoBuildOutput {
 
 /// This kind of message is printed by `cargo build --message-format=json
 /// --quiet` for an artifact such as an .so/.dll
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct CompilerArtifactMessage {
     filenames: Vec<PathBuf>,
     target: CompilerTargetMessage,
+    package_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct CompilerTargetMessage {
     crate_types: Vec<String>,
     name: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct CompilerErrorMessage {
     message: CompilerErrorMessageMessage,
     reason: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct CompilerErrorMessageMessage {
     rendered: String,
 }
@@ -86,7 +88,7 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
         "--build-plan",
     ];
 
-    let command_formated = ["cargo"]
+    let command_formatted = ["cargo"]
         .iter()
         .chain(build_plan_args)
         .chain(shared_args)
@@ -104,7 +106,7 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
             format_err!(
                 "Failed to get a build plan from cargo: {} ({})",
                 e,
-                command_formated
+                command_formatted
             )
         })?;
 
@@ -112,13 +114,46 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
         bail!(
             "Failed to get a build plan from cargo with '{}': `{}`",
             build_plan.status,
-            command_formated
+            command_formatted
         );
     }
 
     let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
         .context("The build plan has an invalid format")?;
     Ok(plan)
+}
+
+fn get_progress_plan(shared_args: &[&str]) -> Option<(ProgressBar, Vec<String>)> {
+    if atty::is(Stream::Stderr) {
+        match get_build_plan(shared_args) {
+            Ok(build_plan) => {
+                let mut packages: Vec<String> = build_plan
+                    .invocations
+                    .iter()
+                    .filter(|x| x.program == "rustc") // Only those gives artifact messages
+                    .map(|x| x.package_name.clone())
+                    .collect();
+
+                let progress_bar = ProgressBar::new(packages.len() as u64);
+                progress_bar.set_style(
+                    ProgressStyle::default_bar()
+                        .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
+                        .progress_chars("=> "),
+                );
+
+                if let Some(first) = packages.first() {
+                    progress_bar.set_message(first);
+                } else {
+                    eprintln!("Warning: The build plan is empty");
+                }
+
+                Some((progress_bar, packages))
+            }
+            Err(_) => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
@@ -163,28 +198,12 @@ pub fn compile(
     let mut cargo_args = vec!["rustc", "--message-format", "json"];
 
     // Mimicks cargo's -Z compile-progress, just without the long result log
-    let progress_plan = if atty::is(Stream::Stderr) {
-        match get_build_plan(&shared_args) {
-            Ok(build_plan) => {
-                let progress_bar = ProgressBar::new(build_plan.invocations.len() as u64);
-                progress_bar.set_style(
-                    ProgressStyle::default_bar()
-                        .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
-                        .progress_chars("=> "),
-                );
+    let mut progress_plan = get_progress_plan(&shared_args);
 
-                progress_bar.set_message(&build_plan.invocations[0].package_name);
-
-                // We have out own progess bar, so we don't need cargo's bar
-                cargo_args.push("--quiet");
-
-                Some((progress_bar, build_plan))
-            }
-            Err(_) => None,
-        }
-    } else {
-        None
-    };
+    if progress_plan.is_some() {
+        // We have out own progess bar, so we don't need cargo's bar
+        cargo_args.push("--quiet");
+    }
 
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args
@@ -222,24 +241,30 @@ pub fn compile(
     let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
 
     let mut artifact_messages = Vec::new();
-    let mut build_plan_pos = 0;
     let reader = BufReader::new(cargo_build.stdout.take().unwrap());
     for line in reader.lines().map(|line| line.unwrap()) {
         if let Ok(message) = serde_json::from_str::<CompilerArtifactMessage>(&line) {
             // Extract the location of the .so/.dll/etc. from cargo's json output
-            if message.target.name == context.module_name
-                || message.target.name == context.metadata21.name
-            {
-                artifact_messages.push(message);
+            let target_name = message.target.name.clone();
+            if target_name == context.module_name || target_name == context.metadata21.name {
+                artifact_messages.push(message.clone());
             }
+
+            let crate_name = message.package_id.split(" ").nth(0).unwrap().to_string();
 
             // The progress bar isn't an exact science and stuff might get out-of-sync,
             // but that isn't big problem since the bar is only to give the user an estimate
-            if let Some((ref progress_bar, ref build_plan)) = progress_plan {
-                progress_bar.inc(1);
-                build_plan_pos += 1;
-                if let Some(package) = build_plan.invocations.get(build_plan_pos) {
-                    progress_bar.set_message(&package.package_name);
+            if let Some((ref progress_bar, ref mut packages)) = progress_plan {
+                match packages.iter().position(|x| x == &crate_name) {
+                    Some(pos) => {
+                        packages.remove(pos);
+                        progress_bar.inc(1);
+                    }
+                    None => eprintln!("WARN: {} not found in build plan", crate_name),
+                }
+
+                if let Some(package) = packages.first() {
+                    progress_bar.set_message(&package);
                 }
             }
         }

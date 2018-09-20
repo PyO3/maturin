@@ -20,6 +20,8 @@ extern crate rpassword;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate structopt;
+#[cfg(feature = "log")]
+extern crate pretty_env_logger;
 
 use failure::Error;
 #[cfg(all(feature = "upload", feature = "keyring"))]
@@ -159,6 +161,9 @@ enum Opt {
 }
 
 fn run() -> Result<(), Error> {
+    #[cfg(feature = "log")]
+    pretty_env_logger::init();
+
     let opt = Opt::from_args();
 
     match opt {

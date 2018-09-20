@@ -1,9 +1,9 @@
 # Pyo3-pack
 
 [![Linux and Mac Build Status](https://img.shields.io/travis/PyO3/pyo3-pack/master.svg?style=flat-square)](https://travis-ci.org/PyO3/pyo3-pack)
-[![Windows Build status](https://ci.appveyor.com/api/projects/status/nns7qplb756sy4y7/branch/master?svg=true)](https://ci.appveyor.com/project/konstin/pyo3-pack/branch/master)
+[![Windows Build status](https://img.shields.io/appveyor/ci/konstin/pyo3-pack/master.svg?style=flat-square)](https://ci.appveyor.com/project/konstin/pyo3-pack/branch/master)
 [![Crates.io](https://img.shields.io/crates/v/pyo3-pack.svg?style=flat-square)](https://crates.io/crates/pyo3-pack)
-[![API Documentation on docs.rs](https://docs.rs/pyo3-pack/badge.svg)](https://docs.rs/pyo3-pack)
+[![PyPI](https://img.shields.io/pypi/v/pyo3-pack.svg?style=flat-square)](https://pypi.org/project/pyo3-pack/)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?style=flat-square)](https://gitter.im/PyO3/Lobby)
 
 Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages.

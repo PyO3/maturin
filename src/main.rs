@@ -13,6 +13,8 @@ extern crate failure;
 extern crate human_panic;
 #[cfg(feature = "keyring")]
 extern crate keyring;
+#[cfg(feature = "log")]
+extern crate pretty_env_logger;
 extern crate pyo3_pack;
 #[cfg(feature = "upload")]
 extern crate reqwest;
@@ -20,10 +22,8 @@ extern crate rpassword;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate structopt;
-#[cfg(feature = "log")]
-extern crate pretty_env_logger;
 
-use failure::Error;
+use failure::{Error, ResultExt};
 #[cfg(all(feature = "upload", feature = "keyring"))]
 use keyring::{Keyring, KeyringError};
 use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
@@ -37,14 +37,17 @@ use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+/// Returns the password and a bool that states whether to ask for re-entering the password
+/// after a failed authentication
+///
 /// Precedence:
 /// 1. PYO3_PACK_PASSWORD
 /// 2. keyring
 /// 3. stdin
 #[cfg(feature = "upload")]
-fn get_password(_username: &str) -> String {
+fn get_password(_username: &str) -> (String, bool) {
     if let Ok(password) = env::var("PYO3_PACK_PASSWORD") {
-        return password;
+        return (password, false);
     };
 
     #[cfg(feature = "keyring")]
@@ -52,18 +55,21 @@ fn get_password(_username: &str) -> String {
         let service = env!("CARGO_PKG_NAME");
         let keyring = Keyring::new(&service, &_username);
         if let Ok(password) = keyring.get_password() {
-            return password;
+            return (password, true);
         };
     }
 
-    rpassword::prompt_password_stdout("Please enter your password: ").unwrap_or_else(|_| {
-        // So we need this fallback for pycharm on windows
-        let mut password = String::new();
-        io::stdin()
-            .read_line(&mut password)
-            .expect("Failed to read line");
-        password.trim().to_string()
-    })
+    let password = rpassword::prompt_password_stdout("Please enter your password: ")
+        .unwrap_or_else(|_| {
+            // So we need this fallback for pycharm on windows
+            let mut password = String::new();
+            io::stdin()
+                .read_line(&mut password)
+                .expect("Failed to read line");
+            password.trim().to_string()
+        });
+
+    (password, true)
 }
 
 #[cfg(feature = "upload")]
@@ -76,18 +82,20 @@ fn get_username() -> String {
 
 #[cfg(feature = "upload")]
 /// Asks for username and password for a registry account where missing.
-fn complete_registry(opt: &PublishOpt) -> Result<Registry, Error> {
+fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool), Error> {
     let username = opt.username.clone().unwrap_or_else(get_username);
-    let password = opt
-        .password
-        .clone()
-        .unwrap_or_else(|| get_password(&username));
+    let (password , reenter)= match opt.password {
+        Some(ref password) => (password.clone(), false),
+        None => get_password(&username),
+    };
 
-    Ok(Registry::new(
+    let registry = Registry::new(
         username,
         password,
         Url::parse(&opt.registry)?,
-    ))
+    );
+
+    Ok((registry, reenter))
 }
 
 /// An account with a registry, possibly incomplete
@@ -180,7 +188,7 @@ fn run() -> Result<(), Error> {
 
             let wheels = build_context.build_wheels()?;
 
-            let mut registry = complete_registry(&publish)?;
+            let (mut registry, reenter) = complete_registry(&publish)?;
 
             loop {
                 println!("Uploading {} packages", wheels.len());
@@ -204,7 +212,7 @@ fn run() -> Result<(), Error> {
 
                         return Ok(());
                     }
-                    Err(UploadError::AuthenticationError) => {
+                    Err(UploadError::AuthenticationError) if reenter => {
                         println!("Username and/or password are wrong");
 
                         #[cfg(feature = "keyring")]
@@ -235,7 +243,10 @@ fn run() -> Result<(), Error> {
                         registry = Registry::new(username, password, registry.url);
                         println!("Retrying")
                     }
-                    Err(err) => return Err(err.into()),
+                    Err(UploadError::AuthenticationError) => {
+                        bail!("Username and/or password are wrong");
+                    }
+                    Err(err) => return Err(err).context("Failed to upload")?,
                 }
             }
         }

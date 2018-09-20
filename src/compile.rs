@@ -1,11 +1,12 @@
 use atty;
 use atty::Stream;
 use build_context::BridgeModel;
+use cargo_metadata;
+use cargo_metadata::Message;
 use failure::{Error, ResultExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde_json;
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
@@ -24,57 +25,6 @@ struct BuildPlanEntry {
 #[derive(Deserialize, Debug, Clone)]
 struct SerializedBuildPlan {
     invocations: Vec<BuildPlanEntry>,
-}
-
-/// This kind of message is printed by `cargo build --message-format=json
-/// --quiet` for a build script
-///
-/// Example with python3.6 on ubuntu 18.04.1:
-///
-/// ```text
-/// CargoBuildConfig {
-///     cfgs: ["Py_3_5", "Py_3_6", "Py_3", "py_sys_config=\"WITH_THREAD\""],
-///     env: [],
-///     linked_libs: ["python3.6m"],
-///     linked_paths: ["native=/usr/lib"],
-///     package_id: "pyo3 0.2.5 (path+file:///home/konsti/capybara/pyo3)",
-///     reason: "build-script-executed",
-/// }
-/// ```
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CargoBuildOutput {
-    cfgs: Vec<String>,
-    env: Vec<String>,
-    linked_libs: Vec<String>,
-    linked_paths: Vec<String>,
-    package_id: String,
-    reason: String,
-}
-
-/// This kind of message is printed by `cargo build --message-format=json
-/// --quiet` for an artifact such as an .so/.dll
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CompilerArtifactMessage {
-    filenames: Vec<PathBuf>,
-    target: CompilerTargetMessage,
-    package_id: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CompilerTargetMessage {
-    crate_types: Vec<String>,
-    name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CompilerErrorMessage {
-    message: CompilerErrorMessageMessage,
-    reason: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CompilerErrorMessageMessage {
-    rendered: String,
 }
 
 /// Queries the number of tasks through the build plan. This only works on
@@ -130,7 +80,6 @@ fn get_progress_plan(shared_args: &[&str]) -> Option<(ProgressBar, Vec<String>)>
                 let mut packages: Vec<String> = build_plan
                     .invocations
                     .iter()
-                    .filter(|x| x.program == "rustc") // Only those gives artifact messages
                     .map(|x| x.package_name.clone())
                     .collect();
 
@@ -153,6 +102,24 @@ fn get_progress_plan(shared_args: &[&str]) -> Option<(ProgressBar, Vec<String>)>
         }
     } else {
         None
+    }
+}
+
+fn update_progress(progress_plan: &mut Option<(ProgressBar, Vec<String>)>, crate_name: &str) {
+    // The progress bar isn't an exact science and stuff might get out-of-sync,
+    // but that isn't big problem since the bar is only to give the user an estimate
+    if let Some((ref progress_bar, ref mut packages)) = progress_plan {
+        match packages.iter().position(|x| x == &crate_name) {
+            Some(pos) => {
+                packages.remove(pos);
+                progress_bar.inc(1);
+            }
+            None => eprintln!("WARN: {} not found in build plan", crate_name),
+        }
+
+        if let Some(package) = packages.first() {
+            progress_bar.set_message(&package);
+        }
     }
 }
 
@@ -240,40 +207,43 @@ pub fn compile(
 
     let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
 
-    let mut artifact_messages = Vec::new();
-    let reader = BufReader::new(cargo_build.stdout.take().unwrap());
-    for line in reader.lines().map(|line| line.unwrap()) {
-        if let Ok(message) = serde_json::from_str::<CompilerArtifactMessage>(&line) {
-            // Extract the location of the .so/.dll/etc. from cargo's json output
-            let target_name = message.target.name.clone();
-            if target_name == context.module_name || target_name == context.metadata21.name {
-                artifact_messages.push(message.clone());
-            }
+    let mut artifacts = HashMap::new();
 
-            let crate_name = message.package_id.split(" ").nth(0).unwrap().to_string();
+    let stream = cargo_build
+        .stdout
+        .take()
+        .expect("Cargo build should have a stdout");
+    for message in cargo_metadata::parse_message_stream(stream) {
+        match message.unwrap() {
+            Message::CompilerArtifact(artifact) => {
+                update_progress(&mut progress_plan, artifact.package_id.name());
 
-            // The progress bar isn't an exact science and stuff might get out-of-sync,
-            // but that isn't big problem since the bar is only to give the user an estimate
-            if let Some((ref progress_bar, ref mut packages)) = progress_plan {
-                match packages.iter().position(|x| x == &crate_name) {
-                    Some(pos) => {
-                        packages.remove(pos);
-                        progress_bar.inc(1);
+                // Extract the location of the .so/.dll/etc. from cargo's json output
+                if artifact.target.name == context.module_name
+                    || artifact.target.name == context.metadata21.name
+                {
+                    let tuples = artifact
+                        .target
+                        .crate_types
+                        .into_iter()
+                        .zip(artifact.filenames);
+                    for (crate_type, filename) in tuples {
+                        artifacts.insert(crate_type, PathBuf::from(filename));
                     }
-                    None => eprintln!("WARN: {} not found in build plan", crate_name),
-                }
-
-                if let Some(package) = packages.first() {
-                    progress_bar.set_message(&package);
                 }
             }
-        }
-
-        // Forward error messages
-        if let Ok(message) = serde_json::from_str::<CompilerErrorMessage>(&line) {
-            if message.reason == "compiler-message" {
-                eprintln!("{}", message.message.rendered);
+            Message::BuildScriptExecuted(script) => {
+                update_progress(&mut progress_plan, &script.package_id.name());
             }
+            Message::CompilerMessage(msg) => {
+                eprintln!(
+                    "{}",
+                    msg.message
+                        .rendered
+                        .unwrap_or_else(|| "Unrendered Message".to_string())
+                );
+            }
+            _ => (),
         }
     }
 
@@ -291,18 +261,6 @@ pub fn compile(
             status,
             command_str
         )
-    }
-
-    let mut artifacts = HashMap::new();
-    for message in artifact_messages {
-        let tuples = message
-            .target
-            .crate_types
-            .into_iter()
-            .zip(message.filenames);
-        for (crate_type, filename) in tuples {
-            artifacts.insert(crate_type, filename);
-        }
     }
 
     Ok(artifacts)

@@ -140,7 +140,7 @@ impl ModuleWriter for WheelWriter {
         let target = target.as_ref().to_str().unwrap().replace("\\", "/");
         let options = zip::write::FileOptions::default()
             .unix_permissions(permissions)
-            .compression_method(zip::CompressionMethod::Stored);
+            .compression_method(zip::CompressionMethod::Deflated);
         self.zip.start_file(target.clone(), options)?;
         self.zip.write_all(&bytes)?;
 
@@ -204,7 +204,7 @@ impl WheelWriter {
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
         let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
         let record_file = self.dist_info_dir.join("RECORD");
         self.zip
             .start_file(record_file.to_str().unwrap(), options)?;

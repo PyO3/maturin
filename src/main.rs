@@ -159,6 +159,9 @@ enum Opt {
         /// Pass --release to cargo
         #[structopt(long = "release")]
         release: bool,
+        /// Strip the library for minimum file size
+        #[structopt(long = "strip")]
+        strip: bool,
         /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
         #[structopt(long = "cargo-extra-args")]
         cargo_extra_args: Vec<String>,
@@ -264,6 +267,7 @@ fn run() -> Result<(), Error> {
             cargo_extra_args,
             rustc_extra_args,
             release,
+            strip,
         } => {
             let venv_dir = match env::var_os("VIRTUAL_ENV") {
                 Some(dir) => PathBuf::from(dir),
@@ -279,6 +283,7 @@ fn run() -> Result<(), Error> {
                 rustc_extra_args,
                 &venv_dir,
                 release,
+                strip,
             )?;
         }
     }

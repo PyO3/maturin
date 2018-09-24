@@ -56,6 +56,8 @@ pub struct BuildContext {
     pub out: PathBuf,
     /// Pass --release to cargo
     pub release: bool,
+    /// Strip the library for minimum file size
+    pub strip: bool,
     /// Don't check for manylinux compliance
     pub skip_auditwheel: bool,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`

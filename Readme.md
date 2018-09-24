@@ -85,6 +85,7 @@ FLAGS:
     -h, --help               Prints help information
         --release            Pass --release to cargo
         --skip-auditwheel    Don't check for manylinux compliance
+        --strip              Strip the library for minimum file size
     -V, --version            Prints version information
 
 OPTIONS:
@@ -116,6 +117,7 @@ FLAGS:
     -h, --help               Prints help information
         --release            Pass --release to cargo
         --skip-auditwheel    Don't check for manylinux compliance
+        --strip              Strip the library for minimum file size
     -V, --version            Prints version information
 
 OPTIONS:
@@ -154,6 +156,7 @@ USAGE:
 FLAGS:
     -h, --help       Prints help information
         --release    Pass --release to cargo
+        --strip      Strip the library for minimum file size
     -V, --version    Prints version information
 
 OPTIONS:

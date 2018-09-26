@@ -185,6 +185,10 @@ pub fn compile(
         }
     }
 
+    if context.strip {
+        rustc_args.extend(&["-C", "link-arg=-s"]);
+    }
+
     let build_args: Vec<_> = cargo_args
         .iter()
         .chain(&shared_args)

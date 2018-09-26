@@ -20,6 +20,7 @@ pub fn develop(
     rustc_extra_args: Vec<String>,
     venv_dir: &Path,
     release: bool,
+    strip: bool,
 ) -> Result<(), Error> {
     let target = Target::current();
 
@@ -37,6 +38,7 @@ pub fn develop(
         skip_auditwheel: true,
         target: None,
         release,
+        strip,
         cargo_extra_args,
         rustc_extra_args,
     };

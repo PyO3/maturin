@@ -42,6 +42,9 @@ pub struct BuildOptions {
     /// Pass --release to cargo
     #[structopt(long = "release")]
     pub release: bool,
+    /// Strip the library for minimum file size
+    #[structopt(long = "strip")]
+    pub strip: bool,
     /// Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
@@ -64,6 +67,7 @@ impl Default for BuildOptions {
             manifest_path: PathBuf::from("Cargo.toml"),
             out: None,
             release: false,
+            strip: false,
             skip_auditwheel: false,
             target: None,
             cargo_extra_args: Vec::new(),
@@ -150,6 +154,7 @@ impl BuildOptions {
             manifest_path: self.manifest_path,
             out: wheel_dir,
             release: self.release,
+            strip: self.strip,
             skip_auditwheel: self.skip_auditwheel,
             cargo_extra_args,
             rustc_extra_args: self.rustc_extra_args,

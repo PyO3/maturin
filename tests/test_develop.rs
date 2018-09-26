@@ -58,7 +58,7 @@ fn test_develop(package: &Path, bindings: Option<String>) {
     }
 
     let manifest_file = package.join("Cargo.toml");
-    develop(bindings, &manifest_file, vec![], vec![], &venv_dir, false).unwrap();
+    develop(bindings, &manifest_file, vec![], vec![], &venv_dir, false, false).unwrap();
 
     check_installed(&package, &python).unwrap();
 }

@@ -66,10 +66,11 @@ sdist = ["tar", "libflate"]
 [workspace]
 members = [
     "get-fourtytwo",
-    "hello-world"
 ]
 
-# This is necessary due to https://github.com/eqrion/cbindgen/issues/203
 exclude = [
-    "points"
+    # This is necessary due to https://github.com/eqrion/cbindgen/issues/203
+    "points",
+    # If we have this crate in the workspace, it will have pyo3 in it's deps and the bridge detection won't work
+    "hello-world"
 ]

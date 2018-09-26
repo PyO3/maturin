@@ -23,8 +23,8 @@ pub struct BuildOptions {
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
     pub interpreter: Vec<String>,
-    /// The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
-    #[structopt(short = "b", long = "bindings-crate")]
+    /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+    #[structopt(short = "b", long = "bindings")]
     pub bindings: Option<String>,
     #[structopt(
         short = "m",
@@ -262,15 +262,11 @@ mod test {
     use std::path::Path;
 
     #[test]
-    fn test_find_bridge() {
+    fn test_find_bridge_pyo3() {
         let get_fourtytwo = cargo_metadata::metadata_deps(
             Some(&Path::new("get-fourtytwo").join("Cargo.toml")),
             true,
         ).unwrap();
-
-        let points =
-            cargo_metadata::metadata_deps(Some(&Path::new("points").join("Cargo.toml")), true)
-                .unwrap();
 
         assert!(match find_bridge(&get_fourtytwo, None).unwrap() {
             BridgeModel::Bindings(_) => true,
@@ -282,14 +278,37 @@ mod test {
             _ => false,
         });
 
+        assert!(find_bridge(&get_fourtytwo, Some("rust-cpython")).is_err());
+    }
+
+    #[test]
+    fn test_find_bridge_cffi() {
+        let points =
+            cargo_metadata::metadata_deps(Some(&Path::new("points").join("Cargo.toml")), true)
+                .unwrap();
+
         assert_eq!(
             find_bridge(&points, Some("cffi")).unwrap(),
             BridgeModel::Cffi
         );
 
-        assert!(find_bridge(&get_fourtytwo, Some("rust-cpython"),).is_err());
-
         assert!(find_bridge(&points, Some("rust-cpython")).is_err());
         assert!(find_bridge(&points, Some("pyo3")).is_err());
+    }
+
+    #[test]
+    fn test_find_bridge_bin() {
+        let hello_world =
+            cargo_metadata::metadata_deps(Some(&Path::new("hello-world").join("Cargo.toml")), true)
+                .unwrap();
+
+        assert_eq!(
+            find_bridge(&hello_world, Some("bin")).unwrap(),
+            BridgeModel::Bin
+        );
+
+        assert!(find_bridge(&hello_world, None).is_err());
+        assert!(find_bridge(&hello_world, Some("rust-cpython")).is_err());
+        assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
     }
 }

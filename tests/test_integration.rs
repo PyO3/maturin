@@ -1,9 +1,11 @@
 extern crate pyo3_pack;
+extern crate structopt;
 
 use common::check_installed;
 use pyo3_pack::{BuildOptions, Target};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use structopt::StructOpt;
 
 mod common;
 
@@ -46,9 +48,16 @@ fn test_integration_hello_world() {
 fn test_integration(package: &Path, bindings: Option<String>) {
     let target = Target::current();
 
-    let mut options = BuildOptions::default();
-    options.manifest_path = package.join("Cargo.toml");
-    options.bindings = bindings;
+    let package_string = package.join("Cargo.toml").display().to_string();
+
+    // The first string is ignored by clap
+    let cli = if let Some(ref bindings) = bindings {
+        vec!["build", "--manifest-path", &package_string, "--bindings", bindings]
+    } else {
+        vec!["build", "--manifest-path", &package_string]
+    };
+
+    let options = BuildOptions::from_iter_safe(cli).unwrap();
 
     let wheels = options
         .into_build_context()

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+With deflate and the strip options, the wheels get about 25x smaller:
+
+wheel | baseline | deflate | strip + deflate
+-|-|-|-
+get_fourtytwo-2.0.1-cp36-cp36m-manylinux1_x86_64.whl | 2,8M | 771K | 102K
+hello_world-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 3,9M | 1,1M | 180K
+points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
+
+### Added 
+
+ * `--strip` by ijl [#7](https://github.com/PyO3/pyo3-pack/pull/7)
+
+### Changed
+
+ * Renamed `--bindings-crate` to `--bindings`
+ * Use deflate compression for zips by ijl [#6](https://github.com/PyO3/pyo3-pack/pull/6)
+
 ## [0.3.5] - 2018-09-20
 
 ### Changed

@@ -109,7 +109,7 @@ fn update_progress(progress_plan: &mut Option<(ProgressBar, Vec<String>)>, crate
     // The progress bar isn't an exact science and stuff might get out-of-sync,
     // but that isn't big problem since the bar is only to give the user an estimate
     if let Some((ref progress_bar, ref mut packages)) = progress_plan {
-        match packages.iter().position(|x| x == &crate_name) {
+        match packages.iter().position(|x| x == crate_name) {
             Some(pos) => {
                 packages.remove(pos);
                 progress_bar.inc(1);
@@ -202,8 +202,11 @@ pub fn compile(
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
         .args(&build_args)
-        .stdout(Stdio::piped()) // We need to capture the json messages
-        .stderr(Stdio::inherit()); // We want to show error messages
+        // We need to capture the json messages
+        .stdout(Stdio::piped())
+        // We can't get colored human and json messages from rustc as they are mutually exclusive,
+        // but forwarding stderr is still useful in case there some non-json error
+        .stderr(Stdio::inherit());
 
     if let Some(python_interpreter) = python_interpreter {
         build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
@@ -223,9 +226,7 @@ pub fn compile(
                 update_progress(&mut progress_plan, artifact.package_id.name());
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
-                if artifact.target.name == context.module_name
-                    || artifact.target.name == context.metadata21.name
-                {
+                if artifact.package_id.name() == context.metadata21.name {
                     let tuples = artifact
                         .target
                         .crate_types

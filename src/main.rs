@@ -84,16 +84,12 @@ fn get_username() -> String {
 /// Asks for username and password for a registry account where missing.
 fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool), Error> {
     let username = opt.username.clone().unwrap_or_else(get_username);
-    let (password , reenter)= match opt.password {
+    let (password, reenter) = match opt.password {
         Some(ref password) => (password.clone(), false),
         None => get_password(&username),
     };
 
-    let registry = Registry::new(
-        username,
-        password,
-        Url::parse(&opt.registry)?,
-    );
+    let registry = Registry::new(username, password, Url::parse(&opt.registry)?);
 
     Ok((registry, reenter))
 }
@@ -145,8 +141,8 @@ enum Opt {
     ///
     /// Note that this command doesn't create entrypoints and compiles in debug mode by default
     Develop {
-        /// The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
-        #[structopt(short = "b", long = "bindings-crate")]
+        /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+        #[structopt(short = "b", long = "bindings")]
         binding_crate: Option<String>,
         #[structopt(
             short = "m",

@@ -28,7 +28,7 @@ fn test_develop_hello_world() {
 /// "pyo3-pack develop" to install it and checks it is working
 fn test_develop(package: &Path, bindings: Option<String>) {
     let venv_dir = package.join("venv_develop");
-    let target = Target::current();
+    let target = Target::from_target_triple(None).unwrap();
 
     if venv_dir.is_dir() {
         fs::remove_dir_all(&venv_dir).unwrap();
@@ -58,7 +58,15 @@ fn test_develop(package: &Path, bindings: Option<String>) {
     }
 
     let manifest_file = package.join("Cargo.toml");
-    develop(bindings, &manifest_file, vec![], vec![], &venv_dir, false, false).unwrap();
+    develop(
+        bindings,
+        &manifest_file,
+        vec![],
+        vec![],
+        &venv_dir,
+        false,
+        false,
+    ).unwrap();
 
     check_installed(&package, &python).unwrap();
 }

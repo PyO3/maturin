@@ -250,7 +250,7 @@ fn run() -> Result<(), Error> {
             }
         }
         Opt::ListPython => {
-            let target = Target::current();
+            let target = Target::from_target_triple(None)?;
             let found = PythonInterpreter::find_all(&target)?;
             println!("{} python interpreter found:", found.len());
             for interpreter in found {

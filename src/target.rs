@@ -1,9 +1,12 @@
+use failure::Error;
+use platforms;
+use platforms::target::Arch;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use target_info;
 
-/// The operating system
+/// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum OS {
     Linux,
@@ -35,6 +38,35 @@ impl Target {
         };
 
         Target { os, is_64_bit }
+    }
+
+    /// Uses the given target triple or tries the guess the current target by using the one used
+    /// for compilation
+    ///
+    /// Fails if the target triple isn't supported
+    pub fn from_target_triple(target_triple: Option<String>) -> Result<Self, Error> {
+        let platform = if let Some(ref target_triple) = target_triple {
+            platforms::find(target_triple)
+                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?
+        } else {
+            platforms::guess_current()
+                .ok_or_else(|| format_err!("Could guess the current platform"))?
+        };
+
+        let os = match platform.target_os {
+            platforms::target::OS::Linux => OS::Linux,
+            platforms::target::OS::Windows => OS::Windows,
+            platforms::target::OS::MacOS => OS::Macos,
+            unsupported => bail!("The operating system {:?} is not supported", unsupported),
+        };
+
+        let is_64_bit = match platform.target_arch {
+            Arch::X86_64 => true,
+            Arch::X86 => false,
+            unsupported => bail!("The architecture {:?} is not supported", unsupported),
+        };
+
+        Ok(Target { os, is_64_bit })
     }
 
     /// Returns whether the platform is 64 bit or 32 bit

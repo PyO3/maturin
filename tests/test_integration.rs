@@ -46,13 +46,19 @@ fn test_integration_hello_world() {
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
 fn test_integration(package: &Path, bindings: Option<String>) {
-    let target = Target::current();
+    let target = Target::from_target_triple(None).unwrap();
 
     let package_string = package.join("Cargo.toml").display().to_string();
 
     // The first string is ignored by clap
     let cli = if let Some(ref bindings) = bindings {
-        vec!["build", "--manifest-path", &package_string, "--bindings", bindings]
+        vec![
+            "build",
+            "--manifest-path",
+            &package_string,
+            "--bindings",
+            bindings,
+        ]
     } else {
         vec!["build", "--manifest-path", &package_string]
     };

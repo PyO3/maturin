@@ -49,6 +49,7 @@ extern crate core;
 extern crate indicatif;
 #[cfg(feature = "sdist")]
 extern crate libflate;
+extern crate platforms;
 #[cfg(feature = "sdist")]
 extern crate tar;
 extern crate target_info;

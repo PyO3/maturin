@@ -118,7 +118,7 @@ impl BuildOptions {
             .unwrap_or_else(|| cargo_toml.package.name.clone())
             .to_owned();
 
-        let target = Target::current();
+        let target = Target::from_target_triple(self.target.clone())?;
 
         // Failure fails here since cargo_metadata does some weird stuff on their side
         let cargo_metadata = cargo_metadata::metadata_deps(Some(&self.manifest_path), true)
@@ -216,7 +216,7 @@ pub fn find_interpreter(
             let interpreter = if !interpreter.is_empty() {
                 PythonInterpreter::check_executables(&interpreter, &target)?
             } else {
-                PythonInterpreter::find_all(&Target::current())?
+                PythonInterpreter::find_all(&target)?
             };
 
             if interpreter.is_empty() {

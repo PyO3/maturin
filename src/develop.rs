@@ -22,7 +22,7 @@ pub fn develop(
     release: bool,
     strip: bool,
 ) -> Result<(), Error> {
-    let target = Target::current();
+    let target = Target::from_target_triple(None)?;
 
     let python = target.get_venv_python(&venv_dir);
 

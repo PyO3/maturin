@@ -46,6 +46,7 @@ tempfile = "3.0.4"
 goblin = { version = "0.0.17", optional = true }
 openssl = { version = "0.10.12", features = ["vendored"], optional = true }
 pretty_env_logger = { version = "0.2.4", optional = true }
+platforms = "0.1.4"
 
 [dev-dependencies]
 indoc = "0.2.8"

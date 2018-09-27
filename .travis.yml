@@ -85,7 +85,7 @@ before_deploy:
   - tar czf ../../../${BINARY_NAME}-$TRAVIS_TAG-$TARGET.tar.gz ${BINARY_NAME}
   - cd ../../..
   # We do care for manylinux compliance, so we use the musl feature to get static binaries for pypi
-  - CFLAGS="-fno-stack-protector" cargo run --release --target $TARGET --features musl -- publish -u konstin --release -b bin --target $TARGET --cargo-extra-args="--features=musl"
+  - CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin --release -b bin --target $TARGET --strip --cargo-extra-args="--features=musl"
 
 deploy:
   - # Add zipped binary to the github release

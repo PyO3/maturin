@@ -8,6 +8,7 @@
 extern crate core;
 #[macro_use]
 extern crate failure;
+#[cfg(feature = "human-panic")]
 #[allow(unused_imports)]
 #[macro_use]
 extern crate human_panic;
@@ -288,6 +289,11 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
+    #[cfg(feature = "human-panic")]
+    {
+        setup_panic!();
+    }
+
     if let Err(e) = run() {
         for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {
             println!("{}", cause);

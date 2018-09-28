@@ -140,7 +140,7 @@ enum Opt {
     #[structopt(name = "develop")]
     /// Installs the crate as module in the current virtualenv so you can import it
     ///
-    /// Note that this command doesn't create entrypoints and compiles in debug mode by default
+    /// Note that this command doesn't create entrypoints
     Develop {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
         #[structopt(short = "b", long = "bindings")]

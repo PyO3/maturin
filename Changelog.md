@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6]
+
 With deflate and the strip options, the wheels get about 25x smaller:
 
 wheel | baseline | deflate | strip + deflate

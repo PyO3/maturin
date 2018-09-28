@@ -91,8 +91,8 @@ FLAGS:
 OPTIONS:
     -m, --manifest-path <PATH>                      The path to the Cargo.toml [default: Cargo.toml]
         --target <TRIPLE>                           The --target option for cargo
-    -b, --bindings-crate <bindings>
-            The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
+    -b, --bindings <bindings>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo_extra_args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
@@ -123,8 +123,8 @@ FLAGS:
 OPTIONS:
     -m, --manifest-path <PATH>                      The path to the Cargo.toml [default: Cargo.toml]
         --target <TRIPLE>                           The --target option for cargo
-    -b, --bindings-crate <bindings>
-            The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
+    -b, --bindings <bindings>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo_extra_args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
@@ -160,8 +160,8 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -b, --bindings-crate <binding_crate>
-            The crate providing the python bindings. pyo3, rust-cpython and cffi are supported
+    -b, --bindings <binding_crate>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo_extra_args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`

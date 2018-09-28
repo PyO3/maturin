@@ -361,7 +361,8 @@ pub fn write_bin(
         "{}-{}.data",
         &metadata.get_distribution_escaped(),
         &metadata.version
-    )).join("scripts");
+    ))
+    .join("scripts");
 
     writer.add_directory(&data_dir)?;
 

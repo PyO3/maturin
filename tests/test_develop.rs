@@ -66,7 +66,8 @@ fn test_develop(package: &Path, bindings: Option<String>) {
         &venv_dir,
         false,
         false,
-    ).unwrap();
+    )
+    .unwrap();
 
     check_installed(&package, &python).unwrap();
 }

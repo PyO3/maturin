@@ -94,7 +94,8 @@ fn test_integration(package: &Path, bindings: Option<String>) {
                     "-p",
                     &venv_py_version.display().to_string(),
                     &venv_dir.display().to_string(),
-                ]).stderr(Stdio::inherit())
+                ])
+                .stderr(Stdio::inherit())
                 .output()
                 .unwrap();
             if !output.status.success() {
@@ -111,7 +112,8 @@ fn test_integration(package: &Path, bindings: Option<String>) {
                 "install",
                 "--force-reinstall",
                 &adjust_canonicalization(filename),
-            ]).stderr(Stdio::inherit())
+            ])
+            .stderr(Stdio::inherit())
             .output()
             .unwrap();
         if !output.status.success() {

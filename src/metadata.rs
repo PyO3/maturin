@@ -271,7 +271,8 @@ mod test {
             [package.metadata.pyo3-pack.scripts]
             ph = "pyo3_pack:print_hello"
         "#
-        ).replace("readme.md", &readme_path);
+        )
+        .replace("readme.md", &readme_path);
 
         let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
 

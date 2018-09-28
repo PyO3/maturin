@@ -266,7 +266,8 @@ mod test {
         let get_fourtytwo = cargo_metadata::metadata_deps(
             Some(&Path::new("get-fourtytwo").join("Cargo.toml")),
             true,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(match find_bridge(&get_fourtytwo, None).unwrap() {
             BridgeModel::Bindings(_) => true,

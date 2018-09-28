@@ -129,11 +129,13 @@ impl Target {
                 }
             }
             OS::Macos => "darwin",
-            OS::Windows => if self.is_64_bit {
-                "win_amd64"
-            } else {
-                "win32"
-            },
+            OS::Windows => {
+                if self.is_64_bit {
+                    "win_amd64"
+                } else {
+                    "win32"
+                }
+            }
         }
     }
 

@@ -1,8 +1,10 @@
 points
 sysconfig
-target
-*/venv*
-*/.tox
-*/.pytest_cache
-venv
+**/venv*
+**/.tox
+**/.pytest_cache
+**/target
+**/__pycache__
+.idea
+.git
 .venv

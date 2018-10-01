@@ -5,7 +5,7 @@
 //!
 //! # Cargo features
 //!
-//! - upload: Uses rewquest to add the upload command. By default this uses native openssl and
+//! - upload: Uses rewqest to add the upload command. By default this uses native openssl and
 //! is therefore not manylinux comopliant
 //!
 //! - musl: Switches from native openssl to statically linked openssl, which makes the upload
@@ -14,6 +14,7 @@
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
 //! for the build on the github releases page.
+//! (https://github.com/hwchen/secret-service-rs/issues/9)
 //
 //! - auditwheel: Reimplements the more important part of the auditwheel
 //! package in rust. Every  wheel is check unless [skip_auditwheel](BuildContext.skip_auditwheel) is
@@ -25,6 +26,9 @@
 //! PEP. It is therefore disabled by default. It also currently requires
 //! nightly as it uses pyo3 for bindings and setting the crate type for lib to
 //! rlib and cdylib.
+//!
+//! - human-panic: Adds human-panic, pulling in some outdated dependencies
+//! (https://github.com/rust-clique/human-panic/pull/47)
 
 #![deny(missing_docs)]
 

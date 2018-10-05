@@ -50,7 +50,7 @@ For pyo3 and rust-cpython, pyo3-pack can only build packages for installed pytho
 
  Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
 
- Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need to use a build script that writes c headers to a file called `target/header.h`
+ Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need cbindgen 0.6.4 as build dependency and a build script that writes c headers to a file called `target/header.h`:
 
 ```rust
 extern crate cbindgen;
@@ -61,11 +61,13 @@ use std::path::Path;
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    let mut config: cbindgen::Config = Default::default();
-    config.language = cbindgen::Language::C;
-    cbindgen::generate_with_config(&crate_dir, config)
-        .expect("Unable to generate bindings")
-        .write_to_file(Path::new("target").join("header.h"));
+    let bindings = cbindgen::Builder::new()
+        .with_no_includes()
+        .with_language(cbindgen::Language::C)
+        .with_crate(crate_dir)
+        .generate()
+        .unwrap();
+    bindings.write_to_file(Path::new("target").join("header.h"));
 }
 ```
 
@@ -174,8 +176,6 @@ OPTIONS:
 ## Code
 
 The main part is the pyo3-pack library, which is completely documented and should be well integratable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.
-
-Without the `upload` and `password-storage` features, pyo3-pack itself is manylinux compliant (and has much less dependencies).
 
 There are three different examples, which are also used for integration testing: `get_fourtytwo` with pyo3 bindings, `points` crate with cffi bindings and `hello-world` as a binary. The `sysconfig` folder contains the output of `python -m sysconfig` for different python versions and platform, which is helpful during development.
 

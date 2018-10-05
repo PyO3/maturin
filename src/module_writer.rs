@@ -2,7 +2,6 @@
 
 use base64;
 use failure::{Context, Error};
-use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -263,22 +262,9 @@ del os
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-pub fn generate_cffi_declarations(header: &Path, python: &PathBuf) -> Result<String, Error> {
-    let is_include = Regex::new("#include <.*>").unwrap();
-
-    // We need to remove the includes from the header because cffi can't process them and there's
-    // no option to deactivate them in cbindgen
-    let filtered_header = fs::read_to_string(header)?
-        .lines()
-        .filter(|line| !is_include.is_match(line))
-        .collect::<Vec<&str>>()
-        .join("");
-
+pub fn generate_cffi_declarations(cbindgen_header: &Path, python: &PathBuf) -> Result<String, Error> {
     let tempdir = tempdir()?;
     let ffi_py = tempdir.as_ref().join("ffi.py");
-    let header_h = tempdir.as_ref().join("header.h");
-
-    File::create(&header_h)?.write_all(filtered_header.as_bytes())?;
 
     let cffi_invocation = format!(
         r#"
@@ -286,13 +272,13 @@ import cffi
 from cffi import recompiler
 
 ffi = cffi.FFI()
-with open("{header_h}") as header:
+with open("{cbindgen_header}") as header:
     ffi.cdef(header.read())
 ffi.set_source("a", None)
 recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
 "#,
         ffi_py = ffi_py.display(),
-        header_h = header_h.display(),
+        cbindgen_header = cbindgen_header.display(),
     );
 
     let output = Command::new(python)

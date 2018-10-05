@@ -23,14 +23,14 @@ name = "pyo3_pack"
 [dependencies]
 base64 = "0.9.3"
 cargo_metadata = { git = "https://github.com/roblabla/cargo_metadata" }
-digest = { version = "0.7.6", features = ["std"] }
+digest = { version = "0.8.0", features = ["std"] }
 failure = "0.1.2"
 keyring = { version = "0.6.1", optional = true }
 reqwest = { version = "0.9.2", optional = true }
 rpassword = "2.0.0"
 serde_derive = "1.0.79"
 serde_json = "1.0.32"
-sha2 = "0.7.1"
+sha2 = "0.8.0"
 structopt = "0.2.10"
 target_info = "0.1.0"
 toml = "0.4.8"
@@ -40,7 +40,7 @@ tar = { version = "0.4.17", optional = true }
 libflate = { version = "0.1.18", optional = true }
 human-panic = { version = "1.0.1", optional = true }
 regex = "1.0.5"
-indicatif = "0.9.0"
+indicatif = { rev = "0c3c0b5cbe666402ed7d3b9366c346f6eb0228fe", git = "https://github.com/mitsuhiko/indicatif" }
 atty = "0.2.11"
 tempfile = "3.0.4"
 goblin = { version = "0.0.17", optional = true }

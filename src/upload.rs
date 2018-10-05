@@ -69,11 +69,13 @@ pub fn upload(
     supported_version: &str,
 ) -> Result<(), UploadError> {
     let mut wheel = File::open(&wheel_path)?;
-    let hash = format!("{:x}", Sha256::digest_reader(&mut wheel)?);
+    let mut hasher = Sha256::new();
+    io::copy(&mut wheel, &mut hasher)?;
+    let hash_hex = format!("{:x}", hasher.result());
 
     let mut api_metadata = vec![
         (":action".to_string(), "file_upload".to_string()),
-        ("sha256_digest".to_string(), hash),
+        ("sha256_digest".to_string(), hash_hex),
         ("protocol_version".to_string(), "1".to_string()),
     ];
 

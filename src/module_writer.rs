@@ -262,7 +262,10 @@ del os
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-pub fn generate_cffi_declarations(cbindgen_header: &Path, python: &PathBuf) -> Result<String, Error> {
+pub fn generate_cffi_declarations(
+    cbindgen_header: &Path,
+    python: &PathBuf,
+) -> Result<String, Error> {
     let tempdir = tempdir()?;
     let ffi_py = tempdir.as_ref().join("ffi.py");
 

@@ -9,9 +9,15 @@ env:
 
 addons:
   apt:
+    sources:
+      - deadsnakes
     packages:
       - libdbus-1-dev
       - musl-tools
+      - python3.5-dev
+      - python3.6-dev
+      - python3.6-venv
+      - python3.7-dev
 
 matrix:
   fast_finish: true
@@ -28,7 +34,14 @@ matrix:
       env: TARGET=i686-unknown-linux-musl
       addons:
         apt:
+          sources:
+            - deadsnakes
           packages:
+            - python3.5-dev
+            - python3.6-dev
+            - python3.6-venv
+            - python3.7-dev
+
             - libdbus-1-dev:i386
             - libgmp-dev:i386
             - binutils:i386
@@ -61,7 +74,6 @@ install:
     fi
   - |
     if [ "$TRAVIS_OS_NAME" == "linux" ]; then
-      pyenv global system 2.7 3.6
       python3.6 -m venv venv
       source venv/bin/activate
       pip install cffi virtualenv

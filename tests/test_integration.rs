@@ -5,6 +5,7 @@ use common::check_installed;
 use pyo3_pack::{BuildOptions, Target};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::str;
 use structopt::StructOpt;
 
 mod common;
@@ -125,7 +126,12 @@ fn test_integration(package: &Path, bindings: Option<String>) {
             .output()
             .unwrap();
         if !output.status.success() {
-            panic!();
+            panic!(
+                "pip failed: {} ||| {} ||| {}",
+                output.status,
+                str::from_utf8(&output.stdout).unwrap(),
+                str::from_utf8(&output.stderr).unwrap()
+            );
         }
 
         check_installed(&package, &python).unwrap();

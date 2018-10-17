@@ -17,7 +17,9 @@ addons:
       - python3.5-dev
       - python3.6-dev
       - python3.6-venv
-      - python3.7-dev
+      # So python 3.7 is broken on travis because they still use 14.04
+      # https://github.com/travis-ci/travis-ci/issues/9069
+      #- python3.7-dev
 
 matrix:
   fast_finish: true

@@ -127,7 +127,7 @@ fn test_integration(package: &Path, bindings: Option<String>) {
             .unwrap();
         if !output.status.success() {
             panic!(
-                "pip failed: {} ||| {} ||| {}",
+                "pip failed: {} \n--- Stdout:\n{}\n--- Stderr:\n{}",
                 output.status,
                 str::from_utf8(&output.stdout).unwrap(),
                 str::from_utf8(&output.stderr).unwrap()

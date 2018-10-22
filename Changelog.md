@@ -109,7 +109,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/pyo3/pyo3-pack/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/pyo3/pyo3-pack/compare/v0.3.5...v0.3.5
 [0.3.5]: https://github.com/pyo3/pyo3-pack/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/pyo3/pyo3-pack/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/pyo3/pyo3-pack/compare/v0.3.1...v0.3.3

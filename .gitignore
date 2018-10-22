@@ -1,5 +1,5 @@
 target/
-Cargo.lock
+*/Cargo.lock
 venv*/
 .venv/
 .pytest_cache/

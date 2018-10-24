@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.8]
+
+ * Pin reqwest to 0.9.2 to work around [seanmonstar/reqwest#374](https://github.com/seanmonstar/reqwest/issues/374)
+
 ## [0.3.7]
 
 ### Fixed
@@ -110,6 +114,7 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
  * Initial Release
 
 [Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.7...HEAD
+[0.3.8]: https://github.com/pyo3/pyo3-pack/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/pyo3/pyo3-pack/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/pyo3/pyo3-pack/compare/v0.3.5...v0.3.5
 [0.3.5]: https://github.com/pyo3/pyo3-pack/compare/v0.3.4...v0.3.5

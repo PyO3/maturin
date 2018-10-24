@@ -1103,7 +1103,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-pack"
-version = "0.3.6"
+version = "0.3.68"
 dependencies = [
  "atty 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",

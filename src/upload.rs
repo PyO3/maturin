@@ -104,7 +104,7 @@ pub fn upload(
     let client = Client::new();
     let mut response = client
         .post(registry.url.clone())
-        .header("content-type", "application/json; charset=utf-8")
+        .header(reqwest::header::CONTENT_TYPE, "application/json; charset=utf-8")
         .multipart(form)
         .basic_auth(registry.username.clone(), Some(registry.password.clone()))
         .send()?;

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.7]
 
-## Fixed
+### Fixed
 
  * Added cargo lock to project [#9](https://github.com/PyO3/pyo3-pack/issues/9)
 

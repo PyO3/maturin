@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+ * Update reqwest to 0.9.4 which has [seanmonstar/reqwest#374](https://github.com/seanmonstar/reqwest/issues/374) fixed
+
 ## [0.3.8]
+
+### Fixed
 
  * Pin reqwest to 0.9.2 to work around [seanmonstar/reqwest#374](https://github.com/seanmonstar/reqwest/issues/374)
 
@@ -67,9 +73,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Builds for i686 linux and mac
  * Builds for pyo3-pack as wheel
- 
+
 ## Fixed
- 
+
  * Usage with stable
  * Wrong tags in WHEEL file on non-linux platforms
  * Uploading on windows
@@ -79,7 +85,7 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 ### Fixed
 
  * Windows compilation
- 
+
 ## [0.3.0] - 2017-09-14
 
 ### Added
@@ -113,7 +119,7 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.7...HEAD
+[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.8...HEAD
 [0.3.8]: https://github.com/pyo3/pyo3-pack/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/pyo3/pyo3-pack/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/pyo3/pyo3-pack/compare/v0.3.5...v0.3.5
@@ -123,5 +129,3 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 [0.3.1]: https://github.com/pyo3/pyo3-pack/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/pyo3/pyo3-pack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/pyo3/pyo3-pack/compare/v0.1.0...v0.2.0
-
-

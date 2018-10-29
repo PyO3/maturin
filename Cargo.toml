@@ -21,7 +21,7 @@ name = "pyo3-pack"
 name = "pyo3_pack"
 
 [dependencies]
-base64 = "0.9.3"
+base64 = "0.10.0"
 cargo_metadata = { git = "https://github.com/roblabla/cargo_metadata" }
 digest = { version = "0.8.0", features = ["std"] }
 failure = "0.1.3"

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::str;
-use CargoToml;
+use crate::CargoToml;
 
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -224,8 +224,8 @@ mod test {
     extern crate indoc;
     extern crate tempfile;
 
-    use cargo_toml::CargoTomlMetadata;
-    use cargo_toml::CargoTomlMetadataPyo3Pack;
+    use crate::cargo_toml::CargoTomlMetadata;
+    use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
     // Macro scoping
     #[allow(unused_imports)]
     use self::indoc::*;

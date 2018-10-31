@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pack"
-version = "0.3.68"
+version = "0.4.0"
 description = "Build and publish crates with pyo3 bindings as python packages"
 exclude = ["get-fourtytwo/**/*", "integration-test/**/*", "sysconfig/*"]
 readme = "Readme.md"

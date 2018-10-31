@@ -1,14 +1,14 @@
-use build_context::BridgeModel;
-use compile::compile;
+use crate::build_context::BridgeModel;
+use crate::compile::compile;
 use failure::{Context, Error, ResultExt};
-use module_writer::write_bindings_module;
-use module_writer::write_cffi_module;
-use module_writer::DevelopModuleWriter;
+use crate::module_writer::write_bindings_module;
+use crate::module_writer::write_cffi_module;
+use crate::module_writer::DevelopModuleWriter;
 use std::fs;
 use std::path::Path;
-use BuildOptions;
-use PythonInterpreter;
-use Target;
+use crate::BuildOptions;
+use crate::PythonInterpreter;
+use crate::Target;
 
 /// Installs a crate by compiling it and copying the shared library to the right directory
 ///

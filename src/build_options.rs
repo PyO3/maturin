@@ -1,7 +1,7 @@
-use build_context::BridgeModel;
+use crate::build_context::BridgeModel;
 use cargo_metadata;
-use cargo_toml::CargoTomlMetadata;
-use cargo_toml::CargoTomlMetadataPyo3Pack;
+use crate::cargo_toml::CargoTomlMetadata;
+use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
 use failure::err_msg;
 use failure::{Error, ResultExt};
 use std::collections::HashMap;
@@ -9,11 +9,11 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use toml;
-use BuildContext;
-use CargoToml;
-use Metadata21;
-use PythonInterpreter;
-use Target;
+use crate::BuildContext;
+use crate::CargoToml;
+use crate::Metadata21;
+use crate::PythonInterpreter;
+use crate::Target;
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]

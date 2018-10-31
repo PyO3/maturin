@@ -1,7 +1,7 @@
 extern crate pyo3_pack;
 extern crate structopt;
 
-use common::check_installed;
+use crate::common::check_installed;
 use pyo3_pack::{BuildOptions, Target};
 use std::path::Path;
 use std::process::{Command, Stdio};

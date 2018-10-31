@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 use std::str;
-use Target;
+use crate::Target;
 
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout

@@ -6,9 +6,9 @@ use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
-use Metadata21;
-use PythonInterpreter;
-use Registry;
+use crate::Metadata21;
+use crate::PythonInterpreter;
+use crate::Registry;
 
 /// Error type for different types of errors that can happen when uploading a
 /// wheel.

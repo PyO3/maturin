@@ -1,6 +1,6 @@
 use atty;
 use atty::Stream;
-use build_context::BridgeModel;
+use crate::build_context::BridgeModel;
 use cargo_metadata;
 use cargo_metadata::Message;
 use failure::{Error, ResultExt};
@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
-use BuildContext;
-use PythonInterpreter;
+use crate::BuildContext;
+use crate::PythonInterpreter;
 
 #[derive(Deserialize, Debug, Clone)]
 struct BuildPlanEntry {

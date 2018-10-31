@@ -17,9 +17,9 @@ use std::process::Stdio;
 use std::str;
 use tempfile::tempdir;
 use zip::{self, ZipWriter};
-use Metadata21;
-use PythonInterpreter;
-use Target;
+use crate::Metadata21;
+use crate::PythonInterpreter;
+use crate::Target;
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {

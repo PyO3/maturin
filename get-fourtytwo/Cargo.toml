@@ -9,7 +9,7 @@ readme = "Readme.md"
 get_42 = "get_fourtytwo:DummyClass.get_42"
 
 [dependencies]
-pyo3 = { version = "0.5.0-alpha.2", features = ["extension-module"] }
+pyo3 = { version = "0.5.0-alpha.3", features = ["extension-module"] }
 
 [lib]
 name = "get_fourtytwo"

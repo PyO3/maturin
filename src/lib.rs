@@ -15,7 +15,7 @@
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
 //! for the build on the github releases page.
 //! (https://github.com/hwchen/secret-service-rs/issues/9)
-//
+//!
 //! - auditwheel: Reimplements the more important part of the auditwheel
 //! package in rust. Every  wheel is check unless [skip_auditwheel](BuildContext.skip_auditwheel) is
 //! set to true.

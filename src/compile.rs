@@ -77,7 +77,7 @@ fn get_progress_plan(shared_args: &[&str]) -> Option<(ProgressBar, Vec<String>)>
     if atty::is(Stream::Stderr) {
         match get_build_plan(shared_args) {
             Ok(build_plan) => {
-                let mut packages: Vec<String> = build_plan
+                let packages: Vec<String> = build_plan
                     .invocations
                     .iter()
                     .map(|x| x.package_name.clone())

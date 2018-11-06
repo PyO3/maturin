@@ -45,7 +45,7 @@ atty = "0.2.11"
 tempfile = "3.0.4"
 goblin = { version = "0.0.19", optional = true }
 openssl = { version = "0.10.15", features = ["vendored"], optional = true }
-pretty_env_logger = { version = "0.2.4", optional = true }
+pretty_env_logger = { version = "0.2.5", optional = true }
 platforms = "0.1.4"
 
 [dev-dependencies]

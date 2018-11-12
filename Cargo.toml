@@ -36,7 +36,7 @@ target_info = "0.1.0"
 toml = "0.4.8"
 zip = "0.4.2"
 serde = "1.0.80"
-tar = { version = "0.4.17", optional = true }
+tar = { version = "0.4.19", optional = true }
 libflate = { version = "0.1.18", optional = true }
 human-panic = { version = "1.0.1", optional = true }
 regex = "1.0.6"

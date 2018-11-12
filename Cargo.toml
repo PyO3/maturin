@@ -39,7 +39,7 @@ serde = "1.0.80"
 tar = { version = "0.4.17", optional = true }
 libflate = { version = "0.1.18", optional = true }
 human-panic = { version = "1.0.1", optional = true }
-regex = "1.0.5"
+regex = "1.0.6"
 indicatif = { rev = "0c3c0b5cbe666402ed7d3b9366c346f6eb0228fe", git = "https://github.com/mitsuhiko/indicatif" }
 atty = "0.2.11"
 tempfile = "3.0.4"

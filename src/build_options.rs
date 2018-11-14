@@ -195,7 +195,7 @@ pub fn find_bridge(
     } else if deps.contains("pyo3") {
         println!("Found pyo3 bindings");
         Ok(BridgeModel::Bindings("pyo3".to_string()))
-    } else if deps.contains("rust-cpython") {
+    } else if deps.contains("cpython") {
         println!("Found rust-python bindings");
         Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {

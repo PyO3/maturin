@@ -144,7 +144,9 @@ pub fn compile(
 
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
-    if python_feature != "" {
+    if *bindings_crate == BridgeModel::Bindings("pyo3".to_string())
+        && python_feature != ""
+    {
         // This is a workaround for a bug in pyo3's build.rs
         shared_args.extend(&["--features", &python_feature]);
     }

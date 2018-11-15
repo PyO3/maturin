@@ -12,16 +12,16 @@ This project was meant as a zero configuration replacement for [setuptools-rust]
 
 ## Usage
 
-You can either download binaries from the [latest release](https://github.com/PyO3/pyo3-pack/releases/latest) or install it from source:
-
-```shell
-cargo install pyo3-pack
-```
-
-You can also install pyo3-pack with pip:
+You can either download binaries from the [latest release](https://github.com/PyO3/pyo3-pack/releases/latest) or install it with pip:
 
 ```shell
 pip install pyo3-pack
+```
+
+You can also install pyo3-pack from source, though it's an older version:
+
+```shell
+cargo install pyo3-pack
 ```
 
 There are three main subsommands:

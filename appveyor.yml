@@ -22,10 +22,9 @@ environment:
     #  CHANNEL: stable
 
     # For the integration test
-    # The test passes, but the build still fails for an unknown reason.
-    # If this is the last entry, we still get the binaries on releases until the this cause is fixed
-    - TARGET: x86_64-pc-windows-msvc
-      CHANNEL: nightly
+    # Comment out because it is failing for not locally reproducable reasons (maybe LIB is set incorrectly)
+    #- TARGET: x86_64-pc-windows-msvc
+    #  CHANNEL: nightly
 
 matrix:
   fast_finish: true

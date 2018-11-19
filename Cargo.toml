@@ -34,7 +34,7 @@ sha2 = "0.8.0"
 structopt = "0.2.13"
 target_info = "0.1.0"
 toml = "0.4.8"
-zip = "0.4.2"
+zip = "0.5.0"
 serde = "1.0.80"
 tar = { version = "0.4.19", optional = true }
 libflate = { version = "0.1.18", optional = true }

@@ -14,6 +14,7 @@ addons:
     packages:
       - libdbus-1-dev
       - musl-tools
+      - fakeroot
       - python3.5-dev
       - python3.6-dev
       - python3.6-venv
@@ -39,6 +40,8 @@ matrix:
           sources:
             - deadsnakes
           packages:
+            - fakeroot
+
             - python3.5-dev
             - python3.6-dev
             - python3.6-venv
@@ -85,26 +88,15 @@ script:
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
 
-before_deploy:
-  # We don't care for manylinux compliance for the downloads, so we can use the keyring.
-  # The stack protector story is a weird one; On 32 bit, you get errors such as the following without the option
-  # /usr/bin/ld: apps/openssl: hidden symbol `__stack_chk_fail_local' isn't defined
-  # I assume that this is a musl bug fixed in 2015 that didn't make into ubuntu 14.04, but that special
-  # case seems to be documented nowhere else:
-  # http://git.musl-libc.org/cgit/musl/commit/?id=55d061f031085f24d138664c897791aebe9a2fab
-  # We can't have a more recent musl on 14.04 (there's no ppa), so we have to disable that feature
-  - CFLAGS="-fno-stack-protector" cargo build --release --target $TARGET --features "password-storage musl"
-  - cd target/$TARGET/release/
-  # You can add more file to the archive by adding them to this line
-  - tar czf ../../../${BINARY_NAME}-$TRAVIS_TAG-$TARGET.tar.gz ${BINARY_NAME}
-  - cd ../../..
-  # We do care for manylinux compliance, so we use the musl feature to get static binaries for pypi
-  - CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin --release -b bin --target $TARGET --strip --cargo-extra-args="--features=musl"
+before_deploy: bash ci/before_deploy.sh
 
 deploy:
   - # Add zipped binary to the github release
     provider: releases
-    file: ${BINARY_NAME}-${TRAVIS_TAG}-${TARGET}.tar.gz
+    file_glob: true
+    file:
+      - $TRAVIS_BUILD_DIR/$BINARY_NAME-$TRAVIS_TAG-$TARGET.*
+      - $TRAVIS_BUILD_DIR/$BINARY_NAME*.deb
     skip_cleanup: true
     on: # Create downloads only with stable rust and only for stable releases
       condition: $TRAVIS_RUST_VERSION = stable

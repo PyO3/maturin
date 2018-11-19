@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+ * New ci script based on hyperfine which also builds debian packages
+
 ## [0.3.10] - 2018-11-16
+
+### Fixed
 
  * Fix rust-cpython detection and compilation
 

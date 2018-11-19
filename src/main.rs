@@ -3,8 +3,6 @@
 //!
 //! Run with --help for usage information
 
-#![cfg_attr(feature = "cargo-clippy", feature(tool_lints))]
-
 extern crate core;
 #[macro_use]
 extern crate failure;

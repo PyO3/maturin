@@ -1,14 +1,14 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
+use crate::Metadata21;
+use crate::PythonInterpreter;
+use crate::Registry;
 use reqwest::{self, multipart::Form, Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
-use crate::Metadata21;
-use crate::PythonInterpreter;
-use crate::Registry;
 
 /// Error type for different types of errors that can happen when uploading a
 /// wheel.
@@ -28,11 +28,7 @@ pub enum UploadError {
     #[fail(display = "IO Error")]
     IOError(#[cause] io::Error),
     /// The registry returned something else than 200
-    #[fail(
-        display = "Failed to upload the wheel with status {}: {}",
-        _0,
-        _1
-    )]
+    #[fail(display = "Failed to upload the wheel with status {}: {}", _0, _1)]
     StatusCodeError(String, String),
 }
 
@@ -104,7 +100,10 @@ pub fn upload(
     let client = Client::new();
     let mut response = client
         .post(registry.url.clone())
-        .header(reqwest::header::CONTENT_TYPE, "application/json; charset=utf-8")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/json; charset=utf-8",
+        )
         .multipart(form)
         .basic_auth(registry.username.clone(), Some(registry.password.clone()))
         .send()?;

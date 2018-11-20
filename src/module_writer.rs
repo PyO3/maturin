@@ -1,6 +1,9 @@
 //! The wheel format is (mostly) specified in PEP 427
 
 use base64;
+use crate::Metadata21;
+use crate::PythonInterpreter;
+use crate::Target;
 use failure::{Context, Error};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -17,9 +20,6 @@ use std::process::Stdio;
 use std::str;
 use tempfile::tempdir;
 use zip::{self, ZipWriter};
-use crate::Metadata21;
-use crate::PythonInterpreter;
-use crate::Target;
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {

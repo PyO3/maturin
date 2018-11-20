@@ -67,7 +67,7 @@ fn test_integration(package: &Path, bindings: Option<String>) {
     let options = BuildOptions::from_iter_safe(cli).unwrap();
 
     let wheels = options
-        .into_build_context()
+        .into_build_context(false, false)
         .unwrap()
         .build_wheels()
         .unwrap();

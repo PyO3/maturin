@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2018-11-20
+
+### Changed
+
+ * publish defaults to release and strip, unless `--debug` or `--no-strip` are given.
 
 ### Added
 
- * New ci script based on hyperfine which also builds debian packages
+ * New ci script based on hyperfine which also builds debian packages.
 
 ## [0.3.10] - 2018-11-16
 
@@ -131,7 +135,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.3.10...HEAD
+[Unreleased]: https://github.com/pyo3/pyo3-pack/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/pyo3/pyo3-pack/compare/v0.3.10...0.4.0
 [0.3.10]: https://github.com/pyo3/pyo3-pack/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/pyo3/pyo3-pack/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/pyo3/pyo3-pack/compare/v0.3.7...v0.3.8

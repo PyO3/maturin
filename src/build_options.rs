@@ -1,7 +1,12 @@
-use crate::build_context::BridgeModel;
 use cargo_metadata;
+use crate::build_context::BridgeModel;
 use crate::cargo_toml::CargoTomlMetadata;
 use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
+use crate::BuildContext;
+use crate::CargoToml;
+use crate::Metadata21;
+use crate::PythonInterpreter;
+use crate::Target;
 use failure::err_msg;
 use failure::{Error, ResultExt};
 use std::collections::HashMap;
@@ -9,11 +14,6 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use toml;
-use crate::BuildContext;
-use crate::CargoToml;
-use crate::Metadata21;
-use crate::PythonInterpreter;
-use crate::Target;
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
@@ -39,12 +39,6 @@ pub struct BuildOptions {
     /// directory in the project's target directory
     #[structopt(short = "o", long = "out", parse(from_os_str))]
     pub out: Option<PathBuf>,
-    /// Pass --release to cargo
-    #[structopt(long = "release")]
-    pub release: bool,
-    /// Strip the library for minimum file size
-    #[structopt(long = "strip")]
-    pub strip: bool,
     /// Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
@@ -66,8 +60,6 @@ impl Default for BuildOptions {
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
             out: None,
-            release: false,
-            strip: false,
             skip_auditwheel: false,
             target: None,
             cargo_extra_args: Vec::new(),
@@ -78,7 +70,7 @@ impl Default for BuildOptions {
 
 impl BuildOptions {
     /// Tries to fill the missing metadata in BuildContext by querying cargo and python
-    pub fn into_build_context(self) -> Result<BuildContext, Error> {
+    pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext, Error> {
         let manifest_file = self
             .manifest_path
             .canonicalize()
@@ -153,8 +145,8 @@ impl BuildOptions {
             module_name,
             manifest_path: self.manifest_path,
             out: wheel_dir,
-            release: self.release,
-            strip: self.strip,
+            release,
+            strip,
             skip_auditwheel: self.skip_auditwheel,
             cargo_extra_args,
             rustc_extra_args: self.rustc_extra_args,

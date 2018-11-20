@@ -60,13 +60,13 @@ extern crate target_info;
 extern crate toml;
 extern crate zip;
 
+#[cfg(feature = "sdist")]
+use capybara::prelude::*;
 #[cfg(feature = "auditwheel")]
 pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};
 pub use crate::build_context::BridgeModel;
 pub use crate::build_context::BuildContext;
 pub use crate::build_options::BuildOptions;
-#[cfg(feature = "sdist")]
-use capybara::prelude::*;
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::compile;
 pub use crate::develop::develop;
@@ -74,11 +74,11 @@ pub use crate::metadata::{Metadata21, WheelMetadata};
 pub use crate::python_interpreter::PythonInterpreter;
 #[cfg(feature = "upload")]
 pub use crate::registry::Registry;
-#[cfg(feature = "sdist")]
-pub use sdist::build_source_distribution;
 pub use crate::target::Target;
 #[cfg(feature = "upload")]
 pub use crate::upload::{upload, upload_wheels, UploadError};
+#[cfg(feature = "sdist")]
+pub use sdist::build_source_distribution;
 
 #[cfg(feature = "auditwheel")]
 mod auditwheel;

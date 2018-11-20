@@ -1,10 +1,10 @@
+use crate::CargoToml;
 use failure::{Error, ResultExt};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::str;
-use crate::CargoToml;
 
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]

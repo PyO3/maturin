@@ -1,3 +1,4 @@
+use crate::Target;
 use failure::{Error, Fail, ResultExt};
 use regex::Regex;
 use serde_json;
@@ -8,7 +9,6 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 use std::str;
-use crate::Target;
 
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout

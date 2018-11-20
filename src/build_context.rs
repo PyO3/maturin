@@ -1,17 +1,17 @@
-#[cfg(feature = "auditwheel")]
-use crate::auditwheel_rs;
 #[cfg(feature = "sdist")]
 use build_source_distribution;
+#[cfg(feature = "auditwheel")]
+use crate::auditwheel_rs;
 use crate::compile;
-use failure::{Context, Error, ResultExt};
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
+use failure::{Context, Error, ResultExt};
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]

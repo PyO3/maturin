@@ -1,11 +1,13 @@
+use std::fs;
+use std::path::Path;
+
+use failure::{Context, Error, ResultExt};
+
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
-use failure::{Context, Error, ResultExt};
 use crate::module_writer::write_bindings_module;
 use crate::module_writer::write_cffi_module;
 use crate::module_writer::DevelopModuleWriter;
-use std::fs;
-use std::path::Path;
 use crate::BuildOptions;
 use crate::PythonInterpreter;
 use crate::Target;
@@ -37,13 +39,11 @@ pub fn develop(
         out: None,
         skip_auditwheel: true,
         target: None,
-        release,
-        strip,
         cargo_extra_args,
         rustc_extra_args,
     };
 
-    let build_context = build_options.into_build_context()?;
+    let build_context = build_options.into_build_context(release, strip)?;
 
     let mut builder = DevelopModuleWriter::venv(&target, &venv_dir)?;
 

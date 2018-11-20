@@ -22,19 +22,21 @@ extern crate rpassword;
 #[macro_use]
 extern crate structopt;
 
-use failure::{Error, ResultExt};
-#[cfg(all(feature = "upload", feature = "keyring"))]
-use keyring::{Keyring, KeyringError};
-use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
-#[cfg(feature = "upload")]
-use pyo3_pack::{upload_wheels, Registry, UploadError};
-#[cfg(feature = "upload")]
-use reqwest::Url;
 use std::env;
 #[cfg(feature = "upload")]
 use std::io;
 use std::path::PathBuf;
+
+use failure::{Error, ResultExt};
+#[cfg(all(feature = "upload", feature = "keyring"))]
+use keyring::{Keyring, KeyringError};
+#[cfg(feature = "upload")]
+use reqwest::Url;
 use structopt::StructOpt;
+
+use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
+#[cfg(feature = "upload")]
+use pyo3_pack::{upload_wheels, Registry, UploadError};
 
 /// Returns the password and a bool that states whether to ask for re-entering the password
 /// after a failed authentication
@@ -110,6 +112,12 @@ struct PublishOpt {
     /// Password for pypi or your custom registry. Note that you can also pass the password
     /// through PYO3_PACK_PASSWORD
     password: Option<String>,
+    /// Do not pass --release to cargo
+    #[structopt(long = "debug")]
+    debug: bool,
+    /// Strip the library for minimum file size
+    #[structopt(long = "no-strip")]
+    no_strip: bool,
 }
 
 #[derive(Debug, StructOpt)]
@@ -122,6 +130,12 @@ enum Opt {
     Build {
         #[structopt(flatten)]
         build: BuildOptions,
+        /// Pass --release to cargo
+        #[structopt(long = "release")]
+        release: bool,
+        /// Strip the library for minimum file size
+        #[structopt(long = "strip")]
+        strip: bool,
     },
     #[cfg(feature = "upload")]
     #[structopt(name = "publish")]
@@ -173,12 +187,16 @@ fn run() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     match opt {
-        Opt::Build { build } => {
-            build.into_build_context()?.build_wheels()?;
+        Opt::Build {
+            build,
+            release,
+            strip,
+        } => {
+            build.into_build_context(release, strip)?.build_wheels()?;
         }
         #[cfg(feature = "upload")]
         Opt::Publish { build, publish } => {
-            let build_context = build.into_build_context()?;
+            let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
 
             if !build_context.release {
                 eprintln!("Warning: You're publishing debug wheels");

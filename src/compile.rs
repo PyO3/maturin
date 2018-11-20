@@ -1,8 +1,10 @@
 use atty;
 use atty::Stream;
-use crate::build_context::BridgeModel;
 use cargo_metadata;
 use cargo_metadata::Message;
+use crate::build_context::BridgeModel;
+use crate::BuildContext;
+use crate::PythonInterpreter;
 use failure::{Error, ResultExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde_json;
@@ -10,8 +12,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
-use crate::BuildContext;
-use crate::PythonInterpreter;
 
 #[derive(Deserialize, Debug, Clone)]
 struct BuildPlanEntry {
@@ -144,9 +144,7 @@ pub fn compile(
 
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
-    if *bindings_crate == BridgeModel::Bindings("pyo3".to_string())
-        && python_feature != ""
-    {
+    if *bindings_crate == BridgeModel::Bindings("pyo3".to_string()) && python_feature != "" {
         // This is a workaround for a bug in pyo3's build.rs
         shared_args.extend(&["--features", &python_feature]);
     }

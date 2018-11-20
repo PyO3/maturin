@@ -76,7 +76,7 @@ EOF
 
 upload_to_pypi() {
     # We do care for manylinux compliance for pypi, so we use the musl feature to get static binaries
-    CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin --release -b bin --target $TARGET --strip --cargo-extra-args="--features=musl"
+    CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin -b bin --target $TARGET --cargo-extra-args="--features=musl"
 }
 
 main() {

@@ -116,10 +116,10 @@ USAGE:
     pyo3-pack publish [FLAGS] [OPTIONS]
 
 FLAGS:
+        --debug              Do not pass --release to cargo
     -h, --help               Prints help information
-        --release            Pass --release to cargo
+        --no-strip           Strip the library for minimum file size
         --skip-auditwheel    Don't check for manylinux compliance
-        --strip              Strip the library for minimum file size
     -V, --version            Prints version information
 
 OPTIONS:

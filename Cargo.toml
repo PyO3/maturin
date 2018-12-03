@@ -42,7 +42,7 @@ human-panic = { version = "1.0.1", optional = true }
 regex = "1.0.6"
 indicatif = "0.10.1"
 atty = "0.2.11"
-tempfile = "3.0.4"
+tempfile = "3.0.5"
 goblin = { version = "0.0.19", optional = true }
 openssl = { version = "0.10.15", features = ["vendored"], optional = true }
 pretty_env_logger = { version = "0.2.5", optional = true }

@@ -40,7 +40,7 @@ tar = { version = "0.4.20", optional = true }
 libflate = { version = "0.1.18", optional = true }
 human-panic = { version = "1.0.1", optional = true }
 regex = "1.1.0"
-indicatif = "0.10.1"
+indicatif = "0.10.2"
 atty = "0.2.11"
 tempfile = "3.0.5"
 goblin = { version = "0.0.19", optional = true }

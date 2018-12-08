@@ -1,10 +1,10 @@
+use crate::build_context::BridgeModel;
+use crate::BuildContext;
+use crate::PythonInterpreter;
 use atty;
 use atty::Stream;
 use cargo_metadata;
 use cargo_metadata::Message;
-use crate::build_context::BridgeModel;
-use crate::BuildContext;
-use crate::PythonInterpreter;
 use failure::{Error, ResultExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde_json;

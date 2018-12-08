@@ -1,9 +1,9 @@
 //! The wheel format is (mostly) specified in PEP 427
 
-use base64;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
+use base64;
 use failure::{Context, Error};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;

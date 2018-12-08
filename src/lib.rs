@@ -60,8 +60,6 @@ extern crate target_info;
 extern crate toml;
 extern crate zip;
 
-#[cfg(feature = "sdist")]
-use capybara::prelude::*;
 #[cfg(feature = "auditwheel")]
 pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};
 pub use crate::build_context::BridgeModel;
@@ -77,6 +75,8 @@ pub use crate::registry::Registry;
 pub use crate::target::Target;
 #[cfg(feature = "upload")]
 pub use crate::upload::{upload, upload_wheels, UploadError};
+#[cfg(feature = "sdist")]
+use capybara::prelude::*;
 #[cfg(feature = "sdist")]
 pub use sdist::build_source_distribution;
 

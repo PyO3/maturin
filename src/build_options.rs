@@ -1,4 +1,13 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fs;
+use std::path::PathBuf;
+
 use cargo_metadata;
+use failure::err_msg;
+use failure::{Error, ResultExt};
+use toml;
+
 use crate::build_context::BridgeModel;
 use crate::cargo_toml::CargoTomlMetadata;
 use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
@@ -7,13 +16,6 @@ use crate::CargoToml;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
-use failure::err_msg;
-use failure::{Error, ResultExt};
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::fs;
-use std::path::PathBuf;
-use toml;
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
@@ -132,10 +134,12 @@ impl BuildOptions {
 
         let interpreter = find_interpreter(&bridge, &self.interpreter, &target)?;
 
-        let mut cargo_extra_args = self.cargo_extra_args.clone();
+        let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
         if let Some(target) = self.target {
             cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
         }
+
+        let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
 
         Ok(BuildContext {
             target,
@@ -149,7 +153,7 @@ impl BuildOptions {
             strip,
             skip_auditwheel: self.skip_auditwheel,
             cargo_extra_args,
-            rustc_extra_args: self.rustc_extra_args,
+            rustc_extra_args,
             interpreter,
         })
     }
@@ -248,10 +252,28 @@ pub fn find_interpreter(
     })
 }
 
+/// Helper function that calls shlex on all extra args given
+fn split_extra_args(given_args: &[String]) -> Result<Vec<String>, Error> {
+    let mut splitted_args = vec![];
+    for arg in given_args {
+        match shlex::split(&arg) {
+            Some(split) => splitted_args.extend(split),
+            None => {
+                bail!(
+                    "Couldn't split argument from `--cargo-extra-args`: '{}'",
+                    arg
+                );
+            }
+        }
+    }
+    Ok(splitted_args)
+}
+
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::path::Path;
+
+    use super::*;
 
     #[test]
     fn test_find_bridge_pyo3() {
@@ -303,5 +325,14 @@ mod test {
         assert!(find_bridge(&hello_world, None).is_err());
         assert!(find_bridge(&hello_world, Some("rust-cpython")).is_err());
         assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
+    }
+
+    #[test]
+    fn test_argument_splitting() {
+        let mut options = BuildOptions::default();
+        options.cargo_extra_args.push("--features foo".to_string());
+        options.bindings = Some("bin".to_string());
+        let context = options.into_build_context(false, false).unwrap();
+        assert_eq!(context.cargo_extra_args, vec!["--features", "foo"])
     }
 }

@@ -1,5 +1,3 @@
-extern crate pyo3_pack;
-
 use crate::common::check_installed;
 use pyo3_pack::{develop, Target};
 use std::fs;

@@ -221,16 +221,12 @@ impl Metadata21 {
 
 #[cfg(test)]
 mod test {
-    extern crate indoc;
-    extern crate tempfile;
-
+    use super::*;
     use crate::cargo_toml::CargoTomlMetadata;
     use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
-    // Macro scoping
-    #[allow(unused_imports)]
-    use self::indoc::*;
-    use super::*;
+    use indoc::indoc;
     use std::io::Write;
+    use tempfile;
     use toml;
 
     #[test]

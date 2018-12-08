@@ -32,33 +32,31 @@
 
 #![deny(missing_docs)]
 
-extern crate base64;
-extern crate cargo_metadata;
+use base64;
+use cargo_metadata;
 #[cfg(feature = "auditwheel")]
 extern crate goblin;
-extern crate regex;
-extern crate tempfile;
+
 #[macro_use]
 extern crate failure;
-extern crate atty;
+use atty;
 #[cfg(feature = "upload")]
 extern crate reqwest;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate sha2;
+use serde_json;
+
 #[macro_use]
 extern crate structopt;
-extern crate core;
-extern crate indicatif;
+
 #[cfg(feature = "sdist")]
 extern crate libflate;
-extern crate platforms;
+use platforms;
 #[cfg(feature = "sdist")]
 extern crate tar;
-extern crate target_info;
-extern crate toml;
-extern crate zip;
+use target_info;
+use toml;
+use zip;
 
 #[cfg(feature = "auditwheel")]
 pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};

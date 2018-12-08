@@ -3,7 +3,6 @@
 //!
 //! Run with --help for usage information
 
-extern crate core;
 #[macro_use]
 extern crate failure;
 #[cfg(feature = "human-panic")]
@@ -14,10 +13,8 @@ extern crate human_panic;
 extern crate keyring;
 #[cfg(feature = "log")]
 extern crate pretty_env_logger;
-extern crate pyo3_pack;
-#[cfg(feature = "upload")]
-extern crate reqwest;
-extern crate rpassword;
+
+use rpassword;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate structopt;
@@ -27,7 +24,9 @@ use std::env;
 use std::io;
 use std::path::PathBuf;
 
-use failure::{Error, ResultExt};
+use failure::Error;
+#[cfg(feature = "upload")]
+use failure::ResultExt;
 #[cfg(all(feature = "upload", feature = "keyring"))]
 use keyring::{Keyring, KeyringError};
 #[cfg(feature = "upload")]

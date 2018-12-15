@@ -24,7 +24,7 @@ You can also install pyo3-pack from source, though it's an older version:
 cargo install pyo3-pack
 ```
 
-There are three main subsommands:
+There are three main subcommands:
 
  * `publish` builds the crate into python packages and publishes them to pypi.
  * `build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them.
@@ -39,6 +39,13 @@ Pip allows adding so called console scripts, which are shell commands that execu
 ```toml
 [package.metadata.pyo3-pack.scripts]
 get_42 = "get_fourtytwo:DummyClass.get_42"
+```
+
+You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `package.metadata.pyo3-pack.classifier`, e.g.:
+
+```toml
+[package.metadata.pyo3-pack]
+classifier = ["Programming Language :: Python"]
 ```
 
 ## pyo3 and rust-cpython

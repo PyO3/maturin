@@ -60,7 +60,7 @@ dependencies = [
  "backtrace-sys 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.45 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-demangle 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-demangle 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-pack"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "atty 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1379,7 +1379,7 @@ dependencies = [
 
 [[package]]
 name = "rustc-demangle"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -2243,7 +2243,7 @@ dependencies = [
 "checksum rpassword 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d37473170aedbe66ffa3ad3726939ba677d83c646ad4fd99e5b4bc38712f45ec"
 "checksum rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)" = "f76d05d3993fd5f4af9434e8e436db163a12a9d40e1a58a726f27a01dfd12a2a"
 "checksum rust-gmp 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4cd7d57377b309a73f69e164109203aa9ab3fee6ea68ac5fb76e2edb50662e9b"
-"checksum rustc-demangle 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "82ae957aa1b3055d8e086486723c0ccd3d7b8fa190ae8fa2e35543b6171c810e"
+"checksum rustc-demangle 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)" = "01b90379b8664dd83460d59bdc5dd1fd3172b8913788db483ed1325171eab2f7"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 "checksum ryu 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "eb9e9b8cde282a9fe6a42dd4681319bfb63f121b8a8ee9439c6f4107e58a46f7"

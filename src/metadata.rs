@@ -1,5 +1,5 @@
-use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
 use crate::cargo_toml::CargoTomlMetadata;
+use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
 use crate::CargoToml;
 use failure::{Error, ResultExt};
 use regex::Regex;
@@ -86,8 +86,8 @@ impl Metadata21 {
             Some(CargoTomlMetadata {
                 pyo3_pack:
                     Some(CargoTomlMetadataPyo3Pack {
-                        scripts: _,
                         classifier: Some(ref classifier),
+                        ..
                     }),
             }) => classifier.clone(),
             _ => Vec::new(),
@@ -115,7 +115,7 @@ impl Metadata21 {
             maintainer: None,
             maintainer_email: None,
             license: cargo_toml.package.license.clone(),
-            classifier: classifier,
+            classifier,
             requires_dist: Vec::new(),
             provides_dist: Vec::new(),
             obsoletes_dist: Vec::new(),

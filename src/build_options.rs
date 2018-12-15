@@ -98,7 +98,7 @@ impl BuildOptions {
                 pyo3_pack:
                     Some(CargoTomlMetadataPyo3Pack {
                         scripts: Some(ref scripts),
-                        classifier: _,
+                        ..
                     }),
             }) => scripts.clone(),
             _ => HashMap::new(),

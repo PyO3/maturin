@@ -47,4 +47,5 @@ pub(crate) struct CargoTomlMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct CargoTomlMetadataPyo3Pack {
     pub(crate) scripts: Option<HashMap<String, String>>,
+    pub(crate) classifier: Option<Vec<String>>,
 }

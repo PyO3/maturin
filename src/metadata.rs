@@ -1,3 +1,5 @@
+use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
+use crate::cargo_toml::CargoTomlMetadata;
 use crate::CargoToml;
 use failure::{Error, ResultExt};
 use regex::Regex;
@@ -80,6 +82,17 @@ impl Metadata21 {
             None
         };
 
+        let classifier = match cargo_toml.package.metadata {
+            Some(CargoTomlMetadata {
+                pyo3_pack:
+                    Some(CargoTomlMetadataPyo3Pack {
+                        scripts: _,
+                        classifier: Some(ref classifier),
+                    }),
+            }) => classifier.clone(),
+            _ => Vec::new(),
+        };
+
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
             name: cargo_toml.package.name.to_owned(),
@@ -102,7 +115,7 @@ impl Metadata21 {
             maintainer: None,
             maintainer_email: None,
             license: cargo_toml.package.license.clone(),
-            classifier: Vec::new(),
+            classifier: classifier,
             requires_dist: Vec::new(),
             provides_dist: Vec::new(),
             obsoletes_dist: Vec::new(),
@@ -266,6 +279,9 @@ mod test {
 
             [package.metadata.pyo3-pack.scripts]
             ph = "pyo3_pack:print_hello"
+
+            [package.metadata.pyo3-pack]
+            classifier = ["Programming Language :: Python"]
         "#
         )
         .replace("readme.md", &readme_path);
@@ -280,6 +296,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
+            Classifier: Programming Language :: Python
             Summary: A test project
             Keywords: ffi test
             Home-Page: https://example.org
@@ -300,11 +317,14 @@ mod test {
         let mut scripts = HashMap::new();
         scripts.insert("ph".to_string(), "pyo3_pack:print_hello".to_string());
 
+        let classifier = vec!["Programming Language :: Python".to_string()];
+
         assert_eq!(
             cargo_toml.package.metadata,
             Some(CargoTomlMetadata {
                 pyo3_pack: Some(CargoTomlMetadataPyo3Pack {
                     scripts: Some(scripts),
+                    classifier: Some(classifier),
                 }),
             })
         );

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
- * You can now specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml with `package.metadata.pyo3-pack.classifier``, e.g.
+ * You can now specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml with `package.metadata.pyo3-pack.classifier`. Implemented by ijl in [#48](https://github.com/PyO3/pyo3-pack/pull/48). Example:
  ```toml
   [package.metadata.pyo3-pack]
   classifier = ["Programming Language :: Python"]

@@ -84,11 +84,6 @@ deploy:
       CHANNEL: stable
       appveyor_repo_tag: true
 
-cache:
-  - '%CARGO_HOME%\registry'
-  - target
-  - '%RUSTUP_HOME%'
-
 branches:
   only:
     # Pushes to the master branch

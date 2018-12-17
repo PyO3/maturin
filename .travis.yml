@@ -88,7 +88,7 @@ install:
 
 script:
   - cargo fmt --all -- --check
-  - cargo clippy -- -D warnings
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo clippy -- -D warnings; fi # TODO: Remove once rust 1.33 is published
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
 

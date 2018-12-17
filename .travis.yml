@@ -66,6 +66,8 @@ matrix:
       env: TARGET=x86_64-apple-darwin
 
 install:
+  - rustup component add clippy
+  - rustup component add rustfmt
   # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this
   # is the source of this mess
   - |
@@ -85,6 +87,8 @@ install:
     fi
 
 script:
+  - cargo fmt --all -- --check
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo clippy -- -D warnings; fi # TODO: Remove once rust 1.33 is published
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
 

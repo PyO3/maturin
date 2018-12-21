@@ -29,6 +29,35 @@ print(json.dumps({
 }))
 "##;
 
+/// Identifies conditions where we do not want to build wheels
+fn windows_interpreter_no_build(
+    major: usize,
+    minor: usize,
+    target_width: usize,
+    pointer_width: usize,
+) -> bool {
+    // Don't use python 2.6
+    if major == 2 && minor != 7 {
+        return true;
+    }
+
+    // Ignore python 3.0 - 3.4
+    if major == 3 && minor < 5 {
+        return true;
+    }
+
+    // There can be 32-bit installations on a 64-bit machine, but we can't link
+    // those for 64-bit targets
+    if pointer_width != target_width {
+        println!(
+            "{}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
+            major, minor, pointer_width, target_width
+        );
+        return true;
+    }
+    false
+}
+
 /// Uses `py -0` to get a list of all installed python versions and then
 /// `sys.executable` to determine the path.
 ///
@@ -36,72 +65,104 @@ print(json.dumps({
 /// on windows the binary is always called "python.exe". We also have to make
 /// sure that the pointer width (32-bit or 64-bit) matches across platforms
 fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
-    let execution = Command::new("py").arg("-0").output();
-    let output = execution
-        .context("Couldn't run 'py' command. Do you have python installed and in PATH?")?;
-    let expr = Regex::new(r" -(\d).(\d)-(\d+)(?: .*)?").unwrap();
-    let lines = str::from_utf8(&output.stdout).unwrap().lines();
+    let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
-    for line in lines {
-        if let Some(capture) = expr.captures(line) {
-            let code = "import sys; print(sys.executable or '')";
-            let context = "Expected a digit";
 
-            let major = capture
-                .get(1)
-                .unwrap()
-                .as_str()
-                .parse::<usize>()
-                .context(context)?;
-            let minor = capture
-                .get(2)
-                .unwrap()
-                .as_str()
-                .parse::<usize>()
-                .context(context)?;
-            let pointer_width = capture
-                .get(3)
-                .unwrap()
-                .as_str()
-                .parse::<usize>()
-                .context(context)?;
+    // If Python is installed from Python.org it should include the "python launcher"
+    // which is used to find the installed interpreters
+    let execution = Command::new("py").arg("-0").output();
+    if let Ok(output) = execution {
+        let expr = Regex::new(r" -(\d).(\d)-(\d+)(?: .*)?").unwrap();
+        let lines = str::from_utf8(&output.stdout).unwrap().lines();
+        for line in lines {
+            if let Some(capture) = expr.captures(line) {
+                let context = "Expected a digit";
 
-            // Don't use python 2.6
-            if major == 2 && minor != 7 {
-                continue;
+                let major = capture
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .parse::<usize>()
+                    .context(context)?;
+                let minor = capture
+                    .get(2)
+                    .unwrap()
+                    .as_str()
+                    .parse::<usize>()
+                    .context(context)?;
+                let pointer_width = capture
+                    .get(3)
+                    .unwrap()
+                    .as_str()
+                    .parse::<usize>()
+                    .context(context)?;
+
+                if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
+                {
+                    continue;
+                }
+
+                let version = format!("-{}.{}-{}", major, minor, pointer_width);
+
+                let output = Command::new("py")
+                    .args(&[&version, "-c", code])
+                    .output()
+                    .unwrap();
+                let path = str::from_utf8(&output.stdout).unwrap().trim();
+                if !output.status.success() || path.trim().is_empty() {
+                    bail!("Couldn't determine the path to python for `py {}`", version);
+                }
+                interpreter.push(path.to_string());
             }
-
-            // Ignore python 3.0 - 3.4
-            if major == 3 && minor < 5 {
-                continue;
-            }
-
-            // There can be 32-bit installations on a 64-bit machine, but we can't link
-            // those for 64-bit targets
-            if pointer_width != target.pointer_width() {
-                println!(
-                    "{}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
-                    major,
-                    minor,
-                    pointer_width,
-                    target.pointer_width()
-                );
-                continue;
-            }
-
-            let version = format!("-{}.{}-{}", major, minor, pointer_width);
-
-            let output = Command::new("py")
-                .args(&[&version, "-c", code])
-                .output()
-                .unwrap();
-            let path = str::from_utf8(&output.stdout).unwrap().trim();
-            if !output.status.success() || path.trim().is_empty() {
-                bail!("Couldn't determine the path to python for `py {}`", version);
-            }
-            interpreter.push(path.to_string());
         }
     }
+
+    // Conda environments are also supported on windows
+    let conda_info = Command::new("conda").arg("info").arg("-e").output();
+    if let Ok(output) = conda_info {
+        let lines = str::from_utf8(&output.stdout).unwrap().lines();
+        let re = Regex::new(r"(\w|\\|:|-)+$").unwrap();
+        let mut paths = vec![];
+        for i in lines.into_iter() {
+            if !i.starts_with("#") {
+                if let Some(capture) = re.captures(&i) {
+                    paths.push(String::from(&capture[0]));
+                }
+            }
+        }
+
+        for path in paths {
+            let executable = format!(r"{}\python", path);
+            let python_info = Command::new(&executable)
+                .arg("-c")
+                .arg("import sys; print(sys.version)")
+                .output()
+                .expect("Error getting Python version info from conda env...");
+            let version_info = str::from_utf8(&python_info.stdout).unwrap();
+            let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
+            if let Some(capture) = expr.captures(version_info) {
+                let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
+                let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
+                let pointer_width = if version_info.contains("64 bit (AMD64)") {
+                    64_usize
+                } else {
+                    32_usize
+                };
+
+                if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
+                {
+                    continue;
+                }
+
+                interpreter.push(executable);
+            }
+        }
+    }
+    if interpreter.is_empty() {
+        bail!(
+            "Could not find any interpreters, are you sure you have python installed on your PATH?"
+        );
+    };
     Ok(interpreter)
 }
 

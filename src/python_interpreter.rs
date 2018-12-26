@@ -2,6 +2,7 @@ use crate::Target;
 use failure::{Error, Fail, ResultExt};
 use regex::Regex;
 use serde_json;
+use std::collections::HashSet;
 use std::fmt;
 use std::io;
 use std::path::Path;
@@ -67,6 +68,7 @@ fn windows_interpreter_no_build(
 fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
+    let mut versions_found = HashSet::new();
 
     // If Python is installed from Python.org it should include the "python launcher"
     // which is used to find the installed interpreters
@@ -90,29 +92,32 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
                     .as_str()
                     .parse::<usize>()
                     .context(context)?;
-                let pointer_width = capture
-                    .get(3)
-                    .unwrap()
-                    .as_str()
-                    .parse::<usize>()
-                    .context(context)?;
+                if !versions_found.contains(&(major, minor)) {
+                    let pointer_width = capture
+                        .get(3)
+                        .unwrap()
+                        .as_str()
+                        .parse::<usize>()
+                        .context(context)?;
 
-                if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
-                {
-                    continue;
+                    if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
+                    {
+                        continue;
+                    }
+
+                    let version = format!("-{}.{}-{}", major, minor, pointer_width);
+
+                    let output = Command::new("py")
+                        .args(&[&version, "-c", code])
+                        .output()
+                        .unwrap();
+                    let path = str::from_utf8(&output.stdout).unwrap().trim();
+                    if !output.status.success() || path.trim().is_empty() {
+                        bail!("Couldn't determine the path to python for `py {}`", version);
+                    }
+                    interpreter.push(path.to_string());
+                    versions_found.insert((major, minor));
                 }
-
-                let version = format!("-{}.{}-{}", major, minor, pointer_width);
-
-                let output = Command::new("py")
-                    .args(&[&version, "-c", code])
-                    .output()
-                    .unwrap();
-                let path = str::from_utf8(&output.stdout).unwrap().trim();
-                if !output.status.success() || path.trim().is_empty() {
-                    bail!("Couldn't determine the path to python for `py {}`", version);
-                }
-                interpreter.push(path.to_string());
             }
         }
     }
@@ -143,18 +148,21 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
             if let Some(capture) = expr.captures(version_info) {
                 let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
                 let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
-                let pointer_width = if version_info.contains("64 bit (AMD64)") {
-                    64_usize
-                } else {
-                    32_usize
-                };
+                if !versions_found.contains(&(major, minor)) {
+                    let pointer_width = if version_info.contains("64 bit (AMD64)") {
+                        64_usize
+                    } else {
+                        32_usize
+                    };
 
-                if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
-                {
-                    continue;
+                    if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
+                        {
+                            continue;
+                        }
+
+                    interpreter.push(executable);
+                    versions_found.insert((major, minor));
                 }
-
-                interpreter.push(executable);
             }
         }
     }

@@ -100,8 +100,12 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
                         .parse::<usize>()
                         .context(context)?;
 
-                    if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
-                    {
+                    if windows_interpreter_no_build(
+                        major,
+                        minor,
+                        target.pointer_width(),
+                        pointer_width,
+                    ) {
                         continue;
                     }
 
@@ -128,8 +132,8 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
         let lines = str::from_utf8(&output.stdout).unwrap().lines();
         let re = Regex::new(r"(\w|\\|:|-)+$").unwrap();
         let mut paths = vec![];
-        for i in lines.into_iter() {
-            if !i.starts_with("#") {
+        for i in lines {
+            if !i.starts_with('#') {
                 if let Some(capture) = re.captures(&i) {
                     paths.push(String::from(&capture[0]));
                 }
@@ -155,10 +159,14 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
                         32_usize
                     };
 
-                    if windows_interpreter_no_build(major, minor, target.pointer_width(), pointer_width)
-                        {
-                            continue;
-                        }
+                    if windows_interpreter_no_build(
+                        major,
+                        minor,
+                        target.pointer_width(),
+                        pointer_width,
+                    ) {
+                        continue;
+                    }
 
                     interpreter.push(executable);
                     versions_found.insert((major, minor));

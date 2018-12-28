@@ -6,9 +6,7 @@ use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
-#[cfg(feature = "sdist")]
-use build_source_distribution;
-use failure::{Context, Error, ResultExt};
+use failure::{bail, Context, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -126,24 +124,6 @@ impl BuildContext {
                 format!("cp{}{}", python_version.major, python_version.minor),
                 Some(python_version.clone()),
             ));
-        }
-
-        #[cfg(feature = "sdist")]
-        {
-            let sdist_path = wheel_dir.join(format!(
-                "{}-{}.tar.gz",
-                &self.metadata21.get_distribution_encoded(),
-                &self.metadata21.get_version_encoded()
-            ));
-
-            println!(
-                "Building the source distribution to {}",
-                sdist_path.display()
-            );
-            build_source_distribution(&self, &self.metadata21, &self.scripts, &sdist_path)
-                .context("Failed to build the source distribution")?;
-
-            wheels.push((sdist_path, None));
         }
 
         Ok(wheels)

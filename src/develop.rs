@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use failure::{Context, Error, ResultExt};
+use failure::{format_err, Context, Error, ResultExt};
 
 use crate::build_context::BridgeModel;
 use crate::compile::compile;

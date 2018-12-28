@@ -1,13 +1,12 @@
 use crate::Target;
-use failure::{Error, Fail, ResultExt};
+use failure::{bail, Error, Fail, ResultExt};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fmt;
 use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-use std::process::Stdio;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::str;
 
 /// This snippets will give us information about the python interpreter's

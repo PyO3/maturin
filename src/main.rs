@@ -3,39 +3,25 @@
 //!
 //! Run with --help for usage information
 
-#[macro_use]
-extern crate failure;
+use failure::{bail, Error};
 #[cfg(feature = "human-panic")]
-#[allow(unused_imports)]
-#[macro_use]
-extern crate human_panic;
-#[cfg(feature = "keyring")]
-extern crate keyring;
-#[cfg(feature = "log")]
-extern crate pretty_env_logger;
-
-use rpassword;
-#[allow(unused_imports)]
-#[macro_use]
-extern crate structopt;
-
-use std::env;
-#[cfg(feature = "upload")]
-use std::io;
-use std::path::PathBuf;
-
-use failure::Error;
-#[cfg(feature = "upload")]
-use failure::ResultExt;
-#[cfg(all(feature = "upload", feature = "keyring"))]
+use human_panic::setup_panic;
+#[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
-#[cfg(feature = "upload")]
-use reqwest::Url;
-use structopt::StructOpt;
-
+#[cfg(feature = "log")]
+use pretty_env_logger;
 use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
+use std::env;
+use std::path::PathBuf;
+use structopt::StructOpt;
 #[cfg(feature = "upload")]
-use pyo3_pack::{upload_wheels, Registry, UploadError};
+use {
+    failure::ResultExt,
+    pyo3_pack::{upload_wheels, Registry, UploadError},
+    reqwest::Url,
+    rpassword,
+    std::io,
+};
 
 /// Returns the password and a bool that states whether to ask for re-entering the password
 /// after a failed authentication

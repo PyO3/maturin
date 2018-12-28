@@ -1,3 +1,4 @@
+use failure::Fail;
 use goblin;
 use goblin::elf::Elf;
 use std::fs::File;

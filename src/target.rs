@@ -1,4 +1,4 @@
-use failure::Error;
+use failure::{bail, format_err, Error};
 use platforms;
 use platforms::target::Arch;
 use std::env;

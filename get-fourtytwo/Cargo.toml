@@ -4,6 +4,7 @@ name = "get-fourtytwo"
 version = "2.0.1"
 description = "This implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
 readme = "Readme.md"
+edition = "2018"
 
 [package.metadata.pyo3-pack.scripts]
 get_42 = "get_fourtytwo:DummyClass.get_42"

@@ -4,6 +4,7 @@
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Registry;
+use failure::Fail;
 use reqwest::{self, multipart::Form, Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;

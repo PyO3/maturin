@@ -20,35 +20,10 @@
 //! package in rust. Every  wheel is check unless [skip_auditwheel](BuildContext.skip_auditwheel) is
 //! set to true.
 //!
-//! - sdist: Allows creating sdist archives. Those archives can not be
-//! installed yet, since (at least in the current 10.0.1) doesn't implement
-//! PEP 517 and pyo3-pack doesn't implement the build backend api from that
-//! PEP. It is therefore disabled by default. It also currently requires
-//! nightly as it uses pyo3 for bindings and setting the crate type for lib to
-//! rlib and cdylib.
-//!
-//! - human-panic: Adds human-panic, pulling in some outdated dependencies
+//! - human-panic (off by default): Adds human-panic, pulling in some outdated dependencies
 //! (https://github.com/rust-clique/human-panic/pull/47)
 
 #![deny(missing_docs)]
-
-#[cfg(feature = "auditwheel")]
-extern crate goblin;
-
-#[macro_use]
-extern crate failure;
-#[cfg(feature = "upload")]
-extern crate reqwest;
-#[macro_use]
-extern crate serde_derive;
-
-#[macro_use]
-extern crate structopt;
-
-#[cfg(feature = "sdist")]
-extern crate libflate;
-#[cfg(feature = "sdist")]
-extern crate tar;
 
 #[cfg(feature = "auditwheel")]
 pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};
@@ -60,15 +35,12 @@ pub use crate::compile::compile;
 pub use crate::develop::develop;
 pub use crate::metadata::{Metadata21, WheelMetadata};
 pub use crate::python_interpreter::PythonInterpreter;
-#[cfg(feature = "upload")]
-pub use crate::registry::Registry;
 pub use crate::target::Target;
 #[cfg(feature = "upload")]
-pub use crate::upload::{upload, upload_wheels, UploadError};
-#[cfg(feature = "sdist")]
-use capybara::prelude::*;
-#[cfg(feature = "sdist")]
-pub use sdist::build_source_distribution;
+pub use {
+    crate::registry::Registry,
+    crate::upload::{upload, upload_wheels, UploadError},
+};
 
 #[cfg(feature = "auditwheel")]
 mod auditwheel;
@@ -82,11 +54,6 @@ mod module_writer;
 mod python_interpreter;
 #[cfg(feature = "upload")]
 mod registry;
-#[cfg(feature = "sdist")]
-mod sdist;
 mod target;
 #[cfg(feature = "upload")]
 mod upload;
-
-#[cfg(feature = "sdist")]
-capybara_init! {pyo3_pack, [], [install_sdist]}

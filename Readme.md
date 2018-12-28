@@ -57,11 +57,10 @@ For pyo3 and rust-cpython, pyo3-pack can only build packages for installed pytho
 
  Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
 
- Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need cbindgen 0.6.4 as build dependency and a build script that writes c headers to a file called `target/header.h`:
+ Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need cbindgen 0.6.4 as build dependency and a build script that writes c headers to a file called `target/header.h` (use `extern crate cbindgen` for rust 2015 Crates):
 
 ```rust
-extern crate cbindgen;
-
+use cbindgen;
 use std::env;
 use std::path::Path;
 

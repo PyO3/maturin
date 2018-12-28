@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
 use cargo_metadata;
-use failure::err_msg;
-use failure::{Error, ResultExt};
+use failure::{bail, err_msg, format_err, Error, ResultExt};
+use serde::{Deserialize, Serialize};
+use structopt::StructOpt;
 use toml;
 
 use crate::build_context::BridgeModel;

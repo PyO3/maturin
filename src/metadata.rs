@@ -1,8 +1,8 @@
-use crate::cargo_toml::CargoTomlMetadata;
-use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
+use crate::cargo_toml::{CargoTomlMetadata, CargoTomlMetadataPyo3Pack};
 use crate::CargoToml;
 use failure::{Error, ResultExt};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::Path;

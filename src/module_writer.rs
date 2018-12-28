@@ -4,7 +4,7 @@ use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
 use base64;
-use failure::{Context, Error};
+use failure::{bail, Context, Error};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -15,8 +15,7 @@ use std::io::{Read, Write};
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::process::Stdio;
+use std::process::{Command, Stdio};
 use std::str;
 use tempfile::tempdir;
 use zip::{self, ZipWriter};

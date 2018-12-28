@@ -48,9 +48,13 @@ pub struct BuildOptions {
     #[structopt(long = "target", name = "TRIPLE")]
     pub target: Option<String>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+    ///
+    /// Use as `--cargo-extra-args="--my-arg"`
     #[structopt(long = "cargo-extra-args")]
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+    ///
+    /// Use as `--rustc-extra-args="--my-arg"`
     #[structopt(long = "rustc-extra-args")]
     pub rustc_extra_args: Vec<String>,
 }

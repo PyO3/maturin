@@ -90,21 +90,36 @@ USAGE:
     pyo3-pack build [FLAGS] [OPTIONS]
 
 FLAGS:
-    -h, --help               Prints help information
-        --release            Pass --release to cargo
-        --skip-auditwheel    Don't check for manylinux compliance
-        --strip              Strip the library for minimum file size
-    -V, --version            Prints version information
+    -h, --help
+            Prints help information
+
+        --release
+            Pass --release to cargo
+
+        --skip-auditwheel
+            Don't check for manylinux compliance
+
+        --strip
+            Strip the library for minimum file size
+
+    -V, --version
+            Prints version information
+
 
 OPTIONS:
-    -m, --manifest-path <PATH>                      The path to the Cargo.toml [default: Cargo.toml]
-        --target <TRIPLE>                           The --target option for cargo
+    -m, --manifest-path <PATH>
+            The path to the Cargo.toml [default: Cargo.toml]
+
+        --target <TRIPLE>
+            The --target option for cargo
+
     -b, --bindings <bindings>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo_extra_args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
 
+            Use as `--cargo-extra-args="--my-arg"`
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
@@ -113,6 +128,9 @@ OPTIONS:
             directory
         --rustc-extra-args <rustc_extra_args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+
+            Use as `--rustc-extra-args="--my-arg"`
+
 ```
 
 ### Publish
@@ -122,21 +140,36 @@ USAGE:
     pyo3-pack publish [FLAGS] [OPTIONS]
 
 FLAGS:
-        --debug              Do not pass --release to cargo
-    -h, --help               Prints help information
-        --no-strip           Strip the library for minimum file size
-        --skip-auditwheel    Don't check for manylinux compliance
-    -V, --version            Prints version information
+        --debug
+            Do not pass --release to cargo
+
+    -h, --help
+            Prints help information
+
+        --no-strip
+            Strip the library for minimum file size
+
+        --skip-auditwheel
+            Don't check for manylinux compliance
+
+    -V, --version
+            Prints version information
+
 
 OPTIONS:
-    -m, --manifest-path <PATH>                      The path to the Cargo.toml [default: Cargo.toml]
-        --target <TRIPLE>                           The --target option for cargo
+    -m, --manifest-path <PATH>
+            The path to the Cargo.toml [default: Cargo.toml]
+
+        --target <TRIPLE>
+            The --target option for cargo
+
     -b, --bindings <bindings>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo_extra_args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
 
+            Use as `--cargo-extra-args="--my-arg"`
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
@@ -152,7 +185,9 @@ OPTIONS:
         --rustc-extra-args <rustc_extra_args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 
-    -u, --username <username>                       Username for pypi or your custom registry
+            Use as `--rustc-extra-args="--my-arg"`
+    -u, --username <username>
+            Username for pypi or your custom registry
 ```
 
 ### Develop
@@ -162,10 +197,18 @@ USAGE:
     pyo3-pack develop [FLAGS] [OPTIONS]
 
 FLAGS:
-    -h, --help       Prints help information
-        --release    Pass --release to cargo
-        --strip      Strip the library for minimum file size
-    -V, --version    Prints version information
+    -h, --help
+            Prints help information
+
+        --release
+            Pass --release to cargo
+
+        --strip
+            Strip the library for minimum file size
+
+    -V, --version
+            Prints version information
+
 
 OPTIONS:
     -b, --bindings <binding_crate>
@@ -174,9 +217,15 @@ OPTIONS:
         --cargo-extra-args <cargo_extra_args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
 
-    -m, --manifest-path <manifest_path>             The path to the Cargo.toml [default: Cargo.toml]
+            Use as `--cargo-extra-args="--my-arg"`
+    -m, --manifest-path <manifest_path>
+            The path to the Cargo.toml [default: Cargo.toml]
+
         --rustc-extra-args <rustc_extra_args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+
+            Use as `--rustc-extra-args="--my-arg"`
+
 ```
 
 ## Code

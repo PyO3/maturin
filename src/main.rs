@@ -3,6 +3,9 @@
 //!
 //! Run with --help for usage information
 
+use std::env;
+use std::path::PathBuf;
+
 use failure::{bail, Error};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
@@ -10,10 +13,9 @@ use human_panic::setup_panic;
 use keyring::{Keyring, KeyringError};
 #[cfg(feature = "log")]
 use pretty_env_logger;
-use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
-use std::env;
-use std::path::PathBuf;
 use structopt::StructOpt;
+
+use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
 #[cfg(feature = "upload")]
 use {
     failure::ResultExt,
@@ -157,9 +159,13 @@ enum Opt {
         #[structopt(long = "strip")]
         strip: bool,
         /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+        ///
+        /// Use as `--cargo-extra-args="--my-arg"`
         #[structopt(long = "cargo-extra-args")]
         cargo_extra_args: Vec<String>,
         /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+        ///
+        /// Use as `--rustc-extra-args="--my-arg"`
         #[structopt(long = "rustc-extra-args")]
         rustc_extra_args: Vec<String>,
     },

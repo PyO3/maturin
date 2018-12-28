@@ -1,5 +1,7 @@
 points
 sysconfig
+hello-world
+get-fourtytwo
 **/venv*
 **/.tox
 **/.pytest_cache
@@ -8,3 +10,8 @@ sysconfig
 .idea
 .git
 .venv
+Dockerfile*
+.dockerignore
+.travis.yml
+appveyor.yml
+ci

@@ -173,7 +173,7 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
         }
 
         for path in paths {
-            let executable = format!(r"{}\python", path);
+            let executable = Path::new(&path).join("python");
             let python_info = Command::new(&executable)
                 .arg("-c")
                 .arg("import sys; print(sys.version)")
@@ -200,7 +200,7 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
                         continue;
                     }
 
-                    interpreter.push(executable);
+                    interpreter.push(String::from(executable.to_str().unwrap()));
                     versions_found.insert((major, minor));
                 }
             }

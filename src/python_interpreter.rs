@@ -59,12 +59,44 @@ fn windows_interpreter_no_build(
     false
 }
 
-/// Uses `py -0` to get a list of all installed python versions and then
-/// `sys.executable` to determine the path.
+/// On windows regular Python installs are supported along with environments
+/// being managed by `conda`.
 ///
-/// We can't use the the linux trick with trying different binary names since
-/// on windows the binary is always called "python.exe". We also have to make
-/// sure that the pointer width (32-bit or 64-bit) matches across platforms
+/// We can't use the linux trick with trying different binary names since on
+/// windows the binary is always called "python.exe".  However, whether dealing
+/// with regular Python installs or `conda` environments there are tools we can
+/// use to query the information regarding installed interpreters.
+///
+/// Regular Python installs downloaded from Python.org will include the python
+/// launcher by default.  We can use the launcher to find the information we need
+/// for each installed interpreter using `py -0` which produces something like
+/// the following output (the path can by determined using `sys.executable`):
+///
+/// ```bash
+/// Installed Pythons found by py Launcher for Windows
+/// -3.7-64 *
+/// -3.6-32
+/// -2.7-64
+/// ```
+///
+/// When using `conda` we can use the `conda info -e` command to retrieve information
+/// regarding the installed interpreters being managed by `conda`.  This is an example
+/// of the output expected:
+///
+/// ```bash
+/// # conda environments:
+/// #
+/// base                     C:\Users\<user-name>\Anaconda3
+/// foo1                  *  C:\Users\<user-name>\Anaconda3\envs\foo1
+/// foo2                  *  C:\Users\<user-name>\Anaconda3\envs\foo2
+/// ```
+///
+/// The information required can either by obtained by parsing this output directly or
+/// by invoking the interpreters to obtain the information.
+///
+/// As well as the version numbers, etc. of the interpreters we also have to find the
+/// pointer width to make sure that the pointer width (32-bit or 64-bit) matches across
+/// platforms.
 fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];

@@ -160,7 +160,7 @@ dependencies = [
  "semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.82 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1128,7 +1128,7 @@ dependencies = [
  "reqwest 0.9.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "shlex 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1326,7 +1326,7 @@ dependencies = [
  "mime_guess 2.0.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "native-tls 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_urlencoded 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1491,7 +1491,7 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.33"
+version = "1.0.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "itoa 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2229,7 +2229,7 @@ dependencies = [
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum serde 1.0.83 (registry+https://github.com/rust-lang/crates.io-index)" = "157e12af46859e968da75dea9845530e13d03bcab2009a41b9b7bb3cf4eb3ec2"
 "checksum serde_derive 1.0.82 (registry+https://github.com/rust-lang/crates.io-index)" = "96a7f9496ac65a2db5929afa087b54f8fc5008dcfbe48a8874ed20049b0d6154"
-"checksum serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)" = "c37ccd6be3ed1fdf419ee848f7c758eb31b054d7cd3ae3600e3bae0adf569811"
+"checksum serde_json 1.0.34 (registry+https://github.com/rust-lang/crates.io-index)" = "bdf540260cfee6da923831f4776ddc495ada940c30117977c70f1313a6130545"
 "checksum serde_urlencoded 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d48f9f99cd749a2de71d29da5f948de7f2764cc5a9d7f3c97e3514d4ee6eabf2"
 "checksum sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7b4d8bfd0e469f417657573d8451fb33d16cfe0989359b93baf3a1ffc639543d"
 "checksum shlex 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"

@@ -25,7 +25,7 @@ name = "pyo3_pack"
 base64 = "0.10.0"
 cargo_metadata = { git = "https://github.com/roblabla/cargo_metadata" }
 digest = { version = "0.8.0", features = ["std"] }
-failure = "0.1.3"
+failure = "0.1.4"
 keyring = { version = "0.6.1", optional = true }
 reqwest = { version = "0.9.5", optional = true }
 rpassword = "2.1.0"

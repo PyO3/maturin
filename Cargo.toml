@@ -25,7 +25,7 @@ name = "pyo3_pack"
 base64 = "0.10.0"
 cargo_metadata = { git = "https://github.com/roblabla/cargo_metadata" }
 digest = { version = "0.8.0", features = ["std"] }
-failure = "0.1.3"
+failure = "0.1.5"
 keyring = { version = "0.6.1", optional = true }
 reqwest = { version = "0.9.5", optional = true }
 rpassword = "2.1.0"
@@ -35,7 +35,7 @@ structopt = "0.2.14"
 target_info = "0.1.0"
 toml = "0.4.10"
 zip = "0.5.0"
-serde = { version = "1.0.83", features = ["derive"] }
+serde = { version = "1.0.84", features = ["derive"] }
 human-panic = { version = "1.0.1", optional = true }
 regex = "1.1.0"
 indicatif = "0.11.0"

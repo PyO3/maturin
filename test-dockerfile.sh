@@ -4,7 +4,7 @@
 
 set -e
 
-rm -r venv-docker
+rm -rf venv-docker
 
 python3.6 -m venv venv-docker
 

@@ -65,6 +65,15 @@ matrix:
       rust: nightly-2019-01-03
       env: TARGET=x86_64-apple-darwin
 
+    # Test docker
+    - os: linux
+      install:
+        - docker build . -t pyo3-pack
+      script:
+        - ./test-dockerfile.sh
+      before_deploy:
+      deploy:
+
 install:
   - rustup component add clippy
   - rustup component add rustfmt

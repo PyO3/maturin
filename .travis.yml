@@ -59,10 +59,10 @@ matrix:
 
     # Those are tested
     - os: linux
-      rust: nightly
+      rust: nightly-2019-01-03
       env: TARGET=x86_64-unknown-linux-gnu
     - os: osx
-      rust: nightly
+      rust: nightly-2019-01-03
       env: TARGET=x86_64-apple-darwin
 
 install:
@@ -88,9 +88,9 @@ install:
 
 script:
   - cargo fmt --all -- --check
-  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo clippy -- -D warnings; fi # TODO: Remove once rust 1.33 is published
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly-2019-01-03" ]; then cargo clippy -- -D warnings; fi # TODO: Remove once rust 1.33 is published
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
-  - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then cargo test -- --nocapture; fi
+  - if [ "$TRAVIS_RUST_VERSION" == "nightly-2019-01-03" ]; then cargo test -- --nocapture; fi
 
 before_deploy: bash ci/before_deploy.sh
 

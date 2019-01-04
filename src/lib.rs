@@ -37,7 +37,7 @@ pub use crate::compile::compile;
 pub use crate::develop::develop;
 pub use crate::metadata::{Metadata21, WheelMetadata};
 pub use crate::python_interpreter::PythonInterpreter;
-pub use crate::target::Target;
+pub use crate::target::{Manylinux, Target};
 #[cfg(feature = "upload")]
 pub use {
     crate::registry::Registry,

@@ -1,9 +1,11 @@
 use failure::{bail, format_err, Error};
 use platforms;
 use platforms::target::Arch;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 use target_info;
 
 /// All supported operating system
@@ -12,6 +14,30 @@ enum OS {
     Linux,
     Windows,
     Macos,
+}
+
+/// Decides how to handle manylinux compliance
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub enum Manylinux {
+    /// Use the manylinux1 tag and check for compliance
+    Manylinux1,
+    /// Use the manylinux1 tag but don't check for compliance
+    Manylinux1Unchecked,
+    /// Use the native linux tag
+    Off,
+}
+
+impl FromStr for Manylinux {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "1" => Ok(Manylinux::Manylinux1),
+            "1-unchecked" => Ok(Manylinux::Manylinux1Unchecked),
+            "off" => Ok(Manylinux::Off),
+            _ => Err("Invalid value for the manylinux option"),
+        }
+    }
 }
 
 /// The part of the current platform that is relevant when building wheels and is supported
@@ -99,22 +125,24 @@ impl Target {
     }
 
     /// Returns the platform part of the tag for the wheel name for cffi wheels
-    pub fn get_platform_tag(&self) -> &'static str {
-        match (&self.os, self.is_64_bit) {
-            (&OS::Linux, true) => "manylinux1_x86_64",
-            (&OS::Linux, false) => "manylinux1_i686",
-            (&OS::Windows, true) => "win_amd64",
-            (&OS::Windows, false) => "win32",
-            (&OS::Macos, true) => "macosx_10_7_x86_64",
-            (&OS::Macos, false) => panic!("32-bit wheels are not supported for mac os"),
+    pub fn get_platform_tag(&self, manylinux: &Manylinux) -> &'static str {
+        match (&self.os, self.is_64_bit, manylinux) {
+            (&OS::Linux, true, Manylinux::Off) => "linux_x86_64",
+            (&OS::Linux, false, Manylinux::Off) => "linux_i686",
+            (&OS::Linux, true, _) => "manylinux1_x86_64",
+            (&OS::Linux, false, _) => "manylinux1_i686",
+            (&OS::Windows, true, _) => "win_amd64",
+            (&OS::Windows, false, _) => "win32",
+            (&OS::Macos, true, _) => "macosx_10_7_x86_64",
+            (&OS::Macos, false, _) => panic!("32-bit wheels are not supported for mac os"),
         }
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py2_and_py3_tags(&self) -> Vec<String> {
+    pub fn get_py2_and_py3_tags(&self, manylinux: &Manylinux) -> Vec<String> {
         vec![
-            format!("py2-none-{}", self.get_platform_tag()),
-            format!("py3-none-{}", self.get_platform_tag()),
+            format!("py2-none-{}", self.get_platform_tag(&manylinux)),
+            format!("py3-none-{}", self.get_platform_tag(&manylinux)),
         ]
     }
 

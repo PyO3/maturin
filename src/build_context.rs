@@ -3,6 +3,7 @@ use crate::auditwheel_rs;
 use crate::compile;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
+use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
@@ -56,8 +57,9 @@ pub struct BuildContext {
     pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
-    /// Don't check for manylinux compliance
-    pub skip_auditwheel: bool,
+    /// Whether to use the the manylinux and check compliance (on), use it but don't
+    /// check compliance (no-auditwheel) or use the native linux tag (off)
+    pub manylinux: Manylinux,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
@@ -97,7 +99,7 @@ impl BuildContext {
         for python_version in &self.interpreter {
             let artifact = self.compile_cdylib(Some(&python_version))?;
 
-            let tag = python_version.get_tag();
+            let tag = python_version.get_tag(&self.manylinux);
 
             let mut builder = WheelWriter::new(
                 &tag,
@@ -149,7 +151,7 @@ impl BuildContext {
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        if !self.skip_auditwheel && target.is_linux() {
+        if self.manylinux == Manylinux::Manylinux1 && target.is_linux() {
             #[cfg(feature = "auditwheel")]
             auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }
@@ -160,9 +162,9 @@ impl BuildContext {
     fn get_unversal_tags(&self) -> (String, Vec<String>) {
         let tag = format!(
             "py2.py3-none-{platform}",
-            platform = self.target.get_platform_tag()
+            platform = self.target.get_platform_tag(&self.manylinux)
         );
-        let tags = self.target.get_py2_and_py3_tags();
+        let tags = self.target.get_py2_and_py3_tags(&self.manylinux);
         (tag, tags)
     }
 
@@ -201,7 +203,7 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| Context::new("Cargo didn't build a binary."))?;
 
-        if !self.skip_auditwheel && self.target.is_linux() {
+        if self.manylinux != Manylinux::Manylinux1Unchecked && self.target.is_linux() {
             #[cfg(feature = "auditwheel")]
             auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
         }

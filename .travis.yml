@@ -1,4 +1,5 @@
 language: rust
+dist: xenial
 
 env:
   global:
@@ -18,9 +19,7 @@ addons:
       - python3.5-dev
       - python3.6-dev
       - python3.6-venv
-      # So python 3.7 is broken on travis because they still use 14.04
-      # https://github.com/travis-ci/travis-ci/issues/9069
-      #- python3.7-dev
+      - python3.7-dev
 
 matrix:
   fast_finish: true
@@ -28,13 +27,13 @@ matrix:
     # These create deployments; Apparently there is not 32 bit mac os
     - os: linux
       rust: stable
-      env: TARGET=x86_64-unknown-linux-musl
+      env: TARGET=x86_64-unknown-linux-musl DEPLOY=1
     - os: osx
       rust: stable
-      env: TARGET=x86_64-apple-darwin
+      env: TARGET=x86_64-apple-darwin DEPLOY=1
     - os: linux
       rust: stable
-      env: TARGET=i686-unknown-linux-musl
+      env: TARGET=i686-unknown-linux-musl DEPLOY=1
       addons:
         apt:
           sources:
@@ -55,9 +54,10 @@ matrix:
             - musl:i386
             - musl-tools:i386
             - gcc-multilib:i386
+            - gcc:i386
             - cpp:i386
 
-    # Those are tested
+    # Those are run rust tests
     - os: linux
       rust: nightly-2019-01-03
       env: TARGET=x86_64-unknown-linux-gnu
@@ -112,7 +112,7 @@ deploy:
       - $TRAVIS_BUILD_DIR/$BINARY_NAME*.deb
     skip_cleanup: true
     on: # Create downloads only with stable rust and only for stable releases
-      condition: $TRAVIS_RUST_VERSION = stable
+      condition: $DEPLOY = 1
       tags: true
     # - Create a `public_repo` GitHub token at https://github.com/settings/tokens/new
     # . If you haven't already, install the travis gem: `gem install TRAVIS_TAG`

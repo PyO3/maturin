@@ -13,7 +13,7 @@ impl DummyClass {
     }
 }
 
-#[pymodinit]
+#[pymodule]
 fn get_fourtytwo(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<DummyClass>().unwrap();
     m.add("fourtytwo", 42).unwrap();

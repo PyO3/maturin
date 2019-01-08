@@ -10,4 +10,4 @@ name = "points"
 crate-type = ["cdylib"]
 
 [build-dependencies]
-cbindgen = "0.6.7"
+cbindgen = "0.6.8"

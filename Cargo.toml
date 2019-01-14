@@ -27,7 +27,7 @@ cargo_metadata = { git = "https://github.com/roblabla/cargo_metadata" }
 digest = { version = "0.8.0", features = ["std"] }
 failure = "0.1.5"
 keyring = { version = "0.6.1", optional = true }
-reqwest = { version = "0.9.8", optional = true }
+reqwest = { version = "0.9.8", optional = true, default-features = false }
 rpassword = { version = "2.1.0", optional = true }
 serde_json = "1.0.35"
 sha2 = "0.8.0"
@@ -42,7 +42,6 @@ indicatif = "0.11.0"
 atty = "0.2.11"
 tempfile = "3.0.5"
 goblin = { version = "0.0.19", optional = true }
-openssl = { version = "0.10.16", features = ["vendored"], optional = true }
 pretty_env_logger = { version = "0.3.0", optional = true }
 platforms = "0.2.0"
 shlex = "0.1.1"
@@ -51,11 +50,11 @@ shlex = "0.1.1"
 indoc = "0.3.1"
 
 [features]
-default = ["auditwheel", "upload", "log"]
+default = ["auditwheel", "log", "upload", "rustls"]
 auditwheel = ["goblin"]
 upload = ["reqwest", "rpassword"]
 password-storage = ["upload", "keyring"]
 log = ["pretty_env_logger"]
-
-# This will make rewquest use a statically linked version of openssl
-musl = ["openssl"]
+# We use rustls for manylinux compliance and because unlike both dynamic and
+# static openssl variants it can be built and used inside a cent os 5 container
+rustls = ["reqwest/rustls-tls"]

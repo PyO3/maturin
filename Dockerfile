@@ -15,15 +15,14 @@ RUN curl https://www.musl-libc.org/releases/musl-1.1.20.tar.gz -o musl.tar.gz \
     && cd .. \
     && rm -rf x86_64-unknown-linux-musl \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
-    && rustup toolchain add nightly \
+    && rustup toolchain add nightly-2019-01-12 \
     && rustup target add x86_64-unknown-linux-musl \
     && mkdir /io \
     && python3 -m pip install cffi
 
 ADD . /pyo3-pack/
 
-# We can't use the upload feature because either the openssl is too old (for native) or the perl version is too old (for vendored)
-RUN cargo install --path /pyo3-pack --no-default-features --features "auditwheel log"
+RUN cargo install --path /pyo3-pack
 
 WORKDIR /io
 

@@ -5,20 +5,22 @@
 //!
 //! # Cargo features
 //!
-//! - upload: Uses rewqest to add the upload command. By default this uses native openssl and
-//! is therefore not manylinux comopliant
+//! Default features: auditwheel, log, upload, rustls
 //!
-//! - musl: Switches from native openssl to statically linked openssl, which makes the upload
-//! feature manylinux compliant
+//! - auditwheel: Reimplements the more important part of the auditwheel
+//! package in rust. A wheel is checked by default, unless deactivated by cli arguments
+//!
+//! - log: Configures pretty-env-logger, even though pyo3-pack doesn't use logging itself.
+//!
+//! - upload: Uses reqwest to add the upload command.
+//!
+//! - rustls: Makes reqwest use the rustls stack so that we can build pyo3-pack in a cent os 5
+//! docker container and which pyo3-pack itself manylinux compliant.
 //!
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
 //! for the build on the github releases page.
 //! (https://github.com/hwchen/secret-service-rs/issues/9)
-//!
-//! - auditwheel: Reimplements the more important part of the auditwheel
-//! package in rust. Every  wheel is check unless [skip_auditwheel](BuildContext.skip_auditwheel) is
-//! set to true.
 //!
 //! - human-panic (off by default): Adds human-panic, pulling in some outdated dependencies
 //! (https://github.com/rust-clique/human-panic/pull/47)
@@ -39,7 +41,7 @@ pub use crate::target::Target;
 #[cfg(feature = "upload")]
 pub use {
     crate::registry::Registry,
-    crate::upload::{upload, upload_wheels, UploadError},
+    crate::upload::{upload, UploadError},
 };
 
 #[cfg(feature = "auditwheel")]

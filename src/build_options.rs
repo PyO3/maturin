@@ -75,7 +75,7 @@ impl Default for BuildOptions {
 }
 
 impl BuildOptions {
-    /// Tries to fill the missing metadata in BuildContext by querying cargo and python
+    /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext, Error> {
         let manifest_file = self
             .manifest_path

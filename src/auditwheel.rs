@@ -80,9 +80,10 @@ pub enum AuditWheelError {
 }
 
 /// An (incomplete) reimplementation of auditwheel, which checks elf files for
-/// manylinux compliance. Returns an error for non compliant elfs
+/// manylinux compliance. Returns an error for non compliant elf files
 ///
-/// Only checks for the libraries marked as NEEDED.
+/// Only checks for the libraries marked as NEEDED, but not for symbol versions
+/// (e.g. requiring a too recent glibc isn't caught).
 pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
     let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
     let mut buffer = Vec::new();

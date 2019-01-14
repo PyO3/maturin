@@ -19,7 +19,7 @@ use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
 #[cfg(feature = "upload")]
 use {
     failure::ResultExt,
-    pyo3_pack::{upload_wheels, Registry, UploadError},
+    pyo3_pack::{upload, Registry, UploadError},
     reqwest::Url,
     rpassword,
     std::io,
@@ -110,7 +110,8 @@ struct PublishOpt {
 #[derive(Debug, StructOpt)]
 #[structopt(name = "pyo3-pack")]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
-/// Build and publish crates with pyo3 bindings as python packages
+/// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
+/// as rust binaries as python packages
 enum Opt {
     #[structopt(name = "build")]
     /// Build the crate into wheels
@@ -137,7 +138,7 @@ enum Opt {
     /// Searches and lists the available python installations
     ListPython,
     #[structopt(name = "develop")]
-    /// Installs the crate as module in the current virtualenv so you can import it
+    /// Installs the crate as module in the current virtualenv
     ///
     /// Note that this command doesn't create entrypoints
     Develop {
@@ -200,7 +201,18 @@ fn run() -> Result<(), Error> {
             loop {
                 println!("Uploading {} packages", wheels.len());
 
-                let result = upload_wheels(&registry, &wheels, &build_context.metadata21);
+                // Upload all wheels, aborting on the first error
+                let result = wheels
+                    .iter()
+                    .map(|(wheel_path, supported_versions, _)| {
+                        upload(
+                            &registry,
+                            &wheel_path,
+                            &build_context.metadata21,
+                            &supported_versions,
+                        )
+                    })
+                    .collect();
 
                 match result {
                     Ok(()) => {

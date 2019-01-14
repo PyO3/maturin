@@ -125,7 +125,8 @@ fn update_progress(progress_plan: &mut Option<(ProgressBar, Vec<String>)>, crate
 }
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
-/// specific python version
+/// specific python version. Returns a mapping from crate type (e.g. cdylib)
+/// to artifact location.
 ///
 /// Shows a progress bar on a tty
 pub fn compile(

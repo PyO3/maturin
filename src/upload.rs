@@ -2,14 +2,13 @@
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
 use crate::Metadata21;
-use crate::PythonInterpreter;
 use crate::Registry;
 use failure::Fail;
 use reqwest::{self, multipart::Form, Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Error type for different types of errors that can happen when uploading a
 /// wheel.
@@ -43,19 +42,6 @@ impl From<reqwest::Error> for UploadError {
     fn from(error: reqwest::Error) -> Self {
         UploadError::RewqestError(error)
     }
-}
-
-/// Uploads all given wheels to the registry
-pub fn upload_wheels(
-    regitry: &Registry,
-    wheels: &[(PathBuf, String, Option<PythonInterpreter>)],
-    metadata21: &Metadata21,
-) -> Result<(), UploadError> {
-    for (wheel_path, supported_versions, _) in wheels {
-        upload(&regitry, &wheel_path, &metadata21, &supported_versions)?;
-    }
-
-    Ok(())
 }
 
 /// Uploads a single wheel to the registry

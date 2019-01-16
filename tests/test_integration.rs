@@ -1,6 +1,6 @@
 use crate::common::check_installed;
 use pyo3_pack::{BuildOptions, Target};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
 use structopt::StructOpt;
@@ -29,6 +29,12 @@ fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
 #[test]
 fn test_integration_get_fourtytwo() {
     test_integration(Path::new("get-fourtytwo"), None);
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn test_integration_get_fourtytwo_conda() {
+    test_integration_conda(Path::new("get-fourtytwo"), None);
 }
 
 #[test]
@@ -132,5 +138,70 @@ fn test_integration(package: &Path, bindings: Option<String>) {
         }
 
         check_installed(&package, &python).unwrap();
+    }
+}
+
+fn create_conda_env(name: &str, major: usize, minor: usize) {
+    Command::new("conda")
+        .arg("create")
+        .arg("-n")
+        .arg(name)
+        .arg(format!("python={}.{}", major, minor))
+        .arg("-q")
+        .arg("-y")
+        .output()
+        .expect("Conda not available.");
+}
+
+fn test_integration_conda(package: &Path, bindings: Option<String>) {
+    let package_string = package.join("Cargo.toml").display().to_string();
+
+    // Create environments to build against
+    create_conda_env("pyo3-build-env-27", 2, 7);
+    create_conda_env("pyo3-build-env-35", 3, 5);
+    create_conda_env("pyo3-build-env-36", 3, 6);
+    create_conda_env("pyo3-build-env-37", 3, 7);
+
+    // The first string is ignored by clap
+    let cli = if let Some(ref bindings) = bindings {
+        vec![
+            "build",
+            "--manifest-path",
+            &package_string,
+            "--bindings",
+            bindings,
+        ]
+    } else {
+        vec!["build", "--manifest-path", &package_string]
+    };
+
+    let options = BuildOptions::from_iter_safe(cli).unwrap();
+
+    let wheels = options
+        .into_build_context(false, false)
+        .unwrap()
+        .build_wheels()
+        .unwrap();
+
+    for (filename, _, python_interpreter) in wheels {
+        if let Some(pi) = python_interpreter {
+            let executable = pi.executable;
+
+            let output = Command::new(&executable)
+                .args(&[
+                    "-m",
+                    "pip",
+                    "install",
+                    "--force-reinstall",
+                    &adjust_canonicalization(filename),
+                ])
+                .stderr(Stdio::inherit())
+                .output()
+                .unwrap();
+            if !output.status.success() {
+                panic!();
+            }
+            check_installed(&package, &executable).unwrap();
+        }
     }
 }

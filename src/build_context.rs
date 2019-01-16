@@ -71,7 +71,7 @@ pub struct BuildContext {
 impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
     /// correct builder. Returns a Vec that contains location, python tag (e.g. py2.py3 or cp35)
-    /// and for bindings the python intepreter they bind against.
+    /// and for bindings the python interpreter they bind against.
     pub fn build_wheels(&self) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;

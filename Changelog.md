@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+ * Switched to rustls. This means the upload feature can be used from the docker container and builds of pyo3-pack itself are auditwheel compliant with the default features.
+
 ## [0.4.2] - 2018-12-15
 
 Fixup release because the appveyor failed to release artifacts for windows for 0.4.1.

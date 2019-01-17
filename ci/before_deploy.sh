@@ -11,7 +11,7 @@ set -ex
 
 make_archive() {
     # We don't care for manylinux compliance for the downloads, so we can use the keyring.
-    CFLAGS="-fno-stack-protector" cargo build --release --target $TARGET --features "password-storage musl"
+    CFLAGS="-fno-stack-protector" cargo build --release --target $TARGET --features "password-storage"
     pushd target/$TARGET/release/
     # You can add more files to the archive by adding them to this line
     tar czf $TRAVIS_BUILD_DIR/$BINARY_NAME-$TRAVIS_TAG-$TARGET.tar.gz $BINARY_NAME
@@ -68,7 +68,7 @@ Maintainer: konstin <konstin@mailbox.org>
 Architecture: $architecture
 Provides: $BINARY_NAME
 Conflicts: $conflictname
-Description: A command-line benchmarking tool.
+Description: Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages
 EOF
 
     fakeroot dpkg-deb --build "$tempdir" "$TRAVIS_BUILD_DIR/${dpkgname}_${version}_${architecture}.deb"
@@ -76,7 +76,7 @@ EOF
 
 upload_to_pypi() {
     # We do care for manylinux compliance for pypi, so we use the musl feature to get static binaries
-    CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin -b bin --target $TARGET --cargo-extra-args="--features=musl"
+    CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin -b bin --target $TARGET
 }
 
 main() {

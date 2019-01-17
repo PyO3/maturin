@@ -141,6 +141,7 @@ fn test_integration(package: &Path, bindings: Option<String>) {
     }
 }
 
+/// Creates conda environments
 fn create_conda_env(name: &str, major: usize, minor: usize) {
     Command::new("conda")
         .arg("create")

@@ -1,3 +1,4 @@
+use crate::Manylinux;
 use crate::Target;
 use failure::{bail, Error, Fail, ResultExt};
 use regex::Regex;
@@ -228,8 +229,8 @@ impl PythonInterpreter {
     /// {python tag}-{abi tag}-{platform tag}
     ///
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
-    pub fn get_tag(&self) -> String {
-        let platform = self.target.get_platform_tag();
+    pub fn get_tag(&self, manylinux: &Manylinux) -> String {
+        let platform = self.target.get_platform_tag(manylinux);
 
         if self.target.is_unix() {
             format!(

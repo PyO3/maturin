@@ -9,6 +9,7 @@ use crate::module_writer::write_bindings_module;
 use crate::module_writer::write_cffi_module;
 use crate::module_writer::DevelopModuleWriter;
 use crate::BuildOptions;
+use crate::Manylinux;
 use crate::PythonInterpreter;
 use crate::Target;
 
@@ -33,11 +34,12 @@ pub fn develop(
     })?;
 
     let build_options = BuildOptions {
+        manylinux: Manylinux::Off,
         interpreter: vec!["python".to_string()],
         bindings,
         manifest_path: manifest_file.to_path_buf(),
         out: None,
-        skip_auditwheel: true,
+        skip_auditwheel: false,
         target: None,
         cargo_extra_args,
         rustc_extra_args,

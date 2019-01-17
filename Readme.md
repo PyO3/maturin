@@ -79,16 +79,21 @@ fn main() {
 
 ## Manylinux and auditwheel
 
-For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy). pyo3-pack contains a reimplementation of the most important part of auditwheel that checks the generated library, so there's no need to use external tools. If you want to disable the manylinux compliance checks for some reason, use the `--skip-auditwheel` flag.
+For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy).
 
-pyo3-pack itself is manylinux compliant when compiled with the `musl` feature and a musl target, which is true for the version published on pypi. The binaries on the release pages have keyring integration (though the `password-storage` feature), which is not manylinux compliant.
+pyo3-pack contains a reimplementation of a major part of auditwheel automatically checking the generated library. If you want to disable those checks or build for native linux target, use the `--manylinux` flag.
+
+For full manylinux compliance you need to compile in a cent os 5 docker container. The [konstin2/pyo3-pack](https://cloud.docker.com/u/konstin2/repository/docker/konstin2/pyo3-pack) image is based on the official manylinux image. You can use it like this:
+
+```
+docker run --rm -v $(pwd):/io konstin2/pyo3-pack build
+```
+
+pyo3-pack itself is manylinux compliant with the default features. The binaries on the release pages have keyring integration (though the `password-storage` feature), which is not manylinux compliant.
 
 ### Build
 
 ```
-USAGE:
-    pyo3-pack build [FLAGS] [OPTIONS]
-
 FLAGS:
     -h, --help
             Prints help information
@@ -97,7 +102,7 @@ FLAGS:
             Pass --release to cargo
 
         --skip-auditwheel
-            Don't check for manylinux compliance
+            [deprecated, use --manylinux instead] Don't check for manylinux compliance
 
         --strip
             Strip the library for minimum file size
@@ -123,6 +128,11 @@ OPTIONS:
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
+        --manylinux <manylinux>
+            Whether to use and check for compliance with the manylinux1 tag (1), use it but don't check compliance (1-
+            unchecked) or use the native linux tag (off)
+
+            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -130,15 +140,11 @@ OPTIONS:
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
-
 ```
 
 ### Publish
 
 ```
-USAGE:
-    pyo3-pack publish [FLAGS] [OPTIONS]
-
 FLAGS:
         --debug
             Do not pass --release to cargo
@@ -150,7 +156,7 @@ FLAGS:
             Strip the library for minimum file size
 
         --skip-auditwheel
-            Don't check for manylinux compliance
+            [deprecated, use --manylinux instead] Don't check for manylinux compliance
 
     -V, --version
             Prints version information
@@ -173,6 +179,11 @@ OPTIONS:
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
+        --manylinux <manylinux>
+            Whether to use and check for compliance with the manylinux1 tag (1), use it but don't check compliance (1-
+            unchecked) or use the native linux tag (off)
+
+            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -193,9 +204,6 @@ OPTIONS:
 ### Develop
 
 ```
-USAGE:
-    pyo3-pack develop [FLAGS] [OPTIONS]
-
 FLAGS:
     -h, --help
             Prints help information
@@ -225,7 +233,6 @@ OPTIONS:
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
-
 ```
 
 ## Code

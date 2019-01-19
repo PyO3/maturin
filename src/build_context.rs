@@ -179,6 +179,7 @@ impl BuildContext {
 
         write_cffi_module(
             &mut builder,
+            self.manifest_path.parent().unwrap(),
             &self.module_name,
             &artifact,
             &self.interpreter[0].executable,

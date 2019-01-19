@@ -52,15 +52,17 @@ classifier = ["Programming Language :: Python"]
 
 For pyo3 and rust-cpython, pyo3-pack can only build packages for installed python versions, so you might want to use pyenv, deadsnakes or docker for building. If you don't set your own interpreters with `-i`, a heuristic is used to search for python installations. You can get a list all found versions with the `list-python` subcommand.
 
-
 ## Cffi
 
  Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
 
- Until [eqrion/cbdingen#203](https://github.com/eqrion/cbindgen/issues/203) is resolved, you also need cbindgen 0.6.4 as build dependency and a build script that writes c headers to a file called `target/header.h` (use `extern crate cbindgen` for rust 2015 Crates):
+pyo3-pack will run cbindgen and generate cffi bindings. You can override this with a build script that writes a header to `target/header.h`.
+
+<details>
+<summary>Example of a custom build script</summary>
 
 ```rust
-use cbindgen;
+use cbindgen; // Use `extern crate cbindgen` in rust 2015
 use std::env;
 use std::path::Path;
 
@@ -77,6 +79,8 @@ fn main() {
 }
 ```
 
+</details>
+
 ## Manylinux and auditwheel
 
 For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy).
@@ -89,7 +93,7 @@ For full manylinux compliance you need to compile in a cent os 5 docker containe
 docker run --rm -v $(pwd):/io konstin2/pyo3-pack build
 ```
 
-pyo3-pack itself is manylinux compliant with the default features. The binaries on the release pages have keyring integration (though the `password-storage` feature), which is not manylinux compliant.
+pyo3-pack itself is manylinux compliant when compiled for the musl target. The binaries on the release pages have additional keyring integration (through the `password-storage` feature), which is not manylinux compliant.
 
 ### Build
 

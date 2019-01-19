@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+ * The [konstin2/pyo3-pack](https://cloud.docker.com/u/konstin2/repository/docker/konstin2/pyo3-pack) docker image makes it easy to build fully manylinux compliant wheels. See the readme for usage details.
+ * pyo3-pack will generate a header for cffi crates using cbinding, which means you don't need a `build.rs` anymore. The option to provide your own header file using a `build.rs` still exists.
+ * The `--manxlinux=[1|1-unchecked|off]` option allows to build for manylinux1, both with audithweel (`1`) and without (`1-unchecked`), but also for the native linux tag with `off`. It is forward compatible to manylinux 2010.
+
 ### Changed
 
- * Switched to rustls. This means the upload feature can be used from the docker container and builds of pyo3-pack itself are auditwheel compliant with the default features.
- * The `--skip-auditwheel` has been deprecated for a new `--manxlinux=[1|1-unchecked|off]`, which allows to build for the native linux tag with `off` and is forward compatible to manylinux 2010.
+ * The `--skip-auditwheel` flag has been deprecated in favor of `--manxlinux=[1|1-unchecked|off]`.
+ * Switched to rustls. This means the upload feature can be used from the docker container and builds of pyo3-pack itself are manylinux compliant when compiled with the musl target.
 
 ## [0.4.2] - 2018-12-15
 

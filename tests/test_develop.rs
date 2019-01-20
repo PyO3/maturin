@@ -1,4 +1,5 @@
 use crate::common::check_installed;
+use crate::common::install_cffi;
 use pyo3_pack::{develop, Target};
 use std::fs;
 use std::path::Path;
@@ -8,21 +9,24 @@ use std::process::Stdio;
 mod common;
 
 #[test]
+#[cfg(not(target_os = "windows"))] // TODO: Virtualenv support is broken on windows
 fn test_develop_get_fourtytwo() {
     test_develop(Path::new("get-fourtytwo"), None);
 }
 
 #[test]
+#[cfg(not(feature = "appveyor-test"))]
 fn test_develop_points() {
     test_develop(Path::new("points"), Some("cffi".to_string()));
 }
 
 #[test]
+#[cfg(not(feature = "appveyor-test"))]
 fn test_develop_hello_world() {
     test_develop(Path::new("hello-world"), Some("bin".to_string()));
 }
 
-/// Creates a virtualenv and activates it, checks that the package isn't installed, uses
+/// Creates a virtual env and activates it, checks that the package isn't installed, uses
 /// "pyo3-pack develop" to install it and checks it is working
 fn test_develop(package: &Path, bindings: Option<String>) {
     let venv_dir = package.join("venv_develop");
@@ -47,13 +51,7 @@ fn test_develop(package: &Path, bindings: Option<String>) {
     // Ensure the test doesn't wrongly pass
     check_installed(&package, &python).unwrap_err();
 
-    let output = Command::new(&python)
-        .args(&["-m", "pip", "install", "cffi"])
-        .output()
-        .unwrap();
-    if !output.status.success() {
-        panic!(output.status);
-    }
+    install_cffi(&python);
 
     let manifest_file = package.join("Cargo.toml");
     develop(

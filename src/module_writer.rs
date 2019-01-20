@@ -291,9 +291,9 @@ import cffi
 from cffi import recompiler
 
 ffi = cffi.FFI()
-with open("{header}") as header:
+with open(r"{header}") as header:
     ffi.cdef(header.read())
-recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
+recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
 "#,
         ffi_py = ffi_py.display(),
         header = header.display(),

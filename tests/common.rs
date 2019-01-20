@@ -2,6 +2,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str;
+use std::process::Stdio;
 
 /// Check that the package is either not installed or works correctly
 pub fn check_installed(package: &Path, python: &PathBuf) -> Result<(), ()> {
@@ -21,4 +22,15 @@ pub fn check_installed(package: &Path, python: &PathBuf) -> Result<(), ()> {
     }
 
     Ok(())
+}
+
+pub fn install_cffi(python: &PathBuf) {
+    let output = Command::new(&python)
+        .args(&["-m", "pip", "install", "cffi"])
+        .stderr(Stdio::inherit())
+        .output()
+        .unwrap();
+    if !output.status.success() {
+        panic!(output.status);
+    }
 }

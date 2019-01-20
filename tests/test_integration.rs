@@ -1,4 +1,5 @@
 use crate::common::check_installed;
+use crate::common::install_cffi;
 use pyo3_pack::{BuildOptions, Target};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -27,6 +28,7 @@ fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
 }
 
 #[test]
+#[cfg(not(feature = "appveyor-test"))]
 fn test_integration_get_fourtytwo() {
     test_integration(Path::new("get-fourtytwo"), None);
 }
@@ -69,6 +71,7 @@ fn test_integration(package: &Path, bindings: Option<String>) {
 
     let options = BuildOptions::from_iter_safe(cli).unwrap();
 
+    install_cffi(&target.get_python());
     let wheels = options
         .into_build_context(false, false)
         .unwrap()

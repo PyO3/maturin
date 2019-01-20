@@ -9,6 +9,11 @@ environment:
   PYO3_PACK_PASSWORD:
     secure: 3xTkaAvLd84qjLwY/quMb0w1Kh5NRXQ0a/zHtjnH4WY=
   matrix:
+    # For the integration test
+    # TODO: Move this down again after testing
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: nightly
+
     # Publishes to pypi
     - TARGET: i686-pc-windows-msvc
       CHANNEL: stable
@@ -21,10 +26,9 @@ environment:
     #- TARGET: x86_64-pc-windows-gnu
     #  CHANNEL: stable
 
-    # For the integration test
-    # Comment out because it is failing for not locally reproducable reasons (maybe LIB is set incorrectly)
-    #- TARGET: x86_64-pc-windows-msvc
-    #  CHANNEL: nightly
+cache: # TODO: Remove before merging
+  - target
+  - '%USERPROFILE%\.cargo\registry'
 
 matrix:
   fast_finish: true
@@ -55,7 +59,7 @@ test_script:
   - cargo build
   - ps: |
       if ($env:channel -like "nightly") {
-        cargo test
+        cargo test --features appveyor-test -- --nocapture
       }
 
 before_deploy:

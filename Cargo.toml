@@ -59,3 +59,5 @@ log = ["pretty_env_logger"]
 # We use rustls for manylinux compliance and because unlike both dynamic and
 # static openssl variants it can be built and used inside a cent os 5 container
 rustls = ["reqwest/rustls-tls"]
+# The pyo3 test fails on appveyor for not locally reproducable reasons (maybe LIB is set incorrectly)
+appveyor-test = []

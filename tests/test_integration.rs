@@ -127,10 +127,7 @@ fn test_integration(package: &Path, bindings: Option<String>) {
             panic!();
         }
 
-        let output = Command::new(&python)
-            .args(&["-m", "pip", "install", "cffi"])
-            .output()
-            .unwrap();
+        install_cffi(&python);
         if !output.status.success() {
             panic!(
                 "pip failed: {} \n--- Stdout:\n{}\n--- Stderr:\n{}",

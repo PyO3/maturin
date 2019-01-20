@@ -56,11 +56,8 @@ install:
   - cargo -V
 
 test_script:
-  - cargo build
-  - ps: |
-      if ($env:channel -like "nightly") {
-        cargo test --features appveyor-test -- --nocapture
-      }
+  - python -m sysconfig
+  - cargo test -j 1 -- --nocapture
 
 before_deploy:
   - cargo build --release --features password-storage

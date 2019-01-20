@@ -53,13 +53,10 @@ fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
         .args(build_plan_args)
         .args(shared_args)
         .output()
-        .map_err(|e| {
-            format_err!(
-                "Failed to get a build plan from cargo: {} ({})",
-                e,
-                command_formatted
-            )
-        })?;
+        .context(format_err!(
+            "Failed to get a build plan from cargo with `{}`",
+            command_formatted
+        ))?;
 
     if !build_plan.status.success() {
         bail!(

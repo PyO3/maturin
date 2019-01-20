@@ -69,6 +69,7 @@ pub fn develop(
 
             write_cffi_module(
                 &mut builder,
+                &build_context.manifest_path.parent().unwrap(),
                 &build_context.module_name,
                 &artifact,
                 &interpreter.executable,

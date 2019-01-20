@@ -4,7 +4,7 @@ use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
 use base64;
-use failure::{bail, Context, Error};
+use failure::{bail, Context, Error, ResultExt};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -255,17 +255,34 @@ del os
 "#
 }
 
-/// Returns the content of what will become ffi.py by invocing cffi
+/// Returns the content of what will become ffi.py by invocing cbindgen and cffi
+///
+/// First we check if user has provided their own header at `target/header.h`, otherwise
+/// we run cbindgen to generate onw.
 ///
 /// We're using the cffi recompiler, which reads the header, translates them into instructions
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-pub fn generate_cffi_declarations(
-    cbindgen_header: &Path,
-    python: &PathBuf,
-) -> Result<String, Error> {
+pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<String, Error> {
     let tempdir = tempdir()?;
+    let maybe_header = crate_dir.join("target").join("header.h");
+
+    let header;
+    if maybe_header.is_file() {
+        println!("Using the existing header at {}", maybe_header.display());
+        header = maybe_header;
+    } else {
+        let bindings = cbindgen::Builder::new()
+            .with_no_includes()
+            .with_language(cbindgen::Language::C)
+            .with_crate(crate_dir)
+            .generate()
+            .context("Failed to run cbindgen")?;
+        header = tempdir.as_ref().join("header.h");
+        bindings.write_to_file(&header);
+    }
+
     let ffi_py = tempdir.as_ref().join("ffi.py");
 
     let cffi_invocation = format!(
@@ -274,13 +291,12 @@ import cffi
 from cffi import recompiler
 
 ffi = cffi.FFI()
-with open("{cbindgen_header}") as header:
+with open("{header}") as header:
     ffi.cdef(header.read())
-ffi.set_source("a", None)
 recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
 "#,
         ffi_py = ffi_py.display(),
-        cbindgen_header = cbindgen_header.display(),
+        header = header.display(),
     );
 
     let output = Command::new(python)
@@ -291,7 +307,9 @@ recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
         bail!("Failed to generate cffi declarations");
     }
 
-    Ok(fs::read_to_string(ffi_py)?)
+    let ffi_py_content = fs::read_to_string(ffi_py)?;
+    tempdir.close()?;
+    Ok(ffi_py_content)
 }
 
 /// Copies the shared library into the module, which is the only extra file needed with bindings
@@ -315,23 +333,16 @@ pub fn write_bindings_module(
 /// Creates the cffi module with the shared library, the cffi declarations and the cffi loader
 pub fn write_cffi_module(
     writer: &mut impl ModuleWriter,
+    crate_dir: &Path,
     module_name: &str,
     artifact: &Path,
     python: &PathBuf,
 ) -> Result<(), Error> {
     let module = Path::new(module_name);
 
-    // This should do until cbindgen gets their serde issues fixed
-    let header = artifact
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("header.h");
-
     writer.add_directory(&module)?;
     writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
-    let cffi_declarations = generate_cffi_declarations(&header, python)?;
+    let cffi_declarations = generate_cffi_declarations(&crate_dir, python)?;
     writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
     writer.add_file(&module.join("native.so"), &artifact)?;
 

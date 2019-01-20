@@ -2,7 +2,6 @@
 name = "points"
 version = "0.1.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
-build = "build.rs"
 edition = "2018"
 
 [lib]

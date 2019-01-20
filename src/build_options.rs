@@ -97,7 +97,7 @@ impl BuildOptions {
         let manifest_file = self
             .manifest_path
             .canonicalize()
-            .map_err(|e| format_err!("Can't find {}: {}", self.manifest_path.display(), e))?;
+            .context(format_err!("Can't find {}", self.manifest_path.display()))?;
 
         if !self.manifest_path.is_file() {
             bail!("{} must be a path to a Cargo.toml", manifest_file.display());

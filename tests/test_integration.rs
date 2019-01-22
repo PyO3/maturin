@@ -1,7 +1,6 @@
 use crate::common::check_installed;
 use pyo3_pack::{BuildOptions, Target};
-use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::str;
 use structopt::StructOpt;
@@ -143,6 +142,7 @@ fn test_integration(package: &Path, bindings: Option<String>) {
 }
 
 /// Creates conda environments
+#[cfg(target_os = "windows")]
 fn create_conda_env(name: &str, major: usize, minor: usize) {
     Command::new("conda")
         .arg("create")
@@ -155,7 +155,11 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
         .expect("Conda not available.");
 }
 
+#[cfg(target_os = "windows")]
 fn test_integration_conda(package: &Path, bindings: Option<String>) {
+    use std::path::PathBuf;
+    use std::env;
+
     let package_string = package.join("Cargo.toml").display().to_string();
 
     // Since the python launcher has precedence over conda, we need to deactivate it.

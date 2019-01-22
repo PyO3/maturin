@@ -1,8 +1,8 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pack"
-version = "0.5.0-alpha.1"
-description = "Build and publish crates with pyo3 bindings as python packages"
+version = "0.5.0-beta.1"
+description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
 exclude = ["get-fourtytwo/**/*", "integration-test/**/*", "sysconfig/*"]
 readme = "Readme.md"
 repository = "https://github.com/pyo3/pyo3-pack"

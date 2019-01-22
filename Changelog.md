@@ -3,14 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
 ## [Unreleased]
 
 ### Added
 
- * The [konstin2/pyo3-pack](https://cloud.docker.com/u/konstin2/repository/docker/konstin2/pyo3-pack) docker image makes it easy to build fully manylinux compliant wheels. See the readme for usage details.
+ * Support for conda environments on windows by paddyhoran [#52](https://github.com/PyO3/pyo3-pack/pull/52)
  * pyo3-pack will generate a header for cffi crates using cbinding, which means you don't need a `build.rs` anymore. The option to provide your own header file using a `build.rs` still exists.
+ * The [konstin2/pyo3-pack](https://cloud.docker.com/u/konstin2/repository/docker/konstin2/pyo3-pack) docker image makes it easy to build fully manylinux compliant wheels. See the readme for usage details.
  * The `--manxlinux=[1|1-unchecked|off]` option allows to build for manylinux1, both with audithweel (`1`) and without (`1-unchecked`), but also for the native linux tag with `off`. It is forward compatible to manylinux 2010.
 
 ### Changed

@@ -30,6 +30,7 @@ matrix:
   fast_finish: true
 
 install:
+  - cinst miniconda3
   - ps: |
       # For the gnu target we need gcc, provided by mingw. mingw which is already preinstalled,
       # but we need the right version (32-bit or 64-bit) to the PATH.

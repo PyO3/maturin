@@ -157,8 +157,8 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 
 #[cfg(target_os = "windows")]
 fn test_integration_conda(package: &Path, bindings: Option<String>) {
-    use std::path::PathBuf;
     use std::env;
+    use std::path::PathBuf;
 
     let package_string = package.join("Cargo.toml").display().to_string();
 

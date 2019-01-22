@@ -162,13 +162,17 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
     let conda_info = Command::new("conda").arg("info").arg("-e").output();
     if let Ok(output) = conda_info {
         let lines = str::from_utf8(&output.stdout).unwrap().lines();
-        let re = Regex::new(r"(\w|\\|:|-)+$").unwrap();
+        // The regex has three parts: The first matches the name and skips
+        // comments, the second skips the part in between and the third
+        // extracts the path
+        let re = Regex::new(r"^([^#].*?)[\s*]+([\w\\:-]+)$").unwrap();
         let mut paths = vec![];
         for i in lines {
-            if !i.starts_with('#') {
-                if let Some(capture) = re.captures(&i) {
-                    paths.push(String::from(&capture[0]));
+            if let Some(capture) = re.captures(&i) {
+                if &capture[1] == "base" {
+                    continue;
                 }
+                paths.push(String::from(&capture[2]));
             }
         }
 
@@ -177,8 +181,23 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
             let python_info = Command::new(&executable)
                 .arg("-c")
                 .arg("import sys; print(sys.version)")
-                .output()
-                .expect("Error getting Python version info from conda env...");
+                .output();
+
+            let python_info = match python_info {
+                Ok(python_info) => python_info,
+                Err(err) => {
+                    if err.kind() == io::ErrorKind::NotFound {
+                        // This conda env doesn't have python installed
+                        continue;
+                    } else {
+                        bail!(
+                            "Error getting Python version info from conda env at {}",
+                            path
+                        );
+                    }
+                }
+            };
+
             let version_info = str::from_utf8(&python_info.stdout).unwrap();
             let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
             if let Some(capture) = expr.captures(version_info) {

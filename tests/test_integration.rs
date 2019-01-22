@@ -1,5 +1,6 @@
 use crate::common::check_installed;
 use pyo3_pack::{BuildOptions, Target};
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
@@ -156,6 +157,18 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 
 fn test_integration_conda(package: &Path, bindings: Option<String>) {
     let package_string = package.join("Cargo.toml").display().to_string();
+
+    // Since the python launcher has precedence over conda, we need to deactivate it.
+    // We do so by shadowing it with our own hello world binary.
+    let original_path = env::var_os("PATH").expect("PATH is not defined");
+    let py_dir = env::current_dir()
+        .unwrap()
+        .join("test-data")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let mocked_path = py_dir + ";" + original_path.to_str().unwrap();
+    env::set_var("PATH", mocked_path);
 
     // Create environments to build against, prepended with "A" to ensure that integration
     // tests are executed with these environments

@@ -8,7 +8,7 @@ use std::path::Path;
 
 /// As specified in "PEP 513 -- A Platform Tag for Portable Linux Built
 /// Distributions"
-const MANYLINUX1: &[&str] = &[
+pub const MANYLINUX1: &[&str] = &[
     "libpanelw.so.5",
     "libncursesw.so.5",
     "libgcc_s.so.1",
@@ -36,8 +36,7 @@ const MANYLINUX1: &[&str] = &[
 /// As specified in "PEP 571 -- The manylinux2010 Platform Tag"
 ///
 /// Currently unused since the python ecosystem is still on manylinux 1
-#[allow(unused)]
-const MANYLINUX2010: &[&str] = &[
+pub const MANYLINUX2010: &[&str] = &[
     "libgcc_s.so.1",
     "libstdc++.so.6",
     "libm.so.6",
@@ -84,7 +83,7 @@ pub enum AuditWheelError {
 ///
 /// Only checks for the libraries marked as NEEDED, but not for symbol versions
 /// (e.g. requiring a too recent glibc isn't caught).
-pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
+pub fn auditwheel_rs(path: &Path, reference: &[&str]) -> Result<(), AuditWheelError> {
     let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
@@ -100,7 +99,7 @@ pub fn auditwheel_rs(path: &Path) -> Result<(), AuditWheelError> {
         if dep == "ld-linux-x86-64.so.2" || dep == "ld-linux.so.2" {
             continue;
         }
-        if !MANYLINUX1.contains(&dep.as_str()) {
+        if !reference.contains(&dep.as_str()) {
             offenders.push(dep);
         }
     }

@@ -136,7 +136,8 @@ OPTIONS:
             Whether to use and check for compliance with the manylinux1 tag (1), use it but don't check compliance (1-
             unchecked) or use the native linux tag (off)
 
-            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, off]
+            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
+            2010-unchecked, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -187,7 +188,8 @@ OPTIONS:
             Whether to use and check for compliance with the manylinux1 tag (1), use it but don't check compliance (1-
             unchecked) or use the native linux tag (off)
 
-            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, off]
+            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
+            2010-unchecked, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory

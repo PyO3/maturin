@@ -23,6 +23,10 @@ pub enum Manylinux {
     Manylinux1,
     /// Use the manylinux1 tag but don't check for compliance
     Manylinux1Unchecked,
+    /// Use manylinux2010 tag and check for compliance
+    Manylinux2010,
+    /// Use the manylinux2010 tag but don't check for compliance
+    Manylinux2010Unchecked,
     /// Use the native linux tag
     Off,
 }
@@ -34,6 +38,8 @@ impl FromStr for Manylinux {
         match value {
             "1" => Ok(Manylinux::Manylinux1),
             "1-unchecked" => Ok(Manylinux::Manylinux1Unchecked),
+            "2010" => Ok(Manylinux::Manylinux2010),
+            "2010-unchecked" => Ok(Manylinux::Manylinux2010Unchecked),
             "off" => Ok(Manylinux::Off),
             _ => Err("Invalid value for the manylinux option"),
         }
@@ -129,8 +135,14 @@ impl Target {
         match (&self.os, self.is_64_bit, manylinux) {
             (&OS::Linux, true, Manylinux::Off) => "linux_x86_64",
             (&OS::Linux, false, Manylinux::Off) => "linux_i686",
-            (&OS::Linux, true, _) => "manylinux1_x86_64",
-            (&OS::Linux, false, _) => "manylinux1_i686",
+            (&OS::Linux, true, Manylinux::Manylinux1) => "manylinux1_x86_64",
+            (&OS::Linux, true, Manylinux::Manylinux1Unchecked) => "manylinux1_x86_64",
+            (&OS::Linux, true, Manylinux::Manylinux2010) => "manylinux2010_x86_64",
+            (&OS::Linux, true, Manylinux::Manylinux2010Unchecked) => "manylinux2010_x86_64",
+            (&OS::Linux, false, Manylinux::Manylinux1) => "manylinux1_i686",
+            (&OS::Linux, false, Manylinux::Manylinux1Unchecked) => "manylinux1_i686",
+            (&OS::Linux, false, Manylinux::Manylinux2010) => "manylinux2010_i686",
+            (&OS::Linux, false, Manylinux::Manylinux2010Unchecked) => "manylinux2010_i686",
             (&OS::Windows, true, _) => "win_amd64",
             (&OS::Windows, false, _) => "win32",
             (&OS::Macos, true, _) => "macosx_10_7_x86_64",

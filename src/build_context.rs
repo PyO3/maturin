@@ -1,5 +1,5 @@
 #[cfg(feature = "auditwheel")]
-use crate::auditwheel_rs;
+use crate::auditwheel::auditwheel_rs;
 use crate::compile;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
@@ -154,10 +154,9 @@ impl BuildContext {
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        if self.manylinux == Manylinux::Manylinux1 && target.is_linux() {
-            #[cfg(feature = "auditwheel")]
-            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
-        }
+        #[cfg(feature = "auditwheel")]
+        auditwheel_rs(&artifact, target, &self.manylinux)
+            .context("Failed to ensure manylinux compliance")?;
 
         Ok(artifact)
     }
@@ -207,10 +206,9 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| Context::new("Cargo didn't build a binary."))?;
 
-        if self.manylinux != Manylinux::Manylinux1Unchecked && self.target.is_linux() {
-            #[cfg(feature = "auditwheel")]
-            auditwheel_rs(&artifact).context("Failed to ensure manylinux compliance")?;
-        }
+        #[cfg(feature = "auditwheel")]
+        auditwheel_rs(&artifact, &self.target, &self.manylinux)
+            .context("Failed to ensure manylinux compliance")?;
 
         let (tag, tags) = self.get_unversal_tags();
 

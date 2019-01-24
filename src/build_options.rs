@@ -31,7 +31,7 @@ pub struct BuildOptions {
     #[structopt(
         long = "manylinux",
         raw(
-            possible_values = r#"&["1", "1-unchecked", "off"]"#,
+            possible_values = r#"&["1", "1-unchecked", "2010", "2010-unchecked", "off"]"#,
             case_insensitive = "true",
             default_value = r#""1""#
         )

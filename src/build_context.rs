@@ -1,5 +1,5 @@
 #[cfg(feature = "auditwheel")]
-use crate::auditwheel::{auditwheel_rs, MANYLINUX1, MANYLINUX2010};
+use crate::auditwheel::auditwheel_rs;
 use crate::compile;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
@@ -152,21 +152,8 @@ impl BuildContext {
             .unwrap_or(&self.target);
 
         #[cfg(feature = "auditwheel")]
-        {
-            if target.is_linux() {
-                match self.manylinux {
-                    Manylinux::Manylinux1 => {
-                        auditwheel_rs(&artifact, MANYLINUX1)
-                            .context("Failed to ensure manylinux compliance")?;
-                    }
-                    Manylinux::Manylinux2010 => {
-                        auditwheel_rs(&artifact, MANYLINUX2010)
-                            .context("Failed to ensure manylinux compliance")?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        auditwheel_rs(&artifact, target, &self.manylinux)
+            .context("Failed to ensure manylinux compliance")?;
 
         Ok(artifact)
     }
@@ -217,21 +204,8 @@ impl BuildContext {
             .ok_or_else(|| Context::new("Cargo didn't build a binary."))?;
 
         #[cfg(feature = "auditwheel")]
-        {
-            if self.target.is_linux() {
-                match self.manylinux {
-                    Manylinux::Manylinux1 => {
-                        auditwheel_rs(&artifact, MANYLINUX1)
-                            .context("Failed to ensure manylinux compliance")?;
-                    }
-                    Manylinux::Manylinux2010 => {
-                        auditwheel_rs(&artifact, MANYLINUX2010)
-                            .context("Failed to ensure manylinux compliance")?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        auditwheel_rs(&artifact, &self.target, &self.manylinux)
+            .context("Failed to ensure manylinux compliance")?;
 
         let (tag, tags) = self.get_unversal_tags();
 

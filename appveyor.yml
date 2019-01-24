@@ -57,6 +57,8 @@ install:
 
 test_script:
   - python -m sysconfig
+  - cargo build
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
   - cargo test -j 1 -- --nocapture
 
 before_deploy:

@@ -191,7 +191,7 @@ fn run() -> Result<(), Error> {
             let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
 
             if !build_context.release {
-                eprintln!("Warning: You're publishing debug wheels");
+                eprintln!("⚠ Warning: You're publishing debug wheels");
             }
 
             let wheels = build_context.build_wheels()?;
@@ -199,7 +199,7 @@ fn run() -> Result<(), Error> {
             let (mut registry, reenter) = complete_registry(&publish)?;
 
             loop {
-                println!("Uploading {} packages", wheels.len());
+                println!("🚀 Uploading {} packages", wheels.len());
 
                 // Upload all wheels, aborting on the first error
                 let result = wheels
@@ -216,7 +216,7 @@ fn run() -> Result<(), Error> {
 
                 match result {
                     Ok(()) => {
-                        println!("Packages uploaded succesfully");
+                        println!("✨ Packages uploaded succesfully");
 
                         #[cfg(feature = "keyring")]
                         {
@@ -225,14 +225,17 @@ fn run() -> Result<(), Error> {
                             let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
                             let password = registry.password.clone();
                             keyring.set_password(&password).unwrap_or_else(|e| {
-                                eprintln!("Failed to store the password in the keyring: {:?}", e)
+                                eprintln!(
+                                    "⚠ Failed to store the password in the keyring: {:?}",
+                                    e
+                                )
                             });
                         }
 
                         return Ok(());
                     }
                     Err(UploadError::AuthenticationError) if reenter => {
-                        println!("Username and/or password are wrong");
+                        println!("❌ Username and/or password are wrong");
 
                         #[cfg(feature = "keyring")]
                         {
@@ -243,7 +246,7 @@ fn run() -> Result<(), Error> {
                                 Ok(()) => {}
                                 Err(KeyringError::NoPasswordFound)
                                 | Err(KeyringError::NoBackendFound) => {}
-                                _ => eprintln!("Failed to remove password from keyring"),
+                                _ => eprintln!("⚠ Failed to remove password from keyring"),
                             }
                         }
 
@@ -260,7 +263,7 @@ fn run() -> Result<(), Error> {
                                 });
 
                         registry = Registry::new(username, password, registry.url);
-                        println!("Retrying")
+                        println!("… Retrying")
                     }
                     Err(UploadError::AuthenticationError) => {
                         bail!("Username and/or password are wrong");
@@ -272,7 +275,7 @@ fn run() -> Result<(), Error> {
         Opt::ListPython => {
             let target = Target::from_target_triple(None)?;
             let found = PythonInterpreter::find_all(&target)?;
-            println!("{} python interpreter found:", found.len());
+            println!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
                 println!(" - {}", interpreter);
             }

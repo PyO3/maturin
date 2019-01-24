@@ -219,33 +219,34 @@ pub fn compile(
         .stdout
         .take()
         .expect("Cargo build should have a stdout");
-    for message in cargo_metadata::parse_message_stream(stream) {
+    for message in cargo_metadata::parse_messages(stream) {
         match message.unwrap() {
             Message::CompilerArtifact(artifact) => {
-                update_progress(&mut progress_plan, artifact.package_id.name());
+                let crate_name = &context.cargo_metadata[&artifact.package_id].name;
+                update_progress(&mut progress_plan, crate_name);
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
-                if artifact.package_id.name() == context.metadata21.name {
+                if crate_name == &context.metadata21.name {
                     let tuples = artifact
                         .target
                         .crate_types
                         .into_iter()
                         .zip(artifact.filenames);
                     for (crate_type, filename) in tuples {
-                        artifacts.insert(crate_type, PathBuf::from(filename));
+                        artifacts.insert(crate_type, filename);
                     }
                 }
             }
             Message::BuildScriptExecuted(script) => {
-                update_progress(&mut progress_plan, &script.package_id.name());
+                let crate_name = &context.cargo_metadata[&script.package_id].name;
+                update_progress(&mut progress_plan, &crate_name);
             }
             Message::CompilerMessage(msg) => {
-                eprintln!(
-                    "{}",
-                    msg.message
-                        .rendered
-                        .unwrap_or_else(|| "Unrendered Message".to_string())
-                );
+                if let Some((ref progress_bar, _)) = progress_plan {
+                    progress_bar.println(msg.message.to_string());
+                } else {
+                    eprintln!("{}", msg.message);
+                }
             }
             _ => (),
         }

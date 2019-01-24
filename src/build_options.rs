@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
-use cargo_metadata;
+use cargo_metadata::{Metadata, MetadataCommand};
 use failure::{bail, err_msg, format_err, Error, ResultExt};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -137,7 +137,9 @@ impl BuildOptions {
         let target = Target::from_target_triple(self.target.clone())?;
 
         // Failure fails here since cargo_metadata does some weird stuff on their side
-        let cargo_metadata = cargo_metadata::metadata_deps(Some(&self.manifest_path), true)
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(&self.manifest_path)
+            .exec()
             .map_err(|e| format_err!("Cargo metadata failed: {}", e))?;
 
         let wheel_dir = match self.out {
@@ -184,22 +186,20 @@ impl BuildOptions {
             cargo_extra_args,
             rustc_extra_args,
             interpreter,
+            cargo_metadata,
         })
     }
 }
 
 /// Tries to determine the [BridgeModel] for the target crate
-pub fn find_bridge(
-    cargo_metadata: &cargo_metadata::Metadata,
-    bridge: Option<&str>,
-) -> Result<BridgeModel, Error> {
+pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel, Error> {
     let deps: HashSet<String> = cargo_metadata
         .resolve
         .clone()
         .unwrap()
         .nodes
         .iter()
-        .map(|node| node.id.split(' ').nth(0).unwrap().to_string())
+        .map(|node| cargo_metadata[&node.id].name.clone())
         .collect();
 
     if let Some(bindings) = bridge {
@@ -306,11 +306,10 @@ mod test {
 
     #[test]
     fn test_find_bridge_pyo3() {
-        let get_fourtytwo = cargo_metadata::metadata_deps(
-            Some(&Path::new("get-fourtytwo").join("Cargo.toml")),
-            true,
-        )
-        .unwrap();
+        let get_fourtytwo = MetadataCommand::new()
+            .manifest_path(&Path::new("get-fourtytwo").join("Cargo.toml"))
+            .exec()
+            .unwrap();
 
         assert!(match find_bridge(&get_fourtytwo, None).unwrap() {
             BridgeModel::Bindings(_) => true,
@@ -327,9 +326,10 @@ mod test {
 
     #[test]
     fn test_find_bridge_cffi() {
-        let points =
-            cargo_metadata::metadata_deps(Some(&Path::new("points").join("Cargo.toml")), true)
-                .unwrap();
+        let points = MetadataCommand::new()
+            .manifest_path(&Path::new("points").join("Cargo.toml"))
+            .exec()
+            .unwrap();
 
         assert_eq!(
             find_bridge(&points, Some("cffi")).unwrap(),
@@ -342,9 +342,10 @@ mod test {
 
     #[test]
     fn test_find_bridge_bin() {
-        let hello_world =
-            cargo_metadata::metadata_deps(Some(&Path::new("hello-world").join("Cargo.toml")), true)
-                .unwrap();
+        let hello_world = MetadataCommand::new()
+            .manifest_path(&Path::new("hello-world").join("Cargo.toml"))
+            .exec()
+            .unwrap();
 
         assert_eq!(
             find_bridge(&hello_world, Some("bin")).unwrap(),

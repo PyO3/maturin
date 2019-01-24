@@ -7,6 +7,7 @@ use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
+use cargo_metadata::Metadata;
 use failure::{bail, Context, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs;
@@ -66,6 +67,8 @@ pub struct BuildContext {
     pub rustc_extra_args: Vec<String>,
     /// The available python interpreter
     pub interpreter: Vec<PythonInterpreter>,
+    /// Cargo.toml as resolved by [cargo_metadata]
+    pub cargo_metadata: Metadata,
 }
 
 impl BuildContext {

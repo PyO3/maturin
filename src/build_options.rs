@@ -22,12 +22,19 @@ use crate::Target;
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
-    /// Whether to use and check for compliance with the manylinux1 tag (1),
-    /// use it but don't check compliance (1-unchecked)
-    /// or use the native linux tag (off)
+    /// Control the platform tag on linux.
+    ///
+    ///  - `1`: Use the manylinux1 tag and check for compliance
+    ///
+    ///  - `1-unchecked`: Use the manylinux1 tag without checking for compliance
+    ///
+    ///  - `2010`: Use the manylinux2010 tag and check for compliance
+    ///
+    ///  - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+    ///
+    ///  - `off`: Use the native linux tag (off)
     ///
     /// This option is ignored on all non-linux platforms
-    // The options use those named to support the upcoming manylinux 2010 tag.
     #[structopt(
         long = "manylinux",
         raw(

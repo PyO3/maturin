@@ -133,8 +133,17 @@ OPTIONS:
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
         --manylinux <manylinux>
-            Whether to use and check for compliance with the manylinux1 tag (1), use it but don't check compliance (1-
-            unchecked) or use the native linux tag (off)
+            Control the platform tag on linux.
+
+            - `1`: Use the manylinux1 tag and check for compliance
+
+            - `1-unchecked`: Use the manylinux1 tag without checking for compliance
+
+            - `2010`: Use the manylinux2010 tag and check for compliance
+
+            - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+
+            - `off`: Use the native linux tag (off)
 
             This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
             2010-unchecked, off]
@@ -185,8 +194,17 @@ OPTIONS:
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
         --manylinux <manylinux>
-            Whether to use and check for compliance with the manylinux1 tag (1), use it but don't check compliance (1-
-            unchecked) or use the native linux tag (off)
+            Control the platform tag on linux.
+
+            - `1`: Use the manylinux1 tag and check for compliance
+
+            - `1-unchecked`: Use the manylinux1 tag without checking for compliance
+
+            - `2010`: Use the manylinux2010 tag and check for compliance
+
+            - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+
+            - `off`: Use the native linux tag (off)
 
             This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
             2010-unchecked, off]

@@ -23,13 +23,13 @@ name = "pyo3_pack"
 
 [dependencies]
 base64 = "0.10.0"
-cargo_metadata = { git = "https://github.com/konstin/cargo_metadata", branch = "parse_messages" }
+cargo_metadata = "0.7.1"
 digest = { version = "0.8.0", features = ["std"] }
 failure = "0.1.5"
 keyring = { version = "0.6.1", optional = true }
-reqwest = { version = "0.9.8", optional = true, default-features = false }
+reqwest = { version = "0.9.9", optional = true, default-features = false }
 rpassword = { version = "2.1.0", optional = true }
-serde_json = "1.0.36"
+serde_json = "1.0.37"
 sha2 = "0.8.0"
 structopt = "0.2.14"
 target_info = "0.1.0"

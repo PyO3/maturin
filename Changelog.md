@@ -1,5 +1,5 @@
-
 # Changelog
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -12,11 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Support for conda environments on windows by paddyhoran [#52](https://github.com/PyO3/pyo3-pack/pull/52)
  * pyo3-pack will generate a header for cffi crates using cbinding, which means you don't need a `build.rs` anymore. The option to provide your own header file using a `build.rs` still exists.
  * The [konstin2/pyo3-pack](https://cloud.docker.com/u/konstin2/repository/docker/konstin2/pyo3-pack) docker image makes it easy to build fully manylinux compliant wheels. See the readme for usage details.
- * The `--manxlinux=[1|1-unchecked|off]` option allows to build for manylinux1, both with audithweel (`1`) and without (`1-unchecked`), but also for the native linux tag with `off`. It is forward compatible to manylinux 2010.
+ * Support for manylinux2010 by ijl [#70](https://github.com/PyO3/pyo3-pack/pull/70)
+ * The `--manxlinux=[1|1-unchecked|2010|2010-unchecked|off]` option allows to build for manylinux1 and manylinux2010, both with audithweel (`1` or `2010`) and without (`1-unchecked` or `2010-unchecked`), but also for the native linux tag with `off`.
 
 ### Changed
 
- * The `--skip-auditwheel` flag has been deprecated in favor of `--manxlinux=[1|1-unchecked|off]`.
+ * The `--skip-auditwheel` flag has been deprecated in favor of `--manxlinux=[1|1-unchecked|2010|2010-unchecked|off]`.
  * Switched to rustls. This means the upload feature can be used from the docker container and builds of pyo3-pack itself are manylinux compliant when compiled with the musl target.
 
 ## [0.4.2] - 2018-12-15

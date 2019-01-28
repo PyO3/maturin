@@ -87,7 +87,7 @@ For portability reasons, native python modules on linux must only dynamically li
 
 pyo3-pack contains a reimplementation of a major part of auditwheel automatically checking the generated library. If you want to disable those checks or build for native linux target, use the `--manylinux` flag.
 
-For full manylinux compliance you need to compile in a cent os 5 docker container. The [konstin2/pyo3-pack](https://cloud.docker.com/u/konstin2/repository/docker/konstin2/pyo3-pack) image is based on the official manylinux image. You can use it like this:
+For full manylinux compliance you need to compile in a cent os 5 docker container. The [konstin2/pyo3-pack](https://hub.docker.com/r/konstin2/pyo3-pack) image is based on the official manylinux image. You can use it like this:
 
 ```
 docker run --rm -v $(pwd):/io konstin2/pyo3-pack build

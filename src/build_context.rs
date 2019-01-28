@@ -117,7 +117,7 @@ impl BuildContext {
             let wheel_path = builder.finish()?;
 
             println!(
-                "Built wheel for python {}.{}{} to {}",
+                "📦 Built wheel for python {}.{}{} to {}",
                 python_version.major,
                 python_version.minor,
                 python_version.abiflags,
@@ -189,7 +189,7 @@ impl BuildContext {
 
         let wheel_path = builder.finish()?;
 
-        println!("Built wheel to {}", wheel_path.display());
+        println!("📦 Built wheel to {}", wheel_path.display());
 
         Ok(wheel_path)
     }
@@ -228,7 +228,7 @@ impl BuildContext {
 
         let wheel_path = builder.finish()?;
 
-        println!("Built wheel to {}", wheel_path.display());
+        println!("📦 Built wheel to {}", wheel_path.display());
 
         Ok(wheel_path)
     }

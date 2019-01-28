@@ -51,7 +51,7 @@ fn windows_interpreter_no_build(
     // those for 64-bit targets
     if pointer_width != target_width {
         println!(
-            "{}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
+            "👽 {}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
             major, minor, pointer_width, target_width
         );
         return true;

@@ -170,7 +170,7 @@ impl BuildOptions {
         let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
 
         let manylinux = if self.skip_auditwheel {
-            eprintln!("--skip-auditwheel is deprecated, use --manylinux=1-unchecked");
+            eprintln!("⚠ --skip-auditwheel is deprecated, use --manylinux=1-unchecked");
             Manylinux::Manylinux1Unchecked
         } else {
             self.manylinux
@@ -222,10 +222,10 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             Ok(BridgeModel::Bindings(bindings.to_string()))
         }
     } else if deps.contains("pyo3") {
-        println!("Found pyo3 bindings");
+        println!("🔗 Found pyo3 bindings");
         Ok(BridgeModel::Bindings("pyo3".to_string()))
     } else if deps.contains("cpython") {
-        println!("Found rust-python bindings");
+        println!("🔗 Found rust-cpython bindings");
         Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {
         bail!("Couldn't find any bindings; Please specify them with -b")
@@ -253,7 +253,7 @@ pub fn find_interpreter(
             }
 
             println!(
-                "Found {}",
+                "🐍 Found {}",
                 interpreter
                     .iter()
                     .map(ToString::to_string)
@@ -277,7 +277,7 @@ pub fn find_interpreter(
                 .context(err_msg(err_message))?
                 .ok_or_else(|| err_msg(err_message))?;
 
-            println!("Using {} to generate the cffi bindings", interpreter);
+            println!("🐍 Using {} to generate the cffi bindings", interpreter);
 
             vec![interpreter]
         }

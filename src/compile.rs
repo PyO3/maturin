@@ -91,7 +91,7 @@ fn get_progress_plan(shared_args: &[&str]) -> Option<(ProgressBar, Vec<String>)>
                 if let Some(first) = packages.first() {
                     progress_bar.set_message(first);
                 } else {
-                    eprintln!("Warning: The build plan is empty");
+                    eprintln!("⚠ Warning: The build plan is empty ಠ_ಠ");
                 }
 
                 Some((progress_bar, packages))
@@ -112,7 +112,10 @@ fn update_progress(progress_plan: &mut Option<(ProgressBar, Vec<String>)>, crate
                 packages.remove(pos);
                 progress_bar.inc(1);
             }
-            None => eprintln!("WARN: {} not found in build plan", crate_name),
+            None => eprintln!(
+                "⚠ Warning: {} was not found in build plan ಠ_ಠ",
+                crate_name
+            ),
         }
 
         if let Some(package) = packages.first() {

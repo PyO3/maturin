@@ -22,21 +22,18 @@ use crate::Target;
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
+    // The {n} are workarounds for https://github.com/TeXitoi/structopt/issues/163
     /// Control the platform tag on linux.
     ///
-    ///  - `1`: Use the manylinux1 tag and check for compliance
-    ///
-    ///  - `1-unchecked`: Use the manylinux1 tag without checking for compliance
-    ///
-    ///  - `2010`: Use the manylinux2010 tag and check for compliance
-    ///
-    ///  - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
-    ///
-    ///  - `off`: Use the native linux tag (off)
+    /// - `1`: Use the manylinux1 tag and check for compliance{n}
+    /// - `1-unchecked`: Use the manylinux1 tag without checking for compliance{n}
+    /// - `2010`: Use the manylinux2010 tag and check for compliance{n}
+    /// - `2010-unchecked`: Use the manylinux1 tag without checking for compliance{n}
+    /// - `off`: Use the native linux tag (off)
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
-        long = "manylinux",
+        long,
         raw(
             possible_values = r#"&["1", "1-unchecked", "2010", "2010-unchecked", "off"]"#,
             case_insensitive = "true",
@@ -44,12 +41,12 @@ pub struct BuildOptions {
         )
     )]
     pub manylinux: Manylinux,
-    #[structopt(short = "i", long = "interpreter")]
+    #[structopt(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
     pub interpreter: Vec<String>,
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-    #[structopt(short = "b", long = "bindings")]
+    #[structopt(short, long)]
     pub bindings: Option<String>,
     #[structopt(
         short = "m",
@@ -62,13 +59,13 @@ pub struct BuildOptions {
     pub manifest_path: PathBuf,
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
-    #[structopt(short = "o", long = "out", parse(from_os_str))]
+    #[structopt(short, long, parse(from_os_str))]
     pub out: Option<PathBuf>,
     /// [deprecated, use --manylinux instead] Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
     /// The --target option for cargo
-    #[structopt(long = "target", name = "TRIPLE")]
+    #[structopt(long, name = "TRIPLE")]
     pub target: Option<String>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     ///

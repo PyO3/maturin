@@ -92,15 +92,15 @@ struct PublishOpt {
     )]
     /// The url of registry where the wheels are uploaded to
     registry: String,
-    #[structopt(short = "u", long = "username")]
+    #[structopt(short, long)]
     /// Username for pypi or your custom registry
     username: Option<String>,
-    #[structopt(short = "p", long = "password")]
+    #[structopt(short, long)]
     /// Password for pypi or your custom registry. Note that you can also pass the password
     /// through PYO3_PACK_PASSWORD
     password: Option<String>,
     /// Do not pass --release to cargo
-    #[structopt(long = "debug")]
+    #[structopt(long)]
     debug: bool,
     /// Strip the library for minimum file size
     #[structopt(long = "no-strip")]
@@ -119,10 +119,10 @@ enum Opt {
         #[structopt(flatten)]
         build: BuildOptions,
         /// Pass --release to cargo
-        #[structopt(long = "release")]
+        #[structopt(long)]
         release: bool,
         /// Strip the library for minimum file size
-        #[structopt(long = "strip")]
+        #[structopt(long)]
         strip: bool,
     },
     #[cfg(feature = "upload")]
@@ -143,7 +143,7 @@ enum Opt {
     /// Note that this command doesn't create entrypoints
     Develop {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-        #[structopt(short = "b", long = "bindings")]
+        #[structopt(short = "b", long)]
         binding_crate: Option<String>,
         #[structopt(
             short = "m",
@@ -154,10 +154,10 @@ enum Opt {
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
         /// Pass --release to cargo
-        #[structopt(long = "release")]
+        #[structopt(long)]
         release: bool,
         /// Strip the library for minimum file size
-        #[structopt(long = "strip")]
+        #[structopt(long)]
         strip: bool,
         /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
         ///

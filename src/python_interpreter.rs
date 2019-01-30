@@ -492,7 +492,7 @@ impl PythonInterpreter {
         Ok(available_versions)
     }
 
-    /// Checks that given list of executables are al valid python intepreters,
+    /// Checks that given list of executables are all valid python intepreters,
     /// determines the abiflags and versions of those interpreters and
     /// returns them as [PythonInterpreter]
     pub fn check_executables(
@@ -506,7 +506,7 @@ impl PythonInterpreter {
             {
                 available_versions.push(version);
             } else {
-                bail!("{} doesn't exist");
+                bail!("{} doesn't exist", executable);
             }
         }
 

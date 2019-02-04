@@ -59,10 +59,10 @@ matrix:
 
     # Those are run rust tests
     - os: linux
-      rust: nightly-2019-01-03
+      rust: nightly-2019-02-04
       env: TARGET=x86_64-unknown-linux-gnu
     - os: osx
-      rust: nightly-2019-01-03
+      rust: nightly-2019-02-04
       env: TARGET=x86_64-apple-darwin
 
     # Test docker

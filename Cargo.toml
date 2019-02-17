@@ -35,7 +35,7 @@ structopt = "0.2.14"
 target_info = "0.1.0"
 toml = "0.4.10"
 zip = "0.5.0"
-serde = { version = "1.0.87", features = ["derive"] }
+serde = { version = "1.0.88", features = ["derive"] }
 human-panic = { version = "1.0.1", optional = true }
 regex = "1.1.0"
 indicatif = "0.11.0"
@@ -45,7 +45,7 @@ goblin = { version = "0.0.20", optional = true }
 pretty_env_logger = { version = "0.3.0", optional = true }
 platforms = "0.2.0"
 shlex = "0.1.1"
-cbindgen = { git = "https://github.com/konstin/cbindgen", branch = "serde_and_failure" }
+cbindgen = "0.8.0"
 
 [dev-dependencies]
 indoc = "0.3.1"

@@ -995,7 +995,7 @@ dependencies = [
  "platforms 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pretty_env_logger 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "reqwest 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "reqwest 0.9.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1189,7 +1189,7 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.9.10"
+version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2045,7 +2045,7 @@ dependencies = [
 "checksum regex 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "53ee8cfdddb2e0291adfb9f13d31d3bbe0a03c9a402c01b1e24188d86c35b24f"
 "checksum regex-syntax 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)" = "8c2f35eedad5295fdf00a63d7d4b238135723f92b434ec06774dad15c7ab0861"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
-"checksum reqwest 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)" = "f205a95638627fc0d21c53901671b06f439dc2830311ff11ecdff34ae2d839a8"
+"checksum reqwest 0.9.11 (registry+https://github.com/rust-lang/crates.io-index)" = "e542d9f077c126af32536b6aacc75bb7325400eab8cd0743543be5d91660780d"
 "checksum ring 0.14.6 (registry+https://github.com/rust-lang/crates.io-index)" = "426bc186e3e95cac1e4a4be125a4aca7e84c2d616ffc02244eef36e2a60a093c"
 "checksum rpassword 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d37473170aedbe66ffa3ad3726939ba677d83c646ad4fd99e5b4bc38712f45ec"
 "checksum rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)" = "f76d05d3993fd5f4af9434e8e436db163a12a9d40e1a58a726f27a01dfd12a2a"

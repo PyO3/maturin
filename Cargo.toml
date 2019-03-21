@@ -45,7 +45,7 @@ goblin = { version = "0.0.21", optional = true }
 pretty_env_logger = { version = "0.3.0", optional = true }
 platforms = "0.2.0"
 shlex = "0.1.1"
-cbindgen = "0.8.0"
+cbindgen = "0.8.2"
 
 [dev-dependencies]
 indoc = "0.3.1"

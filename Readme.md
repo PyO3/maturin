@@ -52,6 +52,8 @@ classifier = ["Programming Language :: Python"]
 
 For pyo3 and rust-cpython, pyo3-pack can only build packages for installed python versions. On linux and mac, all python versions in `PATH` are used. If you don't set your own interpreters with `-i`, a heuristic is used to search for python installations. On windows all versions from the python launcher (which is installed by default by the python.org installer) and all conda environments except base are used. You can check which versions are picked up with the `list-python` subcommand.
 
+pyo3 will set the used python interpreter in the environment variable `PYTHON_SYS_EXECUTABLE`, which can be used from custom build scripts.
+
 ## Cffi
 
  Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).

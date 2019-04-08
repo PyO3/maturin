@@ -35,7 +35,7 @@ structopt = "0.2.15"
 target_info = "0.1.0"
 toml = "0.5.0"
 zip = "0.5.1"
-serde = { version = "1.0.89", features = ["derive"] }
+serde = { version = "1.0.90", features = ["derive"] }
 human-panic = { version = "1.0.1", optional = true }
 regex = "1.1.5"
 indicatif = "0.11.0"

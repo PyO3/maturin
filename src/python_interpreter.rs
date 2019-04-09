@@ -328,7 +328,9 @@ fn fun_with_abiflags(
         }
 
         if abiflags != "" && target.is_windows() {
-            bail!("A python 2 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
+            bail!(
+                "A python 2 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ"
+            )
         }
 
         Ok(abiflags)

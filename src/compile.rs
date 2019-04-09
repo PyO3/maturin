@@ -158,7 +158,7 @@ pub fn compile(
         BridgeModel::Cffi | BridgeModel::Bindings(_) => shared_args.push("--lib"),
     }
 
-    shared_args.extend(context.cargo_extra_args.iter().map(|x| x.as_str()));
+    shared_args.extend(context.cargo_extra_args.iter().map(String::as_str));
 
     if context.release {
         shared_args.push("--release");
@@ -177,7 +177,7 @@ pub fn compile(
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args
         .iter()
-        .map(|x| x.as_str())
+        .map(String::as_str)
         .collect();
 
     if context.target.is_macos() {

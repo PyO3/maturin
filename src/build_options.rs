@@ -1,13 +1,3 @@
-use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::path::PathBuf;
-
-use cargo_metadata::{Metadata, MetadataCommand};
-use failure::{bail, err_msg, format_err, Error, ResultExt};
-use serde::{Deserialize, Serialize};
-use structopt::StructOpt;
-use toml;
-
 use crate::build_context::BridgeModel;
 use crate::cargo_toml::CargoTomlMetadata;
 use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
@@ -17,6 +7,14 @@ use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
+use cargo_metadata::{Metadata, MetadataCommand};
+use failure::{bail, err_msg, format_err, Error, ResultExt};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::PathBuf;
+use structopt::StructOpt;
+use toml;
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]

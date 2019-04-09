@@ -1,8 +1,8 @@
-EXT_SUFFIXPlatform: "linux-x86_64"
+Platform: "linux-x86_64"
 Python version: "3.6"
 Current installation scheme: "posix_prefix"
 
-Paths: 
+Paths:
 	data = "/usr"
 	include = "/usr/include/python3.6m"
 	platinclude = "/usr/include/python3.6m"
@@ -12,7 +12,7 @@ Paths:
 	scripts = "/usr/bin"
 	stdlib = "/usr/lib/python3.6"
 
-Variables: 
+Variables:
 	ABIFLAGS = "m"
 	AC_APPLE_UNIVERSAL_BUILD = "0"
 	AIX_GENUINE_CPLUSPLUS = "0"

@@ -14,14 +14,18 @@ use std::str;
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
 const GET_INTERPRETER_METADATA: &str = r##"
-import sysconfig
-import sys
 import json
+import platform
+import sys
+import sysconfig
 
 print(json.dumps({
     "major": sys.version_info.major,
     "minor": sys.version_info.minor,
     "abiflags": sysconfig.get_config_var("ABIFLAGS"),
+    "interpreter": platform.python_implementation().lower(),
+    "ext_suffix": sysconfig.get_config_var("EXT_SUFFIX"),
+    "abi_tag": (sysconfig.get_config_var("SOABI") or "-").split("-")[1] or None,
     "m": sysconfig.get_config_var("WITH_PYMALLOC") == 1,
     "u": sysconfig.get_config_var("Py_UNICODE_SIZE") == 4,
     "d": sysconfig.get_config_var("Py_DEBUG") == 1,
@@ -250,16 +254,25 @@ fn find_all_unix() -> Vec<String> {
     interpreter.iter().map(ToString::to_string).collect()
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Interpreter {
+    CPython,
+    PyPy,
+}
+
 /// The output format of [GET_INTERPRETER_METADATA]
 #[derive(Serialize, Deserialize)]
 struct IntepreterMetadataMessage {
     major: usize,
     minor: usize,
     abiflags: Option<String>,
+    interpreter: String,
+    ext_suffix: String,
     m: bool,
     u: bool,
     d: bool,
     platform: String,
+    abi_tag: String,
 }
 
 /// The location and version of an interpreter
@@ -282,6 +295,15 @@ pub struct PythonInterpreter {
     ///
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
     pub executable: PathBuf,
+
+    /// Suffix to use for extension modules as given by sysconfig.
+    pub ext_suffix: String,
+
+    /// cpython or pypy
+    pub interpreter: Interpreter,
+
+    /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
+    pub abi_tag: String,
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -346,6 +368,9 @@ fn fun_with_abiflags(
                 bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
             }
             Ok(abiflags.clone())
+        } else if message.interpreter == "pypy" {
+            // pypy does not specify abi flags
+            Ok("".to_string())
         } else {
             bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
         }
@@ -360,68 +385,94 @@ impl PythonInterpreter {
     ///
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     pub fn get_tag(&self, manylinux: &Manylinux) -> String {
-        let platform = self.target.get_platform_tag(manylinux);
-
-        if self.target.is_unix() {
-            format!(
-                "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
-                major = self.major,
-                minor = self.minor,
-                abiflags = self.abiflags,
-                platform = platform
-            )
-        } else {
-            format!(
-                "cp{major}{minor}-none-{platform}",
-                major = self.major,
-                minor = self.minor,
-                platform = platform
-            )
+        match self.interpreter {
+            Interpreter::CPython => {
+                let platform = self.target.get_platform_tag(manylinux);
+                if self.target.is_unix() {
+                    format!(
+                        "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                        major = self.major,
+                        minor = self.minor,
+                        abiflags = self.abiflags,
+                        platform = platform
+                    )
+                } else {
+                    format!(
+                        "cp{major}{minor}-none-{platform}",
+                        major = self.major,
+                        minor = self.minor,
+                        platform = platform
+                    )
+                }
+            }
+            Interpreter::PyPy => {
+                // hack to never use manylinux for pypy
+                let platform = self.target.get_platform_tag(&Manylinux::Off);
+                // pypy uses its version as part of the ABI, e.g.
+                // pypy3 v7.1 => pp371-pypy3_71-linux_x86_64.whl
+                format!(
+                    "pp3{abi_tag}-pypy3_{abi_tag}-{platform}",
+                    abi_tag = self.abi_tag,
+                    platform = platform,
+                )
+            }
         }
     }
 
     /// Generates the correct suffix for shared libraries
     ///
+    /// For CPython, generate extensions as follows:
+    ///
     /// For python 2, it's just `.so`. For python 3, there is PEP 3149, but
     /// that is only valid for 3.2 - 3.4. Since only 3.5+ is supported, the
     /// templates are adapted from the (also
-    /// incorrect) release notes of python 3.5:
+    /// incorrect) release notes of CPython 3.5:
     /// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
     ///
-    /// Examples for 64-bit on Python 3.5m:
+    /// Examples for 64-bit on CPython 3.5m:
     /// Linux:   steinlaus.cpython-35m-x86_64-linux-gnu.so
     /// Windows: steinlaus.cp35-win_amd64.pyd
     /// Mac:     steinlaus.cpython-35m-darwin.so
     ///
-    /// Examples for 64-bit on Python 2.7mu:
+    /// Examples for 64-bit on CPython 2.7mu:
     /// Linux:   steinlaus.so
     /// Windows: steinlaus.pyd
     /// Mac:     steinlaus.so
+    ///
+    /// For pypy3, we read sysconfig.get_config_var("EXT_SUFFIX").
+    ///
+    /// The pypy3 value appears to be wrong for Windows: instead of
+    /// e.g., ".pypy3-70-x86_64-linux-gnu.so", it is just ".pyd".
     pub fn get_library_extension(&self) -> String {
-        if self.major == 2 {
-            if self.target.is_unix() {
-                return ".so".to_string();
-            } else {
-                return ".pyd".to_string();
-            }
-        }
-        let platform = self.target.get_shared_platform_tag();
+        match self.interpreter {
+            Interpreter::CPython => {
+                if self.major == 2 {
+                    if self.target.is_unix() {
+                        return ".so".to_string();
+                    } else {
+                        return ".pyd".to_string();
+                    }
+                }
+                let platform = self.target.get_shared_platform_tag();
 
-        if self.target.is_unix() {
-            format!(
-                ".cpython-{major}{minor}{abiflags}-{platform}.so",
-                major = self.major,
-                minor = self.minor,
-                abiflags = self.abiflags,
-                platform = platform,
-            )
-        } else {
-            format!(
-                ".cp{major}{minor}-{platform}.pyd",
-                major = self.major,
-                minor = self.minor,
-                platform = platform
-            )
+                if self.target.is_unix() {
+                    return format!(
+                        ".cpython-{major}{minor}{abiflags}-{platform}.so",
+                        major = self.major,
+                        minor = self.minor,
+                        abiflags = self.abiflags,
+                        platform = platform,
+                    );
+                } else {
+                    return format!(
+                        ".cp{major}{minor}-{platform}.pyd",
+                        major = self.major,
+                        minor = self.minor,
+                        platform = platform
+                    );
+                }
+            }
+            Interpreter::PyPy => self.ext_suffix.to_string(),
         }
     }
 
@@ -464,6 +515,15 @@ impl PythonInterpreter {
             return Ok(None);
         }
 
+        let interpreter;
+        match message.interpreter.as_str() {
+            "cpython" => interpreter = Interpreter::CPython,
+            "pypy" => interpreter = Interpreter::PyPy,
+            _ => {
+                bail!("Invalid interpreter");
+            }
+        };
+
         let abiflags = fun_with_abiflags(&message, &target)
             .context("Failed to get information from the python interpreter")?;
 
@@ -473,6 +533,9 @@ impl PythonInterpreter {
             abiflags,
             target: target.clone(),
             executable: executable.as_ref().to_path_buf(),
+            ext_suffix: message.ext_suffix,
+            interpreter: interpreter,
+            abi_tag: message.abi_tag,
         }))
     }
 

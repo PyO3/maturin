@@ -10,7 +10,8 @@ edition = "2018"
 get_42 = "get_fourtytwo:DummyClass.get_42"
 
 [dependencies]
-pyo3 = { version = "0.6.0-alpha.1", features = ["extension-module"] }
+# TODO: Remove this once pypy suppport is merged and released
+pyo3 = { git = "https://github.com/omerbenamram/pyo3", branch = "master-pypy", features = ["extension-module"] }
 
 [lib]
 name = "get_fourtytwo"

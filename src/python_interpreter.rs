@@ -259,6 +259,15 @@ pub enum Interpreter {
     PyPy,
 }
 
+impl fmt::Display for Interpreter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Interpreter::CPython => write!(f, "CPython"),
+            Interpreter::PyPy => write!(f, "PyPy"),
+        }
+    }
+}
+
 /// The output format of [GET_INTERPRETER_METADATA]
 #[derive(Serialize, Deserialize)]
 struct IntepreterMetadataMessage {
@@ -266,12 +275,12 @@ struct IntepreterMetadataMessage {
     minor: usize,
     abiflags: Option<String>,
     interpreter: String,
-    ext_suffix: String,
+    ext_suffix: Option<String>,
     m: bool,
     u: bool,
     d: bool,
     platform: String,
-    abi_tag: String,
+    abi_tag: Option<String>,
 }
 
 /// The location and version of an interpreter
@@ -296,13 +305,16 @@ pub struct PythonInterpreter {
     pub executable: PathBuf,
 
     /// Suffix to use for extension modules as given by sysconfig.
-    pub ext_suffix: String,
+    // TODO: After dropping python 2, we can make this field mandatory
+    pub ext_suffix: Option<String>,
 
     /// cpython or pypy
     pub interpreter: Interpreter,
 
     /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
-    pub abi_tag: String,
+    ///
+    /// Note that this always `None` on windows
+    pub abi_tag: Option<String>,
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -405,13 +417,25 @@ impl PythonInterpreter {
                 }
             }
             Interpreter::PyPy => {
+                // TODO: Find out if PyPy can support manylinux 2010 and/or
+                //       add a `Default` variant to the Manylinux enum
+                if manylinux != &Manylinux::Off {
+                    eprintln!(
+                        "🛈  Note: PyPy doesn't support the manylinux yet, \
+                         so native wheels are built instead of manylinux wheels"
+                    );
+                }
                 // hack to never use manylinux for pypy
                 let platform = self.target.get_platform_tag(&Manylinux::Off);
                 // pypy uses its version as part of the ABI, e.g.
                 // pypy3 v7.1 => pp371-pypy3_71-linux_x86_64.whl
                 format!(
                     "pp3{abi_tag}-pypy3_{abi_tag}-{platform}",
-                    abi_tag = self.abi_tag,
+                    // TODO: Proper tag handling for pypy
+                    abi_tag = self
+                        .abi_tag
+                        .clone()
+                        .expect("PyPy's syconfig didn't define an `SOABI` ಠ_ಠ"),
                     platform = platform,
                 )
             }
@@ -471,7 +495,11 @@ impl PythonInterpreter {
                     );
                 }
             }
-            Interpreter::PyPy => self.ext_suffix.to_string(),
+            Interpreter::PyPy => self
+                .ext_suffix
+                .clone()
+                .expect("PyPy's syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")
+                .to_string(),
         }
     }
 
@@ -487,7 +515,7 @@ impl PythonInterpreter {
             .output();
 
         let err_msg = format!(
-            "Trying to get metadata from the python interpreter {} failed",
+            "Trying to get metadata from the python interpreter '{}' failed",
             executable.as_ref().display()
         );
 
@@ -507,8 +535,9 @@ impl PythonInterpreter {
                 }
             }
         };
-        let message: IntepreterMetadataMessage =
-            serde_json::from_slice(&output.stdout).context(err_msg)?;
+        let message: IntepreterMetadataMessage = serde_json::from_slice(&output.stdout)
+            .context(err_msg)
+            .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 
         if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
             return Ok(None);
@@ -533,7 +562,7 @@ impl PythonInterpreter {
             target: target.clone(),
             executable: executable.as_ref().to_path_buf(),
             ext_suffix: message.ext_suffix,
-            interpreter: interpreter,
+            interpreter,
             abi_tag: message.abi_tag,
         }))
     }
@@ -582,7 +611,8 @@ impl fmt::Display for PythonInterpreter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Python {}.{}{} at {}",
+            "{} {}.{}{} at {}",
+            self.interpreter,
             self.major,
             self.minor,
             self.abiflags,

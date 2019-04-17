@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+ * Basic pypy support by ijl [#105](https://github.com/PyO3/pyo3-pack/pull/105)
+
 ### Removed
 
  * Python 2 support

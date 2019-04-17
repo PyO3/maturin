@@ -239,7 +239,6 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
 /// released, which won't be too soon)
 fn find_all_unix() -> Vec<String> {
     let interpreter = &[
-        "python2.7",
         "python3.5",
         "python3.6",
         "python3.7",
@@ -270,7 +269,7 @@ pub struct PythonInterpreter {
     /// Python's minor version
     pub minor: usize,
     /// For linux and mac, this contains the value of the abiflags, e.g. "m"
-    /// for python3.5m or "mu" for python2.7mu. On windows, the value is
+    /// for python3.5m or "dm" for python3.6dm. On windows, the value is
     /// always "".
     ///
     /// See PEP 261 and PEP 393 for details

@@ -37,7 +37,7 @@ toml = "0.5.0"
 zip = "0.5.2"
 serde = { version = "1.0.90", features = ["derive"] }
 human-panic = { version = "1.0.1", optional = true }
-regex = "1.1.5"
+regex = "1.1.6"
 indicatif = "0.11.0"
 atty = "0.2.11"
 tempfile = "3.0.7"

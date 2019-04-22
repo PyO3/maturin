@@ -1023,7 +1023,7 @@ dependencies = [
  "pretty_env_logger 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "rpassword 3.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rpassword 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.90 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "rpassword"
-version = "3.0.1"
+version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2115,7 +2115,7 @@ dependencies = [
 "checksum reqwest 0.9.13 (registry+https://github.com/rust-lang/crates.io-index)" = "3c4ef83e0beb14bfe38b9f01330a5bc8e965a9f9628690aa28383746dac1e925"
 "checksum ring 0.14.6 (registry+https://github.com/rust-lang/crates.io-index)" = "426bc186e3e95cac1e4a4be125a4aca7e84c2d616ffc02244eef36e2a60a093c"
 "checksum rpassword 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d37473170aedbe66ffa3ad3726939ba677d83c646ad4fd99e5b4bc38712f45ec"
-"checksum rpassword 3.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2e666b2d20d009567502170c786aa4d7089204c18b739a68a861c8f9b2206401"
+"checksum rpassword 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c34fa7bcae7fca3c8471e8417088bbc3ad9af8066b0ecf4f3c0d98a0d772716e"
 "checksum rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)" = "f76d05d3993fd5f4af9434e8e436db163a12a9d40e1a58a726f27a01dfd12a2a"
 "checksum rust-gmp 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4cd7d57377b309a73f69e164109203aa9ab3fee6ea68ac5fb76e2edb50662e9b"
 "checksum rustc-demangle 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "adacaae16d02b6ec37fdc7acfcddf365978de76d1983d3ee22afc260e1ca9619"

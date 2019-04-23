@@ -1,8 +1,8 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
 name = "get-fourtytwo"
-version = "2.0.1"
-description = "This implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
+version = "2.1.0"
+description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
 readme = "Readme.md"
 edition = "2018"
 
@@ -11,7 +11,7 @@ get_42 = "get_fourtytwo:DummyClass.get_42"
 
 [dependencies]
 # TODO: Remove this once pypy suppport is merged and released
-pyo3 = { git = "https://github.com/omerbenamram/pyo3", branch = "master-pypy", features = ["extension-module"] }
+pyo3 = { git = "https://github.com/pyo3/pyo3", rev = "f8bf2586026a70233e570a2b12f53f409955754f", features = ["extension-module"] }
 
 [lib]
 name = "get_fourtytwo"

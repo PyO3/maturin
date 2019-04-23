@@ -24,7 +24,7 @@ dependencies = [
 
 [[package]]
 name = "get-fourtytwo"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "pyo3 0.6.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

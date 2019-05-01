@@ -117,7 +117,8 @@ impl BuildContext {
             let wheel_path = builder.finish()?;
 
             println!(
-                "📦 Built wheel for python {}.{}{} to {}",
+                "📦 Built wheel for {} {}.{}{} to {}",
+                python_version.interpreter,
                 python_version.major,
                 python_version.minor,
                 python_version.abiflags,

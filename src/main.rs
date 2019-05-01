@@ -235,7 +235,7 @@ fn run() -> Result<(), Error> {
                         return Ok(());
                     }
                     Err(UploadError::AuthenticationError) if reenter => {
-                        println!("❌ Username and/or password are wrong");
+                        println!("⛔ Username and/or password are wrong");
 
                         #[cfg(feature = "keyring")]
                         {
@@ -268,7 +268,7 @@ fn run() -> Result<(), Error> {
                     Err(UploadError::AuthenticationError) => {
                         bail!("Username and/or password are wrong");
                     }
-                    Err(err) => return Err(err).context("Failed to upload")?,
+                    Err(err) => return Err(err).context("💥 Failed to upload")?,
                 }
             }
         }

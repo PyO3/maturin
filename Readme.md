@@ -8,7 +8,7 @@
 
 Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages.
 
-This project was meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 3.5+ on windows, linux and mac and can upload them to [pypi](https://pypi.org/).
+This project was meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 3.5+ on windows, linux and mac, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
 
 ## Usage
 
@@ -96,6 +96,10 @@ docker run --rm -v $(pwd):/io konstin2/pyo3-pack build
 ```
 
 pyo3-pack itself is manylinux compliant when compiled for the musl target. The binaries on the release pages have additional keyring integration (through the `password-storage` feature), which is not manylinux compliant.
+
+## PyPy
+
+pyo3-pack can build wheels for pypy with pyo3. Note that pypy support in pyo3 is unreleased as of this writing. Also note that pypy [is not compatible with manylinux1](https://github.com/antocuni/pypy-wheels#why-not-manylinux1-wheels) and you can't publish pypy wheel to pypi pypy has been only tested manually and on linux. See [#115](https://github.com/PyO3/pyo3-pack/issues/115) for more details.
 
 ### Build
 

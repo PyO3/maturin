@@ -26,9 +26,9 @@ base64 = "0.10.1"
 cargo_metadata = "0.7.4"
 digest = { version = "0.8.0", features = ["std"] }
 failure = "0.1.5"
-keyring = { version = "0.6.1", optional = true }
-reqwest = { version = "0.9.13", optional = true, default-features = false }
-rpassword = { version = "3.0.1", optional = true }
+keyring = { version = "0.7.0", optional = true }
+reqwest = { version = "0.9.15", optional = true, default-features = false }
+rpassword = { version = "3.0.2", optional = true }
 serde_json = "1.0.39"
 sha2 = "0.8.0"
 structopt = "0.2.15"
@@ -37,7 +37,7 @@ toml = "0.5.0"
 zip = "0.5.2"
 serde = { version = "1.0.90", features = ["derive"] }
 human-panic = { version = "1.0.1", optional = true }
-regex = "1.1.5"
+regex = "1.1.6"
 indicatif = "0.11.0"
 atty = "0.2.11"
 tempfile = "3.0.7"
@@ -48,7 +48,7 @@ shlex = "0.1.1"
 cbindgen = "0.8.3"
 
 [dev-dependencies]
-indoc = "0.3.1"
+indoc = "0.3.3"
 
 [features]
 default = ["auditwheel", "log", "upload", "rustls"]

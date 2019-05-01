@@ -10,7 +10,7 @@ edition = "2018"
 get_42 = "get_fourtytwo:DummyClass.get_42"
 
 [dependencies]
-pyo3 = "0.7.0-alpha.1"
+pyo3 = { version = "0.7.0-alpha.1", features = ["extension-module"] }
 
 [lib]
 name = "get_fourtytwo"

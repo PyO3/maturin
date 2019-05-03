@@ -170,7 +170,7 @@ pub fn compile(
     let mut progress_plan = get_progress_plan(&shared_args);
 
     if progress_plan.is_some() {
-        // We have out own progess bar, so we don't need cargo's bar
+        // We have our own progess bar, so we don't need cargo's bar
         cargo_args.push("--quiet");
     }
 

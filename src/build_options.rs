@@ -7,10 +7,10 @@ use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
-use cargo_metadata::{Metadata, MetadataCommand};
+use cargo_metadata::{Metadata, MetadataCommand, Node};
 use failure::{bail, err_msg, format_err, Error, ResultExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -195,13 +195,14 @@ impl BuildOptions {
 
 /// Tries to determine the [BridgeModel] for the target crate
 pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel, Error> {
-    let deps: HashSet<String> = cargo_metadata
+    let nodes = cargo_metadata
         .resolve
         .clone()
-        .unwrap()
-        .nodes
+        .ok_or_else(|| format_err!("Expected to get a dependency graph from cargo"))?
+        .nodes;
+    let deps: HashMap<String, Node> = nodes
         .iter()
-        .map(|node| cargo_metadata[&node.id].name.clone())
+        .map(|node| (cargo_metadata[&node.id].name.clone(), node.clone()))
         .collect();
 
     if let Some(bindings) = bridge {
@@ -210,7 +211,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else if bindings == "bin" {
             Ok(BridgeModel::Bin)
         } else {
-            if !deps.contains(bindings) {
+            if !deps.contains_key(bindings) {
                 bail!(
                     "The bindings crate {} was not found in the dependencies list",
                     bindings
@@ -219,10 +220,19 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             Ok(BridgeModel::Bindings(bindings.to_string()))
         }
-    } else if deps.contains("pyo3") {
+    } else if let Some(node) = deps.get("pyo3") {
         println!("🔗 Found pyo3 bindings");
+        if !node.features.contains(&"extension-module".to_string()) {
+            let version = cargo_metadata[&node.id].version.to_string();
+            println!(
+                "⚠  Warning: You're building a library without activating pyo3's \
+                 `extension-module` feature. \
+                 See https://pyo3.rs/{}/building-and-distribution.html#linking",
+                version
+            );
+        }
         Ok(BridgeModel::Bindings("pyo3".to_string()))
-    } else if deps.contains("cpython") {
+    } else if deps.contains_key("cpython") {
         println!("🔗 Found rust-cpython bindings");
         Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {

@@ -69,6 +69,8 @@ pub struct BuildContext {
     pub interpreter: Vec<PythonInterpreter>,
     /// Cargo.toml as resolved by [cargo_metadata]
     pub cargo_metadata: Metadata,
+    /// The path to an already compiled binding
+    pub artifact: Option<PathBuf>,
 }
 
 impl BuildContext {
@@ -100,7 +102,10 @@ impl BuildContext {
     ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         let mut wheels = Vec::new();
         for python_version in &self.interpreter {
-            let artifact = self.compile_cdylib(Some(&python_version))?;
+            let artifact = match self.artifact.clone() {
+                Some(artifact) => artifact,
+                None => self.compile_cdylib(None)?,
+            };
 
             let tag = python_version.get_tag(&self.manylinux);
 
@@ -173,7 +178,10 @@ impl BuildContext {
 
     /// Builds a wheel with cffi bindings
     pub fn build_cffi_wheel(&self) -> Result<PathBuf, Error> {
-        let artifact = self.compile_cdylib(None)?;
+        let artifact = match self.artifact.clone() {
+            Some(artifact) => artifact,
+            None => self.compile_cdylib(None)?,
+        };
 
         let (tag, tags) = self.get_unversal_tags();
 

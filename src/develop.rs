@@ -39,6 +39,7 @@ pub fn develop(
         bindings,
         manifest_path: manifest_file.to_path_buf(),
         out: None,
+        artifact_path: None,
         skip_auditwheel: false,
         target: None,
         cargo_extra_args,

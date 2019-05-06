@@ -59,6 +59,10 @@ pub struct BuildOptions {
     /// directory in the project's target directory
     #[structopt(short, long, parse(from_os_str))]
     pub out: Option<PathBuf>,
+    /// A path to an already compiled artifact. If provided this will be used instead of
+    /// the output from running Cargo.
+    #[structopt(short, long, parse(from_os_str))]
+    pub artifact_path: Option<PathBuf>,
     /// [deprecated, use --manylinux instead] Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
@@ -85,6 +89,7 @@ impl Default for BuildOptions {
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
             out: None,
+            artifact_path: None,
             skip_auditwheel: false,
             target: None,
             cargo_extra_args: Vec::new(),
@@ -181,6 +186,7 @@ impl BuildOptions {
             scripts,
             module_name,
             manifest_path: self.manifest_path,
+            artifact: self.artifact_path,
             out: wheel_dir,
             release,
             strip,

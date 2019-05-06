@@ -10,6 +10,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
 use serde_json;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
@@ -272,4 +274,44 @@ pub fn compile(
     }
 
     Ok(artifacts)
+}
+
+/// Checks that the native library contains a function called `PyInit_<module name>` and warns
+/// if it's missing.
+///
+/// That function is the python's entrypoint for loading native extensions, i.e. python will fail
+/// to import the module with error if it's missing or named incorrectly
+///
+/// Currently the check is only run on linux
+pub fn warn_missing_py_init(artifact: &PathBuf, module_name: &str) -> Result<(), Error> {
+    let py_init = format!("PyInit_{}", module_name);
+    let mut fd = File::open(&artifact)?;
+    let mut buffer = Vec::new();
+    fd.read_to_end(&mut buffer)?;
+    let mut found = false;
+    match goblin::Object::parse(&buffer)? {
+        goblin::Object::Elf(elf) => {
+            for dyn_sym in elf.dynsyms.iter() {
+                if py_init == elf.dynstrtab[dyn_sym.st_name] {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        _ => {
+            // Currently, only linux is implemented
+            found = true
+        }
+    }
+
+    if !found {
+        println!(
+            "⚠  Warning: Couldn't find the symbol `{}` in the native library. \
+             Python will fail to import this module. \
+             If you're using pyo3, check that `#[pymodule]` uses `{}` as module name",
+            py_init, module_name
+        )
+    }
+
+    Ok(())
 }

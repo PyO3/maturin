@@ -1,6 +1,7 @@
 #[cfg(feature = "auditwheel")]
 use crate::auditwheel::auditwheel_rs;
 use crate::compile;
+use crate::compile::warn_missing_py_init;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use crate::Manylinux;
@@ -100,7 +101,7 @@ impl BuildContext {
     ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         let mut wheels = Vec::new();
         for python_version in &self.interpreter {
-            let artifact = self.compile_cdylib(Some(&python_version))?;
+            let artifact = self.compile_cdylib(Some(&python_version), Some(&self.module_name))?;
 
             let tag = python_version.get_tag(&self.manylinux);
 
@@ -137,9 +138,13 @@ impl BuildContext {
 
     /// Runs cargo build, extracts the cdylib from the output, runs auditwheel and returns the
     /// artifact
+    ///
+    /// The module name is used to warn about missing a `PyInit_<module name>` function for
+    /// bindings modules.
     pub fn compile_cdylib(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
+        module_name: Option<&str>,
     ) -> Result<PathBuf, Error> {
         let artifacts = compile(&self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
@@ -159,6 +164,11 @@ impl BuildContext {
         auditwheel_rs(&artifact, target, &self.manylinux)
             .context("Failed to ensure manylinux compliance")?;
 
+        if let Some(module_name) = module_name {
+            warn_missing_py_init(&artifact, module_name)
+                .context("Failed to parse the native library")?;
+        }
+
         Ok(artifact)
     }
 
@@ -173,7 +183,7 @@ impl BuildContext {
 
     /// Builds a wheel with cffi bindings
     pub fn build_cffi_wheel(&self) -> Result<PathBuf, Error> {
-        let artifact = self.compile_cdylib(None)?;
+        let artifact = self.compile_cdylib(None, None)?;
 
         let (tag, tags) = self.get_unversal_tags();
 

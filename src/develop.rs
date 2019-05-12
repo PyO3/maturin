@@ -65,7 +65,7 @@ pub fn develop(
             fs::copy(artifact, bin_path)?;
         }
         BridgeModel::Cffi => {
-            let artifact = build_context.compile_cdylib(None).context(context)?;
+            let artifact = build_context.compile_cdylib(None, None).context(context)?;
 
             write_cffi_module(
                 &mut builder,
@@ -77,7 +77,7 @@ pub fn develop(
         }
         BridgeModel::Bindings(_) => {
             let artifact = build_context
-                .compile_cdylib(Some(&interpreter))
+                .compile_cdylib(Some(&interpreter), Some(&build_context.module_name))
                 .context(context)?;
 
             write_bindings_module(

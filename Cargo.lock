@@ -1142,7 +1142,7 @@ dependencies = [
  "structopt 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "target_info 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zip 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2285,7 +2285,7 @@ dependencies = [
 "checksum tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "2910970404ba6fa78c5539126a9ae2045d62e3713041e447f695f41405a120c6"
 "checksum tokio-trace-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "350c9edade9830dc185ae48ba45667a445ab59f6167ef6d0254ec9d2430d9dd3"
 "checksum toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
-"checksum toml 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "87c5890a989fa47ecdc7bcb4c63a77a82c18f306714104b1decfd722db17b39e"
+"checksum toml 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b8c96d7873fa7ef8bdeb3a9cda3ac48389b4154f32b9803b4bc26220b677b039"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum try_from 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "283d3b89e1368717881a9d51dad843cc435380d8109c9e47d38780a324698d8b"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"

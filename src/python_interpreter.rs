@@ -1,6 +1,6 @@
 use crate::Manylinux;
 use crate::Target;
-use failure::{bail, Error, Fail, ResultExt};
+use failure::{bail, format_err, Error, Fail, ResultExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -41,8 +41,8 @@ fn windows_interpreter_no_build(
     target_width: usize,
     pointer_width: usize,
 ) -> bool {
-    // Don't use python 2.6
-    if major == 2 && minor != 7 {
+    // Python 2 support has been dropped
+    if major == 2 {
         return true;
     }
 
@@ -303,14 +303,10 @@ pub struct PythonInterpreter {
     ///
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
     pub executable: PathBuf,
-
     /// Suffix to use for extension modules as given by sysconfig.
-    // TODO: After dropping python 2, we can make this field mandatory
     pub ext_suffix: Option<String>,
-
     /// cpython or pypy
     pub interpreter: Interpreter,
-
     /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
     ///
     /// Note that this always `None` on windows
@@ -321,8 +317,6 @@ pub struct PythonInterpreter {
 /// additional sanity checks.
 ///
 /// The rules are as follows:
-///  - python 2 + Unix: Assemble the individual parts (m/u/d), no ABIFLAGS
-///  - python 2 + Windows: no ABIFLAGS, parts, return an empty string
 ///  - python 3 + Unix: Use ABIFLAGS
 ///  - python 3 + Windows: No ABIFLAGS, return an empty string
 fn fun_with_abiflags(
@@ -344,49 +338,34 @@ fn fun_with_abiflags(
         )
     }
 
-    if message.major == 2 {
-        let mut abiflags = String::new();
-        if message.m {
-            abiflags += "m";
-        }
-        if message.u {
-            abiflags += "u";
-        }
-        if message.d {
-            abiflags += "d";
-        }
+    if message.major != 3 || message.minor < 5 {
+        bail!(
+            "Only python python >= 3.5 is supported, while your using python {}.{}",
+            message.major,
+            message.minor
+        );
+    }
 
+    if target.is_windows() {
         if message.abiflags.is_some() {
-            bail!("A python 2 interpreter does not define abiflags in its sysconfig ಠ_ಠ")
-        }
-
-        if abiflags != "" && target.is_windows() {
             bail!(
-                "A python 2 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ"
+                "A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ"
             )
-        }
-
-        Ok(abiflags)
-    } else if message.major == 3 && message.minor >= 5 {
-        if target.is_windows() {
-            if message.abiflags.is_some() {
-                bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
-            } else {
-                Ok("".to_string())
-            }
-        } else if let Some(ref abiflags) = message.abiflags {
-            if abiflags != "m" {
-                bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
-            }
-            Ok(abiflags.clone())
-        } else if message.interpreter == "pypy" {
-            // pypy does not specify abi flags
-            Ok("".to_string())
         } else {
-            bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
+            Ok("".to_string())
         }
+    } else if let Some(ref abiflags) = message.abiflags {
+        if abiflags != "m" {
+            bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
+        }
+        Ok(abiflags.clone())
+    } else if message.interpreter == "pypy" {
+        // pypy does not specify abi flags
+        Ok("".to_string())
     } else {
-        bail!("Only python 2.7 and python 3.x are supported");
+        bail!(
+            "A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ"
+        )
     }
 }
 
@@ -446,7 +425,7 @@ impl PythonInterpreter {
     ///
     /// For CPython, generate extensions as follows:
     ///
-    /// For python 2, it's just `.so`. For python 3, there is PEP 3149, but
+    /// For python 3, there is PEP 3149, but
     /// that is only valid for 3.2 - 3.4. Since only 3.5+ is supported, the
     /// templates are adapted from the (also
     /// incorrect) release notes of CPython 3.5:
@@ -457,11 +436,6 @@ impl PythonInterpreter {
     /// Windows: steinlaus.cp35-win_amd64.pyd
     /// Mac:     steinlaus.cpython-35m-darwin.so
     ///
-    /// Examples for 64-bit on CPython 2.7mu:
-    /// Linux:   steinlaus.so
-    /// Windows: steinlaus.pyd
-    /// Mac:     steinlaus.so
-    ///
     /// For pypy3, we read sysconfig.get_config_var("EXT_SUFFIX").
     ///
     /// The pypy3 value appears to be wrong for Windows: instead of
@@ -469,13 +443,6 @@ impl PythonInterpreter {
     pub fn get_library_extension(&self) -> String {
         match self.interpreter {
             Interpreter::CPython => {
-                if self.major == 2 {
-                    if self.target.is_unix() {
-                        return ".so".to_string();
-                    } else {
-                        return ".pyd".to_string();
-                    }
-                }
                 let platform = self.target.get_shared_platform_tag();
 
                 if self.target.is_unix() {
@@ -552,8 +519,10 @@ impl PythonInterpreter {
             }
         };
 
-        let abiflags = fun_with_abiflags(&message, &target)
-            .context("Failed to get information from the python interpreter")?;
+        let abiflags = fun_with_abiflags(&message, &target).context(format_err!(
+            "Failed to get information from the python interpreter at {}",
+            executable.as_ref().display()
+        ))?;
 
         Ok(Some(PythonInterpreter {
             major: message.major,

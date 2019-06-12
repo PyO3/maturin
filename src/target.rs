@@ -181,45 +181,26 @@ impl Target {
 
     /// Returns the path to the python executable inside a venv
     pub fn get_venv_python(&self, venv_base: impl AsRef<Path>) -> PathBuf {
-        let message = "expected python to be the venv";
         if self.is_windows() {
-            venv_base
-                .as_ref()
-                .join("Scripts")
-                .join("python.exe")
-                .canonicalize()
-                .expect(message)
+            venv_base.as_ref().join("Scripts").join("python.exe")
         } else {
-            venv_base
-                .as_ref()
-                .join("bin")
-                .join("python")
-                .canonicalize()
-                .expect(message)
+            venv_base.as_ref().join("bin").join("python")
         }
     }
 
     /// Returns the directory where the binaries are stored inside a venv
     pub fn get_venv_bin_dir(&self, venv_base: impl AsRef<Path>) -> PathBuf {
-        let message = "expected the venv to contain a folder for the binaries";
         if self.is_windows() {
-            venv_base
-                .as_ref()
-                .join("Scripts")
-                .canonicalize()
-                .expect(message)
+            venv_base.as_ref().join("Scripts")
         } else {
-            venv_base
-                .as_ref()
-                .join("bin")
-                .canonicalize()
-                .expect(message)
+            venv_base.as_ref().join("bin")
         }
     }
 
     /// Returns the path to the python executable
     ///
-    /// For windows it's always python.exe for unix it's 1. venv's python 2. python3
+    /// For windows it's always python.exe for unix it's first the venv's `python`
+    /// and then `python3`
     pub fn get_python(&self) -> PathBuf {
         if self.is_windows() {
             PathBuf::from("python.exe")

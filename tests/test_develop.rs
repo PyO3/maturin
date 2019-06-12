@@ -1,37 +1,46 @@
-use crate::common::check_installed;
+use crate::common::{check_installed, handle_result};
+use failure::Error;
+use failure::ResultExt;
 use pyo3_pack::{develop, Target};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
-
 mod common;
 
 #[test]
 fn test_develop_get_fourtytwo() {
-    test_develop(Path::new("get-fourtytwo"), None);
+    handle_result(test_develop(Path::new("get-fourtytwo"), None));
 }
 
 #[test]
 fn test_develop_points() {
-    test_develop(Path::new("points"), Some("cffi".to_string()));
+    handle_result(test_develop(Path::new("points"), Some("cffi".to_string())));
 }
 
 #[test]
 fn test_develop_hello_world() {
-    test_develop(Path::new("hello-world"), Some("bin".to_string()));
+    handle_result(test_develop(
+        Path::new("hello-world"),
+        Some("bin".to_string()),
+    ));
 }
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "pyo3-pack develop" to install it and checks it is working
-fn test_develop(package: &Path, bindings: Option<String>) {
-    let venv_dir = package.join("venv_develop");
-    let target = Target::from_target_triple(None).unwrap();
+fn test_develop(package: &Path, bindings: Option<String>) -> Result<(), Error> {
+    let venv_dir = package
+        .canonicalize()
+        .context("package dir doesn't exist")?
+        .join("venv_develop");
+    let target = Target::from_target_triple(None)?;
 
     if venv_dir.is_dir() {
-        fs::remove_dir_all(&venv_dir).unwrap();
+        fs::remove_dir_all(&venv_dir)?;
     }
-    let output = Command::new("virtualenv")
+    let output = Command::new("python3")
+        .arg("-m")
+        .arg("venv")
         .arg(&venv_dir)
         .stderr(Stdio::inherit())
         .output()
@@ -49,10 +58,9 @@ fn test_develop(package: &Path, bindings: Option<String>) {
 
     let output = Command::new(&python)
         .args(&["-m", "pip", "install", "cffi"])
-        .output()
-        .unwrap();
+        .output()?;
     if !output.status.success() {
-        panic!(output.status);
+        panic!("Failed to install cffi: {}", output.status);
     }
 
     let manifest_file = package.join("Cargo.toml");
@@ -64,8 +72,8 @@ fn test_develop(package: &Path, bindings: Option<String>) {
         &venv_dir,
         false,
         false,
-    )
-    .unwrap();
+    )?;
 
-    check_installed(&package, &python).unwrap();
+    check_installed(&package, &python)?;
+    Ok(())
 }

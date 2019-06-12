@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
  * Python 2 support
+ * The custom progress bar was removed and cargo's output is shown instead
 
 ## [0.5.0]
 

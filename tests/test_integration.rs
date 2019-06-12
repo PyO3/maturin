@@ -61,18 +61,18 @@ fn test_integration(package: &Path, bindings: Option<String>) -> Result<(), Erro
 
     let package_string = package.join("Cargo.toml").display().to_string();
 
-    // The first string is ignored by clap
-    let cli = if let Some(ref bindings) = bindings {
-        vec![
-            "build",
-            "--manifest-path",
-            &package_string,
-            "--bindings",
-            bindings,
-        ]
-    } else {
-        vec!["build", "--manifest-path", &package_string]
-    };
+    // The first argument is ignored by clap
+    let mut cli = vec![
+        "build",
+        "--manifest-path",
+        &package_string,
+        "--cargo-extra-args='--quiet'",
+    ];
+
+    if let Some(ref bindings) = bindings {
+        cli.push("--bindings");
+        cli.push(bindings);
+    }
 
     let options = BuildOptions::from_iter_safe(cli)?;
 
@@ -180,18 +180,18 @@ fn test_integration_conda(package: &Path, bindings: Option<String>) -> Result<()
     create_conda_env("A-pyo3-build-env-36", 3, 6);
     create_conda_env("A-pyo3-build-env-37", 3, 7);
 
-    // The first string is ignored by clap
-    let cli = if let Some(ref bindings) = bindings {
-        vec![
-            "build",
-            "--manifest-path",
-            &package_string,
-            "--bindings",
-            bindings,
-        ]
-    } else {
-        vec!["build", "--manifest-path", &package_string]
-    };
+    // The first argument is ignored by clap
+    let mut cli = vec![
+        "build",
+        "--manifest-path",
+        &package_string,
+        "--cargo-extra-args='--quiet'",
+    ];
+
+    if let Some(ref bindings) = bindings {
+        cli.push("--bindings");
+        cli.push(bindings);
+    }
 
     let options = BuildOptions::from_iter_safe(cli)?;
 

@@ -8,6 +8,7 @@ use std::process::Command;
 use std::process::Stdio;
 mod common;
 
+#[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
 fn test_develop_get_fourtytwo() {
     handle_result(test_develop(Path::new("get-fourtytwo"), None));

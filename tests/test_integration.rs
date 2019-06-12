@@ -27,11 +27,13 @@ fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
     }
 }
 
+#[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
 fn test_integration_get_fourtytwo() {
     handle_result(test_integration(Path::new("get-fourtytwo"), None));
 }
 
+#[cfg(not(feature = "skip-nightly-tests"))]
 #[cfg(target_os = "windows")]
 #[test]
 fn test_integration_get_fourtytwo_conda() {

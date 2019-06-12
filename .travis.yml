@@ -17,9 +17,11 @@ addons:
       - musl-tools
       - fakeroot
       - python3.5-dev
+      - python3.5-venv
       - python3.6-dev
       - python3.6-venv
       - python3.7-dev
+      - python3.7-venv
 
 matrix:
   fast_finish: true
@@ -83,9 +85,8 @@ install:
     if [ "$TRAVIS_OS_NAME" == "osx" ]; then
       brew update
       brew upgrade pyenv
-      pyenv install 2.7
       pyenv install 3.6.6
-      pyenv global system 2.7 3.6.6
+      pyenv global system 3.6.6
       python3.6 -m pip install cffi virtualenv
     fi
   - |
@@ -97,7 +98,7 @@ install:
 
 script:
   - cargo fmt --all -- --check
-  - if [ "$TRAVIS_RUST_VERSION" == "nightly-2019-05-04" ]; then cargo clippy -- -D warnings; fi # TODO: Remove once the fix for redundant closures in macros is published
+  - cargo clippy -- -D warnings
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
   - if [ "$TRAVIS_RUST_VERSION" == "nightly-2019-05-04" ]; then cargo test -- --nocapture; fi
 

@@ -136,22 +136,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>, Error> {
-    // Some stringly typing to satisfy the borrow checker
-    let python_feature = match python_interpreter {
-        Some(python_interpreter) => format!(
-            "{}/python{}",
-            bindings_crate.unwrap_bindings(),
-            python_interpreter.major
-        ),
-        None => "".to_string(),
-    };
-
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
-
-    if *bindings_crate == BridgeModel::Bindings("pyo3".to_string()) && python_feature != "" {
-        // This is a workaround for a bug in pyo3's build.rs
-        shared_args.extend(&["--features", &python_feature]);
-    }
 
     // We need to pass --bins / --lib to set the rustc extra args later
     // TODO: What do we do when there are multiple bin targets?

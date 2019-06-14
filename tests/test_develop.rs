@@ -68,7 +68,7 @@ fn test_develop(package: &Path, bindings: Option<String>) -> Result<(), Error> {
     develop(
         bindings,
         &manifest_file,
-        vec![],
+        vec!["--quiet".to_string()],
         vec![],
         &venv_dir,
         false,

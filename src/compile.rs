@@ -1,14 +1,8 @@
 use crate::build_context::BridgeModel;
 use crate::BuildContext;
 use crate::PythonInterpreter;
-use atty;
-use atty::Stream;
 use cargo_metadata;
-use cargo_metadata::Message;
-use failure::{bail, format_err, Error, ResultExt};
-use indicatif::{ProgressBar, ProgressStyle};
-use serde::Deserialize;
-use serde_json;
+use failure::{bail, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -16,121 +10,9 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
 
-#[derive(Deserialize, Debug, Clone)]
-struct BuildPlanEntry {
-    package_name: String,
-    program: String,
-}
-
-/// The (abbreviated) format of `cargo build --build-plan`
-/// For the real thing, see
-/// https://github.com/rust-lang/cargo/blob/master/src/cargo/core/compiler/build_plan.rs
-#[derive(Deserialize, Debug, Clone)]
-struct SerializedBuildPlan {
-    invocations: Vec<BuildPlanEntry>,
-}
-
-/// Queries the number of tasks through the build plan. This only works on
-/// nightly, but that isn't a problem, since pyo3 also only works on nightly
-fn get_build_plan(shared_args: &[&str]) -> Result<SerializedBuildPlan, Error> {
-    let build_plan_args = &[
-        "+nightly",
-        "build",
-        "-Z",
-        "unstable-options",
-        "--build-plan",
-    ];
-
-    let command_formatted = ["cargo"]
-        .iter()
-        .chain(build_plan_args)
-        .chain(shared_args)
-        .map(ToString::to_string)
-        .collect::<Vec<String>>()
-        .join(" ");
-
-    let build_plan = Command::new("cargo")
-        // Eventually we want to get rid of the nightly, but for now it's required because
-        // the rust-toolchain file is ignored
-        .args(build_plan_args)
-        .args(shared_args)
-        .output()
-        .context(format_err!(
-            "Failed to get a build plan from cargo with `{}`",
-            command_formatted
-        ))?;
-
-    if !build_plan.status.success() {
-        bail!(
-            "Failed to get a build plan from cargo with '{}': `{}`",
-            build_plan.status,
-            command_formatted
-        );
-    }
-
-    let plan: SerializedBuildPlan = serde_json::from_slice(&build_plan.stdout)
-        .context("The build plan has an invalid format")?;
-    Ok(plan)
-}
-
-fn get_progress_plan(shared_args: &[&str]) -> Option<(ProgressBar, Vec<String>)> {
-    if atty::is(Stream::Stderr) {
-        match get_build_plan(shared_args) {
-            Ok(build_plan) => {
-                let packages: Vec<String> = build_plan
-                    .invocations
-                    .iter()
-                    .map(|x| x.package_name.clone())
-                    .collect();
-
-                let progress_bar = ProgressBar::new(packages.len() as u64);
-                progress_bar.set_style(
-                    ProgressStyle::default_bar()
-                        .template("[{bar:60}] {pos:>3}/{len:3} {msg}")
-                        .progress_chars("=> "),
-                );
-
-                if let Some(first) = packages.first() {
-                    progress_bar.set_message(first);
-                } else {
-                    eprintln!("⚠ Warning: The build plan is empty ಠ_ಠ");
-                }
-
-                Some((progress_bar, packages))
-            }
-            Err(_) => None,
-        }
-    } else {
-        None
-    }
-}
-
-fn update_progress(progress_plan: &mut Option<(ProgressBar, Vec<String>)>, crate_name: &str) {
-    // The progress bar isn't an exact science and stuff might get out-of-sync,
-    // but that isn't big problem since the bar is only to give the user an estimate
-    if let Some((ref progress_bar, ref mut packages)) = progress_plan {
-        match packages.iter().position(|x| x == crate_name) {
-            Some(pos) => {
-                packages.remove(pos);
-                progress_bar.inc(1);
-            }
-            None => eprintln!(
-                "⚠ Warning: {} was not found in build plan ಠ_ಠ",
-                crate_name
-            ),
-        }
-
-        if let Some(package) = packages.first() {
-            progress_bar.set_message(&package);
-        }
-    }
-}
-
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
-///
-/// Shows a progress bar on a tty
 pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
@@ -151,15 +33,7 @@ pub fn compile(
         shared_args.push("--release");
     }
 
-    let mut cargo_args = vec!["rustc", "--message-format", "json"];
-
-    // Mimicks cargo's -Z compile-progress, just without the long result log
-    let mut progress_plan = get_progress_plan(&shared_args);
-
-    if progress_plan.is_some() {
-        // We have out own progess bar, so we don't need cargo's bar
-        cargo_args.push("--quiet");
-    }
+    let cargo_args = vec!["rustc", "--message-format", "json"];
 
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args
@@ -210,10 +84,9 @@ pub fn compile(
         .take()
         .expect("Cargo build should have a stdout");
     for message in cargo_metadata::parse_messages(stream) {
-        match message.unwrap() {
-            Message::CompilerArtifact(artifact) => {
+        match message.context("Failed to parse message coming from cargo")? {
+            cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let crate_name = &context.cargo_metadata[&artifact.package_id].name;
-                update_progress(&mut progress_plan, crate_name);
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
                 if crate_name == &context.metadata21.name {
@@ -227,23 +100,11 @@ pub fn compile(
                     }
                 }
             }
-            Message::BuildScriptExecuted(script) => {
-                let crate_name = &context.cargo_metadata[&script.package_id].name;
-                update_progress(&mut progress_plan, &crate_name);
-            }
-            Message::CompilerMessage(msg) => {
-                if let Some((ref progress_bar, _)) = progress_plan {
-                    progress_bar.println(msg.message.to_string());
-                } else {
-                    eprintln!("{}", msg.message);
-                }
+            cargo_metadata::Message::CompilerMessage(msg) => {
+                println!("{}", msg.message);
             }
             _ => (),
         }
-    }
-
-    if let Some((ref progress_bar, _)) = progress_plan {
-        progress_bar.finish_and_clear();
     }
 
     let status = cargo_build

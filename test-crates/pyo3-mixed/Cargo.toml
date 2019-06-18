@@ -1,0 +1,17 @@
+[package]
+authors = ["konstin <konstin@mailbox.org>"]
+name = "pyo3-mixed"
+version = "2.1.0"
+description = "Implements a dummy function combining rust and python"
+readme = "Readme.md"
+edition = "2018"
+
+[package.metadata.pyo3-pack.scripts]
+get_42 = "pyo3_pack:get_42"
+
+[dependencies]
+pyo3 = { version = "0.7.0", features = ["extension-module"] }
+
+[lib]
+name = "pyo3_mixed"
+crate-type = ["cdylib"]

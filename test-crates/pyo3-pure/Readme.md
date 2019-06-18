@@ -5,12 +5,12 @@ A package with pyo3 bindings for testing pyo3-pack.
 ## Usage
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ get_fourtytwo
+pip install --index-url https://test.pypi.org/simple/ pyo3_pure
 ```
 
 ```python
-import get_fourtytwo
-assert get_fourtytwo.DummyClass.get_42() == 42
+import pyo3_pure
+assert pyo3_pure.DummyClass.get_42() == 42
 ```
 
 ## Testing

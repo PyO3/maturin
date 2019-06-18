@@ -1,5 +1,5 @@
 use crate::common::{check_installed, handle_result};
-use failure::{bail, Error};
+use failure::{bail, Error, ResultExt};
 use pyo3_pack::{BuildOptions, Target};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -29,21 +29,35 @@ fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
 
 #[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
-fn test_integration_get_fourtytwo() {
-    handle_result(test_integration(Path::new("get-fourtytwo"), None));
+fn test_integration_pyo3_pure() {
+    handle_result(test_integration("test-crates/pyo3-pure", None));
+}
+
+#[cfg(not(feature = "skip-nightly-tests"))]
+#[test]
+fn test_integration_pyo3_mixed() {
+    handle_result(test_integration("test-crates/pyo3-mixed", None));
 }
 
 #[cfg(not(feature = "skip-nightly-tests"))]
 #[cfg(target_os = "windows")]
 #[test]
-fn test_integration_get_fourtytwo_conda() {
-    handle_result(test_integration_conda(Path::new("get-fourtytwo"), None));
+fn test_integration_pyo3_pure_conda() {
+    handle_result(test_integration_conda("text-crates/pyo3-pure", None));
 }
 
 #[test]
-fn test_integration_points() {
+fn test_integration_cffi_pure() {
     handle_result(test_integration(
-        Path::new("points"),
+        "test-crates/cffi-pure",
+        Some("cffi".to_string()),
+    ));
+}
+
+#[test]
+fn test_integration_cffi_mixed() {
+    handle_result(test_integration(
+        "test-crates/cffi-mixed",
         Some("cffi".to_string()),
     ));
 }
@@ -51,17 +65,17 @@ fn test_integration_points() {
 #[test]
 fn test_integration_hello_world() {
     handle_result(test_integration(
-        Path::new("hello-world"),
+        "test-crates/hello-world",
         Some("bin".to_string()),
     ));
 }
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
-fn test_integration(package: &Path, bindings: Option<String>) -> Result<(), Error> {
+fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
     let target = Target::from_target_triple(None)?;
 
-    let package_string = package.join("Cargo.toml").display().to_string();
+    let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
     // The first argument is ignored by clap
     let mut cli = vec![
@@ -82,9 +96,9 @@ fn test_integration(package: &Path, bindings: Option<String>) -> Result<(), Erro
 
     for (filename, supported_version, python_interpreter) in wheels {
         let venv_dir = if supported_version == "py2.py3" {
-            package.canonicalize()?.join("venv_cffi")
+            package.as_ref().canonicalize()?.join("venv_cffi")
         } else {
-            package.canonicalize()?.join(format!(
+            package.as_ref().canonicalize()?.join(format!(
                 "venv{}.{}",
                 supported_version.chars().nth(2usize).unwrap(),
                 supported_version.chars().nth(3usize).unwrap()
@@ -125,14 +139,16 @@ fn test_integration(package: &Path, bindings: Option<String>) -> Result<(), Erro
                 &adjust_canonicalization(filename),
             ])
             .stderr(Stdio::inherit())
-            .output()?;
+            .output()
+            .context("pip install failed")?;
         if !output.status.success() {
             panic!();
         }
 
         let output = Command::new(&python)
             .args(&["-m", "pip", "install", "cffi"])
-            .output()?;
+            .output()
+            .context("pip install cffi failed")?;
         if !output.status.success() {
             panic!(
                 "pip failed: {} \n--- Stdout:\n{}\n--- Stderr:\n{}",
@@ -142,7 +158,7 @@ fn test_integration(package: &Path, bindings: Option<String>) -> Result<(), Erro
             );
         }
 
-        check_installed(&package, &python)?;
+        check_installed(&package.as_ref(), &python)?;
     }
 
     Ok(())
@@ -163,11 +179,14 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 }
 
 #[cfg(target_os = "windows")]
-fn test_integration_conda(package: &Path, bindings: Option<String>) -> Result<(), Error> {
+fn test_integration_conda(
+    package: impl AsRef<Path>,
+    bindings: Option<String>,
+) -> Result<(), Error> {
     use std::env;
     use std::path::PathBuf;
 
-    let package_string = package.join("Cargo.toml").display().to_string();
+    let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
     // Since the python launcher has precedence over conda, we need to deactivate it.
     // We do so by shadowing it with our own hello world binary.
@@ -228,7 +247,7 @@ fn test_integration_conda(package: &Path, bindings: Option<String>) -> Result<()
         if !output.status.success() {
             panic!();
         }
-        check_installed(&package, &executable)?;
+        check_installed(&package.as_ref(), &executable)?;
     }
 
     Ok(())

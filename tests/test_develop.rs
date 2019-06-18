@@ -10,27 +10,45 @@ mod common;
 
 #[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
-fn test_develop_get_fourtytwo() {
-    handle_result(test_develop(Path::new("get-fourtytwo"), None));
+fn test_develop_pyo3_pure() {
+    handle_result(test_develop("test-crates/pyo3-pure", None));
+}
+
+#[cfg(not(feature = "skip-nightly-tests"))]
+#[test]
+fn test_develop_pyo3_mixed() {
+    handle_result(test_develop("test-crates/pyo3-mixed", None));
 }
 
 #[test]
-fn test_develop_points() {
-    handle_result(test_develop(Path::new("points"), Some("cffi".to_string())));
+fn test_develop_cffi_pure() {
+    handle_result(test_develop(
+        "test-crates/cffi-pure",
+        Some("cffi".to_string()),
+    ));
+}
+
+#[test]
+fn test_develop_cffi_mixed() {
+    handle_result(test_develop(
+        "test-crates/cffi-mixed",
+        Some("cffi".to_string()),
+    ));
 }
 
 #[test]
 fn test_develop_hello_world() {
     handle_result(test_develop(
-        Path::new("hello-world"),
+        "test-crates/hello-world",
         Some("bin".to_string()),
     ));
 }
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "pyo3-pack develop" to install it and checks it is working
-fn test_develop(package: &Path, bindings: Option<String>) -> Result<(), Error> {
+fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
     let venv_dir = package
+        .as_ref()
         .canonicalize()
         .context("package dir doesn't exist")?
         .join("venv_develop");
@@ -55,7 +73,7 @@ fn test_develop(package: &Path, bindings: Option<String>) -> Result<(), Error> {
     let python = target.get_venv_python(&venv_dir);
 
     // Ensure the test doesn't wrongly pass
-    check_installed(&package, &python).unwrap_err();
+    check_installed(&package.as_ref(), &python).unwrap_err();
 
     let output = Command::new(&python)
         .args(&["-m", "pip", "install", "cffi"])
@@ -64,7 +82,7 @@ fn test_develop(package: &Path, bindings: Option<String>) -> Result<(), Error> {
         panic!("Failed to install cffi: {}", output.status);
     }
 
-    let manifest_file = package.join("Cargo.toml");
+    let manifest_file = package.as_ref().join("Cargo.toml");
     develop(
         bindings,
         &manifest_file,
@@ -75,6 +93,6 @@ fn test_develop(package: &Path, bindings: Option<String>) -> Result<(), Error> {
         false,
     )?;
 
-    check_installed(&package, &python)?;
+    check_installed(&package.as_ref(), &python)?;
     Ok(())
 }

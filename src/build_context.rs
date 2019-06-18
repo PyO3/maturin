@@ -12,7 +12,7 @@ use cargo_metadata::Metadata;
 use failure::{bail, Context, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,12 +36,46 @@ impl BridgeModel {
     }
 }
 
+/// Whether this project is pure rust or rust mixed with python
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProjectLayout {
+    /// A rust crate compiled into a shared library with only some glue python for cffi
+    PureRust,
+    /// A python package that is extended by a native rust module.
+    ///
+    /// Contains the canonicialized (i.e. absolute) path to the python part of the project
+    Mixed(PathBuf),
+}
+
+impl ProjectLayout {
+    /// Checks whether a python module exists besides Cargo.toml with the right name
+    pub fn determine(
+        project_root: impl AsRef<Path>,
+        module_name: &str,
+    ) -> Result<ProjectLayout, Error> {
+        let python_package_dir = project_root.as_ref().join(module_name);
+        if python_package_dir.is_dir() {
+            if !python_package_dir.join("__init__.py").is_file() {
+                bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
+            }
+
+            println!("🍹 Building a mixed python/rust project");
+
+            Ok(ProjectLayout::Mixed(python_package_dir))
+        } else {
+            Ok(ProjectLayout::PureRust)
+        }
+    }
+}
+
 /// Contains all the metadata required to build the crate
 pub struct BuildContext {
     /// The platform, i.e. os and pointer width
     pub target: Target,
     /// Whether to use cffi or pyo3/rust-cpython
     pub bridge: BridgeModel,
+    /// Whether this project is pure rust or rust mixed with python
+    pub project_layout: ProjectLayout,
     /// Python Package Metadata 2.1
     pub metadata21: Metadata21,
     /// The `[console_scripts]` for the entry_points.txt
@@ -92,7 +126,7 @@ impl BuildContext {
     /// Builds wheels for a Cargo project for all given python versions.
     /// Return type is the same as [BuildContext::build_wheels()]
     ///
-    /// Defaults to 2.7 and 3.{5, 6, 7, 8, 9} if no python versions are given
+    /// Defaults to 3.{5, 6, 7, 8, 9} if no python versions are given
     /// and silently ignores all non-existent python versions.
     ///
     /// Runs [auditwheel_rs()] if not deactivated
@@ -100,12 +134,13 @@ impl BuildContext {
         &self,
     ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
         let mut wheels = Vec::new();
-        for python_version in &self.interpreter {
-            let artifact = self.compile_cdylib(Some(&python_version), Some(&self.module_name))?;
+        for python_interpreter in &self.interpreter {
+            let artifact =
+                self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
 
-            let tag = python_version.get_tag(&self.manylinux);
+            let tag = python_interpreter.get_tag(&self.manylinux);
 
-            let mut builder = WheelWriter::new(
+            let mut writer = WheelWriter::new(
                 &tag,
                 &self.out,
                 &self.metadata21,
@@ -113,23 +148,31 @@ impl BuildContext {
                 &[tag.clone()],
             )?;
 
-            write_bindings_module(&mut builder, &self.module_name, &artifact, &python_version)?;
+            write_bindings_module(
+                &mut writer,
+                &self.project_layout,
+                &self.module_name,
+                &artifact,
+                python_interpreter,
+                false,
+            )
+            .context("Failed to add the files to the wheel")?;
 
-            let wheel_path = builder.finish()?;
+            let wheel_path = writer.finish()?;
 
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
-                python_version.interpreter,
-                python_version.major,
-                python_version.minor,
-                python_version.abiflags,
+                python_interpreter.interpreter,
+                python_interpreter.major,
+                python_interpreter.minor,
+                python_interpreter.abiflags,
                 wheel_path.display()
             );
 
             wheels.push((
                 wheel_path,
-                format!("cp{}{}", python_version.major, python_version.minor),
-                Some(python_version.clone()),
+                format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
+                Some(python_interpreter.clone()),
             ));
         }
 
@@ -192,10 +235,12 @@ impl BuildContext {
 
         write_cffi_module(
             &mut builder,
+            &self.project_layout,
             self.manifest_path.parent().unwrap(),
             &self.module_name,
             &artifact,
             &self.interpreter[0].executable,
+            false,
         )?;
 
         let wheel_path = builder.finish()?;

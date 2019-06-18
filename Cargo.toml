@@ -3,7 +3,7 @@ authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pack"
 version = "0.6.1"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
-exclude = ["get-fourtytwo/**/*", "integration-test/**/*", "sysconfig/*"]
+exclude = ["test-crates/**/*", "integration-test/**/*", "sysconfig/*", "test-data/*"]
 readme = "Readme.md"
 repository = "https://github.com/pyo3/pyo3-pack"
 license = "MIT OR Apache-2.0"
@@ -46,6 +46,7 @@ pretty_env_logger = { version = "0.3.0", optional = true }
 platforms = "0.2.0"
 shlex = "0.1.1"
 cbindgen = "0.8.7"
+walkdir = "2.2.8"
 
 [dev-dependencies]
 indoc = "0.3.3"

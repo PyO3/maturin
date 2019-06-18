@@ -1,5 +1,6 @@
 //! The wheel format is (mostly) specified in PEP 427
 
+use crate::build_context::ProjectLayout;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
 use tempfile::tempdir;
+use walkdir::WalkDir;
 use zip::{self, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
@@ -78,6 +80,18 @@ impl DevelopModuleWriter {
         };
 
         Ok(DevelopModuleWriter { base_path })
+    }
+
+    /// Removes a directory relative to the base path if it exists.
+    ///
+    /// This is to clean up the contents of an older develop call
+    pub fn delete_dir(&self, relative: impl AsRef<Path>) -> Result<(), io::Error> {
+        let absolute = self.base_path.join(relative);
+        if absolute.exists() {
+            fs::remove_dir_all(absolute)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -307,7 +321,10 @@ recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
         .stderr(Stdio::inherit())
         .output()?;
     if !output.status.success() {
-        bail!("Failed to generate cffi declarations");
+        bail!(
+            "Failed to generate cffi declarations using {}",
+            python.display()
+        );
     }
 
     let ffi_py_content = fs::read_to_string(ffi_py)?;
@@ -318,17 +335,29 @@ recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
 /// Copies the shared library into the module, which is the only extra file needed with bindings
 pub fn write_bindings_module(
     writer: &mut impl ModuleWriter,
+    project_layout: &ProjectLayout,
     module_name: &str,
     artifact: &Path,
     python_interpreter: &PythonInterpreter,
+    develop: bool,
 ) -> Result<(), Error> {
-    let so_filename = PathBuf::from(format!(
-        "{}{}",
-        module_name,
-        python_interpreter.get_library_extension()
-    ));
+    let so_filename = python_interpreter.get_library_name(&module_name);
 
-    writer.add_file(&so_filename, &artifact)?;
+    match project_layout {
+        ProjectLayout::Mixed(ref python_module) => {
+            write_python_module(writer, python_module, &module_name)
+                .context("Failed to add the python module to the package")?;
+
+            if develop {
+                fs::copy(&artifact, python_module.join(&so_filename))?;
+            }
+
+            writer.add_file(Path::new(&module_name).join(&so_filename), &artifact)?;
+        }
+        ProjectLayout::PureRust => {
+            writer.add_file(so_filename, &artifact)?;
+        }
+    }
 
     Ok(())
 }
@@ -336,16 +365,38 @@ pub fn write_bindings_module(
 /// Creates the cffi module with the shared library, the cffi declarations and the cffi loader
 pub fn write_cffi_module(
     writer: &mut impl ModuleWriter,
+    project_layout: &ProjectLayout,
     crate_dir: &Path,
     module_name: &str,
     artifact: &Path,
     python: &PathBuf,
+    develop: bool,
 ) -> Result<(), Error> {
-    let module = Path::new(module_name);
+    let cffi_declarations = generate_cffi_declarations(&crate_dir, python)?;
+
+    let module;
+
+    match project_layout {
+        ProjectLayout::Mixed(ref python_module) => {
+            write_python_module(writer, python_module, &module_name)
+                .context("Failed to add the python module to the package")?;
+
+            if develop {
+                let base_path = python_module.join(&module_name);
+                fs::create_dir_all(&base_path)?;
+                fs::copy(&artifact, base_path.join("native.so"))?;
+                File::create(base_path.join("__init__.py"))?
+                    .write_all(cffi_init_file().as_bytes())?;
+                File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
+            }
+
+            module = PathBuf::from(module_name).join(module_name);
+        }
+        ProjectLayout::PureRust => module = PathBuf::from(module_name),
+    };
 
     writer.add_directory(&module)?;
     writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
-    let cffi_declarations = generate_cffi_declarations(&crate_dir, python)?;
     writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
     writer.add_file(&module.join("native.so"), &artifact)?;
 
@@ -373,5 +424,39 @@ pub fn write_bin(
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
     writer.add_bytes_with_permissions(&data_dir.join(bin_name), &buffer, 0o755)?;
+    Ok(())
+}
+
+/// Copies the files from the python module, excluding older versions of the native library
+fn write_python_module(
+    module_writer: &mut impl ModuleWriter,
+    python_module: impl AsRef<Path>,
+    module_name: impl AsRef<Path>,
+) -> Result<(), Error> {
+    for absolute in WalkDir::new(&python_module) {
+        let absolute = absolute?.into_path();
+
+        let relaitve = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;
+
+        // Ignore the cffi folder from develop, if any
+        if relaitve.starts_with(module_name.as_ref().join(&module_name)) {
+            continue;
+        }
+
+        if absolute.is_dir() {
+            module_writer.add_directory(relaitve)?;
+        } else {
+            // Ignore native libraries from develop, if any
+            if let Some(extension) = relaitve.extension() {
+                if extension.to_string_lossy() == "so" {
+                    continue;
+                }
+            }
+            module_writer
+                .add_file(relaitve, &absolute)
+                .context(format!("File to add file from {}", absolute.display()))?;
+        }
+    }
+
     Ok(())
 }

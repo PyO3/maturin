@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds each of the three examples (cffi, binary and pyo3) using the docker
-# container, installs the wheel and checks that the installed package is functional
+# Builds all 5 test crates using the docker container,
+# installs the wheel and checks that the installed package is functional
 
 set -e
 
@@ -12,27 +12,43 @@ source venv-docker/bin/activate
 
 pip install cffi > /dev/null
 
-docker run --rm -v $(pwd)/hello-world:/io pyo3-pack build -b bin
+docker run --rm -v $(pwd)/test-crates/hello-world:/io pyo3-pack build -b bin
 
-pip install hello-world --no-index --find-links hello-world/target/wheels/
+pip install hello-world --no-index --find-links test-crates/hello-world/target/wheels/
 
-if [[ $(python hello-world/check_installed.py) != 'SUCCESS' ]]; then
+if [[ $(python test-crates/hello-world/check_installed/check_installed.py) != 'SUCCESS' ]]; then
   exit 1
 fi
 
-docker run --rm -v $(pwd)/points:/io pyo3-pack build -b cffi
+docker run --rm -v $(pwd)/test-crates/cffi-pure:/io pyo3-pack build -b cffi
 
-pip install points --no-index --find-links points/target/wheels/
+pip install cffi-pure --no-index --find-links test-crates/cffi-pure/target/wheels/
 
-if [[ $(python points/check_installed.py) != 'SUCCESS' ]]; then
+if [[ $(python test-crates/cffi-pure/check_installed/check_installed.py) != 'SUCCESS' ]]; then
   exit 1
 fi
 
-docker run --rm -v $(pwd)/get-fourtytwo:/io pyo3-pack build -i python3.6
+docker run --rm -v $(pwd)/test-crates/cffi-mixed:/io pyo3-pack build -b cffi
 
-pip install get-fourtytwo --no-index --find-links get-fourtytwo/target/wheels/
+pip install cffi-mixed --no-index --find-links test-crates/cffi-mixed/target/wheels/
 
-if [[ $(python points/check_installed.py) != 'SUCCESS' ]]; then
+if [[ $(python test-crates/cffi-mixed/check_installed/check_installed.py) != 'SUCCESS' ]]; then
+  exit 1
+fi
+
+docker run --rm -v $(pwd)/test-crates/pyo3-pure:/io pyo3-pack build -i python3.6
+
+pip install pyo3-pure --no-index --find-links test-crates/pyo3-pure/target/wheels/
+
+if [[ $(python test-crates/pyo3-pure/check_installed/check_installed.py) != 'SUCCESS' ]]; then
+  exit 1
+fi
+
+docker run --rm -v $(pwd)/test-crates/pyo3-mixed:/io pyo3-pack build -i python3.6
+
+pip install pyo3-mixed --no-index --find-links test-crates/pyo3-mixed/target/wheels/
+
+if [[ $(python test-crates/pyo3-mixed/check_installed/check_installed.py) != 'SUCCESS' ]]; then
   exit 1
 fi
 

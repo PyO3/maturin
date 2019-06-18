@@ -421,7 +421,7 @@ impl PythonInterpreter {
         }
     }
 
-    /// Generates the correct suffix for shared libraries
+    /// Generates the correct suffix for shared libraries and adds it to the base name
     ///
     /// For CPython, generate extensions as follows:
     ///
@@ -440,33 +440,38 @@ impl PythonInterpreter {
     ///
     /// The pypy3 value appears to be wrong for Windows: instead of
     /// e.g., ".pypy3-70-x86_64-linux-gnu.so", it is just ".pyd".
-    pub fn get_library_extension(&self) -> String {
+    pub fn get_library_name(&self, base: &str) -> String {
         match self.interpreter {
             Interpreter::CPython => {
                 let platform = self.target.get_shared_platform_tag();
 
                 if self.target.is_unix() {
-                    return format!(
-                        ".cpython-{major}{minor}{abiflags}-{platform}.so",
+                    format!(
+                        "{base}.cpython-{major}{minor}{abiflags}-{platform}.so",
+                        base = base,
                         major = self.major,
                         minor = self.minor,
                         abiflags = self.abiflags,
                         platform = platform,
-                    );
+                    )
                 } else {
-                    return format!(
-                        ".cp{major}{minor}-{platform}.pyd",
+                    format!(
+                        "{base}.cp{major}{minor}-{platform}.pyd",
+                        base = base,
                         major = self.major,
                         minor = self.minor,
                         platform = platform
-                    );
+                    )
                 }
             }
-            Interpreter::PyPy => self
-                .ext_suffix
-                .clone()
-                .expect("PyPy's syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")
-                .to_string(),
+            Interpreter::PyPy => format!(
+                "{base}{ext_suffix}",
+                base = base,
+                ext_suffix = self
+                    .ext_suffix
+                    .clone()
+                    .expect("PyPy's syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")
+            ),
         }
     }
 

@@ -5,9 +5,7 @@ use failure::{format_err, Context, Error, ResultExt};
 
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
-use crate::module_writer::write_bindings_module;
-use crate::module_writer::write_cffi_module;
-use crate::module_writer::DevelopModuleWriter;
+use crate::module_writer::{write_bindings_module, write_cffi_module, DevelopModuleWriter};
 use crate::BuildOptions;
 use crate::Manylinux;
 use crate::PythonInterpreter;
@@ -67,12 +65,16 @@ pub fn develop(
         BridgeModel::Cffi => {
             let artifact = build_context.compile_cdylib(None, None).context(context)?;
 
+            builder.delete_dir(&build_context.module_name)?;
+
             write_cffi_module(
                 &mut builder,
+                &build_context.project_layout,
                 &build_context.manifest_path.parent().unwrap(),
                 &build_context.module_name,
                 &artifact,
                 &interpreter.executable,
+                true,
             )?;
         }
         BridgeModel::Bindings(_) => {
@@ -82,9 +84,11 @@ pub fn develop(
 
             write_bindings_module(
                 &mut builder,
+                &build_context.project_layout,
                 &build_context.module_name,
                 &artifact,
                 &interpreter,
+                true,
             )?;
         }
     }

@@ -6,19 +6,27 @@ use std::str;
 
 /// Check that the package is either not installed or works correctly
 pub fn check_installed(package: &Path, python: &PathBuf) -> Result<(), Error> {
+    let check_installed = Path::new(package)
+        .join("check_installed")
+        .join("check_installed.py");
     let output = Command::new(&python)
-        .arg(Path::new(package).join("check_installed.py"))
+        .arg(check_installed)
         .env("PATH", python.parent().unwrap())
         .output()
         .unwrap();
     if !output.status.success() {
-        bail!("Check install fail: {}", output.status);
+        bail!(
+            "Check install fail: {} \n--- Stdout:\n{}\n--- Stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
     }
 
     let message = str::from_utf8(&output.stdout).unwrap().trim();
 
     if message != "SUCCESS" {
-        panic!();
+        panic!("{}", message);
     }
 
     Ok(())

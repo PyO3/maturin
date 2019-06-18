@@ -1,7 +1,6 @@
-points
 sysconfig
-hello-world
-get-fourtytwo
+test-crates
+test-data
 **/venv*
 **/.tox
 **/.pytest_cache

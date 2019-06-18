@@ -275,7 +275,7 @@ mod test {
 
             [lib]
             crate-type = ["cdylib"]
-            name = "get_fourtytwo"
+            name = "pyo3_pure"
 
             [package.metadata.pyo3-pack.scripts]
             ph = "pyo3_pack:print_hello"

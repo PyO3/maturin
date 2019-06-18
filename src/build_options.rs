@@ -1,4 +1,4 @@
-use crate::build_context::BridgeModel;
+use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cargo_toml::CargoTomlMetadata;
 use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
 use crate::BuildContext;
@@ -101,8 +101,12 @@ impl BuildOptions {
             .canonicalize()
             .context(format_err!("Can't find {}", self.manifest_path.display()))?;
 
-        if !self.manifest_path.is_file() {
-            bail!("{} must be a path to a Cargo.toml", manifest_file.display());
+        if !manifest_file.is_file() {
+            bail!(
+                "{} (resolved to {}) is not the path to a Cargo.toml",
+                self.manifest_path.display(),
+                manifest_file.display()
+            );
         };
         let contents = fs::read_to_string(&manifest_file).context(format!(
             "Can't read Cargo.toml at {}",
@@ -135,6 +139,8 @@ impl BuildOptions {
             .and_then(|lib| lib.name)
             .unwrap_or_else(|| cargo_toml.package.name.clone())
             .to_owned();
+
+        let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
 
         let target = Target::from_target_triple(self.target.clone())?;
 
@@ -177,6 +183,7 @@ impl BuildOptions {
         Ok(BuildContext {
             target,
             bridge,
+            project_layout,
             metadata21,
             scripts,
             module_name,
@@ -236,7 +243,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         println!("🔗 Found rust-cpython bindings");
         Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {
-        bail!("Couldn't find any bindings; Please specify them with -b")
+        bail!("Couldn't find any bindings; Please specify them with --bindings/-b")
     }
 }
 
@@ -318,44 +325,44 @@ mod test {
 
     #[test]
     fn test_find_bridge_pyo3() {
-        let get_fourtytwo = MetadataCommand::new()
-            .manifest_path(&Path::new("get-fourtytwo").join("Cargo.toml"))
+        let pyo3_pure = MetadataCommand::new()
+            .manifest_path(&Path::new("test-crates/pyo3-pure").join("Cargo.toml"))
             .exec()
             .unwrap();
 
-        assert!(match find_bridge(&get_fourtytwo, None).unwrap() {
+        assert!(match find_bridge(&pyo3_pure, None).unwrap() {
             BridgeModel::Bindings(_) => true,
             _ => false,
         });
 
-        assert!(match find_bridge(&get_fourtytwo, Some("pyo3")).unwrap() {
+        assert!(match find_bridge(&pyo3_pure, Some("pyo3")).unwrap() {
             BridgeModel::Bindings(_) => true,
             _ => false,
         });
 
-        assert!(find_bridge(&get_fourtytwo, Some("rust-cpython")).is_err());
+        assert!(find_bridge(&pyo3_pure, Some("rust-cpython")).is_err());
     }
 
     #[test]
     fn test_find_bridge_cffi() {
-        let points = MetadataCommand::new()
-            .manifest_path(&Path::new("points").join("Cargo.toml"))
+        let cffi_pure = MetadataCommand::new()
+            .manifest_path(&Path::new("test-crates/cffi-pure").join("Cargo.toml"))
             .exec()
             .unwrap();
 
         assert_eq!(
-            find_bridge(&points, Some("cffi")).unwrap(),
+            find_bridge(&cffi_pure, Some("cffi")).unwrap(),
             BridgeModel::Cffi
         );
 
-        assert!(find_bridge(&points, Some("rust-cpython")).is_err());
-        assert!(find_bridge(&points, Some("pyo3")).is_err());
+        assert!(find_bridge(&cffi_pure, Some("rust-cpython")).is_err());
+        assert!(find_bridge(&cffi_pure, Some("pyo3")).is_err());
     }
 
     #[test]
     fn test_find_bridge_bin() {
         let hello_world = MetadataCommand::new()
-            .manifest_path(&Path::new("hello-world").join("Cargo.toml"))
+            .manifest_path(&Path::new("test-crates/hello-world").join("Cargo.toml"))
             .exec()
             .unwrap();
 

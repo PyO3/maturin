@@ -116,6 +116,32 @@ my-project
     └── lib.rs
 ```
 
+## pyproject.toml
+
+pyo3-pack has partial support for building through pyproject.toml. To use it, create a `pyproject.toml` next to your `Cargo.toml` with the following content:
+
+```toml
+[build-system]
+requires = ["pyo3-pack", "toml"]
+build-backend = "pyo3_pack"
+```
+
+You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and pyo3-pack.
+
+You can use the options `manylinux`, `skip-auditwheel`, `bindings`, `cargo-extra-args` and `rustc-extra-args` under `[tool.pyo3-pack]` the same way you would when running pyo3-pack directly. The `bindings` key is required for cffi and bin projects as those can't be automatically detected.
+
+```toml
+[build-system]
+requires = ["pyo3-pack", "toml"]
+build-backend = "pyo3_pack"
+
+[tool.pyo3-pack]
+bindings = "cffi"
+cargo-extra-args="-v"
+```
+
+Currently, only the wheel build part of [PEP 517](https://snarky.ca/clarifying-pep-518/) is supported. Building source distribution doesn't work yet, which means isolated builds will fail.
+
 ## Manylinux and auditwheel
 
 For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers a special docker container and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0513/#the-manylinux1-policy).
@@ -132,7 +158,7 @@ pyo3-pack itself is manylinux compliant when compiled for the musl target. The b
 
 ## PyPy
 
-pyo3-pack can build wheels for pypy with pyo3. Note that pypy support in pyo3 is unreleased as of this writing. Also note that pypy [is not compatible with manylinux1](https://github.com/antocuni/pypy-wheels#why-not-manylinux1-wheels) and you can't publish pypy wheel to pypi pypy has been only tested manually and on linux. See [#115](https://github.com/PyO3/pyo3-pack/issues/115) for more details.
+pyo3-pack can build wheels for pypy with pyo3. Note that pypy [is not compatible with manylinux1](https://github.com/antocuni/pypy-wheels#why-not-manylinux1-wheels) and you can't publish pypy wheel to pypi pypy has been only tested manually and on linux. See [#115](https://github.com/PyO3/pyo3-pack/issues/115) for more details.
 
 ### Build
 

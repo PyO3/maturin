@@ -5,7 +5,7 @@ use failure::{format_err, Context, Error, ResultExt};
 
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
-use crate::module_writer::{write_bindings_module, write_cffi_module, DevelopModuleWriter};
+use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};
 use crate::BuildOptions;
 use crate::Manylinux;
 use crate::PythonInterpreter;
@@ -45,7 +45,7 @@ pub fn develop(
 
     let build_context = build_options.into_build_context(release, strip)?;
 
-    let mut builder = DevelopModuleWriter::venv(&target, &venv_dir)?;
+    let mut builder = PathWriter::venv(&target, &venv_dir)?;
 
     let context = "Failed to build a native library through cargo";
 

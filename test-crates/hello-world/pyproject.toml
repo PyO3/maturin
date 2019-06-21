@@ -1,0 +1,6 @@
+[build-system]
+requires = ["pyo3-pack", "toml"]
+build-backend = "pyo3_pack"
+
+[tool.pyo3-pack]
+bindings = "bin"

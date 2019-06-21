@@ -3,9 +3,6 @@
 //!
 //! Run with --help for usage information
 
-use std::env;
-use std::path::PathBuf;
-
 use failure::{bail, Error};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
@@ -13,9 +10,13 @@ use human_panic::setup_panic;
 use keyring::{Keyring, KeyringError};
 #[cfg(feature = "log")]
 use pretty_env_logger;
+use pyo3_pack::{
+    develop, source_distribution, write_dist_info, BridgeModel, BuildOptions, CargoToml,
+    Metadata21, PathWriter, PythonInterpreter, Target,
+};
+use std::env;
+use std::path::PathBuf;
 use structopt::StructOpt;
-
-use pyo3_pack::{develop, BuildOptions, PythonInterpreter, Target};
 #[cfg(feature = "upload")]
 use {
     failure::ResultExt,
@@ -170,6 +171,46 @@ enum Opt {
         #[structopt(long = "rustc-extra-args")]
         rustc_extra_args: Vec<String>,
     },
+    /// Backend for the PEP 517 integration. Not for human consumption
+    ///
+    /// The commands are meant to be called from the python PEP 517
+    #[structopt(name = "pep517")]
+    PEP517(PEP517Command),
+}
+
+/// Backend for the PEP 517 integration. Not for human consumption
+///
+/// The commands are meant to be called from the python PEP 517
+#[derive(Debug, StructOpt)]
+enum PEP517Command {
+    /// The implementation of prepare_metadata_for_build_wheel
+    #[structopt(name = "write-dist-info")]
+    WriteDistInfo {
+        #[structopt(flatten)]
+        build_options: BuildOptions,
+        /// The metadata_directory argument to prepare_metadata_for_build_wheel
+        #[structopt(long = "metadata-directory", parse(from_os_str))]
+        metadata_directory: PathBuf,
+        /// Strip the library for minimum file size
+        #[structopt(long)]
+        strip: bool,
+    },
+    /// The implementation of build_sdist
+    #[structopt(name = "write-sdist")]
+    WriteSDist {
+        /// The sdist_directory argument to build_sdist
+        #[structopt(long = "sdist-directory", parse(from_os_str))]
+        sdist_directory: PathBuf,
+        #[structopt(
+            short = "m",
+            long = "manifest-path",
+            parse(from_os_str),
+            default_value = "Cargo.toml",
+            name = "PATH"
+        )]
+        /// The path to the Cargo.toml
+        manifest_path: PathBuf,
+    },
 }
 
 fn run() -> Result<(), Error> {
@@ -305,6 +346,40 @@ fn run() -> Result<(), Error> {
                 strip,
             )?;
         }
+        Opt::PEP517(subcommand) => match subcommand {
+            PEP517Command::WriteDistInfo {
+                mut build_options,
+                metadata_directory,
+                strip,
+            } => {
+                build_options.interpreter = vec!["python".to_string()];
+                let context = build_options.into_build_context(true, strip)?;
+                let tags = match context.bridge {
+                    BridgeModel::Bindings(_) => {
+                        vec![context.interpreter[0].get_tag(&context.manylinux)]
+                    }
+                    BridgeModel::Bin | BridgeModel::Cffi => {
+                        context.target.get_universal_tags(&context.manylinux).1
+                    }
+                };
+
+                let mut writer = PathWriter::from_path(metadata_directory);
+                write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
+                println!("{}", context.metadata21.get_dist_info_dir().display());
+            }
+            PEP517Command::WriteSDist {
+                sdist_directory,
+                manifest_path,
+            } => {
+                let cargo_toml = CargoToml::from_path(&manifest_path)?;
+                let manifest_dir = manifest_path.parent().unwrap();
+                let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
+                    .context("Failed to parse Cargo.toml into python metadata")?;
+
+                let path = source_distribution(sdist_directory, &metadata21, &manifest_dir)?;
+                println!("{}", path.display());
+            }
+        },
     }
 
     Ok(())

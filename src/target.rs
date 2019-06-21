@@ -210,4 +210,14 @@ impl Target {
             PathBuf::from("python3")
         }
     }
+
+    /// Returns the tags for the platform without python version
+    pub fn get_universal_tags(&self, manylinux: &Manylinux) -> (String, Vec<String>) {
+        let tag = format!(
+            "py2.py3-none-{platform}",
+            platform = self.get_platform_tag(&manylinux)
+        );
+        let tags = self.get_py2_and_py3_tags(&manylinux);
+        (tag, tags)
+    }
 }

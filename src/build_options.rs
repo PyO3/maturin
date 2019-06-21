@@ -1,6 +1,4 @@
 use crate::build_context::{BridgeModel, ProjectLayout};
-use crate::cargo_toml::CargoTomlMetadata;
-use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Manylinux;
@@ -11,10 +9,8 @@ use cargo_metadata::{Metadata, MetadataCommand, Node};
 use failure::{bail, err_msg, format_err, Error, ResultExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use toml;
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
@@ -108,28 +104,12 @@ impl BuildOptions {
                 manifest_file.display()
             );
         };
-        let contents = fs::read_to_string(&manifest_file).context(format!(
-            "Can't read Cargo.toml at {}",
-            manifest_file.display(),
-        ))?;
-        let cargo_toml: CargoToml = toml::from_str(&contents).context(format!(
-            "Failed to parse Cargo.toml at {}",
-            manifest_file.display()
-        ))?;
 
-        let manifest_dir = manifest_file.parent().unwrap().to_path_buf();
+        let cargo_toml = CargoToml::from_path(&manifest_file)?;
+        let manifest_dir = manifest_file.parent().unwrap();
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
-        let scripts = match cargo_toml.package.metadata {
-            Some(CargoTomlMetadata {
-                pyo3_pack:
-                    Some(CargoTomlMetadataPyo3Pack {
-                        scripts: Some(ref scripts),
-                        ..
-                    }),
-            }) => scripts.clone(),
-            _ => HashMap::new(),
-        };
+        let scripts = cargo_toml.scripts();
 
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name

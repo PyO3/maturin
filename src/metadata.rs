@@ -1,11 +1,10 @@
-use crate::cargo_toml::{CargoTomlMetadata, CargoTomlMetadataPyo3Pack};
 use crate::CargoToml;
 use failure::{Error, ResultExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::read_to_string;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str;
 
 /// The metadata required to generate the .dist-info directory
@@ -61,16 +60,18 @@ impl Metadata21 {
     /// manifest_path must be the directory, not the file
     pub fn from_cargo_toml(
         cargo_toml: &CargoToml,
-        manifest_path: &Path,
+        manifest_path: impl AsRef<Path>,
     ) -> Result<Metadata21, Error> {
         let authors = cargo_toml.package.authors.join(", ");
 
         // See https://packaging.python.org/specifications/core-metadata/#description
         let description = if let Some(ref readme) = cargo_toml.package.readme {
-            Some(read_to_string(manifest_path.join(readme)).context(format!(
-                "Failed to read readme specified in Cargo.toml, which should be at {}",
-                manifest_path.join(readme).display()
-            ))?)
+            Some(
+                read_to_string(manifest_path.as_ref().join(readme)).context(format!(
+                    "Failed to read readme specified in Cargo.toml, which should be at {}",
+                    manifest_path.as_ref().join(readme).display()
+                ))?,
+            )
         } else {
             None
         };
@@ -82,16 +83,7 @@ impl Metadata21 {
             None
         };
 
-        let classifier = match cargo_toml.package.metadata {
-            Some(CargoTomlMetadata {
-                pyo3_pack:
-                    Some(CargoTomlMetadataPyo3Pack {
-                        classifier: Some(ref classifier),
-                        ..
-                    }),
-            }) => classifier.clone(),
-            _ => Vec::new(),
-        };
+        let classifier = cargo_toml.classifier();
 
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
@@ -230,13 +222,20 @@ impl Metadata21 {
         let re = Regex::new(r"[^\w\d.]+").unwrap();
         re.replace_all(&self.version, "_").to_string()
     }
+
+    /// Returns the name of the .dist-info directory as defined in the wheel specification
+    pub fn get_dist_info_dir(&self) -> PathBuf {
+        PathBuf::from(format!(
+            "{}-{}.dist-info",
+            &self.get_distribution_escaped(),
+            &self.get_version_escaped()
+        ))
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::cargo_toml::CargoTomlMetadata;
-    use crate::cargo_toml::CargoTomlMetadataPyo3Pack;
     use indoc::indoc;
     use std::io::Write;
     use tempfile;
@@ -314,19 +313,9 @@ mod test {
 
         assert_eq!(actual.trim(), expected.trim());
 
-        let mut scripts = HashMap::new();
-        scripts.insert("ph".to_string(), "pyo3_pack:print_hello".to_string());
-
-        let classifier = vec!["Programming Language :: Python".to_string()];
-
         assert_eq!(
-            cargo_toml.package.metadata,
-            Some(CargoTomlMetadata {
-                pyo3_pack: Some(CargoTomlMetadataPyo3Pack {
-                    scripts: Some(scripts),
-                    classifier: Some(classifier),
-                }),
-            })
-        );
+            metadata.get_dist_info_dir(),
+            PathBuf::from("info_project-0.1.0.dist-info")
+        )
     }
 }

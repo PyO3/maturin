@@ -6,6 +6,8 @@ use crate::PythonInterpreter;
 use crate::Target;
 use base64;
 use failure::{bail, Context, Error, ResultExt};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -56,11 +58,11 @@ pub trait ModuleWriter {
 }
 
 /// A [ModuleWriter] that adds the module somewhere in the filesystem, e.g. in a virtualenv
-pub struct DevelopModuleWriter {
+pub struct PathWriter {
     base_path: PathBuf,
 }
 
-impl DevelopModuleWriter {
+impl PathWriter {
     /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path) -> Result<Self, Error> {
         let interpreter =
@@ -79,7 +81,14 @@ impl DevelopModuleWriter {
             venv_dir.join("Lib").join("site-packages")
         };
 
-        Ok(DevelopModuleWriter { base_path })
+        Ok(PathWriter { base_path })
+    }
+
+    /// Writes the module to the given path
+    pub fn from_path(path: impl AsRef<Path>) -> Self {
+        Self {
+            base_path: path.as_ref().to_path_buf(),
+        }
     }
 
     /// Removes a directory relative to the base path if it exists.
@@ -95,7 +104,7 @@ impl DevelopModuleWriter {
     }
 }
 
-impl ModuleWriter for DevelopModuleWriter {
+impl ModuleWriter for PathWriter {
     fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), io::Error> {
         fs::create_dir_all(self.base_path.join(path))
     }
@@ -132,7 +141,7 @@ impl ModuleWriter for DevelopModuleWriter {
 pub struct WheelWriter {
     zip: ZipWriter<File>,
     record: Vec<(String, String, usize)>,
-    dist_info_dir: PathBuf,
+    record_file: PathBuf,
     wheel_path: PathBuf,
 }
 
@@ -183,32 +192,14 @@ impl WheelWriter {
 
         let file = File::create(&wheel_path)?;
 
-        let dist_info_dir = PathBuf::from(format!(
-            "{}-{}.dist-info",
-            &metadata21.get_distribution_escaped(),
-            &metadata21.get_version_escaped()
-        ));
-
         let mut builder = WheelWriter {
             zip: ZipWriter::new(file),
             record: Vec::new(),
-            dist_info_dir: dist_info_dir.clone(),
+            record_file: metadata21.get_dist_info_dir().join("RECORD"),
             wheel_path,
         };
 
-        builder.add_bytes(
-            &dist_info_dir.join("METADATA"),
-            metadata21.to_file_contents().as_bytes(),
-        )?;
-
-        builder.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags).as_bytes())?;
-
-        if !scripts.is_empty() {
-            builder.add_bytes(
-                &dist_info_dir.join("entry_points.txt"),
-                entry_points_txt(scripts).as_bytes(),
-            )?;
-        }
+        write_dist_info(&mut builder, &metadata21, &scripts, &tags)?;
 
         Ok(builder)
     }
@@ -217,18 +208,75 @@ impl WheelWriter {
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
         let options =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        let record_file = self.dist_info_dir.join("RECORD");
         self.zip
-            .start_file(record_file.to_str().unwrap(), options)?;
+            .start_file(self.record_file.to_str().unwrap(), options)?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
         }
         self.zip
-            .write_all(format!("{},,\n", record_file.to_str().unwrap()).as_bytes())?;
+            .write_all(format!("{},,\n", self.record_file.to_str().unwrap()).as_bytes())?;
 
         self.zip.finish()?;
         Ok(self.wheel_path)
+    }
+}
+
+/// Creates a .tar.gz archive containing the source distribution
+pub struct SDistWriter {
+    tar: tar::Builder<GzEncoder<File>>,
+    path: PathBuf,
+}
+
+impl ModuleWriter for SDistWriter {
+    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), io::Error> {
+        Ok(())
+    }
+
+    fn add_bytes_with_permissions(
+        &mut self,
+        target: impl AsRef<Path>,
+        bytes: &[u8],
+        permissions: u32,
+    ) -> Result<(), io::Error> {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(bytes.len() as u64);
+        header.set_mode(permissions);
+        header.set_cksum();
+        self.tar.append_data(&mut header, target, bytes)?;
+        Ok(())
+    }
+
+    fn add_file(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: impl AsRef<Path>,
+    ) -> Result<(), io::Error> {
+        self.tar.append_path_with_name(source, target)?;
+        Ok(())
+    }
+}
+
+impl SDistWriter {
+    /// Create a source distribution .tar.gz which can be subsequently expanded
+    pub fn new(wheel_dir: impl AsRef<Path>, metadata21: &Metadata21) -> Result<Self, io::Error> {
+        let path = wheel_dir.as_ref().join(format!(
+            "{}-{}.tar.gz",
+            &metadata21.get_distribution_escaped(),
+            &metadata21.get_version_escaped()
+        ));
+
+        let tar_gz = File::create(&path)?;
+        let enc = GzEncoder::new(tar_gz, Compression::default());
+        let tar = tar::Builder::new(enc);
+
+        Ok(Self { tar, path })
+    }
+
+    /// Finished the .tar.gz archive
+    pub fn finish(mut self) -> Result<PathBuf, io::Error> {
+        self.tar.finish()?;
+        Ok(self.path)
     }
 }
 
@@ -250,7 +298,7 @@ Root-Is-Purelib: false
 }
 
 /// https://packaging.python.org/specifications/entry-points/
-fn entry_points_txt(entrypoints: &HashMap<String, String>) -> String {
+fn entry_points_txt(entrypoints: &HashMap<String, String, impl std::hash::BuildHasher>) -> String {
     entrypoints
         .iter()
         .fold("[console_scripts]\n".to_owned(), |text, (k, v)| {
@@ -258,6 +306,7 @@ fn entry_points_txt(entrypoints: &HashMap<String, String>) -> String {
         })
 }
 
+/// Glue code that exposes `lib`.
 fn cffi_init_file() -> &'static str {
     r#"__all__ = ["lib", "ffi"]
 
@@ -345,7 +394,7 @@ pub fn write_bindings_module(
 
     match project_layout {
         ProjectLayout::Mixed(ref python_module) => {
-            write_python_module(writer, python_module, &module_name)
+            write_python_part(writer, python_module, &module_name)
                 .context("Failed to add the python module to the package")?;
 
             if develop {
@@ -378,7 +427,7 @@ pub fn write_cffi_module(
 
     match project_layout {
         ProjectLayout::Mixed(ref python_module) => {
-            write_python_module(writer, python_module, &module_name)
+            write_python_part(writer, python_module, &module_name)
                 .context("Failed to add the python module to the package")?;
 
             if develop {
@@ -427,9 +476,10 @@ pub fn write_bin(
     Ok(())
 }
 
-/// Copies the files from the python module, excluding older versions of the native library
-fn write_python_module(
-    module_writer: &mut impl ModuleWriter,
+/// Adds the python part of a mixed project to the writer,
+/// excluding older versions of the native library or generated cffi declarations
+pub fn write_python_part(
+    writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
     module_name: impl AsRef<Path>,
 ) -> Result<(), Error> {
@@ -444,7 +494,7 @@ fn write_python_module(
         }
 
         if absolute.is_dir() {
-            module_writer.add_directory(relaitve)?;
+            writer.add_directory(relaitve)?;
         } else {
             // Ignore native libraries from develop, if any
             if let Some(extension) = relaitve.extension() {
@@ -452,10 +502,38 @@ fn write_python_module(
                     continue;
                 }
             }
-            module_writer
+            writer
                 .add_file(relaitve, &absolute)
                 .context(format!("File to add file from {}", absolute.display()))?;
         }
+    }
+
+    Ok(())
+}
+
+/// Creates the .dist-info directory and fills it with all metadata files except RECORD
+pub fn write_dist_info(
+    writer: &mut impl ModuleWriter,
+    metadata21: &Metadata21,
+    scripts: &HashMap<String, String, impl std::hash::BuildHasher>,
+    tags: &[String],
+) -> Result<(), io::Error> {
+    let dist_info_dir = metadata21.get_dist_info_dir();
+
+    writer.add_directory(&dist_info_dir)?;
+
+    writer.add_bytes(
+        &dist_info_dir.join("METADATA"),
+        metadata21.to_file_contents().as_bytes(),
+    )?;
+
+    writer.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags).as_bytes())?;
+
+    if !scripts.is_empty() {
+        writer.add_bytes(
+            &dist_info_dir.join("entry_points.txt"),
+            entry_points_txt(scripts).as_bytes(),
+        )?;
     }
 
     Ok(())

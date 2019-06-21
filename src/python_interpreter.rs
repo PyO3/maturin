@@ -13,26 +13,7 @@ use std::str;
 
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
-const GET_INTERPRETER_METADATA: &str = r##"
-import json
-import platform
-import sys
-import sysconfig
-
-print(json.dumps({
-    "major": sys.version_info.major,
-    "minor": sys.version_info.minor,
-    "abiflags": sysconfig.get_config_var("ABIFLAGS"),
-    "interpreter": platform.python_implementation().lower(),
-    "ext_suffix": sysconfig.get_config_var("EXT_SUFFIX"),
-    "abi_tag": (sysconfig.get_config_var("SOABI") or "-").split("-")[1] or None,
-    "m": sysconfig.get_config_var("WITH_PYMALLOC") == 1,
-    "u": sysconfig.get_config_var("Py_UNICODE_SIZE") == 4,
-    "d": sysconfig.get_config_var("Py_DEBUG") == 1,
-    # This one isn't technically necessary, but still very useful for sanity checks
-    "platform": sys.platform,
-}))
-"##;
+const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(

@@ -2,6 +2,7 @@
 use crate::auditwheel::auditwheel_rs;
 use crate::compile;
 use crate::compile::warn_missing_py_init;
+use crate::module_writer::write_python_part;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use crate::Manylinux;
@@ -215,20 +216,11 @@ impl BuildContext {
         Ok(artifact)
     }
 
-    fn get_unversal_tags(&self) -> (String, Vec<String>) {
-        let tag = format!(
-            "py2.py3-none-{platform}",
-            platform = self.target.get_platform_tag(&self.manylinux)
-        );
-        let tags = self.target.get_py2_and_py3_tags(&self.manylinux);
-        (tag, tags)
-    }
-
     /// Builds a wheel with cffi bindings
     pub fn build_cffi_wheel(&self) -> Result<PathBuf, Error> {
         let artifact = self.compile_cdylib(None, None)?;
 
-        let (tag, tags) = self.get_unversal_tags();
+        let (tag, tags) = self.target.get_universal_tags(&self.manylinux);
 
         let mut builder =
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
@@ -266,7 +258,7 @@ impl BuildContext {
         auditwheel_rs(&artifact, &self.target, &self.manylinux)
             .context("Failed to ensure manylinux compliance")?;
 
-        let (tag, tags) = self.get_unversal_tags();
+        let (tag, tags) = self.target.get_universal_tags(&self.manylinux);
 
         if !self.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
@@ -274,6 +266,14 @@ impl BuildContext {
 
         let mut builder =
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
+
+        match self.project_layout {
+            ProjectLayout::Mixed(ref python_module) => {
+                write_python_part(&mut builder, python_module, &self.module_name)
+                    .context("Failed to add the python module to the package")?;
+            }
+            ProjectLayout::PureRust => {}
+        }
 
         // I wouldn't know of any case where this would be the wrong (and neither do
         // I know a better alternative)

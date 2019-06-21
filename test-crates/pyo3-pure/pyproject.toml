@@ -1,0 +1,3 @@
+[build-system]
+requires = ["pyo3-pack", "toml"]
+build-backend = "pyo3_pack"

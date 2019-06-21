@@ -7,7 +7,7 @@ readme = "Readme.md"
 edition = "2018"
 
 [package.metadata.pyo3-pack.scripts]
-get_42 = "pyo3_pack:get_42"
+get_42 = "pyo3_mixed:get_42"
 
 [dependencies]
 pyo3 = { version = "0.7.0", features = ["extension-module"] }

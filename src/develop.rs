@@ -60,7 +60,11 @@ pub fn develop(
             // Copy the artifact into the same folder as pip and python
             let bin_name = artifact.file_name().unwrap();
             let bin_path = target.get_venv_bin_dir(&venv_dir).join(bin_name);
-            fs::copy(artifact, bin_path)?;
+            fs::copy(&artifact, &bin_path).context(format!(
+                "Failed to copy {} to {}",
+                artifact.display(),
+                bin_path.display()
+            ))?;
         }
         BridgeModel::Cffi => {
             let artifact = build_context.compile_cdylib(None, None).context(context)?;

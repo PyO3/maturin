@@ -125,6 +125,9 @@ enum Opt {
         /// Strip the library for minimum file size
         #[structopt(long)]
         strip: bool,
+        /// Don't build a source distribution
+        #[structopt(long = "no-sdist")]
+        no_sdist: bool,
     },
     #[cfg(feature = "upload")]
     #[structopt(name = "publish")]
@@ -134,6 +137,9 @@ enum Opt {
         build: BuildOptions,
         #[structopt(flatten)]
         publish: PublishOpt,
+        /// Don't build a source distribution
+        #[structopt(long = "no-sdist")]
+        no_sdist: bool,
     },
     #[structopt(name = "list-python")]
     /// Searches and lists the available python installations
@@ -224,18 +230,33 @@ fn run() -> Result<(), Error> {
             build,
             release,
             strip,
+            no_sdist,
         } => {
-            build.into_build_context(release, strip)?.build_wheels()?;
+            let build_context = build.into_build_context(release, strip)?;
+            if !no_sdist {
+                build_context.build_source_distribution()?;
+            }
+            build_context.build_wheels()?;
         }
         #[cfg(feature = "upload")]
-        Opt::Publish { build, publish } => {
+        Opt::Publish {
+            build,
+            publish,
+            no_sdist,
+        } => {
             let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
 
             if !build_context.release {
                 eprintln!("⚠ Warning: You're publishing debug wheels");
             }
 
-            let wheels = build_context.build_wheels()?;
+            let mut wheels = build_context.build_wheels()?;
+
+            if !no_sdist {
+                if let Some(source_distribution) = build_context.build_source_distribution()? {
+                    wheels.push(source_distribution);
+                }
+            }
 
             let (mut registry, reenter) = complete_registry(&publish)?;
 
@@ -375,8 +396,8 @@ fn run() -> Result<(), Error> {
                 let manifest_dir = manifest_path.parent().unwrap();
                 let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
                     .context("Failed to parse Cargo.toml into python metadata")?;
-
-                let path = source_distribution(sdist_directory, &metadata21, &manifest_dir)?;
+                let path = source_distribution(sdist_directory, &metadata21, &manifest_path)
+                    .context("Failed to build source distribution")?;
                 println!("{}", path.display());
             }
         },

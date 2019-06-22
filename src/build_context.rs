@@ -5,6 +5,7 @@ use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
+use crate::source_distribution::{get_pyproject_toml, source_distribution};
 use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
@@ -107,11 +108,13 @@ pub struct BuildContext {
     pub cargo_metadata: Metadata,
 }
 
+type BuiltWheelMetadata = (PathBuf, String, Option<PythonInterpreter>);
+
 impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
     /// correct builder. Returns a Vec that contains location, python tag (e.g. py2.py3 or cp35)
     /// and for bindings the python interpreter they bind against.
-    pub fn build_wheels(&self) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
+    pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>, Error> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -122,6 +125,17 @@ impl BuildContext {
         };
 
         Ok(wheels)
+    }
+
+    /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
+    pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>, Error> {
+        if get_pyproject_toml(self.manifest_path.parent().unwrap()).is_ok() {
+            let sdist_path = source_distribution(&self.out, &self.metadata21, &self.manifest_path)
+                .context("Failed to build source distribution")?;
+            Ok(Some((sdist_path, "source".to_string(), None)))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Builds wheels for a Cargo project for all given python versions.

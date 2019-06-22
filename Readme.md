@@ -118,13 +118,15 @@ my-project
 
 ## pyproject.toml
 
-pyo3-pack has partial support for building through pyproject.toml. To use it, create a `pyproject.toml` next to your `Cargo.toml` with the following content:
+pyo3-pack supports building through pyproject.toml. To use it, create a `pyproject.toml` next to your `Cargo.toml` with the following content:
 
 ```toml
 [build-system]
 requires = ["pyo3-pack", "toml"]
 build-backend = "pyo3_pack"
 ```
+
+If a `pyproject.toml` with a `[build-system]` entry is present, pyo3-pack will build a source distribution (sdist) of your package, unless `--no-sdist` is specified.
 
 You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and pyo3-pack.
 
@@ -140,7 +142,7 @@ bindings = "cffi"
 cargo-extra-args="-v"
 ```
 
-Currently, only the wheel build part of [PEP 517](https://snarky.ca/clarifying-pep-518/) is supported. Building source distribution doesn't work yet, which means isolated builds will fail.
+Using tox with build isolation is currently blocked by a tox bug ([tox-dev/tox#1344](https://github.com/tox-dev/tox/issues/1344)).
 
 ## Manylinux and auditwheel
 

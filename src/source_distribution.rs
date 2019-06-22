@@ -1,9 +1,10 @@
 use crate::module_writer::ModuleWriter;
 use crate::{Metadata21, SDistWriter};
 use failure::{bail, Error, ResultExt};
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::str;
+use std::process::Command;
+use std::{fs, str};
 
 /// Creates a source distribution
 ///
@@ -14,19 +15,19 @@ use std::str;
 pub fn source_distribution(
     wheel_dir: impl AsRef<Path>,
     metadata21: &Metadata21,
-    manifest_dir: impl AsRef<Path>,
+    manifest_path: impl AsRef<Path>,
 ) -> Result<PathBuf, Error> {
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
-        .arg(manifest_dir.as_ref())
-        .stderr(Stdio::inherit())
+        .arg(manifest_path.as_ref())
         .output()
         .context("Failed to run cargo")?;
     if !output.status.success() {
         bail!(
-            "Failed to query file list from cargo: {}\n--- Stdout:\n{}",
+            "Failed to query file list from cargo: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
             output.status,
             String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
         );
     }
 
@@ -39,8 +40,8 @@ pub fn source_distribution(
     let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
     for relative_to_cwd in file_list {
         let relative_to_project_root = relative_to_cwd
-            .strip_prefix(manifest_dir.as_ref().parent().unwrap())
-            .context("Cargo returned an out-of-tree path ಠ_ಠ")?;
+            .strip_prefix(manifest_path.as_ref().parent().unwrap())
+            .unwrap_or(relative_to_cwd);
         writer.add_file(relative_to_project_root, relative_to_cwd)?;
     }
 
@@ -54,4 +55,21 @@ pub fn source_distribution(
     );
 
     Ok(source_distribution_path)
+}
+
+/// A pyproject.toml as specified in PEP 517
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct PyProjectToml {
+    build_system: toml::Value,
+}
+
+/// Returns the contents of a pyproject.toml with a `[build-system]` entry or an error
+///
+/// Does no specific error handling because it's only used to check whether or not to build
+/// source distributions
+pub(crate) fn get_pyproject_toml(project_root: impl AsRef<Path>) -> Result<PyProjectToml, Error> {
+    let contents = fs::read_to_string(project_root.as_ref().join("pyproject.toml"))?;
+    let cargo_toml = toml::from_str(&contents)?;
+    Ok(cargo_toml)
 }

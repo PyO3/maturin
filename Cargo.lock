@@ -1108,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-pack"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cargo_metadata 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",

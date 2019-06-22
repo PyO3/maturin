@@ -94,10 +94,11 @@ impl PathWriter {
     /// Removes a directory relative to the base path if it exists.
     ///
     /// This is to clean up the contents of an older develop call
-    pub fn delete_dir(&self, relative: impl AsRef<Path>) -> Result<(), io::Error> {
+    pub fn delete_dir(&self, relative: impl AsRef<Path>) -> Result<(), Error> {
         let absolute = self.base_path.join(relative);
         if absolute.exists() {
-            fs::remove_dir_all(absolute)?;
+            fs::remove_dir_all(&absolute)
+                .context(format!("Failed to remove {}", absolute.display()))?;
         }
 
         Ok(())

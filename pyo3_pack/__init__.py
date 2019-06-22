@@ -11,6 +11,7 @@ TODO: Don't require the user to specify toml as a requirement in the pyproject.t
 import os
 import shutil
 import subprocess
+import sys
 from typing import List, Dict
 
 import toml
@@ -46,11 +47,16 @@ def get_config_options() -> List[str]:
 
 # noinspection PyUnusedLocal
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    command = ["pyo3-pack", "build", "-i", "python"]
+    # The PEP 517 build environment garuantees that `python` is the correct python
+    command = ["pyo3-pack", "build", "-i", "python", "--no-sdist"]
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
-    output = subprocess.check_output(command, universal_newlines=True)
+    try:
+        output = subprocess.check_output(command, universal_newlines=True)
+    except subprocess.CalledProcessError as e:
+        print("Error: {}".format(e))
+        sys.exit(1)
     print(output)
     # Get the filename from `📦 Built wheel [for CPython 3.6m] to /home/user/project`
     filename = os.path.split(output.strip().splitlines()[-1].split(" to ")[1])[1]
@@ -70,7 +76,11 @@ def build_sdist(sdist_directory, config_settings=None):
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
-    output = subprocess.check_output(command, universal_newlines=True)
+    try:
+        output = subprocess.check_output(command, universal_newlines=True)
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exit(1)
     print(output)
     return output.strip().splitlines()[-1]
 

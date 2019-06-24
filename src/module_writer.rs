@@ -27,10 +27,10 @@ use zip::{self, ZipWriter};
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
     /// Adds a directory relative to the module base path
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), io::Error>;
+    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), Error>;
 
     /// Adds a file with bytes as content in target relative to the module base path
-    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), io::Error> {
+    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), Error> {
         // 0o644 is the default from the zip crate
         self.add_bytes_with_permissions(target, bytes, 0o644)
     }
@@ -42,18 +42,19 @@ pub trait ModuleWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<(), io::Error>;
+    ) -> Result<(), Error>;
 
     /// Copies the source file the the target path relative to the module base path
     fn add_file(
         &mut self,
         target: impl AsRef<Path>,
         source: impl AsRef<Path>,
-    ) -> Result<(), io::Error> {
-        let mut file = File::open(source)?;
+    ) -> Result<(), Error> {
+        let mut file = File::open(&source).context("Failed to read file at {}")?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
-        self.add_bytes(target, &buffer)
+        self.add_bytes(target, &buffer)?;
+        Ok(())
     }
 }
 
@@ -106,8 +107,9 @@ impl PathWriter {
 }
 
 impl ModuleWriter for PathWriter {
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), io::Error> {
-        fs::create_dir_all(self.base_path.join(path))
+    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
+        fs::create_dir_all(self.base_path.join(path))?;
+        Ok(())
     }
 
     fn add_bytes_with_permissions(
@@ -115,7 +117,7 @@ impl ModuleWriter for PathWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         _permissions: u32,
-    ) -> Result<(), io::Error> {
+    ) -> Result<(), Error> {
         let path = self.base_path.join(target);
 
         // We only need to set the executable bit on unix
@@ -134,7 +136,8 @@ impl ModuleWriter for PathWriter {
             }
         };
 
-        file.write_all(bytes)
+        file.write_all(bytes)?;
+        Ok(())
     }
 }
 
@@ -147,7 +150,7 @@ pub struct WheelWriter {
 }
 
 impl ModuleWriter for WheelWriter {
-    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), io::Error> {
+    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), Error> {
         Ok(()) // We don't need to create directories in zip archives
     }
 
@@ -156,7 +159,7 @@ impl ModuleWriter for WheelWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<(), io::Error> {
+    ) -> Result<(), Error> {
         // So apparently we must use unix style paths for pypi's checks to succeed; Without
         // the replacing we get a "400 Client Error: Invalid distribution file."
         let target = target.as_ref().to_str().unwrap().replace("\\", "/");
@@ -183,7 +186,7 @@ impl WheelWriter {
         metadata21: &Metadata21,
         scripts: &HashMap<String, String>,
         tags: &[String],
-    ) -> Result<WheelWriter, io::Error> {
+    ) -> Result<WheelWriter, Error> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
             metadata21.get_distribution_escaped(),
@@ -230,7 +233,7 @@ pub struct SDistWriter {
 }
 
 impl ModuleWriter for SDistWriter {
-    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), io::Error> {
+    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), Error> {
         Ok(())
     }
 
@@ -239,12 +242,18 @@ impl ModuleWriter for SDistWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<(), io::Error> {
+    ) -> Result<(), Error> {
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
         header.set_cksum();
-        self.tar.append_data(&mut header, target, bytes)?;
+        self.tar
+            .append_data(&mut header, &target, bytes)
+            .context(format!(
+                "Failed to add {} bytes to sdist as {}",
+                bytes.len(),
+                target.as_ref().display()
+            ))?;
         Ok(())
     }
 
@@ -252,8 +261,14 @@ impl ModuleWriter for SDistWriter {
         &mut self,
         target: impl AsRef<Path>,
         source: impl AsRef<Path>,
-    ) -> Result<(), io::Error> {
-        self.tar.append_path_with_name(source, target)?;
+    ) -> Result<(), Error> {
+        self.tar
+            .append_path_with_name(&source, &target)
+            .context(format!(
+                "Failed to add file from {} to sdist as {}",
+                source.as_ref().display(),
+                target.as_ref().display(),
+            ))?;
         Ok(())
     }
 }
@@ -518,7 +533,7 @@ pub fn write_dist_info(
     metadata21: &Metadata21,
     scripts: &HashMap<String, String, impl std::hash::BuildHasher>,
     tags: &[String],
-) -> Result<(), io::Error> {
+) -> Result<(), Error> {
     let dist_info_dir = metadata21.get_dist_info_dir();
 
     writer.add_directory(&dist_info_dir)?;

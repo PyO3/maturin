@@ -8,7 +8,7 @@
 
 Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages.
 
-This project was meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust). It supports building wheels for python 3.5+ on windows, linux and mac, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
+This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake). It supports building wheels for python 3.5+ on windows, linux and mac, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
 
 ## Usage
 
@@ -16,12 +16,6 @@ You can either download binaries from the [latest release](https://github.com/Py
 
 ```shell
 pip install pyo3-pack
-```
-
-You can also install pyo3-pack from source, though it's an older version:
-
-```shell
-cargo install pyo3-pack
 ```
 
 There are three main commands:

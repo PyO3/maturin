@@ -96,7 +96,7 @@ pyo3-pack will add the native extension as a module in your python folder. When 
 
 With cffi you can do `from .my_project import lib` and then use `lib.my_native_function`, with pyo3/rust-cpython you can directly `from .my_project import my_native_function`.
 
-Example layout with pyo3 after `pyo3-pack develop`: 
+Example layout with pyo3 after `pyo3-pack develop`:
 
 ```
 my-project
@@ -163,6 +163,9 @@ FLAGS:
     -h, --help
             Prints help information
 
+        --no-sdist
+            Don't build a source distribution
+
         --release
             Pass --release to cargo
 
@@ -197,14 +200,10 @@ OPTIONS:
             Control the platform tag on linux.
 
             - `1`: Use the manylinux1 tag and check for compliance
-
-            - `1-unchecked`: Use the manylinux1 tag without checking for compliance
-
-            - `2010`: Use the manylinux2010 tag and check for compliance
-
-            - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
-
-            - `off`: Use the native linux tag (off)
+             - `1-unchecked`: Use the manylinux1 tag without checking for compliance
+             - `2010`: Use the manylinux2010 tag and check for compliance
+             - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+             - `off`: Use the native linux tag (off)
 
             This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
             2010-unchecked, off]
@@ -226,6 +225,9 @@ FLAGS:
 
     -h, --help
             Prints help information
+
+        --no-sdist
+            Don't build a source distribution
 
         --no-strip
             Strip the library for minimum file size
@@ -258,14 +260,10 @@ OPTIONS:
             Control the platform tag on linux.
 
             - `1`: Use the manylinux1 tag and check for compliance
-
-            - `1-unchecked`: Use the manylinux1 tag without checking for compliance
-
-            - `2010`: Use the manylinux2010 tag and check for compliance
-
-            - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
-
-            - `off`: Use the native linux tag (off)
+             - `1-unchecked`: Use the manylinux1 tag without checking for compliance
+             - `2010`: Use the manylinux2010 tag and check for compliance
+             - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+             - `off`: Use the native linux tag (off)
 
             This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
             2010-unchecked, off]
@@ -304,7 +302,7 @@ FLAGS:
 
 
 OPTIONS:
-    -b, --bindings <binding_crate>
+    -b, --binding-crate <binding_crate>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo_extra_args>...

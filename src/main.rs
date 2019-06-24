@@ -150,7 +150,7 @@ enum Opt {
     /// Note that this command doesn't create entrypoints
     Develop {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-        #[structopt(short = "b", long)]
+        #[structopt(short = "b", long = "binding-crate")]
         binding_crate: Option<String>,
         #[structopt(
             short = "m",

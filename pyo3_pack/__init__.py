@@ -53,7 +53,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        output = subprocess.check_output(command, universal_newlines=True)
+        output = subprocess.check_output(command).decode("utf-8", "ignore")
     except subprocess.CalledProcessError as e:
         print("Error: {}".format(e))
         sys.exit(1)
@@ -77,7 +77,7 @@ def build_sdist(sdist_directory, config_settings=None):
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        output = subprocess.check_output(command, universal_newlines=True)
+        output = subprocess.check_output(command).decode("utf-8", "ignore")
     except subprocess.CalledProcessError as e:
         print(e)
         sys.exit(1)
@@ -110,6 +110,6 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
-    output = subprocess.check_output(command, universal_newlines=True)
+    output = subprocess.check_output(command).decode("utf-8", "ignore")
     print(output)
     return output.strip().splitlines()[-1]

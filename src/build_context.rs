@@ -129,6 +129,9 @@ impl BuildContext {
 
     /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
     pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>, Error> {
+        fs::create_dir_all(&self.out)
+            .context("Failed to create the target directory for the source distribution")?;
+
         if get_pyproject_toml(self.manifest_path.parent().unwrap()).is_ok() {
             let sdist_path = source_distribution(&self.out, &self.metadata21, &self.manifest_path)
                 .context("Failed to build source distribution")?;

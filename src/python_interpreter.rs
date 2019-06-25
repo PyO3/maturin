@@ -554,7 +554,7 @@ impl PythonInterpreter {
             {
                 available_versions.push(version);
             } else {
-                bail!("{} doesn't exist", executable);
+                bail!("Python interpreter `{}` doesn't exist", executable);
             }
         }
 

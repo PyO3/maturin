@@ -415,7 +415,7 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("💥 pyo3-pack failed");
         for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {
-            eprintln!("{}", cause);
+            eprintln!("  Caused by: {}", cause);
         }
         std::process::exit(1);
     }

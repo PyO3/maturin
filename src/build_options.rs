@@ -238,9 +238,11 @@ pub fn find_interpreter(
     Ok(match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
-                PythonInterpreter::check_executables(&interpreter, &target)?
+                PythonInterpreter::check_executables(&interpreter, &target)
+                    .context("The given list of python interpreters is invalid")?
             } else {
-                PythonInterpreter::find_all(&target)?
+                PythonInterpreter::find_all(&target)
+                    .context("Finding python interpreters failed")?
             };
 
             if interpreter.is_empty() {

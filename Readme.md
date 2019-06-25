@@ -120,7 +120,7 @@ requires = ["pyo3-pack", "toml"]
 build-backend = "pyo3_pack"
 ```
 
-If a `pyproject.toml` with a `[build-system]` entry is present, pyo3-pack will build a source distribution (sdist) of your package, unless `--no-sdist` is specified.
+If a `pyproject.toml` with a `[build-system]` entry is present, pyo3-pack will build a source distribution (sdist) of your package, unless `--no-sdist` is specified. The source distribution will contain the same files as `cargo package`.
 
 You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and pyo3-pack.
 

@@ -37,12 +37,26 @@ pub fn source_distribution(
         .map(Path::new)
         .collect();
 
+    let target_source: Vec<(&Path, &Path)> = file_list
+        .iter()
+        .map(|relative_to_cwd| {
+            let relative_to_project_root = relative_to_cwd
+                .strip_prefix(manifest_path.as_ref().parent().unwrap())
+                .unwrap_or(relative_to_cwd);
+            (relative_to_project_root, *relative_to_cwd)
+        })
+        .collect();
+
+    if !target_source.iter().any(|(target, _)| target == &Path::new("pyproject.toml")) {
+        bail!(
+            "pyproject.toml was not included by `cargo package`. \
+             Please make sure pyproject.toml is not excluded or build with `--no-sdist`"
+        )
+    }
+
     let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
-    for relative_to_cwd in file_list {
-        let relative_to_project_root = relative_to_cwd
-            .strip_prefix(manifest_path.as_ref().parent().unwrap())
-            .unwrap_or(relative_to_cwd);
-        writer.add_file(relative_to_project_root, relative_to_cwd)?;
+    for (target, source) in target_source {
+        writer.add_file(target, source)?;
     }
 
     writer.add_bytes("PKG-INFO", metadata21.to_file_contents().as_bytes())?;

@@ -47,7 +47,10 @@ pub fn source_distribution(
         })
         .collect();
 
-    if !target_source.iter().any(|(target, _)| target == &Path::new("pyproject.toml")) {
+    if !target_source
+        .iter()
+        .any(|(target, _)| target == &Path::new("pyproject.toml"))
+    {
         bail!(
             "pyproject.toml was not included by `cargo package`. \
              Please make sure pyproject.toml is not excluded or build with `--no-sdist`"

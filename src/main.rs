@@ -233,6 +233,145 @@ enum PEP517Command {
     },
 }
 
+/// Dispatches into the native implementations of the PEP 517 functions
+fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
+    match subcommand {
+        PEP517Command::WriteDistInfo {
+            mut build_options,
+            metadata_directory,
+            strip,
+        } => {
+            build_options.interpreter = vec!["python".to_string()];
+            let context = build_options.into_build_context(true, strip)?;
+            let tags = match context.bridge {
+                BridgeModel::Bindings(_) => {
+                    vec![context.interpreter[0].get_tag(&context.manylinux)]
+                }
+                BridgeModel::Bin | BridgeModel::Cffi => {
+                    context.target.get_universal_tags(&context.manylinux).1
+                }
+            };
+
+            let mut writer = PathWriter::from_path(metadata_directory);
+            write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
+            println!("{}", context.metadata21.get_dist_info_dir().display());
+        }
+        PEP517Command::BuildWheel {
+            build,
+            release,
+            strip,
+        } => {
+            let build_context = build.into_build_context(release, strip)?;
+            let wheels = build_context.build_wheels()?;
+            assert_eq!(wheels.len(), 1);
+            println!("{}", wheels[0].0.file_name().unwrap().to_str().unwrap());
+        }
+        PEP517Command::WriteSDist {
+            sdist_directory,
+            manifest_path,
+        } => {
+            let cargo_toml = CargoToml::from_path(&manifest_path)?;
+            let manifest_dir = manifest_path.parent().unwrap();
+            let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
+                .context("Failed to parse Cargo.toml into python metadata")?;
+            let path = source_distribution(sdist_directory, &metadata21, &manifest_path)
+                .context("Failed to build source distribution")?;
+            println!("{}", path.display());
+        }
+    };
+
+    Ok(())
+}
+
+/// Handles authentification/keyring integration and retrying of the publish subcommand
+#[cfg(feature = "upload")]
+fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Result<(), Error> {
+    let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
+
+    if !build_context.release {
+        eprintln!("⚠ Warning: You're publishing debug wheels");
+    }
+
+    let mut wheels = build_context.build_wheels()?;
+
+    if !no_sdist {
+        if let Some(source_distribution) = build_context.build_source_distribution()? {
+            wheels.push(source_distribution);
+        }
+    }
+
+    let (mut registry, reenter) = complete_registry(&publish)?;
+
+    loop {
+        println!("🚀 Uploading {} packages", wheels.len());
+
+        // Upload all wheels, aborting on the first error
+        let result = wheels
+            .iter()
+            .map(|(wheel_path, supported_versions, _)| {
+                upload(
+                    &registry,
+                    &wheel_path,
+                    &build_context.metadata21,
+                    &supported_versions,
+                )
+            })
+            .collect();
+
+        match result {
+            Ok(()) => {
+                println!("✨ Packages uploaded succesfully");
+
+                #[cfg(feature = "keyring")]
+                {
+                    // We know the password is correct, so we can save it in the keyring
+                    let username = registry.username.clone();
+                    let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
+                    let password = registry.password.clone();
+                    keyring.set_password(&password).unwrap_or_else(|e| {
+                        eprintln!("⚠ Failed to store the password in the keyring: {:?}", e)
+                    });
+                }
+
+                return Ok(());
+            }
+            Err(UploadError::AuthenticationError) if reenter => {
+                println!("⛔ Username and/or password are wrong");
+
+                #[cfg(feature = "keyring")]
+                {
+                    // Delete the wrong password from the keyring
+                    let old_username = registry.username.clone();
+                    let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
+                    match keyring.delete_password() {
+                        Ok(()) => {}
+                        Err(KeyringError::NoPasswordFound) | Err(KeyringError::NoBackendFound) => {}
+                        _ => eprintln!("⚠ Failed to remove password from keyring"),
+                    }
+                }
+
+                let username = get_username();
+                let password = rpassword::prompt_password_stdout("Please enter your password: ")
+                    .unwrap_or_else(|_| {
+                        // So we need this fallback for pycharm on windows
+                        let mut password = String::new();
+                        io::stdin()
+                            .read_line(&mut password)
+                            .expect("Failed to read line");
+                        password.trim().to_string()
+                    });
+
+                registry = Registry::new(username, password, registry.url);
+                println!("… Retrying")
+            }
+            Err(UploadError::AuthenticationError) => {
+                bail!("Username and/or password are wrong");
+            }
+            Err(err) => return Err(err).context("💥 Failed to upload")?,
+        }
+    }
+}
+
 fn run() -> Result<(), Error> {
     #[cfg(feature = "log")]
     pretty_env_logger::init();
@@ -258,95 +397,7 @@ fn run() -> Result<(), Error> {
             publish,
             no_sdist,
         } => {
-            let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
-
-            if !build_context.release {
-                eprintln!("⚠ Warning: You're publishing debug wheels");
-            }
-
-            let mut wheels = build_context.build_wheels()?;
-
-            if !no_sdist {
-                if let Some(source_distribution) = build_context.build_source_distribution()? {
-                    wheels.push(source_distribution);
-                }
-            }
-
-            let (mut registry, reenter) = complete_registry(&publish)?;
-
-            loop {
-                println!("🚀 Uploading {} packages", wheels.len());
-
-                // Upload all wheels, aborting on the first error
-                let result = wheels
-                    .iter()
-                    .map(|(wheel_path, supported_versions, _)| {
-                        upload(
-                            &registry,
-                            &wheel_path,
-                            &build_context.metadata21,
-                            &supported_versions,
-                        )
-                    })
-                    .collect();
-
-                match result {
-                    Ok(()) => {
-                        println!("✨ Packages uploaded succesfully");
-
-                        #[cfg(feature = "keyring")]
-                        {
-                            // We know the password is correct, so we can save it in the keyring
-                            let username = registry.username.clone();
-                            let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
-                            let password = registry.password.clone();
-                            keyring.set_password(&password).unwrap_or_else(|e| {
-                                eprintln!(
-                                    "⚠ Failed to store the password in the keyring: {:?}",
-                                    e
-                                )
-                            });
-                        }
-
-                        return Ok(());
-                    }
-                    Err(UploadError::AuthenticationError) if reenter => {
-                        println!("⛔ Username and/or password are wrong");
-
-                        #[cfg(feature = "keyring")]
-                        {
-                            // Delete the wrong password from the keyring
-                            let old_username = registry.username.clone();
-                            let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
-                            match keyring.delete_password() {
-                                Ok(()) => {}
-                                Err(KeyringError::NoPasswordFound)
-                                | Err(KeyringError::NoBackendFound) => {}
-                                _ => eprintln!("⚠ Failed to remove password from keyring"),
-                            }
-                        }
-
-                        let username = get_username();
-                        let password =
-                            rpassword::prompt_password_stdout("Please enter your password: ")
-                                .unwrap_or_else(|_| {
-                                    // So we need this fallback for pycharm on windows
-                                    let mut password = String::new();
-                                    io::stdin()
-                                        .read_line(&mut password)
-                                        .expect("Failed to read line");
-                                    password.trim().to_string()
-                                });
-
-                        registry = Registry::new(username, password, registry.url);
-                        println!("… Retrying")
-                    }
-                    Err(UploadError::AuthenticationError) => {
-                        bail!("Username and/or password are wrong");
-                    }
-                    Err(err) => return Err(err).context("💥 Failed to upload")?,
-                }
-            }
+            upload_ui(build, &publish, no_sdist)?;
         }
         Opt::ListPython => {
             let target = Target::from_target_triple(None)?;
@@ -381,50 +432,7 @@ fn run() -> Result<(), Error> {
                 strip,
             )?;
         }
-        Opt::PEP517(subcommand) => match subcommand {
-            PEP517Command::WriteDistInfo {
-                mut build_options,
-                metadata_directory,
-                strip,
-            } => {
-                build_options.interpreter = vec!["python".to_string()];
-                let context = build_options.into_build_context(true, strip)?;
-                let tags = match context.bridge {
-                    BridgeModel::Bindings(_) => {
-                        vec![context.interpreter[0].get_tag(&context.manylinux)]
-                    }
-                    BridgeModel::Bin | BridgeModel::Cffi => {
-                        context.target.get_universal_tags(&context.manylinux).1
-                    }
-                };
-
-                let mut writer = PathWriter::from_path(metadata_directory);
-                write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
-                println!("{}", context.metadata21.get_dist_info_dir().display());
-            }
-            PEP517Command::BuildWheel {
-                build,
-                release,
-                strip,
-            } => {
-                let build_context = build.into_build_context(release, strip)?;
-                let wheels = build_context.build_wheels()?;
-                assert_eq!(wheels.len(), 1);
-                println!("{}", wheels[0].0.file_name().unwrap().to_str().unwrap());
-            }
-            PEP517Command::WriteSDist {
-                sdist_directory,
-                manifest_path,
-            } => {
-                let cargo_toml = CargoToml::from_path(&manifest_path)?;
-                let manifest_dir = manifest_path.parent().unwrap();
-                let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-                    .context("Failed to parse Cargo.toml into python metadata")?;
-                let path = source_distribution(sdist_directory, &metadata21, &manifest_path)
-                    .context("Failed to build source distribution")?;
-                println!("{}", path.display());
-            }
-        },
+        Opt::PEP517(subcommand) => pep517(subcommand)?,
     }
 
     Ok(())

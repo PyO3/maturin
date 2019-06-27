@@ -1,10 +1,9 @@
-
 import json
 import platform
 import sys
 import sysconfig
 
-print(json.dumps({
+metadata = {
     "major": sys.version_info.major,
     "minor": sys.version_info.minor,
     "abiflags": sysconfig.get_config_var("ABIFLAGS"),
@@ -16,4 +15,6 @@ print(json.dumps({
     "d": sysconfig.get_config_var("Py_DEBUG") == 1,
     # This one isn't technically necessary, but still very useful for sanity checks
     "platform": sys.platform,
-}))
+}
+
+print(json.dumps(metadata))

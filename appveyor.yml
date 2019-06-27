@@ -67,7 +67,7 @@ before_deploy:
   - appveyor PushArtifact ../../%APPVEYOR_PROJECT_SLUG%-%APPVEYOR_REPO_TAG_NAME%-%TARGET%.zip
   - cd ../..
   # Publish pypi
-  - cargo run -- publish -b bin -u konstin
+  - cargo run -- publish -b bin -u konstin --no-sdist
 
 
 deploy:

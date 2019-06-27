@@ -2,16 +2,9 @@
 # Based on https://github.com/sharkdp/hyperfine/blob/master/ci/before_deploy.bash
 set -ex
 
-# The CFLAGS="-fno-stack-protector" story is a weird one; On 32 bit, you get errors such as the following without the option
-# /usr/bin/ld: apps/openssl: hidden symbol `__stack_chk_fail_local' isn't defined
-# I assume that this is a musl bug fixed in 2015 that didn't make into ubuntu 14.04, but that special
-# case seems to be documented nowhere else:
-# http://git.musl-libc.org/cgit/musl/commit/?id=55d061f031085f24d138664c897791aebe9a2fab
-# We can't have a more recent musl on 14.04 (there's no ppa), so we have to disable that feature
-
 make_archive() {
     # We don't care for manylinux compliance for the downloads, so we can use the keyring.
-    CFLAGS="-fno-stack-protector" cargo build --release --target $TARGET --features "password-storage"
+    cargo build --release --target $TARGET --features "password-storage"
     pushd target/$TARGET/release/
     # You can add more files to the archive by adding them to this line
     tar czf $TRAVIS_BUILD_DIR/$BINARY_NAME-$TRAVIS_TAG-$TARGET.tar.gz $BINARY_NAME
@@ -75,8 +68,11 @@ EOF
 }
 
 upload_to_pypi() {
-    # We do care for manylinux compliance for pypi, so we use the musl feature to get static binaries
-    CFLAGS="-fno-stack-protector" cargo run -- publish -u konstin -b bin --target $TARGET
+    if [[ $TARGET = x86_64-unknown-linux-musl ]]; then
+        cargo run -- publish -u konstin -b bin --target $TARGET
+    else
+        cargo run -- publish -u konstin -b bin --target $TARGET --no-sdist
+    fi
 }
 
 main() {

@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+from subprocess import SubprocessError
 from typing import List, Dict
 
 import toml
@@ -107,12 +108,21 @@ def get_requires_for_build_sdist(config_settings=None):
 # noinspection PyUnusedLocal
 def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     print("Checking for Rust toolchain....")
-    output = subprocess.check_output(["cargo", "--version"]).decode("utf-8", "ignore")
-    if not "cargo" in output:
+    is_cargo_installed = False
+    try:
+        output = subprocess.check_output(["cargo", "--version"]).decode(
+            "utf-8", "ignore"
+        )
+        if "cargo" in output:
+            is_cargo_installed = True
+    except (FileNotFoundError, SubprocessError):
+        pass
+
+    if not is_cargo_installed:
         sys.stderr.write(
-            "cargo, the Rust language build tool, is not installed or is not on PATH.\n"
-            "This package requires Rust to compile extensions. Install it through\n"
-            "the system's package manager or via https://rustup.rs/\n"
+            "\nCargo, the Rust package manager, is not installed or is not on PATH.\n"
+            "This package requires Rust and Cargo to compile extensions. Install it through\n"
+            "the system's package manager or via https://rustup.rs/\n\n"
         )
         sys.exit(1)
 

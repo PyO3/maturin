@@ -100,6 +100,16 @@ def get_requires_for_build_sdist(config_settings=None):
 
 # noinspection PyUnusedLocal
 def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
+    print("Checking for Rust toolchain....")
+    output = subprocess.check_output(["cargo", "--version"]).decode("utf-8", "ignore")
+    if not "cargo" in output:
+        sys.stderr.write(
+            "cargo, the Rust language build tool, is not installed or is not on PATH.\n"
+            "This package requires Rust to compile extensions. Install it through\n"
+            "the system's package manager or via https://rustup.rs/\n"
+        )
+        sys.exit(1)
+
     command = [
         "pyo3-pack",
         "pep517",

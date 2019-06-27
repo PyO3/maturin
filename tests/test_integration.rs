@@ -191,8 +191,12 @@ fn test_integration_conda(
     // Since the python launcher has precedence over conda, we need to deactivate it.
     // We do so by shadowing it with our own hello world binary.
     let original_path = env::var_os("PATH").expect("PATH is not defined");
-    let py_dir = env::current_dir()?.join("test-data").to_str()?.to_string();
-    let mocked_path = py_dir + ";" + original_path.to_str()?;
+    let py_dir = env::current_dir()?
+        .join("test-data")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let mocked_path = py_dir + ";" + original_path.to_str().unwrap();
     env::set_var("PATH", mocked_path);
 
     // Create environments to build against, prepended with "A" to ensure that integration
@@ -222,7 +226,7 @@ fn test_integration_conda(
     for (filename, _, python_interpreter) in wheels {
         if let Some(pi) = python_interpreter {
             let executable = pi.executable;
-            if executable.to_str()?.contains("pyo3-build-env-") {
+            if executable.to_str().unwrap().contains("pyo3-build-env-") {
                 conda_wheels.push((filename, executable))
             }
         }

@@ -2,8 +2,11 @@
 """
 pyo3-pack's implementation of the PEP 517 interface. Calls pyo3-pack through subprocess
 
-Currently pyo3-pack doesn't have json output (nor is there a way to the user visible output off),
-so this parse the user facing messages.
+Currently, the "return value" of the rust implementation is the last line of stdout
+
+On windows, apparently pip's subprocess handling sets stdout to some windows encoding (e.g. cp1252 on my machine),
+even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids ecoding errors due to
+pyo3-pack's emojis.
 
 TODO: Don't require the user to specify toml as a requirement in the pyproject.toml
 """
@@ -48,18 +51,19 @@ def get_config_options() -> List[str]:
 # noinspection PyUnusedLocal
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     # The PEP 517 build environment garuantees that `python` is the correct python
-    command = ["pyo3-pack", "build", "-i", "python", "--no-sdist"]
+    command = ["pyo3-pack", "pep517", "build-wheel", "-i", "python"]
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        output = subprocess.check_output(command).decode("utf-8", "ignore")
+        output = subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         print("Error: {}".format(e))
         sys.exit(1)
-    print(output)
-    # Get the filename from `📦 Built wheel [for CPython 3.6m] to /home/user/project`
-    filename = os.path.split(output.strip().splitlines()[-1].split(" to ")[1])[1]
+    sys.stdout.buffer.write(output)
+    sys.stdout.flush()
+    output = output.decode(errors="replace")
+    filename = output.strip().splitlines()[-1]
     shutil.copy2("target/wheels/" + filename, os.path.join(wheel_directory, filename))
     return filename
 
@@ -77,11 +81,13 @@ def build_sdist(sdist_directory, config_settings=None):
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        output = subprocess.check_output(command).decode("utf-8", "ignore")
+        output = subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         print(e)
         sys.exit(1)
-    print(output)
+    sys.stdout.buffer.write(output)
+    sys.stdout.flush()
+    output = output.decode(errors="replace")
     return output.strip().splitlines()[-1]
 
 
@@ -110,6 +116,12 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
-    output = subprocess.check_output(command).decode("utf-8", "ignore")
-    print(output)
+    try:
+        output = subprocess.check_output(command)
+    except subprocess.CalledProcessError as e:
+        print("Error: {}".format(e))
+        sys.exit(1)
+    sys.stdout.buffer.write(output)
+    sys.stdout.flush()
+    output = output.decode(errors="replace")
     return output.strip().splitlines()[-1]

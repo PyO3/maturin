@@ -3,6 +3,7 @@
 //!
 //! Run with --help for usage information
 
+use failure::ResultExt;
 use failure::{bail, Error};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
@@ -19,7 +20,6 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
-    failure::ResultExt,
     pyo3_pack::{upload, Registry, UploadError},
     reqwest::Url,
     rpassword,
@@ -197,6 +197,20 @@ enum PEP517Command {
         /// The metadata_directory argument to prepare_metadata_for_build_wheel
         #[structopt(long = "metadata-directory", parse(from_os_str))]
         metadata_directory: PathBuf,
+        /// Strip the library for minimum file size
+        #[structopt(long)]
+        strip: bool,
+    },
+    #[structopt(name = "build-wheel")]
+    /// Implementation of build_wheel
+    ///
+    /// --release and --strip are currently unused by the PEP 517 implementation
+    BuildWheel {
+        #[structopt(flatten)]
+        build: BuildOptions,
+        /// Pass --release to cargo
+        #[structopt(long)]
+        release: bool,
         /// Strip the library for minimum file size
         #[structopt(long)]
         strip: bool,
@@ -387,6 +401,16 @@ fn run() -> Result<(), Error> {
                 let mut writer = PathWriter::from_path(metadata_directory);
                 write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
                 println!("{}", context.metadata21.get_dist_info_dir().display());
+            }
+            PEP517Command::BuildWheel {
+                build,
+                release,
+                strip,
+            } => {
+                let build_context = build.into_build_context(release, strip)?;
+                let wheels = build_context.build_wheels()?;
+                assert_eq!(wheels.len(), 1);
+                println!("{}", wheels[0].0.file_name().unwrap().to_str().unwrap());
             }
             PEP517Command::WriteSDist {
                 sdist_directory,

@@ -18,7 +18,7 @@ use std::io::{Read, Write};
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::str;
 use tempfile::tempdir;
 use walkdir::WalkDir;
@@ -367,15 +367,18 @@ pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<
 
     let ffi_py = tempdir.as_ref().join("ffi.py");
 
+    // Using raw strings is important because on windows there are path like
+    // `C:\Users\JohnDoe\AppData\Local\TEmpl\pip-wheel-asdf1234` where the \U
+    // would otherwise be a broken unicode exscape sequence
     let cffi_invocation = format!(
         r#"
 import cffi
 from cffi import recompiler
 
 ffi = cffi.FFI()
-with open("{header}") as header:
+with open(r"{header}") as header:
     ffi.cdef(header.read())
-recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
+recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
 "#,
         ffi_py = ffi_py.display(),
         header = header.display(),
@@ -383,14 +386,19 @@ recompiler.make_py_source(ffi, "ffi", "{ffi_py}")
 
     let output = Command::new(python)
         .args(&["-c", &cffi_invocation])
-        .stderr(Stdio::inherit())
         .output()?;
     if !output.status.success() {
         bail!(
-            "Failed to generate cffi declarations using {}",
-            python.display()
+            "Failed to generate cffi declarations using {}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+            python.display(),
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?,
         );
     }
+
+    // Don't swallow warnings
+    std::io::stderr().write_all(&output.stderr)?;
 
     let ffi_py_content = fs::read_to_string(ffi_py)?;
     tempdir.close()?;

@@ -216,14 +216,15 @@ impl BuildContext {
                  in the lib section of your Cargo.toml?",
             )
         })?;
-
-        let target = python_interpreter
-            .map(|x| &x.target)
-            .unwrap_or(&self.target);
-
         #[cfg(feature = "auditwheel")]
-        auditwheel_rs(&artifact, target, &self.manylinux)
-            .context("Failed to ensure manylinux compliance")?;
+        {
+            let target = python_interpreter
+                .map(|x| &x.target)
+                .unwrap_or(&self.target);
+
+            auditwheel_rs(&artifact, target, &self.manylinux)
+                .context("Failed to ensure manylinux compliance")?;
+        }
 
         if let Some(module_name) = module_name {
             warn_missing_py_init(&artifact, module_name)

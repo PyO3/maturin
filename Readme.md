@@ -126,6 +126,8 @@ You can then e.g. install your package with `pip install .`. With `pip install .
 
 You can use the options `manylinux`, `skip-auditwheel`, `bindings`, `strip`, `cargo-extra-args` and `rustc-extra-args` under `[tool.pyo3-pack]` the same way you would when running pyo3-pack directly.  The `bindings` key is required for cffi and bin projects as those can't be automatically detected. Currently, all build are in release mode (see [this thread](https://discuss.python.org/t/pep-517-debug-vs-release-builds/1924) for details).
 
+For a non-manylinux build you could with cffi bindings you could use the following:
+
 ```toml
 [build-system]
 requires = ["pyo3-pack", "toml"]
@@ -133,7 +135,7 @@ build-backend = "pyo3_pack"
 
 [tool.pyo3-pack]
 bindings = "cffi"
-cargo-extra-args="-v"
+manylinux = "off"
 ```
 
 Using tox with build isolation is currently blocked by a tox bug ([tox-dev/tox#1344](https://github.com/tox-dev/tox/issues/1344)).

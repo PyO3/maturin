@@ -91,6 +91,10 @@ pub fn upload(
             reqwest::header::CONTENT_TYPE,
             "application/json; charset=utf-8",
         )
+        .header(
+            reqwest::header::USER_AGENT,
+            format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        )
         .multipart(form)
         .basic_auth(registry.username.clone(), Some(registry.password.clone()))
         .send()?;

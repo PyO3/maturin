@@ -208,9 +208,6 @@ enum PEP517Command {
     BuildWheel {
         #[structopt(flatten)]
         build: BuildOptions,
-        /// Pass --release to cargo
-        #[structopt(long)]
-        release: bool,
         /// Strip the library for minimum file size
         #[structopt(long)]
         strip: bool,
@@ -258,10 +255,9 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
         }
         PEP517Command::BuildWheel {
             build,
-            release,
             strip,
         } => {
-            let build_context = build.into_build_context(release, strip)?;
+            let build_context = build.into_build_context(true, strip)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.file_name().unwrap().to_str().unwrap());

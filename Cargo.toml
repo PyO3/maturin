@@ -62,3 +62,6 @@ log = ["pretty_env_logger"]
 rustls = ["reqwest/rustls-tls"]
 # Internal feature to run test with stable rust
 skip-nightly-tests = []
+
+[package.metadata.pyo3-pack]
+classifier = ["Software Development :: Build Tools"]

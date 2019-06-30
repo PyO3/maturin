@@ -124,7 +124,7 @@ If a `pyproject.toml` with a `[build-system]` entry is present, pyo3-pack will b
 
 You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and pyo3-pack.
 
-You can use the options `manylinux`, `skip-auditwheel`, `bindings`, `cargo-extra-args` and `rustc-extra-args` under `[tool.pyo3-pack]` the same way you would when running pyo3-pack directly. The `bindings` key is required for cffi and bin projects as those can't be automatically detected.
+You can use the options `manylinux`, `skip-auditwheel`, `bindings`, `strip`, `cargo-extra-args` and `rustc-extra-args` under `[tool.pyo3-pack]` the same way you would when running pyo3-pack directly.  The `bindings` key is required for cffi and bin projects as those can't be automatically detected. Currently, all build are in release mode (see [this thread](https://discuss.python.org/t/pep-517-debug-vs-release-builds/1924) for details).
 
 ```toml
 [build-system]

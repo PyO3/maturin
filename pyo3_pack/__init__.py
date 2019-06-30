@@ -24,6 +24,7 @@ available_options = [
     "manylinux",
     "skip-auditwheel",
     "bindings",
+    "strip",
     "cargo-extra-args",
     "rustc-extra-args",
 ]

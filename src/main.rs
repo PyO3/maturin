@@ -253,10 +253,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
             write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
             println!("{}", context.metadata21.get_dist_info_dir().display());
         }
-        PEP517Command::BuildWheel {
-            build,
-            strip,
-        } => {
+        PEP517Command::BuildWheel { build, strip } => {
             let build_context = build.into_build_context(true, strip)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);

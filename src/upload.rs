@@ -93,7 +93,7 @@ pub fn upload(
         )
         .header(
             reqwest::header::USER_AGENT,
-            format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+            format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
         )
         .multipart(form)
         .basic_auth(registry.username.clone(), Some(registry.password.clone()))

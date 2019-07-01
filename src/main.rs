@@ -231,6 +231,8 @@ enum PEP517Command {
 }
 
 /// Dispatches into the native implementations of the PEP 517 functions
+///
+/// The last line of stdout is used as return value from the python part of the implementation
 fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
     match subcommand {
         PEP517Command::WriteDistInfo {

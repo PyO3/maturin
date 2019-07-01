@@ -29,7 +29,7 @@ failure = "0.1.5"
 keyring = { version = "0.7.0", optional = true }
 reqwest = { version = "0.9.18", optional = true, default-features = false }
 rpassword = { version = "3.0.2", optional = true }
-serde_json = "1.0.39"
+serde_json = "1.0.40"
 sha2 = "0.8.0"
 structopt = "0.2.18"
 target_info = "0.1.0"

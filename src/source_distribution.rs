@@ -77,7 +77,7 @@ pub fn source_distribution(
 /// A pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct PyProjectToml {
+pub struct PyProjectToml {
     build_system: toml::Value,
 }
 
@@ -85,7 +85,7 @@ pub(crate) struct PyProjectToml {
 ///
 /// Does no specific error handling because it's only used to check whether or not to build
 /// source distributions
-pub(crate) fn get_pyproject_toml(project_root: impl AsRef<Path>) -> Result<PyProjectToml, Error> {
+pub fn get_pyproject_toml(project_root: impl AsRef<Path>) -> Result<PyProjectToml, Error> {
     let contents = fs::read_to_string(project_root.as_ref().join("pyproject.toml"))?;
     let cargo_toml = toml::from_str(&contents)?;
     Ok(cargo_toml)

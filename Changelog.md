@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Mixed rust/python layout
  * Added PEP 517 support
+ * Added a `pyo-pack sdist` command as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
 
 ## [0.6.1]
 

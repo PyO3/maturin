@@ -41,7 +41,7 @@ pub use crate::module_writer::{
 };
 pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::{Manylinux, Target};
-pub use source_distribution::source_distribution;
+pub use source_distribution::{source_distribution, get_pyproject_toml};
 #[cfg(feature = "upload")]
 pub use {
     crate::registry::Registry,

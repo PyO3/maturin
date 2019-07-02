@@ -3,8 +3,7 @@
 //!
 //! Run with --help for usage information
 
-use failure::ResultExt;
-use failure::{bail, Error};
+use failure::{ResultExt, bail, Error, format_err};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
@@ -13,10 +12,10 @@ use keyring::{Keyring, KeyringError};
 use pretty_env_logger;
 use pyo3_pack::{
     develop, source_distribution, write_dist_info, BridgeModel, BuildOptions, CargoToml,
-    Metadata21, PathWriter, PythonInterpreter, Target,
+    Metadata21, PathWriter, PythonInterpreter, Target, get_pyproject_toml,
 };
-use std::env;
 use std::path::PathBuf;
+use std::{env, fs};
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
@@ -25,6 +24,7 @@ use {
     rpassword,
     std::io,
 };
+use cargo_metadata::MetadataCommand;
 
 /// Returns the password and a bool that states whether to ask for re-entering the password
 /// after a failed authentication
@@ -115,7 +115,7 @@ struct PublishOpt {
 /// as rust binaries as python packages
 enum Opt {
     #[structopt(name = "build")]
-    /// Build the crate into wheels
+    /// Build the crate into python packages
     Build {
         #[structopt(flatten)]
         build: BuildOptions,
@@ -131,7 +131,7 @@ enum Opt {
     },
     #[cfg(feature = "upload")]
     #[structopt(name = "publish")]
-    /// Build and publish the crate as wheels to pypi
+    /// Build and publish the crate as python packages to pypi
     Publish {
         #[structopt(flatten)]
         build: BuildOptions,
@@ -176,6 +176,26 @@ enum Opt {
         /// Use as `--rustc-extra-args="--my-arg"`
         #[structopt(long = "rustc-extra-args")]
         rustc_extra_args: Vec<String>,
+    },
+    /// Build only a source distribution (sdist) without compiling.
+    ///
+    /// Building a source distribution requires a pyproject.toml with a `[build-system]` table.
+    ///
+    /// This command is a workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
+    #[structopt(name = "sdist")]
+    SDist {
+        #[structopt(
+            short = "m",
+            long = "manifest-path",
+            parse(from_os_str),
+            default_value = "Cargo.toml"
+        )]
+        /// The path to the Cargo.toml
+        manifest_path: PathBuf,
+        /// The directory to store the built wheels in. Defaults to a new "wheels"
+        /// directory in the project's target directory
+        #[structopt(short, long, parse(from_os_str))]
+        out: Option<PathBuf>,
     },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
@@ -426,6 +446,35 @@ fn run() -> Result<(), Error> {
                 release,
                 strip,
             )?;
+        }
+        Opt::SDist { manifest_path, out } => {
+            let manifest_dir = manifest_path.parent().unwrap();
+
+            // Ensure the project has a compliant pyproject.toml
+            get_pyproject_toml(&manifest_dir)
+                .context("A pyproject.toml with a `[build-system]` table is required to build a source distribution")?;
+
+            let cargo_toml = CargoToml::from_path(&manifest_path)?;
+            let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
+                .context("Failed to parse Cargo.toml into python metadata")?;
+
+            // Failure fails here since cargo_metadata does some weird stuff on their side
+            let cargo_metadata = MetadataCommand::new()
+                .manifest_path(&manifest_path)
+                .exec()
+                .map_err(|e| format_err!("Cargo metadata failed: {}", e))?;
+
+            let wheel_dir = match out {
+                Some(ref dir) => dir.clone(),
+                None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
+            };
+
+            fs::create_dir_all(&wheel_dir)
+                .context("Failed to create the target directory for the source distribution")?;
+
+            source_distribution(&wheel_dir, &metadata21, &manifest_path)
+                .context("Failed to build source distribution")?;
+
         }
         Opt::PEP517(subcommand) => pep517(subcommand)?,
     }

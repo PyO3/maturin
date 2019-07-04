@@ -3,7 +3,8 @@
 //!
 //! Run with --help for usage information
 
-use failure::{ResultExt, bail, Error, format_err};
+use cargo_metadata::MetadataCommand;
+use failure::{bail, format_err, Error, ResultExt};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
@@ -11,8 +12,8 @@ use keyring::{Keyring, KeyringError};
 #[cfg(feature = "log")]
 use pretty_env_logger;
 use pyo3_pack::{
-    develop, source_distribution, write_dist_info, BridgeModel, BuildOptions, CargoToml,
-    Metadata21, PathWriter, PythonInterpreter, Target, get_pyproject_toml,
+    develop, get_pyproject_toml, source_distribution, write_dist_info, BridgeModel, BuildOptions,
+    CargoToml, Metadata21, PathWriter, PythonInterpreter, Target,
 };
 use std::path::PathBuf;
 use std::{env, fs};
@@ -24,7 +25,6 @@ use {
     rpassword,
     std::io,
 };
-use cargo_metadata::MetadataCommand;
 
 /// Returns the password and a bool that states whether to ask for re-entering the password
 /// after a failed authentication
@@ -474,7 +474,6 @@ fn run() -> Result<(), Error> {
 
             source_distribution(&wheel_dir, &metadata21, &manifest_path)
                 .context("Failed to build source distribution")?;
-
         }
         Opt::PEP517(subcommand) => pep517(subcommand)?,
     }

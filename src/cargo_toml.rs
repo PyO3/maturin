@@ -61,7 +61,7 @@ impl CargoToml {
         match self.package.metadata {
             Some(CargoTomlMetadata {
                 pyo3_pack:
-                    Some(CargoTomlMetadataPyo3Pack {
+                    Some(RemainingCoreMetadata {
                         scripts: Some(ref scripts),
                         ..
                     }),
@@ -75,7 +75,7 @@ impl CargoToml {
         match self.package.metadata {
             Some(CargoTomlMetadata {
                 pyo3_pack:
-                    Some(CargoTomlMetadataPyo3Pack {
+                    Some(RemainingCoreMetadata {
                         classifier: Some(ref classifier),
                         ..
                     }),
@@ -83,18 +83,41 @@ impl CargoToml {
             _ => Vec::new(),
         }
     }
+
+    /// Returns the value of `[project.metadata.pyo3-pack]` or an empty stub
+    pub fn remaining_core_metadata(&self) -> RemainingCoreMetadata {
+        match &self.package.metadata {
+            Some(CargoTomlMetadata {
+                pyo3_pack: Some(extra_metadata),
+            }) => extra_metadata.clone(),
+            _ => Default::default(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
 struct CargoTomlMetadata {
-    #[serde(rename = "pyo3-pack")]
-    pyo3_pack: Option<CargoTomlMetadataPyo3Pack>,
+    pyo3_pack: Option<RemainingCoreMetadata>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-struct CargoTomlMetadataPyo3Pack {
-    scripts: Option<HashMap<String, String>>,
-    classifier: Option<Vec<String>>,
+/// The `[project.metadata.pyo3-pack]` with the python specific metadata
+///
+/// Those fields are the part of the
+/// [python core metadata](https://packaging.python.org/specifications/core-metadata/)
+/// that doesn't have an equivalent in cargo's `[package]` table
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct RemainingCoreMetadata {
+    pub scripts: Option<HashMap<String, String>>,
+    pub classifier: Option<Vec<String>>,
+    pub maintainer: Option<String>,
+    pub maintainer_email: Option<String>,
+    pub requires_dist: Option<Vec<String>>,
+    pub requires_python: Option<String>,
+    pub requires_external: Option<Vec<String>>,
+    pub project_url: Option<Vec<String>>,
+    pub provides_extra: Option<Vec<String>>,
 }
 
 #[cfg(test)]
@@ -124,6 +147,7 @@ mod test {
 
             [package.metadata.pyo3-pack]
             classifier = ["Programming Language :: Python"]
+            requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
         "#
         );
 
@@ -134,7 +158,13 @@ mod test {
 
         let classifier = vec!["Programming Language :: Python".to_string()];
 
+        let requires_dist = Some(vec!["flask~=1.1.0".to_string(), "toml==0.10.0".to_string()]);
+
         assert_eq!(cargo_toml.scripts(), scripts);
         assert_eq!(cargo_toml.classifier(), classifier);
+        assert_eq!(
+            cargo_toml.remaining_core_metadata().requires_dist,
+            requires_dist
+        );
     }
 }

@@ -98,6 +98,13 @@ my-project
 
 ## Python metadata
 
+To specifiy python dependecies, add a list `requires-dist` in a `[package.metadata.pyo3-pack]` section in the Cargo.toml. This list is equivalent to `install_requires` in setuptools:
+
+```toml
+[package.metadata.pyo3-pack]
+requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
+```
+
 Pip allows adding so called console scripts, which are shell commands that execute some function in you program. You can add console scripts in a section `[package.metadata.pyo3-pack.scripts]`. The keys are the script names while the values are the path to the function in the format `some.module.path:class.function`, where the `class` part is optional. The function is called with no arguments. Example:
 
 ```toml
@@ -105,13 +112,14 @@ Pip allows adding so called console scripts, which are shell commands that execu
 get_42 = "my_project:DummyClass.get_42"
 ```
 
-You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `package.metadata.pyo3-pack.classifier`, e.g.:
+You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `package.metadata.pyo3-pack.classifier`:
 
 ```toml
 [package.metadata.pyo3-pack]
 classifier = ["Programming Language :: Python"]
 ```
 
+You can use other fields from the [python core metadata](https://packaging.python.org/specifications/core-metadata/) in the `[package.metadata.pyo3-pack]` section, specifically ` maintainer`, `maintainer-email` and `requires-python` (string fields), as well as `requires-external`, `project-url` and `provides-extra` (lists of strings).
 
 ## pyproject.toml
 

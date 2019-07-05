@@ -85,12 +85,14 @@ impl Metadata21 {
 
         let classifier = cargo_toml.classifier();
 
+        let extra_metadata = cargo_toml.remaining_core_metadata();
+
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
+
+            // Mapped from cargo metadata
             name: cargo_toml.package.name.to_owned(),
             version: cargo_toml.package.version.clone(),
-            platform: Vec::new(),
-            supported_platform: Vec::new(),
             summary: cargo_toml.package.description.clone(),
             description,
             description_content_type,
@@ -104,17 +106,25 @@ impl Metadata21 {
             // Cargo.toml has no distinction between author and author email
             author: Some(authors.to_owned()),
             author_email: Some(authors.to_owned()),
-            maintainer: None,
-            maintainer_email: None,
             license: cargo_toml.package.license.clone(),
+
+            // Values provided through `[project.metadata.pyo3-pack]`
             classifier,
-            requires_dist: Vec::new(),
+            maintainer: extra_metadata.maintainer,
+            maintainer_email: extra_metadata.maintainer_email,
+            requires_dist: extra_metadata.requires_dist.unwrap_or_default(),
+            requires_python: extra_metadata.requires_python,
+            requires_external: extra_metadata.requires_external.unwrap_or_default(),
+            project_url: extra_metadata.project_url.unwrap_or_default(),
+            provides_extra: extra_metadata.provides_extra.unwrap_or_default(),
+
+            // Officially rarely used, and afaik not applicable with pyo3
             provides_dist: Vec::new(),
             obsoletes_dist: Vec::new(),
-            requires_python: None,
-            requires_external: Vec::new(),
-            project_url: Vec::new(),
-            provides_extra: Vec::new(),
+
+            // Open question: Should those also be supported? And if so, how?
+            platform: Vec::new(),
+            supported_platform: Vec::new(),
         })
     }
 
@@ -281,6 +291,7 @@ mod test {
 
             [package.metadata.pyo3-pack]
             classifier = ["Programming Language :: Python"]
+            requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
         "#
         )
         .replace("readme.md", &readme_path);
@@ -296,6 +307,8 @@ mod test {
             Name: info-project
             Version: 0.1.0
             Classifier: Programming Language :: Python
+            Requires-Dist: flask~=1.1.0
+            Requires-Dist: toml==0.10.0
             Summary: A test project
             Keywords: ffi test
             Home-Page: https://example.org

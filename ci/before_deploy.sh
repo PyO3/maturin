@@ -76,11 +76,12 @@ upload_to_pypi() {
 }
 
 main() {
+    # upload_to_pypi needs to run first because otherwise we have the .tar.gz and the .deb in the source distribution
+    upload_to_pypi
     make_archive
     if [[ $TARGET = *linux* ]]; then
       make_deb
     fi
-    upload_to_pypi
 }
 
 main

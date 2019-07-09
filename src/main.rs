@@ -452,7 +452,7 @@ fn run() -> Result<(), Error> {
 
             // Ensure the project has a compliant pyproject.toml
             get_pyproject_toml(&manifest_dir)
-                .context("A pyproject.toml with a `[build-system]` table is required to build a source distribution")?;
+                .context("A pyproject.toml with a PEP 517 compliant `[build-system]` table is required to build a source distribution")?;
 
             let cargo_toml = CargoToml::from_path(&manifest_path)?;
             let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
@@ -489,7 +489,7 @@ fn main() {
 
     if let Err(e) = run() {
         eprintln!("💥 pyo3-pack failed");
-        for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {
+        for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter() {
             eprintln!("  Caused by: {}", cause);
         }
         std::process::exit(1);

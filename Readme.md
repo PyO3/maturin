@@ -127,7 +127,7 @@ pyo3-pack supports building through pyproject.toml. To use it, create a `pyproje
 
 ```toml
 [build-system]
-requires = ["pyo3-pack", "toml"]
+requires = ["pyo3-pack"]
 build-backend = "pyo3_pack"
 ```
 
@@ -141,7 +141,7 @@ For a non-manylinux build you could with cffi bindings you could use the followi
 
 ```toml
 [build-system]
-requires = ["pyo3-pack", "toml"]
+requires = ["pyo3-pack"]
 build-backend = "pyo3_pack"
 
 [tool.pyo3-pack]

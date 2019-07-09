@@ -7,8 +7,6 @@ Currently, the "return value" of the rust implementation is the last line of std
 On windows, apparently pip's subprocess handling sets stdout to some windows encoding (e.g. cp1252 on my machine),
 even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids ecoding errors due to
 pyo3-pack's emojis.
-
-TODO: Don't require the user to specify toml as a requirement in the pyproject.toml
 """
 
 import os

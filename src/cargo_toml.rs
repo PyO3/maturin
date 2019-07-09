@@ -108,6 +108,7 @@ struct CargoTomlMetadata {
 /// that doesn't have an equivalent in cargo's `[package]` table
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Default)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub struct RemainingCoreMetadata {
     pub scripts: Option<HashMap<String, String>>,
     pub classifier: Option<Vec<String>>,

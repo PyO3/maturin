@@ -1,4 +1,4 @@
-use crate::common::{check_installed, handle_result};
+use crate::common::{check_installed, handle_result, maybe_mock_cargo};
 use failure::Error;
 use failure::ResultExt;
 use pyo3_pack::{develop, Target};
@@ -6,6 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
+use std::str;
 mod common;
 
 #[cfg(not(feature = "skip-nightly-tests"))]
@@ -47,6 +48,8 @@ fn test_develop_hello_world() {
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "pyo3-pack develop" to install it and checks it is working
 fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
+    maybe_mock_cargo();
+
     let venv_dir = package
         .as_ref()
         .canonicalize()
@@ -63,9 +66,7 @@ fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(
         .arg(&venv_dir)
         .stderr(Stdio::inherit())
         .output()
-        .expect(
-            "You need to have virtualenv installed to run the tests (`pip install virtualenv`)",
-        );
+        .expect("Failed to run python to create a virtualenv");
     if !output.status.success() {
         panic!(output.status);
     }
@@ -79,7 +80,12 @@ fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(
         .args(&["-m", "pip", "install", "cffi"])
         .output()?;
     if !output.status.success() {
-        panic!("Failed to install cffi: {}", output.status);
+        panic!(
+            "Failed to install cffi: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
     }
 
     let manifest_file = package.as_ref().join("Cargo.toml");
@@ -90,7 +96,7 @@ fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(
         vec![],
         &venv_dir,
         false,
-        false,
+        cfg!(feature = "faster-tests"),
     )?;
 
     check_installed(&package.as_ref(), &python)?;

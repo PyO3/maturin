@@ -1,4 +1,4 @@
-use crate::common::{check_installed, handle_result};
+use crate::common::{check_installed, handle_result, maybe_mock_cargo};
 use failure::{bail, Error, ResultExt};
 use pyo3_pack::{BuildOptions, Target};
 use std::path::Path;
@@ -73,6 +73,8 @@ fn test_integration_hello_world() {
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
 fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
+    maybe_mock_cargo();
+
     let target = Target::from_target_triple(None)?;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
@@ -92,7 +94,9 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
 
     let options = BuildOptions::from_iter_safe(cli)?;
 
-    let wheels = options.into_build_context(false, false)?.build_wheels()?;
+    let wheels = options
+        .into_build_context(false, cfg!(feature = "faster-tests"))?
+        .build_wheels()?;
 
     for (filename, supported_version, python_interpreter) in wheels {
         let venv_dir = if supported_version == "py2.py3" {
@@ -126,6 +130,19 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
                     output.status
                 );
             }
+
+            let output = Command::new(&target.get_venv_python(&venv_dir))
+                .args(&["-m", "pip", "install", "cffi"])
+                .output()
+                .context("pip install cffi failed")?;
+            if !output.status.success() {
+                panic!(
+                    "pip failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                    output.status,
+                    str::from_utf8(&output.stdout)?,
+                    str::from_utf8(&output.stderr)?
+                );
+            }
         }
 
         let python = target.get_venv_python(&venv_dir);
@@ -143,19 +160,6 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
             .context("pip install failed")?;
         if !output.status.success() {
             panic!();
-        }
-
-        let output = Command::new(&python)
-            .args(&["-m", "pip", "install", "cffi"])
-            .output()
-            .context("pip install cffi failed")?;
-        if !output.status.success() {
-            panic!(
-                "pip failed: {} \n--- Stdout:\n{}\n--- Stderr:\n{}",
-                output.status,
-                str::from_utf8(&output.stdout)?,
-                str::from_utf8(&output.stderr)?
-            );
         }
 
         check_installed(&package.as_ref(), &python)?;
@@ -220,7 +224,9 @@ fn test_integration_conda(
 
     let options = BuildOptions::from_iter_safe(cli)?;
 
-    let wheels = options.into_build_context(false, false)?.build_wheels()?;
+    let wheels = options
+        .into_build_context(false, cfg!(feature = "faster-tests"))?
+        .build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
     for (filename, _, python_interpreter) in wheels {

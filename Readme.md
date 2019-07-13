@@ -339,4 +339,6 @@ The `sysconfig` folder contains the output of `python -m sysconfig` for differen
 
 You need to install `cffi` (`pip install cffi`) to run the tests.
 
+There are two optional hacks that can speed up the tests (over 80s to 17s on my machine). By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python vesion. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactive it. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.
+
 You might want to have look into my [blog post](https://blog.schuetze.link/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains the intricacies of building native python packages.

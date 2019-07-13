@@ -163,9 +163,17 @@ impl ModuleWriter for WheelWriter {
         // So apparently we must use unix style paths for pypi's checks to succeed; Without
         // the replacing we get a "400 Client Error: Invalid distribution file."
         let target = target.as_ref().to_str().unwrap().replace("\\", "/");
+
+        // Unlike users which can use the develop subcommand, the tests have to go through
+        // packing a zip which pip than has to unpack. This makes this 2-3 times faster
+        let compression_method = if cfg!(feature = "faster-tests") {
+            zip::CompressionMethod::Stored
+        } else {
+            zip::CompressionMethod::Deflated
+        };
         let options = zip::write::FileOptions::default()
             .unix_permissions(permissions)
-            .compression_method(zip::CompressionMethod::Deflated);
+            .compression_method(compression_method);
         self.zip.start_file(target.clone(), options)?;
         self.zip.write_all(&bytes)?;
 
@@ -210,8 +218,12 @@ impl WheelWriter {
 
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let compression_method = if cfg!(feature = "faster-tests") {
+            zip::CompressionMethod::Stored
+        } else {
+            zip::CompressionMethod::Deflated
+        };
+        let options = zip::write::FileOptions::default().compression_method(compression_method);
         self.zip
             .start_file(self.record_file.to_str().unwrap(), options)?;
         for (filename, hash, len) in self.record {

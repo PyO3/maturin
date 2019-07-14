@@ -38,7 +38,7 @@ pub struct BuildOptions {
     #[structopt(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
-    pub interpreter: Vec<String>,
+    pub interpreter: Vec<PathBuf>,
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
     #[structopt(short, long)]
     pub bindings: Option<String>,
@@ -232,7 +232,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 /// This means all for bindings, one for cffi and zero for bin.
 pub fn find_interpreter(
     bridge: &BridgeModel,
-    interpreter: &[String],
+    interpreter: &[PathBuf],
     target: &Target,
 ) -> Result<Vec<PythonInterpreter>, Error> {
     Ok(match bridge {
@@ -264,7 +264,7 @@ pub fn find_interpreter(
             let executable = if interpreter.is_empty() {
                 target.get_python()
             } else if interpreter.len() == 1 {
-                PathBuf::from(interpreter[0].clone())
+                interpreter[0].clone()
             } else {
                 bail!("You can only specify one python interpreter for cffi compilation");
             };

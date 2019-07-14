@@ -9,54 +9,41 @@ environment:
   PYO3_PACK_PASSWORD:
     secure: 3xTkaAvLd84qjLwY/quMb0w1Kh5NRXQ0a/zHtjnH4WY=
   matrix:
+    # For the integration test
+    - TARGET: x86_64-pc-windows-msvc
+      CHANNEL: nightly
+      PYTHON: "C:/Python36-x64"
+
     # Publishes to pypi
     - TARGET: i686-pc-windows-msvc
       CHANNEL: stable
     - TARGET: x86_64-pc-windows-msvc
       CHANNEL: stable
 
-    # Commented out to avoid duplicate uploads to pypi
-    #- TARGET: i686-pc-windows-gnu
-    #  CHANNEL: stable
-    #- TARGET: x86_64-pc-windows-gnu
-    #  CHANNEL: stable
-
-    # For the integration test
-    # Comment out because it is failing for not locally reproducable reasons (maybe LIB is set incorrectly)
-    #- TARGET: x86_64-pc-windows-msvc
-    #  CHANNEL: nightly
-
 matrix:
   fast_finish: true
 
 install:
-  - cinst miniconda3
-  - ps: |
-      # For the gnu target we need gcc, provided by mingw. mingw which is already preinstalled,
-      # but we need the right version (32-bit or 64-bit) to the PATH.
-      # See https://www.appveyor.com/docs/build-environment/#mingw-msys-cygwin
-      if ($env:target -like "*-gnu") {
-        if ($env:target -like "x86_64-*") { # x86_64-pc-windows-gnu
-          $env:path += ";C:\msys64\mingw64\bin"
-        } else { # i686-pc-windows-gnu
-          $env:path += ";C:\msys64\mingw32\bin"
-        }
-        gcc --version
-      }
+  #- cinst miniconda3 # Deactivate because it makes non-conda tests fail
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %CHANNEL%
   - SET PATH=%PATH%;%CARGO_HOME%\bin
-  # We need python 3.x 64 bit as default in path for the develop test
-  - SET PATH=C:\Python36-x64\bin;%PATH%
+
+  # See https://github.com/PyO3/pyo3/blob/master/ci/appveyor/setup.ps1
+  - ps: if ($env:channel -like "nightly") { .\ci\setup.ps1 }
+
+  # From and for ring
+  - IF "%CHANNEL%" == "nightly" (call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64)
+
+  - echo %PATH%
+  - echo %LIBPATH%
   - rustc -V
   - cargo -V
 
 test_script:
   - cargo build
-  - ps: |
-      if ($env:channel -like "nightly") {
-        cargo test
-      }
+  - IF "%CHANNEL%" == "nightly" (python.exe -m pip install cffi)
+  - IF "%CHANNEL%" == "nightly" (cargo test)
 
 before_deploy:
   - cargo build --release --features password-storage

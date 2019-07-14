@@ -42,6 +42,7 @@ fn test_integration_pyo3_mixed() {
 #[cfg(not(feature = "skip-nightly-tests"))]
 #[cfg(target_os = "windows")]
 #[test]
+#[ignore]
 fn test_integration_pyo3_pure_conda() {
     handle_result(test_integration_conda("text-crates/pyo3-pure", None));
 }
@@ -120,14 +121,14 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
                 .arg("-m")
                 .arg("venv")
                 .arg(&venv_dir)
-                .stderr(Stdio::inherit())
-                .stdout(Stdio::inherit())
                 .output()?;
             if !output.status.success() {
                 bail!(
-                    "Failed to create a virtualenv at {}: {}",
+                    "Failed to create a virtualenv at {}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
                     venv_dir.display(),
-                    output.status
+                    output.status,
+                    str::from_utf8(&output.stdout)?,
+                    str::from_utf8(&output.stderr)?,
                 );
             }
 

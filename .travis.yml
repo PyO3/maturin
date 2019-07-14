@@ -135,8 +135,6 @@ deploy:
     skip_cleanup: true
     script: cargo publish --token $CRATES_IO_TOKEN --no-verify
     on:
-      branch: master
-      repo: pyo3/pyo3-pack
       tags: true
       condition: $TARGET = x86_64-unknown-linux-musl
 

@@ -260,7 +260,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
             metadata_directory,
             strip,
         } => {
-            build_options.interpreter = vec!["python".to_string()];
+            build_options.interpreter = vec![PathBuf::from("python")];
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
                 BridgeModel::Bindings(_) => {

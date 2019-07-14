@@ -544,17 +544,23 @@ impl PythonInterpreter {
     /// determines the abiflags and versions of those interpreters and
     /// returns them as [PythonInterpreter]
     pub fn check_executables(
-        executables: &[String],
+        executables: &[PathBuf],
         target: &Target,
     ) -> Result<Vec<PythonInterpreter>, Error> {
         let mut available_versions = Vec::new();
         for executable in executables {
             if let Some(version) = PythonInterpreter::check_executable(executable, &target)
-                .context(format!("{} is not a valid python interpreter", executable))?
+                .context(format!(
+                    "{} is not a valid python interpreter",
+                    executable.display()
+                ))?
             {
                 available_versions.push(version);
             } else {
-                bail!("Python interpreter `{}` doesn't exist", executable);
+                bail!(
+                    "Python interpreter `{}` doesn't exist",
+                    executable.display()
+                );
             }
         }
 

@@ -60,7 +60,8 @@ fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(
     if venv_dir.is_dir() {
         fs::remove_dir_all(&venv_dir)?;
     }
-    let output = Command::new("python3")
+
+    let output = Command::new(target.get_python())
         .arg("-m")
         .arg("venv")
         .arg(&venv_dir)

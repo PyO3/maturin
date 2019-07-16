@@ -15,14 +15,14 @@ RUN curl https://www.musl-libc.org/releases/musl-1.1.20.tar.gz -o musl.tar.gz \
     && cd .. \
     && rm -rf x86_64-unknown-linux-musl \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
-    && rustup toolchain add nightly-2019-02-04 \
+    && rustup toolchain add nightly-2019-05-04 \
     && rustup target add x86_64-unknown-linux-musl \
     && mkdir /io \
     && python3 -m pip install cffi
 
 ADD . /pyo3-pack/
 
-RUN cargo install --path /pyo3-pack
+RUN cargo +nightly-2019-05-04 install --path /pyo3-pack
 
 WORKDIR /io
 

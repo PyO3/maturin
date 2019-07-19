@@ -33,7 +33,7 @@ install:
   - ps: if ($env:channel -like "nightly-2019-05-04") { .\ci\setup.ps1 }
 
   # From and for ring
-  - IF "%CHANNEL%" == "nightly-2019-05-04" (call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64)
+  - IF "%CHANNEL%" == "nightly-2019-05-04" (call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"  x86_amd64)
 
   - echo %PATH%
   - echo %LIBPATH%

@@ -320,69 +320,70 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
     loop {
         println!("🚀 Uploading {} packages", wheels.len());
 
-        // Upload all wheels, aborting on the first error
-        let result = wheels
-            .iter()
-            .map(|(wheel_path, supported_versions, _)| {
-                upload(
-                    &registry,
-                    &wheel_path,
-                    &build_context.metadata21,
-                    &supported_versions,
-                )
-            })
-            .collect();
+        for (wheel_path, supported_versions, _) in &wheels {
+            let result = upload(
+                &registry,
+                &wheel_path,
+                &build_context.metadata21,
+                &supported_versions,
+            );
+            match result {
+                Ok(()) => {
+                    println!("✨ Packages uploaded succesfully");
 
-        match result {
-            Ok(()) => {
-                println!("✨ Packages uploaded succesfully");
-
-                #[cfg(feature = "keyring")]
-                {
-                    // We know the password is correct, so we can save it in the keyring
-                    let username = registry.username.clone();
-                    let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
-                    let password = registry.password.clone();
-                    keyring.set_password(&password).unwrap_or_else(|e| {
-                        eprintln!("⚠ Failed to store the password in the keyring: {:?}", e)
-                    });
-                }
-
-                return Ok(());
-            }
-            Err(UploadError::AuthenticationError) if reenter => {
-                println!("⛔ Username and/or password are wrong");
-
-                #[cfg(feature = "keyring")]
-                {
-                    // Delete the wrong password from the keyring
-                    let old_username = registry.username.clone();
-                    let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
-                    match keyring.delete_password() {
-                        Ok(()) => {}
-                        Err(KeyringError::NoPasswordFound) | Err(KeyringError::NoBackendFound) => {}
-                        _ => eprintln!("⚠ Failed to remove password from keyring"),
+                    #[cfg(feature = "keyring")]
+                    {
+                        // We know the password is correct, so we can save it in the keyring
+                        let username = registry.username.clone();
+                        let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
+                        let password = registry.password.clone();
+                        keyring.set_password(&password).unwrap_or_else(|e| {
+                            eprintln!("⚠ Failed to store the password in the keyring: {:?}", e)
+                        });
                     }
+
+                    return Ok(());
                 }
+                Err(UploadError::AuthenticationError) if reenter => {
+                    println!("⛔ Username and/or password are wrong");
 
-                let username = get_username();
-                let password = rpassword::prompt_password_stdout("Please enter your password: ")
-                    .unwrap_or_else(|_| {
-                        // So we need this fallback for pycharm on windows
-                        let mut password = String::new();
-                        io::stdin()
-                            .read_line(&mut password)
-                            .expect("Failed to read line");
-                        password.trim().to_string()
-                    });
+                    #[cfg(feature = "keyring")]
+                    {
+                        // Delete the wrong password from the keyring
+                        let old_username = registry.username.clone();
+                        let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
+                        match keyring.delete_password() {
+                            Ok(()) => {}
+                            Err(KeyringError::NoPasswordFound)
+                            | Err(KeyringError::NoBackendFound) => {}
+                            _ => eprintln!("⚠ Failed to remove password from keyring"),
+                        }
+                    }
 
-                registry = Registry::new(username, password, registry.url);
-                println!("… Retrying")
+                    let username = get_username();
+                    let password =
+                        rpassword::prompt_password_stdout("Please enter your password: ")
+                            .unwrap_or_else(|_| {
+                                // So we need this fallback for pycharm on windows
+                                let mut password = String::new();
+                                io::stdin()
+                                    .read_line(&mut password)
+                                    .expect("Failed to read line");
+                                password.trim().to_string()
+                            });
+
+                    registry = Registry::new(username, password, registry.url);
+                    println!("… Retrying");
+                    break;
+                }
+                Err(UploadError::AuthenticationError) => {
+                    bail!("Username and/or password are wrong");
+                }
+                Err(err) => {
+                    let filename = wheel_path.file_name().unwrap_or(&wheel_path.as_os_str());
+                    return Err(err).context(format!("💥 Failed to upload {:?}", filename))?;
+                }
             }
-            Err(UploadError::AuthenticationError) => {
-                bail!("Username and/or password are wrong");
-            }
-            Err(err) => return Err(err).context("💥 Failed to upload")?,
         }
     }
 }

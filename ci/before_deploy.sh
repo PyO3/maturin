@@ -82,6 +82,9 @@ main() {
     if [[ $TARGET = *linux* ]]; then
       make_deb
     fi
+    if [[ $TARGET = x86_64-unknown-linux-musl ]]; then
+        cargo publish --token $CRATES_IO_TOKEN --no-verify
+    fi
 }
 
 main

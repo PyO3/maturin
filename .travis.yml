@@ -131,12 +131,6 @@ deploy:
     # - Paste the output down here
     api_key:
       secure: "bKY3J8FBwgit9inzp2CMxQC3icBVco+COcRnqM6NhaOWX3KefXYG/yWQ7htBkeTRAfQERlOkZZOPsOto2dAD49/Mo4Uin9wbRPjPDGPJpFcQofX5aKHqK1Xd1k96rtZKZRIEG5k5J2IKAzPso3GnA0FESAZlZbxEShSCBD6aOlVmjFXwB2kKzJDo9zECxCg84GSvR/7wQg4hwMaMBa79y3VJRCohGTMaISL22QJ0haG+gqZgTv/r9K8P9lwSMBIiTXX3wFJU871sqUNTSSwkmHlVLhVUOwluv+KQ2DI/V/gWfx2CuiZ/7OQlz4zkOB/Y56msH0G7vOwqbSHLwkMYC+zgDWvF0oI/Eb/mdY5VliQdsLDOkKwWm3EuoEUvCgyV9UB1POxxogIx1sAU+Vt9QUj5/cRIJc1zrtA3LdNlbg9M9rYG8jJ6JMbeYTFDTL6YNoHc2lPAdmAqQAZQy6vyR515vm76JfS7yDcLRXKKhLE4dEPUEpv0qU8vCA/FdaZaiW+GJZSS5rJoE0vHaMRsWkgFLqCNSDpUZBd2x60E+n6dQ7XX4DrJ1JmzcG+IZ6AfuIWyRD9s3jQBxRjtyM61ZGo3Nb4zwX2ML1PftNURNAo8rPlgIrqPaveic45hP6PAeX+iMIWzTckq8shlYngjBTw/3UmA8Z18udrRyKCbygs="
-  - provider: script
-    skip_cleanup: true
-    script: cargo publish --token $CRATES_IO_TOKEN --no-verify
-    on:
-      tags: true
-      condition: $TARGET = x86_64-unknown-linux-musl
 
 branches:
   only:

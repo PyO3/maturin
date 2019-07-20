@@ -37,19 +37,19 @@ pub fn source_distribution(
         .map(Path::new)
         .collect();
 
-    let target_source: Vec<(&Path, &Path)> = file_list
+    let manifest_dir = manifest_path.as_ref().parent().unwrap();
+
+    let target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
-        .map(|relative_to_cwd| {
-            let relative_to_project_root = relative_to_cwd
-                .strip_prefix(manifest_path.as_ref().parent().unwrap())
-                .unwrap_or(relative_to_cwd);
-            (relative_to_project_root, *relative_to_cwd)
+        .map(|relative_to_manifests| {
+            let relative_to_cwd = manifest_dir.join(relative_to_manifests);
+            (relative_to_manifests.to_path_buf(), relative_to_cwd)
         })
         .collect();
 
     if !target_source
         .iter()
-        .any(|(target, _)| target == &Path::new("pyproject.toml"))
+        .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
         bail!(
             "pyproject.toml was not included by `cargo package`. \

@@ -5,7 +5,7 @@ A package with pyo3 bindings for testing pyo3-pack.
 ## Usage
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ pyo3_pure
+pip install .
 ```
 
 ```python
@@ -27,4 +27,4 @@ Run it:
 tox
 ```
 
-The tests are in `test_get_gourtytwo.py`, while the configuration is in tox.ini
+The tests are in `test_pyo3_pure.py`, while the configuration is in tox.ini

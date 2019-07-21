@@ -1,16 +1,16 @@
 # pyo3-mixed
 
-A package for testing testing pyo3-pack with a mixed pyo3/python project.
+A package for testing pyo3-pack with a mixed pyo3/python project.
 
 ## Usage
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ pyo3_pure
+pip install .
 ```
 
 ```python
-import pyo3_pure
-assert pyo3_pure.DummyClass.get_42() == 42
+import pyo3_mixed
+assert pyo3_mixed.get_42() == 42
 ```
 
 ## Testing
@@ -27,4 +27,4 @@ Run it:
 tox
 ```
 
-The tests are in `test_get_gourtytwo.py`, while the configuration is in tox.ini
+The tests are in `test_pyo3_mixed.py`, while the configuration is in tox.ini

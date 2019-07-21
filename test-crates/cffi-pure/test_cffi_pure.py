@@ -13,4 +13,6 @@ def test_range():
 
 
 def test_ffi():
-    assert cffi_pure.ffi is not None
+    point = cffi_pure.ffi.new("Point *", (10, 20))
+    assert point.x == 10
+    assert point.y == 20

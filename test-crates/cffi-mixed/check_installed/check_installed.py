@@ -2,10 +2,13 @@
 
 import cffi_mixed
 
-point1 = cffi_mixed.lib.make_point(10, 10)
-point2 = cffi_mixed.lib.make_point(2, 2)
-sum = cffi_mixed.add_points(point1, point2)
+from cffi_mixed import Line
 
-assert sum.x == 12 and sum.y == 12
+point = cffi_mixed.lib.get_origin()
+point.x = 10
+point.y = 10
+assert cffi_mixed.lib.is_in_range(point, 15)
+
+assert Line(2, 5, 6, 8).length() == 5
 
 print("SUCCESS")

@@ -1,2 +1,2 @@
-from .cffi_mixed import lib
-from .add import add_points
+from .cffi_mixed import ffi, lib
+from .line import Line

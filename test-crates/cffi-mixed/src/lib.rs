@@ -17,8 +17,11 @@ pub unsafe extern "C" fn get_origin() -> Point {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn make_point(x: f32, y: f32) -> Point {
-    Point { x, y }
+pub unsafe extern "C" fn add_points(p1: Point, p2: Point) -> Point {
+    Point {
+        x: p1.x + p2.x,
+        y: p1.y + p2.y,
+    }
 }
 
 #[no_mangle]

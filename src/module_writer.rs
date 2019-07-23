@@ -367,12 +367,29 @@ pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<
         );
         header = maybe_header;
     } else {
+        if crate_dir.join("cbindgen.toml").is_file() {
+            println!(
+                "💼 Using the existing cbindgen.toml configuration. \n\
+                 💼 Enforcing the following settings: \n   \
+                 - language = \"C\" \n   \
+                 - no_includes = true \n   \
+                 - no include_guard \t (directives are not yet supported) \n   \
+                 - no defines       \t (directives are not yet supported)"
+            );
+        }
+
+        let mut config = cbindgen::Config::from_root_or_default(&crate_dir);
+        config.defines = HashMap::new();
+        config.include_guard = None;
+
         let bindings = cbindgen::Builder::new()
-            .with_no_includes()
-            .with_language(cbindgen::Language::C)
+            .with_config(config)
             .with_crate(crate_dir)
+            .with_language(cbindgen::Language::C)
+            .with_no_includes()
             .generate()
             .context("Failed to run cbindgen")?;
+
         header = tempdir.as_ref().join("header.h");
         bindings.write_to_file(&header);
     }

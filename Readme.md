@@ -38,7 +38,9 @@ pyo3 will set the used python interpreter in the environment variable `PYTHON_SY
 
  Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
 
-pyo3-pack will run cbindgen and generate cffi bindings. You can override this with a build script that writes a header to `target/header.h`. The generated modules export an `ffi` and a `lib` object.
+pyo3-pack will utilize cbindgen to generate a header file. To customize the header file you can either configure cbindgen through a cbindgen.toml file inside your project root or write a setup a build script which writes a header file to `$PROJECT_ROOT/target/header.h`. 
+
+Based on these header file pyo3-pack is going to generated a module which exports a `ffi` and a `lib` object.
 
 <details>
 <summary>Example of a custom build script</summary>

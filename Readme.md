@@ -98,6 +98,8 @@ my-project
     └── lib.rs
 ```
 
+For quickly setting up a package, there is a *WIP* [cookiecutter-rust-pypackage](https://github.com/pattonw/cookiecutter-rust-pypackage) adapted from audreyr's [cookiecutter-pypackage](https://github.com/audreyr/cookiecutter-pypackage)
+
 ## Python metadata
 
 To specifiy python dependecies, add a list `requires-dist` in a `[package.metadata.pyo3-pack]` section in the Cargo.toml. This list is equivalent to `install_requires` in setuptools:

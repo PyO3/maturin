@@ -277,8 +277,8 @@ pub struct PythonInterpreter {
     ///
     /// See PEP 261 and PEP 393 for details
     pub abiflags: String,
-    /// Currently just the value of [Target::os()], i.e. "windows", "linux" or
-    /// "macos"
+    /// Currently just the value of [Target::os()], i.e. "windows", "linux",
+    /// "macos" or "freebsd"
     pub target: Target,
     /// Path to the python interpreter, e.g. /usr/bin/python3.6
     ///
@@ -308,6 +308,7 @@ fn fun_with_abiflags(
         "win32" | "win_amd64" => target.is_windows(),
         "linux" | "linux2" | "linux3" => target.is_linux(),
         "darwin" => target.is_macos(),
+        "freebsd11" | "freebsd12" | "freebsd13" => target.is_freebsd(),
         _ => false,
     };
 
@@ -420,6 +421,7 @@ impl PythonInterpreter {
     /// Linux:   steinlaus.cpython-35m-x86_64-linux-gnu.so
     /// Windows: steinlaus.cp35-win_amd64.pyd
     /// Mac:     steinlaus.cpython-35m-darwin.so
+    /// FreeBSD: steinlaus.cpython-35m.so
     ///
     /// For pypy3, we read sysconfig.get_config_var("EXT_SUFFIX").
     ///
@@ -430,7 +432,15 @@ impl PythonInterpreter {
             Interpreter::CPython => {
                 let platform = self.target.get_shared_platform_tag();
 
-                if self.target.is_unix() {
+                if self.target.is_freebsd() {
+                    format!(
+                        "{base}.cpython-{major}{minor}{abiflags}.so",
+                        base = base,
+                        major = self.major,
+                        minor = self.minor,
+                        abiflags = self.abiflags,
+                    )
+                } else if self.target.is_unix() {
                     format!(
                         "{base}.cpython-{major}{minor}{abiflags}-{platform}.so",
                         base = base,

@@ -1,4 +1,5 @@
 use failure::{bail, format_err, Error};
+use platform_info::*;
 use platforms;
 use platforms::target::Arch;
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,7 @@ enum OS {
     Linux,
     Windows,
     Macos,
+    FreeBSD,
 }
 
 /// Decides how to handle manylinux compliance
@@ -60,6 +62,7 @@ impl Target {
             "linux" => OS::Linux,
             "windows" => OS::Windows,
             "macos" => OS::Macos,
+            "freebsd" => OS::FreeBSD,
             unsupported => panic!("The platform {} is not supported", unsupported),
         };
 
@@ -89,6 +92,7 @@ impl Target {
             platforms::target::OS::Linux => OS::Linux,
             platforms::target::OS::Windows => OS::Windows,
             platforms::target::OS::MacOS => OS::Macos,
+            platforms::target::OS::FreeBSD => OS::FreeBSD,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -120,6 +124,11 @@ impl Target {
         self.os == OS::Linux
     }
 
+    /// Returns true if the current platform is freebsd
+    pub fn is_freebsd(&self) -> bool {
+        self.os == OS::FreeBSD
+    }
+
     /// Returns true if the current platform is mac os
     pub fn is_macos(&self) -> bool {
         self.os == OS::Macos
@@ -131,22 +140,35 @@ impl Target {
     }
 
     /// Returns the platform part of the tag for the wheel name for cffi wheels
-    pub fn get_platform_tag(&self, manylinux: &Manylinux) -> &'static str {
+    pub fn get_platform_tag(&self, manylinux: &Manylinux) -> String {
         match (&self.os, self.is_64_bit, manylinux) {
-            (&OS::Linux, true, Manylinux::Off) => "linux_x86_64",
-            (&OS::Linux, false, Manylinux::Off) => "linux_i686",
-            (&OS::Linux, true, Manylinux::Manylinux1) => "manylinux1_x86_64",
-            (&OS::Linux, true, Manylinux::Manylinux1Unchecked) => "manylinux1_x86_64",
-            (&OS::Linux, true, Manylinux::Manylinux2010) => "manylinux2010_x86_64",
-            (&OS::Linux, true, Manylinux::Manylinux2010Unchecked) => "manylinux2010_x86_64",
-            (&OS::Linux, false, Manylinux::Manylinux1) => "manylinux1_i686",
-            (&OS::Linux, false, Manylinux::Manylinux1Unchecked) => "manylinux1_i686",
-            (&OS::Linux, false, Manylinux::Manylinux2010) => "manylinux2010_i686",
-            (&OS::Linux, false, Manylinux::Manylinux2010Unchecked) => "manylinux2010_i686",
-            (&OS::Windows, true, _) => "win_amd64",
-            (&OS::Windows, false, _) => "win32",
-            (&OS::Macos, true, _) => "macosx_10_7_x86_64",
+            (&OS::Linux, true, Manylinux::Off) => "linux_x86_64".to_string(),
+            (&OS::Linux, false, Manylinux::Off) => "linux_i686".to_string(),
+            (&OS::Linux, true, Manylinux::Manylinux1) => "manylinux1_x86_64".to_string(),
+            (&OS::Linux, true, Manylinux::Manylinux1Unchecked) => "manylinux1_x86_64".to_string(),
+            (&OS::Linux, true, Manylinux::Manylinux2010) => "manylinux2010_x86_64".to_string(),
+            (&OS::Linux, true, Manylinux::Manylinux2010Unchecked) => {
+                "manylinux2010_x86_64".to_string()
+            }
+            (&OS::Linux, false, Manylinux::Manylinux1) => "manylinux1_i686".to_string(),
+            (&OS::Linux, false, Manylinux::Manylinux1Unchecked) => "manylinux1_i686".to_string(),
+            (&OS::Linux, false, Manylinux::Manylinux2010) => "manylinux2010_i686".to_string(),
+            (&OS::Linux, false, Manylinux::Manylinux2010Unchecked) => {
+                "manylinux2010_i686".to_string()
+            }
+            (&OS::Windows, true, _) => "win_amd64".to_string(),
+            (&OS::Windows, false, _) => "win32".to_string(),
+            (&OS::Macos, true, _) => "macosx_10_7_x86_64".to_string(),
             (&OS::Macos, false, _) => panic!("32-bit wheels are not supported for mac os"),
+            (&OS::FreeBSD, true, _) => {
+                let info = match PlatformInfo::new() {
+                    Ok(info) => info,
+                    Err(error) => panic!(error),
+                };
+                let release = info.release().replace(".", "_").replace("-", "_");
+                format!("freebsd_{}_amd64", release)
+            }
+            (&OS::FreeBSD, false, _) => panic!("32-bit wheels are not supported for FreeBSD"),
         }
     }
 
@@ -169,6 +191,7 @@ impl Target {
                 }
             }
             OS::Macos => "darwin",
+            OS::FreeBSD => "", // according imp.get_suffixes(), there are no such
             OS::Windows => {
                 if self.is_64_bit {
                     "win_amd64"

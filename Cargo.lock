@@ -1059,6 +1059,15 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "platform-info"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "platforms"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1127,6 +1136,7 @@ dependencies = [
  "human-panic 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "indoc 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "keyring 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "platform-info 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "platforms 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pretty_env_logger 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2257,6 +2267,7 @@ dependencies = [
 "checksum phf_generator 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "09364cc93c159b8b06b1f4dd8a4398984503483891b0c26b867cf431fb132662"
 "checksum phf_shared 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "234f71a15de2288bcb7e3b6515828d22af7ec8598ee6d24c3b526fa0a80b67a0"
 "checksum plain 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+"checksum platform-info 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f2fd076acdc7a98374de6e300bf3af675997225bef21aecac2219553f04dd7e8"
 "checksum platforms 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6cfec0daac55b13af394ceaaad095d17c790f77bdc9329264f06e49d6cd3206c"
 "checksum podio 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "780fb4b6698bbf9cf2444ea5d22411cef2953f0824b98f33cf454ec5615645bd"
 "checksum ppv-lite86 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e3cbf9f658cdb5000fcf6f362b8ea2ba154b9f146a61c7a20d647034c6b6561b"

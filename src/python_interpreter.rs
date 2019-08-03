@@ -305,10 +305,10 @@ fn fun_with_abiflags(
     target: &Target,
 ) -> Result<String, Error> {
     let sane_platform = match message.platform.as_ref() {
-        "win32" | "win_amd64" => target.is_windows(),
-        "linux" | "linux2" | "linux3" => target.is_linux(),
+        "windows" => target.is_windows(),
+        "linux" => target.is_linux(),
         "darwin" => target.is_macos(),
-        "freebsd11" | "freebsd12" | "freebsd13" => target.is_freebsd(),
+        "freebsd" => target.is_freebsd(),
         _ => false,
     };
 

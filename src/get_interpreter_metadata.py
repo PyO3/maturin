@@ -14,7 +14,7 @@ metadata = {
     "u": sysconfig.get_config_var("Py_UNICODE_SIZE") == 4,
     "d": sysconfig.get_config_var("Py_DEBUG") == 1,
     # This one isn't technically necessary, but still very useful for sanity checks
-    "platform": sys.platform,
+    "platform": platform.system().lower(),
 }
 
 print(json.dumps(metadata))

@@ -327,7 +327,10 @@ fn fun_with_abiflags(
         );
     }
 
-    if target.is_windows() {
+    if message.interpreter == "pypy" {
+        // pypy does not specify abi flags
+        Ok("".to_string())
+    } else if target.is_windows() {
         if message.abiflags.is_some() {
             bail!(
                 "A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ"
@@ -336,13 +339,14 @@ fn fun_with_abiflags(
             Ok("".to_string())
         }
     } else if let Some(ref abiflags) = message.abiflags {
-        if abiflags != "m" {
+        if message.minor >= 8 {
+            // for 3.8, "builds with and without pymalloc are ABI compatible" and the flag dropped
+            Ok(abiflags.to_string())
+        } else if abiflags != "m" {
             bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
+        } else {
+            Ok(abiflags.to_string())
         }
-        Ok(abiflags.clone())
-    } else if message.interpreter == "pypy" {
-        // pypy does not specify abi flags
-        Ok("".to_string())
     } else {
         bail!(
             "A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ"

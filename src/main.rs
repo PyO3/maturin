@@ -21,7 +21,6 @@ use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
     pyo3_pack::{upload, Registry, UploadError},
-    reqwest::Url,
     rpassword,
     std::io,
 };
@@ -48,17 +47,21 @@ fn get_password(_username: &str) -> (String, bool) {
         };
     }
 
-    let password = rpassword::prompt_password_stdout("Please enter your password: ")
-        .unwrap_or_else(|_| {
-            // So we need this fallback for pycharm on windows
-            let mut password = String::new();
-            io::stdin()
-                .read_line(&mut password)
-                .expect("Failed to read line");
-            password.trim().to_string()
-        });
+    let password = promt_for_password();
 
     (password, true)
+}
+
+#[cfg(feature = "upload")]
+fn promt_for_password() -> String {
+    rpassword::prompt_password_stdout("Please enter your password: ").unwrap_or_else(|_| {
+        // So we need this fallback for pycharm on windows
+        let mut password = String::new();
+        io::stdin()
+            .read_line(&mut password)
+            .expect("Failed to read line");
+        password.trim().to_string()
+    })
 }
 
 #[cfg(feature = "upload")]
@@ -71,16 +74,15 @@ fn get_username() -> String {
 
 #[cfg(feature = "upload")]
 /// Asks for username and password for a registry account where missing.
-fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool), Error> {
+fn complete_registry(opt: &PublishOpt) -> (Registry, bool) {
     let username = opt.username.clone().unwrap_or_else(get_username);
     let (password, reenter) = match opt.password {
         Some(ref password) => (password.clone(), false),
         None => get_password(&username),
     };
 
-    let registry = Registry::new(username, password, Url::parse(&opt.registry)?);
-
-    Ok((registry, reenter))
+    let registry = Registry::new(username, password, opt.registry.clone());
+    (registry, reenter)
 }
 
 /// An account with a registry, possibly incomplete
@@ -315,7 +317,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
         }
     }
 
-    let (mut registry, reenter) = complete_registry(&publish)?;
+    let (mut registry, reenter) = complete_registry(&publish);
 
     loop {
         println!("🚀 Uploading {} packages", wheels.len());
@@ -351,15 +353,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                 }
 
                 let username = get_username();
-                let password = rpassword::prompt_password_stdout("Please enter your password: ")
-                    .unwrap_or_else(|_| {
-                        // So we need this fallback for pycharm on windows
-                        let mut password = String::new();
-                        io::stdin()
-                            .read_line(&mut password)
-                            .expect("Failed to read line");
-                        password.trim().to_string()
-                    });
+                let password = promt_for_password();
 
                 registry = Registry::new(username, password, registry.url);
                 println!("… Retrying");

@@ -21,7 +21,6 @@ use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
     pyo3_pack::{upload, Registry, UploadError},
-    reqwest::Url,
     rpassword,
     std::io,
 };
@@ -78,7 +77,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool), Error> {
         None => get_password(&username),
     };
 
-    let registry = Registry::new(username, password, Url::parse(&opt.registry)?);
+    let registry = Registry::new(username, password, opt.registry.clone());
 
     Ok((registry, reenter))
 }
@@ -263,9 +262,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
             build_options.interpreter = vec![PathBuf::from("python")];
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
-                BridgeModel::Bindings(_) => {
-                    vec![context.interpreter[0].get_tag(&context.manylinux)]
-                }
+                BridgeModel::Bindings(_) => vec![context.interpreter[0].get_tag(&context.manylinux)],
                 BridgeModel::Bin | BridgeModel::Cffi => {
                     context.target.get_universal_tags(&context.manylinux).1
                 }
@@ -391,7 +388,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
 }
 
 fn run() -> Result<(), Error> {
-    #[cfg(feature = "log")]
+    #[cfg(feature = "pretty-env-logger")]
     pretty_env_logger::init();
 
     let opt = Opt::from_args();

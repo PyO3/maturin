@@ -36,7 +36,6 @@ cargo_metadata = "0.8.1"
 digest = { version = "0.8.1", features = ["std"] }
 failure = "0.1.5"
 keyring = { version = "0.7.0", optional = true }
-reqwest = { version = "0.9.18", optional = true, default-features = false }
 rpassword = { version = "4.0.1", optional = true }
 serde_json = "1.0.40"
 sha2 = "0.8.0"
@@ -56,20 +55,24 @@ cbindgen = { version = "0.9.0", default-features = false }
 walkdir = "2.2.8"
 flate2 = "1.0.9"
 tar = "0.4.26"
+curl = { version = "0.4.22", optional = true, default-features = false, features = ["static-curl", "ssl", "static-ssl"] }
+curl-sys = { version = "0.4.20", optional = true, default-features = false }
+log = "0.4.8"
 
 [dev-dependencies]
 indoc = "0.3.3"
 
 [features]
-default = ["auditwheel", "log", "upload", "rustls"]
+default = ["auditwheel", "pretty-env-logger", "upload"]
 auditwheel = []
-upload = ["reqwest", "rpassword"]
+upload = ["curl", "curl-sys", "rpassword"]
 password-storage = ["upload", "keyring"]
-log = ["pretty_env_logger"]
-# We use rustls for manylinux compliance and because unlike both dynamic and
-# static openssl variants it can be built and used inside a cent os 5 container
-rustls = ["reqwest/rustls-tls"]
+pretty-env-logger = ["pretty_env_logger"]
 # Internal feature to run test with stable rust
 skip-nightly-tests = []
 # Internal feature to speed up the tests significantly
 faster-tests = []
+
+[patch.crates-io]
+curl = { git = "https://github.com/alexcrichton/curl-rust", rev = "20162df06dd9becc951926988d8a5da649850b0b" }
+curl-sys = { git = "https://github.com/alexcrichton/curl-rust", rev = "20162df06dd9becc951926988d8a5da649850b0b" }

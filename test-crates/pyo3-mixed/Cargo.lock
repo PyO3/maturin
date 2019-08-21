@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-mixed"
-version = "2.1.1"
+version = "2.2.5"
 dependencies = [
  "pyo3 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

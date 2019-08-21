@@ -361,10 +361,7 @@ pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<
 
     let header;
     if maybe_header.is_file() {
-        println!(
-            "💼 Using the existing header at {}",
-            maybe_header.display()
-        );
+        println!("💼 Using the existing header at {}", maybe_header.display());
         header = maybe_header;
     } else {
         if crate_dir.join("cbindgen.toml").is_file() {

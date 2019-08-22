@@ -13,6 +13,8 @@ freebsd_task:
     - pkg install -y curl bash python
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --default-toolchain $TOOLCHAIN
+    - python -m ensurepip
+    - python -m pip install cffi
   build_script:
     - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo build
   test_script:

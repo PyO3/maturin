@@ -2,13 +2,14 @@
 
 [![Linux and Mac Build Status](https://img.shields.io/travis/PyO3/pyo3-pack/master.svg?style=flat-square)](https://travis-ci.org/PyO3/pyo3-pack)
 [![Windows Build status](https://img.shields.io/appveyor/ci/konstin/pyo3-pack/master.svg?style=flat-square)](https://ci.appveyor.com/project/konstin/pyo3-pack/branch/master)
+[![FreeBSD](https://img.shields.io/cirrus/github/PyO3/pyo3-pack?style=flat-square&task=freebsd)](https://cirrus-ci.com/github/PyO3/pyo3-pack)
 [![Crates.io](https://img.shields.io/crates/v/pyo3-pack.svg?style=flat-square)](https://crates.io/crates/pyo3-pack)
 [![PyPI](https://img.shields.io/pypi/v/pyo3-pack.svg?style=flat-square)](https://pypi.org/project/pyo3-pack/)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?style=flat-square)](https://gitter.im/PyO3/Lobby)
 
 Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages.
 
-This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake). It supports building wheels for python 3.5+ on windows, linux and mac, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
+This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake). It supports building wheels for python 3.5+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
 
 ## Usage
 

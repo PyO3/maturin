@@ -1,6 +1,9 @@
 freebsd_instance:
   image: freebsd-12-0-release-amd64
 
+env:
+  RUST_BACKTRACE: 1
+
 freebsd_task:
   name: $TOOLCHAIN x86_64-unknown-freebsd
   env:
@@ -10,5 +13,9 @@ freebsd_task:
     - pkg install -y curl bash python
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --default-toolchain $TOOLCHAIN
+    - python -m ensurepip
+    - python -m pip install cffi
   build_script:
     - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo build
+  test_script:
+    - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo test --features skip-nightly-tests

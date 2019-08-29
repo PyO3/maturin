@@ -106,9 +106,9 @@ script:
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
   - |
     if [ "$TRAVIS_RUST_VERSION" == "stable" ]; then
-      cargo test --features skip-nightly-tests
+      cargo test --no-default-features --features skip-nightly-tests
     else
-      cargo test
+      cargo test --no-default-features
     fi
 
 before_deploy: bash ci/before_deploy.sh

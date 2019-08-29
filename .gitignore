@@ -9,3 +9,5 @@ __pycache__/
 *.egg
 dist/
 *.whl
+build
+dist

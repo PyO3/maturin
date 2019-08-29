@@ -26,6 +26,13 @@ addons:
 matrix:
   fast_finish: true
   include:
+    # Test the dockerfile
+    - os: linux
+      install:
+        - docker build . -t pyo3-pack
+      script:
+        - ./test-dockerfile.sh
+
     # These create deployments
     - os: linux
       rust: stable
@@ -77,13 +84,6 @@ matrix:
       script:
         - cargo fmt --all -- --check
         - cargo clippy -- -D warnings
-
-    # Test the dockerfile
-    - os: linux
-      install:
-        - docker build . -t pyo3-pack
-      script:
-        - ./test-dockerfile.sh
 
 install:
   # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this

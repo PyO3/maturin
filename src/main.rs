@@ -3,6 +3,15 @@
 //!
 //! Run with --help for usage information
 
+// This should not be needed, perhaps better to update AppVeyor to 
+// use rust stable 1.37 whenever it's available, and then 
+// drop this.
+
+#![deny(stable_features)]
+#![feature(option_xor)]
+#![warn(stable_features)]
+
+
 use cargo_metadata::MetadataCommand;
 use failure::{bail, format_err, Error, ResultExt};
 #[cfg(feature = "human-panic")]
@@ -484,6 +493,7 @@ fn run() -> Result<(), Error> {
 
     Ok(())
 }
+
 
 fn main() {
     #[cfg(feature = "human-panic")]

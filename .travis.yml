@@ -73,6 +73,9 @@ matrix:
     - os: osx
       rust: nightly-2019-08-21
       env: TARGET=x86_64-apple-darwin
+      addons:
+        homebrew:
+          packages: python3
 
     # Run clippy and rustfmt
     - name: stylecheck
@@ -90,11 +93,7 @@ install:
   # is the source of this mess
   - |
     if [ "$TRAVIS_OS_NAME" == "osx" ]; then
-      brew update
-      brew upgrade pyenv
-      pyenv install 3.6.6
-      pyenv global system 3.6.6
-      python3.6 -m pip install cffi virtualenv
+      python3 -m pip install cffi virtualenv
     fi
   - |
     if [ "$TRAVIS_OS_NAME" == "linux" ]; then
@@ -107,9 +106,9 @@ script:
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
   - |
     if [ "$TRAVIS_RUST_VERSION" == "stable" ]; then
-      cargo test --features skip-nightly-tests
+      cargo test --no-default-features --features skip-nightly-tests
     else
-      cargo test
+      cargo test --no-default-features
     fi
 
 before_deploy: bash ci/before_deploy.sh

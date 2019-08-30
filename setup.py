@@ -50,7 +50,7 @@ class PostInstallCommand(install):
         if os.path.isfile(existing_binary):
             source = existing_binary
         else:
-            subprocess.check_call(["cargo", "rustc", "--bin", "pyo3-pack"])
+            subprocess.check_call(["cargo", "rustc", "--bin", "pyo3-pack", "--", "-C", "link-arg=-s"])
             source = os.path.join(source_dir, "target", "debug", executable_name)
         # run this after trying to build with cargo (as otherwise this leaves
         # venv in a bad state: https://github.com/benfred/py-spy/issues/69)

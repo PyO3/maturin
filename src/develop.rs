@@ -33,7 +33,7 @@ pub fn develop(
 
     let build_options = BuildOptions {
         manylinux: Manylinux::Off,
-        interpreter: vec![target.get_python()],
+        interpreter: Some(vec![target.get_python()]),
         bindings,
         manifest_path: manifest_file.to_path_buf(),
         out: None,

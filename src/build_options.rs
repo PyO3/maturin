@@ -36,7 +36,7 @@ pub struct BuildOptions {
     #[structopt(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
-    pub interpreter: Vec<PathBuf>,
+    pub interpreter: Option<Vec<PathBuf>>,
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
     #[structopt(short, long)]
     pub bindings: Option<String>,
@@ -75,7 +75,7 @@ impl Default for BuildOptions {
     fn default() -> Self {
         BuildOptions {
             manylinux: Manylinux::Manylinux1,
-            interpreter: vec![],
+            interpreter: Some(vec![]),
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
             out: None,
@@ -142,8 +142,14 @@ impl BuildOptions {
             );
         }
 
-        let interpreter = find_interpreter(&bridge, &self.interpreter, &target)?;
-
+        let interpreter = match self.interpreter {
+            // Only build a source ditribution
+            Some(ref interpreter) if interpreter.is_empty() => vec![],
+            // User given list of interpreters
+            Some(interpreter) => find_interpreter(&bridge, &interpreter, &target)?,
+            // Auto-detect interpreters
+            None => find_interpreter(&bridge, &[], &target)?,
+        };
         let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
         if let Some(target) = self.target {
             cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
@@ -233,7 +239,7 @@ pub fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
 ) -> Result<Vec<PythonInterpreter>, Error> {
-    Ok(match bridge {
+    match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
                 PythonInterpreter::check_executables(&interpreter, &target)
@@ -256,7 +262,7 @@ pub fn find_interpreter(
                     .join(", ")
             );
 
-            interpreter
+            Ok(interpreter)
         }
         BridgeModel::Cffi => {
             let executable = if interpreter.is_empty() {
@@ -274,10 +280,10 @@ pub fn find_interpreter(
 
             println!("🐍 Using {} to generate the cffi bindings", interpreter);
 
-            vec![interpreter]
+            Ok(vec![interpreter])
         }
-        BridgeModel::Bin => vec![],
-    })
+        BridgeModel::Bin => Ok(vec![]),
+    }
 }
 
 /// Helper function that calls shlex on all extra args given

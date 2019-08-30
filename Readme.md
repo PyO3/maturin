@@ -136,7 +136,7 @@ requires = ["maturin"]
 build-backend = "maturin"
 ```
 
-If a `pyproject.toml` with a `[build-system]` entry is present, maturin will build a source distribution (sdist) of your package, unless `--no-sdist` is specified. The source distribution will contain the same files as `cargo package`.
+If a `pyproject.toml` with a `[build-system]` entry is present, maturin will build a source distribution (sdist) of your package, unless `--no-sdist` is specified. The source distribution will contain the same files as `cargo package`. To only build a source distribution, pass `--interpreter` without any values.
 
 You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and maturin.
 

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
+## [0.7.1] - Unreleased
+
+### Added
+
+ * `maturin build --interpreter`/`maturin publish --interpreter` builds only a source distribution.
+
 ## [0.7.0] - 2019-08-30
 
 With this release, the name of this project changes from _pyo3-pack_ to _maturin_.

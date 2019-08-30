@@ -50,7 +50,7 @@ matrix:
     - os: osx
       # FIXME: Replace this with stable again once https://github.com/rust-lang/cargo/pull/7268 finds it way
       # to stable through https://github.com/rust-lang/rust/pull/63960
-      rust: nigthly
+      rust: nightly
       env: TARGET=x86_64-apple-darwin DEPLOY=1
     - os: linux
       rust: stable

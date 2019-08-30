@@ -6,7 +6,7 @@ environment:
   global:
     RUST_BACKTRACE: full
 
-  maturin_PASSWORD:
+  MATURIN_PASSWORD:
     secure: 3xTkaAvLd84qjLwY/quMb0w1Kh5NRXQ0a/zHtjnH4WY=
   matrix:
     # For the integration test

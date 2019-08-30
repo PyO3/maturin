@@ -9,12 +9,12 @@ use failure::{bail, format_err, Error, ResultExt};
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
-#[cfg(feature = "log")]
-use pretty_env_logger;
 use maturin::{
     develop, get_pyproject_toml, source_distribution, write_dist_info, BridgeModel, BuildOptions,
     CargoToml, Metadata21, PathWriter, PythonInterpreter, Target,
 };
+#[cfg(feature = "log")]
+use pretty_env_logger;
 use std::path::PathBuf;
 use std::{env, fs};
 use structopt::StructOpt;
@@ -35,7 +35,7 @@ use {
 /// 3. stdin
 #[cfg(feature = "upload")]
 fn get_password(_username: &str) -> (String, bool) {
-    if let Ok(password) = env::var("maturin_PASSWORD") {
+    if let Ok(password) = env::var("MATURIN_PASSWORD") {
         return (password, false);
     };
 
@@ -263,9 +263,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
             build_options.interpreter = vec![PathBuf::from("python")];
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
-                BridgeModel::Bindings(_) => {
-                    vec![context.interpreter[0].get_tag(&context.manylinux)]
-                }
+                BridgeModel::Bindings(_) => vec![context.interpreter[0].get_tag(&context.manylinux)],
                 BridgeModel::Bin | BridgeModel::Cffi => {
                     context.target.get_universal_tags(&context.manylinux).1
                 }

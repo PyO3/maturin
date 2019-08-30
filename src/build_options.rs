@@ -28,11 +28,9 @@ pub struct BuildOptions {
     /// This option is ignored on all non-linux platforms
     #[structopt(
         long,
-        raw(
-            possible_values = r#"&["1", "1-unchecked", "2010", "2010-unchecked", "off"]"#,
-            case_insensitive = "true",
-            default_value = r#""1""#
-        )
+        possible_values = &["1", "1-unchecked", "2010", "2010-unchecked", "off"],
+        case_insensitive = true,
+        default_value = "1"
     )]
     pub manylinux: Manylinux,
     #[structopt(short, long)]

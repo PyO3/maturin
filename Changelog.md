@@ -13,7 +13,7 @@ With this release, the name of this project changes from _pyo3-pack_ to _maturin
 
  * Mixed rust/python layout
  * Added PEP 517 support
- * Added a `pyo3-pack sdist` command as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
+ * Added a `maturin sdist` command as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
  * Support settings all applicable fields from the python core metadata specification in Cargo.toml
  * Support for FreeBSD by kxepal [#173](https://github.com/PyO3/maturin/pull/173)
 

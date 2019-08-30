@@ -18,7 +18,8 @@ from setuptools.command.install import install
 
 # Force the wheel to be platform specific
 # https://stackoverflow.com/a/45150383/3549270
-# There's also the much more concise solution in https://stackoverflow.com/a/53463910/3549270,
+# There's also the much more concise solution in
+# https://stackoverflow.com/a/53463910/3549270,
 # but that would requires python-dev
 try:
     # noinspection PyPackageRequirements,PyUnresolvedReferences

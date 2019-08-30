@@ -30,7 +30,7 @@ use {
 /// after a failed authentication
 ///
 /// Precedence:
-/// 1. maturin_PASSWORD
+/// 1. MATURIN_PASSWORD
 /// 2. keyring
 /// 3. stdin
 #[cfg(feature = "upload")]
@@ -98,7 +98,7 @@ struct PublishOpt {
     username: Option<String>,
     #[structopt(short, long)]
     /// Password for pypi or your custom registry. Note that you can also pass the password
-    /// through maturin_PASSWORD
+    /// through MATURIN_PASSWORD
     password: Option<String>,
     /// Do not pass --release to cargo
     #[structopt(long)]

@@ -76,7 +76,7 @@ setup(
     "python packages",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version="0.7.0",
+    version="0.7.1-beta.1",
     license="MIT OR Apache-2.0",
     cmdclass={"install": PostInstallCommand, "bdist_wheel": bdist_wheel},
     classifiers=[

@@ -2,11 +2,11 @@ environment:
   CARGO_HOME: "c:\\cargo"
   RUSTUP_HOME: "c:\\rustup"
   # Change this to the name of your binary
-  BINARY_NAME: "pyo3-pack.exe"
+  BINARY_NAME: "maturin.exe"
   global:
     RUST_BACKTRACE: full
 
-  PYO3_PACK_PASSWORD:
+  maturin_PASSWORD:
     secure: 3xTkaAvLd84qjLwY/quMb0w1Kh5NRXQ0a/zHtjnH4WY=
   matrix:
     # For the integration test

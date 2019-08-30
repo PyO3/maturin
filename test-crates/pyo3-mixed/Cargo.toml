@@ -6,7 +6,7 @@ description = "Implements a dummy function combining rust and python"
 readme = "Readme.md"
 edition = "2018"
 
-[package.metadata.pyo3-pack.scripts]
+[package.metadata.maturin.scripts]
 get_42 = "pyo3_mixed:get_42"
 
 [dependencies]

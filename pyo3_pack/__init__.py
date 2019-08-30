@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-pyo3-pack's implementation of the PEP 517 interface. Calls pyo3-pack through subprocess
+maturin's implementation of the PEP 517 interface. Calls maturin through subprocess
 
 Currently, the "return value" of the rust implementation is the last line of stdout
 
 On windows, apparently pip's subprocess handling sets stdout to some windows encoding (e.g. cp1252 on my machine),
 even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids ecoding errors due to
-pyo3-pack's emojis.
+maturin's emojis.
 """
 
 import os
@@ -31,7 +31,7 @@ available_options = [
 def get_config() -> Dict[str, str]:
     with open("pyproject.toml") as fp:
         pyproject_toml = toml.load(fp)
-    return pyproject_toml.get("tool", {}).get("pyo3-pack", {})
+    return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
 def get_config_options() -> List[str]:
@@ -40,7 +40,7 @@ def get_config_options() -> List[str]:
     for key, value in config.items():
         if key not in available_options:
             raise RuntimeError(
-                "{} is not a valid option for pyo3-pack. Valid are: {}".format(
+                "{} is not a valid option for maturin. Valid are: {}".format(
                     key, ", ".join(available_options)
                 )
             )
@@ -51,7 +51,7 @@ def get_config_options() -> List[str]:
 # noinspection PyUnusedLocal
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     # The PEP 517 build environment garuantees that `python` is the correct python
-    command = ["pyo3-pack", "pep517", "build-wheel", "-i", "python"]
+    command = ["maturin", "pep517", "build-wheel", "-i", "python"]
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
@@ -71,7 +71,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
 # noinspection PyUnusedLocal
 def build_sdist(sdist_directory, config_settings=None):
     command = [
-        "pyo3-pack",
+        "maturin",
         "pep517",
         "write-sdist",
         "--sdist-directory",
@@ -126,7 +126,7 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
         sys.exit(1)
 
     command = [
-        "pyo3-pack",
+        "maturin",
         "pep517",
         "write-dist-info",
         "--metadata-directory",

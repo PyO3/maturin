@@ -1,6 +1,6 @@
 # cffi-pure
 
-A package for testing a crate with cffi bindings with pyo3-pack.
+A package for testing a crate with cffi bindings with maturin.
 
 Read the [cffi guide](https://cffi.readthedocs.io/en/latest/index.html) to learn how to use the generated `ffi` and `lib` objects.
 

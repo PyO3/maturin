@@ -1,7 +1,7 @@
 use crate::common::{check_installed, handle_result, maybe_mock_cargo};
 use failure::Error;
 use failure::ResultExt;
-use pyo3_pack::{develop, Target};
+use maturin::{develop, Target};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -46,7 +46,7 @@ fn test_develop_hello_world() {
 }
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
-/// "pyo3-pack develop" to install it and checks it is working
+/// "maturin develop" to install it and checks it is working
 fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
     maybe_mock_cargo();
 

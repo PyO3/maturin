@@ -1,6 +1,6 @@
 # pyo3-mixed
 
-A package for testing pyo3-pack with a mixed pyo3/python project.
+A package for testing maturin with a mixed pyo3/python project.
 
 ## Usage
 

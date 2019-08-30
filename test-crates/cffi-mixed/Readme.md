@@ -1,6 +1,6 @@
 # cffi-mixed
 
-A package for testing pyo3-pack with a cffi wrapper with a rust backend and a python wrapper.
+A package for testing maturin with a cffi wrapper with a rust backend and a python wrapper.
 
 Read the [cffi guide](https://cffi.readthedocs.io/en/latest/index.html) to learn how to use the generated `ffi` and `lib` objects.
 

@@ -60,7 +60,7 @@ impl CargoToml {
     pub fn scripts(&self) -> HashMap<String, String> {
         match self.package.metadata {
             Some(CargoTomlMetadata {
-                pyo3_pack:
+                maturin:
                     Some(RemainingCoreMetadata {
                         scripts: Some(ref scripts),
                         ..
@@ -74,7 +74,7 @@ impl CargoToml {
     pub fn classifier(&self) -> Vec<String> {
         match self.package.metadata {
             Some(CargoTomlMetadata {
-                pyo3_pack:
+                maturin:
                     Some(RemainingCoreMetadata {
                         classifier: Some(ref classifier),
                         ..
@@ -84,11 +84,11 @@ impl CargoToml {
         }
     }
 
-    /// Returns the value of `[project.metadata.pyo3-pack]` or an empty stub
+    /// Returns the value of `[project.metadata.maturin]` or an empty stub
     pub fn remaining_core_metadata(&self) -> RemainingCoreMetadata {
         match &self.package.metadata {
             Some(CargoTomlMetadata {
-                pyo3_pack: Some(extra_metadata),
+                maturin: Some(extra_metadata),
             }) => extra_metadata.clone(),
             _ => Default::default(),
         }
@@ -98,10 +98,10 @@ impl CargoToml {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 struct CargoTomlMetadata {
-    pyo3_pack: Option<RemainingCoreMetadata>,
+    maturin: Option<RemainingCoreMetadata>,
 }
 
-/// The `[project.metadata.pyo3-pack]` with the python specific metadata
+/// The `[project.metadata.maturin]` with the python specific metadata
 ///
 /// Those fields are the part of the
 /// [python core metadata](https://packaging.python.org/specifications/core-metadata/)
@@ -143,10 +143,10 @@ mod test {
             crate-type = ["cdylib"]
             name = "pyo3_pure"
 
-            [package.metadata.pyo3-pack.scripts]
-            ph = "pyo3_pack:print_hello"
+            [package.metadata.maturin.scripts]
+            ph = "maturin:print_hello"
 
-            [package.metadata.pyo3-pack]
+            [package.metadata.maturin]
             classifier = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
         "#
@@ -155,7 +155,7 @@ mod test {
         let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
 
         let mut scripts = HashMap::new();
-        scripts.insert("ph".to_string(), "pyo3_pack:print_hello".to_string());
+        scripts.insert("ph".to_string(), "maturin:print_hello".to_string());
 
         let classifier = vec!["Programming Language :: Python".to_string()];
 

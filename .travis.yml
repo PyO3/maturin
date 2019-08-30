@@ -3,20 +3,20 @@ dist: xenial
 
 env:
   global:
-    - BINARY_NAME="pyo3-pack"
+    - BINARY_NAME="maturin"
     - secure: xxDBiPcL7jDjbnKJ3R0UzTTjaWdITGBHUB7SmjKAy5WPk8Eyx/BgYwGBv2F4/EfSOoOOF+HSUfegXV70r+UHA8OyZtb+h9RLrcBsnEvnrBo2FylQCzz8JeoTdHJikvhH8H9oEbb4jQpwy85r5xDK3+8dMkD2nDjf5vfctblMyShayNTzyMX9DkG5OqZnJ0CXaPzPrtrMXEw3hPpMpyTYBqnZhNVK5IHzXA8kR+6WKgkrf+X/48Or3TDys9ufdO3mEazgxfLJ6WHESQFONYtjT67++rkBNB0jYXf+bFjW2OaEl9Qa8ZHevbWZcJkb3dlW9ktbPnhBmjw14a6Oqhu1w5x2DGVp9196vRwPzXi5YCFXbw93OurF2cDS4NVCk5vZKKuKZvHa6LdS6zVh31uwdOYa5AUK9mYLpwsW0B8k/YyBjea9pkskyBeLXzKpYXgplbMzyqnJZMoiHimeLlHMNNSUlJqKVinDEEEukazABJvN6xcbUunvKj8nQpNVdVg0NPcmMQ2R7CLOJTkhLYqnq+CsX8nTmH5PSh/XxA7NkTfbbibxpWqHp0QDLCFltK23rGAAhs0WkvXF8lSaUSpl7DksA3CfNUn2eI2k+iWao8OD7gu0pFeVOHxND4fuT8Jy8nILySwsECyB0LECPNr++Ymz6+xMHrlaIpGBkCGQXcY=
     - secure: "jMJvcpFoNBLwG0NfDVo5LLV9vPyssFlY9Y7iNhHD47BjpYaryn4aA40ClIjfyJ3ktcdXt97Alu4aoQEw0UIFZSlpzcfuSWhYs0CAJ/ozefXKCD8E+RdzVQxZKVhRsCgoo4u1CL1OwtU1Pg+N0EWv3Mpbcs0l+SbozMTHk/xubg1O75qkbEsUZXMEV4IDEi5AtdJ13TUOjy34chdfL/pgW0sv7XVdVLAGBzpGyiickoQmiRHkyDNmk8AFX9L+DM6L2J/QoukMI0ioIcGrItlf5w/MG+SzecuctSVC8fFaofrCuUfM5nVJ7RAJksgC2H0x49+A6jrf9QxhtY2ZswQLoQLIlK5HV0kHQIH0e78oEBCsRycaqDeeC2a6qYJvuHPoQRTJwY3XgOrKH1oLazLFIlEQBOb8yUDPtcgX1IJADn8B0t/KjXoHRALTw1XSsL/rB0buvkZi1uVbgP8ICq3tcJvL/ll3KLY05PweSRMKhZWLLpClHlxPXqPR+PkDRQ7JecFRZAHYOPv5vVbxZXo2w/4YyDbfhqUc8y4xgav8K0Zq1qFlRUR9Z+LQwlS3FyBA2gy4noMGzafWgXMf8d5ToTxlgilumFls0wVr4awMFLH5Imv9stGed7Nc1//vMuCEJfFVWhK7buhoaoiU1Hx3wJcr//1HDEC4SgzrRlE3AFc="
 
 # https://gist.github.com/jkcclemens/000456ca646bd502cac0dbddcb8fa307
 cache: cargo
 before_cache:
-  - rm -rfv target/debug/incremental/{pyo3_pack,build_script_build,common,test}*
-  - rm -rfv target/debug/.fingerprint/pyo3_pack-*
-  - rm -rfv target/debug/build/pyo3_pack-*
-  - rm -rfv target/debug/deps/libpyo3_pack-*
-  - rm -rfv target/debug/deps/pyo3_pack-*
-  - rm -rfv target/debug/{pyo3_pack,libpyo3_pack}.d
-  - cargo clean -p pyo3_pack
+  - rm -rfv target/debug/incremental/{maturin,build_script_build,common,test}*
+  - rm -rfv target/debug/.fingerprint/maturin-*
+  - rm -rfv target/debug/build/maturin-*
+  - rm -rfv target/debug/deps/libmaturin-*
+  - rm -rfv target/debug/deps/maturin-*
+  - rm -rfv target/debug/{maturin,libmaturin}.d
+  - cargo clean -p maturin
 
 addons:
   apt:
@@ -39,7 +39,7 @@ matrix:
     # Test the dockerfile
     - os: linux
       install:
-        - docker build . -t pyo3-pack
+        - docker build . -t maturin
       script:
         - ./test-dockerfile.sh
 

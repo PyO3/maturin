@@ -1,4 +1,4 @@
-//! Caches cargo invocations to make pyo3-pack's tests faster
+//! Caches cargo invocations to make maturin's tests faster
 //!
 //! For each invocation, a directory inside `target/test-cache` is created with the
 //! name `<PYTHON_SYS_EXECUTABLE> <cargo arg1> <cargo arg2> ... <cargo argx>` with some args

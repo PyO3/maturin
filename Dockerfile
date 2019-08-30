@@ -20,12 +20,12 @@ RUN curl https://www.musl-libc.org/releases/musl-1.1.20.tar.gz -o musl.tar.gz \
     && python3 -m pip install --no-cache-dir cffi \
     && mkdir /io
 
-ADD . /pyo3-pack/
+ADD . /maturin/
 
-RUN cargo +nightly-2019-08-21 rustc --bin pyo3-pack --manifest-path /pyo3-pack/Cargo.toml -- -C link-arg=-s \
-    && mv /pyo3-pack/target/debug/pyo3-pack /usr/bin/pyo3-pack \
-    && rm -rf /pyo3-pack
+RUN cargo +nightly-2019-08-21 rustc --bin maturin --manifest-path /maturin/Cargo.toml -- -C link-arg=-s \
+    && mv /maturin/target/debug/maturin /usr/bin/maturin \
+    && rm -rf /maturin
 
 WORKDIR /io
 
-ENTRYPOINT ["/usr/bin/pyo3-pack"]
+ENTRYPOINT ["/usr/bin/maturin"]

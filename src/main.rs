@@ -11,7 +11,7 @@ use human_panic::setup_panic;
 use keyring::{Keyring, KeyringError};
 #[cfg(feature = "log")]
 use pretty_env_logger;
-use pyo3_pack::{
+use maturin::{
     develop, get_pyproject_toml, source_distribution, write_dist_info, BridgeModel, BuildOptions,
     CargoToml, Metadata21, PathWriter, PythonInterpreter, Target,
 };
@@ -20,7 +20,7 @@ use std::{env, fs};
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
-    pyo3_pack::{upload, Registry, UploadError},
+    maturin::{upload, Registry, UploadError},
     reqwest::Url,
     rpassword,
     std::io,
@@ -30,12 +30,12 @@ use {
 /// after a failed authentication
 ///
 /// Precedence:
-/// 1. PYO3_PACK_PASSWORD
+/// 1. maturin_PASSWORD
 /// 2. keyring
 /// 3. stdin
 #[cfg(feature = "upload")]
 fn get_password(_username: &str) -> (String, bool) {
-    if let Ok(password) = env::var("PYO3_PACK_PASSWORD") {
+    if let Ok(password) = env::var("maturin_PASSWORD") {
         return (password, false);
     };
 
@@ -98,7 +98,7 @@ struct PublishOpt {
     username: Option<String>,
     #[structopt(short, long)]
     /// Password for pypi or your custom registry. Note that you can also pass the password
-    /// through PYO3_PACK_PASSWORD
+    /// through maturin_PASSWORD
     password: Option<String>,
     /// Do not pass --release to cargo
     #[structopt(long)]
@@ -109,7 +109,7 @@ struct PublishOpt {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "pyo3-pack")]
+#[structopt(name = "maturin")]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
@@ -491,7 +491,7 @@ fn main() {
     }
 
     if let Err(e) = run() {
-        eprintln!("💥 pyo3-pack failed");
+        eprintln!("💥 maturin failed");
         for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter() {
             eprintln!("  Caused by: {}", cause);
         }

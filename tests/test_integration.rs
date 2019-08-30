@@ -1,6 +1,6 @@
 use crate::common::{check_installed, handle_result, maybe_mock_cargo};
 use failure::{bail, Error, ResultExt};
-use pyo3_pack::{BuildOptions, Target};
+use maturin::{BuildOptions, Target};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::str;

@@ -1,6 +1,6 @@
 # Get fourtytwo
 
-A package with pyo3 bindings for testing pyo3-pack.
+A package with pyo3 bindings for testing maturin.
 
 ## Usage
 

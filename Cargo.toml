@@ -1,17 +1,17 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
-name = "pyo3-pack"
-version = "0.7.0-beta.12"
+name = "maturin"
+version = "0.7.0"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
 exclude = ["test-crates/**/*", "sysconfig/*", "test-data/*", "ci/*", "tests/*"]
 readme = "Readme.md"
-repository = "https://github.com/pyo3/pyo3-pack"
+repository = "https://github.com/pyo3/maturin"
 license = "MIT OR Apache-2.0"
 keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 edition = "2018"
 
-[package.metadata.pyo3-pack]
+[package.metadata.maturin]
 classifier = [
     "Software Development :: Build Tools",
     "Programming Language :: Rust",
@@ -21,14 +21,14 @@ classifier = [
 requires-dist = ["toml~=0.10.0"]
 
 [badges]
-travis-ci = { repository = "PyO3/pyo3-pack" }
+travis-ci = { repository = "PyO3/maturin" }
 appveyor = { repository = "konstin/pyo3" }
 
 [[bin]]
-name = "pyo3-pack"
+name = "maturin"
 
 [lib]
-name = "pyo3_pack"
+name = "maturin"
 
 [dependencies]
 base64 = "0.10.1"

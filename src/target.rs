@@ -56,7 +56,7 @@ pub struct Target {
 }
 
 impl Target {
-    /// Returns the target pyo3-pack was compiled for
+    /// Returns the target maturin was compiled for
     pub fn current() -> Self {
         let os = match target_info::Target::os() {
             "linux" => OS::Linux,

@@ -108,7 +108,7 @@ impl Metadata21 {
             author_email: Some(authors.to_owned()),
             license: cargo_toml.package.license.clone(),
 
-            // Values provided through `[project.metadata.pyo3-pack]`
+            // Values provided through `[project.metadata.maturin]`
             classifier,
             maintainer: extra_metadata.maintainer,
             maintainer_email: extra_metadata.maintainer_email,
@@ -286,10 +286,10 @@ mod test {
             crate-type = ["cdylib"]
             name = "pyo3_pure"
 
-            [package.metadata.pyo3-pack.scripts]
-            ph = "pyo3_pack:print_hello"
+            [package.metadata.maturin.scripts]
+            ph = "maturin:print_hello"
 
-            [package.metadata.pyo3-pack]
+            [package.metadata.maturin]
             classifier = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
         "#

@@ -1,7 +1,7 @@
-# Workaround to bootstrap pyo3-pack on non-manylinux platforms
+# Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
 requires = ["setuptools~=41.2.0", "wheel~=0.33.6"]
 build-backend = "setuptools.build_meta"
 
-[tool.pyo3-pack]
+[tool.maturin]
 bindings = "bin"

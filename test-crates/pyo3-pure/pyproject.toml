@@ -1,3 +1,3 @@
 [build-system]
-requires = ["pyo3-pack"]
-build-backend = "pyo3_pack"
+requires = ["maturin"]
+build-backend = "maturin"

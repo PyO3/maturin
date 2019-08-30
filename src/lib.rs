@@ -10,12 +10,12 @@
 //! - auditwheel: Reimplements the more important part of the auditwheel
 //! package in rust. A wheel is checked by default, unless deactivated by cli arguments
 //!
-//! - log: Configures pretty-env-logger, even though pyo3-pack doesn't use logging itself.
+//! - log: Configures pretty-env-logger, even though maturin doesn't use logging itself.
 //!
 //! - upload: Uses reqwest to add the upload command.
 //!
-//! - rustls: Makes reqwest use the rustls stack so that we can build pyo3-pack in a cent os 5
-//! docker container and which pyo3-pack itself manylinux compliant.
+//! - rustls: Makes reqwest use the rustls stack so that we can build maturin in a cent os 5
+//! docker container and which maturin itself manylinux compliant.
 //!
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except

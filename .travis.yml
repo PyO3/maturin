@@ -11,11 +11,10 @@ env:
 cache: cargo
 before_cache:
   - rm -rfv target/debug/incremental/{maturin,build_script_build,common,test}*
-  - rm -rfv target/debug/.fingerprint/maturin-*
-  - rm -rfv target/debug/build/maturin-*
-  - rm -rfv target/debug/deps/libmaturin-*
-  - rm -rfv target/debug/deps/maturin-*
-  - rm -rfv target/debug/{maturin,libmaturin}.d
+  - rm -rfv target/debug/.fingerprint/maturin*
+  - rm -rfv target/debug/build/maturin*
+  - rm -rfv target/debug/deps/{libmaturin,maturin,test,common}*
+  - rm -rfv target/debug/{libmaturin,maturin,common,test}*
   - cargo clean -p maturin
 
 addons:

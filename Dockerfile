@@ -17,8 +17,8 @@ RUN curl https://www.musl-libc.org/releases/musl-1.1.20.tar.gz -o musl.tar.gz \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && rustup toolchain add nightly-2019-08-21 \
     && rustup target add x86_64-unknown-linux-musl \
+    && python3 -m pip install --no-cache-dir cffi
     && mkdir /io \
-    && python3 -m pip install cffi
 
 ADD . /pyo3-pack/
 

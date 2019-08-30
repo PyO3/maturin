@@ -13,7 +13,7 @@ RUN curl https://www.musl-libc.org/releases/musl-1.1.20.tar.gz -o musl.tar.gz \
     && ./configure \
     && make install -j2 \
     && cd .. \
-    && rm -rf x86_64-unknown-linux-musl \
+    && rm -rf musl-1.1.20 \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && rustup toolchain add nightly-2019-08-21 \
     && rustup target add x86_64-unknown-linux-musl \

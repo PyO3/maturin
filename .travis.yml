@@ -48,7 +48,9 @@ matrix:
       rust: stable
       env: TARGET=x86_64-unknown-linux-musl DEPLOY=1
     - os: osx
-      rust: stable
+      # FIXME: Replace this with stable again once https://github.com/rust-lang/cargo/pull/7268 finds it way
+      # to stable through https://github.com/rust-lang/rust/pull/63960
+      rust: nigthly
       env: TARGET=x86_64-apple-darwin DEPLOY=1
     - os: linux
       rust: stable

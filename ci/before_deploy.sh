@@ -3,8 +3,11 @@
 set -ex
 
 make_archive() {
-    # We don't care for manylinux compliance for the downloads, so we can use the keyring.
-    cargo build --release --target $TARGET --features "password-storage"
+    if [[ $TARGET == *linux* ]]; then
+        cargo build --release --target $TARGET
+    else
+        cargo build --release --target $TARGET --features "password-storage"
+    fi
     pushd target/$TARGET/release/
     # You can add more files to the archive by adding them to this line
     tar czf $TRAVIS_BUILD_DIR/$BINARY_NAME-$TRAVIS_TAG-$TARGET.tar.gz $BINARY_NAME
@@ -19,24 +22,24 @@ make_deb() {
     local conflictname
 
     case $TARGET in
-        x86_64*)
-            architecture=amd64
-            ;;
-        i686*)
-            architecture=i386
-            ;;
-        *)
-            echo "ERROR: unknown target" >&2
-            return 1
-            ;;
+    x86_64*)
+        architecture=amd64
+        ;;
+    i686*)
+        architecture=i386
+        ;;
+    *)
+        echo "ERROR: unknown target" >&2
+        return 1
+        ;;
     esac
     version=${TRAVIS_TAG#v}
-    if [[ $TARGET = *musl* ]]; then
-      dpkgname=$BINARY_NAME-musl
-      conflictname=$BINARY_NAME
+    if [[ $TARGET == *musl* ]]; then
+        dpkgname=$BINARY_NAME-musl
+        conflictname=$BINARY_NAME
     else
-      dpkgname=$BINARY_NAME
-      conflictname=$BINARY_NAME-musl
+        dpkgname=$BINARY_NAME
+        conflictname=$BINARY_NAME-musl
     fi
 
     tempdir=$(mktemp -d 2>/dev/null || mktemp -d -t tmp)
@@ -52,7 +55,7 @@ make_deb() {
 
     # Control file
     mkdir "$tempdir/DEBIAN"
-    cat > "$tempdir/DEBIAN/control" <<EOF
+    cat >"$tempdir/DEBIAN/control" <<EOF
 Package: $dpkgname
 Version: $version
 Section: utils
@@ -68,7 +71,7 @@ EOF
 }
 
 upload_to_pypi() {
-    if [[ $TARGET = x86_64-unknown-linux-musl ]]; then
+    if [[ $TARGET == x86_64-unknown-linux-musl ]]; then
         cargo run -- publish -u konstin -b bin --target $TARGET
     else
         cargo run -- publish -u konstin -b bin --target $TARGET --no-sdist
@@ -79,12 +82,12 @@ main() {
     # upload_to_pypi needs to run first because otherwise we have the .tar.gz and the .deb in the source distribution
     upload_to_pypi
     # `cargo publish` also needs to run before making te archives because we want a clean working tree
-    if [[ $TARGET = x86_64-unknown-linux-musl ]]; then
+    if [[ $TARGET == x86_64-unknown-linux-musl ]]; then
         cargo publish --token $CRATES_IO_TOKEN --no-verify
     fi
     make_archive
-    if [[ $TARGET = *linux* ]]; then
-      make_deb
+    if [[ $TARGET == *linux* ]]; then
+        make_deb
     fi
 }
 

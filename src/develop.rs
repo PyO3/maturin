@@ -27,9 +27,10 @@ pub fn develop(
 
     let python = target.get_venv_python(&venv_dir);
 
-    let interpreter = PythonInterpreter::check_executable(python, &target)?.ok_or_else(|| {
-        Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-    })?;
+    let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
+        .ok_or_else(|| {
+            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+        })?;
 
     let build_options = BuildOptions {
         manylinux: Manylinux::Off,

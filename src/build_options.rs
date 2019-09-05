@@ -242,10 +242,10 @@ pub fn find_interpreter(
     match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
-                PythonInterpreter::check_executables(&interpreter, &target)
+                PythonInterpreter::check_executables(&interpreter, &target, &bridge)
                     .context("The given list of python interpreters is invalid")?
             } else {
-                PythonInterpreter::find_all(&target)
+                PythonInterpreter::find_all(&target, &bridge)
                     .context("Finding python interpreters failed")?
             };
 
@@ -274,7 +274,7 @@ pub fn find_interpreter(
             };
             let err_message = "Failed to find python interpreter for generating cffi bindings";
 
-            let interpreter = PythonInterpreter::check_executable(executable, &target)
+            let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
                 .context(err_msg(err_message))?
                 .ok_or_else(|| err_msg(err_message))?;
 

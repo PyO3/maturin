@@ -263,9 +263,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
             build_options.interpreter = Some(vec![PathBuf::from("python")]);
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
-                BridgeModel::Bindings(_) => {
-                    vec![context.interpreter[0].get_tag(&context.manylinux)]
-                }
+                BridgeModel::Bindings(_) => vec![context.interpreter[0].get_tag(&context.manylinux)],
                 BridgeModel::Bin | BridgeModel::Cffi => {
                     context.target.get_universal_tags(&context.manylinux).1
                 }
@@ -419,7 +417,8 @@ fn run() -> Result<(), Error> {
         }
         Opt::ListPython => {
             let target = Target::from_target_triple(None)?;
-            let found = PythonInterpreter::find_all(&target)?;
+            // We don't know the targeted bindings yet, so we use the most lenient
+            let found = PythonInterpreter::find_all(&target, &BridgeModel::Cffi)?;
             println!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
                 println!(" - {}", interpreter);

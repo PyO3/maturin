@@ -1,5 +1,5 @@
-use crate::Manylinux;
 use crate::Target;
+use crate::{BridgeModel, Manylinux};
 use failure::{bail, format_err, Error, Fail, ResultExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -303,21 +303,24 @@ pub struct PythonInterpreter {
 fn fun_with_abiflags(
     message: &IntepreterMetadataMessage,
     target: &Target,
+    bridge: &BridgeModel,
 ) -> Result<String, Error> {
-    let sane_platform = match message.platform.as_ref() {
-        "windows" => target.is_windows(),
-        "linux" => target.is_linux(),
-        "darwin" => target.is_macos(),
-        "freebsd" => target.is_freebsd(),
-        _ => false,
-    };
+    if bridge == BridgeModel::Cffi {
+        let sane_platform = match message.platform.as_ref() {
+            "windows" => target.is_windows(),
+            "linux" => target.is_linux(),
+            "darwin" => target.is_macos(),
+            "freebsd" => target.is_freebsd(),
+            _ => false,
+        };
 
-    if !sane_platform {
-        bail!(
-            "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
-            message.platform,
-            target,
-        )
+        if !sane_platform {
+            bail!(
+                "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
+                message.platform,
+                target,
+            )
+        }
     }
 
     if message.major != 3 || message.minor < 5 {
@@ -333,9 +336,7 @@ fn fun_with_abiflags(
         Ok("".to_string())
     } else if target.is_windows() {
         if message.abiflags.is_some() {
-            bail!(
-                "A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ"
-            )
+            bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
         } else {
             Ok("".to_string())
         }
@@ -349,9 +350,7 @@ fn fun_with_abiflags(
             Ok(abiflags.to_string())
         }
     } else {
-        bail!(
-            "A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ"
-        )
+        bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
     }
 }
 
@@ -475,6 +474,7 @@ impl PythonInterpreter {
     pub fn check_executable(
         executable: impl AsRef<Path>,
         target: &Target,
+        bridge: &BridgeModel,
     ) -> Result<Option<PythonInterpreter>, Error> {
         let output = Command::new(&executable.as_ref())
             .args(&["-c", GET_INTERPRETER_METADATA])
@@ -519,7 +519,7 @@ impl PythonInterpreter {
             }
         };
 
-        let abiflags = fun_with_abiflags(&message, &target).context(format_err!(
+        let abiflags = fun_with_abiflags(&message, &target, &bridge).context(format_err!(
             "Failed to get information from the python interpreter at {}",
             executable.as_ref().display()
         ))?;
@@ -538,7 +538,10 @@ impl PythonInterpreter {
 
     /// Tries to find all installed python versions using the heuristic for the
     /// given platform
-    pub fn find_all(target: &Target) -> Result<Vec<PythonInterpreter>, Error> {
+    pub fn find_all(
+        target: &Target,
+        bridge: &BridgeModel,
+    ) -> Result<Vec<PythonInterpreter>, Error> {
         let executables = if target.is_windows() {
             find_all_windows(&target)?
         } else {
@@ -546,7 +549,9 @@ impl PythonInterpreter {
         };
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(&executable, &target)? {
+            if let Some(version) =
+                PythonInterpreter::check_executable(&executable, &target, &bridge)?
+            {
                 available_versions.push(version);
             }
         }
@@ -560,14 +565,14 @@ impl PythonInterpreter {
     pub fn check_executables(
         executables: &[PathBuf],
         target: &Target,
+        bridge: &BridgeModel,
     ) -> Result<Vec<PythonInterpreter>, Error> {
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(executable, &target)
-                .context(format!(
-                    "{} is not a valid python interpreter",
-                    executable.display()
-                ))?
+            if let Some(version) =
+                PythonInterpreter::check_executable(executable, &target, &bridge).context(
+                    format!("{} is not a valid python interpreter", executable.display()),
+                )?
             {
                 available_versions.push(version);
             } else {

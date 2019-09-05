@@ -23,6 +23,9 @@ environment:
 matrix:
   fast_finish: true
 
+cache:
+  - target -> Cargo.lock
+
 install:
   #- cinst miniconda3 # Deactivate because it makes non-conda tests fail
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe

@@ -1,9 +1,9 @@
 //! The wheel format is (mostly) specified in PEP 427
 
 use crate::build_context::ProjectLayout;
-use crate::{Metadata21, BridgeModel};
 use crate::PythonInterpreter;
 use crate::Target;
+use crate::{BridgeModel, Metadata21};
 use base64;
 use failure::{bail, Context, Error, ResultExt};
 use flate2::write::GzEncoder;
@@ -66,13 +66,14 @@ pub struct PathWriter {
 impl PathWriter {
     /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self, Error> {
-        let interpreter =
-            PythonInterpreter::check_executable(target.get_venv_python(&venv_dir), &target, &bridge)?
-                .ok_or_else(|| {
-                    Context::new(
-                        "Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ",
-                    )
-                })?;
+        let interpreter = PythonInterpreter::check_executable(
+            target.get_venv_python(&venv_dir),
+            &target,
+            &bridge,
+        )?
+        .ok_or_else(|| {
+            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+        })?;
 
         let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
 

@@ -41,11 +41,10 @@ pub fn develop(
 
     let build_context = build_options.into_build_context(release, strip)?;
 
-        let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
+    let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
         .ok_or_else(|| {
             Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
         })?;
-
 
     let mut builder = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;
 

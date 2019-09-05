@@ -85,9 +85,6 @@ matrix:
     - os: osx
       rust: nightly-2019-08-21
       env: TARGET=x86_64-apple-darwin
-      addons:
-        homebrew:
-          packages: python3
 
     # Run clippy and rustfmt
     - name: stylecheck

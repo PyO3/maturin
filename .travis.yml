@@ -95,9 +95,11 @@ matrix:
       install:
         - rustup component add clippy
         - rustup component add rustfmt
+        - pip install --pre black==19.3b0
       script:
         - cargo fmt --all -- --check
         - cargo clippy -- -D warnings
+        - black . --check
 
 install:
   # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this

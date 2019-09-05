@@ -5,3 +5,22 @@ build-backend = "setuptools.build_meta"
 
 [tool.maturin]
 bindings = "bin"
+
+[tool.black]
+target_version = ['py35']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.eggs
+    | \.git
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | venv
+    | .*/venv.*
+    | target
+    | dist
+  )/
+)
+'''

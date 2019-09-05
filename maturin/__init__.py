@@ -70,13 +70,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
 
 # noinspection PyUnusedLocal
 def build_sdist(sdist_directory, config_settings=None):
-    command = [
-        "maturin",
-        "pep517",
-        "write-sdist",
-        "--sdist-directory",
-        sdist_directory,
-    ]
+    command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))

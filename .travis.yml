@@ -95,7 +95,7 @@ matrix:
       install:
         - rustup component add clippy
         - rustup component add rustfmt
-        - pip install --pre black==19.3b0
+        - python3 -m pip install --pre black==19.3b0
       script:
         - cargo fmt --all -- --check
         - cargo clippy -- -D warnings

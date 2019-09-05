@@ -27,11 +27,6 @@ pub fn develop(
 
     let python = target.get_venv_python(&venv_dir);
 
-    let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
-        .ok_or_else(|| {
-            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-        })?;
-
     let build_options = BuildOptions {
         manylinux: Manylinux::Off,
         interpreter: Some(vec![target.get_python()]),
@@ -46,7 +41,13 @@ pub fn develop(
 
     let build_context = build_options.into_build_context(release, strip)?;
 
-    let mut builder = PathWriter::venv(&target, &venv_dir)?;
+        let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
+        .ok_or_else(|| {
+            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+        })?;
+
+
+    let mut builder = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;
 
     let context = "Failed to build a native library through cargo";
 

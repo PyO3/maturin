@@ -305,7 +305,7 @@ fn fun_with_abiflags(
     target: &Target,
     bridge: &BridgeModel,
 ) -> Result<String, Error> {
-    if bridge == BridgeModel::Cffi {
+    if bridge != &BridgeModel::Cffi {
         let sane_platform = match message.platform.as_ref() {
             "windows" => target.is_windows(),
             "linux" => target.is_linux(),

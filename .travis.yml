@@ -31,7 +31,7 @@ addons:
       - python3.6-venv
       - python3.7-dev
       - python3.7-venv
-      - python3.6-pip
+      - python3-pip
 
 matrix:
   fast_finish: true

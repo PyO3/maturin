@@ -334,7 +334,7 @@ fn fun_with_abiflags(
     if message.interpreter == "pypy" {
         // pypy does not specify abi flags
         Ok("".to_string())
-    } else if target.is_windows() {
+    } else if message.platform == "windows" {
         if message.abiflags.is_some() {
             bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
         } else {

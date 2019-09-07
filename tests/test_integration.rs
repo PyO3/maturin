@@ -49,26 +49,17 @@ fn test_integration_pyo3_pure_conda() {
 
 #[test]
 fn test_integration_cffi_pure() {
-    handle_result(test_integration(
-        "test-crates/cffi-pure",
-        Some("cffi".to_string()),
-    ));
+    handle_result(test_integration("test-crates/cffi-pure", None));
 }
 
 #[test]
 fn test_integration_cffi_mixed() {
-    handle_result(test_integration(
-        "test-crates/cffi-mixed",
-        Some("cffi".to_string()),
-    ));
+    handle_result(test_integration("test-crates/cffi-mixed", None));
 }
 
 #[test]
 fn test_integration_hello_world() {
-    handle_result(test_integration(
-        "test-crates/hello-world",
-        Some("bin".to_string()),
-    ));
+    handle_result(test_integration("test-crates/hello-world", None));
 }
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it

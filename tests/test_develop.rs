@@ -23,26 +23,17 @@ fn test_develop_pyo3_mixed() {
 
 #[test]
 fn test_develop_cffi_pure() {
-    handle_result(test_develop(
-        "test-crates/cffi-pure",
-        Some("cffi".to_string()),
-    ));
+    handle_result(test_develop("test-crates/cffi-pure", None));
 }
 
 #[test]
 fn test_develop_cffi_mixed() {
-    handle_result(test_develop(
-        "test-crates/cffi-mixed",
-        Some("cffi".to_string()),
-    ));
+    handle_result(test_develop("test-crates/cffi-mixed", None));
 }
 
 #[test]
 fn test_develop_hello_world() {
-    handle_result(test_develop(
-        "test-crates/hello-world",
-        Some("bin".to_string()),
-    ));
+    handle_result(test_develop("test-crates/hello-world", None));
 }
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses

@@ -186,14 +186,14 @@ impl BuildOptions {
 
 /// Tries to determine the [BridgeModel] for the target crate
 pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel, Error> {
-    let nodes = cargo_metadata
+    let resolve = cargo_metadata
         .resolve
-        .clone()
-        .ok_or_else(|| format_err!("Expected to get a dependency graph from cargo"))?
-        .nodes;
-    let deps: HashMap<String, Node> = nodes
+        .as_ref()
+        .ok_or_else(|| format_err!("Expected to get a dependency graph from cargo"))?;
+
+    let deps: HashMap<&str, &Node> = resolve.nodes
         .iter()
-        .map(|node| (cargo_metadata[&node.id].name.clone(), node.clone()))
+        .map(|node| (cargo_metadata[&node.id].name.as_ref(), node))
         .collect();
 
     if let Some(bindings) = bridge {
@@ -227,6 +227,25 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         println!("🔗 Found rust-cpython bindings");
         Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {
+        let package_id = resolve
+            .root
+            .clone()
+            .unwrap();
+        let package = cargo_metadata
+            .packages
+            .iter()
+            .find(|p| p.id == package_id)
+            .unwrap();
+
+        if package.targets.len() == 1 {
+            let target = &package.targets[0];
+            if target.kind.iter().any(|kind| kind == "cdylib") {
+                return Ok(BridgeModel::Cffi);
+            }
+            if target.kind.iter().any(|kind| kind == "bin") {
+                return Ok(BridgeModel::Bin);
+            }
+        }
         bail!("Couldn't find any bindings; Please specify them with --bindings/-b")
     }
 }
@@ -340,6 +359,7 @@ mod test {
             find_bridge(&cffi_pure, Some("cffi")).unwrap(),
             BridgeModel::Cffi
         );
+        assert_eq!(find_bridge(&cffi_pure, None).unwrap(), BridgeModel::Cffi);
 
         assert!(find_bridge(&cffi_pure, Some("rust-cpython")).is_err());
         assert!(find_bridge(&cffi_pure, Some("pyo3")).is_err());
@@ -356,8 +376,8 @@ mod test {
             find_bridge(&hello_world, Some("bin")).unwrap(),
             BridgeModel::Bin
         );
+        assert_eq!(find_bridge(&hello_world, None).unwrap(), BridgeModel::Bin);
 
-        assert!(find_bridge(&hello_world, None).is_err());
         assert!(find_bridge(&hello_world, Some("rust-cpython")).is_err());
         assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
     }

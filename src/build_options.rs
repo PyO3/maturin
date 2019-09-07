@@ -113,9 +113,9 @@ impl BuildOptions {
         // underscores as lib name
         let module_name = cargo_toml
             .lib
-            .clone()
-            .and_then(|lib| lib.name)
-            .unwrap_or_else(|| cargo_toml.package.name.clone())
+            .as_ref()
+            .and_then(|lib| lib.name.as_ref())
+            .unwrap_or_else(|| &cargo_toml.package.name)
             .to_owned();
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
@@ -229,20 +229,20 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     } else {
         let package_id = resolve
             .root
-            .clone()
+            .as_ref()
             .unwrap();
         let package = cargo_metadata
             .packages
             .iter()
-            .find(|p| p.id == package_id)
+            .find(|p| &p.id == package_id)
             .unwrap();
 
         if package.targets.len() == 1 {
             let target = &package.targets[0];
-            if target.kind.iter().any(|kind| kind == "cdylib") {
+            if target.crate_types.iter().any(|crate_type| crate_type == "cdylib") {
                 return Ok(BridgeModel::Cffi);
             }
-            if target.kind.iter().any(|kind| kind == "bin") {
+            if target.crate_types.iter().any(|crate_type| crate_type == "bin") {
                 return Ok(BridgeModel::Bin);
             }
         }

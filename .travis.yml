@@ -37,7 +37,7 @@ matrix:
   include:
     # Test the dockerfile
     - name: Docker
-    - os: linux
+      os: linux
       install:
         - docker build . -t maturin
       script:

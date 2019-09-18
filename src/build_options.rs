@@ -191,7 +191,8 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         .as_ref()
         .ok_or_else(|| format_err!("Expected to get a dependency graph from cargo"))?;
 
-    let deps: HashMap<&str, &Node> = resolve.nodes
+    let deps: HashMap<&str, &Node> = resolve
+        .nodes
         .iter()
         .map(|node| (cargo_metadata[&node.id].name.as_ref(), node))
         .collect();
@@ -227,10 +228,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         println!("🔗 Found rust-cpython bindings");
         Ok(BridgeModel::Bindings("rust_cpython".to_string()))
     } else {
-        let package_id = resolve
-            .root
-            .as_ref()
-            .unwrap();
+        let package_id = resolve.root.as_ref().unwrap();
         let package = cargo_metadata
             .packages
             .iter()
@@ -239,10 +237,18 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
         if package.targets.len() == 1 {
             let target = &package.targets[0];
-            if target.crate_types.iter().any(|crate_type| crate_type == "cdylib") {
+            if target
+                .crate_types
+                .iter()
+                .any(|crate_type| crate_type == "cdylib")
+            {
                 return Ok(BridgeModel::Cffi);
             }
-            if target.crate_types.iter().any(|crate_type| crate_type == "bin") {
+            if target
+                .crate_types
+                .iter()
+                .any(|crate_type| crate_type == "bin")
+            {
                 return Ok(BridgeModel::Bin);
             }
         }

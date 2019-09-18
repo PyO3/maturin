@@ -36,6 +36,7 @@ matrix:
   fast_finish: true
   include:
     # Test the dockerfile
+    - name: Docker
     - os: linux
       install:
         - docker build . -t maturin
@@ -84,9 +85,6 @@ matrix:
     - os: osx
       rust: nightly-2019-08-21
       env: TARGET=x86_64-apple-darwin
-      addons:
-        homebrew:
-          packages: python3
 
     # Run clippy and rustfmt
     - name: stylecheck
@@ -95,11 +93,9 @@ matrix:
       install:
         - rustup component add clippy
         - rustup component add rustfmt
-        - python3 -m pip install --pre black==19.3b0
       script:
         - cargo fmt --all -- --check
         - cargo clippy -- -D warnings
-        - black . --check
 
 install:
   # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this

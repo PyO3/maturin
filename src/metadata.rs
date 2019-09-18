@@ -128,9 +128,9 @@ impl Metadata21 {
         })
     }
 
-    /// Formats the metadata into a list of key with multiple values have
-    /// mutliple singel-valued pairs. This format is needed for the pypi
-    /// uploader and for the metadata file inside wheels
+    /// Formats the metadata into a list where keys with multiple values
+    /// become multiple single-valued key-value pairs. This format is needed for the pypi
+    /// uploader and for the METADATA file inside wheels
     pub fn to_vec(&self) -> Vec<(String, String)> {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),
@@ -138,55 +138,43 @@ impl Metadata21 {
             ("Version", self.version.clone()),
         ];
 
-        macro_rules! vec_types {
-            ($(($name:tt : $value:ident)),*) => {
-                $(
-                    for i in &self.$value {
-                        fields.push(($name, i.to_string()));
-                    }
-                )*
+        let mut add_vec = |name, values: &[String]| {
+            for i in values {
+                fields.push((name, i.clone()));
             }
         };
 
-        macro_rules! option_types {
-            ($(($name:tt : $value:ident)),*) => {
-                $(
-                    if let Some(some) = self.$value.clone() {
-                        fields.push(($name, some));
-                    }
-                )*
+        add_vec("Supported-Platform", &self.supported_platform);
+        add_vec("Platform", &self.platform);
+        add_vec("Supported-Platform", &self.supported_platform);
+        add_vec("Classifier", &self.classifier);
+        add_vec("Requires-Dist", &self.requires_dist);
+        add_vec("Provides-Dist", &self.provides_dist);
+        add_vec("Obsoletes-Dist", &self.obsoletes_dist);
+        add_vec("Requires-External", &self.requires_external);
+        add_vec("Project-Url", &self.project_url);
+        add_vec("Provides-Extra", &self.provides_extra);
+
+        let mut add_option = |name, value: &Option<String>| {
+            if let Some(some) = value.clone() {
+                fields.push((name, some));
             }
-        }
+        };
 
-        vec_types![
-            ("Supported-Platform": supported_platform),
-            ("Platform": platform),
-            ("Supported-Platform": supported_platform),
-            ("Classifier": classifier),
-            ("Requires-Dist": requires_dist),
-            ("Provides-Dist": provides_dist),
-            ("Obsoletes-Dist": obsoletes_dist),
-            ("Requires-External": requires_external),
-            ("Project-Url": project_url),
-            ("Provides-Extra": provides_extra)
-        ];
-
-        option_types![
-            ("Summary": summary),
-            ("Keywords": keywords),
-            ("Home-Page": home_page),
-            ("Download-Url": download_url),
-            ("Author": author),
-            ("Author-Email": author_email),
-            ("Maintainer": maintainer),
-            ("Maintainer-Email": maintainer_email),
-            ("License": license),
-            ("Requires-Python": requires_python),
-            ("Description-Content-Type": description_content_type),
-            // Description shall be last, so we can ignore RFC822 and just put the description
-            // in the body
-            ("Description": description)
-        ];
+        add_option("Summary", &self.summary);
+        add_option("Keywords", &self.keywords);
+        add_option("Home-Page", &self.home_page);
+        add_option("Download-Url", &self.download_url);
+        add_option("Author", &self.author);
+        add_option("Author-Email", &self.author_email);
+        add_option("Maintainer", &self.maintainer);
+        add_option("Maintainer-Email", &self.maintainer_email);
+        add_option("License", &self.license);
+        add_option("Requires-Python", &self.requires_python);
+        add_option("Description-Content-Type", &self.description_content_type);
+        // Description shall be last, so we can ignore RFC822 and just put the description
+        // in the body
+        add_option("Description", &self.description);
 
         fields
             .into_iter()

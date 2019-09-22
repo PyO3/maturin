@@ -462,11 +462,10 @@ fn run() -> Result<(), Error> {
             let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
                 .context("Failed to parse Cargo.toml into python metadata")?;
 
-            // Failure fails here since cargo_metadata does some weird stuff on their side
             let cargo_metadata = MetadataCommand::new()
                 .manifest_path(&manifest_path)
                 .exec()
-                .map_err(|e| format_err!("Cargo metadata failed: {}", e))?;
+                .context("Cargo metadata failed")?;
 
             let wheel_dir = match out {
                 Some(ref dir) => dir.clone(),

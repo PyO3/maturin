@@ -122,11 +122,16 @@ impl BuildOptions {
 
         let target = Target::from_target_triple(self.target.clone())?;
 
-        // Failure fails here since cargo_metadata does some weird stuff on their side
+        let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
+        if let Some(target) = self.target {
+            cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
+        }
+
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(&self.manifest_path)
+            .other_options(&cargo_extra_args)
             .exec()
-            .map_err(|e| format_err!("Cargo metadata failed: {}", e))?;
+            .context("Cargo metadata failed")?;
 
         let wheel_dir = match self.out {
             Some(ref dir) => dir.clone(),
@@ -150,10 +155,6 @@ impl BuildOptions {
             // Auto-detect interpreters
             None => find_interpreter(&bridge, &[], &target)?,
         };
-        let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
-        if let Some(target) = self.target {
-            cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
-        }
 
         let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
 
@@ -355,6 +356,27 @@ mod test {
     }
 
     #[test]
+    fn test_find_bridge_pyo3_feature() {
+        let pyo3_pure = MetadataCommand::new()
+            .manifest_path(&Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        assert!(find_bridge(&pyo3_pure, None).is_err());
+
+        let pyo3_pure = MetadataCommand::new()
+            .manifest_path(&Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
+            .other_options(&["--features=pyo3".to_string()])
+            .exec()
+            .unwrap();
+
+        assert!(match find_bridge(&pyo3_pure, None).unwrap() {
+            BridgeModel::Bindings(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
     fn test_find_bridge_cffi() {
         let cffi_pure = MetadataCommand::new()
             .manifest_path(&Path::new("test-crates/cffi-pure").join("Cargo.toml"))
@@ -391,9 +413,9 @@ mod test {
     #[test]
     fn test_argument_splitting() {
         let mut options = BuildOptions::default();
-        options.cargo_extra_args.push("--features foo".to_string());
+        options.cargo_extra_args.push("--features log".to_string());
         options.bindings = Some("bin".to_string());
         let context = options.into_build_context(false, false).unwrap();
-        assert_eq!(context.cargo_extra_args, vec!["--features", "foo"])
+        assert_eq!(context.cargo_extra_args, vec!["--features", "log"])
     }
 }

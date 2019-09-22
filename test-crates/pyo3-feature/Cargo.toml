@@ -1,0 +1,8 @@
+[package]
+authors = ["konstin <konstin@mailbox.org>"]
+name = "pyo3-feature"
+version = "0.7.3"
+edition = "2018"
+
+[dependencies]
+pyo3 = { version = "0.7.0", optional = true }

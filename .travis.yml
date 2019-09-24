@@ -146,6 +146,3 @@ branches:
     - master
     # Match release tags with a regex
     - /^v\d+\.\d+\.\d+.*$/
-
-notifications:
-  email: false

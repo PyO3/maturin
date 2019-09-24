@@ -5,7 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## [0.7.1] - 2019-09-05
+## [0.7.5] - 2019-09-24
+
+### Fixed
+
+ * Fix clippy error to fix publishing from ci
+
+## [0.7.4] - 2019-09-22
+
+### Fixed
+
+ * Fix tests
+
+## [0.7.3] - 2019-09-22
+
+### Fixed
+
+ * Fix building when the bindings crate is behind a feature flag
+
+## [0.7.3] - 2019-09-22
+
+## Removed
+
+ * The manylinux docker container doesn't contain musl anymore. If you're targeting musl, there's no need to use manylinux.
+
+## [0.7.2] - 2019-09-05
 
 ### Added
 
@@ -209,7 +233,12 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.7.5...HEAD
+[0.7.5]: https://github.com/pyo3/maturin/compare/v0.7.4...0.7.5
+[0.7.4]: https://github.com/pyo3/maturin/compare/v0.7.3...0.7.4
+[0.7.3]: https://github.com/pyo3/maturin/compare/v0.7.2...0.7.3
+[0.7.2]: https://github.com/pyo3/maturin/compare/v0.7.1...0.7.2
+[0.7.1]: https://github.com/pyo3/maturin/compare/v0.7.0...0.7.1
 [0.7.0]: https://github.com/pyo3/maturin/compare/v0.6.1...0.7.0
 [0.6.1]: https://github.com/pyo3/maturin/compare/v0.6.0...0.6.1
 [0.6.0]: https://github.com/pyo3/maturin/compare/v0.5.0...0.6.0

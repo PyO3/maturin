@@ -4,7 +4,7 @@
 //! Run with --help for usage information
 
 use cargo_metadata::MetadataCommand;
-use failure::{bail, format_err, Error, ResultExt};
+use failure::{bail, Error, ResultExt};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]

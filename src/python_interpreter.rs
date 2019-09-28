@@ -336,9 +336,7 @@ fn fun_with_abiflags(
         Ok("".to_string())
     } else if message.platform == "windows" {
         if message.abiflags.is_some() {
-            bail!(
-                "A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ"
-            )
+            bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
         } else {
             Ok("".to_string())
         }
@@ -352,9 +350,7 @@ fn fun_with_abiflags(
             Ok(abiflags.to_string())
         }
     } else {
-        bail!(
-            "A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ"
-        )
+        bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
     }
 }
 

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
+## [0.7.6] - 2019-09-28
+
+### Changed
+
+ * Only `--features`, `--no-default-features` and `--all-features` in `--cargo-extra-args` are passed to `cargo metadata` when determining the bindings, fixing problems in the previous release with arguments supported by `cargo build` but by `cargo metadata`.
+
 ## [0.7.5] - 2019-09-24
 
 ### Fixed
@@ -233,7 +239,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.7.5...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/pyo3/maturin/compare/v0.7.5...0.7.6
 [0.7.5]: https://github.com/pyo3/maturin/compare/v0.7.4...0.7.5
 [0.7.4]: https://github.com/pyo3/maturin/compare/v0.7.3...0.7.4
 [0.7.3]: https://github.com/pyo3/maturin/compare/v0.7.2...0.7.3

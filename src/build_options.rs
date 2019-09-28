@@ -127,9 +127,11 @@ impl BuildOptions {
             cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
         }
 
+        let cargo_metadata_extra_args = extra_feature_args(&cargo_extra_args);
+
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(&self.manifest_path)
-            .other_options(&cargo_extra_args)
+            .other_options(cargo_metadata_extra_args)
             .exec()
             .context("Cargo metadata failed")?;
 
@@ -329,6 +331,35 @@ fn split_extra_args(given_args: &[String]) -> Result<Vec<String>, Error> {
     Ok(splitted_args)
 }
 
+/// We need to pass feature flags to cargo metadata
+/// (s. https://github.com/PyO3/maturin/issues/211), but we can't pass
+/// all the extra args, as e.g. `--target` isn't supported.
+/// So we try to extract all the arguments related to features and
+/// hope that that's sufficient
+fn extra_feature_args(cargo_extra_args: &[String]) -> Vec<String> {
+    let mut cargo_metadata_extra_args = vec![];
+    let mut feature_args = false;
+    for arg in cargo_extra_args {
+        if feature_args {
+            if arg.starts_with("-") {
+                feature_args = false;
+            } else {
+                cargo_metadata_extra_args.push(arg.clone());
+            }
+        }
+        if arg == "--features" {
+            cargo_metadata_extra_args.push(arg.clone());
+            feature_args = true;
+        } else if arg == "--all-features"
+            || arg == "--no-default-features"
+            || arg.starts_with("--features")
+        {
+            cargo_metadata_extra_args.push(arg.clone());
+        }
+    }
+    cargo_metadata_extra_args
+}
+
 #[cfg(test)]
 mod test {
     use std::path::Path;
@@ -417,5 +448,22 @@ mod test {
         options.bindings = Some("bin".to_string());
         let context = options.into_build_context(false, false).unwrap();
         assert_eq!(context.cargo_extra_args, vec!["--features", "log"])
+    }
+
+    #[test]
+    fn test_extra_feature_args() {
+        let cargo_extra_args = "--no-default-features --features a b --target x86_64-unknown-linux-musl --features=c --lib";
+        let cargo_extra_args = split_extra_args(&[cargo_extra_args.to_string()]).unwrap();
+        let cargo_metadata_extra_args = extra_feature_args(&cargo_extra_args);
+        assert_eq!(
+            cargo_metadata_extra_args,
+            vec![
+                "--no-default-features",
+                "--features",
+                "a",
+                "b",
+                "--features=c"
+            ]
+        );
     }
 }

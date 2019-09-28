@@ -341,7 +341,7 @@ fn extra_feature_args(cargo_extra_args: &[String]) -> Vec<String> {
     let mut feature_args = false;
     for arg in cargo_extra_args {
         if feature_args {
-            if arg.starts_with("-") {
+            if arg.starts_with('-') {
                 feature_args = false;
             } else {
                 cargo_metadata_extra_args.push(arg.clone());

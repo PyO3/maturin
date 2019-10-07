@@ -54,7 +54,7 @@ platforms = "0.2.0"
 shlex = "0.1.1"
 cbindgen = { version = "0.9.0", default-features = false }
 walkdir = "2.2.8"
-flate2 = "1.0.9"
+flate2 = "1.0.12"
 tar = "0.4.26"
 platform-info = "0.0.1"
 

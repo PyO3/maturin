@@ -58,6 +58,7 @@ walkdir = "2.2.8"
 flate2 = "1.0.12"
 tar = "0.4.26"
 platform-info = "0.0.1"
+bytesize = "1.0.0"
 
 [dev-dependencies]
 indoc = "0.3.3"

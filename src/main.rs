@@ -3,6 +3,7 @@
 //!
 //! Run with --help for usage information
 
+use bytesize::ByteSize;
 use cargo_metadata::MetadataCommand;
 use failure::{bail, Error, ResultExt};
 #[cfg(feature = "human-panic")]
@@ -368,8 +369,14 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                 bail!("Username and/or password are wrong");
             }
             Err((wheel_path, err)) => {
+                let filesize = std::fs::metadata(&wheel_path)
+                    .map(|x| ByteSize(x.len()).to_string())
+                    .unwrap_or_else(|e| {
+                        format!("Failed to get the filesize of {:?}: {}", &wheel_path, e)
+                    });
                 let filename = wheel_path.file_name().unwrap_or(&wheel_path.as_os_str());
-                return Err(err).context(format!("💥 Failed to upload {:?}", filename))?;
+                return Err(err)
+                    .context(format!("💥 Failed to upload {:?} ({})", filename, filesize))?;
             }
         }
     }

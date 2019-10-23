@@ -79,6 +79,7 @@ setup(
     long_description_content_type="text/markdown",
     version="0.7.6",
     license="MIT OR Apache-2.0",
+    python_requires=">=3.5",
     cmdclass={"install": PostInstallCommand, "bdist_wheel": bdist_wheel},
     classifiers=[
         "Software Development :: Build Tools",

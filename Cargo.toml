@@ -12,6 +12,7 @@ categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"
 edition = "2018"
 
 [package.metadata.maturin]
+requires-python = ">=3.5"
 classifier = [
     "Software Development :: Build Tools",
     "Programming Language :: Rust",

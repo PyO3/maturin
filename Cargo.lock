@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "cargo_metadata"
-version = "0.8.2"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -835,7 +835,7 @@ name = "maturin"
 version = "0.7.6"
 dependencies = [
  "base64 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cargo_metadata 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cargo_metadata 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cbindgen 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2322,7 +2322,7 @@ dependencies = [
 "checksum bzip2-sys 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "6584aa36f5ad4c9247f5323b0a42f37802b37a836f0ad87084d7a33961abe25f"
 "checksum c2-chacha 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7d64d04786e0f528460fc884753cf8dddcc466be308f6026f8e355c41a0e4101"
 "checksum cargo_metadata 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e5d1b4d380e1bab994591a24c2bdd1b054f64b60bef483a8c598c7c345bc3bbe"
-"checksum cargo_metadata 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "700b3731fd7d357223d0000f4dbf1808401b694609035c3c411fbc0cd375c426"
+"checksum cargo_metadata 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8d2d1617e838936c0d2323a65cc151e03ae19a7678dd24f72bccf27119b90a5d"
 "checksum cbindgen 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9daec6140ab4dcd38c3dd57e580b59a621172a526ac79f1527af760a55afeafd"
 "checksum cc 1.0.45 (registry+https://github.com/rust-lang/crates.io-index)" = "4fc9a35e1f4290eb9e5fc54ba6cf40671ed2a2514c3eeb2b2a908dda2ea5a1be"
 "checksum cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"

@@ -449,7 +449,12 @@ pub fn write_bindings_module(
                 .context("Failed to add the python module to the package")?;
 
             if develop {
-                fs::copy(&artifact, python_module.join(&so_filename))?;
+                let target = python_module.join(&so_filename);
+                fs::copy(&artifact, &target).context(format!(
+                    "Failed to copy {} to {}",
+                    artifact.display(),
+                    target.display()
+                ))?;
             }
 
             writer.add_file(Path::new(&module_name).join(&so_filename), &artifact)?;
@@ -484,7 +489,12 @@ pub fn write_cffi_module(
             if develop {
                 let base_path = python_module.join(&module_name);
                 fs::create_dir_all(&base_path)?;
-                fs::copy(&artifact, base_path.join("native.so"))?;
+                let target = base_path.join("native.so");
+                fs::copy(&artifact, &target).context(format!(
+                    "Failed to copy {} to {}",
+                    artifact.display(),
+                    target.display()
+                ))?;
                 File::create(base_path.join("__init__.py"))?
                     .write_all(cffi_init_file().as_bytes())?;
                 File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;

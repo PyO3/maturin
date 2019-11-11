@@ -10,6 +10,7 @@
 # for maturin itself use `maturin sdist`.
 
 import os
+import shutil
 import subprocess
 import sys
 
@@ -48,6 +49,11 @@ class PostInstallCommand(install):
         if os.path.isfile(existing_binary):
             source = existing_binary
         else:
+            if not shutil.which("cargo"):
+                raise RuntimeError(
+                    "cargo not found in PATH. Please install rust "
+                    "(https://www.rust-lang.org/tools/install) and try again"
+                )
             subprocess.check_call(
                 ["cargo", "rustc", "--bin", "maturin", "--", "-C", "link-arg=-s"]
             )

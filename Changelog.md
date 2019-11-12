@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.7] - 2019-11-12
+
+### Added
+
+ * The setup.py installer for bootstrapping maturin now checks for cargo instead of failing with a complex error message.
+ * Upload errors now show the filesize
+
 ### Changed
 
 * maturin's metadata now lists a requirement of python3.5 or later to install.

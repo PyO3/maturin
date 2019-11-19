@@ -16,6 +16,7 @@ before_cache:
   - rm -rfv target/debug/deps/{libmaturin,maturin,test,common}*
   - rm -rfv target/debug/{libmaturin,maturin,common,test}*
   - cargo clean -p maturin
+  - rm -rfv target/.rustc_info.json
 
 addons:
   apt:
@@ -38,8 +39,10 @@ matrix:
     # Test the dockerfile
     - name: Docker
       os: linux
+      cache: false
       install:
-        - docker build . -t maturin
+        - docker pull konstin2/maturin:master || true
+        - docker build --cache-from konstin2/maturin:master . -t maturin
       script:
         - ./test-dockerfile.sh
 

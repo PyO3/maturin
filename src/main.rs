@@ -441,10 +441,10 @@ fn run() -> Result<(), Error> {
             release,
             strip,
         } => {
-            let venv_dir = match env::var_os("VIRTUAL_ENV") {
+            let venv_dir = match env::var_os("VIRTUAL_ENV").xor(env::var_os("CONDA_PREFIX")) {
                 Some(dir) => PathBuf::from(dir),
                 None => {
-                    bail!("You need be inside a virtualenv to use develop (VIRTUAL_ENV isn't set)")
+                    bail!("You need to be inside a virtualenv or conda environment to use develop (neither VIRTUAL_ENV nor CONDA_PREFIX are set)")
                 }
             };
 

@@ -187,7 +187,7 @@ impl Target {
                 if self.is_64_bit {
                     "x86_64-linux-gnu"
                 } else {
-                    "x86-linux-gnu"
+                    "i386-linux-gnu"
                 }
             }
             OS::Macos => "darwin",

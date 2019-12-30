@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.7] - 2019-11-12
 
+### Fixed 
+
+ * 32-bit wheels didn't work on linux. This has been fixed by dae in [#250](https://github.com/PyO3/maturin/pull/250)
+ * The path of the RECORD file on windows used a backward slash instead of a forward slash 
+
+## [0.7.7] - 2019-11-12
+
 ### Added
 
  * The setup.py installer for bootstrapping maturin now checks for cargo instead of failing with a complex error message.

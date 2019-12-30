@@ -4,7 +4,7 @@
 use crate::Metadata21;
 use crate::Registry;
 use failure::Fail;
-use reqwest::{self, multipart::Form, Client, StatusCode};
+use reqwest::{self, blocking::multipart::Form, blocking::Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
@@ -85,7 +85,7 @@ pub fn upload(
     form = form.file("content", &wheel_path)?;
 
     let client = Client::new();
-    let mut response = client
+    let response = client
         .post(registry.url.clone())
         .header(
             reqwest::header::CONTENT_TYPE,
@@ -104,15 +104,13 @@ pub fn upload(
     } else if response.status() == StatusCode::FORBIDDEN {
         Err(UploadError::AuthenticationError)
     } else {
+        let status_string = response.status().to_string();
         let err_text = response.text().unwrap_or_else(|e| {
             format!(
                 "The registry should return some text, even in case of an error, but didn't ({})",
                 e
             )
         });
-        Err(UploadError::StatusCodeError(
-            response.status().to_string(),
-            err_text,
-        ))
+        Err(UploadError::StatusCodeError(status_string, err_text))
     }
 }

@@ -105,7 +105,7 @@ impl Metadata21 {
             download_url: None,
             // Cargo.toml has no distinction between author and author email
             author: Some(authors.to_owned()),
-            author_email: Some(authors.to_owned()),
+            author_email: Some(authors),
             license: cargo_toml.package.license.clone(),
 
             // Values provided through `[project.metadata.maturin]`

@@ -72,7 +72,7 @@ pub fn upload(
 
     let joined_metadata: Vec<(String, String)> = api_metadata
         .into_iter()
-        .chain(metadata21.to_vec().clone().into_iter())
+        .chain(metadata21.to_vec().into_iter())
         // All fields must be lower case and with underscores or they will be ignored by warehouse
         .map(|(key, value)| (key.to_lowercase().replace("-", "_"), value))
         .collect();

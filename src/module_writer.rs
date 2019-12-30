@@ -161,8 +161,7 @@ impl ModuleWriter for WheelWriter {
         bytes: &[u8],
         permissions: u32,
     ) -> Result<(), Error> {
-        // So apparently we must use unix style paths for pypi's checks to succeed; Without
-        // the replacing we get a "400 Client Error: Invalid distribution file."
+        // The zip standard mandates using unix style paths
         let target = target.as_ref().to_str().unwrap().replace("\\", "/");
 
         // Unlike users which can use the develop subcommand, the tests have to go through
@@ -225,8 +224,10 @@ impl WheelWriter {
             zip::CompressionMethod::Deflated
         };
         let options = zip::write::FileOptions::default().compression_method(compression_method);
-        self.zip
-            .start_file(self.record_file.to_str().unwrap(), options)?;
+        self.zip.start_file(
+            self.record_file.to_str().unwrap().replace("\\", "/"),
+            options,
+        )?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;

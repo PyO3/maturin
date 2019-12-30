@@ -224,16 +224,14 @@ impl WheelWriter {
             zip::CompressionMethod::Deflated
         };
         let options = zip::write::FileOptions::default().compression_method(compression_method);
-        self.zip.start_file(
-            self.record_file.to_str().unwrap().replace("\\", "/"),
-            options,
-        )?;
+        let record_filename = self.record_file.to_str().unwrap().replace("\\", "/");
+        self.zip.start_file(&record_filename, options)?;
         for (filename, hash, len) in self.record {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
         }
         self.zip
-            .write_all(format!("{},,\n", self.record_file.to_str().unwrap()).as_bytes())?;
+            .write_all(format!("{},,\n", record_filename).as_bytes())?;
 
         self.zip.finish()?;
         Ok(self.wheel_path)

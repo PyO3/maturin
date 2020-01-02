@@ -173,9 +173,8 @@ impl Target {
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py2_and_py3_tags(&self, manylinux: &Manylinux) -> Vec<String> {
+    pub fn get_py3_tags(&self, manylinux: &Manylinux) -> Vec<String> {
         vec![
-            format!("py2-none-{}", self.get_platform_tag(&manylinux)),
             format!("py3-none-{}", self.get_platform_tag(&manylinux)),
         ]
     }
@@ -237,10 +236,10 @@ impl Target {
     /// Returns the tags for the platform without python version
     pub fn get_universal_tags(&self, manylinux: &Manylinux) -> (String, Vec<String>) {
         let tag = format!(
-            "py2.py3-none-{platform}",
+            "py3-none-{platform}",
             platform = self.get_platform_tag(&manylinux)
         );
-        let tags = self.get_py2_and_py3_tags(&manylinux);
+        let tags = self.get_py3_tags(&manylinux);
         (tag, tags)
     }
 }

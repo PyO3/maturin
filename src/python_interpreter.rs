@@ -61,7 +61,6 @@ fn windows_interpreter_no_build(
 /// Installed Pythons found by py Launcher for Windows
 /// -3.7-64 *
 /// -3.6-32
-/// -2.7-64
 /// ```
 ///
 /// When using `conda` we can use the `conda info -e` command to retrieve information

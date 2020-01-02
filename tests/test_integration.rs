@@ -91,7 +91,7 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
         .build_wheels()?;
 
     for (filename, supported_version, python_interpreter) in wheels {
-        let venv_dir = if supported_version == "py2.py3" {
+        let venv_dir = if supported_version == "py3" {
             package.as_ref().canonicalize()?.join("venv_cffi")
         } else {
             package.as_ref().canonicalize()?.join(format!(

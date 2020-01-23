@@ -174,9 +174,7 @@ impl Target {
 
     /// Returns the tags for the WHEEL file for cffi wheels
     pub fn get_py3_tags(&self, manylinux: &Manylinux) -> Vec<String> {
-        vec![
-            format!("py3-none-{}", self.get_platform_tag(&manylinux)),
-        ]
+        vec![format!("py3-none-{}", self.get_platform_tag(&manylinux))]
     }
 
     /// Returns the platform for the tag in the shared libaries file name

@@ -36,7 +36,7 @@ if [[ $(python test-crates/cffi-mixed/check_installed/check_installed.py) != 'SU
   exit 1
 fi
 
-docker run --rm -e RUSTUP_TOOLCHAIN=nightly-2019-08-21 -v $(pwd)/test-crates/pyo3-pure:/io maturin build --no-sdist -i python3.6
+docker run --rm -e RUSTUP_TOOLCHAIN=nightly-2020-01-23 -v $(pwd)/test-crates/pyo3-pure:/io maturin build --no-sdist -i python3.6
 
 pip install pyo3-pure --no-index --find-links test-crates/pyo3-pure/target/wheels/
 
@@ -44,7 +44,7 @@ if [[ $(python test-crates/pyo3-pure/check_installed/check_installed.py) != 'SUC
   exit 1
 fi
 
-docker run --rm -e RUSTUP_TOOLCHAIN=nightly-2019-08-21 -v $(pwd)/test-crates/pyo3-mixed:/io maturin build --no-sdist -i python3.6
+docker run --rm -e RUSTUP_TOOLCHAIN=nightly-2020-01-23 -v $(pwd)/test-crates/pyo3-mixed:/io maturin build --no-sdist -i python3.6
 
 pip install pyo3-mixed --no-index --find-links test-crates/pyo3-mixed/target/wheels/
 

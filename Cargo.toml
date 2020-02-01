@@ -53,7 +53,7 @@ goblin = "0.1.1"
 pretty_env_logger = { version = "0.3.0", optional = true }
 platforms = "0.2.1"
 shlex = "0.1.1"
-cbindgen = { version = "0.12.0", default-features = false }
+cbindgen = { version = "0.13.0", default-features = false }
 walkdir = "2.2.8"
 flate2 = "1.0.12"
 tar = "0.4.26"

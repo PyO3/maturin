@@ -1,0 +1,12 @@
+[package]
+name = "lib_with_path_dep"
+version = "0.1.0"
+authors = ["konstin <konstin@mailbox.org>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+some_path_dep = { path = "../some_path_dep" }
+lazy_static = "1.4.0"

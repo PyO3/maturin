@@ -24,7 +24,7 @@ pip install maturin
 There are three main commands:
 
  * `maturin publish` builds the crate into python packages and publishes them to pypi.
- * `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them.
+ * `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine).
  * `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv.
 
 `pyo3` and `rust-cpython` bindings are automatically detected, for cffi or binaries you need to pass `-b cffi` or `-b bin`. maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust or milksnake configuration. You can even integrate it with testing tools such as [tox](https://tox.readthedocs.io/en/latest/). There are examples for the different bindings in the `test-crates` folder.

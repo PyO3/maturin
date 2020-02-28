@@ -1,13 +1,12 @@
 use failure::{bail, format_err, Error};
 use platform_info::*;
 use platforms;
-use platforms::target::Arch;
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-use target_info;
 
 /// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -29,8 +28,26 @@ pub enum Manylinux {
     Manylinux2010,
     /// Use the manylinux2010 tag but don't check for compliance
     Manylinux2010Unchecked,
+    /// Use manylinux2014 tag and check for compliance
+    Manylinux2014,
+    /// Use the manylinux2014 tag but don't check for compliance
+    Manylinux2014Unchecked,
     /// Use the native linux tag
     Off,
+}
+
+impl fmt::Display for Manylinux {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Manylinux::Manylinux1 => write!(f, "manylinux1"),
+            Manylinux::Manylinux1Unchecked => write!(f, "manylinux1"),
+            Manylinux::Manylinux2010 => write!(f, "manylinux2010"),
+            Manylinux::Manylinux2010Unchecked => write!(f, "manylinux2010"),
+            Manylinux::Manylinux2014 => write!(f, "manylinux2014"),
+            Manylinux::Manylinux2014Unchecked => write!(f, "manylinux2014"),
+            Manylinux::Off => write!(f, "linux"),
+        }
+    }
 }
 
 impl FromStr for Manylinux {
@@ -42,8 +59,30 @@ impl FromStr for Manylinux {
             "1-unchecked" => Ok(Manylinux::Manylinux1Unchecked),
             "2010" => Ok(Manylinux::Manylinux2010),
             "2010-unchecked" => Ok(Manylinux::Manylinux2010Unchecked),
+            "2014" => Ok(Manylinux::Manylinux2014Unchecked),
+            "2014-unchecked" => Ok(Manylinux::Manylinux2014Unchecked),
             "off" => Ok(Manylinux::Off),
             _ => Err("Invalid value for the manylinux option"),
+        }
+    }
+}
+
+/// All supported CPU architectures
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum Arch {
+    AARCH64,
+    ARM7L,
+    X86,
+    X86_64,
+}
+
+impl fmt::Display for Arch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Arch::AARCH64 => write!(f, "aarch64"),
+            Arch::ARM7L => write!(f, "arm7l"),
+            Arch::X86 => write!(f, "i686"),
+            Arch::X86_64 => write!(f, "x86_64"),
         }
     }
 }
@@ -52,29 +91,10 @@ impl FromStr for Manylinux {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Target {
     os: OS,
-    is_64_bit: bool,
+    arch: Arch,
 }
 
 impl Target {
-    /// Returns the target maturin was compiled for
-    pub fn current() -> Self {
-        let os = match target_info::Target::os() {
-            "linux" => OS::Linux,
-            "windows" => OS::Windows,
-            "macos" => OS::Macos,
-            "freebsd" => OS::FreeBSD,
-            unsupported => panic!("The platform {} is not supported", unsupported),
-        };
-
-        let is_64_bit = match target_info::Target::pointer_width() {
-            "64" => true,
-            "32" => false,
-            unsupported => panic!("The pointer width {} is not supported ಠ_ಠ", unsupported),
-        };
-
-        Target { os, is_64_bit }
-    }
-
     /// Uses the given target triple or tries the guess the current target by using the one used
     /// for compilation
     ///
@@ -96,21 +116,42 @@ impl Target {
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
-        let is_64_bit = match platform.target_arch {
-            Arch::X86_64 => true,
-            Arch::X86 => false,
+        let arch = match platform.target_arch {
+            platforms::target::Arch::X86_64 => Arch::X86_64,
+            platforms::target::Arch::X86 => Arch::X86,
+            platforms::target::Arch::ARM => Arch::ARM7L,
+            platforms::target::Arch::AARCH64 => Arch::AARCH64,
             unsupported => bail!("The architecture {:?} is not supported", unsupported),
         };
 
-        Ok(Target { os, is_64_bit })
+        // bail on any unsupported targets
+        match (&os, &arch) {
+            (OS::FreeBSD, Arch::AARCH64) => bail!("aarch64 is not supported for FreeBSD"),
+            (OS::FreeBSD, Arch::ARM7L) => bail!("arm7l is not supported for FreeBSD"),
+            (OS::FreeBSD, Arch::X86) => bail!("32-bit wheels are not supported for FreeBSD"),
+            (OS::FreeBSD, Arch::X86_64) => {
+                match PlatformInfo::new() {
+                    Ok(_) => {}
+                    Err(error) => bail!(error),
+                };
+            }
+            (OS::Macos, Arch::AARCH64) => bail!("aarch64 is not supported for macOS"),
+            (OS::Macos, Arch::ARM7L) => bail!("arm7l is not supported for macOS"),
+            (OS::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
+            (OS::Windows, Arch::AARCH64) => bail!("aarch64 is not supported for Windows"),
+            (OS::Windows, Arch::ARM7L) => bail!("arm7l is not supported for Windows"),
+            (_, _) => {}
+        }
+        Ok(Target { os, arch })
     }
 
     /// Returns whether the platform is 64 bit or 32 bit
     pub fn pointer_width(&self) -> usize {
-        if self.is_64_bit {
-            64
-        } else {
-            32
+        match self.arch {
+            Arch::AARCH64 => 64,
+            Arch::ARM7L => 32,
+            Arch::X86 => 32,
+            Arch::X86_64 => 64,
         }
     }
 
@@ -141,26 +182,8 @@ impl Target {
 
     /// Returns the platform part of the tag for the wheel name for cffi wheels
     pub fn get_platform_tag(&self, manylinux: &Manylinux) -> String {
-        match (&self.os, self.is_64_bit, manylinux) {
-            (&OS::Linux, true, Manylinux::Off) => "linux_x86_64".to_string(),
-            (&OS::Linux, false, Manylinux::Off) => "linux_i686".to_string(),
-            (&OS::Linux, true, Manylinux::Manylinux1) => "manylinux1_x86_64".to_string(),
-            (&OS::Linux, true, Manylinux::Manylinux1Unchecked) => "manylinux1_x86_64".to_string(),
-            (&OS::Linux, true, Manylinux::Manylinux2010) => "manylinux2010_x86_64".to_string(),
-            (&OS::Linux, true, Manylinux::Manylinux2010Unchecked) => {
-                "manylinux2010_x86_64".to_string()
-            }
-            (&OS::Linux, false, Manylinux::Manylinux1) => "manylinux1_i686".to_string(),
-            (&OS::Linux, false, Manylinux::Manylinux1Unchecked) => "manylinux1_i686".to_string(),
-            (&OS::Linux, false, Manylinux::Manylinux2010) => "manylinux2010_i686".to_string(),
-            (&OS::Linux, false, Manylinux::Manylinux2010Unchecked) => {
-                "manylinux2010_i686".to_string()
-            }
-            (&OS::Windows, true, _) => "win_amd64".to_string(),
-            (&OS::Windows, false, _) => "win32".to_string(),
-            (&OS::Macos, true, _) => "macosx_10_7_x86_64".to_string(),
-            (&OS::Macos, false, _) => panic!("32-bit wheels are not supported for mac os"),
-            (&OS::FreeBSD, true, _) => {
+        match (&self.os, &self.arch) {
+            (OS::FreeBSD, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
                     Ok(info) => info,
                     Err(error) => panic!(error),
@@ -168,7 +191,11 @@ impl Target {
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!("freebsd_{}_amd64", release)
             }
-            (&OS::FreeBSD, false, _) => panic!("32-bit wheels are not supported for FreeBSD"),
+            (OS::Linux, _) => format!("{}_{}", manylinux, self.arch),
+            (OS::Macos, Arch::X86_64) => "macosx_10_7_x86_64".to_string(),
+            (OS::Windows, Arch::X86) => "win32".to_string(),
+            (OS::Windows, Arch::X86_64) => "win_amd64".to_string(),
+            (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         }
     }
 
@@ -179,22 +206,20 @@ impl Target {
 
     /// Returns the platform for the tag in the shared libaries file name
     pub fn get_shared_platform_tag(&self) -> &'static str {
-        match self.os {
-            OS::Linux => {
-                if self.is_64_bit {
-                    "x86_64-linux-gnu"
-                } else {
-                    "i386-linux-gnu"
-                }
+        match (&self.os, &self.arch) {
+            (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
+            (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnueabihf", // aka armv8-linux-gnueabihf
+            (OS::Linux, Arch::ARM7L) => "arm-linux-gnueabihf",
+            (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
+            (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",
+            (OS::Macos, Arch::X86_64) => "darwin",
+            (OS::Windows, Arch::X86) => "win32",
+            (OS::Windows, Arch::X86_64) => "win_amd64",
+            (OS::Macos, _) => {
+                panic!("unsupported macOS Arch should not have reached get_shared_platform_tag()")
             }
-            OS::Macos => "darwin",
-            OS::FreeBSD => "", // according imp.get_suffixes(), there are no such
-            OS::Windows => {
-                if self.is_64_bit {
-                    "win_amd64"
-                } else {
-                    "win32"
-                }
+            (OS::Windows, _) => {
+                panic!("unsupported Windows Arch should not have reached get_shared_platform_tag()")
             }
         }
     }

@@ -22,13 +22,15 @@ pub struct BuildOptions {
     /// - `1`: Use the manylinux1 tag and check for compliance{n}
     /// - `1-unchecked`: Use the manylinux1 tag without checking for compliance{n}
     /// - `2010`: Use the manylinux2010 tag and check for compliance{n}
-    /// - `2010-unchecked`: Use the manylinux1 tag without checking for compliance{n}
+    /// - `2010-unchecked`: Use the manylinux2010 tag without checking for compliance{n}
+    /// - `2014`: Use the manylinux2010 tag and check for compliance{n}
+    /// - `2014-unchecked`: Use the manylinux2014 tag without checking for compliance{n}
     /// - `off`: Use the native linux tag (off)
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
         long,
-        possible_values = &["1", "1-unchecked", "2010", "2010-unchecked", "off"],
+        possible_values = &["1", "1-unchecked", "2010", "2010-unchecked", "2014", "2014-unchecked", "off"],
         case_insensitive = true,
         default_value = "1"
     )]

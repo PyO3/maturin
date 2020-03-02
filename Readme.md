@@ -41,7 +41,7 @@ pyo3 will set the used python interpreter in the environment variable `PYTHON_SY
 
  Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
 
-maturin will utilize cbindgen to generate a header file. To customize the header file you can either configure cbindgen through a cbindgen.toml file inside your project root or write a setup a build script which writes a header file to `$PROJECT_ROOT/target/header.h`. 
+maturin will utilize cbindgen to generate a header file. To customize the header file you can either configure cbindgen through a cbindgen.toml file inside your project root or write a setup a build script which writes a header file to `$PROJECT_ROOT/target/header.h`.
 
 Based on this header file maturin generates a module which exports an `ffi` and a `lib` object.
 
@@ -178,22 +178,22 @@ maturin can build wheels for pypy with pyo3. Note that pypy [is not compatible w
 
 ```
 FLAGS:
-    -h, --help               
+    -h, --help
             Prints help information
 
-        --no-sdist           
+        --no-sdist
             Don't build a source distribution
 
-        --release            
+        --release
             Pass --release to cargo
 
-        --skip-auditwheel    
+        --skip-auditwheel
             [deprecated, use --manylinux instead] Don't check for manylinux compliance
 
-        --strip              
+        --strip
             Strip the library for minimum file size
 
-    -V, --version            
+    -V, --version
             Prints version information
 
 
@@ -203,33 +203,35 @@ OPTIONS:
 
         --cargo-extra-args <cargo-extra-args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
-            
+
             Use as `--cargo-extra-args="--my-arg"`
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
         --manylinux <manylinux>
             Control the platform tag on linux.
-            
+
             - `1`: Use the manylinux1 tag and check for compliance
              - `1-unchecked`: Use the manylinux1 tag without checking for compliance
              - `2010`: Use the manylinux2010 tag and check for compliance
-             - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+             - `2010-unchecked`: Use the manylinux2010 tag without checking for compliance
+             - `2014`: Use the manylinux2014 tag and check for compliance
+             - `2014-unchecked`: Use the manylinux2014 tag without checking for compliance
              - `off`: Use the native linux tag (off)
-            
+
             This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
             2010-unchecked, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
-    -m, --manifest-path <path>                      
+    -m, --manifest-path <path>
             The path to the Cargo.toml [default: Cargo.toml]
 
         --rustc-extra-args <rustc-extra-args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
-            
+
             Use as `--rustc-extra-args="--my-arg"`
-        --target <triple>                           
+        --target <triple>
             The --target option for cargo
 ```
 
@@ -237,22 +239,22 @@ OPTIONS:
 
 ```
 FLAGS:
-        --debug              
+        --debug
             Do not pass --release to cargo
 
-    -h, --help               
+    -h, --help
             Prints help information
 
-        --no-sdist           
+        --no-sdist
             Don't build a source distribution
 
-        --no-strip           
+        --no-strip
             Strip the library for minimum file size
 
-        --skip-auditwheel    
+        --skip-auditwheel
             [deprecated, use --manylinux instead] Don't check for manylinux compliance
 
-    -V, --version            
+    -V, --version
             Prints version information
 
 
@@ -262,29 +264,31 @@ OPTIONS:
 
         --cargo-extra-args <cargo-extra-args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
-            
+
             Use as `--cargo-extra-args="--my-arg"`
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set.
         --manylinux <manylinux>
             Control the platform tag on linux.
-            
+
             - `1`: Use the manylinux1 tag and check for compliance
              - `1-unchecked`: Use the manylinux1 tag without checking for compliance
              - `2010`: Use the manylinux2010 tag and check for compliance
              - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
+             - `2014`: Use the manylinux2010 tag and check for compliance
+             - `2014-unchecked`: Use the manylinux1 tag without checking for compliance
              - `off`: Use the native linux tag (off)
-            
+
             This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
-            2010-unchecked, off]
+            2010-unchecked, 2014, 2014-unchecked, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
     -p, --password <password>
             Password for pypi or your custom registry. Note that you can also pass the password through MATURIN_PASSWORD
 
-    -m, --manifest-path <path>                      
+    -m, --manifest-path <path>
             The path to the Cargo.toml [default: Cargo.toml]
 
     -r, --repository-url <registry>
@@ -292,12 +296,12 @@ OPTIONS:
 
         --rustc-extra-args <rustc-extra-args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
-            
+
             Use as `--rustc-extra-args="--my-arg"`
-        --target <triple>                           
+        --target <triple>
             The --target option for cargo
 
-    -u, --username <username>                       
+    -u, --username <username>
             Username for pypi or your custom registry
 ```
 
@@ -305,16 +309,16 @@ OPTIONS:
 
 ```
 FLAGS:
-    -h, --help       
+    -h, --help
             Prints help information
 
-        --release    
+        --release
             Pass --release to cargo
 
-        --strip      
+        --strip
             Strip the library for minimum file size
 
-    -V, --version    
+    -V, --version
             Prints version information
 
 
@@ -324,14 +328,14 @@ OPTIONS:
 
         --cargo-extra-args <cargo-extra-args>...
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
-            
+
             Use as `--cargo-extra-args="--my-arg"`
-    -m, --manifest-path <manifest-path>             
+    -m, --manifest-path <manifest-path>
             The path to the Cargo.toml [default: Cargo.toml]
 
         --rustc-extra-args <rustc-extra-args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
-            
+
             Use as `--rustc-extra-args="--my-arg"`
 ```
 

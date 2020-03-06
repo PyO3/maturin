@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.9] - 2020-03-06
 
+### Fixed
+
+ * This release includes binary wheels for mac os
+
+## [0.7.8] - 2020-03-06
+
 ### Added
 
  * Added support from arm, specifically arm7l, aarch64 by ijl in [#273](https://github.com/PyO3/maturin/pull/273)
@@ -17,11 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
  * Remove python 2 from tags by ijl in [#254](https://github.com/PyO3/maturin/pull/254)
-
-## [0.7.8] - 2019-12-31
-
-### Fixed 
-
  * 32-bit wheels didn't work on linux. This has been fixed by dae in [#250](https://github.com/PyO3/maturin/pull/250)
  * The path of the RECORD file on windows used a backward slash instead of a forward slash 
 

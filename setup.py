@@ -83,7 +83,7 @@ setup(
     "python packages",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version="0.7.8",
+    version="0.7.9",
     license="MIT OR Apache-2.0",
     python_requires=">=3.5",
     cmdclass={"install": PostInstallCommand, "bdist_wheel": bdist_wheel},

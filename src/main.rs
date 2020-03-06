@@ -472,7 +472,7 @@ fn run() -> Result<(), Error> {
             let cargo_metadata = MetadataCommand::new()
                 .manifest_path(&manifest_path)
                 .exec()
-                .context("Cargo metadata failed")?;
+                .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
 
             let wheel_dir = match out {
                 Some(ref dir) => dir.clone(),

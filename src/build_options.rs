@@ -135,7 +135,7 @@ impl BuildOptions {
             .manifest_path(&self.manifest_path)
             .other_options(cargo_metadata_extra_args)
             .exec()
-            .context("Cargo metadata failed")?;
+            .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
 
         let wheel_dir = match self.out {
             Some(ref dir) => dir.clone(),

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.9] - 2020-03-06
+
+### Added
+
+ * Added support from arm, specifically arm7l, aarch64 by ijl in [#273](https://github.com/PyO3/maturin/pull/273)
+ * Added support for manylinux2014 by ijl in [#273](https://github.com/PyO3/maturin/pull/273)
+
+### Fixed
+
+ * Remove python 2 from tags by ijl in [#254](https://github.com/PyO3/maturin/pull/254)
+
 ## [0.7.8] - 2019-12-31
 
 ### Fixed 

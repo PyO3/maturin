@@ -69,6 +69,7 @@ pub fn source_distribution(
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
             (relative_to_manifests.to_path_buf(), relative_to_cwd)
         })
+        .filter(|(target, _)| target != Path::new("Cargo.toml.orig"))
         .collect();
 
     if !target_source

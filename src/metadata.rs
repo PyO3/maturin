@@ -236,8 +236,6 @@ mod test {
     use super::*;
     use indoc::indoc;
     use std::io::Write;
-    use tempfile;
-    use toml;
 
     #[test]
     fn test_metadata_from_cargo_toml() {

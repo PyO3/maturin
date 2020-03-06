@@ -14,8 +14,6 @@ use maturin::{
     develop, get_pyproject_toml, source_distribution, write_dist_info, BridgeModel, BuildOptions,
     CargoToml, Metadata21, PathWriter, PythonInterpreter, Target,
 };
-#[cfg(feature = "log")]
-use pretty_env_logger;
 use std::path::PathBuf;
 use std::{env, fs};
 use structopt::StructOpt;

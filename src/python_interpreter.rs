@@ -3,7 +3,6 @@ use crate::{BridgeModel, Manylinux};
 use failure::{bail, format_err, Error, Fail, ResultExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashSet;
 use std::fmt;
 use std::io;

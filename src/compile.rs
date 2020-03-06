@@ -1,7 +1,6 @@
 use crate::build_context::BridgeModel;
 use crate::BuildContext;
 use crate::PythonInterpreter;
-use cargo_metadata;
 use failure::{bail, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs::File;

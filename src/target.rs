@@ -1,6 +1,5 @@
 use failure::{bail, format_err, Error};
 use platform_info::*;
-use platforms;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt;

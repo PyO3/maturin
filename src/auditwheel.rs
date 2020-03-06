@@ -1,7 +1,6 @@
 use crate::Manylinux;
 use crate::Target;
 use failure::Fail;
-use goblin;
 use goblin::elf::Elf;
 use std::fs::File;
 use std::io;

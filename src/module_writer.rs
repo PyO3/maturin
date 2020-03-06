@@ -4,7 +4,6 @@ use crate::build_context::ProjectLayout;
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::{BridgeModel, Metadata21};
-use base64;
 use failure::{bail, Context, Error, ResultExt};
 use flate2::write::GzEncoder;
 use flate2::Compression;

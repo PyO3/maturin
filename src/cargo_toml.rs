@@ -125,7 +125,6 @@ pub struct RemainingCoreMetadata {
 mod test {
     use super::*;
     use indoc::indoc;
-    use toml;
 
     #[test]
     fn test_metadata_from_cargo_toml() {

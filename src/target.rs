@@ -208,7 +208,7 @@ impl Target {
     pub fn get_shared_platform_tag(&self) -> &'static str {
         match (&self.os, &self.arch) {
             (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
-            (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnueabihf", // aka armv8-linux-gnueabihf
+            (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
             (OS::Linux, Arch::ARM7L) => "arm-linux-gnueabihf",
             (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
             (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",

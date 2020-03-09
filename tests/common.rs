@@ -4,6 +4,25 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::{env, io, str};
 
+// Y U NO accept windows path prefix, pip?
+// Anyways, here's shepmasters stack overflow solution
+// https://stackoverflow.com/a/50323079/3549270
+#[cfg(not(target_os = "windows"))]
+pub fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
+    p.as_ref().display().to_string()
+}
+
+#[cfg(target_os = "windows")]
+pub fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
+    const VERBATIM_PREFIX: &str = r#"\\?\"#;
+    let p = p.as_ref().display().to_string();
+    if p.starts_with(VERBATIM_PREFIX) {
+        p[VERBATIM_PREFIX.len()..].to_string()
+    } else {
+        p
+    }
+}
+
 /// Check that the package is either not installed or works correctly
 pub fn check_installed(package: &Path, python: &PathBuf) -> Result<(), Error> {
     let check_installed = Path::new(package)

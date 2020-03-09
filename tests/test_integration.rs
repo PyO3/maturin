@@ -1,31 +1,12 @@
-use crate::common::{check_installed, handle_result, maybe_mock_cargo};
+use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
 use failure::{bail, Error, ResultExt};
 use maturin::{BuildOptions, Target};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
 use structopt::StructOpt;
 
 mod common;
-
-// Y U NO accept windows path prefix, pip?
-// Anyways, here's shepmasters stack overflow solution
-// https://stackoverflow.com/a/50323079/3549270
-#[cfg(not(target_os = "windows"))]
-fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
-    p.as_ref().display().to_string()
-}
-
-#[cfg(target_os = "windows")]
-fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
-    const VERBATIM_PREFIX: &str = r#"\\?\"#;
-    let p = p.as_ref().display().to_string();
-    if p.starts_with(VERBATIM_PREFIX) {
-        p[VERBATIM_PREFIX.len()..].to_string()
-    } else {
-        p
-    }
-}
 
 #[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
@@ -90,29 +71,38 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
         .into_build_context(false, cfg!(feature = "faster-tests"))?
         .build_wheels()?;
 
+    let test_name = package
+        .as_ref()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     for (filename, supported_version, python_interpreter) in wheels {
-        let venv_dir = if supported_version == "py3" {
-            package.as_ref().canonicalize()?.join("venv_cffi")
-        } else {
-            package.as_ref().canonicalize()?.join(format!(
-                "venv{}.{}",
-                supported_version.chars().nth(2usize).unwrap(),
-                supported_version.chars().nth(3usize).unwrap()
-            ))
-        };
+        let venv_dir = PathBuf::from("test-crates")
+            .canonicalize()?
+            .join("venvs")
+            .join(if supported_version == "py3" {
+                format!("{}-cffi", test_name)
+            } else {
+                format!(
+                    "{}-{}.{}",
+                    test_name,
+                    supported_version.chars().nth(2usize).unwrap(),
+                    supported_version.chars().nth(3usize).unwrap()
+                )
+            });
 
         if !venv_dir.is_dir() {
-            let venv_py_version = if let Some(ref python_interpreter) = python_interpreter {
-                python_interpreter.executable.clone()
+            let output = if let Some(ref python_interpreter) = python_interpreter {
+                Command::new("virtualenv")
+                    .arg("-p")
+                    .arg(python_interpreter.executable.clone())
+                    .arg(&venv_dir)
+                    .output()?
             } else {
-                target.get_python()
+                Command::new("virtualenv").arg(&venv_dir).output()?
             };
-
-            let output = Command::new(venv_py_version)
-                .arg("-m")
-                .arg("venv")
-                .arg(&venv_dir)
-                .output()?;
             if !output.status.success() {
                 bail!(
                     "Failed to create a virtualenv at {}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
@@ -180,7 +170,6 @@ fn test_integration_conda(
     bindings: Option<String>,
 ) -> Result<(), Error> {
     use std::env;
-    use std::path::PathBuf;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 

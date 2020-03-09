@@ -11,4 +11,16 @@ steps:
     PATH: "/root/.local/bin:/root/.cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   commands:
     - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --profile minimal -y
+    - python3.8 -m pip install twine
     - python3.8 -m pip wheel --no-binary=maturin .
+    - if [[ "$DRONE_TAG" != "undefined" ]]; then twine upload --repository-url https://test.pypi.org/legacy/ --non-interactive *.whl; fi
+
+- name: publish
+  image: python:3.8-buster
+  commands:
+    - python3.8 -m pip install twine
+    - twine upload --repository-url https://test.pypi.org/legacy/ --non-interactive *.whl
+  #when:
+  #  event:
+  #  - pull_request # TODO: Replace with tag
+  #  # - tag

@@ -16,6 +16,11 @@ steps:
 
 - name: publish
   image: python:3.8-buster
+  environment:
+    TWINE_USERNAME:
+      from_secret: TWINE_USERNAME
+    TWINE_PASSWORD:
+      from_secret: TWINE_PASSWORD
   commands:
     - python3.8 -m pip install twine
     - twine upload --repository-url https://test.pypi.org/legacy/ --non-interactive *.whl

@@ -1,0 +1,14 @@
+kind: pipeline
+type: docker
+name: linux_aarch64
+platform:
+  arch: arm64
+
+steps:
+- name: test
+  image: python:3.8-buster
+  environment:
+    PATH: "/root/.local/bin:/root/.cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  commands:
+    - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --profile minimal -y
+    - python3.8 -m pip wheel --no-binary=maturin .

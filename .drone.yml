@@ -18,4 +18,5 @@ steps:
     - cargo build --release
     - cargo run --release -- publish -b bin -u konstin --no-sdist --manylinux 2014 --interpreter python3.8
   when:
-    - tag
+    event:
+      - tag

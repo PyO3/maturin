@@ -1,9 +1,8 @@
-use crate::common::{check_installed, handle_result, maybe_mock_cargo};
+use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
 use failure::Error;
-use failure::ResultExt;
 use maturin::{develop, Target};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
 use std::str;
@@ -41,26 +40,36 @@ fn test_develop_hello_world() {
 fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
     maybe_mock_cargo();
 
-    let venv_dir = package
+    let test_name = package
         .as_ref()
-        .canonicalize()
-        .context("package dir doesn't exist")?
-        .join("venv_develop");
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let venv_dir = PathBuf::from("test-crates")
+        .canonicalize()?
+        .join("venvs")
+        .join(format!("{}-develop", test_name));
     let target = Target::from_target_triple(None)?;
 
     if venv_dir.is_dir() {
         fs::remove_dir_all(&venv_dir)?;
     }
 
-    let output = Command::new(target.get_python())
-        .arg("-m")
-        .arg("venv")
-        .arg(&venv_dir)
+    let output = Command::new("virtualenv")
+        .arg(adjust_canonicalization(&venv_dir))
         .stderr(Stdio::inherit())
         .output()
         .expect("Failed to run python to create a virtualenv");
     if !output.status.success() {
-        panic!(output.status);
+        panic!(
+            "Failed to run virtualenv: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
     }
 
     let python = target.get_venv_python(&venv_dir);

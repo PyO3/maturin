@@ -14,7 +14,7 @@ freebsd_task:
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --default-toolchain $TOOLCHAIN
     - python -m ensurepip
-    - python -m pip install cffi
+    - python -m pip install --upgrade cffi virtualenv
   build_script:
     - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo build
   test_script:

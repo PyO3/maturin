@@ -45,7 +45,7 @@ install:
 
 test_script:
   - cargo build
-  - IF "%CHANNEL%" == "nightly-2020-01-23" (python.exe -m pip install cffi)
+  - IF "%CHANNEL%" == "nightly-2020-01-23" (python.exe -m pip install --upgrade cffi virtualenv)
   - IF "%CHANNEL%" == "nightly-2020-01-23" (cargo test)
 
 before_deploy:

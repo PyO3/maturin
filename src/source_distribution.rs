@@ -20,14 +20,16 @@ pub fn warn_on_local_deps(cargo_metadata: &Metadata) {
         .packages
         .iter()
         .filter(|x| x.source.is_none())
-        // Remove the pacakge itself
+        // Remove the package itself
         .filter(|x| x.id != root_package)
         .map(|x| x.name.clone())
         .collect();
-    eprintln!(
-        "⚠ The are local dependencies, which the source distribution might not include: {}",
-        local_deps.join(", ")
-    );
+    if !local_deps.is_empty() {
+        eprintln!(
+            "⚠ The are local dependencies, which the source distribution might not include: {}",
+            local_deps.join(", ")
+        );
+    }
 }
 
 /// Creates a source distribution

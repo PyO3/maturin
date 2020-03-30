@@ -139,7 +139,7 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
             ])
             .stderr(Stdio::inherit())
             .output()
-            .context("pip install failed")?;
+            .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
             panic!();
         }

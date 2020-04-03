@@ -87,6 +87,12 @@ impl Metadata21 {
 
         let extra_metadata = cargo_toml.remaining_core_metadata();
 
+        let author_email = if authors.contains('@') {
+            Some(authors.clone())
+        } else {
+            None
+        };
+
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
 
@@ -104,8 +110,8 @@ impl Metadata21 {
             home_page: cargo_toml.package.homepage.clone(),
             download_url: None,
             // Cargo.toml has no distinction between author and author email
-            author: Some(authors.to_owned()),
-            author_email: Some(authors),
+            author: Some(authors),
+            author_email,
             license: cargo_toml.package.license.clone(),
 
             // Values provided through `[project.metadata.maturin]`

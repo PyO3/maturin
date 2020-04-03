@@ -1,4 +1,4 @@
-# pyo3 is self bootstraping, however on platforms like alpine linux that aren't
+# maturin is self bootstraping, however on platforms like alpine linux that aren't
 # manylinux, pip will try installing maturin from the source distribution.
 # That source distribution obviously can't depend on maturin, so we're using
 # the always available setuptools.
@@ -83,7 +83,7 @@ setup(
     "python packages",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version="0.8.0-beta.1",
+    version="0.8.0",
     license="MIT OR Apache-2.0",
     python_requires=">=3.5",
     cmdclass={"install": PostInstallCommand, "bdist_wheel": bdist_wheel},

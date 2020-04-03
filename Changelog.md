@@ -5,19 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-### 0.8.0 - Unreleased
+### 0.8.0 - 2020-04-03
 
 ### Added
 
- - There is now a binary wheel for aarch64
+ * There is now a binary wheel for aarch64
+ * Warn if there are local dependencies
 
-## [0.7.9] - 2020-03-06
+### Fixed
+
+ * Omit author_email if `@` is not found in authors by evandrocoan in [#290](https://github.com/PyO3/maturin/pull/290)
+
+## 0.7.9 - 2020-03-06
 
 ### Fixed
 
  * This release includes binary wheels for mac os
 
-## [0.7.8] - 2020-03-06
+## 0.7.8 - 2020-03-06
 
 ### Added
 
@@ -30,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * 32-bit wheels didn't work on linux. This has been fixed by dae in [#250](https://github.com/PyO3/maturin/pull/250)
  * The path of the RECORD file on windows used a backward slash instead of a forward slash 
 
-## [0.7.7] - 2019-11-12
+## 0.7.7 - 2019-11-12
 
 ### Added
 

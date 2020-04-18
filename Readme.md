@@ -103,7 +103,7 @@ my-project
 
 ## Python metadata
 
-To specifiy python dependecies, add a list `requires-dist` in a `[package.metadata.maturin]` section in the Cargo.toml. This list is equivalent to `install_requires` in setuptools:
+To specify python dependencies, add a list `requires-dist` in a `[package.metadata.maturin]` section in the Cargo.toml. This list is equivalent to `install_requires` in setuptools:
 
 ```toml
 [package.metadata.maturin]

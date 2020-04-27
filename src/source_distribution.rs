@@ -42,6 +42,7 @@ pub fn source_distribution(
     wheel_dir: impl AsRef<Path>,
     metadata21: &Metadata21,
     manifest_path: impl AsRef<Path>,
+    sdist_include: Option<&Vec<String>>,
 ) -> Result<PathBuf, Error> {
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
@@ -89,6 +90,18 @@ pub fn source_distribution(
         writer.add_file(target, source)?;
     }
 
+    if let Some(include_targets) = sdist_include {
+        for pattern in include_targets {
+            println!("📦 Including files matching \"{}\"", pattern);
+            for source in glob::glob(pattern)
+                .expect("No files found for pattern")
+                .filter_map(Result::ok)
+            {
+                writer.add_file(manifest_dir.join(&source).to_path_buf(), source)?;
+            }
+        }
+    }
+
     writer.add_bytes("PKG-INFO", metadata21.to_file_contents().as_bytes())?;
 
     let source_distribution_path = writer.finish()?;
@@ -109,11 +122,32 @@ pub struct BuildSystem {
     build_backend: String,
 }
 
+/// The `[tool]` section of a pyproject.toml
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct Tool {
+    maturin: Option<ToolMaturin>,
+}
+
+/// The `[tool.maturin]` section of a pyproject.toml
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct ToolMaturin {
+    sdist_include: Option<Vec<String>>,
+}
+
 /// A pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
     build_system: BuildSystem,
+    tool: Option<Tool>,
+}
+
+impl PyProjectToml {
+    pub fn sdist_include(&self) -> Option<&Vec<String>> {
+        self.tool.as_ref()?.maturin.as_ref()?.sdist_include.as_ref()
+    }
 }
 
 /// Returns the contents of a pyproject.toml with a `[build-system]` entry or an error

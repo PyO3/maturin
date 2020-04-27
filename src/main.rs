@@ -288,7 +288,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
             let manifest_dir = manifest_path.parent().unwrap();
             let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
                 .context("Failed to parse Cargo.toml into python metadata")?;
-            let path = source_distribution(sdist_directory, &metadata21, &manifest_path)
+            let path = source_distribution(sdist_directory, &metadata21, &manifest_path, None)
                 .context("Failed to build source distribution")?;
             println!("{}", path.display());
         }
@@ -462,7 +462,7 @@ fn run() -> Result<(), Error> {
             let manifest_dir = manifest_path.parent().unwrap();
 
             // Ensure the project has a compliant pyproject.toml
-            get_pyproject_toml(&manifest_dir)
+            let pyproject = get_pyproject_toml(&manifest_dir)
                 .context("A pyproject.toml with a PEP 517 compliant `[build-system]` table is required to build a source distribution")?;
 
             let cargo_toml = CargoToml::from_path(&manifest_path)?;
@@ -482,8 +482,13 @@ fn run() -> Result<(), Error> {
             fs::create_dir_all(&wheel_dir)
                 .context("Failed to create the target directory for the source distribution")?;
 
-            source_distribution(&wheel_dir, &metadata21, &manifest_path)
-                .context("Failed to build source distribution")?;
+            source_distribution(
+                &wheel_dir,
+                &metadata21,
+                &manifest_path,
+                pyproject.sdist_include(),
+            )
+            .context("Failed to build source distribution")?;
         }
         Opt::PEP517(subcommand) => pep517(subcommand)?,
     }

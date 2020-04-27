@@ -154,6 +154,13 @@ bindings = "cffi"
 manylinux = "off"
 ```
 
+To include arbitrary files in the sdist for use during compilation specify `sdist-include` as an array of globs:
+
+```toml
+[tool.maturin]
+sdist-include = ["path/**/*"]
+```
+
 Using tox with build isolation is currently blocked by a tox bug ([tox-dev/tox#1344](https://github.com/tox-dev/tox/issues/1344)). There's a `cargo sdist` command for only building a source distribution as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041).
 
 ## Manylinux and auditwheel

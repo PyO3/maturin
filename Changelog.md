@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-### 0.8.0 - 2020-04-03
+## Unreleased
+
+### Added
+
+* `[tool.maturin]` now supports `sdist-include = ["path/**/*"]` to
+include arbitrary files in source distributions ([#296](https://github.com/PyO3/maturin/pull/296)).
+
+## 0.8.0 - 2020-04-03
 
 ### Added
 
@@ -33,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Remove python 2 from tags by ijl in [#254](https://github.com/PyO3/maturin/pull/254)
  * 32-bit wheels didn't work on linux. This has been fixed by dae in [#250](https://github.com/PyO3/maturin/pull/250)
- * The path of the RECORD file on windows used a backward slash instead of a forward slash 
+ * The path of the RECORD file on windows used a backward slash instead of a forward slash
 
 ## 0.7.7 - 2019-11-12
 

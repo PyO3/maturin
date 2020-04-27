@@ -132,13 +132,19 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the source distribution")?;
 
-        if get_pyproject_toml(self.manifest_path.parent().unwrap()).is_ok() {
-            warn_on_local_deps(&self.cargo_metadata);
-            let sdist_path = source_distribution(&self.out, &self.metadata21, &self.manifest_path)
+        match get_pyproject_toml(self.manifest_path.parent().unwrap()) {
+            Ok(pyproject) => {
+                warn_on_local_deps(&self.cargo_metadata);
+                let sdist_path = source_distribution(
+                    &self.out,
+                    &self.metadata21,
+                    &self.manifest_path,
+                    pyproject.sdist_include(),
+                )
                 .context("Failed to build source distribution")?;
-            Ok(Some((sdist_path, "source".to_string(), None)))
-        } else {
-            Ok(None)
+                Ok(Some((sdist_path, "source".to_string(), None)))
+            }
+            Err(_) => Ok(None),
         }
     }
 

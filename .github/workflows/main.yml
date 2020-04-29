@@ -1,0 +1,21 @@
+name: Docker test
+
+on:
+  push:
+    branches: [ '*' ]
+    tags: [ '*' ]
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: docker/build-push-action@v1
+      with:
+        cache-from: konstin2/maturin:master
+        repository: konstin2/maturin
+        tag_with_ref: true
+        tags: maturin
+        push: ${{ startsWith(github.ref, 'refs/tags/') }}
+    - run: ./test-dockerfile.sh

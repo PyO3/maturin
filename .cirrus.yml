@@ -1,5 +1,5 @@
 freebsd_instance:
-  image: freebsd-12-0-release-amd64
+  image_family: freebsd-12-1
 
 env:
   RUST_BACKTRACE: 1
@@ -9,8 +9,9 @@ freebsd_task:
   env:
     matrix:
       - TOOLCHAIN: stable
-  setup_script:
+  install_script:
     - pkg install -y curl bash python
+  setup_script:
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --default-toolchain $TOOLCHAIN
     - python -m ensurepip

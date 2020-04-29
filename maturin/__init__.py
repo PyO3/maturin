@@ -18,13 +18,18 @@ from typing import List, Dict
 
 import toml
 
+# these are only used when creating the sdist, not when building it
+create_only_options = [
+    "sdist-include",
+]
+
 available_options = [
-    "manylinux",
-    "skip-auditwheel",
     "bindings",
-    "strip",
     "cargo-extra-args",
+    "manylinux",
     "rustc-extra-args",
+    "skip-auditwheel",
+    "strip",
 ]
 
 
@@ -38,12 +43,11 @@ def get_config_options() -> List[str]:
     config = get_config()
     options = []
     for key, value in config.items():
+        if key in create_only_options:
+            continue
         if key not in available_options:
-            raise RuntimeError(
-                "{} is not a valid option for maturin. Valid are: {}".format(
-                    key, ", ".join(available_options)
-                )
-            )
+            # attempt to install even if keys from newer or older versions are present
+            print("WARNING: {} is not a recognized option for maturin".format(key))
         options.append("--{}={}".format(key, value))
     return options
 

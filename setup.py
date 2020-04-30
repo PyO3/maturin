@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 
+import toml
 from setuptools import setup
 from setuptools.command.install import install
 
@@ -74,6 +75,9 @@ class PostInstallCommand(install):
 with open("Readme.md") as fp:
     long_description = fp.read()
 
+with open("Cargo.toml") as fp:
+    version = toml.load(fp)["package"]["version"]
+
 setup(
     name="maturin",
     author="konstin",
@@ -83,7 +87,7 @@ setup(
     "python packages",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version="0.8.0",
+    version=version,
     license="MIT OR Apache-2.0",
     python_requires=">=3.5",
     cmdclass={"install": PostInstallCommand, "bdist_wheel": bdist_wheel},

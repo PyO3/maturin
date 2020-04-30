@@ -172,7 +172,7 @@ maturin contains a reimplementation of a major part of auditwheel automatically 
 For full manylinux compliance you need to compile in a cent os 5 docker container. The [konstin2/maturin](https://hub.docker.com/r/konstin2/maturin) image is based on the official manylinux image. You can use it like this:
 
 ```
-docker run --rm -v $(pwd):/io konstin2/maturin build
+docker run --rm -v $(pwd):/io konstin2/maturin:master build
 ```
 
 maturin itself is manylinux compliant when compiled for the musl target. The binaries on the release pages have additional keyring integration (through the `password-storage` feature), which is not manylinux compliant.

@@ -36,16 +36,6 @@ addons:
 jobs:
   fast_finish: true
   include:
-    # Test the dockerfile
-    - name: Docker
-      os: linux
-      cache: false
-      install:
-        - docker pull konstin2/maturin:master || true
-        - docker build --cache-from konstin2/maturin:master . -t maturin
-      script:
-        - ./test-dockerfile.sh
-
     # These create deployments
     - os: linux
       rust: stable

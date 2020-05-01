@@ -1,0 +1,23 @@
+name: Update the master tag of the Docker container
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  update-docker-master:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Load docker cache
+        uses: docker/build-push-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          cache-from: konstin2/maturin:master
+          repository: konstin2/maturin
+          tag_with_ref: false
+          tags: master
+          build_args: BUILDKIT_INLINE_CACHE=1

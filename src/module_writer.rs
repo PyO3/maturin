@@ -49,10 +49,13 @@ pub trait ModuleWriter {
         target: impl AsRef<Path>,
         source: impl AsRef<Path>,
     ) -> Result<(), Error> {
-        let mut file = File::open(&source).context("Failed to read file at {}")?;
+        let read_failed_context = format!("Failed to read {}", source.as_ref().display());
+        let mut file = File::open(&source).context(&read_failed_context)?;
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        self.add_bytes(target, &buffer)?;
+        file.read_to_end(&mut buffer)
+            .context(&read_failed_context)?;
+        self.add_bytes(target, &buffer)
+            .context(format!("Failed to write to {}", target.as_ref().display()))?;
         Ok(())
     }
 }

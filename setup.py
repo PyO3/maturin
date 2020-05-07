@@ -72,7 +72,7 @@ class PostInstallCommand(install):
         )
 
 
-with open("Readme.md") as fp:
+with open("Readme.md", encoding="utf-8", errors="ignore") as fp:
     long_description = fp.read()
 
 with open("Cargo.toml") as fp:

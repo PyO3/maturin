@@ -17,13 +17,12 @@
 //! - rustls: Makes reqwest use the rustls stack so that we can build maturin in a cent os 5
 //! docker container and which maturin itself manylinux compliant.
 //!
+//! - human-panic: Adds https://github.com/rust-clique/human-panic
+//!
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
 //! for the build on the github releases page.
 //! (https://github.com/hwchen/secret-service-rs/issues/9)
-//!
-//! - human-panic (off by default): Adds human-panic, pulling in some outdated dependencies
-//! (https://github.com/rust-clique/human-panic/pull/47)
 
 #![deny(missing_docs)]
 

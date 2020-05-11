@@ -1,12 +1,12 @@
 use crate::Manylinux;
 use crate::Target;
-use failure::Fail;
+use anyhow::Result;
 use goblin::elf::Elf;
 use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::path::Path;
-
+use thiserror::Error;
 /// As specified in "PEP 513 -- A Platform Tag for Portable Linux Built
 /// Distributions"
 const MANYLINUX1: &[&str] = &[
@@ -60,21 +60,20 @@ const MANYLINUX2010: &[&str] = &[
     "libglib-2.0.so.0",
 ];
 
-/// Error raised duing auditing an elf file for manylinux compatibility
-#[derive(Fail, Debug)]
-#[fail(display = "Ensuring manylinux compliancy failed")]
+/// Error raised during auditing an elf file for manylinux compatibility
+#[derive(Error, Debug)]
+#[error("Ensuring manylinux compliance failed")]
 pub enum AuditWheelError {
     /// The wheel couldn't be read
-    #[fail(display = "Failed to read the wheel")]
-    IOError(#[cause] io::Error),
-    /// Reexports elfkit parsing erorrs
-    #[fail(display = "Goblin failed to parse the elf file")]
-    GoblinError(#[cause] goblin::error::Error),
+    #[error("Failed to read the wheel")]
+    IOError(#[source] io::Error),
+    /// Reexports elfkit parsing errors
+    #[error("Goblin failed to parse the elf file")]
+    GoblinError(#[source] goblin::error::Error),
     /// The elf file isn't manylinux compatible. Contains the list of offending
     /// libraries.
-    #[fail(
-        display = "Your library is not manylinux compliant because it links the following forbidden libraries: {:?}",
-        _0
+    #[error(
+        "Your library is not manylinux compliant because it links the following forbidden libraries: {0:?}",
     )]
     ManylinuxValidationError(Vec<String>),
 }

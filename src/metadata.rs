@@ -1,5 +1,5 @@
 use crate::CargoToml;
-use failure::{Error, ResultExt};
+use anyhow::{Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,7 +61,7 @@ impl Metadata21 {
     pub fn from_cargo_toml(
         cargo_toml: &CargoToml,
         manifest_path: impl AsRef<Path>,
-    ) -> Result<Metadata21, Error> {
+    ) -> Result<Metadata21> {
         let authors = cargo_toml.package.authors.join(", ");
 
         // See https://packaging.python.org/specifications/core-metadata/#description

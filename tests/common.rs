@@ -1,4 +1,4 @@
-use failure::{bail, Error};
+use anyhow::{bail, Result};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,7 +24,7 @@ pub fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
 }
 
 /// Check that the package is either not installed or works correctly
-pub fn check_installed(package: &Path, python: &PathBuf) -> Result<(), Error> {
+pub fn check_installed(package: &Path, python: &PathBuf) -> Result<()> {
     let check_installed = Path::new(package)
         .join("check_installed")
         .join("check_installed.py");
@@ -76,9 +76,9 @@ pub fn maybe_mock_cargo() {
 }
 
 /// Better error formatting
-pub fn handle_result<T>(result: Result<T, Error>) {
+pub fn handle_result<T>(result: Result<T>) {
     if let Err(e) = result {
-        for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter().rev() {
+        for cause in e.chain().collect::<Vec<_>>().iter().rev() {
             eprintln!("{}", cause);
         }
         panic!("{}", e);

@@ -2,19 +2,20 @@
 //!
 //! For each invocation, a directory inside `target/test-cache` is created with the
 //! name `<PYTHON_SYS_EXECUTABLE> <cargo arg1> <cargo arg2> ... <cargo argx>` with some args
-//! stripped for path length contrains. It contains a `cargo.stdout`, a `cargo.stderr` and all
+//! stripped for path length constrains. It contains a `cargo.stdout`, a `cargo.stderr` and all
 //! non-rlib artifacts.
 
-use failure::{bail, format_err, Error, ResultExt};
+use anyhow::{bail, format_err, Context, Result};
+use cargo_metadata::Message;
+use std::env;
 use std::fs;
 use std::fs::File;
+use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::process::Command;
-use std::env;
-use std::io;
 
-fn run() -> Result<(), Error> {
+fn run() -> Result<()> {
     let base_cache_path = Path::new("target").join("test-cache");
 
     fs::create_dir_all(&base_cache_path).context("Couldn't create cache dir")?;
@@ -70,7 +71,7 @@ fn run() -> Result<(), Error> {
             BufWriter::new(File::create(stdout_path).context("Failed to create stdout path")?);
 
         // Copy over the artifacts
-        for message in cargo_metadata::parse_messages(&*output.stdout) {
+        for message in Message::parse_stream(&*output.stdout) {
             let patched_message =
                 match message.context("Failed to parse message coming from cargo")? {
                     cargo_metadata::Message::CompilerArtifact(mut artifact) => {
@@ -114,7 +115,7 @@ fn run() -> Result<(), Error> {
 fn main() {
     if let Err(e) = run() {
         eprintln!("💥 Cargo mock failed");
-        for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter() {
+        for cause in e.chain().collect::<Vec<_>>().iter() {
             eprintln!("  Caused by: {}", cause);
         }
         std::process::exit(1);

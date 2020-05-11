@@ -1,7 +1,7 @@
 use crate::module_writer::ModuleWriter;
 use crate::{Metadata21, SDistWriter};
+use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::Metadata;
-use failure::{bail, format_err, Error, ResultExt};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -43,7 +43,7 @@ pub fn source_distribution(
     metadata21: &Metadata21,
     manifest_path: impl AsRef<Path>,
     sdist_include: Option<&Vec<String>>,
-) -> Result<PathBuf, Error> {
+) -> Result<PathBuf> {
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path.as_ref())
@@ -154,7 +154,7 @@ impl PyProjectToml {
 ///
 /// Does no specific error handling because it's only used to check whether or not to build
 /// source distributions
-pub fn get_pyproject_toml(project_root: impl AsRef<Path>) -> Result<PyProjectToml, Error> {
+pub fn get_pyproject_toml(project_root: impl AsRef<Path>) -> Result<PyProjectToml> {
     let path = project_root.as_ref().join("pyproject.toml");
     let contents = fs::read_to_string(&path).context(format!(
         "Couldn't find pyproject.toml at {}",

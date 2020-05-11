@@ -1,5 +1,5 @@
 use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
-use failure::Error;
+use anyhow::Result;
 use maturin::{develop, Target};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -37,7 +37,7 @@ fn test_develop_hello_world() {
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "maturin develop" to install it and checks it is working
-fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
+fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
     maybe_mock_cargo();
 
     let test_name = package

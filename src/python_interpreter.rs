@@ -1,6 +1,6 @@
 use crate::Target;
 use crate::{BridgeModel, Manylinux};
-use failure::{bail, format_err, Error, Fail, ResultExt};
+use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -80,7 +80,7 @@ fn windows_interpreter_no_build(
 /// As well as the version numbers, etc. of the interpreters we also have to find the
 /// pointer width to make sure that the pointer width (32-bit or 64-bit) matches across
 /// platforms.
-fn find_all_windows(target: &Target) -> Result<Vec<String>, Error> {
+fn find_all_windows(target: &Target) -> Result<Vec<String>> {
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
@@ -302,7 +302,7 @@ fn fun_with_abiflags(
     message: &IntepreterMetadataMessage,
     target: &Target,
     bridge: &BridgeModel,
-) -> Result<String, Error> {
+) -> Result<String> {
     if bridge != &BridgeModel::Cffi {
         let sane_platform = match message.platform.as_ref() {
             "windows" => target.is_windows(),
@@ -473,7 +473,7 @@ impl PythonInterpreter {
         executable: impl AsRef<Path>,
         target: &Target,
         bridge: &BridgeModel,
-    ) -> Result<Option<PythonInterpreter>, Error> {
+    ) -> Result<Option<PythonInterpreter>> {
         let output = Command::new(&executable.as_ref())
             .args(&["-c", GET_INTERPRETER_METADATA])
             .stderr(Stdio::inherit())
@@ -483,7 +483,6 @@ impl PythonInterpreter {
             "Trying to get metadata from the python interpreter '{}' failed",
             executable.as_ref().display()
         );
-
         let output = match output {
             Ok(output) => {
                 if output.status.success() {
@@ -496,7 +495,7 @@ impl PythonInterpreter {
                 if err.kind() == io::ErrorKind::NotFound {
                     return Ok(None);
                 } else {
-                    bail!(err.context(err_msg));
+                    return Err(err).context(err_msg);
                 }
             }
         };
@@ -536,10 +535,7 @@ impl PythonInterpreter {
 
     /// Tries to find all installed python versions using the heuristic for the
     /// given platform
-    pub fn find_all(
-        target: &Target,
-        bridge: &BridgeModel,
-    ) -> Result<Vec<PythonInterpreter>, Error> {
+    pub fn find_all(target: &Target, bridge: &BridgeModel) -> Result<Vec<PythonInterpreter>> {
         let executables = if target.is_windows() {
             find_all_windows(&target)?
         } else {
@@ -564,7 +560,7 @@ impl PythonInterpreter {
         executables: &[PathBuf],
         target: &Target,
         bridge: &BridgeModel,
-    ) -> Result<Vec<PythonInterpreter>, Error> {
+    ) -> Result<Vec<PythonInterpreter>> {
         let mut available_versions = Vec::new();
         for executable in executables {
             if let Some(version) =

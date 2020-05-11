@@ -1,10 +1,10 @@
 use crate::build_context::BridgeModel;
 use crate::BuildContext;
 use crate::PythonInterpreter;
-use failure::{bail, Error, ResultExt};
+use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str;
@@ -16,7 +16,7 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
-) -> Result<HashMap<String, PathBuf>, Error> {
+) -> Result<HashMap<String, PathBuf>> {
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
     // We need to pass --bins / --lib to set the rustc extra args later
@@ -82,7 +82,7 @@ pub fn compile(
         .stdout
         .take()
         .expect("Cargo build should have a stdout");
-    for message in cargo_metadata::parse_messages(stream) {
+    for message in cargo_metadata::Message::parse_stream(BufReader::new(stream)) {
         match message.context("Failed to parse message coming from cargo")? {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let crate_name = &context.cargo_metadata[&artifact.package_id].name;
@@ -128,7 +128,7 @@ pub fn compile(
 /// to import the module with error if it's missing or named incorrectly
 ///
 /// Currently the check is only run on linux
-pub fn warn_missing_py_init(artifact: &PathBuf, module_name: &str) -> Result<(), Error> {
+pub fn warn_missing_py_init(artifact: &PathBuf, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{}", module_name);
     let mut fd = File::open(&artifact)?;
     let mut buffer = Vec::new();

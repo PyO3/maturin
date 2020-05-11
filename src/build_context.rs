@@ -10,8 +10,8 @@ use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
+use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
-use failure::{bail, Context, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,10 +51,7 @@ pub enum ProjectLayout {
 
 impl ProjectLayout {
     /// Checks whether a python module exists besides Cargo.toml with the right name
-    pub fn determine(
-        project_root: impl AsRef<Path>,
-        module_name: &str,
-    ) -> Result<ProjectLayout, Error> {
+    pub fn determine(project_root: impl AsRef<Path>, module_name: &str) -> Result<ProjectLayout> {
         let python_package_dir = project_root.as_ref().join(module_name);
         if python_package_dir.is_dir() {
             if !python_package_dir.join("__init__.py").is_file() {
@@ -114,7 +111,7 @@ impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
     /// correct builder. Returns a Vec that contains location, python tag (e.g. py3 or cp35)
     /// and for bindings the python interpreter they bind against.
-    pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>, Error> {
+    pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -128,7 +125,7 @@ impl BuildContext {
     }
 
     /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
-    pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>, Error> {
+    pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the source distribution")?;
 
@@ -157,7 +154,7 @@ impl BuildContext {
     /// Runs [auditwheel_rs()] if not deactivated
     pub fn build_binding_wheels(
         &self,
-    ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>, Error> {
+    ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>> {
         let mut wheels = Vec::new();
         for python_interpreter in &self.interpreter {
             let artifact =
@@ -213,12 +210,12 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         module_name: Option<&str>,
-    ) -> Result<PathBuf, Error> {
+    ) -> Result<PathBuf> {
         let artifacts = compile(&self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts.get("cdylib").cloned().ok_or_else(|| {
-            Context::new(
+            anyhow!(
                 "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
             )
@@ -242,7 +239,7 @@ impl BuildContext {
     }
 
     /// Builds a wheel with cffi bindings
-    pub fn build_cffi_wheel(&self) -> Result<PathBuf, Error> {
+    pub fn build_cffi_wheel(&self) -> Result<PathBuf> {
         let artifact = self.compile_cdylib(None, None)?;
 
         let (tag, tags) = self.target.get_universal_tags(&self.manylinux);
@@ -270,14 +267,14 @@ impl BuildContext {
     /// Builds a wheel that contains a binary
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_bin_wheel(&self) -> Result<PathBuf, Error> {
+    pub fn build_bin_wheel(&self) -> Result<PathBuf> {
         let artifacts = compile(&self, None, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts
             .get("bin")
             .cloned()
-            .ok_or_else(|| Context::new("Cargo didn't build a binary."))?;
+            .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
         #[cfg(feature = "auditwheel")]
         auditwheel_rs(&artifact, &self.target, &self.manylinux)

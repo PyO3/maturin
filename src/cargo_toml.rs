@@ -1,4 +1,4 @@
-use failure::{Error, ResultExt};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -44,7 +44,7 @@ pub struct CargoToml {
 
 impl CargoToml {
     /// Reads and parses the Cargo.toml at the given location
-    pub fn from_path(manifest_file: impl AsRef<Path>) -> Result<Self, Error> {
+    pub fn from_path(manifest_file: impl AsRef<Path>) -> Result<Self> {
         let contents = fs::read_to_string(&manifest_file).context(format!(
             "Can't read Cargo.toml at {}",
             manifest_file.as_ref().display(),

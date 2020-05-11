@@ -5,8 +5,8 @@ use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
+use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand, Node};
-use failure::{bail, err_msg, format_err, Error, ResultExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -91,7 +91,7 @@ impl Default for BuildOptions {
 
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
-    pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext, Error> {
+    pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
         let manifest_file = self
             .manifest_path
             .canonicalize()
@@ -190,7 +190,7 @@ impl BuildOptions {
 }
 
 /// Tries to determine the [BridgeModel] for the target crate
-pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel, Error> {
+pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
     let resolve = cargo_metadata
         .resolve
         .as_ref()
@@ -268,7 +268,7 @@ pub fn find_interpreter(
     bridge: &BridgeModel,
     interpreter: &[PathBuf],
     target: &Target,
-) -> Result<Vec<PythonInterpreter>, Error> {
+) -> Result<Vec<PythonInterpreter>> {
     match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
@@ -305,8 +305,8 @@ pub fn find_interpreter(
             let err_message = "Failed to find python interpreter for generating cffi bindings";
 
             let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
-                .context(err_msg(err_message))?
-                .ok_or_else(|| err_msg(err_message))?;
+                .context(format_err!(err_message))?
+                .ok_or_else(|| format_err!(err_message))?;
 
             println!("🐍 Using {} to generate the cffi bindings", interpreter);
 
@@ -317,7 +317,7 @@ pub fn find_interpreter(
 }
 
 /// Helper function that calls shlex on all extra args given
-fn split_extra_args(given_args: &[String]) -> Result<Vec<String>, Error> {
+fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
     let mut splitted_args = vec![];
     for arg in given_args {
         match shlex::split(&arg) {
@@ -399,7 +399,7 @@ mod test {
 
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(&Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
-            .other_options(&["--features=pyo3".to_string()])
+            .other_options(vec!["--features=pyo3".to_string()])
             .exec()
             .unwrap();
 

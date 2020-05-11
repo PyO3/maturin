@@ -3,32 +3,32 @@
 
 use crate::Metadata21;
 use crate::Registry;
-use failure::Fail;
 use reqwest::{self, blocking::multipart::Form, blocking::Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io;
 use std::path::Path;
+use thiserror::Error;
 
 /// Error type for different types of errors that can happen when uploading a
 /// wheel.
 ///
-/// The most interesting tpye is AuthenticationError because it allows asking
+/// The most interesting type is AuthenticationError because it allows asking
 /// the user to reenter the password
-#[derive(Fail, Debug)]
-#[fail(display = "Uploading to the registry failed")]
+#[derive(Error, Debug)]
+#[error("Uploading to the registry failed")]
 pub enum UploadError {
     /// Any reqwest error
-    #[fail(display = "Http error")]
-    RewqestError(#[cause] reqwest::Error),
+    #[error("Http error")]
+    RewqestError(#[source] reqwest::Error),
     /// The registry returned a "403 Forbidden"
-    #[fail(display = "Username or password are incorrect")]
+    #[error("Username or password are incorrect")]
     AuthenticationError,
     /// Reading the wheel failed
-    #[fail(display = "IO Error")]
-    IOError(#[cause] io::Error),
+    #[error("IO Error")]
+    IOError(#[source] io::Error),
     /// The registry returned something else than 200
-    #[fail(display = "Failed to upload the wheel with status {}: {}", _0, _1)]
+    #[error("Failed to upload the wheel with status {0}: {1}")]
     StatusCodeError(String, String),
 }
 

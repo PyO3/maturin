@@ -3,9 +3,9 @@
 //!
 //! Run with --help for usage information
 
+use anyhow::{bail, Context, Result};
 use bytesize::ByteSize;
 use cargo_metadata::MetadataCommand;
-use failure::{bail, Error, ResultExt};
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
@@ -70,7 +70,7 @@ fn get_username() -> String {
 
 #[cfg(feature = "upload")]
 /// Asks for username and password for a registry account where missing.
-fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool), Error> {
+fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool)> {
     let username = opt.username.clone().unwrap_or_else(get_username);
     let (password, reenter) = match opt.password {
         Some(ref password) => (password.clone(), false),
@@ -252,7 +252,7 @@ enum PEP517Command {
 /// Dispatches into the native implementations of the PEP 517 functions
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
-fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
+fn pep517(subcommand: PEP517Command) -> Result<()> {
     match subcommand {
         PEP517Command::WriteDistInfo {
             mut build_options,
@@ -299,7 +299,7 @@ fn pep517(subcommand: PEP517Command) -> Result<(), Error> {
 
 /// Handles authentification/keyring integration and retrying of the publish subcommand
 #[cfg(feature = "upload")]
-fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Result<(), Error> {
+fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Result<()> {
     let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
 
     if !build_context.release {
@@ -395,7 +395,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
     Ok(())
 }
 
-fn run() -> Result<(), Error> {
+fn run() -> Result<()> {
     #[cfg(feature = "log")]
     pretty_env_logger::init();
 
@@ -504,7 +504,7 @@ fn main() {
 
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");
-        for cause in e.as_fail().iter_chain().collect::<Vec<_>>().iter() {
+        for cause in e.chain().collect::<Vec<_>>().iter() {
             eprintln!("  Caused by: {}", cause);
         }
         std::process::exit(1);

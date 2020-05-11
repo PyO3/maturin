@@ -1,8 +1,3 @@
-use std::fs;
-use std::path::Path;
-
-use failure::{format_err, Context, Error, ResultExt};
-
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
 use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};
@@ -10,6 +5,9 @@ use crate::BuildOptions;
 use crate::Manylinux;
 use crate::PythonInterpreter;
 use crate::Target;
+use anyhow::{anyhow, format_err, Context, Result};
+use std::fs;
+use std::path::Path;
 
 /// Installs a crate by compiling it and copying the shared library to the right directory
 ///
@@ -22,7 +20,7 @@ pub fn develop(
     venv_dir: &Path,
     release: bool,
     strip: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let target = Target::from_target_triple(None)?;
 
     let python = target.get_venv_python(&venv_dir);
@@ -43,7 +41,7 @@ pub fn develop(
 
     let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
         .ok_or_else(|| {
-            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+            anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
         })?;
 
     let mut builder = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;

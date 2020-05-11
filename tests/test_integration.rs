@@ -1,5 +1,5 @@
 use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
-use failure::{bail, Error, ResultExt};
+use anyhow::{bail, Context, Result};
 use maturin::{BuildOptions, Target};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -45,7 +45,7 @@ fn test_integration_hello_world() {
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
-fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(), Error> {
+fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
     maybe_mock_cargo();
 
     let target = Target::from_target_triple(None)?;
@@ -165,10 +165,7 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 }
 
 #[cfg(target_os = "windows")]
-fn test_integration_conda(
-    package: impl AsRef<Path>,
-    bindings: Option<String>,
-) -> Result<(), Error> {
+fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
     use std::env;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();

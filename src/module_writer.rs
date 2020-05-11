@@ -4,7 +4,7 @@ use crate::build_context::ProjectLayout;
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::{BridgeModel, Metadata21};
-use failure::{bail, Context, Error, ResultExt};
+use anyhow::{anyhow, bail, Context, Result};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use sha2::{Digest, Sha256};
@@ -26,10 +26,10 @@ use zip::{self, ZipWriter};
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
     /// Adds a directory relative to the module base path
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), Error>;
+    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()>;
 
     /// Adds a file with bytes as content in target relative to the module base path
-    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<(), Error> {
+    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
         // 0o644 is the default from the zip crate
         self.add_bytes_with_permissions(target, bytes, 0o644)
     }
@@ -41,14 +41,10 @@ pub trait ModuleWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<(), Error>;
+    ) -> Result<()>;
 
     /// Copies the source file the the target path relative to the module base path
-    fn add_file(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: impl AsRef<Path>,
-    ) -> Result<(), Error> {
+    fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
         let read_failed_context = format!("Failed to read {}", source.as_ref().display());
         let mut file = File::open(&source).context(read_failed_context.clone())?;
         let mut buffer = Vec::new();
@@ -66,14 +62,14 @@ pub struct PathWriter {
 
 impl PathWriter {
     /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
-    pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self, Error> {
+    pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self> {
         let interpreter = PythonInterpreter::check_executable(
             target.get_venv_python(&venv_dir),
             &target,
             &bridge,
         )?
         .ok_or_else(|| {
-            Context::new("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+            anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
         })?;
 
         let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
@@ -97,7 +93,7 @@ impl PathWriter {
     /// Removes a directory relative to the base path if it exists.
     ///
     /// This is to clean up the contents of an older develop call
-    pub fn delete_dir(&self, relative: impl AsRef<Path>) -> Result<(), Error> {
+    pub fn delete_dir(&self, relative: impl AsRef<Path>) -> Result<()> {
         let absolute = self.base_path.join(relative);
         if absolute.exists() {
             fs::remove_dir_all(&absolute)
@@ -109,7 +105,7 @@ impl PathWriter {
 }
 
 impl ModuleWriter for PathWriter {
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
+    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()> {
         fs::create_dir_all(self.base_path.join(path))?;
         Ok(())
     }
@@ -119,7 +115,7 @@ impl ModuleWriter for PathWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         _permissions: u32,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let path = self.base_path.join(target);
 
         // We only need to set the executable bit on unix
@@ -152,7 +148,7 @@ pub struct WheelWriter {
 }
 
 impl ModuleWriter for WheelWriter {
-    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), Error> {
+    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<()> {
         Ok(()) // We don't need to create directories in zip archives
     }
 
@@ -161,7 +157,7 @@ impl ModuleWriter for WheelWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         // The zip standard mandates using unix style paths
         let target = target.as_ref().to_str().unwrap().replace("\\", "/");
 
@@ -195,7 +191,7 @@ impl WheelWriter {
         metadata21: &Metadata21,
         scripts: &HashMap<String, String>,
         tags: &[String],
-    ) -> Result<WheelWriter, Error> {
+    ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
             metadata21.get_distribution_escaped(),
@@ -246,7 +242,7 @@ pub struct SDistWriter {
 }
 
 impl ModuleWriter for SDistWriter {
-    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<(), Error> {
+    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<()> {
         Ok(())
     }
 
@@ -255,7 +251,7 @@ impl ModuleWriter for SDistWriter {
         target: impl AsRef<Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
@@ -270,11 +266,7 @@ impl ModuleWriter for SDistWriter {
         Ok(())
     }
 
-    fn add_file(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: impl AsRef<Path>,
-    ) -> Result<(), Error> {
+    fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
         self.tar
             .append_path_with_name(&source, &target)
             .context(format!(
@@ -356,7 +348,7 @@ del os
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<String, Error> {
+pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<String> {
     let tempdir = tempdir()?;
     let maybe_header = crate_dir.join("target").join("header.h");
 
@@ -440,7 +432,7 @@ pub fn write_bindings_module(
     artifact: &Path,
     python_interpreter: &PythonInterpreter,
     develop: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let so_filename = python_interpreter.get_library_name(&module_name);
 
     match project_layout {
@@ -476,7 +468,7 @@ pub fn write_cffi_module(
     artifact: &Path,
     python: &PathBuf,
     develop: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(&crate_dir, python)?;
 
     let module;
@@ -519,7 +511,7 @@ pub fn write_bin(
     artifact: &Path,
     metadata: &Metadata21,
     bin_name: &OsStr,
-) -> Result<(), Error> {
+) -> Result<()> {
     let data_dir = PathBuf::from(format!(
         "{}-{}.data",
         &metadata.get_distribution_escaped(),
@@ -543,7 +535,7 @@ pub fn write_python_part(
     writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
     module_name: impl AsRef<Path>,
-) -> Result<(), Error> {
+) -> Result<()> {
     for absolute in WalkDir::new(&python_module) {
         let absolute = absolute?.into_path();
 
@@ -578,7 +570,7 @@ pub fn write_dist_info(
     metadata21: &Metadata21,
     scripts: &HashMap<String, String, impl std::hash::BuildHasher>,
     tags: &[String],
-) -> Result<(), Error> {
+) -> Result<()> {
     let dist_info_dir = metadata21.get_dist_info_dir();
 
     writer.add_directory(&dist_info_dir)?;

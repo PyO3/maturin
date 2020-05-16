@@ -9,11 +9,6 @@ environment:
   MATURIN_PASSWORD:
     secure: 3xTkaAvLd84qjLwY/quMb0w1Kh5NRXQ0a/zHtjnH4WY=
   matrix:
-    # For the integration test
-    - TARGET: x86_64-pc-windows-msvc
-      CHANNEL: nightly-2020-01-23
-      PYTHON: "C:/Python36-x64"
-
     # Publishes to pypi
     - TARGET: i686-pc-windows-msvc
       CHANNEL: stable
@@ -32,12 +27,6 @@ install:
   - rustup-init.exe -y --default-host %TARGET% --default-toolchain %CHANNEL%
   - SET PATH=%PATH%;%CARGO_HOME%\bin
 
-  # See https://github.com/PyO3/pyo3/blob/master/ci/appveyor/setup.ps1
-  - ps: if ($env:channel -like "nightly-2020-01-23") { .\ci\setup.ps1 }
-
-  # From and for ring
-  - IF "%CHANNEL%" == "nightly-2020-01-23" (call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"  x86_amd64)
-
   - echo %PATH%
   - echo %LIBPATH%
   - rustc -V
@@ -45,8 +34,6 @@ install:
 
 test_script:
   - cargo build
-  - IF "%CHANNEL%" == "nightly-2020-01-23" (python.exe -m pip install --upgrade cffi virtualenv)
-  - IF "%CHANNEL%" == "nightly-2020-01-23" (cargo test)
 
 before_deploy:
   - cargo build --release --features password-storage

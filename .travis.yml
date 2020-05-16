@@ -69,25 +69,6 @@ jobs:
             - gcc:i386
             - cpp:i386
 
-    # Those are run all tests
-    - os: linux
-      rust: nightly-2020-01-23
-      env: TARGET=x86_64-unknown-linux-gnu
-    - os: osx
-      rust: nightly-2020-01-23
-      env: TARGET=x86_64-apple-darwin
-
-    # Run clippy and rustfmt
-    - name: stylecheck
-      os: linux
-      rust: stable
-      install:
-        - rustup component add clippy
-        - rustup component add rustfmt
-      script:
-        - cargo fmt --all -- --check
-        - cargo clippy -- -D warnings
-
 install:
   # Both pyenv and travis are weird; Mac os can't do virtualenv out of venv, linux needs a venv, so this
   # is the source of this mess
@@ -104,12 +85,7 @@ install:
 
 script:
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
-  - |
-    if [ "$TRAVIS_RUST_VERSION" == "stable" ]; then
-      cargo test --no-default-features --features skip-nightly-tests
-    else
-      cargo test --no-default-features
-    fi
+  - cargo test --no-default-features --features skip-nightly-tests
 
 before_deploy: bash ci/before_deploy.sh
 

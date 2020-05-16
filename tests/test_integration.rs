@@ -1,10 +1,13 @@
-use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
-use anyhow::{bail, Context, Result};
-use maturin::{BuildOptions, Target};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
+
+use anyhow::{bail, Context, Result};
 use structopt::StructOpt;
+
+use maturin::{BuildOptions, Target};
+
+use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
 
 mod common;
 

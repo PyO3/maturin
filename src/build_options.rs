@@ -142,7 +142,7 @@ impl BuildOptions {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
-        let bridge = find_bridge(&cargo_metadata, self.bindings.as_ref().map(|x| &**x))?;
+        let bridge = find_bridge(&cargo_metadata, self.bindings.as_deref())?;
 
         if bridge != BridgeModel::Bin && module_name.contains('-') {
             bail!(

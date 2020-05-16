@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* `[tool.maturin]` now supports `sdist-include = ["path/**/*"]` to
+ * `[tool.maturin]` now supports `sdist-include = ["path/**/*"]` to
 include arbitrary files in source distributions ([#296](https://github.com/PyO3/maturin/pull/296)).
+ * cffi is installed if it's missing and python is running inside a virtualenv.
 
 ## 0.8.0 - 2020-04-03
 

@@ -39,17 +39,17 @@ pyo3 will set the used python interpreter in the environment variable `PYTHON_SY
 
 ## Cffi
 
- Cffi wheels are compatible with all python versions, but they need to have `cffi` installed for the python used for building (`pip install cffi`).
+Cffi wheels are compatible with all python versions including pypy. If `cffi` isn't installed and python is running inside a virtualenv, maturin will install it, otherwise you habe to install it yourself (`pip install cffi`).
 
-maturin will utilize cbindgen to generate a header file. To customize the header file you can either configure cbindgen through a cbindgen.toml file inside your project root or write a setup a build script which writes a header file to `$PROJECT_ROOT/target/header.h`.
+maturin uses cbindgen to generate a header file, which can be customized by configuring cbindgen through a cbindgen.toml file inside your project root. Aternatively you can use a build script that writes a header file to `$PROJECT_ROOT/target/header.h`.
 
-Based on this header file maturin generates a module which exports an `ffi` and a `lib` object.
+Based on the header file maturin generates a module which exports an `ffi` and a `lib` object.
 
 <details>
 <summary>Example of a custom build script</summary>
 
 ```rust
-use cbindgen; // Use `extern crate cbindgen` in rust 2015
+use cbindgen;
 use std::env;
 use std::path::Path;
 
@@ -348,12 +348,12 @@ OPTIONS:
 
 ## Code
 
-The main part is the maturin library, which is completely documented and should be well integratable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.
+The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.
 
 The `sysconfig` folder contains the output of `python -m sysconfig` for different python versions and platform, which is helpful during development.
 
 You need to install `cffi` and `virtualenv` (`pip install cffi virtualenv`) to run the tests.
 
-There are two optional hacks that can speed up the tests (over 80s to 17s on my machine). By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python vesion. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactive it. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.
+There are two optional hacks that can speed up the tests (over 80s to 17s on my machine). By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python version. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactivate it. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.
 
 You might want to have look into my [blog post](https://blog.schuetze.link/2018/07/21/a-dive-into-packaging-native-python-extensions.html) which explains the intricacies of building native python packages.

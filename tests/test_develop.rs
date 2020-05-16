@@ -62,7 +62,7 @@ fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<(
         .arg(adjust_canonicalization(&venv_dir))
         .stderr(Stdio::inherit())
         .output()
-        .expect("Failed to run python to create a virtualenv");
+        .expect("Failed to create a virtualenv");
     if !output.status.success() {
         panic!(
             "Failed to run virtualenv: {}\n---stdout:\n{}---stderr:\n{}",

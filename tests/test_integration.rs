@@ -79,19 +79,20 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
         .unwrap()
         .to_string();
     for (filename, supported_version, python_interpreter) in wheels {
+        let venv_name = if supported_version == "py3" {
+            format!("{}-cffi", test_name)
+        } else {
+            format!(
+                "{}-{}.{}",
+                test_name,
+                supported_version.chars().nth(2usize).unwrap(),
+                supported_version.chars().nth(3usize).unwrap()
+            )
+        };
         let venv_dir = PathBuf::from("test-crates")
             .canonicalize()?
             .join("venvs")
-            .join(if supported_version == "py3" {
-                format!("{}-cffi", test_name)
-            } else {
-                format!(
-                    "{}-{}.{}",
-                    test_name,
-                    supported_version.chars().nth(2usize).unwrap(),
-                    supported_version.chars().nth(3usize).unwrap()
-                )
-            });
+            .join(venv_name);
 
         if !venv_dir.is_dir() {
             let output = if let Some(ref python_interpreter) = python_interpreter {
@@ -110,19 +111,6 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
                     output.status,
                     str::from_utf8(&output.stdout)?,
                     str::from_utf8(&output.stderr)?,
-                );
-            }
-
-            let output = Command::new(&target.get_venv_python(&venv_dir))
-                .args(&["-m", "pip", "install", "cffi"])
-                .output()
-                .context("pip install cffi failed")?;
-            if !output.status.success() {
-                panic!(
-                    "pip failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
-                    output.status,
-                    str::from_utf8(&output.stdout)?,
-                    str::from_utf8(&output.stderr)?
                 );
             }
         }

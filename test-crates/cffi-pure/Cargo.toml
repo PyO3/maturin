@@ -7,3 +7,6 @@ edition = "2018"
 [lib]
 name = "cffi_pure"
 crate-type = ["cdylib"]
+
+[package.metadata.maturin]
+requires-dist = ["cffi"]

@@ -116,19 +116,6 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
                     str::from_utf8(&output.stderr)?,
                 );
             }
-
-            let output = Command::new(&target.get_venv_python(&venv_dir))
-                .args(&["-m", "pip", "install", "cffi"])
-                .output()
-                .context("pip install cffi failed")?;
-            if !output.status.success() {
-                panic!(
-                    "pip failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
-                    output.status,
-                    str::from_utf8(&output.stdout)?,
-                    str::from_utf8(&output.stderr)?
-                );
-            }
         }
 
         let python = target.get_venv_python(&venv_dir);

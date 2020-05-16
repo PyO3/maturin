@@ -1,10 +1,13 @@
-use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
-use anyhow::{bail, Context, Result};
-use maturin::{BuildOptions, Target};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
+
+use anyhow::{bail, Context, Result};
 use structopt::StructOpt;
+
+use maturin::{BuildOptions, Target};
+
+use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
 
 mod common;
 
@@ -111,6 +114,19 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
                     output.status,
                     str::from_utf8(&output.stdout)?,
                     str::from_utf8(&output.stderr)?,
+                );
+            }
+
+            let output = Command::new(&target.get_venv_python(&venv_dir))
+                .args(&["-m", "pip", "install", "cffi"])
+                .output()
+                .context("pip install cffi failed")?;
+            if !output.status.success() {
+                panic!(
+                    "pip failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                    output.status,
+                    str::from_utf8(&output.stdout)?,
+                    str::from_utf8(&output.stderr)?
                 );
             }
         }

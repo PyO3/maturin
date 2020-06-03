@@ -150,7 +150,7 @@ You can then e.g. install your package with `pip install .`. With `pip install .
 
 You can use the options `manylinux`, `skip-auditwheel`, `bindings`, `strip`, `cargo-extra-args` and `rustc-extra-args` under `[tool.maturin]` the same way you would when running maturin directly.  The `bindings` key is required for cffi and bin projects as those can't be automatically detected. Currently, all builds are in release mode (see [this thread](https://discuss.python.org/t/pep-517-debug-vs-release-builds/1924) for details).
 
-For a non-manylinux build you could with cffi bindings you could use the following:
+For a non-manylinux build with cffi bindings you could use the following:
 
 ```toml
 [build-system]

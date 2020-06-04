@@ -102,7 +102,7 @@ struct PublishOpt {
     /// Do not pass --release to cargo
     #[structopt(long)]
     debug: bool,
-    /// Strip the library for minimum file size
+    /// Do not strip the library for minimum file size
     #[structopt(long = "no-strip")]
     no_strip: bool,
 }

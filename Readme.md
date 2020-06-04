@@ -264,7 +264,7 @@ FLAGS:
             Don't build a source distribution
 
         --no-strip
-            Strip the library for minimum file size
+            Do not strip the library for minimum file size
 
         --skip-auditwheel
             [deprecated, use --manylinux instead] Don't check for manylinux compliance

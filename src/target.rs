@@ -229,7 +229,8 @@ impl Target {
             let path = venv_base.as_ref().join("Scripts").join("python.exe");
             if path.exists() {
                 path
-            } else { // for conda environment
+            } else {
+                // for conda environment
                 venv_base.as_ref().join("python.exe")
             }
         } else {

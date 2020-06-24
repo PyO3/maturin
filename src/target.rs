@@ -226,7 +226,12 @@ impl Target {
     /// Returns the path to the python executable inside a venv
     pub fn get_venv_python(&self, venv_base: impl AsRef<Path>) -> PathBuf {
         if self.is_windows() {
-            venv_base.as_ref().join("Scripts").join("python.exe")
+            let path = venv_base.as_ref().join("Scripts").join("python.exe");
+            if path.exists() {
+                path
+            } else { // for conda environment
+                venv_base.as_ref().join("python.exe")
+            }
         } else {
             venv_base.as_ref().join("bin").join("python")
         }

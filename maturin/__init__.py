@@ -54,7 +54,7 @@ def get_config_options() -> List[str]:
 
 # noinspection PyUnusedLocal
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    # The PEP 517 build environment garuantees that `python` is the correct python
+    # The PEP 517 build environment guarantees that `python` is the correct python
     command = ["maturin", "pep517", "build-wheel", "-i", "python"]
     command.extend(get_config_options())
 

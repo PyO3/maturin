@@ -192,11 +192,11 @@ impl Metadata21 {
     pub fn to_file_contents(&self) -> String {
         let mut fields = self.to_vec();
         let mut out = "".to_string();
-
-        let body = match fields.clone().last() {
+        let body = match fields.last() {
             Some((key, description)) if key == "Description" => {
+                let desc = description.clone();
                 fields.pop().unwrap();
-                Some(description.clone())
+                Some(desc)
             }
             Some((_, _)) => None,
             None => None,

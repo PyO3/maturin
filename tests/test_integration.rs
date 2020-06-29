@@ -11,19 +11,16 @@ use crate::common::{adjust_canonicalization, check_installed, handle_result, may
 
 mod common;
 
-#[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
 fn test_integration_pyo3_pure() {
     handle_result(test_integration("test-crates/pyo3-pure", None));
 }
 
-#[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
 fn test_integration_pyo3_mixed() {
     handle_result(test_integration("test-crates/pyo3-mixed", None));
 }
 
-#[cfg(not(feature = "skip-nightly-tests"))]
 #[cfg(target_os = "windows")]
 #[test]
 #[ignore]

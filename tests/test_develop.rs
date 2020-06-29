@@ -8,13 +8,11 @@ use std::process::Stdio;
 use std::str;
 mod common;
 
-#[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
 fn test_develop_pyo3_pure() {
     handle_result(test_develop("test-crates/pyo3-pure", None));
 }
 
-#[cfg(not(feature = "skip-nightly-tests"))]
 #[test]
 fn test_develop_pyo3_mixed() {
     handle_result(test_develop("test-crates/pyo3-mixed", None));

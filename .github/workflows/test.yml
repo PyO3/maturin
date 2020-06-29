@@ -26,15 +26,16 @@ jobs:
       - name: Install cffi and virtualenv
         run: pip install cffi virtualenv
       - uses: actions-rs/toolchain@v1
+        id: rustup
         with:
           profile: minimal
-          toolchain: nightly-2020-01-23
+          toolchain: stable
           override: true
       - name: Cache cargo build
         uses: actions/cache@v1
         with:
           path: target
-          key: ${{ runner.os }}-nightly-2020-01-23-cargo-target-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-target-${{ hashFiles('Cargo.lock') }}
       - name: cargo test
         uses: actions-rs/cargo@v1
         with:

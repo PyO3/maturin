@@ -19,4 +19,4 @@ freebsd_task:
   build_script:
     - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo build
   test_script:
-    - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo test --features skip-nightly-tests
+    - $HOME/.cargo/bin/rustup run $TOOLCHAIN cargo test

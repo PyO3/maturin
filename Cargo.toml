@@ -38,7 +38,6 @@ bytesize = "1.0.1"
 glob = "0.3.0"
 cargo_metadata = "0.10.0"
 cbindgen = { version = "0.14.2", default-features = false }
-digest = { version = "0.8.1", features = ["std"] }
 flate2 = "1.0.14"
 goblin = "0.2.3"
 human-panic = { version = "1.0.3", optional = true }
@@ -51,7 +50,7 @@ reqwest = { version = "0.10.4", optional = true, default-features = false, featu
 rpassword = { version = "4.0.5", optional = true }
 serde = { version = "1.0.110", features = ["derive"] }
 serde_json = "1.0.53"
-sha2 = "0.8.1"
+sha2 = "0.9.0"
 shlex = "0.1.1"
 structopt = "0.3.14"
 tar = "0.4.26"
@@ -73,7 +72,5 @@ log = ["pretty_env_logger"]
 # We use rustls for manylinux compliance and because unlike both dynamic and
 # static openssl variants it can be built and used inside a cent os 5 container
 rustls = ["reqwest/rustls-tls"]
-# Internal feature to run test with stable rust
-skip-nightly-tests = []
 # Internal feature to speed up the tests significantly
 faster-tests = []

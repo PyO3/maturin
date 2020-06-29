@@ -11,7 +11,7 @@ use std::path::Path;
 
 /// Installs a crate by compiling it and copying the shared library to the right directory
 ///
-/// Works only in virtualenvs.
+/// Works only in a virtualenv.
 pub fn develop(
     bindings: Option<String>,
     manifest_file: &Path,

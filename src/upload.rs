@@ -54,7 +54,7 @@ pub fn upload(
     let mut wheel = File::open(&wheel_path)?;
     let mut hasher = Sha256::new();
     io::copy(&mut wheel, &mut hasher)?;
-    let hash_hex = format!("{:x}", hasher.result());
+    let hash_hex = format!("{:x}", hasher.finalize());
 
     let mut api_metadata = vec![
         (":action".to_string(), "file_upload".to_string()),

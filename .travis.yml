@@ -85,7 +85,7 @@ install:
 
 script:
   - if [[ "$TARGET" == *musl ]]; then rustup target add $TARGET; fi
-  - cargo test --no-default-features --features skip-nightly-tests
+  - cargo test --no-default-features
 
 before_deploy: bash ci/before_deploy.sh
 

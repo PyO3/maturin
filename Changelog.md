@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 include arbitrary files in source distributions ([#296](https://github.com/PyO3/maturin/pull/296)).
  * cffi is installed if it's missing and python is running inside a virtualenv.
 
+### Fixed
+ * Fix incorrectly returning full path (not basename) from PEP 517 `build_sdist` hook
+
 ## 0.8.0 - 2020-04-03
 
 ### Added

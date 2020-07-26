@@ -85,7 +85,10 @@ def build_sdist(sdist_directory, config_settings=None):
     sys.stdout.buffer.write(output)
     sys.stdout.flush()
     output = output.decode(errors="replace")
-    return output.strip().splitlines()[-1]
+    sdist_path = output.strip().splitlines()[-1]
+    dirname, basename = sdist_path.rpartition(os.sep)
+    assert dirname == sdist_directory
+    return basename
 
 
 # noinspection PyUnusedLocal

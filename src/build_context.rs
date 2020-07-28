@@ -36,6 +36,14 @@ impl BridgeModel {
             _ => panic!("Expected Bindings"),
         }
     }
+
+    /// Test whether this is using a specific bindings crate
+    pub fn is_bindings(&self, name: &str) -> bool {
+        match self {
+            BridgeModel::Bindings(value) => value == name,
+            _ => false,
+        }
+    }
 }
 
 /// Whether this project is pure rust or rust mixed with python

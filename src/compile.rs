@@ -71,6 +71,11 @@ pub fn compile(
         .stderr(Stdio::inherit());
 
     if let Some(python_interpreter) = python_interpreter {
+        if bindings_crate.is_bindings("pyo3") {
+            build_command.env("PYO3_PYTHON", &python_interpreter.executable);
+        }
+
+        // rust-cpython, and legacy pyo3 versions
         build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
     }
 

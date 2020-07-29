@@ -290,7 +290,7 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
                 .context("Failed to parse Cargo.toml into python metadata")?;
             let path = source_distribution(sdist_directory, &metadata21, &manifest_path, None)
                 .context("Failed to build source distribution")?;
-            println!("{}", path.display());
+            println!("{}", path.file_name().unwrap().to_str().unwrap());
         }
     };
 

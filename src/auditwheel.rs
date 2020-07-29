@@ -109,7 +109,7 @@ pub fn auditwheel_rs(
     for dep in deps {
         // I'm not 100% what exactely this line does, but auditwheel also seems to skip
         // everything with ld-linux in its name
-        if dep == "ld-linux-x86-64.so.2" || dep == "ld-linux.so.2" {
+        if dep.starts_with("ld-linux") {
             continue;
         }
         if !reference.contains(&dep.as_str()) {

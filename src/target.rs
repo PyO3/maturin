@@ -70,7 +70,7 @@ impl FromStr for Manylinux {
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Arch {
     AARCH64,
-    ARM7L,
+    ARMV7L,
     X86,
     X86_64,
 }
@@ -79,7 +79,7 @@ impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Arch::AARCH64 => write!(f, "aarch64"),
-            Arch::ARM7L => write!(f, "arm7l"),
+            Arch::ARMV7L => write!(f, "armv7l"),
             Arch::X86 => write!(f, "i686"),
             Arch::X86_64 => write!(f, "x86_64"),
         }
@@ -118,7 +118,7 @@ impl Target {
         let arch = match platform.target_arch {
             platforms::target::Arch::X86_64 => Arch::X86_64,
             platforms::target::Arch::X86 => Arch::X86,
-            platforms::target::Arch::ARM => Arch::ARM7L,
+            platforms::target::Arch::ARM => Arch::ARMV7L,
             platforms::target::Arch::AARCH64 => Arch::AARCH64,
             unsupported => bail!("The architecture {:?} is not supported", unsupported),
         };
@@ -126,7 +126,7 @@ impl Target {
         // bail on any unsupported targets
         match (&os, &arch) {
             (OS::FreeBSD, Arch::AARCH64) => bail!("aarch64 is not supported for FreeBSD"),
-            (OS::FreeBSD, Arch::ARM7L) => bail!("arm7l is not supported for FreeBSD"),
+            (OS::FreeBSD, Arch::ARMV7L) => bail!("armv7l is not supported for FreeBSD"),
             (OS::FreeBSD, Arch::X86) => bail!("32-bit wheels are not supported for FreeBSD"),
             (OS::FreeBSD, Arch::X86_64) => {
                 match PlatformInfo::new() {
@@ -135,10 +135,10 @@ impl Target {
                 };
             }
             (OS::Macos, Arch::AARCH64) => bail!("aarch64 is not supported for macOS"),
-            (OS::Macos, Arch::ARM7L) => bail!("arm7l is not supported for macOS"),
+            (OS::Macos, Arch::ARMV7L) => bail!("armv7l is not supported for macOS"),
             (OS::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
             (OS::Windows, Arch::AARCH64) => bail!("aarch64 is not supported for Windows"),
-            (OS::Windows, Arch::ARM7L) => bail!("arm7l is not supported for Windows"),
+            (OS::Windows, Arch::ARMV7L) => bail!("armv7l is not supported for Windows"),
             (_, _) => {}
         }
         Ok(Target { os, arch })
@@ -148,7 +148,7 @@ impl Target {
     pub fn pointer_width(&self) -> usize {
         match self.arch {
             Arch::AARCH64 => 64,
-            Arch::ARM7L => 32,
+            Arch::ARMV7L => 32,
             Arch::X86 => 32,
             Arch::X86_64 => 64,
         }
@@ -208,7 +208,7 @@ impl Target {
         match (&self.os, &self.arch) {
             (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
             (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
-            (OS::Linux, Arch::ARM7L) => "arm-linux-gnueabihf",
+            (OS::Linux, Arch::ARMV7L) => "arm-linux-gnueabihf",
             (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
             (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",
             (OS::Macos, Arch::X86_64) => "darwin",

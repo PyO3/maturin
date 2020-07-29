@@ -255,11 +255,14 @@ enum PEP517Command {
 fn pep517(subcommand: PEP517Command) -> Result<()> {
     match subcommand {
         PEP517Command::WriteDistInfo {
-            mut build_options,
+            build_options,
             metadata_directory,
             strip,
         } => {
-            build_options.interpreter = Some(vec![PathBuf::from("python")]);
+            assert!(matches!(
+                build_options.interpreter.as_ref(),
+                Some(version) if version.len() == 1
+            ));
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
                 BridgeModel::Bindings(_) => {

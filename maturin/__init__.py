@@ -128,6 +128,10 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
         "write-dist-info",
         "--metadata-directory",
         metadata_directory,
+        # PEP 517 specifies that only `sys.executable` points to the correct
+        # python interpreter
+        "--interpreter",
+        sys.executable,
     ]
     command.extend(get_config_options())
 

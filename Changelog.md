@@ -5,14 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## Unreleased
-
-### Added
+## 0.8.3 - 2020-07-29
 
  * `[tool.maturin]` now supports `sdist-include = ["path/**/*"]` to
 include arbitrary files in source distributions ([#296](https://github.com/PyO3/maturin/pull/296)).
- * cffi is installed if it's missing and python is running inside a virtualenv.
  * Add support for PyO3 `0.12`'s `PYO3_PYTHON` environment variable. [#331](https://github.com/PyO3/maturin/pull/331)
+
+## 0.8.2 - 2020-06-29
+
+### Added
+
+ * Python 3.8 was added to PATH in the docker image by oconnor663 in [#302](https://github.com/PyO3/maturin/pull/302)
+
+## 0.8.1 - 2020-04-30
+
+### Added
+
+ * cffi is installed if it's missing and python is running inside a virtualenv.
 
 ## 0.8.0 - 2020-04-03
 

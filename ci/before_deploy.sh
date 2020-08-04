@@ -81,10 +81,6 @@ upload_to_pypi() {
 main() {
     # upload_to_pypi needs to run first because otherwise we have the .tar.gz and the .deb in the source distribution
     upload_to_pypi
-    # `cargo publish` also needs to run before making te archives because we want a clean working tree
-    if [[ $TARGET == x86_64-unknown-linux-musl ]]; then
-        cargo publish --token $CRATES_IO_TOKEN --no-verify
-    fi
     make_archive
     if [[ $TARGET == *linux* ]]; then
         make_deb

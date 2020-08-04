@@ -1,15 +1,16 @@
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
 use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};
-use crate::BuildOptions;
 use crate::Manylinux;
 use crate::PythonInterpreter;
 use crate::Target;
+use crate::{write_dist_info, BuildOptions};
 use anyhow::{anyhow, format_err, Context, Result};
 use std::fs;
 use std::path::Path;
 
-/// Installs a crate by compiling it and copying the shared library to the right directory
+/// Installs a crate by compiling it and copying the shared library to site-packages.
+/// Also adds the dist-info directory to make sure pip and other tools detect the library
 ///
 /// Works only in a virtualenv.
 pub fn develop(
@@ -95,6 +96,28 @@ pub fn develop(
             )?;
         }
     }
+
+    // Write dist-info directory so pip can interact with it
+    let tags = match build_context.bridge {
+        BridgeModel::Bindings(_) => {
+            vec![build_context.interpreter[0].get_tag(&build_context.manylinux)]
+        }
+        BridgeModel::Bin | BridgeModel::Cffi => {
+            build_context
+                .target
+                .get_universal_tags(&build_context.manylinux)
+                .1
+        }
+    };
+
+    write_dist_info(
+        &mut builder,
+        &build_context.metadata21,
+        &build_context.scripts,
+        &tags,
+    )?;
+
+    builder.write_record(&build_context.metadata21)?;
 
     Ok(())
 }

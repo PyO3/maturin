@@ -58,6 +58,7 @@ pub trait ModuleWriter {
 /// A [ModuleWriter] that adds the module somewhere in the filesystem, e.g. in a virtualenv
 pub struct PathWriter {
     base_path: PathBuf,
+    record: Vec<(String, String, usize)>,
 }
 
 impl PathWriter {
@@ -80,13 +81,17 @@ impl PathWriter {
             venv_dir.join("Lib").join("site-packages")
         };
 
-        Ok(PathWriter { base_path })
+        Ok(PathWriter {
+            base_path,
+            record: Vec::new(),
+        })
     }
 
     /// Writes the module to the given path
     pub fn from_path(path: impl AsRef<Path>) -> Self {
         Self {
             base_path: path.as_ref().to_path_buf(),
+            record: Vec::new(),
         }
     }
 
@@ -99,6 +104,36 @@ impl PathWriter {
             fs::remove_dir_all(&absolute)
                 .context(format!("Failed to remove {}", absolute.display()))?;
         }
+
+        Ok(())
+    }
+
+    /// Writes the RECORD file after everything else has been written
+    pub fn write_record(self, metadata21: &Metadata21) -> Result<()> {
+        let record_file = self
+            .base_path
+            .join(metadata21.get_dist_info_dir())
+            .join("RECORD");
+        let mut buffer = File::create(&record_file).context(format!(
+            "Failed to create a file at {}",
+            record_file.display()
+        ))?;
+
+        for (filename, hash, len) in self.record {
+            buffer
+                .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())
+                .context(format!(
+                    "Failed to write to file at {}",
+                    record_file.display()
+                ))?;
+        }
+        // Write the record for the RECORD file itself
+        buffer
+            .write_all(format!("{},,\n", record_file.display()).as_bytes())
+            .context(format!(
+                "Failed to write to file at {}",
+                record_file.display()
+            ))?;
 
         Ok(())
     }
@@ -116,7 +151,7 @@ impl ModuleWriter for PathWriter {
         bytes: &[u8],
         _permissions: u32,
     ) -> Result<()> {
-        let path = self.base_path.join(target);
+        let path = self.base_path.join(&target);
 
         // We only need to set the executable bit on unix
         let mut file = {
@@ -126,15 +161,25 @@ impl ModuleWriter for PathWriter {
                     .create(true)
                     .write(true)
                     .mode(_permissions)
-                    .open(path)?
+                    .open(&path)
             }
             #[cfg(target_os = "windows")]
             {
-                File::create(path)?
+                File::create(&path)
             }
-        };
+        }
+        .context(format!("Failed to create a file at {}", path.display()))?;
 
-        file.write_all(bytes)?;
+        file.write_all(bytes)
+            .context(format!("Failed to write to file at {}", path.display()))?;
+
+        let hash = base64::encode_config(&Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
+        self.record.push((
+            target.as_ref().to_str().unwrap().to_owned(),
+            hash,
+            bytes.len(),
+        ));
+
         Ok(())
     }
 }
@@ -227,6 +272,7 @@ impl WheelWriter {
             self.zip
                 .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
         }
+        // Write the record for the RECORD file itself
         self.zip
             .write_all(format!("{},,\n", record_filename).as_bytes())?;
 

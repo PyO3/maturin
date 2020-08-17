@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## 0.8.3 - Unreleased
+## 0.8.3 - 2020-08-17
 
 ### Added
 
@@ -16,7 +16,7 @@ include arbitrary files in source distributions ([#296](https://github.com/PyO3/
 
 ### Fixed
 
- * Fix incorrectly returning full path (not basename) from PEP 517 `build_sdist` hook
+ * Fix incorrectly returning full path (not basename) from PEP 517 `build_sdist` hook. This fixes tox support from maturin's side
  * Packages installed with `maturin develop` are now visible to pip and can be uninstalled with pip
 
 ## 0.8.2 - 2020-06-29

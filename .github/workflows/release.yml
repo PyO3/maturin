@@ -33,10 +33,9 @@ jobs:
           toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
-        env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         with:
-          command: login ${CRATES_IO_TOKEN}
+          command: login
+          args: ${{ secrets.CRATES_IO_TOKEN }}
       - uses: actions-rs/cargo@v1
         with:
           command: publish

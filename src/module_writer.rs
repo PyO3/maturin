@@ -556,8 +556,9 @@ pub fn write_bindings_module(
     artifact: &Path,
     python_interpreter: &PythonInterpreter,
     develop: bool,
+    abi3: bool,
 ) -> Result<()> {
-    let so_filename = python_interpreter.get_library_name(&module_name);
+    let so_filename = python_interpreter.get_library_name(&module_name, abi3);
 
     match project_layout {
         ProjectLayout::Mixed(ref python_module) => {

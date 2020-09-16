@@ -357,11 +357,20 @@ impl PythonInterpreter {
     /// {python tag}-{abi tag}-{platform tag}
     ///
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
-    pub fn get_tag(&self, manylinux: &Manylinux) -> String {
+    ///
+    /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
+    pub fn get_tag(&self, manylinux: &Manylinux, abi3: bool) -> String {
         match self.interpreter {
             Interpreter::CPython => {
                 let platform = self.target.get_platform_tag(manylinux);
-                if self.target.is_unix() {
+                if abi3 {
+                    format!(
+                        "cp{major}{minor}-abi3-{platform}",
+                        major = self.major,
+                        minor = self.minor,
+                        platform = platform
+                    )
+                } else {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
                         major = self.major,
@@ -369,18 +378,10 @@ impl PythonInterpreter {
                         abiflags = self.abiflags,
                         platform = platform
                     )
-                } else {
-                    format!(
-                        "cp{major}{minor}-none-{platform}",
-                        major = self.major,
-                        minor = self.minor,
-                        platform = platform
-                    )
                 }
             }
             Interpreter::PyPy => {
-                // TODO: Find out if PyPy can support manylinux 2010 and/or
-                //       add a `Default` variant to the Manylinux enum
+                // TODO: Use manylinux 2010 by default with pypy
                 if manylinux != &Manylinux::Off {
                     eprintln!(
                         "🛈  Note: PyPy doesn't support the manylinux yet, \
@@ -415,21 +416,28 @@ impl PythonInterpreter {
     /// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
     ///
     /// Examples for 64-bit on CPython 3.5m:
-    /// Linux:   steinlaus.cpython-35m-x86_64-linux-gnu.so
-    /// Windows: steinlaus.cp35-win_amd64.pyd
-    /// Mac:     steinlaus.cpython-35m-darwin.so
-    /// FreeBSD: steinlaus.cpython-35m.so
+    /// Linux:   foobar.cpython-35m-x86_64-linux-gnu.so
+    /// Windows: foobar.cp35-win_amd64.pyd
+    /// Mac:     foobar.cpython-35m-darwin.so
+    /// FreeBSD: foobar.cpython-35m.so
     ///
     /// For pypy3, we read sysconfig.get_config_var("EXT_SUFFIX").
     ///
     /// The pypy3 value appears to be wrong for Windows: instead of
     /// e.g., ".pypy3-70-x86_64-linux-gnu.so", it is just ".pyd".
-    pub fn get_library_name(&self, base: &str) -> String {
+    pub fn get_library_name(&self, base: &str, abi3: bool) -> String {
         match self.interpreter {
             Interpreter::CPython => {
                 let platform = self.target.get_shared_platform_tag();
 
-                if self.target.is_freebsd() {
+                if abi3 {
+                    if self.target.is_freebsd() || self.target.is_unix() {
+                        format!("{base}.abi3.so", base = base)
+                    } else {
+                        // Apparently there is no tag for abi3 on windows
+                        format!("{base}.pyd", base = base)
+                    }
+                } else if self.target.is_freebsd() {
                     format!(
                         "{base}.cpython-{major}{minor}{abiflags}.so",
                         base = base,

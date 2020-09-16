@@ -10,7 +10,8 @@ edition = "2018"
 get_42 = "pyo3_pure:DummyClass.get_42"
 
 [dependencies]
-pyo3 = { version = "0.11", features = ["extension-module"] }
+# This is temporary until https://github.com/PyO3/pyo3/pull/1152 is merged
+pyo3 = { git = "https://github.com/PyO3/pyo3", branch = "abi3", deafult-features = false, features = ["extension-module", "macros"] }
 
 [lib]
 name = "pyo3_pure"

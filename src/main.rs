@@ -266,7 +266,10 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
                 BridgeModel::Bindings(_) => {
-                    vec![context.interpreter[0].get_tag(&context.manylinux)]
+                    vec![context.interpreter[0].get_tag(&context.manylinux, false)]
+                }
+                BridgeModel::BindingsAbi3 => {
+                    vec![context.interpreter[0].get_tag(&context.manylinux, true)]
                 }
                 BridgeModel::Bin | BridgeModel::Cffi => {
                     context.target.get_universal_tags(&context.manylinux).1

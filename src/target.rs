@@ -1,5 +1,6 @@
 use anyhow::{bail, format_err, Result};
 use platform_info::*;
+use platforms::Platform;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt;
@@ -100,10 +101,10 @@ impl Target {
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
         let platform = if let Some(ref target_triple) = target_triple {
-            platforms::find(target_triple)
+            Platform::find(target_triple)
                 .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?
         } else {
-            platforms::guess_current()
+            Platform::guess_current()
                 .ok_or_else(|| format_err!("Could guess the current platform"))?
         };
 

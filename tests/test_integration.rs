@@ -117,19 +117,26 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
 
         let python = target.get_venv_python(&venv_dir);
 
+        let command = [
+            "-m",
+            "pip",
+            "install",
+            "--force-reinstall",
+            &adjust_canonicalization(filename),
+        ];
         let output = Command::new(&python)
-            .args(&[
-                "-m",
-                "pip",
-                "install",
-                "--force-reinstall",
-                &adjust_canonicalization(filename),
-            ])
+            .args(&command)
             .stderr(Stdio::inherit())
             .output()
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
-            panic!();
+            bail!(
+                "pip install failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                &command,
+                output.status,
+                str::from_utf8(&output.stdout)?,
+                str::from_utf8(&output.stderr)?,
+            );
         }
 
         check_installed(&package.as_ref(), &python)?;

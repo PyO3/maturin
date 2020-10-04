@@ -81,7 +81,7 @@ pub fn develop(
                 true,
             )?;
         }
-        BridgeModel::Bindings(_) => {
+        BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 => {
             let artifact = build_context
                 .compile_cdylib(Some(&interpreter), Some(&build_context.module_name))
                 .context(context)?;
@@ -93,6 +93,7 @@ pub fn develop(
                 &artifact,
                 &interpreter,
                 true,
+                build_context.bridge == BridgeModel::BindingsAbi3,
             )?;
         }
     }
@@ -100,7 +101,10 @@ pub fn develop(
     // Write dist-info directory so pip can interact with it
     let tags = match build_context.bridge {
         BridgeModel::Bindings(_) => {
-            vec![build_context.interpreter[0].get_tag(&build_context.manylinux)]
+            vec![build_context.interpreter[0].get_tag(&build_context.manylinux, false)]
+        }
+        BridgeModel::BindingsAbi3 => {
+            vec![build_context.interpreter[0].get_tag(&build_context.manylinux, true)]
         }
         BridgeModel::Bin | BridgeModel::Cffi => {
             build_context

@@ -1,4 +1,5 @@
 use crate::build_context::{BridgeModel, ProjectLayout};
+use crate::python_interpreter::Interpreter;
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Manylinux;
@@ -122,10 +123,8 @@ impl BuildOptions {
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
 
-        let target = Target::from_target_triple(self.target.clone())?;
-
         let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
-        if let Some(target) = self.target {
+        if let Some(target) = self.target.clone() {
             cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
         }
 
@@ -137,11 +136,6 @@ impl BuildOptions {
             .exec()
             .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
 
-        let wheel_dir = match self.out {
-            Some(ref dir) => dir.clone(),
-            None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
-        };
-
         let bridge = find_bridge(&cargo_metadata, self.bindings.as_deref())?;
 
         if bridge != BridgeModel::Bin && module_name.contains('-') {
@@ -150,6 +144,13 @@ impl BuildOptions {
                  (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
             );
         }
+
+        let target = Target::from_target_triple(self.target.clone())?;
+
+        let wheel_dir = match self.out {
+            Some(ref dir) => dir.clone(),
+            None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
+        };
 
         let interpreter = match self.interpreter {
             // Only build a source ditribution
@@ -189,6 +190,33 @@ impl BuildOptions {
     }
 }
 
+/// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
+fn has_abi3(cargo_metadata: &Metadata) -> Result<bool> {
+    let pyo3_packages = cargo_metadata
+        .packages
+        .iter()
+        .filter(|package| package.name == "pyo3")
+        .collect::<Vec<_>>();
+    match pyo3_packages.as_slice() {
+        [pyo3_crate] => {
+            let root_id = cargo_metadata
+                .resolve
+                .as_ref()
+                .and_then(|resolve| resolve.root.as_ref())
+                .context("Expected cargo to return a root package")?;
+            // Check that we have a pyo3 version with abi3 and that abi3 is selected
+            Ok(pyo3_crate.features.contains_key("unstable-api")
+                && !cargo_metadata[&root_id]
+                    .features
+                    .contains_key("unstable-api"))
+        }
+        _ => bail!(format!(
+            "Expected exactly one pyo3 dependency, found {}",
+            pyo3_packages.len()
+        )),
+    }
+}
+
 /// Tries to determine the [BridgeModel] for the target crate
 pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
     let resolve = cargo_metadata
@@ -202,11 +230,11 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         .map(|node| (cargo_metadata[&node.id].name.as_ref(), node))
         .collect();
 
-    if let Some(bindings) = bridge {
+    let bridge = if let Some(bindings) = bridge {
         if bindings == "cffi" {
-            Ok(BridgeModel::Cffi)
+            BridgeModel::Cffi
         } else if bindings == "bin" {
-            Ok(BridgeModel::Bin)
+            BridgeModel::Bin
         } else {
             if !deps.contains_key(bindings) {
                 bail!(
@@ -215,12 +243,37 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 );
             }
 
-            Ok(BridgeModel::Bindings(bindings.to_string()))
+            BridgeModel::Bindings(bindings.to_string())
         }
-    } else if let Some(node) = deps.get("pyo3") {
+    } else if deps.get("pyo3").is_some() {
         println!("🔗 Found pyo3 bindings");
-        if !node.features.contains(&"extension-module".to_string()) {
-            let version = cargo_metadata[&node.id].version.to_string();
+        BridgeModel::Bindings("pyo3".to_string())
+    } else if deps.contains_key("cpython") {
+        println!("🔗 Found rust-cpython bindings");
+        BridgeModel::Bindings("rust_cpython".to_string())
+    } else {
+        let package = &cargo_metadata[resolve.root.as_ref().unwrap()];
+        let targets: Vec<_> = package
+            .targets
+            .iter()
+            .map(|target| target.crate_types.iter())
+            .flatten()
+            .map(String::as_str)
+            .collect();
+
+        if targets.contains(&"cdylib") {
+            BridgeModel::Cffi
+        } else if targets.contains(&"bin") {
+            BridgeModel::Bin
+        } else {
+            bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")
+        }
+    };
+
+    if BridgeModel::Bindings("pyo3".to_string()) == bridge {
+        let pyo3_node = deps["pyo3"];
+        if !pyo3_node.features.contains(&"extension-module".to_string()) {
+            let version = cargo_metadata[&pyo3_node.id].version.to_string();
             println!(
                 "⚠  Warning: You're building a library without activating pyo3's \
                  `extension-module` feature. \
@@ -228,37 +281,14 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 version
             );
         }
-        Ok(BridgeModel::Bindings("pyo3".to_string()))
-    } else if deps.contains_key("cpython") {
-        println!("🔗 Found rust-cpython bindings");
-        Ok(BridgeModel::Bindings("rust_cpython".to_string()))
-    } else {
-        let package_id = resolve.root.as_ref().unwrap();
-        let package = cargo_metadata
-            .packages
-            .iter()
-            .find(|p| &p.id == package_id)
-            .unwrap();
 
-        if package.targets.len() == 1 {
-            let target = &package.targets[0];
-            if target
-                .crate_types
-                .iter()
-                .any(|crate_type| crate_type == "cdylib")
-            {
-                return Ok(BridgeModel::Cffi);
-            }
-            if target
-                .crate_types
-                .iter()
-                .any(|crate_type| crate_type == "bin")
-            {
-                return Ok(BridgeModel::Bin);
-            }
+        if has_abi3(&cargo_metadata)? {
+            println!("🔗 Building an abi3 wheel, which is compatible if all cpython versions. TODO: Minimum python version");
+            return Ok(BridgeModel::BindingsAbi3);
         }
-        bail!("Couldn't find any bindings; Please specify them with --bindings/-b")
     }
+
+    Ok(bridge)
 }
 
 /// Finds the appropriate amount for python versions for each [BridgeModel].
@@ -269,6 +299,8 @@ pub fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
 ) -> Result<Vec<PythonInterpreter>> {
+    let err_message = "Failed to find a python interpreter";
+
     match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
@@ -294,6 +326,37 @@ pub fn find_interpreter(
 
             Ok(interpreter)
         }
+        BridgeModel::BindingsAbi3 => {
+            let interpreter = if interpreter.is_empty() {
+                // Since we do not autodetect pypy anyway, we only need one interpreter.
+                // Ideally we'd pick the lowest supported version, but there's no way to
+                // specify that yet in pyo3 yet
+                let interpreter =
+                    PythonInterpreter::check_executable(target.get_python(), &target, &bridge)
+                        .context(format_err!(err_message))?
+                        .ok_or_else(|| format_err!(err_message))?;
+                vec![interpreter]
+            } else {
+                let interpreter =
+                    PythonInterpreter::check_executables(&interpreter, &target, &bridge)
+                        .context("The given list of python interpreters is invalid")?;
+                // It's ok if there are pypy versions, but there should be either no or exactly one
+                // cpython version. We can build wheels for more since the minimum version is in
+                // the tag, but that is unnecessary
+                if interpreter
+                    .iter()
+                    .filter(|python| python.interpreter == Interpreter::CPython)
+                    .count()
+                    > 1
+                {
+                    println!("⚠ You have more than one cpython version specified when compiling with abi3, \
+                     while you only need to lowest compatible version to build a single abi3 wheel.");
+                }
+                interpreter
+            };
+
+            Ok(interpreter)
+        }
         BridgeModel::Cffi => {
             let executable = if interpreter.is_empty() {
                 target.get_python()
@@ -302,7 +365,6 @@ pub fn find_interpreter(
             } else {
                 bail!("You can only specify one python interpreter for cffi compilation");
             };
-            let err_message = "Failed to find python interpreter for generating cffi bindings";
 
             let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
                 .context(format_err!(err_message))?
@@ -370,21 +432,38 @@ mod test {
 
     #[test]
     fn test_find_bridge_pyo3() {
+        let pyo3_mixed = MetadataCommand::new()
+            .manifest_path(&Path::new("test-crates/pyo3-mixed").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        assert!(matches!(
+            find_bridge(&pyo3_mixed, None),
+            Ok(BridgeModel::Bindings(_))
+        ));
+        assert!(matches!(
+            find_bridge(&pyo3_mixed, Some("pyo3")),
+            Ok(BridgeModel::Bindings(_))
+        ));
+
+        assert!(find_bridge(&pyo3_mixed, Some("rust-cpython")).is_err());
+    }
+
+    #[test]
+    fn test_find_bridge_pyo3_abi3() {
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(&Path::new("test-crates/pyo3-pure").join("Cargo.toml"))
             .exec()
             .unwrap();
 
-        assert!(match find_bridge(&pyo3_pure, None).unwrap() {
-            BridgeModel::Bindings(_) => true,
-            _ => false,
-        });
-
-        assert!(match find_bridge(&pyo3_pure, Some("pyo3")).unwrap() {
-            BridgeModel::Bindings(_) => true,
-            _ => false,
-        });
-
+        assert!(matches!(
+            find_bridge(&pyo3_pure, None),
+            Ok(BridgeModel::BindingsAbi3)
+        ));
+        assert!(matches!(
+            find_bridge(&pyo3_pure, Some("pyo3")),
+            Ok(BridgeModel::BindingsAbi3)
+        ));
         assert!(find_bridge(&pyo3_pure, Some("rust-cpython")).is_err());
     }
 

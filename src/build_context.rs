@@ -26,6 +26,9 @@ pub enum BridgeModel {
     /// A native module with pyo3 or rust-cpython bindings. The String is the name of the bindings
     /// providing crate, e.g. pyo3.
     Bindings(String),
+    /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
+    /// for all cpython versions (pypy still needs multiple versions)
+    BindingsAbi3,
 }
 
 impl BridgeModel {
@@ -126,7 +129,7 @@ impl BuildContext {
         let wheels = match &self.bridge {
             BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py3".to_string(), None)],
             BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py3".to_string(), None)],
-            BridgeModel::Bindings(_) => self.build_binding_wheels()?,
+            BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 => self.build_binding_wheels()?,
         };
 
         Ok(wheels)
@@ -168,7 +171,8 @@ impl BuildContext {
             let artifact =
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
 
-            let tag = python_interpreter.get_tag(&self.manylinux);
+            let tag = python_interpreter
+                .get_tag(&self.manylinux, self.bridge == BridgeModel::BindingsAbi3);
 
             let mut writer = WheelWriter::new(
                 &tag,
@@ -185,6 +189,7 @@ impl BuildContext {
                 &artifact,
                 python_interpreter,
                 false,
+                self.bridge == BridgeModel::BindingsAbi3,
             )
             .context("Failed to add the files to the wheel")?;
 

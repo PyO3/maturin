@@ -205,10 +205,8 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<bool> {
                 .and_then(|resolve| resolve.root.as_ref())
                 .context("Expected cargo to return a root package")?;
             // Check that we have a pyo3 version with abi3 and that abi3 is selected
-            Ok(pyo3_crate.features.contains_key("unstable-api")
-                && !cargo_metadata[&root_id]
-                    .features
-                    .contains_key("unstable-api"))
+            Ok(pyo3_crate.features.contains_key("abi3")
+                && !cargo_metadata[&root_id].features.contains_key("abi3"))
         }
         _ => bail!(format!(
             "Expected exactly one pyo3 dependency, found {}",
@@ -246,7 +244,6 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             BridgeModel::Bindings(bindings.to_string())
         }
     } else if deps.get("pyo3").is_some() {
-        println!("🔗 Found pyo3 bindings");
         BridgeModel::Bindings("pyo3".to_string())
     } else if deps.contains_key("cpython") {
         println!("🔗 Found rust-cpython bindings");
@@ -283,8 +280,11 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         }
 
         if has_abi3(&cargo_metadata)? {
-            println!("🔗 Building an abi3 wheel, which is compatible if all cpython versions. TODO: Minimum python version");
+            println!("🔗 Found pyo3 bindings with abi3 support");
             return Ok(BridgeModel::BindingsAbi3);
+        } else {
+            println!("🔗 Found pyo3 bindings");
+            return Ok(bridge);
         }
     }
 

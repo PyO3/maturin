@@ -370,12 +370,20 @@ impl PythonInterpreter {
                         minor = self.minor,
                         platform = platform
                     )
-                } else {
+                } else if self.target.is_unix() {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
                         major = self.major,
                         minor = self.minor,
                         abiflags = self.abiflags,
+                        platform = platform
+                    )
+                } else {
+                    // On windows the abiflags are missing, but this seems to work
+                    format!(
+                        "cp{major}{minor}-none-{platform}",
+                        major = self.major,
+                        minor = self.minor,
                         platform = platform
                     )
                 }

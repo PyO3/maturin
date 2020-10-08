@@ -269,9 +269,15 @@ mod test {
         if actual.trim() != expected.trim() {
             panic!(
                 "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
-                expected, actual
-            );
-        }
+            expected,
+            actual
+        );
+        assert_eq!(
+            metadata.get_dist_info_dir(),
+            PathBuf::from("info_project-0.1.0.dist-info"),
+            "Dist info dir differed from expected"
+        );
+    }
 
         assert_eq!(actual.trim(), expected.trim());
 

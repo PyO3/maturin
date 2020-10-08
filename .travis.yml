@@ -30,8 +30,6 @@ addons:
       - python3.6-venv
       - python3.7-dev
       - python3.7-venv
-      - python3.8-dev
-      - python3.8-venv
 
 jobs:
   fast_finish: true
@@ -56,7 +54,6 @@ jobs:
             - python3.6-dev
             - python3.6-venv
             - python3.7-dev
-            - python3.8-dev
 
             - libdbus-1-dev:i386
             - libgmp-dev:i386

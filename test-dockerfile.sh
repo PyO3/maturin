@@ -9,7 +9,7 @@ rm -rf venv-docker
 python3.8 -m venv venv-docker
 
 # FIXME: Can we run the tests without activate?
-source .venv-docker/bin/activate
+source venv-docker/bin/activate
 
 venv-docker/bin/pip install -U pip cffi
 

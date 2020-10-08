@@ -257,12 +257,13 @@ mod test {
 
         readme_md.write_all(readme.as_bytes()).unwrap();
 
-        let cargo_toml = cargo_toml.replace("readme.md", &readme_path);
+        let toml_with_path = cargo_toml.replace("README_PATH", &readme_path);
 
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
+        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
 
         let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &readme_md.path().parent().unwrap()).unwrap();
+            Metadata21::from_cargo_toml(&cargo_toml_struct, &readme_md.path().parent().unwrap())
+                .unwrap();
 
         let actual = metadata.to_file_contents();
 
@@ -272,6 +273,13 @@ mod test {
             "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
             expected,
             actual
+        );
+
+        // get_dist_info_dir test checks against hard-coded values - check that they are as expected in the source first
+        assert!(
+            cargo_toml.contains("name = \"info-project\"")
+                && cargo_toml.contains("version = \"0.1.0\""),
+            "cargo_toml name and version string do not match hardcoded values, test will fail",
         );
         assert_eq!(
             metadata.get_dist_info_dir(),
@@ -298,7 +306,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
-            readme = "readme.md"
+            readme = "README_PATH"
             keywords = ["ffi", "test"]
 
             [lib]
@@ -355,7 +363,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
-            readme = "readme.rst"
+            readme = "README_PATH"
             keywords = ["ffi", "test"]
 
             [lib]

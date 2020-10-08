@@ -266,9 +266,10 @@ mod test {
 
         let actual = metadata.to_file_contents();
 
-        if actual.trim() != expected.trim() {
-            panic!(
-                "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
+        assert_eq!(
+            actual.trim(),
+            expected.trim(),
+            "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
             expected,
             actual
         );
@@ -277,13 +278,6 @@ mod test {
             PathBuf::from("info_project-0.1.0.dist-info"),
             "Dist info dir differed from expected"
         );
-    }
-
-        assert_eq!(actual.trim(), expected.trim());
-
-        if metadata.get_dist_info_dir() != PathBuf::from("info_project-0.1.0.dist-info") {
-            panic!("Dist info dir differed from expected");
-        }
     }
 
     #[test]
@@ -348,7 +342,8 @@ mod test {
     fn test_metadata_from_cargo_toml_rst() {
         let readme = indoc!(
             r#"
-            # Some test package
+            Some test package
+            =================
         "#
         );
 
@@ -360,7 +355,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
-            readme = "readme.md"
+            readme = "readme.rst"
             keywords = ["ffi", "test"]
 
             [lib]
@@ -392,7 +387,8 @@ mod test {
             Author-Email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/x-rst
 
-            # Some test package
+            Some test package
+            =================
         "#
         );
 

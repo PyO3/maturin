@@ -54,6 +54,27 @@ pub struct Metadata21 {
     pub provides_extra: Vec<String>,
 }
 
+const PLAINTEXT_CONTENT_TYPE: &str = "text/plain; charset=UTF-8";
+const GFM_CONTENT_TYPE: &str = "text/markdown; charset=UTF-8; variant=GFM";
+
+/// Guess a Description-Content-Type based on the file extension,
+/// defaulting to plaintext if extension is unknown or empty.
+///
+/// See https://packaging.python.org/specifications/core-metadata/#description-content-type
+fn path_to_content_type(path: &PathBuf) -> String {
+    path.extension()
+        .map_or(String::from(PLAINTEXT_CONTENT_TYPE), |ext| {
+            let ext = ext.to_string_lossy().to_lowercase();
+            let type_str = match ext.as_str() {
+                "rst" => "text/x-rst; charset=UTF-8",
+                "md" => GFM_CONTENT_TYPE,
+                "markdown" => GFM_CONTENT_TYPE,
+                _ => PLAINTEXT_CONTENT_TYPE,
+            };
+            String::from(type_str)
+        })
+}
+
 impl Metadata21 {
     /// Uses a Cargo.toml to create the metadata for python packages
     ///
@@ -63,18 +84,6 @@ impl Metadata21 {
         manifest_path: impl AsRef<Path>,
     ) -> Result<Metadata21> {
         let authors = cargo_toml.package.authors.join(", ");
-
-        // See https://packaging.python.org/specifications/core-metadata/#description
-        let description = if let Some(ref readme) = cargo_toml.package.readme {
-            Some(
-                read_to_string(manifest_path.as_ref().join(readme)).context(format!(
-                    "Failed to read readme specified in Cargo.toml, which should be at {}",
-                    manifest_path.as_ref().join(readme).display()
-                ))?,
-            )
-        } else {
-            None
-        };
 
         let classifier = cargo_toml.classifier();
 
@@ -86,15 +95,23 @@ impl Metadata21 {
 
         let extra_metadata = cargo_toml.remaining_core_metadata();
 
-        // See https://packaging.python.org/specifications/core-metadata/#description-content-type
-        let description_content_type = extra_metadata.description_content_type.or_else(|| {
-            if description.is_some() {
-                // I'm not hundred percent sure if that's the best preset
-                Some("text/markdown; charset=UTF-8; variant=GFM".to_owned())
-            } else {
-                None
-            }
-        });
+        let description: Option<String>;
+        let description_content_type: Option<String>;
+        // See https://packaging.python.org/specifications/core-metadata/#description
+        if let Some(ref readme) = cargo_toml.package.readme {
+            let readme_path = manifest_path.as_ref().join(readme);
+            description = Some(read_to_string(&readme_path).context(format!(
+                "Failed to read readme specified in Cargo.toml, which should be at {}",
+                readme_path.display()
+            ))?);
+
+            description_content_type = extra_metadata
+                .description_content_type
+                .or_else(|| Some(path_to_content_type(&readme_path)));
+        } else {
+            description = None;
+            description_content_type = None;
+        };
 
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
@@ -257,7 +274,7 @@ mod test {
 
         readme_md.write_all(readme.as_bytes()).unwrap();
 
-        let toml_with_path = cargo_toml.replace("README_PATH", &readme_path);
+        let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
 
         let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
 
@@ -306,7 +323,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
-            readme = "README_PATH"
+            readme = "REPLACE_README_PATH"
             keywords = ["ffi", "test"]
 
             [lib]
@@ -335,7 +352,7 @@ mod test {
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-Email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
+            Description-Content-Type: text/plain; charset=UTF-8
 
             # Some test package
 
@@ -363,7 +380,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
-            readme = "README_PATH"
+            readme = "REPLACE_README_PATH"
             keywords = ["ffi", "test"]
 
             [lib]
@@ -401,5 +418,27 @@ mod test {
         );
 
         assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
+    }
+
+    #[test]
+    fn test_path_to_content_type() {
+        for (filename, expected) in vec![
+            ("r.md", GFM_CONTENT_TYPE),
+            ("r.markdown", GFM_CONTENT_TYPE),
+            ("r.mArKdOwN", GFM_CONTENT_TYPE),
+            ("r.rst", "text/x-rst; charset=UTF-8"),
+            ("r.somethingelse", PLAINTEXT_CONTENT_TYPE),
+            ("r", PLAINTEXT_CONTENT_TYPE),
+        ] {
+            let result = path_to_content_type(&PathBuf::from(filename));
+            assert_eq!(
+                result.as_str(),
+                expected,
+                "Wrong content type for file '{}'. Expected '{}', got '{}'",
+                filename,
+                expected,
+                result
+            );
+        }
     }
 }

@@ -54,6 +54,27 @@ pub struct Metadata21 {
     pub provides_extra: Vec<String>,
 }
 
+const PLAINTEXT_CONTENT_TYPE: &str = "text/plain; charset=UTF-8";
+const GFM_CONTENT_TYPE: &str = "text/markdown; charset=UTF-8; variant=GFM";
+
+/// Guess a Description-Content-Type based on the file extension,
+/// defaulting to plaintext if extension is unknown or empty.
+///
+/// See https://packaging.python.org/specifications/core-metadata/#description-content-type
+fn path_to_content_type(path: &PathBuf) -> String {
+    path.extension()
+        .map_or(String::from(PLAINTEXT_CONTENT_TYPE), |ext| {
+            let ext = ext.to_string_lossy().to_lowercase();
+            let type_str = match ext.as_str() {
+                "rst" => "text/x-rst; charset=UTF-8",
+                "md" => GFM_CONTENT_TYPE,
+                "markdown" => GFM_CONTENT_TYPE,
+                _ => PLAINTEXT_CONTENT_TYPE,
+            };
+            String::from(type_str)
+        })
+}
+
 impl Metadata21 {
     /// Uses a Cargo.toml to create the metadata for python packages
     ///
@@ -64,33 +85,32 @@ impl Metadata21 {
     ) -> Result<Metadata21> {
         let authors = cargo_toml.package.authors.join(", ");
 
-        // See https://packaging.python.org/specifications/core-metadata/#description
-        let description = if let Some(ref readme) = cargo_toml.package.readme {
-            Some(
-                read_to_string(manifest_path.as_ref().join(readme)).context(format!(
-                    "Failed to read readme specified in Cargo.toml, which should be at {}",
-                    manifest_path.as_ref().join(readme).display()
-                ))?,
-            )
-        } else {
-            None
-        };
-
-        let description_content_type = if description.is_some() {
-            // I'm not hundred percent sure if that's the best preset
-            Some("text/markdown; charset=UTF-8; variant=GFM".to_owned())
-        } else {
-            None
-        };
-
         let classifier = cargo_toml.classifier();
-
-        let extra_metadata = cargo_toml.remaining_core_metadata();
 
         let author_email = if authors.contains('@') {
             Some(authors.clone())
         } else {
             None
+        };
+
+        let extra_metadata = cargo_toml.remaining_core_metadata();
+
+        let description: Option<String>;
+        let description_content_type: Option<String>;
+        // See https://packaging.python.org/specifications/core-metadata/#description
+        if let Some(ref readme) = cargo_toml.package.readme {
+            let readme_path = manifest_path.as_ref().join(readme);
+            description = Some(read_to_string(&readme_path).context(format!(
+                "Failed to read readme specified in Cargo.toml, which should be at {}",
+                readme_path.display()
+            ))?);
+
+            description_content_type = extra_metadata
+                .description_content_type
+                .or_else(|| Some(path_to_content_type(&readme_path)));
+        } else {
+            description = None;
+            description_content_type = None;
         };
 
         Ok(Metadata21 {
@@ -243,16 +263,7 @@ mod test {
     use indoc::indoc;
     use std::io::Write;
 
-    #[test]
-    fn test_metadata_from_cargo_toml() {
-        let readme = indoc!(
-            r#"
-            # Some test package
-
-            This is the readme for a test package
-        "#
-        );
-
+    fn assert_metadata_from_cargo_toml(readme: &str, cargo_toml: &str, expected: &str) {
         let mut readme_md = tempfile::NamedTempFile::new().unwrap();
 
         let readme_path = if cfg!(windows) {
@@ -263,6 +274,47 @@ mod test {
 
         readme_md.write_all(readme.as_bytes()).unwrap();
 
+        let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
+
+        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
+
+        let metadata =
+            Metadata21::from_cargo_toml(&cargo_toml_struct, &readme_md.path().parent().unwrap())
+                .unwrap();
+
+        let actual = metadata.to_file_contents();
+
+        assert_eq!(
+            actual.trim(),
+            expected.trim(),
+            "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
+            expected,
+            actual
+        );
+
+        // get_dist_info_dir test checks against hard-coded values - check that they are as expected in the source first
+        assert!(
+            cargo_toml.contains("name = \"info-project\"")
+                && cargo_toml.contains("version = \"0.1.0\""),
+            "cargo_toml name and version string do not match hardcoded values, test will fail",
+        );
+        assert_eq!(
+            metadata.get_dist_info_dir(),
+            PathBuf::from("info_project-0.1.0.dist-info"),
+            "Dist info dir differed from expected"
+        );
+    }
+
+    #[test]
+    fn test_metadata_from_cargo_toml() {
+        let readme = indoc!(
+            r#"
+            # Some test package
+
+            This is the readme for a test package
+        "#
+        );
+
         let cargo_toml = indoc!(
             r#"
             [package]
@@ -271,7 +323,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
-            readme = "readme.md"
+            readme = "REPLACE_README_PATH"
             keywords = ["ffi", "test"]
 
             [lib]
@@ -285,13 +337,7 @@ mod test {
             classifier = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
         "#
-        )
-        .replace("readme.md", &readme_path);
-
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
-
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &readme_md.path().parent().unwrap()).unwrap();
+        );
 
         let expected = indoc!(
             r#"
@@ -306,7 +352,7 @@ mod test {
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-Email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
+            Description-Content-Type: text/plain; charset=UTF-8
 
             # Some test package
 
@@ -314,13 +360,85 @@ mod test {
         "#
         );
 
-        let actual = metadata.to_file_contents();
+        assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
+    }
 
-        assert_eq!(actual.trim(), expected.trim());
+    #[test]
+    fn test_metadata_from_cargo_toml_rst() {
+        let readme = indoc!(
+            r#"
+            Some test package
+            =================
+        "#
+        );
 
-        assert_eq!(
-            metadata.get_dist_info_dir(),
-            PathBuf::from("info_project-0.1.0.dist-info")
-        )
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            authors = ["konstin <konstin@mailbox.org>"]
+            name = "info-project"
+            version = "0.1.0"
+            description = "A test project"
+            homepage = "https://example.org"
+            readme = "REPLACE_README_PATH"
+            keywords = ["ffi", "test"]
+
+            [lib]
+            crate-type = ["cdylib"]
+            name = "pyo3_pure"
+
+            [package.metadata.maturin.scripts]
+            ph = "maturin:print_hello"
+
+            [package.metadata.maturin]
+            classifier = ["Programming Language :: Python"]
+            requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
+            description-content-type = "text/x-rst"
+        "#
+        );
+
+        let expected = indoc!(
+            r#"
+            Metadata-Version: 2.1
+            Name: info-project
+            Version: 0.1.0
+            Classifier: Programming Language :: Python
+            Requires-Dist: flask~=1.1.0
+            Requires-Dist: toml==0.10.0
+            Summary: A test project
+            Keywords: ffi test
+            Home-Page: https://example.org
+            Author: konstin <konstin@mailbox.org>
+            Author-Email: konstin <konstin@mailbox.org>
+            Description-Content-Type: text/x-rst
+
+            Some test package
+            =================
+        "#
+        );
+
+        assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
+    }
+
+    #[test]
+    fn test_path_to_content_type() {
+        for (filename, expected) in vec![
+            ("r.md", GFM_CONTENT_TYPE),
+            ("r.markdown", GFM_CONTENT_TYPE),
+            ("r.mArKdOwN", GFM_CONTENT_TYPE),
+            ("r.rst", "text/x-rst; charset=UTF-8"),
+            ("r.somethingelse", PLAINTEXT_CONTENT_TYPE),
+            ("r", PLAINTEXT_CONTENT_TYPE),
+        ] {
+            let result = path_to_content_type(&PathBuf::from(filename));
+            assert_eq!(
+                result.as_str(),
+                expected,
+                "Wrong content type for file '{}'. Expected '{}', got '{}'",
+                filename,
+                expected,
+                result
+            );
+        }
     }
 }

@@ -119,6 +119,7 @@ pub struct RemainingCoreMetadata {
     pub requires_external: Option<Vec<String>>,
     pub project_url: Option<Vec<String>>,
     pub provides_extra: Option<Vec<String>>,
+    pub description_content_type: Option<String>,
 }
 
 #[cfg(test)]

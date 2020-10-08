@@ -178,9 +178,10 @@ fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -
 
     // Create environments to build against, prepended with "A" to ensure that integration
     // tests are executed with these environments
-    create_conda_env("A-pyo3-build-env-35", 3, 5);
     create_conda_env("A-pyo3-build-env-36", 3, 6);
     create_conda_env("A-pyo3-build-env-37", 3, 7);
+    create_conda_env("A-pyo3-build-env-38", 3, 8);
+    create_conda_env("A-pyo3-build-env-39", 3, 9);
 
     // The first argument is ignored by clap
     let mut cli = vec![

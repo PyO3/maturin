@@ -4,6 +4,7 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
+#[cfg(feature = "upload")]
 use bytesize::ByteSize;
 use cargo_metadata::MetadataCommand;
 #[cfg(feature = "human-panic")]

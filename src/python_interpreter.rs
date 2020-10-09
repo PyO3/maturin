@@ -26,8 +26,8 @@ fn windows_interpreter_no_build(
         return true;
     }
 
-    // Ignore python 3.0 - 3.4
-    if major == 3 && minor < 5 {
+    // Ignore python 3.0 - 3.5
+    if major == 3 && minor < 6 {
         return true;
     }
 
@@ -270,8 +270,8 @@ pub struct PythonInterpreter {
     /// Python's minor version
     pub minor: usize,
     /// For linux and mac, this contains the value of the abiflags, e.g. "m"
-    /// for python3.5m or "dm" for python3.6dm. On windows, the value is
-    /// always "".
+    /// for python3.7m or "dm" for python3.6dm. Since python3.8, the value is
+    /// empty. On windows, the value was always "".
     ///
     /// See PEP 261 and PEP 393 for details
     pub abiflags: String,
@@ -418,16 +418,16 @@ impl PythonInterpreter {
     /// For CPython, generate extensions as follows:
     ///
     /// For python 3, there is PEP 3149, but
-    /// that is only valid for 3.2 - 3.4. Since only 3.5+ is supported, the
+    /// that is only valid for 3.2 - 3.4. Since only 3.6+ is supported, the
     /// templates are adapted from the (also
     /// incorrect) release notes of CPython 3.5:
     /// https://docs.python.org/3/whatsnew/3.5.html#build-and-c-api-changes
     ///
-    /// Examples for 64-bit on CPython 3.5m:
-    /// Linux:   foobar.cpython-35m-x86_64-linux-gnu.so
-    /// Windows: foobar.cp35-win_amd64.pyd
-    /// Mac:     foobar.cpython-35m-darwin.so
-    /// FreeBSD: foobar.cpython-35m.so
+    /// Examples for 64-bit on CPython 3.6m:
+    /// Linux:   foobar.cpython-36m-x86_64-linux-gnu.so
+    /// Windows: foobar.cp36-win_amd64.pyd
+    /// Mac:     foobar.cpython-36m-darwin.so
+    /// FreeBSD: foobar.cpython-36m.so
     ///
     /// For pypy3, we read sysconfig.get_config_var("EXT_SUFFIX").
     ///

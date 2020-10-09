@@ -20,8 +20,6 @@ pub struct BuildOptions {
     // The {n} are workarounds for https://github.com/TeXitoi/structopt/issues/163
     /// Control the platform tag on linux.
     ///
-    /// - `1`: Use the manylinux1 tag and check for compliance{n}
-    /// - `1-unchecked`: Use the manylinux1 tag without checking for compliance{n}
     /// - `2010`: Use the manylinux2010 tag and check for compliance{n}
     /// - `2010-unchecked`: Use the manylinux2010 tag without checking for compliance{n}
     /// - `2014`: Use the manylinux2010 tag and check for compliance{n}
@@ -31,9 +29,9 @@ pub struct BuildOptions {
     /// This option is ignored on all non-linux platforms
     #[structopt(
         long,
-        possible_values = &["1", "1-unchecked", "2010", "2010-unchecked", "2014", "2014-unchecked", "off"],
+        possible_values = &["2010", "2010-unchecked", "2014", "2014-unchecked", "off"],
         case_insensitive = true,
-        default_value = "1"
+        default_value = "2010"
     )]
     pub manylinux: Manylinux,
     #[structopt(short, long)]
@@ -77,7 +75,7 @@ pub struct BuildOptions {
 impl Default for BuildOptions {
     fn default() -> Self {
         BuildOptions {
-            manylinux: Manylinux::Manylinux1,
+            manylinux: Manylinux::Manylinux2010,
             interpreter: Some(vec![]),
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
@@ -164,8 +162,8 @@ impl BuildOptions {
         let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
 
         let manylinux = if self.skip_auditwheel {
-            eprintln!("⚠ --skip-auditwheel is deprecated, use --manylinux=1-unchecked");
-            Manylinux::Manylinux1Unchecked
+            eprintln!("⚠ --skip-auditwheel is deprecated, use --manylinux=2010-unchecked");
+            Manylinux::Manylinux2010Unchecked
         } else {
             self.manylinux
         };

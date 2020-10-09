@@ -26,8 +26,6 @@ addons:
       - libdbus-1-dev
       - musl-tools
       - fakeroot
-      - python3.5-dev
-      - python3.5-venv
       - python3.6-dev
       - python3.6-venv
       - python3.7-dev
@@ -53,7 +51,6 @@ jobs:
           packages:
             - fakeroot
 
-            - python3.5-dev
             - python3.6-dev
             - python3.6-venv
             - python3.7-dev
@@ -74,13 +71,13 @@ install:
   # is the source of this mess
   - |
     if [ "$TRAVIS_OS_NAME" == "osx" ]; then
-      python3 -m pip install cffi virtualenv
+      python3 -m pip install -U cffi virtualenv
     fi
   - |
     if [ "$TRAVIS_OS_NAME" == "linux" ]; then
       python3.6 -m venv venv
       source venv/bin/activate
-      pip install cffi virtualenv
+      pip install -U cffi virtualenv
     fi
 
 script:

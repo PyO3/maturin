@@ -20,14 +20,10 @@ enum OS {
 /// Decides how to handle manylinux compliance
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub enum Manylinux {
-    /// Use manylinux2010 tag and check for compliance
+    /// Use the manylinux2010 tag
     Manylinux2010,
-    /// Use the manylinux2010 tag but don't check for compliance
-    Manylinux2010Unchecked,
-    /// Use manylinux2014 tag and check for compliance
+    /// Use the manylinux2014 tag
     Manylinux2014,
-    /// Use the manylinux2014 tag but don't check for compliance
-    Manylinux2014Unchecked,
     /// Use the native linux tag
     Off,
 }
@@ -36,9 +32,7 @@ impl fmt::Display for Manylinux {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Manylinux::Manylinux2010 => write!(f, "manylinux2010"),
-            Manylinux::Manylinux2010Unchecked => write!(f, "manylinux2010"),
             Manylinux::Manylinux2014 => write!(f, "manylinux2014"),
-            Manylinux::Manylinux2014Unchecked => write!(f, "manylinux2014"),
             Manylinux::Off => write!(f, "linux"),
         }
     }
@@ -50,9 +44,7 @@ impl FromStr for Manylinux {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "2010" => Ok(Manylinux::Manylinux2010),
-            "2010-unchecked" => Ok(Manylinux::Manylinux2010Unchecked),
-            "2014" => Ok(Manylinux::Manylinux2014Unchecked),
-            "2014-unchecked" => Ok(Manylinux::Manylinux2014Unchecked),
+            "2014" => Ok(Manylinux::Manylinux2014),
             "off" => Ok(Manylinux::Off),
             _ => Err("Invalid value for the manylinux option"),
         }

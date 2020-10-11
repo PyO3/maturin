@@ -8,8 +8,6 @@ use std::io::Read;
 use std::path::Path;
 use thiserror::Error;
 /// As specified in "PEP 571 -- The manylinux2010 Platform Tag"
-///
-/// Currently unused since the python ecosystem is still on manylinux 1
 const MANYLINUX2010: &[&str] = &[
     "libgcc_s.so.1",
     "libstdc++.so.6",
@@ -33,7 +31,28 @@ const MANYLINUX2010: &[&str] = &[
     "libglib-2.0.so.0",
 ];
 
-// TODO: Add manylinux2014
+/// As specified in "PEP 599 -- The manylinux2014 Platform Tag"
+const MANYLINUX2014: &[&str] = &[
+    "libgcc_s.so.1",
+    "libstdc++.so.6",
+    "libm.so.6",
+    "libdl.so.2",
+    "librt.so.1",
+    "libc.so.6",
+    "libnsl.so.1",
+    "libutil.so.1",
+    "libpthread.so.0",
+    "libresolv.so.2",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXrender.so.1",
+    "libICE.so.6",
+    "libSM.so.6",
+    "libGL.so.1",
+    "libgobject-2.0.so.0",
+    "libgthread-2.0.so.0",
+    "libglib-2.0.so.0",
+];
 
 /// Error raised during auditing an elf file for manylinux compatibility
 #[derive(Error, Debug)]
@@ -69,7 +88,8 @@ pub fn auditwheel_rs(
     let reference: &[&str];
     match *manylinux {
         Manylinux::Manylinux2010 => reference = MANYLINUX2010,
-        _ => return Ok(()),
+        Manylinux::Manylinux2014 => reference = MANYLINUX2014,
+        Manylinux::Off => return Ok(()),
     };
     let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
     let mut buffer = Vec::new();

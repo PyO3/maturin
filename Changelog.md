@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Added support for building abi3 wheels with pyo3 0.13
  * Python 3.9 is supported (it should have worked before, but it is now tested on ci)
+ * The auditwheel options have changed to `--manylinux=[off|2010|2014]` with manylinux2010 as default, and optionally `--skip-auditwheel`.
  * Removed Python 3.5 since it is unsupported 
  * The default and minimum manylinux version is now manylinux2010
  * restructured text (rst) readmes are now supported, by clbarnes in [#360](https://github.com/PyO3/maturin/pull/360)

@@ -17,19 +17,16 @@ use structopt::StructOpt;
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
-    // The {n} are workarounds for https://github.com/TeXitoi/structopt/issues/163
-    /// Control the platform tag on linux.
-    ///
-    /// - `2010`: Use the manylinux2010 tag and check for compliance{n}
-    /// - `2010-unchecked`: Use the manylinux2010 tag without checking for compliance{n}
-    /// - `2014`: Use the manylinux2010 tag and check for compliance{n}
-    /// - `2014-unchecked`: Use the manylinux2014 tag without checking for compliance{n}
-    /// - `off`: Use the native linux tag (off)
+    /// Control the platform tag on linux. Options are `2010` (for manylinux2010),
+    /// `2014` (for manylinux2014) and `off` (for the native linux tag). Note that
+    /// manylinux1 is unsupported by the rust compiler. Wheels with the native tag
+    /// will be rejected by pypi, unless they are separately validated by
+    /// `auditwheel`.
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
         long,
-        possible_values = &["2010", "2010-unchecked", "2014", "2014-unchecked", "off"],
+        possible_values = &["2010", "2014", "off"],
         case_insensitive = true,
         default_value = "2010"
     )]
@@ -54,7 +51,7 @@ pub struct BuildOptions {
     /// directory in the project's target directory
     #[structopt(short, long, parse(from_os_str))]
     pub out: Option<PathBuf>,
-    /// [deprecated, use --manylinux instead] Don't check for manylinux compliance
+    /// Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
     /// The --target option for cargo
@@ -161,13 +158,6 @@ impl BuildOptions {
 
         let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
 
-        let manylinux = if self.skip_auditwheel {
-            eprintln!("⚠ --skip-auditwheel is deprecated, use --manylinux=2010-unchecked");
-            Manylinux::Manylinux2010Unchecked
-        } else {
-            self.manylinux
-        };
-
         Ok(BuildContext {
             target,
             bridge,
@@ -179,7 +169,8 @@ impl BuildOptions {
             out: wheel_dir,
             release,
             strip,
-            manylinux,
+            skip_auditwheel: self.skip_auditwheel,
+            manylinux: self.manylinux,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

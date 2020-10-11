@@ -103,8 +103,9 @@ pub struct BuildContext {
     pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
-    /// Whether to use the the manylinux and check compliance (on), use it but don't
-    /// check compliance (no-auditwheel) or use the native linux tag (off)
+    /// Whether to skip checking the linked libraries for manylinux compliance
+    pub skip_auditwheel: bool,
+    /// Whether to use the the manylinux or use the native linux tag (off)
     pub manylinux: Manylinux,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     pub cargo_extra_args: Vec<String>,
@@ -234,7 +235,7 @@ impl BuildContext {
             )
         })?;
         #[cfg(feature = "auditwheel")]
-        {
+        if !self.skip_auditwheel {
             let target = python_interpreter
                 .map(|x| &x.target)
                 .unwrap_or(&self.target);

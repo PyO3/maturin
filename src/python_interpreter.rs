@@ -148,7 +148,7 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>> {
         // The regex has three parts: The first matches the name and skips
         // comments, the second skips the part in between and the third
         // extracts the path
-        let re = Regex::new(r"^([^#].*?)[\s*]+([\w\\:-]+)$").unwrap();
+        let re = Regex::new(r"^([^#].*?)[\s*]+([\w\\:.-]+)\s*$").unwrap();
         let mut paths = vec![];
         for i in lines {
             if let Some(capture) = re.captures(&i) {

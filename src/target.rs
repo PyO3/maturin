@@ -109,11 +109,19 @@ impl Target {
             platforms::target::Arch::X86 => Arch::X86,
             platforms::target::Arch::ARM => Arch::ARMV7L,
             platforms::target::Arch::AARCH64 => Arch::AARCH64,
-            platforms::target::Arch::POWERPC64 if platform.target_triple.starts_with("powerpc64-") => Arch::POWERPC64,
-            platforms::target::Arch::POWERPC64 if platform.target_triple.starts_with("powerpc64le-") => Arch::POWERPC64LE,
+            platforms::target::Arch::POWERPC64
+                if platform.target_triple.starts_with("powerpc64-") =>
+            {
+                Arch::POWERPC64
+            }
+            platforms::target::Arch::POWERPC64
+                if platform.target_triple.starts_with("powerpc64le-") =>
+            {
+                Arch::POWERPC64LE
+            }
             unsupported => bail!("The architecture {:?} is not supported", unsupported),
         };
-        
+
         // bail on any unsupported targets
         match (&os, &arch) {
             (OS::FreeBSD, Arch::AARCH64) => bail!("aarch64 is not supported for FreeBSD"),

@@ -210,8 +210,8 @@ impl Target {
             (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
             (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
             (OS::Linux, Arch::ARMV7L) => "arm-linux-gnueabihf",
-            (OS::Linux, Arch::POWERPC64) => "ppc64-linux-gnu",
-            (OS::Linux, Arch::POWERPC64LE) => "ppc64le-linux-gnu",
+            (OS::Linux, Arch::POWERPC64) => "powerpc64-linux-gnu",
+            (OS::Linux, Arch::POWERPC64LE) => "powerpc64le-linux-gnu",
             (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
             (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",
             (OS::Macos, Arch::X86_64) => "darwin",

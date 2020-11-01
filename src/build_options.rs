@@ -107,13 +107,15 @@ impl BuildOptions {
             .context("Failed to parse Cargo.toml into python metadata")?;
         let scripts = cargo_toml.scripts();
 
+        let crate_name = cargo_toml.package.name;
+
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name
         let module_name = cargo_toml
             .lib
             .as_ref()
             .and_then(|lib| lib.name.as_ref())
-            .unwrap_or_else(|| &cargo_toml.package.name)
+            .unwrap_or_else(|| &crate_name)
             .to_owned();
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
@@ -164,6 +166,7 @@ impl BuildOptions {
             project_layout,
             metadata21,
             scripts,
+            crate_name,
             module_name,
             manifest_path: self.manifest_path,
             out: wheel_dir,

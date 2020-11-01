@@ -117,7 +117,9 @@ impl Metadata21 {
             metadata_version: "2.1".to_owned(),
 
             // Mapped from cargo metadata
-            name: cargo_toml.package.name.to_owned(),
+            name: extra_metadata
+                .name
+                .unwrap_or_else(|| cargo_toml.package.name.clone()),
             version: cargo_toml.package.version.clone(),
             summary: cargo_toml.package.description.clone(),
             description,
@@ -418,6 +420,63 @@ mod test {
         );
 
         assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
+    }
+
+    #[test]
+    fn test_metadata_from_cargo_toml_name_override() {
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            authors = ["konstin <konstin@mailbox.org>"]
+            name = "info-project"
+            version = "0.1.0"
+            description = "A test project"
+            homepage = "https://example.org"
+
+            [lib]
+            crate-type = ["cdylib"]
+            name = "pyo3_pure"
+
+            [package.metadata.maturin.scripts]
+            ph = "maturin:print_hello"
+
+            [package.metadata.maturin]
+            name = "info"
+            classifier = ["Programming Language :: Python"]
+            description-content-type = "text/x-rst"
+        "#
+        );
+
+        let expected = indoc!(
+            r#"
+            Metadata-Version: 2.1
+            Name: info
+            Version: 0.1.0
+            Classifier: Programming Language :: Python
+            Summary: A test project
+            Home-Page: https://example.org
+            Author: konstin <konstin@mailbox.org>
+            Author-Email: konstin <konstin@mailbox.org>
+        "#
+        );
+
+        let cargo_toml_struct: CargoToml = toml::from_str(&cargo_toml).unwrap();
+        let metadata = Metadata21::from_cargo_toml(&cargo_toml_struct, "").unwrap();
+        let actual = metadata.to_file_contents();
+
+        assert_eq!(
+            actual.trim(),
+            expected.trim(),
+            "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
+            expected,
+            actual
+        );
+
+        assert_eq!(
+            metadata.get_dist_info_dir(),
+            PathBuf::from("info-0.1.0.dist-info"),
+            "Dist info dir differed from expected"
+        );
     }
 
     #[test]

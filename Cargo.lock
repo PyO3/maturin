@@ -1113,9 +1113,9 @@ dependencies = [
 
 [[package]]
 name = "platforms"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b293f8e1b9172c3090804c6dedc31b0a61d382101dd4abc80aa6df5bd52e878"
+checksum = "cc77a3fc329982cbf3ea772aa265b742a550998bad65747c630406ee52dac425"
 
 [[package]]
 name = "podio"

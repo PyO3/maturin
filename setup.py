@@ -50,9 +50,6 @@ class PostInstallCommand(install):
         existing_binary = os.path.join(source_dir, "target", "debug", executable_name)
         if os.path.isfile(existing_binary):
             source = existing_binary
-        # Shortcut for development
-        if shutil.which('maturin'):
-            source = shutil.which(executable_name)
         else:
             if not shutil.which("cargo"):
                 raise RuntimeError(

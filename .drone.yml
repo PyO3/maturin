@@ -15,8 +15,9 @@ steps:
       from_secret: MATURIN_PASSWORD
   commands:
     - curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal -y
-    - cargo build --release
-    - cargo run --release -- publish -b bin -u konstin --no-sdist --manylinux 2014 --interpreter python3.8
+    - rustup target add aarch64-unknown-linux-musl
+    - cargo build --release --target aarch64-unknown-linux-musl
+    - cargo run --release --target aarch64-unknown-linux-musl -- publish -u konstin -b bin --no-sdist --target aarch64-unknown-linux-musl
   when:
     event:
       - tag

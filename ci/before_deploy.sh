@@ -28,6 +28,14 @@ make_deb() {
     i686*)
         architecture=i386
         ;;
+    # Let's see if this can pass the CI (probably not ...)
+    # NOTE: Musl supports ppc64le, building a toolchain is not too difficult
+    ppc64le;;
+        architecture=ppc64le
+        ;;
+    ppc64;;
+        architecture=ppc64
+        ;;
     *)
         echo "ERROR: unknown target" >&2
         return 1

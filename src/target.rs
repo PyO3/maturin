@@ -56,6 +56,8 @@ impl FromStr for Manylinux {
 enum Arch {
     AARCH64,
     ARMV7L,
+    POWERPC64LE,
+    POWERPC64,
     X86,
     X86_64,
 }
@@ -65,6 +67,8 @@ impl fmt::Display for Arch {
         match *self {
             Arch::AARCH64 => write!(f, "aarch64"),
             Arch::ARMV7L => write!(f, "armv7l"),
+            Arch::POWERPC64LE => write!(f, "ppc64le"),
+            Arch::POWERPC64 => write!(f, "ppc64"),
             Arch::X86 => write!(f, "i686"),
             Arch::X86_64 => write!(f, "x86_64"),
         }
@@ -105,6 +109,16 @@ impl Target {
             platforms::target::Arch::X86 => Arch::X86,
             platforms::target::Arch::ARM => Arch::ARMV7L,
             platforms::target::Arch::AARCH64 => Arch::AARCH64,
+            platforms::target::Arch::POWERPC64
+                if platform.target_triple.starts_with("powerpc64-") =>
+            {
+                Arch::POWERPC64
+            }
+            platforms::target::Arch::POWERPC64
+                if platform.target_triple.starts_with("powerpc64le-") =>
+            {
+                Arch::POWERPC64LE
+            }
             unsupported => bail!("The architecture {:?} is not supported", unsupported),
         };
 
@@ -134,6 +148,8 @@ impl Target {
         match self.arch {
             Arch::AARCH64 => 64,
             Arch::ARMV7L => 32,
+            Arch::POWERPC64 => 64,
+            Arch::POWERPC64LE => 64,
             Arch::X86 => 32,
             Arch::X86_64 => 64,
         }
@@ -194,6 +210,8 @@ impl Target {
             (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
             (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
             (OS::Linux, Arch::ARMV7L) => "arm-linux-gnueabihf",
+            (OS::Linux, Arch::POWERPC64) => "powerpc64-linux-gnu",
+            (OS::Linux, Arch::POWERPC64LE) => "powerpc64le-linux-gnu",
             (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
             (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",
             (OS::Macos, Arch::X86_64) => "darwin",

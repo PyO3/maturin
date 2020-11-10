@@ -10,6 +10,7 @@
 # for maturin itself use `maturin sdist`.
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -55,10 +56,15 @@ class PostInstallCommand(install):
                     "cargo not found in PATH. Please install rust "
                     "(https://www.rust-lang.org/tools/install) and try again"
                 )
-            subprocess.check_call(
-                ["cargo", "rustc", "--bin", "maturin", "--", "-C", "link-arg=-s"]
-            )
+
+            if platform.machine() in ('ppc64le', 'ppc64'):
+                cargo_args = ["cargo", "rustc", "--bin", "maturin", '--no-default-features', '--features=auditwheel,log,human-panic', "--", "-C", "link-arg=-s"]
+            else:
+                cargo_args = ["cargo", "rustc", "--bin", "maturin", "--", "-C", "link-arg=-s"]
+
+            subprocess.check_call(cargo_args)
             source = os.path.join(source_dir, "target", "debug", executable_name)
+
         # run this after trying to build with cargo (as otherwise this leaves
         # venv in a bad state: https://github.com/benfred/py-spy/issues/69)
         install.run(self)

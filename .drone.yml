@@ -18,6 +18,7 @@ steps:
     - wget -q http://musl.cc/aarch64-linux-musl-cross.tgz
     - tar xzf aarch64-linux-musl-cross.tgz -C /opt --strip-components=1
     - export PATH=$PATH:/opt/bin
+    - mkdir ~/.cargo
     - echo '[target.aarch64-unknown-linux-musl]' >> ~/.cargo/config
     - echo 'linker = "aarch64-linux-musl-gcc"' >> ~/.cargo/config
     - echo 'rustflags = [ "-C", "target-feature=+crt-static", "-C", "link-arg=-lgcc" ]' >> ~/.cargo/config

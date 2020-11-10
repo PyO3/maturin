@@ -98,7 +98,7 @@ jobs:
       - name: Archive binary (linux and mac)
         if: matrix.os != 'windows-latest'
         run: |
-          cd target/${{ matrix.target }}/release
+          cd target/${{ matrix.target }}/debug
           ls
           tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
           cd -

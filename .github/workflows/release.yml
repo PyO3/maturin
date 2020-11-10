@@ -78,28 +78,24 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt install -y musl-tools
 
-      # Those two will also create target/${target}/maturin
+      # Those two will also create target/${{ matrix.target }}/maturin
       - name: Publish to pypi (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: cargo run -- publish -u konstin -b bin --target $TARGET
+        run: cargo run -- publish -u konstin -b bin --target ${{ matrix.target }}
 
       - name: Publish to pypi (without sdist)
         if: matrix.target != 'x86_64-unknown-linux-musl'
-        run: cargo run -- publish -u konstin -b bin --target $TARGET --no-sdist
+        run: cargo run -- publish -u konstin -b bin --target ${{ matrix.target }} --no-sdist
 
-      - name: Archive binary (windowx)
+      - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
-          cd -
+        working-directory: target/${{ matrix.target }}/release
+        run: 7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
 
       - name: Archive binary (linux and mac)
         if: matrix.os != 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
-          cd -
+        working-directory: target/${{ matrix.target }}/release
+        run: tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
 
       - name: Build debian package
         if: matrix.target == 'x86_64-unknown-linux-musl'

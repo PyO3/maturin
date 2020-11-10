@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Removed Python 3.5 since it is unsupported 
  * The default and minimum manylinux version is now manylinux2010
  * restructured text (rst) readmes are now supported, by clbarnes in [#360](https://github.com/PyO3/maturin/pull/360)
+ * Allow python 3 interpreter with debuginfo use maturin by inevity in [#370](https://github.com/PyO3/maturin/pull/370)
+ * pypirc is checked for credentials by houqp in [#374](https://github.com/PyO3/maturin/pull/374)
+ * Added support for PowerPC by mzpqnxow and programmerjake in [#366](https://github.com/PyO3/maturin/pull/366)
 
 ## 0.8.3 - 2020-08-17
 

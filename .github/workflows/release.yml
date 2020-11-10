@@ -93,13 +93,19 @@ jobs:
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
-        working-directory: target/${{ matrix.target }}/release
-        run: 7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
+        run: |
+          cd target/${{ matrix.target }}/release
+          dir
+          7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
+          cd -
 
       - name: Archive binary (linux and mac)
         if: matrix.os != 'windows-latest'
-        working-directory: target/${{ matrix.target }}/release
-        run: tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
+        run: |
+          cd target/${{ matrix.target }}/release
+          ls
+          tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
+          cd -
 
       - name: Build debian package
         if: matrix.target == 'x86_64-unknown-linux-musl'

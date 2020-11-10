@@ -84,7 +84,7 @@ jobs:
         run: cargo run -- publish -u konstin -b bin --target $TARGET
 
       - name: Publish to pypi (without sdist)
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo run -- publish -u konstin -b bin --target $TARGET --no-sdist
 
       - name: Archive binary (windowx)

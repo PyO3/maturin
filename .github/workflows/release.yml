@@ -79,13 +79,13 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --release
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }}
 
       - name: Publish to pypi (without sdist)
         if: matrix.target != 'x86_64-unknown-linux-musl'
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --release
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'

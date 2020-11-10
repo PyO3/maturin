@@ -2,8 +2,7 @@
 
 _formerly pyo3-pack_
 
-[![Linux and Mac Build Status](https://img.shields.io/travis/PyO3/maturin/master.svg?style=flat-square)](https://travis-ci.org/PyO3/maturin)
-[![Windows Build status](https://img.shields.io/appveyor/ci/konstin/maturin/master.svg?style=flat-square)](https://ci.appveyor.com/project/konstin/maturin/branch/master)
+[![Actions Status](https://github.com/PyO3/maturin/workflows/Run%20tests/badge.svg)](https://github.com/PyO3/maturin/actions)
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin?style=flat-square&task=freebsd)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Crates.io](https://img.shields.io/crates/v/maturin.svg?style=flat-square)](https://crates.io/crates/maturin)
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?style=flat-square)](https://pypi.org/project/maturin/)

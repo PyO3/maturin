@@ -14,7 +14,7 @@ i686*)
   return 1
   ;;
 esac
-version=${TRAVIS_TAG#v}
+version=${VERSION#v}
 if [[ $TARGET == *musl* ]]; then
   dpkgname=$BINARY_NAME-musl
   conflictname=$BINARY_NAME
@@ -48,4 +48,4 @@ Conflicts: $conflictname
 Description: Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages
 EOF
 
-fakeroot dpkg-deb --build "$tempdir" "$TRAVIS_BUILD_DIR/${dpkgname}_${version}_${architecture}.deb"
+fakeroot dpkg-deb --build "$tempdir" "${dpkgname}_${version}_${architecture}.deb"

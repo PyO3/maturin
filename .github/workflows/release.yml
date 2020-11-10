@@ -46,14 +46,10 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - x86_64-apple-darwin
           - x86_64-pc-windows-msvc
         include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: maturin-x86_64-unknown-linux-gnu.tar.gz
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             name: maturin-x86_64-unknown-linux-musl.tar.gz

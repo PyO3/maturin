@@ -327,7 +327,7 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
             let build_context = build.into_build_context(true, strip)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
-            println!("{}", wheels[0].0.file_name().unwrap().to_str().unwrap());
+            println!("{}", wheels[0].0.to_str().unwrap());
         }
         PEP517Command::WriteSDist {
             sdist_directory,

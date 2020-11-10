@@ -81,11 +81,11 @@ jobs:
       # Those two will also create target/${{ matrix.target }}/maturin
       - name: Publish to pypi (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: cargo run -- publish -u konstin -b bin --target ${{ matrix.target }} --debug # TODO: No debug
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --debug # TODO: No debug
 
       - name: Publish to pypi (without sdist)
         if: matrix.target != 'x86_64-unknown-linux-musl'
-        run: cargo run -- publish -u konstin -b bin --target ${{ matrix.target }} --no-sdist --debug # TODO: No debug
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --debug # TODO: No debug
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'

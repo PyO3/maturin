@@ -14,7 +14,7 @@ i686*)
   return 1
   ;;
 esac
-version=${VERSION#v}
+version=${VERSION#refs/tags/v}
 if [[ $TARGET == *musl* ]]; then
   dpkgname=$BINARY_NAME-musl
   conflictname=$BINARY_NAME

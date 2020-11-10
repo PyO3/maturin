@@ -81,10 +81,14 @@ jobs:
       # Those two will also create target/${{ matrix.target }}/maturin
       - name: Publish to pypi (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --debug # TODO: No debug
 
       - name: Publish to pypi (without sdist)
         if: matrix.target != 'x86_64-unknown-linux-musl'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --debug # TODO: No debug
 
       - name: Archive binary (windows)

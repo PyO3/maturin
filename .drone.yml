@@ -14,10 +14,17 @@ steps:
     MATURIN_PASSWORD:
       from_secret: MATURIN_PASSWORD
   commands:
+    # https://github.com/PyO3/maturin/issues/369#issuecomment-719615672
+    - wget http://musl.cc/aarch64-linux-musl-cross.tgz
+    - tar xzf aarch64-linux-musl-cross.tgz -C /opt --strip-components=1
+    - export PATH=$PATH:/opt/bin
+    - echo '[target.aarch64-unknown-linux-musl]' >> ~/.cargo/config
+    - echo 'linker = "aarch64-linux-musl-gcc"' >> ~/.cargo/config
+    - echo 'rustflags = [ "-C", "target-feature=+crt-static", "-C", "link-arg=-lgcc" ]' >> ~/.cargo/config
     - curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal -y
     - rustup target add aarch64-unknown-linux-musl
     - cargo build --release --target aarch64-unknown-linux-musl
-    - cargo run --release --target aarch64-unknown-linux-musl -- publish -u konstin -b bin --no-sdist --target aarch64-unknown-linux-musl
-  when:
-    event:
-      - tag
+    # - cargo run --release --target aarch64-unknown-linux-musl -- publish -u konstin -b bin --no-sdist --target aarch64-unknown-linux-musl
+  # when:
+  #   event:
+  #     - tag

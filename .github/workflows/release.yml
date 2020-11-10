@@ -2,41 +2,116 @@ name: Release
 
 on:
   push:
-    tags: [ '*' ]
+    tags: [ 'v*' ]
 
 jobs:
-  release-docker:
-    name: Release docker
-    runs-on: ubuntu-latest
+  #release-docker:
+  #  name: Release docker
+  #  runs-on: ubuntu-latest
+  #
+  #  steps:
+  #    - uses: actions/checkout@v2
+  #    - name: Build and Push tag and latest
+  #      uses: docker/build-push-action@v1
+  #      env:
+  #        DOCKER_BUILDKIT: 1
+  #      with:
+  #        username: ${{ secrets.DOCKER_USERNAME }}
+  #        password: ${{ secrets.DOCKER_PASSWORD }}
+  #        repository: konstin2/maturin
+  #        tag_with_ref: true
+  #        tags: latest
+  #
+  #release-crates-io:
+  #  name: Release crates.io
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - uses: actions/checkout@v2
+  #    - uses: actions-rs/toolchain@v1
+  #      with:
+  #        profile: minimal
+  #        toolchain: stable
+  #        override: true
+  #    - uses: actions-rs/cargo@v1
+  #      with:
+  #        command: login
+  #        args: ${{ secrets.CRATES_IO_TOKEN }}
+  #    - uses: actions-rs/cargo@v1
+  #      with:
+  #        command: publish
 
+  release-github-pypi:
+    name: Release Github and PyPI
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-apple-darwin
+          - x86_64-pc-windows-msvc
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: maturin-x86_64-unknown-linux-gnu.tar.gz
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: maturin-x86_64-unknown-linux-musl.tar.gz
+          - target: x86_64-apple-darwin
+            os: macOS-latest
+            name: maturin-x86_64-apple-darwin.tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: maturin-x86_64-pc-windows-msvc.zip
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-      - name: Build and Push tag and latest
-        uses: docker/build-push-action@v1
-        env:
-          DOCKER_BUILDKIT: 1
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: konstin2/maturin
-          tag_with_ref: true
-          tags: latest
-
-  release-crates-io:
-    name: Release crates.io
-    runs-on: ubuntu-latest
-    steps:
+      # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: login
-          args: ${{ secrets.CRATES_IO_TOKEN }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: publish
+          target: ${{ matrix.target }}
 
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt install -y musl-tools
+
+      # Those two will also create target/${{ matrix.target }}/maturin
+      - name: Publish to pypi (with sdist)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --debug # TODO: No debug
+
+      - name: Publish to pypi (without sdist)
+        if: matrix.target != 'x86_64-unknown-linux-musl'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --debug # TODO: No debug
+
+      - name: Archive binary (windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: target/${{ matrix.target }}/release
+        run: 7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
+
+      - name: Archive binary (linux and mac)
+        if: matrix.os != 'windows-latest'
+        working-directory: target/${{ matrix.target }}/release
+        run: tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
+
+      - name: Build debian package
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        env:
+          BINARY_NAME: ${{ github.event.repository.name }}
+          TARGET: ${{ matrix.target }}
+        run: ci/build_deb.sh
+
+      - name: Upload to github release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: '*.{tar.gz,zip}'
+          file_glob: true
+          tag: ${{ github.ref }}

@@ -90,7 +90,7 @@ jobs:
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cd target/${{ matrix.target }}/release
+          cd target/${{ matrix.target }}/debug # TODO: no debug
           dir
           7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
           cd -

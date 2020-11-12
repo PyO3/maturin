@@ -26,7 +26,7 @@ pub fn warn_on_local_deps(cargo_metadata: &Metadata) {
         .collect();
     if !local_deps.is_empty() {
         eprintln!(
-            "⚠ The are local dependencies, which the source distribution might not include: {}",
+            "⚠ There are local dependencies, which the source distribution might not include: {}",
             local_deps.join(", ")
         );
     }

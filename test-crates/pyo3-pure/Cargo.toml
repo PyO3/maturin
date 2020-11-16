@@ -10,8 +10,7 @@ edition = "2018"
 get_42 = "pyo3_pure:DummyClass.get_42"
 
 [dependencies]
-#pyo3 = { git = "https://github.com/PyO3/pyo3", branch = "abi3-min-python", features = ["extension-module", "abi3-py38"] }
-pyo3 = { path = "../../../pyo3", features = ["extension-module", "abi3-py38"] }
+pyo3 = { git = "https://github.com/PyO3/pyo3", branch = "konstin-abi3", features = ["extension-module", "abi3-py38"] }
 
 [lib]
 name = "pyo3_pure"

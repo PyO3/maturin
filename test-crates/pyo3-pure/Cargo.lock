@@ -174,6 +174,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.12.3"
+source = "git+https://github.com/PyO3/pyo3?branch=konstin-abi3#bf0dccb7efd5d05f68f72a195b1d4bd47956c8d9"
 dependencies = [
  "ctor",
  "indoc",
@@ -188,6 +189,7 @@ dependencies = [
 [[package]]
 name = "pyo3-derive-backend"
 version = "0.12.3"
+source = "git+https://github.com/PyO3/pyo3?branch=konstin-abi3#bf0dccb7efd5d05f68f72a195b1d4bd47956c8d9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -204,6 +206,7 @@ dependencies = [
 [[package]]
 name = "pyo3cls"
 version = "0.12.3"
+source = "git+https://github.com/PyO3/pyo3?branch=konstin-abi3#bf0dccb7efd5d05f68f72a195b1d4bd47956c8d9"
 dependencies = [
  "pyo3-derive-backend",
  "quote",

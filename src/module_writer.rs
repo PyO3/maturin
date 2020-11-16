@@ -555,11 +555,22 @@ pub fn write_bindings_module(
     project_layout: &ProjectLayout,
     module_name: &str,
     artifact: &Path,
-    python_interpreter: &PythonInterpreter,
+    python_interpreter: Option<&PythonInterpreter>,
+    target: &Target,
     develop: bool,
-    abi3: bool,
 ) -> Result<()> {
-    let so_filename = python_interpreter.get_library_name(&module_name, abi3);
+    let so_filename = match python_interpreter {
+        Some(python_interpreter) => python_interpreter.get_library_name(&module_name),
+        // abi3
+        None => {
+            if target.is_freebsd() || target.is_unix() {
+                format!("{base}.abi3.so", base = module_name)
+            } else {
+                // Apparently there is no tag for abi3 on windows
+                format!("{base}.pyd", base = module_name)
+            }
+        }
+    };
 
     match project_layout {
         ProjectLayout::Mixed(ref python_module) => {

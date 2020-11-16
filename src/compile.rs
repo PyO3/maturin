@@ -23,7 +23,7 @@ pub fn compile(
     // TODO: What do we do when there are multiple bin targets?
     match bindings_crate {
         BridgeModel::Bin => shared_args.push("--bins"),
-        BridgeModel::Cffi | BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 => {
+        BridgeModel::Cffi | BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) => {
             shared_args.push("--lib")
         }
     }
@@ -44,7 +44,7 @@ pub fn compile(
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if context.target.is_macos() {
-        if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 = bindings_crate {
+        if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) = bindings_crate {
             let mac_args = &["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
             rustc_args.extend(mac_args);
         }

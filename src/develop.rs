@@ -81,7 +81,7 @@ pub fn develop(
                 true,
             )?;
         }
-        BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 => {
+        BridgeModel::Bindings(_) => {
             let artifact = build_context
                 .compile_cdylib(Some(&interpreter), Some(&build_context.module_name))
                 .context(context)?;
@@ -91,9 +91,24 @@ pub fn develop(
                 &build_context.project_layout,
                 &build_context.module_name,
                 &artifact,
-                &interpreter,
+                Some(&interpreter),
+                &target,
                 true,
-                build_context.bridge == BridgeModel::BindingsAbi3,
+            )?;
+        }
+        BridgeModel::BindingsAbi3(_, _) => {
+            let artifact = build_context
+                .compile_cdylib(None, Some(&build_context.module_name))
+                .context(context)?;
+
+            write_bindings_module(
+                &mut builder,
+                &build_context.project_layout,
+                &build_context.module_name,
+                &artifact,
+                None,
+                &target,
+                true,
             )?;
         }
     }
@@ -101,10 +116,11 @@ pub fn develop(
     // Write dist-info directory so pip can interact with it
     let tags = match build_context.bridge {
         BridgeModel::Bindings(_) => {
-            vec![build_context.interpreter[0].get_tag(&build_context.manylinux, false)]
+            vec![build_context.interpreter[0].get_tag(&build_context.manylinux)]
         }
-        BridgeModel::BindingsAbi3 => {
-            vec![build_context.interpreter[0].get_tag(&build_context.manylinux, true)]
+        BridgeModel::BindingsAbi3(major, minor) => {
+            let platform = target.get_platform_tag(&build_context.manylinux);
+            vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
         }
         BridgeModel::Bin | BridgeModel::Cffi => {
             build_context

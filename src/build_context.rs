@@ -27,8 +27,9 @@ pub enum BridgeModel {
     /// providing crate, e.g. pyo3.
     Bindings(String),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
-    /// for all cpython versions (pypy still needs multiple versions)
-    BindingsAbi3,
+    /// for all cpython versions (pypy still needs multiple versions).
+    /// The numbers are the minimum major and minor version
+    BindingsAbi3(u8, u8),
 }
 
 impl BridgeModel {
@@ -130,7 +131,12 @@ impl BuildContext {
         let wheels = match &self.bridge {
             BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py3".to_string(), None)],
             BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py3".to_string(), None)],
-            BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 => self.build_binding_wheels()?,
+            BridgeModel::Bindings(_) => self.build_binding_wheels()?,
+            BridgeModel::BindingsAbi3(major, minor) => vec![(
+                self.build_binding_wheel_abi3(*major, *minor)?,
+                format!("cp{}{}", major, minor),
+                None,
+            )],
         };
 
         Ok(wheels)
@@ -157,6 +163,45 @@ impl BuildContext {
         }
     }
 
+    /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
+    /// for it
+    pub fn build_binding_wheel_abi3(&self, major: u8, min_minor: u8) -> Result<PathBuf> {
+        let artifact = self.compile_cdylib(None, Some(&self.module_name))?;
+
+        let platform = self.target.get_platform_tag(&self.manylinux);
+        let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
+
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &self.metadata21,
+            &self.scripts,
+            &[tag.clone()],
+        )?;
+
+        write_bindings_module(
+            &mut writer,
+            &self.project_layout,
+            &self.module_name,
+            &artifact,
+            None,
+            &self.target,
+            false,
+        )
+        .context("Failed to add the files to the wheel")?;
+
+        let wheel_path = writer.finish()?;
+
+        println!(
+            "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
+            major,
+            min_minor,
+            wheel_path.display()
+        );
+
+        Ok(wheel_path)
+    }
+
     /// Builds wheels for a Cargo project for all given python versions.
     /// Return type is the same as [BuildContext::build_wheels()]
     ///
@@ -172,8 +217,7 @@ impl BuildContext {
             let artifact =
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
 
-            let tag = python_interpreter
-                .get_tag(&self.manylinux, self.bridge == BridgeModel::BindingsAbi3);
+            let tag = python_interpreter.get_tag(&self.manylinux);
 
             let mut writer = WheelWriter::new(
                 &tag,
@@ -188,9 +232,9 @@ impl BuildContext {
                 &self.project_layout,
                 &self.module_name,
                 &artifact,
-                python_interpreter,
+                Some(&python_interpreter),
+                &self.target,
                 false,
-                self.bridge == BridgeModel::BindingsAbi3,
             )
             .context("Failed to add the files to the wheel")?;
 

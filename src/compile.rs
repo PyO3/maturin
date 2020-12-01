@@ -96,7 +96,7 @@ pub fn compile(
                 let crate_name = &context.cargo_metadata[&artifact.package_id].name;
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
-                if crate_name == &context.metadata21.name {
+                if crate_name == &context.crate_name {
                     let tuples = artifact
                         .target
                         .crate_types

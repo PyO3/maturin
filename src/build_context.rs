@@ -90,6 +90,8 @@ pub struct BuildContext {
     pub metadata21: Metadata21,
     /// The `[console_scripts]` for the entry_points.txt
     pub scripts: HashMap<String, String>,
+    /// The name of the crate
+    pub crate_name: String,
     /// The name of the module can be distinct from the package name, mostly
     /// because package names normally contain minuses while module names
     /// have underscores. The package name is part of metadata21

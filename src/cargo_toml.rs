@@ -110,6 +110,7 @@ struct CargoTomlMetadata {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub struct RemainingCoreMetadata {
+    pub name: Option<String>,
     pub scripts: Option<HashMap<String, String>>,
     pub classifier: Option<Vec<String>>,
     pub maintainer: Option<String>,

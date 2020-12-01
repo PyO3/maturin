@@ -113,7 +113,7 @@ impl BuildOptions {
             .lib
             .as_ref()
             .and_then(|lib| lib.name.as_ref())
-            .unwrap_or_else(|| &cargo_toml.package.name)
+            .unwrap_or(&cargo_toml.package.name)
             .to_owned();
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;

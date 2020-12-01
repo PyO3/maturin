@@ -1,7 +1,6 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use crate::Metadata21;
 use crate::Registry;
 use reqwest::{self, blocking::multipart::Form, blocking::Client, StatusCode};
 use sha2::{Digest, Sha256};
@@ -48,7 +47,7 @@ impl From<reqwest::Error> for UploadError {
 pub fn upload(
     registry: &Registry,
     wheel_path: &Path,
-    metadata21: &Metadata21,
+    metadata21: &Vec<(String, String)>,
     supported_version: &str,
 ) -> Result<(), UploadError> {
     let mut wheel = File::open(&wheel_path)?;
@@ -72,7 +71,7 @@ pub fn upload(
 
     let joined_metadata: Vec<(String, String)> = api_metadata
         .into_iter()
-        .chain(metadata21.to_vec().into_iter())
+        .chain(metadata21.clone().into_iter())
         // All fields must be lower case and with underscores or they will be ignored by warehouse
         .map(|(key, value)| (key.to_lowercase().replace("-", "_"), value))
         .collect();

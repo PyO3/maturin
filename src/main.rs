@@ -374,7 +374,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                 let result = upload(
                     &registry,
                     &wheel_path,
-                    &build_context.metadata21,
+                    &build_context.metadata21.to_vec(),
                     &supported_versions,
                 );
                 result.map_err(|err| (wheel_path.clone(), err))
@@ -488,10 +488,12 @@ fn run() -> Result<()> {
             release,
             strip,
         } => {
-            let venv_dir = match (env::var_os("VIRTUAL_ENV"),env::var_os("CONDA_PREFIX")) {
+            let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
                 (Some(dir), None) => PathBuf::from(dir),
                 (None, Some(dir)) => PathBuf::from(dir),
-                (Some(_), Some(_)) => bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them"),
+                (Some(_), Some(_)) => {
+                    bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
+                }
                 (None, None) => {
                     bail!("You need to be inside a virtualenv or conda environment to use develop (neither VIRTUAL_ENV nor CONDA_PREFIX are set)")
                 }

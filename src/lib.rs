@@ -57,6 +57,7 @@ mod develop;
 mod metadata;
 mod module_writer;
 mod python_interpreter;
+mod read_distribution;
 #[cfg(feature = "upload")]
 mod registry;
 mod source_distribution;

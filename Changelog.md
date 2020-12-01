@@ -9,10 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Added support for building abi3 wheels with pyo3 0.13
  * Python 3.9 is supported (it should have worked before, but it is now tested on ci)
+ * There are 64-bit and aarch64 binary builds for linux and 64-bit builds for windows, mac and freebsd-12-1 
  * The auditwheel options have changed to `--manylinux=[off|2010|2014]` with manylinux2010 as default, and optionally `--skip-auditwheel`.
  * Removed Python 3.5 since it is unsupported 
  * The default and minimum manylinux version is now manylinux2010
  * restructured text (rst) readmes are now supported, by clbarnes in [#360](https://github.com/PyO3/maturin/pull/360)
+ * Allow python 3 interpreter with debuginfo use maturin by inevity in [#370](https://github.com/PyO3/maturin/pull/370)
+ * pypirc is checked for credentials by houqp in [#374](https://github.com/PyO3/maturin/pull/374)
+ * Added support for PowerPC by mzpqnxow and programmerjake in [#366](https://github.com/PyO3/maturin/pull/366)
 
 ## 0.8.3 - 2020-08-17
 

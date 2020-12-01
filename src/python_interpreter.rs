@@ -342,8 +342,8 @@ fn fun_with_abiflags(
         if message.minor >= 8 {
             // for 3.8, "builds with and without pymalloc are ABI compatible" and the flag dropped
             Ok(abiflags.to_string())
-        } else if abiflags != "m" {
-            bail!("A python 3 interpreter on linux or mac os must have 'm' as abiflags ಠ_ಠ")
+        } else if (abiflags != "m") && (abiflags != "dm") {
+            bail!("A python 3 interpreter on linux or mac os must have 'm' or 'dm' as abiflags ಠ_ಠ")
         } else {
             Ok(abiflags.to_string())
         }

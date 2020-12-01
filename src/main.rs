@@ -7,6 +7,8 @@ use anyhow::{bail, Context, Result};
 #[cfg(feature = "upload")]
 use bytesize::ByteSize;
 use cargo_metadata::MetadataCommand;
+#[cfg(feature = "upload")]
+use configparser::ini::Ini;
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
@@ -70,14 +72,54 @@ fn get_username() -> String {
 }
 
 #[cfg(feature = "upload")]
-/// Asks for username and password for a registry account where missing.
-fn complete_registry(opt: &PublishOpt) -> Result<(Registry, bool)> {
+fn load_pypi_cred_from_config(package_name: &str) -> Option<(String, String)> {
+    if let Some(mut config_path) = dirs::home_dir() {
+        config_path.push(".pypirc");
+        if let Ok(pypirc) = fs::read_to_string(config_path.as_path()) {
+            let mut config = Ini::new();
+            if config.read(pypirc).is_err() {
+                return None;
+            }
+
+            if let (Some(username), Some(password)) = (
+                config.get(package_name, "username"),
+                config.get(package_name, "password"),
+            ) {
+                return Some((username, password));
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(feature = "upload")]
+fn resolve_pypi_cred(opt: &PublishOpt, package_name: &str) -> (String, String, bool) {
+    // API token from environment variable takes priority
+    if let Ok(token) = env::var("MATURIN_PYPI_TOKEN") {
+        return ("__token__".to_string(), token, false);
+    }
+
+    // load creds from pypirc if found
+    if let Some((username, password)) = load_pypi_cred_from_config(package_name) {
+        println!("🔐 Using credential in pypirc for upload");
+        return (username, password, false);
+    }
+
+    // fallback to username and password
     let username = opt.username.clone().unwrap_or_else(get_username);
     let (password, reenter) = match opt.password {
         Some(ref password) => (password.clone(), false),
         None => get_password(&username),
     };
 
+    (username, password, reenter)
+}
+
+#[cfg(feature = "upload")]
+/// Asks for username and password for a registry account where missing.
+fn complete_registry(opt: &PublishOpt, package_name: &str) -> Result<(Registry, bool)> {
+    let (username, password, reenter) = resolve_pypi_cred(opt, package_name);
     let registry = Registry::new(username, password, Url::parse(&opt.registry)?);
 
     Ok((registry, reenter))
@@ -285,7 +327,7 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
             let build_context = build.into_build_context(true, strip)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
-            println!("{}", wheels[0].0.file_name().unwrap().to_str().unwrap());
+            println!("{}", wheels[0].0.to_str().unwrap());
         }
         PEP517Command::WriteSDist {
             sdist_directory,
@@ -321,7 +363,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
         }
     }
 
-    let (mut registry, reenter) = complete_registry(&publish)?;
+    let (mut registry, reenter) = complete_registry(&publish, &build_context.metadata21.name)?;
 
     loop {
         println!("🚀 Uploading {} packages", wheels.len());
@@ -332,7 +374,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                 let result = upload(
                     &registry,
                     &wheel_path,
-                    &build_context.metadata21,
+                    &build_context.metadata21.to_vec(),
                     &supported_versions,
                 );
                 result.map_err(|err| (wheel_path.clone(), err))
@@ -446,10 +488,12 @@ fn run() -> Result<()> {
             release,
             strip,
         } => {
-            let venv_dir = match (env::var_os("VIRTUAL_ENV"),env::var_os("CONDA_PREFIX")) {
+            let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
                 (Some(dir), None) => PathBuf::from(dir),
                 (None, Some(dir)) => PathBuf::from(dir),
-                (Some(_), Some(_)) => bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them"),
+                (Some(_), Some(_)) => {
+                    bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
+                }
                 (None, None) => {
                     bail!("You need to be inside a virtualenv or conda environment to use develop (neither VIRTUAL_ENV nor CONDA_PREFIX are set)")
                 }

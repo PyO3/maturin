@@ -115,7 +115,7 @@ impl BuildOptions {
             .lib
             .as_ref()
             .and_then(|lib| lib.name.as_ref())
-            .unwrap_or_else(|| &crate_name)
+            .unwrap_or(&crate_name)
             .to_owned();
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;

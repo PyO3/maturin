@@ -67,8 +67,9 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     sys.stdout.buffer.write(output)
     sys.stdout.flush()
     output = output.decode(errors="replace")
-    filename = output.strip().splitlines()[-1]
-    shutil.copy2("target/wheels/" + filename, os.path.join(wheel_directory, filename))
+    wheel_path = output.strip().splitlines()[-1]
+    filename = os.path.basename(wheel_path)
+    shutil.copy2(wheel_path, os.path.join(wheel_directory, filename))
     return filename
 
 

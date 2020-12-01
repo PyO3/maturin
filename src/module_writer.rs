@@ -160,6 +160,7 @@ impl ModuleWriter for PathWriter {
                 fs::OpenOptions::new()
                     .create(true)
                     .write(true)
+                    .truncate(true)
                     .mode(_permissions)
                     .open(&path)
             }

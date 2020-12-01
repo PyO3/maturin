@@ -2,8 +2,7 @@
 
 _formerly pyo3-pack_
 
-[![Linux and Mac Build Status](https://img.shields.io/travis/PyO3/maturin/master.svg?style=flat-square)](https://travis-ci.org/PyO3/maturin)
-[![Windows Build status](https://img.shields.io/appveyor/ci/konstin/maturin/master.svg?style=flat-square)](https://ci.appveyor.com/project/konstin/maturin/branch/master)
+[![Actions Status](https://github.com/PyO3/maturin/workflows/Run%20tests/badge.svg)](https://github.com/PyO3/maturin/actions)
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin?style=flat-square&task=freebsd)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Crates.io](https://img.shields.io/crates/v/maturin.svg?style=flat-square)](https://crates.io/crates/maturin)
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?style=flat-square)](https://pypi.org/project/maturin/)
@@ -192,6 +191,9 @@ maturin can build wheels for pypy with pyo3. Note that pypy [is not compatible w
 ### Build
 
 ```
+USAGE:
+    maturin build [FLAGS] [OPTIONS]
+
 FLAGS:
     -h, --help
             Prints help information
@@ -203,7 +205,7 @@ FLAGS:
             Pass --release to cargo
 
         --skip-auditwheel
-            [deprecated, use --manylinux instead] Don't check for manylinux compliance
+            Don't check for manylinux compliance
 
         --strip
             Strip the library for minimum file size
@@ -213,6 +215,12 @@ FLAGS:
 
 
 OPTIONS:
+    -m, --manifest-path <PATH>
+            The path to the Cargo.toml [default: Cargo.toml]
+
+        --target <TRIPLE>
+            The --target option for cargo
+
     -b, --bindings <bindings>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
@@ -222,37 +230,27 @@ OPTIONS:
             Use as `--cargo-extra-args="--my-arg"`
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
-            explicitly set.
+            explicitly set
         --manylinux <manylinux>
-            Control the platform tag on linux.
+            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014) and
+            `off` (for the native linux tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the
+            native tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
-            - `1`: Use the manylinux1 tag and check for compliance
-             - `1-unchecked`: Use the manylinux1 tag without checking for compliance
-             - `2010`: Use the manylinux2010 tag and check for compliance
-             - `2010-unchecked`: Use the manylinux2010 tag without checking for compliance
-             - `2014`: Use the manylinux2014 tag and check for compliance
-             - `2014-unchecked`: Use the manylinux2014 tag without checking for compliance
-             - `off`: Use the native linux tag (off)
-
-            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
-            2010-unchecked, off]
+            This option is ignored on all non-linux platforms [default: 2010]  [possible values: 2010, 2014, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
-    -m, --manifest-path <path>
-            The path to the Cargo.toml [default: Cargo.toml]
-
         --rustc-extra-args <rustc-extra-args>...
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
-        --target <triple>
-            The --target option for cargo
 ```
-
 ### Publish
 
 ```
+USAGE:
+    maturin publish [FLAGS] [OPTIONS]
+
 FLAGS:
         --debug
             Do not pass --release to cargo
@@ -267,13 +265,19 @@ FLAGS:
             Do not strip the library for minimum file size
 
         --skip-auditwheel
-            [deprecated, use --manylinux instead] Don't check for manylinux compliance
+            Don't check for manylinux compliance
 
     -V, --version
             Prints version information
 
 
 OPTIONS:
+    -m, --manifest-path <PATH>
+            The path to the Cargo.toml [default: Cargo.toml]
+
+        --target <TRIPLE>
+            The --target option for cargo
+
     -b, --bindings <bindings>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
@@ -283,28 +287,18 @@ OPTIONS:
             Use as `--cargo-extra-args="--my-arg"`
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
-            explicitly set.
+            explicitly set
         --manylinux <manylinux>
-            Control the platform tag on linux.
+            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014) and
+            `off` (for the native linux tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the
+            native tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
-            - `1`: Use the manylinux1 tag and check for compliance
-             - `1-unchecked`: Use the manylinux1 tag without checking for compliance
-             - `2010`: Use the manylinux2010 tag and check for compliance
-             - `2010-unchecked`: Use the manylinux1 tag without checking for compliance
-             - `2014`: Use the manylinux2010 tag and check for compliance
-             - `2014-unchecked`: Use the manylinux1 tag without checking for compliance
-             - `off`: Use the native linux tag (off)
-
-            This option is ignored on all non-linux platforms [default: 1]  [possible values: 1, 1-unchecked, 2010,
-            2010-unchecked, 2014, 2014-unchecked, off]
+            This option is ignored on all non-linux platforms [default: 2010]  [possible values: 2010, 2014, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
     -p, --password <password>
             Password for pypi or your custom registry. Note that you can also pass the password through MATURIN_PASSWORD
-
-    -m, --manifest-path <path>
-            The path to the Cargo.toml [default: Cargo.toml]
 
     -r, --repository-url <registry>
             The url of registry where the wheels are uploaded to [default: https://upload.pypi.org/legacy/]
@@ -313,9 +307,6 @@ OPTIONS:
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
-        --target <triple>
-            The --target option for cargo
-
     -u, --username <username>
             Username for pypi or your custom registry
 ```
@@ -323,6 +314,9 @@ OPTIONS:
 ### Develop
 
 ```
+USAGE:
+    maturin develop [FLAGS] [OPTIONS]
+
 FLAGS:
     -h, --help
             Prints help information

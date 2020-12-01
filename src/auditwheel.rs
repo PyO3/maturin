@@ -101,9 +101,8 @@ pub fn auditwheel_rs(
 
     let mut offenders = Vec::new();
     for dep in deps {
-        // I'm not 100% what exactely this line does, but auditwheel also seems to skip
-        // everything with ld-linux in its name
-        if dep.starts_with("ld-linux") {
+        // Skip dynamic linker/loader
+        if dep.starts_with("ld-linux") || dep == "ld64.so.2" || dep == "ld64.so.1" {
             continue;
         }
         if !reference.contains(&dep.as_str()) {

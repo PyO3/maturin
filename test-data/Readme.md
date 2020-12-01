@@ -1,0 +1,2 @@
+ * `py.exe`: Mock for the windows python launcher we can insert in path
+ * `pyo3_mixed-2.1.1.tar.gz` and `pyo3_mixed-2.1.1-cp38-cp38-manylinux1_x86_64.whl`: Near empty archives to test the metadata reader.

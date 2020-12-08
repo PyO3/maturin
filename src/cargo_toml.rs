@@ -118,7 +118,7 @@ pub struct RemainingCoreMetadata {
     pub requires_dist: Option<Vec<String>>,
     pub requires_python: Option<String>,
     pub requires_external: Option<Vec<String>>,
-    pub project_url: Option<Vec<String>>,
+    pub project_url: Option<HashMap<String, String>>,
     pub provides_extra: Option<Vec<String>>,
     pub description_content_type: Option<String>,
 }

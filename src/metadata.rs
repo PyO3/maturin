@@ -50,7 +50,7 @@ pub struct Metadata21 {
     pub obsoletes_dist: Vec<String>,
     pub requires_python: Option<String>,
     pub requires_external: Vec<String>,
-    pub project_url: Vec<String>,
+    pub project_url: HashMap<String, String>,
     pub provides_extra: Vec<String>,
 }
 
@@ -180,7 +180,6 @@ impl Metadata21 {
         add_vec("Provides-Dist", &self.provides_dist);
         add_vec("Obsoletes-Dist", &self.obsoletes_dist);
         add_vec("Requires-External", &self.requires_external);
-        add_vec("Project-Url", &self.project_url);
         add_vec("Provides-Extra", &self.provides_extra);
 
         let mut add_option = |name, value: &Option<String>| {
@@ -200,9 +199,19 @@ impl Metadata21 {
         add_option("License", &self.license);
         add_option("Requires-Python", &self.requires_python);
         add_option("Description-Content-Type", &self.description_content_type);
+        // Project-URL is special
+        // "A string containing a browsable URL for the project and a label for it, separated by a comma."
+        // `Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/`
+        for (key, value) in self.project_url.iter() {
+            fields.push(("Project-URL", format!("{}, {}", key, value)))
+        }
+
         // Description shall be last, so we can ignore RFC822 and just put the description
         // in the body
-        add_option("Description", &self.description);
+        // The borrow checker doesn't like us using add_option here
+        if let Some(description) = &self.description {
+            fields.push(("Description", description.clone()));
+        }
 
         fields
             .into_iter()
@@ -338,6 +347,7 @@ mod test {
             [package.metadata.maturin]
             classifier = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
+            project-url = { "Bug Tracker" = "http://bitbucket.org/tarek/distribute/issues/" }
         "#
         );
 
@@ -355,6 +365,7 @@ mod test {
             Author: konstin <konstin@mailbox.org>
             Author-Email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/plain; charset=UTF-8
+            Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/
 
             # Some test package
 

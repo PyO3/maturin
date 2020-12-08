@@ -14,8 +14,9 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, get_pyproject_toml, source_distribution, write_dist_info, BridgeModel, BuildOptions,
-    CargoToml, Metadata21, PathWriter, PythonInterpreter, Target,
+    develop, get_metadata_for_distribution, get_pyproject_toml, source_distribution,
+    write_dist_info, BridgeModel, BuildOptions, CargoToml, Metadata21, PathWriter,
+    PythonInterpreter, Target,
 };
 use std::path::PathBuf;
 use std::{env, fs};
@@ -239,10 +240,16 @@ enum Opt {
         #[structopt(short, long, parse(from_os_str))]
         out: Option<PathBuf>,
     },
+    /// This is supposed to become an upload command eventually
+    #[structopt(name = "print-metadata", setting = structopt::clap::AppSettings::Hidden)]
+    PrintMetadata {
+        #[structopt(parse(from_os_str))]
+        file: PathBuf,
+    },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
     /// The commands are meant to be called from the python PEP 517
-    #[structopt(name = "pep517")]
+    #[structopt(name = "pep517", setting = structopt::clap::AppSettings::Hidden)]
     PEP517(PEP517Command),
 }
 
@@ -542,6 +549,10 @@ fn run() -> Result<()> {
             .context("Failed to build source distribution")?;
         }
         Opt::PEP517(subcommand) => pep517(subcommand)?,
+        Opt::PrintMetadata { file } => {
+            let metadata = get_metadata_for_distribution(&file)?;
+            println!("{:?}", metadata);
+        }
     }
 
     Ok(())

@@ -78,6 +78,13 @@ pub fn compile(
             build_command.env("PYO3_PYTHON", &python_interpreter.executable);
         }
 
+        if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
+            // If the target is not Windows, set PYO3_NO_PYTHON to speed up the build
+            if !context.target.is_windows() {
+                build_command.env("PYO3_NO_PYTHON", "1");
+            }
+        }
+
         // rust-cpython, and legacy pyo3 versions
         build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
     }

@@ -133,7 +133,6 @@ impl Target {
                     Err(error) => bail!(error),
                 };
             }
-            (OS::Macos, Arch::AARCH64) => bail!("aarch64 is not supported for macOS"),
             (OS::Macos, Arch::ARMV7L) => bail!("armv7l is not supported for macOS"),
             (OS::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
             (OS::Windows, Arch::AARCH64) => bail!("aarch64 is not supported for Windows"),
@@ -193,6 +192,7 @@ impl Target {
             }
             (OS::Linux, _) => format!("{}_{}", manylinux, self.arch),
             (OS::Macos, Arch::X86_64) => "macosx_10_7_x86_64".to_string(),
+            (OS::Macos, Arch::AARCH64) => "macosx_11_0_arm64".to_string(),
             (OS::Windows, Arch::X86) => "win32".to_string(),
             (OS::Windows, Arch::X86_64) => "win_amd64".to_string(),
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
@@ -215,6 +215,7 @@ impl Target {
             (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
             (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",
             (OS::Macos, Arch::X86_64) => "darwin",
+            (OS::Macos, Arch::AARCH64) => "darwin",
             (OS::Windows, Arch::X86) => "win32",
             (OS::Windows, Arch::X86_64) => "win_amd64",
             (OS::Macos, _) => {

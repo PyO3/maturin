@@ -44,23 +44,25 @@ class PostInstallCommand(install):
 
     def run(self):
         source_dir = os.path.dirname(os.path.abspath(__file__))
-        executable_name = "maturin.exe" if sys.platform.startswith("win") else "maturin"
+        executable_suffix = ".exe" if sys.platform.startswith("win") else ""
+        executable_name = "maturin%s" % executable_suffix
+        cargo = "cargo%s" % executable_suffix
 
         # Shortcut for development
         existing_binary = os.path.join(source_dir, "target", "debug", executable_name)
         if os.path.isfile(existing_binary):
             source = existing_binary
         else:
-            if not shutil.which("cargo"):
+            if not shutil.which(cargo):
                 raise RuntimeError(
                     "cargo not found in PATH. Please install rust "
                     "(https://www.rust-lang.org/tools/install) and try again"
                 )
 
             if platform.machine() in ('ppc64le', 'ppc64'):
-                cargo_args = ["cargo", "rustc", "--bin", "maturin", '--no-default-features', '--features=auditwheel,log,human-panic', "--", "-C", "link-arg=-s"]
+                cargo_args = [cargo, "rustc", "--bin", "maturin", '--no-default-features', '--features=auditwheel,log,human-panic', "--", "-C", "link-arg=-s"]
             else:
-                cargo_args = ["cargo", "rustc", "--bin", "maturin", "--", "-C", "link-arg=-s"]
+                cargo_args = [cargo, "rustc", "--bin", "maturin", "--", "-C", "link-arg=-s"]
 
             subprocess.check_call(cargo_args)
             source = os.path.join(source_dir, "target", "debug", executable_name)

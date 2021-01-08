@@ -168,7 +168,9 @@ impl BuildContext {
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
     /// for it
     pub fn build_binding_wheel_abi3(&self, major: u8, min_minor: u8) -> Result<PathBuf> {
-        let artifact = self.compile_cdylib(None, Some(&self.module_name))?;
+        // On windows, we have picked an interpreter to set the location of python.lib,
+        // otherwise it's none
+        let artifact = self.compile_cdylib(self.interpreter.get(0), Some(&self.module_name))?;
 
         let platform = self.target.get_platform_tag(&self.manylinux);
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
@@ -244,7 +246,7 @@ impl BuildContext {
 
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
-                python_interpreter.interpreter,
+                python_interpreter.interpreter_kind,
                 python_interpreter.major,
                 python_interpreter.minor,
                 python_interpreter.abiflags,

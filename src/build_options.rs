@@ -106,15 +106,13 @@ impl BuildOptions {
             .context("Failed to parse Cargo.toml into python metadata")?;
         let scripts = cargo_toml.scripts();
 
-        let crate_name = cargo_toml.package.name;
-
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name
         let module_name = cargo_toml
             .lib
             .as_ref()
             .and_then(|lib| lib.name.as_ref())
-            .unwrap_or(&crate_name)
+            .unwrap_or(&cargo_toml.package.name)
             .to_owned();
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
@@ -149,7 +147,7 @@ impl BuildOptions {
         };
 
         let interpreter = match self.interpreter {
-            // Only build a source ditribution
+            // Only build a source distribution
             Some(ref interpreter) if interpreter.is_empty() => vec![],
             // User given list of interpreters
             Some(interpreter) => find_interpreter(&bridge, &interpreter, &target)?,
@@ -165,7 +163,6 @@ impl BuildOptions {
             project_layout,
             metadata21,
             scripts,
-            crate_name,
             module_name,
             manifest_path: self.manifest_path,
             out: wheel_dir,
@@ -297,6 +294,32 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     Ok(bridge)
 }
 
+/// Shared between cffi and pyo3-abi3
+fn find_single_python_interpreter(
+    bridge: &BridgeModel,
+    interpreter: &[PathBuf],
+    target: &Target,
+    bridge_name: &str,
+) -> Result<PythonInterpreter> {
+    let err_message = "Failed to find a python interpreter";
+
+    let executable = if interpreter.is_empty() {
+        target.get_python()
+    } else if interpreter.len() == 1 {
+        interpreter[0].clone()
+    } else {
+        bail!(
+            "You can only specify one python interpreter for {}",
+            bridge_name
+        );
+    };
+
+    let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
+        .context(format_err!(err_message))?
+        .ok_or_else(|| format_err!(err_message))?;
+    Ok(interpreter)
+}
+
 /// Finds the appropriate amount for python versions for each [BridgeModel].
 ///
 /// This means all for bindings, one for cffi and zero for bin.
@@ -305,8 +328,6 @@ pub fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
 ) -> Result<Vec<PythonInterpreter>> {
-    let err_message = "Failed to find a python interpreter";
-
     match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
@@ -333,23 +354,25 @@ pub fn find_interpreter(
             Ok(interpreter)
         }
         BridgeModel::Cffi => {
-            let executable = if interpreter.is_empty() {
-                target.get_python()
-            } else if interpreter.len() == 1 {
-                interpreter[0].clone()
-            } else {
-                bail!("You can only specify one python interpreter for cffi compilation");
-            };
-
-            let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
-                .context(format_err!(err_message))?
-                .ok_or_else(|| format_err!(err_message))?;
-
+            let interpreter = find_single_python_interpreter(bridge, interpreter, target, "cffi")?;
             println!("🐍 Using {} to generate the cffi bindings", interpreter);
-
             Ok(vec![interpreter])
         }
-        BridgeModel::Bin | BridgeModel::BindingsAbi3(_, _) => Ok(vec![]),
+        BridgeModel::Bin => Ok(vec![]),
+        BridgeModel::BindingsAbi3(_, _) => {
+            // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
+            // Unfortunately, on windows we need one to figure out base_prefix for a linker
+            // argument.
+            if target.is_windows() {
+                let interpreter =
+                    find_single_python_interpreter(bridge, interpreter, target, "abi3 on windows")?;
+                println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interpreter);
+                Ok(vec![interpreter])
+            } else {
+                println!("🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)");
+                Ok(vec![])
+            }
+        }
     }
 }
 

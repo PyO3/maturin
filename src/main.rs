@@ -378,7 +378,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
 
         let upload_result = wheels
             .iter()
-            .map(|(wheel_path, supported_versions, _)| {
+            .try_for_each(|(wheel_path, supported_versions, _)| {
                 let result = upload(
                     &registry,
                     &wheel_path,
@@ -386,8 +386,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                     &supported_versions,
                 );
                 result.map_err(|err| (wheel_path.clone(), err))
-            })
-            .collect();
+            });
 
         match upload_result {
             Ok(()) => break,

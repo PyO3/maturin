@@ -98,7 +98,8 @@ pub fn develop(
         }
         BridgeModel::BindingsAbi3(_, _) => {
             let artifact = build_context
-                .compile_cdylib(None, Some(&build_context.module_name))
+                // We need the interpreter on windows
+                .compile_cdylib(Some(&interpreter), Some(&build_context.module_name))
                 .context(context)?;
 
             write_bindings_module(

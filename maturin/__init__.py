@@ -59,14 +59,17 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
-    try:
-        output = subprocess.check_output(command)
-    except subprocess.CalledProcessError as e:
-        print("Error: {}".format(e))
-        sys.exit(1)
-    sys.stdout.buffer.write(output)
     sys.stdout.flush()
-    output = output.decode(errors="replace")
+    result = subprocess.run(command, stdout=subprocess.PIPE)
+    sys.stdout.buffer.write(result.stdout)
+    sys.stdout.flush()
+    if result.returncode != 0:
+        print("Error: command {} returned non-zero exit status {}".format(
+            command,
+            result.returncode
+        ))
+        sys.exit(1)
+    output = result.stdout.decode(errors="replace")
     wheel_path = output.strip().splitlines()[-1]
     filename = os.path.basename(wheel_path)
     shutil.copy2(wheel_path, os.path.join(wheel_directory, filename))
@@ -78,14 +81,17 @@ def build_sdist(sdist_directory, config_settings=None):
     command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
 
     print("Running `{}`".format(" ".join(command)))
-    try:
-        output = subprocess.check_output(command)
-    except subprocess.CalledProcessError as e:
-        print(e)
-        sys.exit(1)
-    sys.stdout.buffer.write(output)
     sys.stdout.flush()
-    output = output.decode(errors="replace")
+    result = subprocess.run(command, stdout=subprocess.PIPE)
+    sys.stdout.buffer.write(result.stdout)
+    sys.stdout.flush()
+    if result.returncode != 0:
+        print("Error: command {} returned non-zero exit status {}".format(
+            command,
+            result.returncode
+        ))
+        sys.exit(1)
+    output = result.stdout.decode(errors="replace")
     return output.strip().splitlines()[-1]
 
 

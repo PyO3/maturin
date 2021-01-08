@@ -9,6 +9,7 @@
 # `pip install <source dir>` are supported. For creating a source distribution
 # for maturin itself use `maturin sdist`.
 
+import json
 import os
 import platform
 import shutil
@@ -57,13 +58,17 @@ class PostInstallCommand(install):
                     "(https://www.rust-lang.org/tools/install) and try again"
                 )
 
-            if platform.machine() in ('ppc64le', 'ppc64'):
-                cargo_args = ["cargo", "rustc", "--bin", "maturin", '--no-default-features', '--features=auditwheel,log,human-panic', "--", "-C", "link-arg=-s"]
-            else:
-                cargo_args = ["cargo", "rustc", "--bin", "maturin", "--", "-C", "link-arg=-s"]
+            cargo_args = ["cargo", "rustc", "--bin", "maturin", "--message-format=json"]
 
-            subprocess.check_call(cargo_args)
-            source = os.path.join(source_dir, "target", "debug", executable_name)
+            if platform.machine() in ('ppc64le', 'ppc64'):
+                cargo_args.extend(['--no-default-features', '--features=auditwheel,log,human-panic'])
+
+            cargo_args.extend(["--", "-C", "link-arg=-s"])
+
+            metadata = json.loads(subprocess.check_output(cargo_args).splitlines()[-2])
+            print(metadata)
+            assert metadata["target"]["name"] == "maturin"
+            source = metadata["filenames"][0]
 
         # run this after trying to build with cargo (as otherwise this leaves
         # venv in a bad state: https://github.com/benfred/py-spy/issues/69)

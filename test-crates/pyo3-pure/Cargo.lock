@@ -125,8 +125,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cdd01a4c2719dd1f3ceab0875fa1a2c2cd3c619477349d78f43cd716b345436"
+source = "git+https://github.com/pyo3/pyo3?branch=maturin-abi3-windows-linker-args#5a65cacb476d9b891866eaa195a014d73956fdb4"
 dependencies = [
  "cfg-if",
  "ctor",
@@ -142,8 +141,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f8218769d13e354f841d559a19b0cf22cfd55959c7046ef594e5f34dbe46d16"
+source = "git+https://github.com/pyo3/pyo3?branch=maturin-abi3-windows-linker-args#5a65cacb476d9b891866eaa195a014d73956fdb4"
 dependencies = [
  "pyo3-macros-backend",
  "quote",
@@ -153,8 +151,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc4da0bfdf76f0a5971c698f2cb6b3f832a6f80f16dedeeb3f123eb0431ecce2"
+source = "git+https://github.com/pyo3/pyo3?branch=maturin-abi3-windows-linker-args#5a65cacb476d9b891866eaa195a014d73956fdb4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -191,9 +188,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "smallvec"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a55ca5f3b68e41c979bf8c46a6f1da892ca4db8f94023ce0bd32407573b1ac0"
+checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
 name = "syn"

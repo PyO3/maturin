@@ -198,17 +198,14 @@ fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -
 
     let options = BuildOptions::from_iter_safe(cli)?;
 
-    let wheels = options
-        .into_build_context(false, cfg!(feature = "faster-tests"))?
-        .build_wheels()?;
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let wheels = build_context.build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
-    for (filename, _, python_interpreter) in wheels {
-        if let Some(pi) = python_interpreter {
-            let executable = pi.executable;
-            if executable.to_str().unwrap().contains("pyo3-build-env-") {
-                conda_wheels.push((filename, executable))
-            }
+    for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.interpreter) {
+        let executable = python_interpreter.executable;
+        if executable.to_str().unwrap().contains("pyo3-build-env-") {
+            conda_wheels.push((filename.clone(), executable))
         }
     }
 

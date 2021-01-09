@@ -2,11 +2,13 @@ use crate::Manylinux;
 use crate::Target;
 use anyhow::Result;
 use goblin::elf::Elf;
+use regex::Regex;
 use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::path::Path;
 use thiserror::Error;
+
 /// As specified in "PEP 571 -- The manylinux2010 Platform Tag"
 const MANYLINUX2010: &[&str] = &[
     "libgcc_s.so.1",
@@ -67,6 +69,12 @@ pub enum AuditWheelError {
     /// The elf file isn't manylinux compatible. Contains the list of offending
     /// libraries.
     #[error(
+        "Your library links libpython ({0}), which libraries must not do. Have you forgotten to activate the extension-module feature?",
+    )]
+    LinksLibPythonError(String),
+    /// The elf file isn't manylinux compatible. Contains the list of offending
+    /// libraries.
+    #[error(
         "Your library is not manylinux compliant because it links the following forbidden libraries: {0:?}",
     )]
     ManylinuxValidationError(Vec<String>),
@@ -110,9 +118,15 @@ pub fn auditwheel_rs(
         }
     }
 
-    if offenders.is_empty() {
-        Ok(())
-    } else {
-        Err(AuditWheelError::ManylinuxValidationError(offenders))
+    // Checks if we can give a more helpful error message
+    let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
+    match offenders.as_slice() {
+        [] => Ok(()),
+        [lib] if is_libpython.is_match(lib) => {
+            Err(AuditWheelError::LinksLibPythonError(lib.clone()))
+        }
+        offenders => Err(AuditWheelError::ManylinuxValidationError(
+            offenders.to_vec(),
+        )),
     }
 }

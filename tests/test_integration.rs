@@ -67,9 +67,8 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
 
     let options = BuildOptions::from_iter_safe(cli)?;
 
-    let wheels = options
-        .into_build_context(false, cfg!(feature = "faster-tests"))?
-        .build_wheels()?;
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let wheels = build_context.build_wheels()?;
 
     let test_name = package
         .as_ref()
@@ -78,7 +77,11 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
         .to_str()
         .unwrap()
         .to_string();
-    for (filename, supported_version, python_interpreter) in wheels {
+    // We can do this since we know that wheels are built and returned in the
+    // order they are in the build context
+    for ((filename, supported_version), python_interpreter) in
+        wheels.iter().zip(build_context.interpreter)
+    {
         let venv_name = if supported_version == "py3" {
             format!("{}-cffi", test_name)
         } else {
@@ -95,15 +98,12 @@ fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
             .join(venv_name);
 
         if !venv_dir.is_dir() {
-            let output = if let Some(ref python_interpreter) = python_interpreter {
-                Command::new("virtualenv")
-                    .arg("-p")
-                    .arg(python_interpreter.executable.clone())
-                    .arg(&venv_dir)
-                    .output()?
-            } else {
-                Command::new("virtualenv").arg(&venv_dir).output()?
-            };
+            let output = Command::new("virtualenv")
+                .arg("-p")
+                .arg(python_interpreter.executable.clone())
+                .arg(&venv_dir)
+                .output()?;
+
             if !output.status.success() {
                 bail!(
                     "Failed to create a virtualenv at {}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",

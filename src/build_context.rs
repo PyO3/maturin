@@ -120,7 +120,7 @@ pub struct BuildContext {
     pub cargo_metadata: Metadata,
 }
 
-type BuiltWheelMetadata = (PathBuf, String, Option<PythonInterpreter>);
+type BuiltWheelMetadata = (PathBuf, String);
 
 impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
@@ -131,8 +131,8 @@ impl BuildContext {
             .context("Failed to create the target directory for the wheels")?;
 
         let wheels = match &self.bridge {
-            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py3".to_string(), None)],
-            BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py3".to_string(), None)],
+            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py3".to_string())],
+            BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py3".to_string())],
             BridgeModel::Bindings(_) => self.build_binding_wheels()?,
             BridgeModel::BindingsAbi3(major, minor) => vec![(
                 self.build_binding_wheel_abi3(*major, *minor)?,
@@ -159,7 +159,7 @@ impl BuildContext {
                     pyproject.sdist_include(),
                 )
                 .context("Failed to build source distribution")?;
-                Ok(Some((sdist_path, "source".to_string(), None)))
+                Ok(Some((sdist_path, "source".to_string())))
             }
             Err(_) => Ok(None),
         }
@@ -213,9 +213,7 @@ impl BuildContext {
     /// and silently ignores all non-existent python versions.
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_binding_wheels(
-        &self,
-    ) -> Result<Vec<(PathBuf, String, Option<PythonInterpreter>)>> {
+    pub fn build_binding_wheels(&self) -> Result<Vec<(PathBuf, String)>> {
         let mut wheels = Vec::new();
         for python_interpreter in &self.interpreter {
             let artifact =
@@ -256,7 +254,6 @@ impl BuildContext {
             wheels.push((
                 wheel_path,
                 format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
-                Some(python_interpreter.clone()),
             ));
         }
 

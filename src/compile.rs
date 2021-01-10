@@ -117,7 +117,22 @@ pub fn compile(
     for message in cargo_metadata::Message::parse_stream(BufReader::new(stream)) {
         match message.context("Failed to parse message coming from cargo")? {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
-                let crate_name = &context.cargo_metadata[&artifact.package_id].name;
+                let package_in_metadata = context
+                    .cargo_metadata
+                    .packages
+                    .iter()
+                    .find(|package| package.id == artifact.package_id);
+                let crate_name = match package_in_metadata {
+                    Some(package) => &package.name,
+                    None => {
+                        // This is a spurious error I don't really understand
+                        println!(
+                            "⚠  Warning: The package {} wasn't listed in `cargo metadata`",
+                            artifact.package_id
+                        );
+                        continue;
+                    }
+                };
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
                 if crate_name == &context.crate_name {

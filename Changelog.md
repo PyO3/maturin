@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * pypirc is checked for credentials by houqp in [#374](https://github.com/PyO3/maturin/pull/374)
  * Added support for PowerPC by mzpqnxow and programmerjake in [#366](https://github.com/PyO3/maturin/pull/366)
  * `project-url` is now a toml dictionary instead of a toml list to conform to the standard.
+ * No more retry loop when the password was wrong.
 
 ## 0.8.3 - 2020-08-17
 

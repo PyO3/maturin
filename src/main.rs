@@ -37,9 +37,9 @@ use {
 /// 2. keyring
 /// 3. stdin
 #[cfg(feature = "upload")]
-fn get_password(_username: &str) -> (String, bool) {
+fn get_password(_username: &str) -> String {
     if let Ok(password) = env::var("MATURIN_PASSWORD") {
-        return (password, false);
+        return password;
     };
 
     #[cfg(feature = "keyring")]
@@ -47,21 +47,18 @@ fn get_password(_username: &str) -> (String, bool) {
         let service = env!("CARGO_PKG_NAME");
         let keyring = Keyring::new(&service, &_username);
         if let Ok(password) = keyring.get_password() {
-            return (password, true);
+            return password;
         };
     }
 
-    let password = rpassword::prompt_password_stdout("Please enter your password: ")
-        .unwrap_or_else(|_| {
-            // So we need this fallback for pycharm on windows
-            let mut password = String::new();
-            io::stdin()
-                .read_line(&mut password)
-                .expect("Failed to read line");
-            password.trim().to_string()
-        });
-
-    (password, true)
+    rpassword::prompt_password_stdout("Please enter your password: ").unwrap_or_else(|_| {
+        // So we need this fallback for pycharm on windows
+        let mut password = String::new();
+        io::stdin()
+            .read_line(&mut password)
+            .expect("Failed to read line");
+        password.trim().to_string()
+    })
 }
 
 #[cfg(feature = "upload")]
@@ -95,35 +92,35 @@ fn load_pypi_cred_from_config(package_name: &str) -> Option<(String, String)> {
 }
 
 #[cfg(feature = "upload")]
-fn resolve_pypi_cred(opt: &PublishOpt, package_name: &str) -> (String, String, bool) {
+fn resolve_pypi_cred(opt: &PublishOpt, package_name: &str) -> (String, String) {
     // API token from environment variable takes priority
     if let Ok(token) = env::var("MATURIN_PYPI_TOKEN") {
-        return ("__token__".to_string(), token, false);
+        return ("__token__".to_string(), token);
     }
 
     // load creds from pypirc if found
     if let Some((username, password)) = load_pypi_cred_from_config(package_name) {
         println!("🔐 Using credential in pypirc for upload");
-        return (username, password, false);
+        return (username, password);
     }
 
     // fallback to username and password
     let username = opt.username.clone().unwrap_or_else(get_username);
-    let (password, reenter) = match opt.password {
-        Some(ref password) => (password.clone(), false),
+    let password = match opt.password {
+        Some(ref password) => password.clone(),
         None => get_password(&username),
     };
 
-    (username, password, reenter)
+    (username, password)
 }
 
 #[cfg(feature = "upload")]
 /// Asks for username and password for a registry account where missing.
-fn complete_registry(opt: &PublishOpt, package_name: &str) -> Result<(Registry, bool)> {
-    let (username, password, reenter) = resolve_pypi_cred(opt, package_name);
+fn complete_registry(opt: &PublishOpt, package_name: &str) -> Result<Registry> {
+    let (username, password) = resolve_pypi_cred(opt, package_name);
     let registry = Registry::new(username, password, Url::parse(&opt.registry)?);
 
-    Ok((registry, reenter))
+    Ok(registry)
 }
 
 /// An account with a registry, possibly incomplete
@@ -354,7 +351,7 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
     Ok(())
 }
 
-/// Handles authentification/keyring integration and retrying of the publish subcommand
+/// Handles authentication/keyring integration and retrying of the publish subcommand
 #[cfg(feature = "upload")]
 fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Result<()> {
     let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
@@ -371,26 +368,20 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
         }
     }
 
-    let (mut registry, reenter) = complete_registry(&publish, &build_context.metadata21.name)?;
+    let registry = complete_registry(&publish, &build_context.metadata21.name)?;
 
-    loop {
-        println!("🚀 Uploading {} packages", wheels.len());
+    println!("🚀 Uploading {} packages", wheels.len());
 
-        let upload_result = wheels
-            .iter()
-            .try_for_each(|(wheel_path, supported_versions, _)| {
-                let result = upload(
-                    &registry,
-                    &wheel_path,
-                    &build_context.metadata21.to_vec(),
-                    &supported_versions,
-                );
-                result.map_err(|err| (wheel_path.clone(), err))
-            });
-
+    for (wheel_path, supported_versions) in wheels {
+        let upload_result = upload(
+            &registry,
+            &wheel_path,
+            &build_context.metadata21.to_vec(),
+            &supported_versions,
+        );
         match upload_result {
-            Ok(()) => break,
-            Err((_, UploadError::AuthenticationError)) if reenter => {
+            Ok(()) => (),
+            Err(UploadError::AuthenticationError) => {
                 println!("⛔ Username and/or password are wrong");
 
                 #[cfg(feature = "keyring")]
@@ -399,30 +390,17 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                     let old_username = registry.username.clone();
                     let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
                     match keyring.delete_password() {
-                        Ok(()) => {}
+                        Ok(()) => {
+                            println!("🔑 Removed wrong password from keyring")
+                        }
                         Err(KeyringError::NoPasswordFound) | Err(KeyringError::NoBackendFound) => {}
-                        _ => eprintln!("⚠ Failed to remove password from keyring"),
+                        Err(err) => eprintln!("⚠ Failed to remove password from keyring: {}", err),
                     }
                 }
 
-                let username = get_username();
-                let password = rpassword::prompt_password_stdout("Please enter your password: ")
-                    .unwrap_or_else(|_| {
-                        // So we need this fallback for pycharm on windows
-                        let mut password = String::new();
-                        io::stdin()
-                            .read_line(&mut password)
-                            .expect("Failed to read line");
-                        password.trim().to_string()
-                    });
-
-                registry = Registry::new(username, password, registry.url);
-                println!("… Retrying");
-            }
-            Err((_, UploadError::AuthenticationError)) => {
                 bail!("Username and/or password are wrong");
             }
-            Err((wheel_path, err)) => {
+            Err(err) => {
                 let filesize = std::fs::metadata(&wheel_path)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| {
@@ -430,12 +408,12 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                     });
                 let filename = wheel_path.file_name().unwrap_or(&wheel_path.as_os_str());
                 return Err(err)
-                    .context(format!("💥 Failed to upload {:?} ({})", filename, filesize))?;
+                    .context(format!("💥 Failed to upload {:?} ({})", filename, filesize));
             }
         }
     }
 
-    println!("✨ Packages uploaded succesfully");
+    println!("✨ Packages uploaded successfully");
 
     #[cfg(feature = "keyring")]
     {
@@ -443,9 +421,13 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
         let username = registry.username.clone();
         let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
         let password = registry.password.clone();
-        keyring.set_password(&password).unwrap_or_else(|e| {
-            eprintln!("⚠ Failed to store the password in the keyring: {:?}", e)
-        });
+        match keyring.set_password(&password) {
+            Ok(()) => {}
+            Err(KeyringError::NoBackendFound) => {}
+            Err(err) => {
+                eprintln!("⚠ Failed to store the password in the keyring: {:?}", err);
+            }
+        }
     }
 
     Ok(())

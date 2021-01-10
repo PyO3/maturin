@@ -1,5 +1,4 @@
 use crate::build_context::{BridgeModel, ProjectLayout};
-use crate::python_interpreter::Interpreter;
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Manylinux;
@@ -150,7 +149,7 @@ impl BuildOptions {
         };
 
         let interpreter = match self.interpreter {
-            // Only build a source ditribution
+            // Only build a source distribution
             Some(ref interpreter) if interpreter.is_empty() => vec![],
             // User given list of interpreters
             Some(interpreter) => find_interpreter(&bridge, &interpreter, &target)?,
@@ -183,22 +182,34 @@ impl BuildOptions {
 }
 
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
-fn has_abi3(cargo_metadata: &Metadata) -> Result<bool> {
-    let pyo3_packages = cargo_metadata
-        .packages
+fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
+    let resolve = cargo_metadata
+        .resolve
+        .as_ref()
+        .context("Expected cargo to return metadata with resolve")?;
+    let pyo3_packages = resolve
+        .nodes
         .iter()
-        .filter(|package| package.name == "pyo3")
+        .filter(|package| cargo_metadata[&package.id].name == "pyo3")
         .collect::<Vec<_>>();
     match pyo3_packages.as_slice() {
         [pyo3_crate] => {
-            let root_id = cargo_metadata
-                .resolve
-                .as_ref()
-                .and_then(|resolve| resolve.root.as_ref())
-                .context("Expected cargo to return a root package")?;
-            // Check that we have a pyo3 version with abi3 and that abi3 is selected
-            Ok(pyo3_crate.features.contains_key("abi3")
-                && !cargo_metadata[&root_id].features.contains_key("abi3"))
+            // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
+            // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
+            Ok(pyo3_crate
+                .features
+                .iter()
+                .filter(|x| x.starts_with("abi3-py") && x.len() == "abi3-pyxx".len())
+                .map(|x| {
+                    Ok((
+                        (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
+                        (x.as_bytes()[8] as char).to_string().parse::<u8>()?,
+                    ))
+                })
+                .collect::<Result<Vec<(u8, u8)>>>()
+                .context("Bogus pyo3 cargo features")?
+                .into_iter()
+                .min())
         }
         _ => bail!(format!(
             "Expected exactly one pyo3 dependency, found {}",
@@ -271,9 +282,12 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             );
         }
 
-        if has_abi3(&cargo_metadata)? {
-            println!("🔗 Found pyo3 bindings with abi3 support");
-            return Ok(BridgeModel::BindingsAbi3);
+        if let Some((major, minor)) = has_abi3(&cargo_metadata)? {
+            println!(
+                "🔗 Found pyo3 bindings with abi3 support for Python ≥ {}.{}",
+                major, minor
+            );
+            return Ok(BridgeModel::BindingsAbi3(major, minor));
         } else {
             println!("🔗 Found pyo3 bindings");
             return Ok(bridge);
@@ -281,6 +295,32 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     }
 
     Ok(bridge)
+}
+
+/// Shared between cffi and pyo3-abi3
+fn find_single_python_interpreter(
+    bridge: &BridgeModel,
+    interpreter: &[PathBuf],
+    target: &Target,
+    bridge_name: &str,
+) -> Result<PythonInterpreter> {
+    let err_message = "Failed to find a python interpreter";
+
+    let executable = if interpreter.is_empty() {
+        target.get_python()
+    } else if interpreter.len() == 1 {
+        interpreter[0].clone()
+    } else {
+        bail!(
+            "You can only specify one python interpreter for {}",
+            bridge_name
+        );
+    };
+
+    let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
+        .context(format_err!(err_message))?
+        .ok_or_else(|| format_err!(err_message))?;
+    Ok(interpreter)
 }
 
 /// Finds the appropriate amount for python versions for each [BridgeModel].
@@ -291,8 +331,6 @@ pub fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
 ) -> Result<Vec<PythonInterpreter>> {
-    let err_message = "Failed to find a python interpreter";
-
     match bridge {
         BridgeModel::Bindings(_) => {
             let interpreter = if !interpreter.is_empty() {
@@ -318,55 +356,26 @@ pub fn find_interpreter(
 
             Ok(interpreter)
         }
-        BridgeModel::BindingsAbi3 => {
-            let interpreter = if interpreter.is_empty() {
-                // Since we do not autodetect pypy anyway, we only need one interpreter.
-                // Ideally we'd pick the lowest supported version, but there's no way to
-                // specify that yet in pyo3 yet
-                let interpreter =
-                    PythonInterpreter::check_executable(target.get_python(), &target, &bridge)
-                        .context(format_err!(err_message))?
-                        .ok_or_else(|| format_err!(err_message))?;
-                vec![interpreter]
-            } else {
-                let interpreter =
-                    PythonInterpreter::check_executables(&interpreter, &target, &bridge)
-                        .context("The given list of python interpreters is invalid")?;
-                // It's ok if there are pypy versions, but there should be either no or exactly one
-                // cpython version. We can build wheels for more since the minimum version is in
-                // the tag, but that is unnecessary
-                if interpreter
-                    .iter()
-                    .filter(|python| python.interpreter == Interpreter::CPython)
-                    .count()
-                    > 1
-                {
-                    println!("⚠ You have more than one cpython version specified when compiling with abi3, \
-                     while you only need to lowest compatible version to build a single abi3 wheel.");
-                }
-                interpreter
-            };
-
-            Ok(interpreter)
-        }
         BridgeModel::Cffi => {
-            let executable = if interpreter.is_empty() {
-                target.get_python()
-            } else if interpreter.len() == 1 {
-                interpreter[0].clone()
-            } else {
-                bail!("You can only specify one python interpreter for cffi compilation");
-            };
-
-            let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
-                .context(format_err!(err_message))?
-                .ok_or_else(|| format_err!(err_message))?;
-
+            let interpreter = find_single_python_interpreter(bridge, interpreter, target, "cffi")?;
             println!("🐍 Using {} to generate the cffi bindings", interpreter);
-
             Ok(vec![interpreter])
         }
         BridgeModel::Bin => Ok(vec![]),
+        BridgeModel::BindingsAbi3(_, _) => {
+            // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
+            // Unfortunately, on windows we need one to figure out base_prefix for a linker
+            // argument.
+            if target.is_windows() {
+                let interpreter =
+                    find_single_python_interpreter(bridge, interpreter, target, "abi3 on windows")?;
+                println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interpreter);
+                Ok(vec![interpreter])
+            } else {
+                println!("🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)");
+                Ok(vec![])
+            }
+        }
     }
 }
 
@@ -450,11 +459,11 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_pure, None),
-            Ok(BridgeModel::BindingsAbi3)
+            Ok(BridgeModel::BindingsAbi3(3, 6))
         ));
         assert!(matches!(
             find_bridge(&pyo3_pure, Some("pyo3")),
-            Ok(BridgeModel::BindingsAbi3)
+            Ok(BridgeModel::BindingsAbi3(3, 6))
         ));
         assert!(find_bridge(&pyo3_pure, Some("rust-cpython")).is_err());
     }

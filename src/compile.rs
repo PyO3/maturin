@@ -23,7 +23,7 @@ pub fn compile(
     // TODO: What do we do when there are multiple bin targets?
     match bindings_crate {
         BridgeModel::Bin => shared_args.push("--bins"),
-        BridgeModel::Cffi | BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 => {
+        BridgeModel::Cffi | BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) => {
             shared_args.push("--lib")
         }
     }
@@ -44,7 +44,7 @@ pub fn compile(
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if context.target.is_macos() {
-        if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3 = bindings_crate {
+        if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) = bindings_crate {
             let mac_args = &["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
             rustc_args.extend(mac_args);
         }
@@ -52,6 +52,24 @@ pub fn compile(
 
     if context.strip {
         rustc_args.extend(&["-C", "link-arg=-s"]);
+    }
+
+    let pythonxy_lib_folder;
+    if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
+        // NB: We set PYO3_NO_PYTHON further below.
+        // On linux, we can build a shared library without the python
+        // providing these symbols being present, on mac we can do it with
+        // the `-undefined dynamic_lookup` we use above anyway. On windows
+        // however, we get an exit code 0xc0000005 if we try the same with
+        // `/FORCE:UNDEFINED`, so we still look up the python interpreter
+        // and pass the location of the lib with the definitions.
+        if context.target.is_windows() {
+            let python_interpreter = python_interpreter
+                .expect("Must have a python interpreter for building abi3 on windows");
+            pythonxy_lib_folder =
+                format!("native={}\\libs", python_interpreter.base_prefix.display());
+            rustc_args.extend(&["-L", &pythonxy_lib_folder]);
+        }
     }
 
     let build_args: Vec<_> = cargo_args
@@ -72,6 +90,12 @@ pub fn compile(
         // We can't get colored human and json messages from rustc as they are mutually exclusive,
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
+
+    if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
+        // This will make pyo3's build script only set some predefined linker
+        // arguments without trying to read any python configuration
+        build_command.env("PYO3_NO_PYTHON", "1");
+    }
 
     if let Some(python_interpreter) = python_interpreter {
         if bindings_crate.is_bindings("pyo3") {

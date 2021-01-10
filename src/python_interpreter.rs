@@ -233,16 +233,16 @@ fn find_all_unix() -> Vec<String> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Interpreter {
+pub enum InterpreterKind {
     CPython,
     PyPy,
 }
 
-impl fmt::Display for Interpreter {
+impl fmt::Display for InterpreterKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Interpreter::CPython => write!(f, "CPython"),
-            Interpreter::PyPy => write!(f, "PyPy"),
+            InterpreterKind::CPython => write!(f, "CPython"),
+            InterpreterKind::PyPy => write!(f, "PyPy"),
         }
     }
 }
@@ -260,6 +260,7 @@ struct IntepreterMetadataMessage {
     d: bool,
     platform: String,
     abi_tag: Option<String>,
+    base_prefix: String,
 }
 
 /// The location and version of an interpreter
@@ -285,11 +286,13 @@ pub struct PythonInterpreter {
     /// Suffix to use for extension modules as given by sysconfig.
     pub ext_suffix: Option<String>,
     /// cpython or pypy
-    pub interpreter: Interpreter,
+    pub interpreter_kind: InterpreterKind,
     /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
     ///
     /// Note that this always `None` on windows
     pub abi_tag: Option<String>,
+    /// We need this value for windows abi3 linking
+    pub base_prefix: PathBuf,
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -359,18 +362,11 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, manylinux: &Manylinux, abi3: bool) -> String {
-        match self.interpreter {
-            Interpreter::CPython => {
+    pub fn get_tag(&self, manylinux: &Manylinux) -> String {
+        match self.interpreter_kind {
+            InterpreterKind::CPython => {
                 let platform = self.target.get_platform_tag(manylinux);
-                if abi3 {
-                    format!(
-                        "cp{major}{minor}-abi3-{platform}",
-                        major = self.major,
-                        minor = self.minor,
-                        platform = platform
-                    )
-                } else if self.target.is_unix() {
+                if self.target.is_unix() {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
                         major = self.major,
@@ -388,7 +384,7 @@ impl PythonInterpreter {
                     )
                 }
             }
-            Interpreter::PyPy => {
+            InterpreterKind::PyPy => {
                 // TODO: Use manylinux 2010 by default with pypy
                 if manylinux != &Manylinux::Off {
                     eprintln!(
@@ -433,19 +429,12 @@ impl PythonInterpreter {
     ///
     /// The pypy3 value appears to be wrong for Windows: instead of
     /// e.g., ".pypy3-70-x86_64-linux-gnu.so", it is just ".pyd".
-    pub fn get_library_name(&self, base: &str, abi3: bool) -> String {
-        match self.interpreter {
-            Interpreter::CPython => {
+    pub fn get_library_name(&self, base: &str) -> String {
+        match self.interpreter_kind {
+            InterpreterKind::CPython => {
                 let platform = self.target.get_shared_platform_tag();
 
-                if abi3 {
-                    if self.target.is_freebsd() || self.target.is_unix() {
-                        format!("{base}.abi3.so", base = base)
-                    } else {
-                        // Apparently there is no tag for abi3 on windows
-                        format!("{base}.pyd", base = base)
-                    }
-                } else if self.target.is_freebsd() {
+                if self.target.is_freebsd() {
                     format!(
                         "{base}.cpython-{major}{minor}{abiflags}.so",
                         base = base,
@@ -472,7 +461,7 @@ impl PythonInterpreter {
                     )
                 }
             }
-            Interpreter::PyPy => format!(
+            InterpreterKind::PyPy => format!(
                 "{base}{ext_suffix}",
                 base = base,
                 ext_suffix = self
@@ -525,8 +514,8 @@ impl PythonInterpreter {
 
         let interpreter;
         match message.interpreter.as_str() {
-            "cpython" => interpreter = Interpreter::CPython,
-            "pypy" => interpreter = Interpreter::PyPy,
+            "cpython" => interpreter = InterpreterKind::CPython,
+            "pypy" => interpreter = InterpreterKind::PyPy,
             _ => {
                 bail!("Invalid interpreter");
             }
@@ -544,8 +533,9 @@ impl PythonInterpreter {
             target: target.clone(),
             executable: executable.as_ref().to_path_buf(),
             ext_suffix: message.ext_suffix,
-            interpreter,
+            interpreter_kind: interpreter,
             abi_tag: message.abi_tag,
+            base_prefix: PathBuf::from(message.base_prefix),
         }))
     }
 
@@ -602,7 +592,7 @@ impl fmt::Display for PythonInterpreter {
         write!(
             f,
             "{} {}.{}{} at {}",
-            self.interpreter,
+            self.interpreter_kind,
             self.major,
             self.minor,
             self.abiflags,

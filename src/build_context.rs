@@ -137,7 +137,6 @@ impl BuildContext {
             BridgeModel::BindingsAbi3(major, minor) => vec![(
                 self.build_binding_wheel_abi3(*major, *minor)?,
                 format!("cp{}{}", major, minor),
-                None,
             )],
         };
 

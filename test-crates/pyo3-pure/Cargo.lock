@@ -13,6 +13,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "cloudabi"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -44,24 +50,10 @@ dependencies = [
 
 [[package]]
 name = "indoc"
-version = "0.3.6"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47741a8bc60fb26eb8d6e0238bbb26d8575ff623fdc97b1a2c00c050b9684ed8"
+checksum = "e5a75aeaaef0ce18b58056d306c27b07436fbb34b8816c53094b76dd81803136"
 dependencies = [
- "indoc-impl",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "indoc-impl"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce046d161f000fffde5f432a0d034d0341dc152643b2598ed5bfce44c4f3a8f0"
-dependencies = [
- "proc-macro-hack",
- "proc-macro2",
- "quote",
- "syn",
  "unindent",
 ]
 
@@ -71,7 +63,7 @@ version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63312a18f7ea8760cdd0a7c5aac1a619752a246b833545e3e36d1f81f7cd9e66"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -128,7 +120,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c361aa727dd08437f2f1447be8b59a33b0edd15e0fcee698f935613d9efbca9b"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "cloudabi",
  "instant",
  "libc",
@@ -139,28 +131,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "0.1.18"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45ca20c77d80be666aef2b45486da86238fabe33e38306bd3118fe4af33fa880"
-dependencies = [
- "paste-impl",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "paste-impl"
-version = "0.1.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d95a7db200b97ef370c8e6de0088252f7e0dfff7d047a28528e47456c0fc98b6"
-dependencies = [
- "proc-macro-hack",
-]
-
-[[package]]
-name = "proc-macro-hack"
-version = "0.5.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99c605b9a0adc77b7211c6b1f722dcb613d68d66859a44f3d485a6da332b0598"
+checksum = "c5d65c4d95931acda4498f675e332fcbdc9a06705cd07086c510e9b6009cd1c1"
 
 [[package]]
 name = "proc-macro2"
@@ -173,23 +146,34 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.12.3"
-source = "git+https://github.com/PyO3/pyo3?rev=3b3ba4e3abd57bc3b8f86444b3f61e6e2f4c5fc1#3b3ba4e3abd57bc3b8f86444b3f61e6e2f4c5fc1"
+version = "0.13.0"
+source = "git+https://github.com/PyO3/pyo3?rev=69fcfadc56de4fe7c8f7cfd2b288fdccbbbcef45#69fcfadc56de4fe7c8f7cfd2b288fdccbbbcef45"
 dependencies = [
+ "cfg-if 1.0.0",
  "ctor",
  "indoc",
  "inventory",
  "libc",
  "parking_lot",
  "paste",
- "pyo3cls",
+ "pyo3-macros",
  "unindent",
 ]
 
 [[package]]
-name = "pyo3-derive-backend"
-version = "0.12.3"
-source = "git+https://github.com/PyO3/pyo3?rev=3b3ba4e3abd57bc3b8f86444b3f61e6e2f4c5fc1#3b3ba4e3abd57bc3b8f86444b3f61e6e2f4c5fc1"
+name = "pyo3-macros"
+version = "0.13.0"
+source = "git+https://github.com/PyO3/pyo3?rev=69fcfadc56de4fe7c8f7cfd2b288fdccbbbcef45#69fcfadc56de4fe7c8f7cfd2b288fdccbbbcef45"
+dependencies = [
+ "pyo3-macros-backend",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "pyo3-macros-backend"
+version = "0.13.0"
+source = "git+https://github.com/PyO3/pyo3?rev=69fcfadc56de4fe7c8f7cfd2b288fdccbbbcef45#69fcfadc56de4fe7c8f7cfd2b288fdccbbbcef45"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -201,16 +185,6 @@ name = "pyo3-pure"
 version = "2.1.0"
 dependencies = [
  "pyo3",
-]
-
-[[package]]
-name = "pyo3cls"
-version = "0.12.3"
-source = "git+https://github.com/PyO3/pyo3?rev=3b3ba4e3abd57bc3b8f86444b3f61e6e2f4c5fc1#3b3ba4e3abd57bc3b8f86444b3f61e6e2f4c5fc1"
-dependencies = [
- "pyo3-derive-backend",
- "quote",
- "syn",
 ]
 
 [[package]]

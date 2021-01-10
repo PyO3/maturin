@@ -52,16 +52,20 @@ class PostInstallCommand(install):
         if os.path.isfile(existing_binary):
             source = existing_binary
         else:
-            if not shutil.which("cargo"):
+            # https://github.com/PyO3/maturin/pull/398
+            cargo = shutil.which("cargo") or shutil.which("cargo.exe")
+            if not cargo:
                 raise RuntimeError(
                     "cargo not found in PATH. Please install rust "
                     "(https://www.rust-lang.org/tools/install) and try again"
                 )
 
-            cargo_args = ["cargo", "rustc", "--bin", "maturin", "--message-format=json"]
+            cargo_args = [cargo, "rustc", "--bin", "maturin", "--message-format=json"]
 
-            if platform.machine() in ('ppc64le', 'ppc64'):
-                cargo_args.extend(['--no-default-features', '--features=auditwheel,log,human-panic'])
+            if platform.machine() in ("ppc64le", "ppc64"):
+                cargo_args.extend(
+                    ["--no-default-features", "--features=auditwheel,log,human-panic"]
+                )
 
             cargo_args.extend(["--", "-C", "link-arg=-s"])
 

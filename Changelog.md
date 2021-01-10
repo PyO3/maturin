@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.9.0 - Unreleased
 
- * Added support for building abi3 wheels with pyo3 0.13
+ * Added support for building abi3 wheels with pyo3 0.13.1
  * Python 3.9 is supported (it should have worked before, but it is now tested on ci)
  * There are 64-bit and aarch64 binary builds for linux and 64-bit builds for windows, mac and freebsd-12-1 
  * The auditwheel options have changed to `--manylinux=[off|2010|2014]` with manylinux2010 as default, and optionally `--skip-auditwheel`.
@@ -17,8 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Allow python 3 interpreter with debuginfo use maturin by inevity in [#370](https://github.com/PyO3/maturin/pull/370)
  * pypirc is checked for credentials by houqp in [#374](https://github.com/PyO3/maturin/pull/374)
  * Added support for PowerPC by mzpqnxow and programmerjake in [#366](https://github.com/PyO3/maturin/pull/366)
- * `project-url` is now a toml dictionary instead of a toml list to conform to the standard.
- * No more retry loop when the password was wrong.
+ * `project-url` is now a toml dictionary instead of a toml list to conform to the standard
+ * No more retry loop when the password was wrong
+ * When bootstrapping, also search for `cargo.exe` if `cargo` was not found
 
 ## 0.8.3 - 2020-08-17
 

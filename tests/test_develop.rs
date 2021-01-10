@@ -1,7 +1,7 @@
 use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
 use anyhow::Result;
+use fs_err as fs;
 use maturin::{develop, Target};
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;

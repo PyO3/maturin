@@ -1,9 +1,9 @@
 use crate::CargoToml;
 use anyhow::{Context, Result};
+use fs_err as fs;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::str;
 
@@ -100,7 +100,7 @@ impl Metadata21 {
         // See https://packaging.python.org/specifications/core-metadata/#description
         if let Some(ref readme) = cargo_toml.package.readme {
             let readme_path = manifest_path.as_ref().join(readme);
-            description = Some(read_to_string(&readme_path).context(format!(
+            description = Some(fs::read_to_string(&readme_path).context(format!(
                 "Failed to read readme specified in Cargo.toml, which should be at {}",
                 readme_path.display()
             ))?);

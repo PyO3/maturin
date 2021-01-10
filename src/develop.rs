@@ -6,7 +6,7 @@ use crate::PythonInterpreter;
 use crate::Target;
 use crate::{write_dist_info, BuildOptions};
 use anyhow::{anyhow, format_err, Context, Result};
-use std::fs;
+use fs_err as fs;
 use std::path::Path;
 
 /// Installs a crate by compiling it and copying the shared library to site-packages.

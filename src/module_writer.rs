@@ -7,11 +7,12 @@ use crate::{BridgeModel, Metadata21};
 use anyhow::{anyhow, bail, Context, Result};
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use fs_err as fs;
+use fs_err::File;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io;
 use std::io::{Read, Write};
 #[cfg(not(target_os = "windows"))]
@@ -46,7 +47,7 @@ pub trait ModuleWriter {
     /// Copies the source file the the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
         let read_failed_context = format!("Failed to read {}", source.as_ref().display());
-        let mut file = File::open(&source).context(read_failed_context.clone())?;
+        let mut file = File::open(source.as_ref()).context(read_failed_context.clone())?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).context(read_failed_context)?;
         self.add_bytes(&target, &buffer)
@@ -157,7 +158,7 @@ impl ModuleWriter for PathWriter {
         let mut file = {
             #[cfg(not(target_os = "windows"))]
             {
-                fs::OpenOptions::new()
+                OpenOptions::new()
                     .create(true)
                     .write(true)
                     .truncate(true)

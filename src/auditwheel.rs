@@ -1,9 +1,9 @@
 use crate::Manylinux;
 use crate::Target;
 use anyhow::Result;
+use fs_err::File;
 use goblin::elf::Elf;
 use regex::Regex;
-use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::path::Path;

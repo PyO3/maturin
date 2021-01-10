@@ -12,8 +12,8 @@ use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
+use fs_err as fs;
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The way the rust code is used in the wheel

@@ -2,9 +2,9 @@
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
 use crate::Registry;
+use fs_err::File;
 use reqwest::{self, blocking::multipart::Form, blocking::Client, StatusCode};
 use sha2::{Digest, Sha256};
-use std::fs::File;
 use std::io;
 use std::path::Path;
 use thiserror::Error;

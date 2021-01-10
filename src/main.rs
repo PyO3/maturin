@@ -9,6 +9,7 @@ use bytesize::ByteSize;
 use cargo_metadata::MetadataCommand;
 #[cfg(feature = "upload")]
 use configparser::ini::Ini;
+use fs_err as fs;
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
@@ -18,8 +19,8 @@ use maturin::{
     write_dist_info, BridgeModel, BuildOptions, CargoToml, Metadata21, PathWriter,
     PythonInterpreter, Target,
 };
+use std::env;
 use std::path::PathBuf;
-use std::{env, fs};
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
@@ -401,7 +402,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                 bail!("Username and/or password are wrong");
             }
             Err(err) => {
-                let filesize = std::fs::metadata(&wheel_path)
+                let filesize = fs::metadata(&wheel_path)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| {
                         format!("Failed to get the filesize of {:?}: {}", &wheel_path, e)

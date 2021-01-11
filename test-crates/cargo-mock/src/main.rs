@@ -7,9 +7,9 @@
 
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::Message;
-use fs_err as fs;
-use fs_err::File;
 use std::env;
+use std::fs;
+use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;

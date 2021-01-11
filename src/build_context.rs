@@ -285,7 +285,7 @@ impl BuildContext {
                 .unwrap_or(&self.target);
 
             auditwheel_rs(&artifact, target, &self.manylinux)
-                .context("Failed to ensure manylinux compliance")?;
+                .context(format!("Failed to ensure {} compliance", self.manylinux))?;
         }
 
         if let Some(module_name) = module_name {
@@ -336,7 +336,7 @@ impl BuildContext {
 
         #[cfg(feature = "auditwheel")]
         auditwheel_rs(&artifact, &self.target, &self.manylinux)
-            .context("Failed to ensure manylinux compliance")?;
+            .context(format!("Failed to ensure {} compliance", self.manylinux))?;
 
         let (tag, tags) = self.target.get_universal_tags(&self.manylinux);
 

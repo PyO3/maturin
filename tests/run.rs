@@ -72,3 +72,8 @@ fn integration_hello_world() {
 fn abi3_without_version() {
     handle_result(errors::abi3_without_version())
 }
+
+#[test]
+fn pyo3_no_extension_module() {
+    handle_result(errors::pyo3_no_extension_module())
+}

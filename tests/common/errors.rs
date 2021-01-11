@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, format_err, Result};
 use maturin::BuildOptions;
 use structopt::StructOpt;
 
@@ -18,6 +18,36 @@ pub fn abi3_without_version() -> Result<()> {
             "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
             maturin needs a minimum version feature to build abi3 wheels."
         );
+    } else {
+        bail!("Should have errored");
+    }
+
+    Ok(())
+}
+
+pub fn pyo3_no_extension_module() -> Result<()> {
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-no-extension-module/Cargo.toml",
+        "--cargo-extra-args='--quiet'",
+        "-i=python",
+    ];
+
+    let options = BuildOptions::from_iter_safe(cli)?;
+    let result = options
+        .into_build_context(false, cfg!(feature = "faster-tests"))?
+        .build_wheels();
+    if let Err(err) = result {
+        if !(err
+            .source()
+            .ok_or(format_err!("{}", err))?
+            .to_string()
+            .starts_with("Your library links libpython"))
+        {
+            return Err(err);
+        }
     } else {
         bail!("Should have errored");
     }

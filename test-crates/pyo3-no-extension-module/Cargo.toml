@@ -1,16 +1,13 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
-name = "pyo3-pure"
+name = "pyo3-no-extension-module"
 version = "2.1.0"
 description = "Does not use the extension-module feature, thus errorneously linking libpython"
 edition = "2018"
-
-[package.metadata.maturin.scripts]
-get_42 = "pyo3_pure:DummyClass.get_42"
 
 [dependencies]
 pyo3 = { version = "0.13.0", default-features = false }
 
 [lib]
-name = "pyo3_pure"
+name = "pyo3_no_extension_module"
 crate-type = ["cdylib"]

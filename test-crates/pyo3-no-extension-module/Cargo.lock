@@ -67,7 +67,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pyo3-pure"
+name = "pyo3-no-extension-module"
 version = "2.1.0"
 dependencies = [
  "pyo3",

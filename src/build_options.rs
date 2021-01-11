@@ -196,7 +196,9 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
         [pyo3_crate] => {
             // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
             // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-            Ok(pyo3_crate
+            let abi3_selected = pyo3_crate.features.iter().any(|x| x == "abi3");
+
+            let min_abi3_version = pyo3_crate
                 .features
                 .iter()
                 .filter(|x| x.starts_with("abi3-py") && x.len() == "abi3-pyxx".len())
@@ -209,7 +211,14 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
                 .collect::<Result<Vec<(u8, u8)>>>()
                 .context("Bogus pyo3 cargo features")?
                 .into_iter()
-                .min())
+                .min();
+            if abi3_selected && min_abi3_version.is_none() {
+                bail!(
+                    "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
+                    maturin needs a minimum version feature to build abi3 wheels."
+                )
+            }
+            Ok(min_abi3_version)
         }
         _ => bail!(format!(
             "Expected exactly one pyo3 dependency, found {}",

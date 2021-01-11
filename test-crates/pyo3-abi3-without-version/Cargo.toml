@@ -1,0 +1,12 @@
+[package]
+name = "pyo3-abi3-without-version"
+version = "0.1.0"
+authors = ["konstin <konstin@mailbox.org>"]
+edition = "2018"
+
+[dependencies]
+pyo3 = { version ="0.13.1", features = ["abi3", "extension-module"] }
+
+[lib]
+name = "pyo3_abi3_without_version"
+crate-type = ["cdylib"]

@@ -137,13 +137,11 @@ impl BuildOptions {
             Err(cargo_metadata::Error::Io(inner)) if inner.kind() == io::ErrorKind::NotFound => {
                 // NotFound is the specific error when cargo is not in PATH
                 return Err(inner)
-                    .context("Cargo metadata failed. Do you have cargo in your PATH?")
-                    .into();
+                    .context("Cargo metadata failed. Do you have cargo in your PATH?");
             }
             Err(err) => {
                 return Err(err)
-                    .context("Cargo metadata failed. Does your crate compile with `cargo build`?")
-                    .into();
+                    .context("Cargo metadata failed. Does your crate compile with `cargo build`?");
             }
         };
 

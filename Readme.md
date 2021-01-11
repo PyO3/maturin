@@ -3,7 +3,7 @@
 _formerly pyo3-pack_
 
 [![Actions Status](https://github.com/PyO3/maturin/workflows/Run%20tests/badge.svg)](https://github.com/PyO3/maturin/actions)
-[![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin?style=flat-square&task=freebsd)](https://cirrus-ci.com/github/PyO3/maturin)
+[![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/master?style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Crates.io](https://img.shields.io/crates/v/maturin.svg?style=flat-square)](https://crates.io/crates/maturin)
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?style=flat-square)](https://pypi.org/project/maturin/)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?style=flat-square)](https://gitter.im/PyO3/Lobby)

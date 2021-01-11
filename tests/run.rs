@@ -44,7 +44,10 @@ fn integration_pyo3_mixed() {
 #[test]
 #[ignore]
 fn integration_pyo3_pure_conda() {
-    handle_result(test_integration_conda("text-crates/pyo3-pure", None));
+    handle_result(integration::test_integration_conda(
+        "text-crates/pyo3-pure",
+        None,
+    ));
 }
 
 #[test]
@@ -74,6 +77,7 @@ fn abi3_without_version() {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
 fn pyo3_no_extension_module() {
     handle_result(errors::pyo3_no_extension_module())
 }

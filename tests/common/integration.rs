@@ -123,7 +123,7 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 }
 
 #[cfg(target_os = "windows")]
-fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
     use std::env;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();

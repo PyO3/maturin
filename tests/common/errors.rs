@@ -25,6 +25,7 @@ pub fn abi3_without_version() -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 pub fn pyo3_no_extension_module() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![

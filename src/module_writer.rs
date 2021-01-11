@@ -12,6 +12,7 @@ use fs_err::File;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
+#[cfg(not(target_os = "windows"))]
 use std::fs::OpenOptions;
 use std::io;
 use std::io::{Read, Write};

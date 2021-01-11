@@ -131,7 +131,7 @@ You can also specify [trove classifiers](https://pypi.org/classifiers/) in your 
 classifier = ["Programming Language :: Python"]
 ```
 
-You can use other fields from the [python core metadata](https://packaging.python.org/specifications/core-metadata/) in the `[package.metadata.maturin]` section, specifically ` maintainer`, `maintainer-email` and `requires-python` (string fields), as well as `requires-external`, `project-url` and `provides-extra` (lists of strings).
+You can use other fields from the [python core metadata](https://packaging.python.org/specifications/core-metadata/) in the `[package.metadata.maturin]` section, specifically ` maintainer`, `maintainer-email` and `requires-python` (string fields), as well as `requires-external` and `provides-extra` (lists of strings) and `project-url` (dictionary string to string)
 
 ## pyproject.toml
 

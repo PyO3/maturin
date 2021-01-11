@@ -4,6 +4,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::{env, io, str};
 
+pub mod develop;
+pub mod errors;
+pub mod integration;
+
 // Y U NO accept windows path prefix, pip?
 // Anyways, here's shepmasters stack overflow solution
 // https://stackoverflow.com/a/50323079/3549270

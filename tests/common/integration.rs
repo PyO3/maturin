@@ -1,51 +1,14 @@
+use crate::common::{adjust_canonicalization, check_installed, maybe_mock_cargo};
+use anyhow::{bail, Context, Result};
+use maturin::{BuildOptions, Target};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
-
-use anyhow::{bail, Context, Result};
 use structopt::StructOpt;
-
-use maturin::{BuildOptions, Target};
-
-use crate::common::{adjust_canonicalization, check_installed, handle_result, maybe_mock_cargo};
-
-mod common;
-
-#[test]
-fn test_integration_pyo3_pure() {
-    handle_result(test_integration("test-crates/pyo3-pure", None));
-}
-
-#[test]
-fn test_integration_pyo3_mixed() {
-    handle_result(test_integration("test-crates/pyo3-mixed", None));
-}
-
-#[cfg(target_os = "windows")]
-#[test]
-#[ignore]
-fn test_integration_pyo3_pure_conda() {
-    handle_result(test_integration_conda("text-crates/pyo3-pure", None));
-}
-
-#[test]
-fn test_integration_cffi_pure() {
-    handle_result(test_integration("test-crates/cffi-pure", None));
-}
-
-#[test]
-fn test_integration_cffi_mixed() {
-    handle_result(test_integration("test-crates/cffi-mixed", None));
-}
-
-#[test]
-fn test_integration_hello_world() {
-    handle_result(test_integration("test-crates/hello-world", None));
-}
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
-fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
     maybe_mock_cargo();
 
     let target = Target::from_target_triple(None)?;

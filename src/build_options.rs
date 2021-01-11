@@ -9,6 +9,7 @@ use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand, Node};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -126,11 +127,25 @@ impl BuildOptions {
 
         let cargo_metadata_extra_args = extra_feature_args(&cargo_extra_args);
 
-        let cargo_metadata = MetadataCommand::new()
+        let result = MetadataCommand::new()
             .manifest_path(&self.manifest_path)
             .other_options(cargo_metadata_extra_args)
-            .exec()
-            .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
+            .exec();
+
+        let cargo_metadata = match result {
+            Ok(cargo_metadata) => cargo_metadata,
+            Err(cargo_metadata::Error::Io(inner)) if inner.kind() == io::ErrorKind::NotFound => {
+                // NotFound is the specific error when cargo is not in PATH
+                return Err(inner)
+                    .context("Cargo metadata failed. Do you have cargo in your PATH?")
+                    .into();
+            }
+            Err(err) => {
+                return Err(err)
+                    .context("Cargo metadata failed. Does your crate compile with `cargo build`?")
+                    .into();
+            }
+        };
 
         let bridge = find_bridge(&cargo_metadata, self.bindings.as_deref())?;
 

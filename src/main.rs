@@ -238,11 +238,16 @@ enum Opt {
         #[structopt(short, long, parse(from_os_str))]
         out: Option<PathBuf>,
     },
-    /// This is supposed to become an upload command eventually
-    #[structopt(name = "print-metadata", setting = structopt::clap::AppSettings::Hidden)]
-    PrintMetadata {
-        #[structopt(parse(from_os_str))]
-        file: PathBuf,
+    /// WIP Upload command, similar to twine
+    ///
+    /// ```
+    /// maturin upload dist/*
+    /// ```
+    #[structopt(name = "upload", setting = structopt::clap::AppSettings::Hidden)]
+    Upload {
+        /// Wheels and source distributions to upload
+        #[structopt(name = "FILE", parse(from_os_str))]
+        files: Vec<PathBuf>,
     },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
@@ -532,8 +537,16 @@ fn run() -> Result<()> {
             .context("Failed to build source distribution")?;
         }
         Opt::PEP517(subcommand) => pep517(subcommand)?,
-        Opt::PrintMetadata { file } => {
-            let metadata = get_metadata_for_distribution(&file)?;
+        Opt::Upload { files } => {
+            if files.is_empty() {
+                println!("⚠  Warning: No files given, exiting.");
+                return Ok(());
+            }
+            let metadata: Vec<Vec<(String, String)>> = files
+                .iter()
+                .map(|path| get_metadata_for_distribution(&path))
+                .collect::<Result<_>>()?;
+
             println!("{:?}", metadata);
         }
     }

@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use flate2::read::GzDecoder;
 use fs_err::File;
 use mailparse::parse_mail;
+use regex::Regex;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use zip::ZipArchive;
@@ -34,6 +35,15 @@ fn metadata_from_bytes(metadata_email: &mut Vec<u8>) -> Result<Vec<(String, Stri
     Ok(metadata)
 }
 
+/// Port of pip's `canonicalize_name`
+/// https://github.com/pypa/pip/blob/b33e791742570215f15663410c3ed987d2253d5b/src/pip/_vendor/packaging/utils.py#L18-L25
+fn canonicalize_name(name: &str) -> String {
+    Regex::new("[-_.]+")
+        .unwrap()
+        .replace(name, "-")
+        .to_lowercase()
+}
+
 /// Reads the METADATA file in the .dist-info directory of a wheel, returning
 /// the metadata (https://packaging.python.org/specifications/core-metadata/)
 /// as key value pairs
@@ -51,16 +61,35 @@ fn read_metadata_for_wheel(path: impl AsRef<Path>) -> Result<Vec<(String, String
     let reader = BufReader::new(File::open(path.as_ref())?);
     let mut archive = ZipArchive::new(reader).context("Failed to read file as zip")?;
     // The METADATA format is an email (RFC 822)
+    // pip's implementation: https://github.com/pypa/pip/blob/b33e791742570215f15663410c3ed987d2253d5b/src/pip/_internal/utils/wheel.py#L109-L144
+    // twine's implementation: https://github.com/pypa/twine/blob/534385596820129b41cbcdcc83d34aa8788067f1/twine/wheel.py#L52-L56
+    // We mostly follow pip
     let name = format!("{}.dist-info/METADATA", dist_name_version);
     let mut metadata_email = Vec::new();
-    archive
-        .by_name(&name)
-        .context(format!(
-            "This wheel does not contain a METADATA file at {}, which is mandatory for wheels",
+
+    // Find the metadata file
+    let metadata_files: Vec<_> = archive
+        .file_names()
+        .filter(|i| canonicalize_name(i) == canonicalize_name(&name))
+        .map(ToString::to_string)
+        .collect();
+
+    match &metadata_files.as_slice() {
+        [] => bail!(
+            "This wheel does not contain a METADATA matching {}, which is mandatory for wheels",
             name
-        ))?
-        .read_to_end(&mut metadata_email)
-        .context("Failed to read METADATA file")?;
+        ),
+        [metadata_file] => archive
+            .by_name(&metadata_file)
+            .context(format!("Failed to read METADATA file {}", metadata_file))?
+            .read_to_end(&mut metadata_email)
+            .context(format!("Failed to read METADATA file {}", metadata_file))?,
+        files => bail!(
+            "Found more than one metadata file matching {}: {:?}",
+            name,
+            files
+        ),
+    };
 
     metadata_from_bytes(&mut metadata_email)
 }

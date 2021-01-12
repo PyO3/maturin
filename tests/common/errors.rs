@@ -25,6 +25,7 @@ pub fn abi3_without_version() -> Result<()> {
     Ok(())
 }
 
+/// Check that you get a good error message if you forgot to set the extension-module feature
 #[cfg(target_os = "linux")]
 pub fn pyo3_no_extension_module() -> Result<()> {
     // The first argument is ignored by clap

@@ -1,4 +1,5 @@
 use crate::build_context::{BridgeModel, ProjectLayout};
+use crate::python_interpreter::InterpreterKind;
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Manylinux;
@@ -384,15 +385,36 @@ pub fn find_interpreter(
             Ok(vec![interpreter])
         }
         BridgeModel::Bin => Ok(vec![]),
-        BridgeModel::BindingsAbi3(_, _) => {
+        BridgeModel::BindingsAbi3(major, minor) => {
             // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
             // Unfortunately, on windows we need one to figure out base_prefix for a linker
             // argument.
             if target.is_windows() {
-                let interpreter =
-                    find_single_python_interpreter(bridge, interpreter, target, "abi3 on windows")?;
-                println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interpreter);
-                Ok(vec![interpreter])
+                if let Some(manual_base_prefix) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
+                    // PYO3_CROSS_LIB_DIR equals base_prefix when cross compiling,
+                    // so we fake a python interpreter matching it
+                    println!("⚠ Cross-compiling is poorly supported");
+                    Ok(vec![PythonInterpreter {
+                        major: *major as usize,
+                        minor: *minor as usize,
+                        abiflags: "".to_string(),
+                        target: target.clone(),
+                        executable: PathBuf::new(),
+                        ext_suffix: Some(".pyd".to_string()),
+                        interpreter_kind: InterpreterKind::CPython,
+                        abi_tag: None,
+                        base_prefix: PathBuf::from(manual_base_prefix),
+                    }])
+                } else {
+                    let interpreter = find_single_python_interpreter(
+                        bridge,
+                        interpreter,
+                        target,
+                        "abi3 on windows",
+                    )?;
+                    println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interpreter);
+                    Ok(vec![interpreter])
+                }
             } else {
                 println!("🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)");
                 Ok(vec![])

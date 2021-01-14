@@ -6,14 +6,14 @@ ENV PATH /opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp3
 # Otherwise `cargo new` errors
 ENV USER root
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && python3 -m pip install --no-cache-dir cffi \
     && mkdir /io
 
 ADD . /maturin/
 
-RUN cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml -- -C link-arg=-s \
-    && mv /maturin/target/debug/maturin /usr/bin/maturin \
+RUN cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release -- -C link-arg=-s \
+    && mv /maturin/target/release/maturin /usr/bin/maturin \
     && rm -rf /maturin
 
 WORKDIR /io

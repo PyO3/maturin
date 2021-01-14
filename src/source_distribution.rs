@@ -38,6 +38,8 @@ pub fn warn_on_local_deps(cargo_metadata: &Metadata) {
 ///
 /// The source distribution format is specified in
 /// [PEP 517 under "build_sdist"](https://www.python.org/dev/peps/pep-0517/#build-sdist)
+/// and in
+/// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
 pub fn source_distribution(
     wheel_dir: impl AsRef<Path>,
     metadata21: &Metadata21,
@@ -86,8 +88,15 @@ pub fn source_distribution(
     }
 
     let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
+    let root_dir = PathBuf::from(format!(
+        "{}-{}",
+        &metadata21.get_distribution_escaped(),
+        &metadata21.get_version_escaped()
+    ));
+    writer.add_directory(&root_dir)?;
     for (target, source) in target_source {
-        writer.add_file(target, source)?;
+        println!("{} {}", target.display(), source.display());
+        writer.add_file(root_dir.join(target), source)?;
     }
 
     if let Some(include_targets) = sdist_include {
@@ -102,7 +111,10 @@ pub fn source_distribution(
         }
     }
 
-    writer.add_bytes("PKG-INFO", metadata21.to_file_contents().as_bytes())?;
+    writer.add_bytes(
+        root_dir.join("PKG-INFO"),
+        metadata21.to_file_contents().as_bytes(),
+    )?;
 
     let source_distribution_path = writer.finish()?;
 

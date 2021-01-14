@@ -6,7 +6,7 @@ ENV PATH /opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp3
 # Otherwise `cargo new` errors
 ENV USER root
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && python3 -m pip install --no-cache-dir cffi \
     && mkdir /io
 

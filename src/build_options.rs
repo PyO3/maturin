@@ -391,8 +391,8 @@ pub fn find_interpreter(
             // argument.
             if target.is_windows() {
                 if let Some(manual_base_prefix) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
-                    // PYO3_CROSS_LIB_DIR equals base_prefix when cross compiling,
-                    // so we fake a python interpreter matching it
+                    // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
+                    // when cross compiling, so we fake a python interpreter matching it
                     println!("⚠ Cross-compiling is poorly supported");
                     Ok(vec![PythonInterpreter {
                         major: *major as usize,
@@ -403,7 +403,7 @@ pub fn find_interpreter(
                         ext_suffix: Some(".pyd".to_string()),
                         interpreter_kind: InterpreterKind::CPython,
                         abi_tag: None,
-                        base_prefix: PathBuf::from(manual_base_prefix),
+                        libs_dir: PathBuf::from(manual_base_prefix),
                     }])
                 } else {
                     let interpreter = find_single_python_interpreter(

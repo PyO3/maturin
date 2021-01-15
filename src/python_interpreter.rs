@@ -292,7 +292,7 @@ pub struct PythonInterpreter {
     /// Note that this always `None` on windows
     pub abi_tag: Option<String>,
     /// We need this value for windows abi3 linking
-    pub base_prefix: PathBuf,
+    pub libs_dir: PathBuf,
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -535,7 +535,7 @@ impl PythonInterpreter {
             ext_suffix: message.ext_suffix,
             interpreter_kind: interpreter,
             abi_tag: message.abi_tag,
-            base_prefix: PathBuf::from(message.base_prefix),
+            libs_dir: PathBuf::from(message.base_prefix).join("libs"),
         }))
     }
 

@@ -66,8 +66,7 @@ pub fn compile(
         if context.target.is_windows() {
             let python_interpreter = python_interpreter
                 .expect("Must have a python interpreter for building abi3 on windows");
-            pythonxy_lib_folder =
-                format!("native={}\\libs", python_interpreter.base_prefix.display());
+            pythonxy_lib_folder = format!("native={}", python_interpreter.libs_dir.display());
             rustc_args.extend(&["-L", &pythonxy_lib_folder]);
         }
     }

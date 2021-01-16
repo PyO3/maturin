@@ -9,6 +9,12 @@ edition = "2018"
 [package.metadata.maturin.scripts]
 get_42 = "pyo3_mixed:get_42"
 
+[package.metadata.maturin]
+classifier = [
+    "Programming Language :: Python",
+    "Programming Language :: Rust"
+]
+
 [dependencies]
 pyo3 = { version = "0.13.1", features = ["extension-module"] }
 

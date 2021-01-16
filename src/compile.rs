@@ -1,7 +1,7 @@
 use crate::build_context::BridgeModel;
 use crate::BuildContext;
 use crate::PythonInterpreter;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use fs_err::File;
 use std::collections::HashMap;
 use std::io::{BufReader, Read};
@@ -16,6 +16,74 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
+) -> Result<HashMap<String, PathBuf>> {
+    if context.target.is_macos_universal2() {
+        let arm64_artifact = compile_target(
+            context,
+            python_interpreter,
+            bindings_crate,
+            Some("aarch64-apple-darwin"),
+        )
+        .context("Failed to build a arm64 library through cargo")?
+        .get("cdylib")
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
+                 in the lib section of your Cargo.toml?",
+            )
+        })?;
+        let x86_64_artifact = compile_target(
+            context,
+            python_interpreter,
+            bindings_crate,
+            Some("x86_64-apple-darwin"),
+        )
+        .context("Failed to build a x86_64 library through cargo")?
+        .get("cdylib")
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
+                 in the lib section of your Cargo.toml?",
+            )
+        })?;
+        // Use lipo to create an universal dylib
+        let cdylib_path = arm64_artifact
+            .display()
+            .to_string()
+            .replace("aarch64-apple-darwin/", "");
+        let mut cmd = Command::new("lipo");
+        cmd.arg("-create")
+            .arg("-output")
+            .arg(&cdylib_path)
+            .arg(arm64_artifact)
+            .arg(x86_64_artifact);
+        let lipo = cmd.spawn().context("Failed to run lipo")?;
+        let output = lipo
+            .wait_with_output()
+            .expect("Failed to wait on lipo child process");
+
+        if !output.status.success() {
+            bail!(
+                r#"lipo finished with "{}": {}"#,
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            )
+        }
+        let mut result = HashMap::new();
+        result.insert("cdylib".to_string(), PathBuf::from(cdylib_path));
+        Ok(result)
+    } else {
+        compile_target(context, python_interpreter, bindings_crate, None)
+    }
+}
+
+fn compile_target(
+    context: &BuildContext,
+    python_interpreter: Option<&PythonInterpreter>,
+    bindings_crate: &BridgeModel,
+    target: Option<&str>,
 ) -> Result<HashMap<String, PathBuf>> {
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
@@ -32,6 +100,10 @@ pub fn compile(
 
     if context.release {
         shared_args.push("--release");
+    }
+    if let Some(target) = target {
+        shared_args.push("--target");
+        shared_args.push(target);
     }
 
     let cargo_args = vec!["rustc", "--message-format", "json"];

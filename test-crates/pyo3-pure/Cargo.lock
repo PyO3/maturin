@@ -163,7 +163,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-pure"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "pyo3",
 ]

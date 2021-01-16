@@ -44,7 +44,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
     if let Err(err) = result {
         if !(err
             .source()
-            .ok_or(format_err!("{}", err))?
+            .ok_or_else(|| format_err!("{}", err))?
             .to_string()
             .starts_with("Your library links libpython"))
         {

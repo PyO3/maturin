@@ -182,7 +182,7 @@ mod test {
             ]
         );
         // Check the description
-        assert!(metadata.clone()[7].1.starts_with("# pyo3-mixed"));
-        assert!(metadata.clone()[7].1.ends_with("tox.ini\n\n"));
+        assert!(metadata[7].1.starts_with("# pyo3-mixed"));
+        assert!(metadata[7].1.ends_with("tox.ini\n\n"));
     }
 }

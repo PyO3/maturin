@@ -492,7 +492,7 @@ mod test {
 
     #[test]
     fn test_path_to_content_type() {
-        for (filename, expected) in vec![
+        for (filename, expected) in &[
             ("r.md", GFM_CONTENT_TYPE),
             ("r.markdown", GFM_CONTENT_TYPE),
             ("r.mArKdOwN", GFM_CONTENT_TYPE),
@@ -502,7 +502,7 @@ mod test {
         ] {
             let result = path_to_content_type(&PathBuf::from(filename));
             assert_eq!(
-                result.as_str(),
+                &result.as_str(),
                 expected,
                 "Wrong content type for file '{}'. Expected '{}', got '{}'",
                 filename,

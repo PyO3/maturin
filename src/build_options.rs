@@ -527,10 +527,10 @@ mod test {
             .exec()
             .unwrap();
 
-        assert!(match find_bridge(&pyo3_pure, None).unwrap() {
-            BridgeModel::Bindings(_) => true,
-            _ => false,
-        });
+        assert!(matches!(
+            find_bridge(&pyo3_pure, None).unwrap(),
+            BridgeModel::Bindings(_)
+        ));
     }
 
     #[test]

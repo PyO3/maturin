@@ -2,8 +2,10 @@ use crate::build_context::BridgeModel;
 use crate::BuildContext;
 use crate::PythonInterpreter;
 use anyhow::{anyhow, bail, Context, Result};
+use fat_macho::FatWriter;
 use fs_err::File;
 use std::collections::HashMap;
+use std::fs;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -60,29 +62,25 @@ pub fn compile(
                 anyhow!("Cargo didn't build a x86_64 bin.")
             }
         })?;
-        // Use lipo to create an universal dylib/bin
-        let output_path = aarch64_artifact
+
+        // Create an universal dylib
+        let cdylib_path = arm64_artifact
             .display()
             .to_string()
             .replace("aarch64-apple-darwin/", "");
-        let mut cmd = Command::new("lipo");
-        cmd.arg("-create")
-            .arg("-output")
-            .arg(&output_path)
-            .arg(aarch64_artifact)
-            .arg(x86_64_artifact);
-        let lipo = cmd.spawn().context("Failed to run lipo")?;
-        let output = lipo
-            .wait_with_output()
-            .expect("Failed to wait on lipo child process");
+        let mut writer = FatWriter::new();
+        let arm64_file = fs::read(arm64_artifact)?;
+        let x86_64_file = fs::read(x86_64_artifact)?;
+        writer
+            .add(&arm64_file)
+            .map_err(|e| anyhow!("Failed to add arm64 cdylib: {:?}", e))?;
+        writer
+            .add(&x86_64_file)
+            .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
+        writer
+            .write_to_file(&cdylib_path)
+            .map_err(|e| anyhow!("Failed to create unversal cdylib: {:?}", e))?;
 
-        if !output.status.success() {
-            bail!(
-                r#"lipo finished with "{}": {}"#,
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            )
-        }
         let mut result = HashMap::new();
         result.insert(build_type.to_string(), PathBuf::from(output_path));
         Ok(result)

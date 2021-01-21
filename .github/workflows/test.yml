@@ -35,6 +35,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          target: aarch64-apple-darwin
           override: true
       #- name: Cache cargo registry
       #  uses: actions/cache@v2
@@ -51,6 +52,16 @@ jobs:
       #  with:
       #    path: target
       #    key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup Xcode env
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "PYO3_CROSS_LIB_DIR=/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.8/lib" >> "${GITHUB_ENV}"
+          sudo xcode-select -s /Applications/Xcode_12.3.app
+          bindir="$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/bin"
+          echo "CC=${bindir}/clang" >> "${GITHUB_ENV}"
+          echo "CXX=${bindir}/clang++" >> "${GITHUB_ENV}"
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
       - name: cargo test
         uses: actions-rs/cargo@v1
         with:

@@ -319,14 +319,19 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
             let context = build_options.into_build_context(true, strip)?;
             let tags = match context.bridge {
                 BridgeModel::Bindings(_) => {
-                    vec![context.interpreter[0].get_tag(&context.manylinux)]
+                    vec![context.interpreter[0].get_tag(&context.manylinux, context.universal2)]
                 }
                 BridgeModel::BindingsAbi3(major, minor) => {
-                    let platform = context.target.get_platform_tag(&context.manylinux);
+                    let platform = context
+                        .target
+                        .get_platform_tag(&context.manylinux, context.universal2);
                     vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
                 }
                 BridgeModel::Bin | BridgeModel::Cffi => {
-                    context.target.get_universal_tags(&context.manylinux).1
+                    context
+                        .target
+                        .get_universal_tags(&context.manylinux, context.universal2)
+                        .1
                 }
             };
 

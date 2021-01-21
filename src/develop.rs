@@ -36,6 +36,7 @@ pub fn develop(
         target: None,
         cargo_extra_args,
         rustc_extra_args,
+        universal2: true,
     };
 
     let build_context = build_options.into_build_context(release, strip)?;
@@ -117,16 +118,18 @@ pub fn develop(
     // Write dist-info directory so pip can interact with it
     let tags = match build_context.bridge {
         BridgeModel::Bindings(_) => {
-            vec![build_context.interpreter[0].get_tag(&build_context.manylinux)]
+            vec![build_context.interpreter[0]
+                .get_tag(&build_context.manylinux, build_context.universal2)]
         }
         BridgeModel::BindingsAbi3(major, minor) => {
-            let platform = target.get_platform_tag(&build_context.manylinux);
+            let platform =
+                target.get_platform_tag(&build_context.manylinux, build_context.universal2);
             vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
         }
         BridgeModel::Bin | BridgeModel::Cffi => {
             build_context
                 .target
-                .get_universal_tags(&build_context.manylinux)
+                .get_universal_tags(&build_context.manylinux, build_context.universal2)
                 .1
         }
     };

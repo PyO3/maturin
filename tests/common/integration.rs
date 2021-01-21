@@ -80,6 +80,21 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
 
         let python = target.get_venv_python(&venv_dir);
 
+        // Upgrade pip
+        let output = Command::new(&python)
+            .args(&["-m", "pip", "install", "-U", "pip"])
+            .stderr(Stdio::inherit())
+            .output()
+            .context(format!("pip install failed with {:?}", python))?;
+        if !output.status.success() {
+            bail!(
+                "pip install -U pip failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                output.status,
+                str::from_utf8(&output.stdout)?,
+                str::from_utf8(&output.stderr)?,
+            );
+        }
+
         let command = [
             "-m",
             "pip",

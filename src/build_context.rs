@@ -118,6 +118,8 @@ pub struct BuildContext {
     pub interpreter: Vec<PythonInterpreter>,
     /// Cargo.toml as resolved by [cargo_metadata]
     pub cargo_metadata: Metadata,
+    /// Whether to use universal2 or use the native macOS tag (off)
+    pub universal2: bool,
 }
 
 type BuiltWheelMetadata = (PathBuf, String);
@@ -171,7 +173,9 @@ impl BuildContext {
         // otherwise it's none
         let artifact = self.compile_cdylib(self.interpreter.get(0), Some(&self.module_name))?;
 
-        let platform = self.target.get_platform_tag(&self.manylinux);
+        let platform = self
+            .target
+            .get_platform_tag(&self.manylinux, self.universal2);
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(
@@ -218,7 +222,7 @@ impl BuildContext {
             let artifact =
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
 
-            let tag = python_interpreter.get_tag(&self.manylinux);
+            let tag = python_interpreter.get_tag(&self.manylinux, self.universal2);
 
             let mut writer = WheelWriter::new(
                 &tag,
@@ -300,7 +304,9 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<PathBuf> {
         let artifact = self.compile_cdylib(None, None)?;
 
-        let (tag, tags) = self.target.get_universal_tags(&self.manylinux);
+        let (tag, tags) = self
+            .target
+            .get_universal_tags(&self.manylinux, self.universal2);
 
         let mut builder =
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
@@ -338,7 +344,9 @@ impl BuildContext {
         auditwheel_rs(&artifact, &self.target, &self.manylinux)
             .context(format!("Failed to ensure {} compliance", self.manylinux))?;
 
-        let (tag, tags) = self.target.get_universal_tags(&self.manylinux);
+        let (tag, tags) = self
+            .target
+            .get_universal_tags(&self.manylinux, self.universal2);
 
         if !self.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");

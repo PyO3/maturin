@@ -362,10 +362,10 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, manylinux: &Manylinux) -> String {
+    pub fn get_tag(&self, manylinux: &Manylinux, universal2: bool) -> String {
         match self.interpreter_kind {
             InterpreterKind::CPython => {
-                let platform = self.target.get_platform_tag(manylinux);
+                let platform = self.target.get_platform_tag(manylinux, universal2);
                 if self.target.is_unix() {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
@@ -393,7 +393,7 @@ impl PythonInterpreter {
                     );
                 }
                 // hack to never use manylinux for pypy
-                let platform = self.target.get_platform_tag(&Manylinux::Off);
+                let platform = self.target.get_platform_tag(&Manylinux::Off, universal2);
                 // pypy uses its version as part of the ABI, e.g.
                 // pypy3 v7.1 => pp371-pypy3_71-linux_x86_64.whl
                 format!(

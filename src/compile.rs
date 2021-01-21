@@ -19,7 +19,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
-    if context.target.is_macos_universal2() {
+    if context.target.is_macos() && context.universal2 {
         let build_type = match bindings_crate {
             BridgeModel::Bin => "bin",
             _ => "cdylib",
@@ -30,7 +30,7 @@ pub fn compile(
             bindings_crate,
             Some("aarch64-apple-darwin"),
         )
-        .context("Failed to build a arm64 library through cargo")?
+        .context("Failed to build a aarch64 library through cargo")?
         .get(build_type)
         .cloned()
         .ok_or_else(|| {
@@ -64,21 +64,21 @@ pub fn compile(
         })?;
 
         // Create an universal dylib
-        let cdylib_path = arm64_artifact
+        let output_path = aarch64_artifact
             .display()
             .to_string()
             .replace("aarch64-apple-darwin/", "");
         let mut writer = FatWriter::new();
-        let arm64_file = fs::read(arm64_artifact)?;
+        let aarch64_file = fs::read(aarch64_artifact)?;
         let x86_64_file = fs::read(x86_64_artifact)?;
         writer
-            .add(&arm64_file)
-            .map_err(|e| anyhow!("Failed to add arm64 cdylib: {:?}", e))?;
+            .add(&aarch64_file)
+            .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
         writer
             .add(&x86_64_file)
             .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
         writer
-            .write_to_file(&cdylib_path)
+            .write_to_file(&output_path)
             .map_err(|e| anyhow!("Failed to create unversal cdylib: {:?}", e))?;
 
         let mut result = HashMap::new();

@@ -1,0 +1,91 @@
+name: Build ARM64 wheels
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  build_wheels:
+    name: ARM64 Python Wheels on ubuntu-latest
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pyver: [cp37-cp37m, cp38-cp38, cp39-cp39]
+        arch: [aarch64]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@v1
+      with:
+        platforms: arm64
+
+    - name: Build Python wheels - ${{ matrix.pyver }}
+      run: |
+        podman run --rm=true \
+          -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
+          quay.io/pypa/manylinux2014_${{ matrix.arch }} \
+          bash -exc '\
+            echo $PATH && \
+            curl -L https://sh.rustup.rs > rustup.rs && \
+            chmod +x rustup.rs && \
+            ./rustup.rs -y && \
+            export PATH=$HOME/.cargo/bin:$PATH && \
+            rm -rf venv && \
+            /opt/python/${{ matrix.pyver }}/bin/python -m venv venv && \
+            if [ ! -f "activate" ]; then ln -s venv/bin/activate; fi && \
+            . ./activate && \
+            pip wheel . --wheel-dir=/tmp/wheels/ && \
+            auditwheel repair /tmp/wheels/maturin*.whl --wheel-dir target/wheels/ \
+          '
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: wheels
+        path: target/wheels/
+
+    - name: Install Twine
+      run: |
+        if [ ! -f "venv" ]; then rm -rf venv; fi
+        sudo apt-get install python3-venv python3-pip -y
+        python3 -m venv venv
+        if [ ! -f "activate" ]; then ln -s venv/bin/activate; fi
+        . ./activate
+        pip install twine
+
+    - name: Test for secrets access
+      id: check_secrets
+      shell: bash
+      run: |
+        unset HAS_SECRET
+        if [ -n "$SECRET" ]; then HAS_SECRET='true' ; fi
+        echo ::set-output name=HAS_SECRET::${HAS_SECRET}
+      env:
+        SECRET: "${{ secrets.test_pypi_password }}"
+
+    - name: publish (PyPi)
+      if: startsWith(github.event.ref, 'refs/tags') && steps.check_secrets.outputs.HAS_SECRET
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_NON_INTERACTIVE: 1
+        TWINE_PASSWORD: ${{ secrets.pypi_password }}
+      run: |
+        . ./activate
+        twine upload --non-interactive --skip-existing --verbose 'target/wheels/*'
+
+    - name: publish (Test PyPi)
+      if: steps.check_secrets.outputs.HAS_SECRET
+      env:
+        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+        TWINE_USERNAME: __token__
+        TWINE_NON_INTERACTIVE: 1
+        TWINE_PASSWORD: ${{ secrets.test_pypi_password }}
+      run: |
+        . ./activate
+        twine upload --non-interactive --skip-existing --verbose 'target/wheels/*'

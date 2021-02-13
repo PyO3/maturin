@@ -1,4 +1,4 @@
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, Result};
 use maturin::BuildOptions;
 use structopt::StructOpt;
 
@@ -28,6 +28,8 @@ pub fn abi3_without_version() -> Result<()> {
 /// Check that you get a good error message if you forgot to set the extension-module feature
 #[cfg(target_os = "linux")]
 pub fn pyo3_no_extension_module() -> Result<()> {
+    use anyhow::format_err;
+
     // The first argument is ignored by clap
     let cli = vec![
         "build",

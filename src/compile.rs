@@ -2,7 +2,8 @@ use crate::build_context::BridgeModel;
 use crate::BuildContext;
 use crate::PythonInterpreter;
 use anyhow::{anyhow, bail, Context, Result};
-use fs_err::File;
+use fat_macho::FatWriter;
+use fs_err::{self as fs, File};
 use std::collections::HashMap;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
@@ -17,7 +18,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
-    if context.target.is_macos_universal2() {
+    if context.target.is_macos() && context.universal2 {
         let build_type = match bindings_crate {
             BridgeModel::Bin => "bin",
             _ => "cdylib",
@@ -28,7 +29,7 @@ pub fn compile(
             bindings_crate,
             Some("aarch64-apple-darwin"),
         )
-        .context("Failed to build a arm64 library through cargo")?
+        .context("Failed to build a aarch64 library through cargo")?
         .get(build_type)
         .cloned()
         .ok_or_else(|| {
@@ -60,29 +61,25 @@ pub fn compile(
                 anyhow!("Cargo didn't build a x86_64 bin.")
             }
         })?;
-        // Use lipo to create an universal dylib/bin
+
+        // Create an universal dylib
         let output_path = aarch64_artifact
             .display()
             .to_string()
             .replace("aarch64-apple-darwin/", "");
-        let mut cmd = Command::new("lipo");
-        cmd.arg("-create")
-            .arg("-output")
-            .arg(&output_path)
-            .arg(aarch64_artifact)
-            .arg(x86_64_artifact);
-        let lipo = cmd.spawn().context("Failed to run lipo")?;
-        let output = lipo
-            .wait_with_output()
-            .expect("Failed to wait on lipo child process");
+        let mut writer = FatWriter::new();
+        let aarch64_file = fs::read(aarch64_artifact)?;
+        let x86_64_file = fs::read(x86_64_artifact)?;
+        writer
+            .add(aarch64_file)
+            .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
+        writer
+            .add(x86_64_file)
+            .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
+        writer
+            .write_to_file(&output_path)
+            .map_err(|e| anyhow!("Failed to create unversal cdylib: {:?}", e))?;
 
-        if !output.status.success() {
-            bail!(
-                r#"lipo finished with "{}": {}"#,
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            )
-        }
         let mut result = HashMap::new();
         result.insert(build_type.to_string(), PathBuf::from(output_path));
         Ok(result)

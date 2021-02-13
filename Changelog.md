@@ -5,14 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## 0.9.1 - Unreleased
+## 0.9.1 - 2021-01-13
 
  * Error when the `abi3` feature is selected but no minimum version
  * Support building universal2 wheels (x86 and aarch64 in a single file) by messense in [#403](https://github.com/PyO3/maturin/pull/403)
  * Recognize `PYO3_CROSS_LIB_DIR` for cross compiling with abi3 targeting windows. 
- * `package.metadata.maturin.classifier` is renamed to `classifiers`
+ * `package.metadata.maturin.classifier` is renamed to `classifiers` by kngwyu in [#416](https://github.com/PyO3/maturin/pull/416)
+ * Added more instructions to building complex manylinux setups
 
-## 0.9.0 - 2020-01-10
+## 0.9.0 - 2021-01-10
 
  * Added support for building abi3 wheels with pyo3 0.13.1
  * Python 3.9 is supported (it should have worked before, but it is now tested on ci)

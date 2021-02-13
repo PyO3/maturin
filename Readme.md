@@ -131,7 +131,7 @@ You can also specify [trove classifiers](https://pypi.org/classifiers/) in your 
 classifiers = ["Programming Language :: Python"]
 ```
 
-Note that `package.metadata.maturin.classifier` is
+Note that `package.metadata.maturin.classifier` is also supported for backwards compatibility.
 
 You can use other fields from the [python core metadata](https://packaging.python.org/specifications/core-metadata/) in the `[package.metadata.maturin]` section, specifically ` maintainer`, `maintainer-email` and `requires-python` (string fields), as well as `requires-external` and `provides-extra` (lists of strings) and `project-url` (dictionary string to string)
 

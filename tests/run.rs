@@ -1,3 +1,4 @@
+/// To speed up the tests, they are tests all collected in a single module
 use common::{develop, errors, handle_result, integration};
 
 mod common;

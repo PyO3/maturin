@@ -2,50 +2,82 @@ use crate::module_writer::ModuleWriter;
 use crate::{Metadata21, SDistWriter};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::Metadata;
+use fs_err as fs;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::{fs, str};
+use std::str;
 
-/// Checks if there a local/path dependencies which might not be included
-/// when building the source distribution.
-pub fn warn_on_local_deps(cargo_metadata: &Metadata) {
-    let root_package = cargo_metadata
-        .resolve
-        .clone()
-        .and_then(|y| y.root)
-        .expect("Expected a resolve with a root");
+const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 
-    let local_deps: Vec<String> = cargo_metadata
-        .packages
-        .iter()
-        .filter(|x| x.source.is_none())
-        // Remove the package itself
-        .filter(|x| x.id != root_package)
-        .map(|x| x.name.clone())
-        .collect();
-    if !local_deps.is_empty() {
-        eprintln!(
-            "⚠ There are local dependencies, which the source distribution might not include: {}",
-            local_deps.join(", ")
-        );
+/// We need cargo to load the local dependencies from the location where we put them in the source
+/// distribution. Since there is no cargo-backed way to replace dependencies
+/// (see https://github.com/rust-lang/cargo/issues/9170), we do a simple
+/// Cargo.toml rewrite ourselves.
+/// A big chunk of that (including toml_edit) comes from cargo edit, and esp.
+/// https://github.com/killercup/cargo-edit/blob/2a08f0311bcb61690d71d39cb9e55e69b256c8e1/src/manifest.rs
+/// This method is rather frail, but unfortunately I don't know a better solution.
+fn rewrite_cargo_toml(
+    manifest_path: impl AsRef<Path>,
+    known_path_deps: &HashMap<String, String>,
+) -> Result<String> {
+    let text = fs::read_to_string(&manifest_path).context(format!(
+        "Can't read Cargo.toml at {}",
+        manifest_path.as_ref().display(),
+    ))?;
+    let mut data = text.parse::<toml_edit::Document>().context(format!(
+        "Failed to parse Cargo.toml at {}",
+        manifest_path.as_ref().display()
+    ))?;
+    //  ˇˇˇˇˇˇˇˇˇˇˇˇ dep_category
+    // [dependencies]
+    // some_path_dep = { path = "../some_path_dep" }
+    //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
+    // ^^^^^^^^^^^^^ dep_name
+    for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
+        if let Some(table) = data[&dep_category].as_table_mut() {
+            let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
+            for dep_name in dep_names {
+                // There should either be no value for path, or it should be a string
+                if table[&dep_name]["path"].is_none() {
+                    continue;
+                }
+                if !table[&dep_name]["path"].is_str() {
+                    bail!(
+                        "In {}, {} {} has a path value that is not a string",
+                        manifest_path.as_ref().display(),
+                        dep_category,
+                        dep_name
+                    )
+                }
+                // This is the location of the targeted crate in the source distribution
+                table[&dep_name]["path"] =
+                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name));
+                if !known_path_deps.contains_key(&dep_name) {
+                    bail!(
+                        "cargo metadata does not know about the path for {} {} present in {}, which should never happen ಠ_ಠ",
+                        dep_category, dep_name, manifest_path.as_ref().display()
+                    );
+                }
+            }
+        }
     }
+    Ok(data.to_string_in_original_order())
 }
 
-/// Creates a source distribution
+/// Copies the files of a crate to a source distribution, recursively adding path dependencies
+/// and rewriting path entries in Cargo.toml
 ///
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
-///
-/// The source distribution format is specified in
-/// [PEP 517 under "build_sdist"](https://www.python.org/dev/peps/pep-0517/#build-sdist)
-/// and in
-/// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
-pub fn source_distribution(
-    wheel_dir: impl AsRef<Path>,
-    metadata21: &Metadata21,
+fn add_crate_to_source_distribution(
+    writer: &mut SDistWriter,
     manifest_path: impl AsRef<Path>,
-    sdist_include: Option<&Vec<String>>,
-) -> Result<PathBuf> {
+    prefix: impl AsRef<Path>,
+    known_path_deps: &HashMap<String, String>,
+    root_crate: bool,
+) -> Result<()> {
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path.as_ref())
@@ -74,18 +106,67 @@ pub fn source_distribution(
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
             (relative_to_manifests.to_path_buf(), relative_to_cwd)
         })
-        .filter(|(target, _)| target != Path::new("Cargo.toml.orig"))
+        // We rewrite Cargo.toml and add it separately
+        .filter(|(target, _)| {
+            target != Path::new("Cargo.toml.orig") && target != Path::new("Cargo.toml")
+        })
         .collect();
 
-    if !target_source
-        .iter()
-        .any(|(target, _)| target == Path::new("pyproject.toml"))
+    if root_crate
+        && !target_source
+            .iter()
+            .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
         bail!(
             "pyproject.toml was not included by `cargo package`. \
-             Please make sure pyproject.toml is not excluded or build with `--no-sdist`"
+                 Please make sure pyproject.toml is not excluded or build with `--no-sdist`"
         )
     }
+
+    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, &known_path_deps)?;
+
+    writer.add_directory(&prefix)?;
+    writer.add_bytes(
+        prefix
+            .as_ref()
+            .join(manifest_path.as_ref().file_name().unwrap()),
+        rewritten_cargo_toml.as_bytes(),
+    )?;
+    for (target, source) in target_source {
+        writer.add_file(prefix.as_ref().join(target), source)?;
+    }
+
+    Ok(())
+}
+
+/// Creates aif source distribution, packing the root crate and all local dependencies
+///
+/// The source distribution format is specified in
+/// [PEP 517 under "build_sdist"](https://www.python.org/dev/peps/pep-0517/#build-sdist)
+/// and in
+/// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
+pub fn source_distribution(
+    wheel_dir: impl AsRef<Path>,
+    metadata21: &Metadata21,
+    manifest_path: impl AsRef<Path>,
+    cargo_metadata: &Metadata,
+    sdist_include: Option<&Vec<String>>,
+) -> Result<PathBuf> {
+    // Parse ids in the format:
+    // some_path_dep 0.1.0 (path+file:///home/konsti/maturin/test-crates/some_path_dep)
+    // This is not a good way to identify path dependencies, but I don't know a better one
+    let matcher = Regex::new(r"^(.*) .* \(path\+file://(.*)\)$").unwrap();
+    let resolve = cargo_metadata
+        .resolve
+        .as_ref()
+        .context("Expected to get a dependency graph from cargo")?;
+    let known_path_deps: HashMap<String, String> = resolve
+        .nodes
+        .iter()
+        .filter(|node| &node.id != resolve.root.as_ref().unwrap())
+        .filter_map(|node| matcher.captures(&node.id.repr))
+        .map(|captures| (captures[1].to_string(), captures[2].to_string()))
+        .collect();
 
     let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
     let root_dir = PathBuf::from(format!(
@@ -93,10 +174,32 @@ pub fn source_distribution(
         &metadata21.get_distribution_escaped(),
         &metadata21.get_version_escaped()
     ));
-    writer.add_directory(&root_dir)?;
-    for (target, source) in target_source {
-        writer.add_file(root_dir.join(target), source)?;
+
+    // Add local path dependencies
+    for (name, path) in known_path_deps.iter() {
+        add_crate_to_source_distribution(
+            &mut writer,
+            &PathBuf::from(path).join("Cargo.toml"),
+            &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
+            &known_path_deps,
+            false,
+        )
+        .context(format!(
+            "Failed to add local dependency {} at {} to the source distribution",
+            name, path
+        ))?;
     }
+
+    // Add the main crate
+    add_crate_to_source_distribution(
+        &mut writer,
+        &manifest_path,
+        &root_dir,
+        &known_path_deps,
+        false,
+    )?;
+
+    let manifest_dir = manifest_path.as_ref().parent().unwrap();
 
     if let Some(include_targets) = sdist_include {
         for pattern in include_targets {

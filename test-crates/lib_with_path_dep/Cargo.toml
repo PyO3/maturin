@@ -8,5 +8,6 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
+# Don't use the macros feature, which makes compilation much faster
+pyo3 = { version = "0.13.2", default-features = false, features = ["extension-module"] }
 some_path_dep = { path = "../some_path_dep" }
-lazy_static = "1.4.0"

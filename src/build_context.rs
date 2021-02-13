@@ -5,7 +5,7 @@ use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
-use crate::source_distribution::{get_pyproject_toml, source_distribution, warn_on_local_deps};
+use crate::source_distribution::{get_pyproject_toml, source_distribution};
 use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
@@ -152,11 +152,11 @@ impl BuildContext {
 
         match get_pyproject_toml(self.manifest_path.parent().unwrap()) {
             Ok(pyproject) => {
-                warn_on_local_deps(&self.cargo_metadata);
                 let sdist_path = source_distribution(
                     &self.out,
                     &self.metadata21,
                     &self.manifest_path,
+                    &self.cargo_metadata,
                     pyproject.sdist_include(),
                 )
                 .context("Failed to build source distribution")?;

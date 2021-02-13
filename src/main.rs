@@ -353,8 +353,19 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
             let manifest_dir = manifest_path.parent().unwrap();
             let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
                 .context("Failed to parse Cargo.toml into python metadata")?;
-            let path = source_distribution(sdist_directory, &metadata21, &manifest_path, None)
-                .context("Failed to build source distribution")?;
+            let cargo_metadata = MetadataCommand::new()
+                .manifest_path(&manifest_path)
+                .exec()
+                .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
+
+            let path = source_distribution(
+                sdist_directory,
+                &metadata21,
+                &manifest_path,
+                &cargo_metadata,
+                None,
+            )
+            .context("Failed to build source distribution")?;
             println!("{}", path.file_name().unwrap().to_str().unwrap());
         }
     };
@@ -537,6 +548,7 @@ fn run() -> Result<()> {
                 &wheel_dir,
                 &metadata21,
                 &manifest_path,
+                &cargo_metadata,
                 pyproject.sdist_include(),
             )
             .context("Failed to build source distribution")?;

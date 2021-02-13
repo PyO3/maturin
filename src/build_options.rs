@@ -68,7 +68,8 @@ pub struct BuildOptions {
     /// Use as `--rustc-extra-args="--my-arg"`
     #[structopt(long = "rustc-extra-args")]
     pub rustc_extra_args: Vec<String>,
-    /// Control whether to build universal2 wheel for macOS or not
+    /// Control whether to build universal2 wheel for macOS or not.
+    /// Only applies to macOS targets, do nothing otherwise.
     #[structopt(long)]
     pub universal2: bool,
 }
@@ -85,7 +86,7 @@ impl Default for BuildOptions {
             target: None,
             cargo_extra_args: Vec::new(),
             rustc_extra_args: Vec::new(),
-            universal2: true,
+            universal2: false,
         }
     }
 }

@@ -3,9 +3,8 @@ use crate::BuildContext;
 use crate::PythonInterpreter;
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
-use fs_err::File;
+use fs_err::{self as fs, File};
 use std::collections::HashMap;
-use std::fs;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -72,10 +71,10 @@ pub fn compile(
         let aarch64_file = fs::read(aarch64_artifact)?;
         let x86_64_file = fs::read(x86_64_artifact)?;
         writer
-            .add(&aarch64_file)
+            .add(aarch64_file)
             .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
         writer
-            .add(&x86_64_file)
+            .add(x86_64_file)
             .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
         writer
             .write_to_file(&output_path)

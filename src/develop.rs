@@ -36,7 +36,7 @@ pub fn develop(
         target: None,
         cargo_extra_args,
         rustc_extra_args,
-        universal2: true,
+        universal2: false,
     };
 
     let build_context = build_options.into_build_context(release, strip)?;

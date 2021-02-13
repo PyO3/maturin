@@ -35,8 +35,10 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-          target: aarch64-apple-darwin
           override: true
+      - name: Install aarch64-apple-darwin Rust target
+        if: matrix.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin
       #- name: Cache cargo registry
       #  uses: actions/cache@v2
       #  with:

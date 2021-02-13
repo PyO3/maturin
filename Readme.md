@@ -212,6 +212,10 @@ FLAGS:
         --strip
             Strip the library for minimum file size
 
+        --universal2
+            Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets, do nothing
+            otherwise
+
     -V, --version
             Prints version information
 
@@ -268,6 +272,10 @@ FLAGS:
 
         --skip-auditwheel
             Don't check for manylinux compliance
+
+        --universal2
+            Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets, do nothing
+            otherwise
 
     -V, --version
             Prints version information

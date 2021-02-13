@@ -18,20 +18,28 @@ pub fn compile(
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
     if context.target.is_macos_universal2() {
-        let arm64_artifact = compile_target(
+        let build_type = match bindings_crate {
+            BridgeModel::Bin => "bin",
+            _ => "cdylib",
+        };
+        let aarch64_artifact = compile_target(
             context,
             python_interpreter,
             bindings_crate,
             Some("aarch64-apple-darwin"),
         )
         .context("Failed to build a arm64 library through cargo")?
-        .get("cdylib")
+        .get(build_type)
         .cloned()
         .ok_or_else(|| {
-            anyhow!(
-                "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
+            if build_type == "cdylib" {
+                anyhow!(
+                    "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
-            )
+                )
+            } else {
+                anyhow!("Cargo didn't build an aarch64 bin.")
+            }
         })?;
         let x86_64_artifact = compile_target(
             context,
@@ -40,24 +48,28 @@ pub fn compile(
             Some("x86_64-apple-darwin"),
         )
         .context("Failed to build a x86_64 library through cargo")?
-        .get("cdylib")
+        .get(build_type)
         .cloned()
         .ok_or_else(|| {
-            anyhow!(
-                "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
+            if build_type == "cdylib" {
+                anyhow!(
+                    "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
-            )
+                )
+            } else {
+                anyhow!("Cargo didn't build a x86_64 bin.")
+            }
         })?;
-        // Use lipo to create an universal dylib
-        let cdylib_path = arm64_artifact
+        // Use lipo to create an universal dylib/bin
+        let output_path = aarch64_artifact
             .display()
             .to_string()
             .replace("aarch64-apple-darwin/", "");
         let mut cmd = Command::new("lipo");
         cmd.arg("-create")
             .arg("-output")
-            .arg(&cdylib_path)
-            .arg(arm64_artifact)
+            .arg(&output_path)
+            .arg(aarch64_artifact)
             .arg(x86_64_artifact);
         let lipo = cmd.spawn().context("Failed to run lipo")?;
         let output = lipo
@@ -72,7 +84,7 @@ pub fn compile(
             )
         }
         let mut result = HashMap::new();
-        result.insert("cdylib".to_string(), PathBuf::from(cdylib_path));
+        result.insert(build_type.to_string(), PathBuf::from(output_path));
         Ok(result)
     } else {
         compile_target(context, python_interpreter, bindings_crate, None)

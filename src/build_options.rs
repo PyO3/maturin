@@ -258,6 +258,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         if bindings == "cffi" {
             BridgeModel::Cffi
         } else if bindings == "bin" {
+            println!("🔗 Found bin bindings");
             BridgeModel::Bin
         } else {
             if !deps.contains_key(bindings) {

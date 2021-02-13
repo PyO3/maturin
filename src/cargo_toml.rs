@@ -70,13 +70,13 @@ impl CargoToml {
         }
     }
 
-    /// Returns the trove classifier
-    pub fn classifier(&self) -> Vec<String> {
+    /// Returns the trove classifiers
+    pub fn classifiers(&self) -> Vec<String> {
         match self.package.metadata {
             Some(CargoTomlMetadata {
                 maturin:
                     Some(RemainingCoreMetadata {
-                        classifier: Some(ref classifier),
+                        classifiers: Some(ref classifier),
                         ..
                     }),
             }) => classifier.clone(),
@@ -112,7 +112,9 @@ struct CargoTomlMetadata {
 pub struct RemainingCoreMetadata {
     pub name: Option<String>,
     pub scripts: Option<HashMap<String, String>>,
-    pub classifier: Option<Vec<String>>,
+    // For backward compatibility, we also allow classifier.
+    #[serde(alias = "classifier")]
+    pub classifiers: Option<Vec<String>>,
     pub maintainer: Option<String>,
     pub maintainer_email: Option<String>,
     pub requires_dist: Option<Vec<String>>,
@@ -148,7 +150,7 @@ mod test {
             ph = "maturin:print_hello"
 
             [package.metadata.maturin]
-            classifier = ["Programming Language :: Python"]
+            classifiers = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
         "#
         );
@@ -158,15 +160,44 @@ mod test {
         let mut scripts = HashMap::new();
         scripts.insert("ph".to_string(), "maturin:print_hello".to_string());
 
-        let classifier = vec!["Programming Language :: Python".to_string()];
+        let classifiers = vec!["Programming Language :: Python".to_string()];
 
         let requires_dist = Some(vec!["flask~=1.1.0".to_string(), "toml==0.10.0".to_string()]);
 
         assert_eq!(cargo_toml.scripts(), scripts);
-        assert_eq!(cargo_toml.classifier(), classifier);
+        assert_eq!(cargo_toml.classifiers(), classifiers);
         assert_eq!(
             cargo_toml.remaining_core_metadata().requires_dist,
             requires_dist
         );
+    }
+
+    #[test]
+    fn test_old_classifier_works() {
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            authors = ["konstin <konstin@mailbox.org>"]
+            name = "info-project"
+            version = "0.1.0"
+            description = "A test project"
+            homepage = "https://example.org"
+            keywords = ["ffi", "test"]
+
+            [lib]
+            crate-type = ["cdylib"]
+            name = "pyo3_pure"
+
+            [package.metadata.maturin]
+            # Not classifiers
+            classifier = ["Programming Language :: Python"]
+        "#
+        );
+
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
+
+        let classifiers = vec!["Programming Language :: Python".to_string()];
+
+        assert_eq!(cargo_toml.classifiers(), classifiers);
     }
 }

@@ -124,12 +124,14 @@ Pip allows adding so called console scripts, which are shell commands that execu
 get_42 = "my_project:DummyClass.get_42"
 ```
 
-You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `package.metadata.maturin.classifier`:
+You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `package.metadata.maturin.classifiers`:
 
 ```toml
 [package.metadata.maturin]
-classifier = ["Programming Language :: Python"]
+classifiers = ["Programming Language :: Python"]
 ```
+
+Note that `package.metadata.maturin.classifier` is
 
 You can use other fields from the [python core metadata](https://packaging.python.org/specifications/core-metadata/) in the `[package.metadata.maturin]` section, specifically ` maintainer`, `maintainer-email` and `requires-python` (string fields), as well as `requires-external` and `provides-extra` (lists of strings) and `project-url` (dictionary string to string)
 

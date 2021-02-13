@@ -44,7 +44,7 @@ pub struct Metadata21 {
     pub maintainer: Option<String>,
     pub maintainer_email: Option<String>,
     pub license: Option<String>,
-    pub classifier: Vec<String>,
+    pub classifiers: Vec<String>,
     pub requires_dist: Vec<String>,
     pub provides_dist: Vec<String>,
     pub obsoletes_dist: Vec<String>,
@@ -85,7 +85,7 @@ impl Metadata21 {
     ) -> Result<Metadata21> {
         let authors = cargo_toml.package.authors.join(", ");
 
-        let classifier = cargo_toml.classifier();
+        let classifiers = cargo_toml.classifiers();
 
         let author_email = if authors.contains('@') {
             Some(authors.clone())
@@ -137,7 +137,7 @@ impl Metadata21 {
             license: cargo_toml.package.license.clone(),
 
             // Values provided through `[project.metadata.maturin]`
-            classifier,
+            classifiers,
             maintainer: extra_metadata.maintainer,
             maintainer_email: extra_metadata.maintainer_email,
             requires_dist: extra_metadata.requires_dist.unwrap_or_default(),
@@ -175,7 +175,7 @@ impl Metadata21 {
         add_vec("Supported-Platform", &self.supported_platform);
         add_vec("Platform", &self.platform);
         add_vec("Supported-Platform", &self.supported_platform);
-        add_vec("Classifier", &self.classifier);
+        add_vec("Classifiers", &self.classifiers);
         add_vec("Requires-Dist", &self.requires_dist);
         add_vec("Provides-Dist", &self.provides_dist);
         add_vec("Obsoletes-Dist", &self.obsoletes_dist);
@@ -345,7 +345,7 @@ mod test {
             ph = "maturin:print_hello"
 
             [package.metadata.maturin]
-            classifier = ["Programming Language :: Python"]
+            classifiers = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
             project-url = { "Bug Tracker" = "http://bitbucket.org/tarek/distribute/issues/" }
         "#
@@ -356,7 +356,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
-            Classifier: Programming Language :: Python
+            Classifiers: Programming Language :: Python
             Requires-Dist: flask~=1.1.0
             Requires-Dist: toml==0.10.0
             Summary: A test project
@@ -404,7 +404,7 @@ mod test {
             ph = "maturin:print_hello"
 
             [package.metadata.maturin]
-            classifier = ["Programming Language :: Python"]
+            classifiers = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
             description-content-type = "text/x-rst"
         "#
@@ -415,7 +415,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
-            Classifier: Programming Language :: Python
+            Classifiers: Programming Language :: Python
             Requires-Dist: flask~=1.1.0
             Requires-Dist: toml==0.10.0
             Summary: A test project
@@ -453,7 +453,7 @@ mod test {
 
             [package.metadata.maturin]
             name = "info"
-            classifier = ["Programming Language :: Python"]
+            classifiers = ["Programming Language :: Python"]
             description-content-type = "text/x-rst"
         "#
         );
@@ -463,7 +463,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info
             Version: 0.1.0
-            Classifier: Programming Language :: Python
+            Classifiers: Programming Language :: Python
             Summary: A test project
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>

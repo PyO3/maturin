@@ -62,7 +62,7 @@ class PostInstallCommand(install):
 
             cargo_args = [cargo, "rustc", "--bin", "maturin", "--message-format=json"]
 
-            if platform.machine() in ("ppc64le", "ppc64"):
+            if platform.machine() in ("ppc64le", "ppc64", "powerpc"):
                 cargo_args.extend(
                     ["--no-default-features", "--features=auditwheel,log,human-panic"]
                 )

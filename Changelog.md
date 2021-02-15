@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
+## Unreleased
+
+* Escape version in wheel metadata by messense in [#420](https://github.com/PyO3/maturin/pull/420)
+
 ## 0.9.1 - 2021-01-13
 
  * Error when the `abi3` feature is selected but no minimum version

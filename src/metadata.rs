@@ -163,7 +163,7 @@ impl Metadata21 {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),
             ("Name", self.name.clone()),
-            ("Version", self.version.clone()),
+            ("Version", self.get_version_escaped()),
         ];
 
         let mut add_vec = |name, values: &[String]| {

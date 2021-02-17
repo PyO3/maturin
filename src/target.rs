@@ -1,5 +1,6 @@
 use anyhow::{bail, format_err, Result};
 use platform_info::*;
+use platforms::target::Env;
 use platforms::Platform;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -80,6 +81,7 @@ impl fmt::Display for Arch {
 pub struct Target {
     os: OS,
     arch: Arch,
+    env: Option<Env>,
 }
 
 impl Target {
@@ -139,7 +141,11 @@ impl Target {
             (OS::Windows, Arch::ARMV7L) => bail!("armv7l is not supported for Windows"),
             (_, _) => {}
         }
-        Ok(Target { os, arch })
+        Ok(Target {
+            os,
+            arch,
+            env: platform.target_env,
+        })
     }
 
     /// Returns whether the platform is 64 bit or 32 bit
@@ -177,6 +183,15 @@ impl Target {
     /// Returns true if the current platform is windows
     pub fn is_windows(&self) -> bool {
         self.os == OS::Windows
+    }
+
+    /// Returns true if the current platform's target env is Musl
+    pub fn is_musl_target(&self) -> bool {
+        match self.env {
+            Some(Env::Musl) => true,
+            Some(_) => false,
+            None => false,
+        }
     }
 
     /// Returns the platform part of the tag for the wheel name for cffi wheels

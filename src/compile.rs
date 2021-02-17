@@ -5,6 +5,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use std::collections::HashMap;
+use std::env;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -162,9 +163,14 @@ fn compile_target(
         .iter()
         .fold("cargo".to_string(), |acc, x| acc + " " + x);
 
+    let mut rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
+    if context.target.is_musl_target() {
+        rust_flags.push(" -C target-feature=-crt-static");
+    }
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
         .args(&build_args)
+        .env("RUSTFLAGS", rust_flags)
         // We need to capture the json messages
         .stdout(Stdio::piped())
         // We can't get colored human and json messages from rustc as they are mutually exclusive,

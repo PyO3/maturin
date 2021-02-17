@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Rename `classifier` to `classifiers` for pypi compatibility. The old `classifier` is still available and now also works with pypi 
  * Fix building for musl by automatically setting `-C target-feature=-crt-static` 
 
+## 0.9.4
+
+* Fix building a bin with musl 
+
+## 0.9.3
+
+* CI failure
+
+## 0.9.2
+
+* CI failure
+
 ## 0.9.1 - 2021-01-13
 
  * Error when the `abi3` feature is selected but no minimum version

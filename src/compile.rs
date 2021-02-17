@@ -97,15 +97,6 @@ fn compile_target(
 ) -> Result<HashMap<String, PathBuf>> {
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
-    // We need to pass --bins / --lib to set the rustc extra args later
-    // TODO: What do we do when there are multiple bin targets?
-    match bindings_crate {
-        BridgeModel::Bin => shared_args.push("--bins"),
-        BridgeModel::Cffi | BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) => {
-            shared_args.push("--lib")
-        }
-    }
-
     shared_args.extend(context.cargo_extra_args.iter().map(String::as_str));
 
     if context.release {
@@ -116,13 +107,25 @@ fn compile_target(
         shared_args.push(target);
     }
 
-    let cargo_args = vec!["rustc", "--message-format", "json"];
-
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args
         .iter()
         .map(String::as_str)
         .collect();
+
+    // We need to pass --bins / --lib to set the rustc extra args later
+    // TODO: What do we do when there are multiple bin targets?
+    match bindings_crate {
+        BridgeModel::Bin => shared_args.push("--bins"),
+        BridgeModel::Cffi | BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) => {
+            shared_args.push("--lib");
+            // https://github.com/rust-lang/rust/issues/59302#issue-422994250
+            // We must only do this for libraries as it breaks binaries
+            if context.target.is_musl_target() {
+                rustc_args.extend(&["-C", "target-feature=-crt-static"]);
+            }
+        }
+    }
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if context.target.is_macos() {
@@ -153,9 +156,7 @@ fn compile_target(
         }
     }
 
-    if context.target.is_musl_target() {
-        rustc_args.extend(&["-C", "target-feature=-crt-static"]);
-    }
+    let cargo_args = vec!["rustc", "--message-format", "json"];
 
     let build_args: Vec<_> = cargo_args
         .iter()

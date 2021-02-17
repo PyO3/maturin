@@ -95,7 +95,6 @@ pub fn source_distribution(
     ));
     writer.add_directory(&root_dir)?;
     for (target, source) in target_source {
-        println!("{} {}", target.display(), source.display());
         writer.add_file(root_dir.join(target), source)?;
     }
 

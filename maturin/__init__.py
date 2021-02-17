@@ -5,7 +5,7 @@ maturin's implementation of the PEP 517 interface. Calls maturin through subproc
 Currently, the "return value" of the rust implementation is the last line of stdout
 
 On windows, apparently pip's subprocess handling sets stdout to some windows encoding (e.g. cp1252 on my machine),
-even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids ecoding errors due to
+even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids encoding errors due to
 maturin's emojis.
 """
 
@@ -47,7 +47,7 @@ def get_config_options() -> List[str]:
             continue
         if key not in available_options:
             # attempt to install even if keys from newer or older versions are present
-            print("WARNING: {} is not a recognized option for maturin".format(key))
+            sys.stderr.write(f"WARNING: {key} is not a recognized option for maturin\n")
         options.append("--{}={}".format(key, value))
     return options
 
@@ -64,10 +64,9 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
-        print("Error: command {} returned non-zero exit status {}".format(
-            command,
-            result.returncode
-        ))
+        sys.stderr.write(
+            f"Error: command {command} returned non-zero exit status {result.returncode}\n"
+        )
         sys.exit(1)
     output = result.stdout.decode(errors="replace")
     wheel_path = output.strip().splitlines()[-1]
@@ -86,10 +85,9 @@ def build_sdist(sdist_directory, config_settings=None):
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
-        print("Error: command {} returned non-zero exit status {}".format(
-            command,
-            result.returncode
-        ))
+        sys.stderr.write(
+            f"Error: command {command} returned non-zero exit status {result.returncode}\n"
+        )
         sys.exit(1)
     output = result.stdout.decode(errors="replace")
     return output.strip().splitlines()[-1]
@@ -146,7 +144,7 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     try:
         output = subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
-        print("Error: {}".format(e))
+        sys.stderr.write(f"Error running maturin: {e}\n")
         sys.exit(1)
     sys.stdout.buffer.write(output)
     sys.stdout.flush()

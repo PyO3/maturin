@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## Unreleased
+## 0.9.2 - 2021-02-17
 
-* Escape version in wheel metadata by messense in [#420](https://github.com/PyO3/maturin/pull/420)
-* Set executable bit on shared library by messense in [#421](https://github.com/PyO3/maturin/pull/421)
+ * Escape version in wheel metadata by messense in [#420](https://github.com/PyO3/maturin/pull/420)
+ * Set executable bit on shared library by messense in [#421](https://github.com/PyO3/maturin/pull/421)
+ * Rename `classifier` to `classifiers` for pypi compatibility. The old `classifier` is still available and now also works with pypi 
+ * Fix building for musl by automatically setting `-C target-feature=-crt-static` 
 
 ## 0.9.1 - 2021-01-13
 

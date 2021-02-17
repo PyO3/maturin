@@ -153,6 +153,10 @@ fn compile_target(
         }
     }
 
+    if context.target.is_musl_target() {
+        rustc_args.extend(&["-C", "target-feature=-crt-static"]);
+    }
+
     let build_args: Vec<_> = cargo_args
         .iter()
         .chain(&shared_args)
@@ -163,10 +167,8 @@ fn compile_target(
         .iter()
         .fold("cargo".to_string(), |acc, x| acc + " " + x);
 
-    let mut rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
-    if context.target.is_musl_target() {
-        rust_flags.push(" -C target-feature=-crt-static");
-    }
+    let rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
+
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
         .args(&build_args)

@@ -55,6 +55,23 @@ pub trait ModuleWriter {
             .context(format!("Failed to write to {}", target.as_ref().display()))?;
         Ok(())
     }
+
+    /// Copies the source file the the target path relative to the module base path while setting
+    /// the given unix permissions
+    fn add_file_with_permissions(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: impl AsRef<Path>,
+        permissions: u32,
+    ) -> Result<()> {
+        let read_failed_context = format!("Failed to read {}", source.as_ref().display());
+        let mut file = File::open(source.as_ref()).context(read_failed_context.clone())?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).context(read_failed_context)?;
+        self.add_bytes_with_permissions(target.as_ref(), &buffer, permissions)
+            .context(format!("Failed to write to {}", target.as_ref().display()))?;
+        Ok(())
+    }
 }
 
 /// A [ModuleWriter] that adds the module somewhere in the filesystem, e.g. in a virtualenv
@@ -588,10 +605,14 @@ pub fn write_bindings_module(
                 ))?;
             }
 
-            writer.add_file(Path::new(&module_name).join(&so_filename), &artifact)?;
+            writer.add_file_with_permissions(
+                Path::new(&module_name).join(&so_filename),
+                &artifact,
+                0o755,
+            )?;
         }
         ProjectLayout::PureRust => {
-            writer.add_file(so_filename, &artifact)?;
+            writer.add_file_with_permissions(so_filename, &artifact, 0o755)?;
         }
     }
 
@@ -639,7 +660,7 @@ pub fn write_cffi_module(
     writer.add_directory(&module)?;
     writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
     writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
-    writer.add_file(&module.join("native.so"), &artifact)?;
+    writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;
 
     Ok(())
 }
@@ -661,10 +682,7 @@ pub fn write_bin(
     writer.add_directory(&data_dir)?;
 
     // We can't use add_file since we need to mark the file as executable
-    let mut file = File::open(artifact)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-    writer.add_bytes_with_permissions(&data_dir.join(bin_name), &buffer, 0o755)?;
+    writer.add_file_with_permissions(&data_dir.join(bin_name), artifact, 0o755)?;
     Ok(())
 }
 

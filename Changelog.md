@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 * Escape version in wheel metadata by messense in [#420](https://github.com/PyO3/maturin/pull/420)
+* Set executable bit on shared library by messense in [#421](https://github.com/PyO3/maturin/pull/421)
 
 ## 0.9.1 - 2021-01-13
 

@@ -116,3 +116,22 @@ jobs:
           file: '*.{tar.gz,zip,deb}'
           file_glob: true
           tag: ${{ github.ref }}
+
+  release-musl-github-pypi:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [ aarch64-musl ]
+    container:
+      image: docker://benfred/rust-musl-cross:${{ matrix.target }}
+      env:
+        RUSTUP_HOME: /root/.rustup
+        CARGO_HOME: /root/.cargo
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build and publish wheel
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+        run: |
+          sudo python3 -m pip install maturin
+          maturin publish -u __token__ -b bin --no-sdist -o dist --target aarch64-unknown-linux-musl --manylinux 2014

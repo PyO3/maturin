@@ -49,6 +49,7 @@ jobs:
           - x86_64-unknown-linux-musl
           - x86_64-apple-darwin
           - x86_64-pc-windows-msvc
+          - i686-pc-windows-msvc
         include:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
@@ -59,6 +60,9 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             name: maturin-x86_64-pc-windows-msvc.zip
+          - target: i686-pc-windows-msvc
+            os: windows-latest
+            name: maturin-i686-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml

@@ -66,6 +66,11 @@ class PostInstallCommand(install):
                 cargo_args.extend(
                     ["--no-default-features", "--features=auditwheel,log,human-panic"]
                 )
+            
+            # If we're not compiling using glibc, we assume this is musl libc.
+            # See https://bugs.python.org/issue43248
+            if platform.libc_ver()[0] == '':
+                cargo_args.append("-C target-feature=-crt-static")
 
             cargo_args.extend(["--", "-C", "link-arg=-s"])
 

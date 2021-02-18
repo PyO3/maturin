@@ -121,13 +121,16 @@ jobs:
           file_glob: true
           tag: ${{ github.ref }}
 
-  release-musl-github-pypi:
+  release-musl-pypi:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ aarch64-musl ]
+        platform: [
+          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl" },
+          { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf" },
+        ]
     container:
-      image: docker://benfred/rust-musl-cross:${{ matrix.target }}
+      image: docker://benfred/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
@@ -138,4 +141,4 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin
-          maturin publish -u __token__ -b bin --no-sdist -o dist --target aarch64-unknown-linux-musl --manylinux 2014
+          maturin publish -u __token__ -b bin --no-sdist -o dist --target ${{ matrix.platform.target }} --manylinux 2014

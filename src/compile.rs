@@ -113,6 +113,8 @@ fn compile_target(
         .map(String::as_str)
         .collect();
 
+    let mut rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
+
     // We need to pass --bins / --lib to set the rustc extra args later
     // TODO: What do we do when there are multiple bin targets?
     match bindings_crate {
@@ -121,8 +123,9 @@ fn compile_target(
             shared_args.push("--lib");
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
+            // For some reason this value is ignored when passed as rustc argument
             if context.target.is_musl_target() {
-                rustc_args.extend(&["-C", "target-feature=-crt-static"]);
+                rust_flags.push(" -C target-feature=-crt-static");
             }
         }
     }
@@ -168,12 +171,9 @@ fn compile_target(
         .iter()
         .fold("cargo".to_string(), |acc, x| acc + " " + x);
 
-    let rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
-
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
         .args(&build_args)
-        .env("RUSTFLAGS", rust_flags)
         // We need to capture the json messages
         .stdout(Stdio::piped())
         // We can't get colored human and json messages from rustc as they are mutually exclusive,

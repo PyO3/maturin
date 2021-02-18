@@ -27,7 +27,7 @@ pub fn develop(
     let python = target.get_venv_python(&venv_dir);
 
     let build_options = BuildOptions {
-        manylinux: Manylinux::Off,
+        manylinux: Some(Manylinux::Off),
         interpreter: Some(vec![target.get_python()]),
         bindings,
         manifest_path: manifest_file.to_path_buf(),

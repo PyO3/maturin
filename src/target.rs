@@ -194,6 +194,16 @@ impl Target {
         }
     }
 
+    /// Returns the default Manylinux tag for this architecture
+    pub fn get_default_manylinux_tag(&self) -> Manylinux {
+        match self.arch {
+            Arch::AARCH64 | Arch::ARMV7L | Arch::POWERPC64 | Arch::POWERPC64LE => {
+                Manylinux::Manylinux2014
+            }
+            Arch::X86 | Arch::X86_64 => Manylinux::Manylinux2010,
+        }
+    }
+
     /// Returns the platform part of the tag for the wheel name for cffi wheels
     pub fn get_platform_tag(&self, manylinux: &Manylinux, universal2: bool) -> String {
         match (&self.os, &self.arch) {

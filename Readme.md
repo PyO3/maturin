@@ -244,7 +244,9 @@ OPTIONS:
             `off` (for the native linux tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the
             native tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
-            This option is ignored on all non-linux platforms [default: 2010]  [possible values: 2010, 2014, off]
+            The default is the lowest supported value for a target, which is 2010 for x86 and 2014 for arm and powerpc.
+
+            This option is ignored on all non-linux platforms [possible values: 2010, 2014, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -305,7 +307,9 @@ OPTIONS:
             `off` (for the native linux tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the
             native tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
-            This option is ignored on all non-linux platforms [default: 2010]  [possible values: 2010, 2014, off]
+            The default is the lowest supported value for a target, which is 2010 for x86 and 2014 for arm and powerpc.
+
+            This option is ignored on all non-linux platforms [possible values: 2010, 2014, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory

@@ -133,10 +133,30 @@ fn compile_target(
         }
     }
 
+    let module_name = &context.module_name;
+    let so_filename = match python_interpreter {
+        Some(python_interpreter) => python_interpreter.get_library_name(module_name),
+        // abi3
+        None => {
+            format!("{base}.abi3.so", base = module_name)
+        }
+    };
+    // Change LC_ID_DYLIB to the finaly .so name for macOS targets to avoid linking with
+    // non-existent library.
+    // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
+    let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
+
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if context.target.is_macos() {
         if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) = bindings_crate {
-            let mac_args = &["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"];
+            let mac_args = &[
+                "-C",
+                "link-arg=-undefined",
+                "-C",
+                "link-arg=dynamic_lookup",
+                "-C",
+                &macos_dylib_install_name,
+            ];
             rustc_args.extend(mac_args);
         }
     }

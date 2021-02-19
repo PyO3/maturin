@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Change manylinux default version based on target arch by messense in [#424](https://github.com/PyO3/maturin/pull/424)
  * Support local path dependencies in source distribution (i.e. you can now package a workspace into an sdist)
+ * Set a more reasonable LC_ID_DYLIB entry on macOS by messense [#433](https://github.com/PyO3/maturin/pull/433)
 
 ## 0.9.4 - 2021-02-18
 

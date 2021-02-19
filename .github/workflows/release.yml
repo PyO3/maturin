@@ -126,8 +126,9 @@ jobs:
     strategy:
       matrix:
         platform: [
-          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl" },
-          { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf" },
+          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl", manylinux: "2014" },
+          { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf", manylinux: "2014"},
+          { target: "i686-unknown-linux-musl", image_tag: "i686-musl", manylinux: "2010"},
         ]
     container:
       image: docker://benfred/rust-musl-cross:${{ matrix.platform.image_tag }}
@@ -141,4 +142,4 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin
-          maturin publish -u __token__ -b bin --no-sdist -o dist --target ${{ matrix.platform.target }} --manylinux 2014
+          maturin publish -u __token__ -b bin --no-sdist -o dist --target ${{ matrix.platform.target }} --manylinux ${{ matrix.platform.manylinux }}

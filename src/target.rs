@@ -82,6 +82,7 @@ pub struct Target {
     os: OS,
     arch: Arch,
     env: Option<Env>,
+    triple: &'static str,
 }
 
 impl Target {
@@ -145,6 +146,7 @@ impl Target {
             os,
             arch,
             env: platform.target_env,
+            triple: platform.target_triple,
         })
     }
 
@@ -158,6 +160,11 @@ impl Target {
             Arch::X86 => 32,
             Arch::X86_64 => 64,
         }
+    }
+
+    /// Returns target triple string
+    pub fn target_triple(&self) -> &str {
+        &self.triple
     }
 
     /// Returns true if the current platform is linux or mac os

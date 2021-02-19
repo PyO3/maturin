@@ -126,10 +126,7 @@ impl BuildOptions {
 
         let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
 
-        let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
-        if let Some(target) = self.target.clone() {
-            cargo_extra_args.extend_from_slice(&["--target".to_string(), target]);
-        }
+        let cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
 
         let cargo_metadata_extra_args = extra_feature_args(&cargo_extra_args);
 

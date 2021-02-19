@@ -356,7 +356,7 @@ fn fun_with_abiflags(
 }
 
 impl PythonInterpreter {
-    /// Returns the supported python environment in the PEP 425 format:
+    /// Returns the supported python environment in the PEP 425 format used for the wheel filename:
     /// {python tag}-{abi tag}-{platform tag}
     ///
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
@@ -385,19 +385,13 @@ impl PythonInterpreter {
                 }
             }
             InterpreterKind::PyPy => {
-                // TODO: Use manylinux 2010 by default with pypy
-                if manylinux != &Manylinux::Off {
-                    eprintln!(
-                        "🛈  Note: PyPy doesn't support the manylinux yet, \
-                         so native wheels are built instead of manylinux wheels"
-                    );
-                }
-                // hack to never use manylinux for pypy
-                let platform = self.target.get_platform_tag(&Manylinux::Off, universal2);
+                let platform = self.target.get_platform_tag(manylinux, universal2);
                 // pypy uses its version as part of the ABI, e.g.
-                // pypy3 v7.1 => pp371-pypy3_71-linux_x86_64.whl
+                // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2010_x86_64.whl
                 format!(
-                    "pp3{abi_tag}-pypy3_{abi_tag}-{platform}",
+                    "pp{major}{minor}-pypy{major}{minor}_{abi_tag}-{platform}",
+                    major = self.major,
+                    minor = self.minor,
                     // TODO: Proper tag handling for pypy
                     abi_tag = self
                         .abi_tag

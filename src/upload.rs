@@ -88,10 +88,6 @@ pub fn upload(
     let response = client
         .post(registry.url.clone())
         .header(
-            reqwest::header::CONTENT_TYPE,
-            "application/json; charset=utf-8",
-        )
-        .header(
             reqwest::header::USER_AGENT,
             format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
         )

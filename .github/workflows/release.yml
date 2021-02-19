@@ -105,6 +105,19 @@ jobs:
           tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
           cd -
 
+      - name: Publish to pypi (macOS universal2)
+        if: matrix.target == 'x86_64-apple-darwin'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+          MACOSX_DEPLOYMENT_TARGET: '10.9'
+          PYO3_CROSS_LIB_DIR: /Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.8/lib
+        run: |
+          # set SDKROOT for C dependencies like ring and bzip2
+          export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+          rustup target add aarch64-apple-darwin
+          cargo run -- publish -u __token__ -b bin --no-sdist --universal2
+
       - name: Build debian package
         if: matrix.target == 'x86_64-unknown-linux-musl'
         env:

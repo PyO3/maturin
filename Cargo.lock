@@ -982,6 +982,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rpassword",
+ "scroll",
  "serde",
  "serde_json",
  "sha2",

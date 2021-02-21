@@ -1,3 +1,5 @@
+mod policy;
+
 use crate::Manylinux;
 use crate::Target;
 use anyhow::Result;
@@ -9,52 +11,7 @@ use std::io::Read;
 use std::path::Path;
 use thiserror::Error;
 
-/// As specified in "PEP 571 -- The manylinux2010 Platform Tag"
-const MANYLINUX2010: &[&str] = &[
-    "libgcc_s.so.1",
-    "libstdc++.so.6",
-    "libm.so.6",
-    "libdl.so.2",
-    "librt.so.1",
-    "libcrypt.so.1",
-    "libc.so.6",
-    "libnsl.so.1",
-    "libutil.so.1",
-    "libpthread.so.0",
-    "libresolv.so.2",
-    "libX11.so.6",
-    "libXext.so.6",
-    "libXrender.so.1",
-    "libICE.so.6",
-    "libSM.so.6",
-    "libGL.so.1",
-    "libgobject-2.0.so.0",
-    "libgthread-2.0.so.0",
-    "libglib-2.0.so.0",
-];
-
-/// As specified in "PEP 599 -- The manylinux2014 Platform Tag"
-const MANYLINUX2014: &[&str] = &[
-    "libgcc_s.so.1",
-    "libstdc++.so.6",
-    "libm.so.6",
-    "libdl.so.2",
-    "librt.so.1",
-    "libc.so.6",
-    "libnsl.so.1",
-    "libutil.so.1",
-    "libpthread.so.0",
-    "libresolv.so.2",
-    "libX11.so.6",
-    "libXext.so.6",
-    "libXrender.so.1",
-    "libICE.so.6",
-    "libSM.so.6",
-    "libGL.so.1",
-    "libgobject-2.0.so.0",
-    "libgthread-2.0.so.0",
-    "libglib-2.0.so.0",
-];
+use policy::POLICIES;
 
 /// Error raised during auditing an elf file for manylinux compatibility
 #[derive(Error, Debug)]
@@ -90,15 +47,14 @@ pub fn auditwheel_rs(
     target: &Target,
     manylinux: &Manylinux,
 ) -> Result<(), AuditWheelError> {
-    if !target.is_linux() {
+    if !target.is_linux() || matches!(manylinux, Manylinux::Off) {
         return Ok(());
     }
-    let reference: &[&str];
-    match *manylinux {
-        Manylinux::Manylinux2010 => reference = MANYLINUX2010,
-        Manylinux::Manylinux2014 => reference = MANYLINUX2014,
-        Manylinux::Off => return Ok(()),
-    };
+    let reference = POLICIES
+        .iter()
+        .find(|p| p.name == manylinux.to_string())
+        .map(|p| &p.lib_whitelist)
+        .unwrap();
     let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
@@ -113,7 +69,7 @@ pub fn auditwheel_rs(
         if dep.starts_with("ld-linux") || dep == "ld64.so.2" || dep == "ld64.so.1" {
             continue;
         }
-        if !reference.contains(&dep.as_str()) {
+        if !reference.contains(&dep) {
             offenders.push(dep);
         }
     }

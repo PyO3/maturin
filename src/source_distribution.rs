@@ -101,11 +101,12 @@ pub fn source_distribution(
     if let Some(include_targets) = sdist_include {
         for pattern in include_targets {
             println!("📦 Including files matching \"{}\"", pattern);
-            for source in glob::glob(pattern)
+            for source in glob::glob(&manifest_dir.join(pattern).to_string_lossy())
                 .expect("No files found for pattern")
                 .filter_map(Result::ok)
             {
-                writer.add_file(manifest_dir.join(&source).to_path_buf(), source)?;
+                let target = root_dir.join(&source.strip_prefix(manifest_dir)?);
+                writer.add_file(target, source)?;
             }
         }
     }

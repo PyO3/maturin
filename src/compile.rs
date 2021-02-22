@@ -176,6 +176,7 @@ fn compile_target(
 
     let mut let_binding = Command::new("cargo");
     let build_command = let_binding
+        .env("RUSTFLAGS", rust_flags)
         .args(&build_args)
         // We need to capture the json messages
         .stdout(Stdio::piped())

@@ -1,6 +1,6 @@
 # Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
-requires = ["setuptools~=41.2.0", "wheel~=0.33.6", "toml~=0.10.0"]
+requires = ["setuptools~=53.0.0", "wheel~=0.36.2", "toml~=0.10.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.maturin]

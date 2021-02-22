@@ -39,6 +39,10 @@ jobs:
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin
+      # We use this target in the musl unit test
+      - name: Install x86_64-unknown-linux-musl Rust target
+        if: matrix.os == 'ubuntu-latest'
+        run: rustup target add x86_64-unknown-linux-musl
       #- name: Cache cargo registry
       #  uses: actions/cache@v2
       #  with:

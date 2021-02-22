@@ -26,13 +26,15 @@ fn run() -> Result<()> {
     let cargo_args = env::args().skip(1).collect::<Vec<String>>().join(" ");
     // Assumption: Slash is the only character in the cli args that we must not use for directory names
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
-    let index_key = format!("{} {}", env_args, cargo_args)
+    let env_key = env_args.replace(" ", "-").replace("/", "-");
+    let cargo_key = cargo_args
         .replace("--message-format json", "")
         .replace("--quiet", "")
         .replace(&cwd, "")
+        .replace(" ", "-")
         .replace("/", "-");
 
-    let cache_path = base_cache_path.join(&index_key);
+    let cache_path = base_cache_path.join(&env_key).join(&cargo_key);
     let stdout_path = cache_path.join("cargo.stdout");
     let stderr_path = cache_path.join("cargo.stderr");
 
@@ -47,7 +49,10 @@ fn run() -> Result<()> {
         let mut stderr = io::stderr();
         io::copy(&mut stderr_file, &mut stderr).context(context_message)?;
     } else {
-        fs::create_dir_all(&cache_path).context("Failed to create cache path")?;
+        fs::create_dir_all(&cache_path).context(format!(
+            "Failed to create cache path {}",
+            cache_path.display()
+        ))?;
         // Unmock to run the real cargo
         let old_path = env::var_os("PATH").expect("PATH must be set");
         let mut path_split = env::split_paths(&old_path);

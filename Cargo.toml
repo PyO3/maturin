@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>"]
 name = "maturin"
-version = "0.9.4"
+version = "0.10.0"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
 exclude = ["test-crates/**/*", "sysconfig/*", "test-data/*", "ci/*", "tests/*"]
 readme = "Readme.md"
@@ -12,14 +12,14 @@ categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"
 edition = "2018"
 
 [package.metadata.maturin]
-requires-python = ">=3.5"
+requires-python = ">=3.6"
 classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-requires-dist = ["toml~=0.10.0"]
+requires-dist = ["toml~=0.10.2"]
 
 [badges]
 travis-ci = { repository = "PyO3/maturin" }

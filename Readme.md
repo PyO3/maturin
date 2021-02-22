@@ -141,7 +141,7 @@ maturin supports building through pyproject.toml. To use it, create a `pyproject
 
 ```toml
 [build-system]
-requires = ["maturin"]
+requires = ["maturin>=0.10,<0.11"]
 build-backend = "maturin"
 ```
 
@@ -155,7 +155,7 @@ For a non-manylinux build with cffi bindings you could use the following:
 
 ```toml
 [build-system]
-requires = ["maturin"]
+requires = ["maturin>=0.10,<0.11"]
 build-backend = "maturin"
 
 [tool.maturin]

@@ -7,6 +7,7 @@ use std::{env, io, str};
 pub mod develop;
 pub mod errors;
 pub mod integration;
+pub mod other;
 
 // Y U NO accept windows path prefix, pip?
 // Anyways, here's shepmasters stack overflow solution
@@ -80,11 +81,14 @@ pub fn maybe_mock_cargo() {
 }
 
 /// Better error formatting
-pub fn handle_result<T>(result: Result<T>) {
-    if let Err(e) = result {
-        for cause in e.chain().collect::<Vec<_>>().iter().rev() {
-            eprintln!("{}", cause);
+pub fn handle_result<T>(result: Result<T>) -> T {
+    match result {
+        Err(e) => {
+            for cause in e.chain().collect::<Vec<_>>().iter().rev() {
+                eprintln!("{}", cause);
+            }
+            panic!("{}", e);
         }
-        panic!("{}", e);
+        Ok(result) => result,
     }
 }

@@ -1,5 +1,5 @@
 /// To speed up the tests, they are tests all collected in a single module
-use common::{develop, errors, handle_result, integration};
+use common::{develop, errors, handle_result, integration, other};
 
 mod common;
 
@@ -81,4 +81,13 @@ fn abi3_without_version() {
 #[cfg(target_os = "linux")]
 fn pyo3_no_extension_module() {
     handle_result(errors::pyo3_no_extension_module())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn musl() {
+    let ran = handle_result(other::test_musl());
+    if !ran {
+        eprintln!("⚠  Warning: rustup and/or musl target not installed, test didn't run");
+    }
 }

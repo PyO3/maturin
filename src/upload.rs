@@ -105,6 +105,12 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     add_option("requires_python", &metadata.requires_python);
     add_option("summary", &metadata.summary);
 
+    if metadata.requires_python.is_none() {
+        // GitLab PyPI repository API implementation requires this metadata field
+        // and twine always includes it in the request, even when it's empty.
+        api_metadata.push(("requires_python", "".to_string()));
+    }
+
     let mut add_vec = |name, values: &[String]| {
         for i in values {
             api_metadata.push((name, i.clone()));

@@ -58,7 +58,7 @@ pub struct BuildOptions {
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
     /// The --target option for cargo
-    #[structopt(long, name = "TRIPLE")]
+    #[structopt(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
     pub target: Option<String>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     ///

@@ -64,6 +64,7 @@ configparser = { version = "2.0.0", optional = true }
 mailparse = "0.13.2"
 fs-err = "2.5.0"
 fat-macho = "0.4.2"
+toml_edit = "0.2.0"
 
 [dev-dependencies]
 indoc = "1.0.2"

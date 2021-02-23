@@ -9,7 +9,8 @@ use crate::Target;
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand, Node};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::env;
 use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -180,6 +181,25 @@ impl BuildOptions {
 
         let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
 
+        let mut universal2 = self.universal2;
+        // Also try to determine universal2 from ARCHFLAGS environment variable
+        if let Ok(arch_flags) = env::var("ARCHFLAGS") {
+            let arches: HashSet<&str> = arch_flags
+                .split("-arch")
+                .filter_map(|x| {
+                    let x = x.trim();
+                    if x.is_empty() {
+                        None
+                    } else {
+                        Some(x)
+                    }
+                })
+                .collect();
+            if arches.contains("x86_64") && arches.contains("arm64") {
+                universal2 = true;
+            }
+        };
+
         Ok(BuildContext {
             target,
             bridge,
@@ -198,7 +218,7 @@ impl BuildOptions {
             rustc_extra_args,
             interpreter,
             cargo_metadata,
-            universal2: self.universal2,
+            universal2,
         })
     }
 }

@@ -506,7 +506,12 @@ fn run() -> Result<()> {
                     bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
                 }
                 (None, None) => {
-                    bail!("You need to be inside a virtualenv or conda environment to use develop (neither VIRTUAL_ENV nor CONDA_PREFIX are set)")
+                    bail!(
+                        "You need to be inside a virtualenv or conda environment to use develop \
+                        (neither VIRTUAL_ENV nor CONDA_PREFIX are set). \
+                        See https://virtualenv.pypa.io/en/latest/index.html on how to use virtualenv or \
+                        use `maturin build` and `pip install <path/to/wheel>` instead."
+                    )
                 }
             };
 

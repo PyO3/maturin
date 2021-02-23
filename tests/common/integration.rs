@@ -21,6 +21,8 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
         "--manifest-path",
         &package_string,
         "--cargo-extra-args='--quiet'",
+        "--manylinux",
+        "off",
     ];
 
     if let Some(ref bindings) = bindings {

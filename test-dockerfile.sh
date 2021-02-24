@@ -47,7 +47,7 @@ fi
 
 docker run --rm -v $(pwd)/test-crates/pyo3-mixed:/io maturin build --no-sdist -i python3.8
 
-venv-docker/bin/pip install pyo3-mixed --no-index --find-links test-crates/pyo3-mixed/target/wheels/
+venv-docker/bin/pip install pyo3-mixed --find-links test-crates/pyo3-mixed/target/wheels/
 
 if [[ $(venv-docker/bin/python test-crates/pyo3-mixed/check_installed/check_installed.py) != 'SUCCESS' ]]; then
   exit 1

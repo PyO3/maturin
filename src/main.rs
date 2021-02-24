@@ -147,6 +147,10 @@ struct PublishOpt {
     /// Do not strip the library for minimum file size
     #[structopt(long = "no-strip")]
     no_strip: bool,
+    /// Continue uploading files if one already exists.
+    /// (Only valid when uploading to PyPI. Other implementations may not support this.)
+    #[structopt(long = "skip-existing")]
+    skip_existing: bool,
 }
 
 #[derive(Debug, StructOpt)]
@@ -423,12 +427,21 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
                 bail!("Username and/or password are wrong");
             }
             Err(err) => {
+                let filename = wheel_path.file_name().unwrap_or(&wheel_path.as_os_str());
+                if let UploadError::FileExistsError(_) = err {
+                    if publish.skip_existing {
+                        eprintln!(
+                            "⚠  Skipping {:?} because it appears to already exist",
+                            filename
+                        );
+                        continue;
+                    }
+                }
                 let filesize = fs::metadata(&wheel_path)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| {
                         format!("Failed to get the filesize of {:?}: {}", &wheel_path, e)
                     });
-                let filename = wheel_path.file_name().unwrap_or(&wheel_path.as_os_str());
                 return Err(err)
                     .context(format!("💥 Failed to upload {:?} ({})", filename, filesize));
             }

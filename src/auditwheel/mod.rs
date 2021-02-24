@@ -38,6 +38,11 @@ pub enum AuditWheelError {
     "Your library is not manylinux compliant because it links the following forbidden libraries: {0:?}",
     )]
     ManylinuxValidationError(Vec<String>),
+    /// The elf file isn't manylinux compaible. Contains unsupported architecture
+    #[error(
+        "Your library is not manylinux compliant because it has unsupported architecture: {0}"
+    )]
+    UnsupportedArchitecture(String),
 }
 
 /// Structure of "version needed" entries is documented in
@@ -176,6 +181,11 @@ pub fn auditwheel_rs(
         .iter()
         .find(|p| p.name == manylinux.to_string())
         .unwrap();
+    let arch = target.target_arch().to_string();
+    let arch_versions = &policy
+        .symbol_versions
+        .get(&arch)
+        .ok_or(AuditWheelError::UnsupportedArchitecture(arch))?;
     let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
@@ -210,8 +220,6 @@ pub fn auditwheel_rs(
                 .or_default()
                 .insert(version.to_string());
         }
-        let arch = target.target_arch().to_string();
-        let arch_versions = &policy.symbol_versions[&arch];
         for (name, versions_needed) in versions.iter() {
             let versions_allowed = &arch_versions[name];
             if !versions_needed.is_subset(versions_allowed) {
@@ -225,7 +233,7 @@ pub fn auditwheel_rs(
                     .collect();
                 let offending_symbols = find_incompliant_symbols(&elf, &offending_symbol_versions)?;
                 let offender = format!(
-                    "{} offending symbols:  {}",
+                    "{} offending symbols: {}",
                     library.name,
                     offending_symbols.join(", ")
                 );

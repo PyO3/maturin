@@ -44,6 +44,8 @@ pub fn test_musl() -> Result<bool> {
         "python3",
         "--target",
         "x86_64-unknown-linux-musl",
+        "--manylinux",
+        "off",
     ])?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;

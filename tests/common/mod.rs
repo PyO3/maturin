@@ -7,6 +7,7 @@ use std::{env, io, str};
 pub mod develop;
 pub mod errors;
 pub mod integration;
+#[cfg(target_os = "linux")]
 pub mod other;
 
 // Y U NO accept windows path prefix, pip?

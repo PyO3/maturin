@@ -6,9 +6,9 @@ set -ex
 # which makes everything complex and slow
 cd "$(git rev-parse --show-toplevel)" # Go to project root
 
-pip uninstall -y lib_with_path_dep
+pip uninstall -y lib_with_path_dep 2> /dev/null
 # Make sure it's actually removed
-python -c "from lib_with_path_dep import add; assert add(2,2)==4" && exit 1 || true
+python -c "from lib_with_path_dep import add; assert add(2,2)==4" 2> /dev/null && exit 1 || true
 
 # Build maturin wheel
 cargo run -- build -b bin --strip

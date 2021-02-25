@@ -29,6 +29,9 @@ pub enum UploadError {
     /// The registry returned something else than 200
     #[error("Failed to upload the wheel with status {0}: {1}")]
     StatusCodeError(String, String),
+    /// File already exists
+    #[error("File already exists: {0}")]
+    FileExistsError(String),
 }
 
 impl From<io::Error> for UploadError {
@@ -95,18 +98,38 @@ pub fn upload(
         .basic_auth(registry.username.clone(), Some(registry.password.clone()))
         .send()?;
 
-    if response.status().is_success() {
-        Ok(())
-    } else if response.status() == StatusCode::FORBIDDEN {
-        Err(UploadError::AuthenticationError)
+    let status = response.status();
+    if status.is_success() {
+        return Ok(());
+    }
+    let err_text = response.text().unwrap_or_else(|e| {
+        format!(
+            "The registry should return some text, even in case of an error, but didn't ({})",
+            e
+        )
+    });
+    // Detect FileExistsError the way twine does
+    // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
+    if status == StatusCode::FORBIDDEN {
+        if err_text.contains("overwrite artifact") {
+            // Artifactory (https://jfrog.com/artifactory/)
+            Err(UploadError::FileExistsError(err_text))
+        } else {
+            Err(UploadError::AuthenticationError)
+        }
     } else {
-        let status_string = response.status().to_string();
-        let err_text = response.text().unwrap_or_else(|e| {
-            format!(
-                "The registry should return some text, even in case of an error, but didn't ({})",
-                e
-            )
-        });
-        Err(UploadError::StatusCodeError(status_string, err_text))
+        let status_string = status.to_string();
+        if status == StatusCode::CONFLICT // pypiserver (https://pypi.org/project/pypiserver)
+            // PyPI / TestPyPI
+            || (status == StatusCode::BAD_REQUEST && err_text.contains("already exists"))
+            // Nexus Repository OSS (https://www.sonatype.com/nexus-repository-oss)
+            || (status == StatusCode::BAD_REQUEST && err_text.contains("updating asset"))
+            // # Gitlab Enterprise Edition (https://about.gitlab.com)
+            || (status == StatusCode::BAD_REQUEST && err_text.contains("already been taken"))
+        {
+            Err(UploadError::FileExistsError(err_text))
+        } else {
+            Err(UploadError::StatusCodeError(status_string, err_text))
+        }
     }
 }

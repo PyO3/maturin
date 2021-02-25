@@ -277,6 +277,10 @@ FLAGS:
         --skip-auditwheel
             Don't check for manylinux compliance
 
+        --skip-existing
+            Continue uploading files if one already exists. (Only valid when uploading to PyPI. Other implementations
+            may not support this.)
+
         --universal2
             Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets, do nothing
             otherwise

@@ -975,12 +975,14 @@ dependencies = [
  "indoc",
  "keyring",
  "mailparse",
+ "once_cell",
  "platform-info",
  "platforms",
  "pretty_env_logger",
  "regex",
  "reqwest",
  "rpassword",
+ "scroll",
  "serde",
  "serde_json",
  "sha2",
@@ -2004,9 +2006,9 @@ checksum = "360dfd1d6d30e05fda32ace2c8c70e9c0a9da713275777f5a4dbb8a1893930c6"
 
 [[package]]
 name = "tracing"
-version = "0.1.24"
+version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f77d3842f76ca899ff2dbcf231c5c65813dea431301d6eb686279c15c4464f12"
+checksum = "01ebdc2bb4498ab1ab5f5b73c5803825e60199229ccba0698170e3be0e7f959f"
 dependencies = [
  "cfg-if",
  "pin-project-lite",

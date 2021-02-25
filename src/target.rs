@@ -53,8 +53,8 @@ impl FromStr for Manylinux {
 }
 
 /// All supported CPU architectures
-#[derive(Debug, Clone, Eq, PartialEq)]
-enum Arch {
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Arch {
     AARCH64,
     ARMV7L,
     POWERPC64LE,
@@ -160,6 +160,11 @@ impl Target {
             Arch::X86 => 32,
             Arch::X86_64 => 64,
         }
+    }
+
+    /// Returns target architecture
+    pub fn target_arch(&self) -> Arch {
+        self.arch
     }
 
     /// Returns target triple string

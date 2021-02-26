@@ -21,7 +21,8 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// This method is rather frail, but unfortunately I don't know a better solution.
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, String>,
+    known_path_deps: &HashMap<&String, &PathBuf>,
+    is_path_dep: bool,
 ) -> Result<String> {
     let text = fs::read_to_string(&manifest_path).context(format!(
         "Can't read Cargo.toml at {}",
@@ -53,8 +54,11 @@ fn rewrite_cargo_toml(
                     )
                 }
                 // This is the location of the targeted crate in the source distribution
-                table[&dep_name]["path"] =
-                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name));
+                table[&dep_name]["path"] = toml_edit::value(if is_path_dep {
+                    format!("../{}", dep_name)
+                } else {
+                    format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name)
+                });
                 if !known_path_deps.contains_key(&dep_name) {
                     bail!(
                         "cargo metadata does not know about the path for {} {} present in {}, which should never happen ಠ_ಠ",
@@ -75,8 +79,9 @@ fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, String>,
+    known_path_deps: &HashMap<&String, &PathBuf>,
     root_crate: bool,
+    is_path_dep: bool,
 ) -> Result<()> {
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
@@ -123,7 +128,7 @@ fn add_crate_to_source_distribution(
         )
     }
 
-    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, &known_path_deps)?;
+    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, known_path_deps, is_path_dep)?;
 
     writer.add_directory(&prefix)?;
     writer.add_bytes(
@@ -139,7 +144,38 @@ fn add_crate_to_source_distribution(
     Ok(())
 }
 
-/// Creates aif source distribution, packing the root crate and all local dependencies
+/// Finds all path dependencies of the crate.
+fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<&String, &PathBuf>> {
+    let root = cargo_metadata
+        .root_package()
+        .context("Expected the dependency graph to have a root package")?;
+    // scan the dependency graph for path dependencies
+    let mut path_deps = HashMap::new();
+    let mut stack: Vec<&cargo_metadata::Package> = vec![root];
+    while let Some(top) = stack.pop() {
+        for dependency in &top.dependencies {
+            if let Some(path) = &dependency.path {
+                path_deps.insert(&dependency.name, path);
+                // we search for the respective package by `manifest_path`, there seems
+                // to be no way to query the dependency graph given `dependency`
+                let dep_manifest_path = path.join("Cargo.toml");
+                let dep_package = cargo_metadata
+                    .packages
+                    .iter()
+                    .find(|package| package.manifest_path == dep_manifest_path)
+                    .context(format!(
+                        "Expected metadata to contain a package for path dependency {:?}",
+                        path
+                    ))?;
+                // scan the dependencies of the path dependency
+                stack.push(dep_package)
+            }
+        }
+    }
+    Ok(path_deps)
+}
+
+/// Creates a source distribution, packing the root crate and all local dependencies
 ///
 /// The source distribution format is specified in
 /// [PEP 517 under "build_sdist"](https://www.python.org/dev/peps/pep-0517/#build-sdist)
@@ -152,21 +188,7 @@ pub fn source_distribution(
     cargo_metadata: &Metadata,
     sdist_include: Option<&Vec<String>>,
 ) -> Result<PathBuf> {
-    // Parse ids in the format:
-    // some_path_dep 0.1.0 (path+file:///home/konsti/maturin/test-crates/some_path_dep)
-    // This is not a good way to identify path dependencies, but I don't know a better one
-    let matcher = Regex::new(r"^(.*) .* \(path\+file://(.*)\)$").unwrap();
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected to get a dependency graph from cargo")?;
-    let known_path_deps: HashMap<String, String> = resolve
-        .nodes
-        .iter()
-        .filter(|node| &node.id != resolve.root.as_ref().unwrap())
-        .filter_map(|node| matcher.captures(&node.id.repr))
-        .map(|captures| (captures[1].to_string(), captures[2].to_string()))
-        .collect();
+    let path_deps = find_path_deps(cargo_metadata)?;
 
     let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
     let root_dir = PathBuf::from(format!(
@@ -176,17 +198,19 @@ pub fn source_distribution(
     ));
 
     // Add local path dependencies
-    for (name, path) in known_path_deps.iter() {
+    for (name, path) in path_deps.iter() {
         add_crate_to_source_distribution(
             &mut writer,
             &PathBuf::from(path).join("Cargo.toml"),
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
-            &known_path_deps,
+            &path_deps,
             false,
+            true,
         )
         .context(format!(
             "Failed to add local dependency {} at {} to the source distribution",
-            name, path
+            name,
+            path.to_string_lossy()
         ))?;
     }
 
@@ -195,7 +219,8 @@ pub fn source_distribution(
         &mut writer,
         &manifest_path,
         &root_dir,
-        &known_path_deps,
+        &path_deps,
+        false,
         false,
     )?;
 

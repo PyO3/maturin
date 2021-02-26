@@ -26,6 +26,7 @@ pub enum Manylinux {
     /// Use the manylinux2014 tag
     Manylinux2014,
     /// Use the manylinux_2_24 tag
+    #[allow(non_camel_case_types)]
     Manylinux_2_24,
     /// Use the native linux tag
     Off,

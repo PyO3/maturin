@@ -232,11 +232,19 @@ pub fn auditwheel_rs(
                     .map(|v| format!("{}_{}", name, v))
                     .collect();
                 let offending_symbols = find_incompliant_symbols(&elf, &offending_symbol_versions)?;
-                let offender = format!(
-                    "{} offending symbols: {}",
-                    library.name,
-                    offending_symbols.join(", ")
-                );
+                let offender = if offending_symbols.is_empty() {
+                    format!(
+                        "{} offending versions: {}",
+                        library.name,
+                        offending_symbol_versions.join(", ")
+                    )
+                } else {
+                    format!(
+                        "{} offending symbols: {}",
+                        library.name,
+                        offending_symbols.join(", ")
+                    )
+                };
                 offenders.insert(offender);
             }
         }

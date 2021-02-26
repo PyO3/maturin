@@ -71,36 +71,42 @@ fn get_username() -> String {
 }
 
 #[cfg(feature = "upload")]
-fn load_pypi_cred_from_config(package_name: &str) -> Option<(String, String)> {
+fn load_pypirc() -> Ini {
+    let mut config = Ini::new();
     if let Some(mut config_path) = dirs::home_dir() {
         config_path.push(".pypirc");
         if let Ok(pypirc) = fs::read_to_string(config_path.as_path()) {
-            let mut config = Ini::new();
-            if config.read(pypirc).is_err() {
-                return None;
-            }
-
-            if let (Some(username), Some(password)) = (
-                config.get(package_name, "username"),
-                config.get(package_name, "password"),
-            ) {
-                return Some((username, password));
-            }
+            let _ = config.read(pypirc);
         }
     }
+    config
+}
 
+#[cfg(feature = "upload")]
+fn load_pypi_cred_from_config(config: &Ini, registry_name: &str) -> Option<(String, String)> {
+    if let (Some(username), Some(password)) = (
+        config.get(registry_name, "username"),
+        config.get(registry_name, "password"),
+    ) {
+        return Some((username, password));
+    }
     None
 }
 
 #[cfg(feature = "upload")]
-fn resolve_pypi_cred(opt: &PublishOpt, package_name: &str) -> (String, String) {
+fn resolve_pypi_cred(
+    opt: &PublishOpt,
+    config: &Ini,
+    registry_name: Option<&str>,
+) -> (String, String) {
     // API token from environment variable takes priority
     if let Ok(token) = env::var("MATURIN_PYPI_TOKEN") {
         return ("__token__".to_string(), token);
     }
 
-    // load creds from pypirc if found
-    if let Some((username, password)) = load_pypi_cred_from_config(package_name) {
+    if let Some((username, password)) =
+        registry_name.and_then(|name| load_pypi_cred_from_config(&config, name))
+    {
         println!("🔐 Using credential in pypirc for upload");
         return (username, password);
     }
@@ -117,9 +123,23 @@ fn resolve_pypi_cred(opt: &PublishOpt, package_name: &str) -> (String, String) {
 
 #[cfg(feature = "upload")]
 /// Asks for username and password for a registry account where missing.
-fn complete_registry(opt: &PublishOpt, package_name: &str) -> Result<Registry> {
-    let (username, password) = resolve_pypi_cred(opt, package_name);
-    let registry = Registry::new(username, password, Url::parse(&opt.registry)?);
+fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
+    // load creds from pypirc if found
+    let pypirc = load_pypirc();
+    let (register_name, registry_url) =
+        if !opt.registry.starts_with("http://") && !opt.registry.starts_with("https://") {
+            if let Some(url) = pypirc.get(&opt.registry, "repository") {
+                (Some(opt.registry.as_str()), url)
+            } else {
+                bail!("Failed to get registry {} in .pypirc", opt.registry);
+            }
+        } else if opt.registry == "https://upload.pypi.org/legacy/" {
+            (Some("pypi"), opt.registry.clone())
+        } else {
+            (None, opt.registry.clone())
+        };
+    let (username, password) = resolve_pypi_cred(opt, &pypirc, register_name);
+    let registry = Registry::new(username, password, Url::parse(&registry_url)?);
 
     Ok(registry)
 }
@@ -394,7 +414,7 @@ fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Resul
         }
     }
 
-    let registry = complete_registry(&publish, &build_context.metadata21.name)?;
+    let registry = complete_registry(&publish)?;
 
     println!("🚀 Uploading {} packages", wheels.len());
 

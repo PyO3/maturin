@@ -3,7 +3,6 @@ use crate::{Metadata21, SDistWriter};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

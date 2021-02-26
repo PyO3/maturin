@@ -5,9 +5,10 @@ use crate::Manylinux;
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::{write_dist_info, BuildOptions};
-use anyhow::{anyhow, format_err, Context, Result};
+use anyhow::{anyhow, bail, format_err, Context, Result};
 use fs_err as fs;
 use std::path::Path;
+use std::process::Command;
 
 /// Installs a crate by compiling it and copying the shared library to site-packages.
 /// Also adds the dist-info directory to make sure pip and other tools detect the library
@@ -45,6 +46,25 @@ pub fn develop(
         .ok_or_else(|| {
             anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
         })?;
+
+    // Install dependencies
+    if !build_context.metadata21.requires_dist.is_empty() {
+        let mut args = vec!["-m", "pip", "install"];
+        args.extend(
+            build_context
+                .metadata21
+                .requires_dist
+                .iter()
+                .map(|x| x.as_str()),
+        );
+        let status = Command::new(&interpreter.executable)
+            .args(&args)
+            .status()
+            .context("Failed to run pip install")?;
+        if !status.success() {
+            bail!(r#"pip install finished with "{}""#, status,)
+        }
+    }
 
     let mut builder = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;
 

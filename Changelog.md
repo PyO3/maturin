@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Support local path dependencies in source distribution (i.e. you can now package a workspace into an sdist)
  * Set a more reasonable LC_ID_DYLIB entry on macOS by messense [#433](https://github.com/PyO3/maturin/pull/433)
  * Add `--skip-existing` option to publish by messense [#444](https://github.com/PyO3/maturin/pull/444)
+ * maturn develop install dependencies automatically by messense [#443](https://github.com/PyO3/maturin/pull/443)
 
 ## 0.9.4 - 2021-02-18
 

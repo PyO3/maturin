@@ -213,12 +213,15 @@ fn compile_target(
     }
 
     if let Some(python_interpreter) = python_interpreter {
-        if bindings_crate.is_bindings("pyo3") {
-            build_command.env("PYO3_PYTHON", &python_interpreter.executable);
-        }
+        // `python_interpreter.executable` could be empty when cross compiling
+        if python_interpreter.executable != PathBuf::new() {
+            if bindings_crate.is_bindings("pyo3") {
+                build_command.env("PYO3_PYTHON", &python_interpreter.executable);
+            }
 
-        // rust-cpython, and legacy pyo3 versions
-        build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
+            // rust-cpython, and legacy pyo3 versions
+            build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
+        }
     }
 
     let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;

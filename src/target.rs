@@ -84,6 +84,7 @@ pub struct Target {
     os: Os,
     arch: Arch,
     env: Option<Env>,
+    triple: String,
 }
 
 impl Target {
@@ -92,13 +93,15 @@ impl Target {
     ///
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
-        let platform = if let Some(ref target_triple) = target_triple {
-            Platform::find(target_triple)
-                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?
+        let (platform, triple) = if let Some(ref target_triple) = target_triple {
+            let platform = Platform::find(target_triple)
+                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?;
+            (platform, target_triple.to_string())
         } else {
             let target_triple = get_host_target()?;
-            Platform::find(&target_triple)
-                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?
+            let platform = Platform::find(&target_triple)
+                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?;
+            (platform, target_triple)
         };
 
         let os = match platform.target_os {
@@ -136,6 +139,7 @@ impl Target {
             os,
             arch,
             env: platform.target_env,
+            triple,
         })
     }
 
@@ -218,6 +222,11 @@ impl Target {
             Arch::X86_64 => 64,
             Arch::S390X => 64,
         }
+    }
+
+    /// Returns target triple string
+    pub fn target_triple(&self) -> &str {
+        &self.triple
     }
 
     /// Returns true if the current platform is not windows

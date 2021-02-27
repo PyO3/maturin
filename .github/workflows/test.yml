@@ -143,3 +143,24 @@ jobs:
 
       # Fix permissions from docker for caching
       - run: sudo chown $(id -u):$(id -g) -R target test-crates/*/target
+
+  test-cross-compile:
+    name: Test Cross Compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [
+          { target: "aarch64-unknown-linux-gnu", arch: "aarch64" },
+          { target: "armv7-unknown-linux-gnueabihf", arch: "armv7" },
+        ]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build Wheels
+        run: |
+          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+          source ~/.cargo/env
+          rustup target add ${{ matrix.platform.target }}
+          export PYO3_CROSS_LIB_DIR=/opt/python/cp36-cp36m/lib
+          cargo run --target x86_64-unknown-linux-gnu -- build -i python3.9 --release --out dist --no-sdist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          ' > build-wheel.sh
+          docker run --rm -v "$PWD":/io -w /io messense/manylinux2014-cross:${{ matrix.platform.arch }} bash build-wheel.sh

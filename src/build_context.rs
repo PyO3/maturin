@@ -1,5 +1,6 @@
 #[cfg(feature = "auditwheel")]
 use crate::auditwheel::auditwheel_rs;
+use crate::auditwheel::policy::Policy;
 use crate::compile;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
@@ -133,13 +134,12 @@ impl BuildContext {
             .context("Failed to create the target directory for the wheels")?;
 
         let wheels = match &self.bridge {
-            BridgeModel::Cffi => vec![(self.build_cffi_wheel()?, "py3".to_string())],
-            BridgeModel::Bin => vec![(self.build_bin_wheel()?, "py3".to_string())],
+            BridgeModel::Cffi => self.build_cffi_wheel()?,
+            BridgeModel::Bin => self.build_bin_wheel()?,
             BridgeModel::Bindings(_) => self.build_binding_wheels()?,
-            BridgeModel::BindingsAbi3(major, minor) => vec![(
-                self.build_binding_wheel_abi3(*major, *minor)?,
-                format!("cp{}{}", major, minor),
-            )],
+            BridgeModel::BindingsAbi3(major, minor) => {
+                self.build_binding_wheel_abi3(*major, *minor)?
+            }
         };
 
         Ok(wheels)
@@ -166,16 +166,45 @@ impl BuildContext {
         }
     }
 
-    /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
-    /// for it
-    pub fn build_binding_wheel_abi3(&self, major: u8, min_minor: u8) -> Result<PathBuf> {
-        // On windows, we have picked an interpreter to set the location of python.lib,
-        // otherwise it's none
-        let artifact = self.compile_cdylib(self.interpreter.get(0), Some(&self.module_name))?;
+    #[cfg(feature = "auditwheel")]
+    fn auditwheel(
+        &self,
+        python_interpreter: Option<&PythonInterpreter>,
+        artifact: &Path,
+        manylinux: &Manylinux,
+    ) -> Result<Option<Policy>> {
+        if !self.skip_auditwheel {
+            let target = python_interpreter
+                .map(|x| &x.target)
+                .unwrap_or(&self.target);
 
-        let platform = self
-            .target
-            .get_platform_tag(&self.manylinux, self.universal2);
+            let policy = auditwheel_rs(&artifact, target, manylinux)
+                .context(format!("Failed to ensure {} compliance", manylinux))?;
+            Ok(policy)
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[cfg(not(feature = "auditwheel"))]
+    #[allow(clippy::unnecessary_wraps)]
+    fn auditwheel(
+        &self,
+        _python_interpreter: Option<&PythonInterpreter>,
+        _artifact: &Path,
+        _manylinux: &Manylinux,
+    ) -> Result<Option<Policy>> {
+        Ok(None)
+    }
+
+    fn write_binding_wheel_abi3(
+        &self,
+        artifact: &Path,
+        manylinux: &Manylinux,
+        major: u8,
+        min_minor: u8,
+    ) -> Result<(PathBuf, String)> {
+        let platform = self.target.get_platform_tag(&manylinux, self.universal2);
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(
@@ -190,7 +219,7 @@ impl BuildContext {
             &mut writer,
             &self.project_layout,
             &self.module_name,
-            &artifact,
+            artifact,
             None,
             &self.target,
             false,
@@ -198,6 +227,24 @@ impl BuildContext {
         .context("Failed to add the files to the wheel")?;
 
         let wheel_path = writer.finish()?;
+        Ok((wheel_path, format!("cp{}{}", major, min_minor)))
+    }
+
+    /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
+    /// for it
+    pub fn build_binding_wheel_abi3(
+        &self,
+        major: u8,
+        min_minor: u8,
+    ) -> Result<Vec<(PathBuf, String)>> {
+        let mut wheels = Vec::new();
+        // On windows, we have picked an interpreter to set the location of python.lib,
+        // otherwise it's none
+        let python_interpreter = self.interpreter.get(0);
+        let artifact = self.compile_cdylib(python_interpreter, Some(&self.module_name))?;
+        let policy = self.auditwheel(python_interpreter, &artifact, &self.manylinux)?;
+        let (wheel_path, tag) =
+            self.write_binding_wheel_abi3(&artifact, &self.manylinux, major, min_minor)?;
 
         println!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -205,8 +252,63 @@ impl BuildContext {
             min_minor,
             wheel_path.display()
         );
+        wheels.push((wheel_path, tag));
 
-        Ok(wheel_path)
+        if let Some(policy) = policy {
+            if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
+                let manylinux = policy.manylinux_tag();
+                if self
+                    .auditwheel(python_interpreter, &artifact, &manylinux)
+                    .is_ok()
+                {
+                    println!(
+                        "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
+                        &self.manylinux,
+                        manylinux,
+                    );
+                    let (wheel_path, tag) =
+                        self.write_binding_wheel_abi3(&artifact, &manylinux, major, min_minor)?;
+                    println!("📦 Fixed-up wheel written to {}", wheel_path.display());
+                    wheels.push((wheel_path, tag));
+                }
+            }
+        }
+
+        Ok(wheels)
+    }
+
+    fn write_binding_wheel(
+        &self,
+        python_interpreter: &PythonInterpreter,
+        artifact: &Path,
+        manylinux: &Manylinux,
+    ) -> Result<(PathBuf, String)> {
+        let tag = python_interpreter.get_tag(manylinux, self.universal2);
+
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &self.metadata21,
+            &self.scripts,
+            &[tag.clone()],
+        )?;
+
+        write_bindings_module(
+            &mut writer,
+            &self.project_layout,
+            &self.module_name,
+            &artifact,
+            Some(&python_interpreter),
+            &self.target,
+            false,
+        )
+        .context("Failed to add the files to the wheel")?;
+
+        let wheel_path = writer.finish()?;
+        Ok((
+            wheel_path,
+            format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
+        ))
     }
 
     /// Builds wheels for a Cargo project for all given python versions.
@@ -221,30 +323,9 @@ impl BuildContext {
         for python_interpreter in &self.interpreter {
             let artifact =
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
-
-            let tag = python_interpreter.get_tag(&self.manylinux, self.universal2);
-
-            let mut writer = WheelWriter::new(
-                &tag,
-                &self.out,
-                &self.metadata21,
-                &self.scripts,
-                &[tag.clone()],
-            )?;
-
-            write_bindings_module(
-                &mut writer,
-                &self.project_layout,
-                &self.module_name,
-                &artifact,
-                Some(&python_interpreter),
-                &self.target,
-                false,
-            )
-            .context("Failed to add the files to the wheel")?;
-
-            let wheel_path = writer.finish()?;
-
+            let policy = self.auditwheel(Some(&python_interpreter), &artifact, &self.manylinux)?;
+            let (wheel_path, tag) =
+                self.write_binding_wheel(python_interpreter, &artifact, &self.manylinux)?;
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -254,10 +335,27 @@ impl BuildContext {
                 wheel_path.display()
             );
 
-            wheels.push((
-                wheel_path,
-                format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
-            ));
+            wheels.push((wheel_path, tag));
+
+            if let Some(policy) = policy {
+                if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
+                    let manylinux = policy.manylinux_tag();
+                    if self
+                        .auditwheel(Some(&python_interpreter), &artifact, &manylinux)
+                        .is_ok()
+                    {
+                        println!(
+                            "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
+                            &self.manylinux,
+                            manylinux,
+                        );
+                        let (wheel_path, tag) =
+                            self.write_binding_wheel(python_interpreter, &artifact, &manylinux)?;
+                        println!("📦 Fixed-up wheel written to {}", wheel_path.display());
+                        wheels.push((wheel_path, tag));
+                    }
+                }
+            }
         }
 
         Ok(wheels)
@@ -282,15 +380,6 @@ impl BuildContext {
                  in the lib section of your Cargo.toml?",
             )
         })?;
-        #[cfg(feature = "auditwheel")]
-        if !self.skip_auditwheel {
-            let target = python_interpreter
-                .map(|x| &x.target)
-                .unwrap_or(&self.target);
-
-            auditwheel_rs(&artifact, target, &self.manylinux)
-                .context(format!("Failed to ensure {} compliance", self.manylinux))?;
-        }
 
         if let Some(module_name) = module_name {
             warn_missing_py_init(&artifact, module_name)
@@ -300,13 +389,12 @@ impl BuildContext {
         Ok(artifact)
     }
 
-    /// Builds a wheel with cffi bindings
-    pub fn build_cffi_wheel(&self) -> Result<PathBuf> {
-        let artifact = self.compile_cdylib(None, None)?;
-
-        let (tag, tags) = self
-            .target
-            .get_universal_tags(&self.manylinux, self.universal2);
+    fn write_cffi_wheel(
+        &self,
+        artifact: &Path,
+        manylinux: &Manylinux,
+    ) -> Result<(PathBuf, String)> {
+        let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
 
         let mut builder =
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
@@ -322,31 +410,40 @@ impl BuildContext {
         )?;
 
         let wheel_path = builder.finish()?;
-
-        println!("📦 Built wheel to {}", wheel_path.display());
-
-        Ok(wheel_path)
+        Ok((wheel_path, "py3".to_string()))
     }
 
-    /// Builds a wheel that contains a binary
-    ///
-    /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_bin_wheel(&self) -> Result<PathBuf> {
-        let artifacts = compile(&self, None, &self.bridge)
-            .context("Failed to build a native library through cargo")?;
+    /// Builds a wheel with cffi bindings
+    pub fn build_cffi_wheel(&self) -> Result<Vec<(PathBuf, String)>> {
+        let mut wheels = Vec::new();
+        let artifact = self.compile_cdylib(None, None)?;
+        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &self.manylinux)?;
+        let policy = self.auditwheel(None, &artifact, &self.manylinux)?;
 
-        let artifact = artifacts
-            .get("bin")
-            .cloned()
-            .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
+        println!("📦 Built wheel to {}", wheel_path.display());
+        wheels.push((wheel_path, tag));
 
-        #[cfg(feature = "auditwheel")]
-        auditwheel_rs(&artifact, &self.target, &self.manylinux)
-            .context(format!("Failed to ensure {} compliance", self.manylinux))?;
+        if let Some(policy) = policy {
+            if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
+                let manylinux = policy.manylinux_tag();
+                if self.auditwheel(None, &artifact, &manylinux).is_ok() {
+                    println!(
+                        "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
+                        &self.manylinux,
+                        manylinux,
+                    );
+                    let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &manylinux)?;
+                    println!("📦 Fixed-up wheel written to {}", wheel_path.display());
+                    wheels.push((wheel_path, tag));
+                }
+            }
+        }
 
-        let (tag, tags) = self
-            .target
-            .get_universal_tags(&self.manylinux, self.universal2);
+        Ok(wheels)
+    }
+
+    fn write_bin_wheel(&self, artifact: &Path, manylinux: &Manylinux) -> Result<(PathBuf, String)> {
+        let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
 
         if !self.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
@@ -371,9 +468,44 @@ impl BuildContext {
         write_bin(&mut builder, &artifact, &self.metadata21, bin_name)?;
 
         let wheel_path = builder.finish()?;
+        Ok((wheel_path, "py3".to_string()))
+    }
 
+    /// Builds a wheel that contains a binary
+    ///
+    /// Runs [auditwheel_rs()] if not deactivated
+    pub fn build_bin_wheel(&self) -> Result<Vec<(PathBuf, String)>> {
+        let mut wheels = Vec::new();
+        let artifacts = compile(&self, None, &self.bridge)
+            .context("Failed to build a native library through cargo")?;
+
+        let artifact = artifacts
+            .get("bin")
+            .cloned()
+            .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
+
+        let policy = self.auditwheel(None, &artifact, &self.manylinux)?;
+
+        let (wheel_path, tag) = self.write_bin_wheel(&artifact, &self.manylinux)?;
         println!("📦 Built wheel to {}", wheel_path.display());
+        wheels.push((wheel_path, tag));
 
-        Ok(wheel_path)
+        if let Some(policy) = policy {
+            if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
+                let manylinux = policy.manylinux_tag();
+                if self.auditwheel(None, &artifact, &manylinux).is_ok() {
+                    println!(
+                        "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
+                        &self.manylinux,
+                        manylinux,
+                    );
+                    let (wheel_path, tag) = self.write_bin_wheel(&artifact, &manylinux)?;
+                    println!("📦 Fixed-up wheel written to {}", wheel_path.display());
+                    wheels.push((wheel_path, tag));
+                }
+            }
+        }
+
+        Ok(wheels)
     }
 }

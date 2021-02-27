@@ -48,7 +48,6 @@ pub use {
     crate::upload::{upload, UploadError},
 };
 
-#[cfg(feature = "auditwheel")]
 mod auditwheel;
 mod build_context;
 mod build_options;

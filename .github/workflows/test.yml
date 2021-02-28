@@ -76,17 +76,17 @@ jobs:
   test-auditwheel:
     name: Test Auditwheel
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux${{ matrix.manylinux }}_x86_64
     strategy:
       matrix:
         manylinux: [2010, 2014]
     steps:
       - uses: actions/checkout@v2
-      - name: Install Rust
-        run: curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
       - name: Build
         run: |
-          source $HOME/.cargo/env
+          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          source ~/.cargo/env
           for PYBIN in /opt/python/cp3[6789]*/bin; do
             cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml -i "${PYBIN}/python" --manylinux ${{ matrix.manylinux }} -o dist
           done
+          ' > build-wheel.sh
+          docker run --rm -v "$PWD":/io -w /io quay.io/pypa/manylinux${{ matrix.manylinux }}_x86_64 bash build-wheel.sh

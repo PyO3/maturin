@@ -22,6 +22,7 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
     known_path_deps: &HashMap<String, String>,
+    root_crate: bool,
 ) -> Result<String> {
     let text = fs::read_to_string(&manifest_path).context(format!(
         "Can't read Cargo.toml at {}",
@@ -53,12 +54,19 @@ fn rewrite_cargo_toml(
                     )
                 }
                 // This is the location of the targeted crate in the source distribution
-                table[&dep_name]["path"] =
-                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name));
+                table[&dep_name]["path"] = if root_crate {
+                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
+                } else {
+                    // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
+                    toml_edit::value(format!("../{}", dep_name))
+                };
                 if !known_path_deps.contains_key(&dep_name) {
                     bail!(
-                        "cargo metadata does not know about the path for {} {} present in {}, which should never happen ಠ_ಠ",
-                        dep_category, dep_name, manifest_path.as_ref().display()
+                        "cargo metadata does not know about the path for {}.{} present in {}, \
+                        which should never happen ಠ_ಠ",
+                        dep_category,
+                        dep_name,
+                        manifest_path.as_ref().display()
                     );
                 }
             }
@@ -123,7 +131,7 @@ fn add_crate_to_source_distribution(
         )
     }
 
-    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, &known_path_deps)?;
+    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, &known_path_deps, root_crate)?;
 
     writer.add_directory(&prefix)?;
     writer.add_bytes(
@@ -196,7 +204,7 @@ pub fn source_distribution(
         &manifest_path,
         &root_dir,
         &known_path_deps,
-        false,
+        true,
     )?;
 
     let manifest_dir = manifest_path.as_ref().parent().unwrap();

@@ -3,7 +3,9 @@
 use pyo3::prelude::*;
 
 fn add(x: usize, y: usize) -> usize {
-    some_path_dep::add(x, y)
+    let sum = some_path_dep::add(x, y);
+    debug_assert!(some_path_dep::is_sum(x, y, sum));
+    sum
 }
 
 unsafe extern "C" fn __pyo3_raw_add(

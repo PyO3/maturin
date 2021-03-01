@@ -72,3 +72,36 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+
+  test-auditwheel:
+    name: Test Auditwheel
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        manylinux: ['2010', '2014']
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: |
+          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          source ~/.cargo/env
+          for PYBIN in /opt/python/cp3[6789]*/bin; do
+            cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml -i "${PYBIN}/python" --manylinux ${{ matrix.manylinux }} -o dist
+          done
+          ' > build-wheel.sh
+          docker run --rm -v "$PWD":/io -w /io quay.io/pypa/manylinux${{ matrix.manylinux }}_x86_64 bash build-wheel.sh
+      - name: Imcompliant Build
+        if: matrix.manylinux == '2014'
+        run: |
+          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          source ~/.cargo/env
+          for PYBIN in /opt/python/cp3[6]*/bin; do
+            if cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml -i "${PYBIN}/python" --manylinux 2010 -o dist; then
+              echo "maturin build unexpectedly succeed"
+              exit 1
+            else
+              echo "maturin build failed as expected"
+            fi
+          done
+          ' > build-wheel.sh
+          docker run --rm -v "$PWD":/io -w /io quay.io/pypa/manylinux${{ matrix.manylinux }}_x86_64 bash build-wheel.sh

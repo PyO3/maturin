@@ -25,6 +25,9 @@ pub enum Manylinux {
     Manylinux2010,
     /// Use the manylinux2014 tag
     Manylinux2014,
+    /// Use the manylinux_2_24 tag
+    #[allow(non_camel_case_types)]
+    Manylinux_2_24,
     /// Use the native linux tag
     Off,
 }
@@ -34,6 +37,7 @@ impl fmt::Display for Manylinux {
         match *self {
             Manylinux::Manylinux2010 => write!(f, "manylinux2010"),
             Manylinux::Manylinux2014 => write!(f, "manylinux2014"),
+            Manylinux::Manylinux_2_24 => write!(f, "manylinux_2_24"),
             Manylinux::Off => write!(f, "linux"),
         }
     }
@@ -46,6 +50,7 @@ impl FromStr for Manylinux {
         match value {
             "2010" => Ok(Manylinux::Manylinux2010),
             "2014" => Ok(Manylinux::Manylinux2014),
+            "2_24" => Ok(Manylinux::Manylinux_2_24),
             "off" => Ok(Manylinux::Off),
             _ => Err("Invalid value for the manylinux option"),
         }

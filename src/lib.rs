@@ -26,7 +26,6 @@
 
 #![deny(missing_docs)]
 
-#[cfg(feature = "auditwheel")]
 pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};
 pub use crate::build_context::BridgeModel;
 pub use crate::build_context::BuildContext;
@@ -48,7 +47,6 @@ pub use {
     crate::upload::{upload, UploadError},
 };
 
-#[cfg(feature = "auditwheel")]
 mod auditwheel;
 mod build_context;
 mod build_options;

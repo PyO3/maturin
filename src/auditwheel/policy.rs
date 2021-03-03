@@ -1,5 +1,7 @@
+use crate::Manylinux;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::cmp::{Ordering, PartialOrd};
 use std::collections::{HashMap, HashSet};
 
 pub static POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
@@ -9,7 +11,7 @@ pub static POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
 });
 
 /// Manylinux policy
-#[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Policy {
     /// manylinux platform tag name
     pub name: String,
@@ -22,9 +24,44 @@ pub struct Policy {
     pub lib_whitelist: HashSet<String>,
 }
 
+impl Default for Policy {
+    fn default() -> Self {
+        // defaults to linux
+        Policy::from_priority(0).unwrap()
+    }
+}
+
+impl PartialOrd for Policy {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.priority.partial_cmp(&other.priority)
+    }
+}
+
+impl Policy {
+    /// Get highest priority policy than self
+    pub fn higher_priority_policies(&self) -> impl Iterator<Item = &Policy> {
+        POLICIES.iter().filter(move |p| p.priority > self.priority)
+    }
+
+    /// Get manylinux platform tag from this policy
+    pub fn manylinux_tag(&self) -> Manylinux {
+        self.name.parse().expect("Manylinux variants is incomplete")
+    }
+
+    /// Get policy by it's manylinux platform tag name
+    pub fn from_name(name: &str) -> Option<Self> {
+        POLICIES.iter().find(|p| p.name == name).cloned()
+    }
+
+    /// Get policy by it's priority
+    pub fn from_priority(priority: i64) -> Option<Self> {
+        POLICIES.iter().find(|p| p.priority == priority).cloned()
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::POLICIES;
+    use super::{Policy, POLICIES};
 
     #[test]
     fn test_load_policy() {
@@ -39,6 +76,30 @@ mod test {
         let cxxabi = &symbol_version["CXXABI"];
         for version in &["1.3", "1.3.1", "1.3.2", "1.3.3"] {
             assert!(cxxabi.contains(*version));
+        }
+    }
+
+    #[test]
+    fn test_policy_manylinux_tag() {
+        for policy in POLICIES.iter() {
+            let _tag = policy.manylinux_tag();
+        }
+    }
+
+    #[test]
+    fn test_policy_from_name() {
+        use crate::Manylinux;
+
+        let tags = &[
+            Manylinux::Manylinux1,
+            Manylinux::Manylinux2010,
+            Manylinux::Manylinux2014,
+            Manylinux::Manylinux_2_24,
+            Manylinux::Off,
+        ];
+        for manylinux in tags {
+            let policy = Policy::from_name(&manylinux.to_string());
+            assert!(policy.is_some());
         }
     }
 }

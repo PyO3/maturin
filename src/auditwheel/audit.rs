@@ -241,7 +241,7 @@ fn policy_is_satisfied(
     }
 }
 
-/// An (incomplete) reimplementation of auditwheel, which checks elf files for
+/// An reimplementation of auditwheel, which checks elf files for
 /// manylinux compliance. Returns an error for non compliant elf files
 ///
 /// Checks for the libraries marked as NEEDED and symbol versions

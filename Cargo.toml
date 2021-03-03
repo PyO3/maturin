@@ -72,8 +72,7 @@ scroll = "0.10.2"
 indoc = "1.0.2"
 
 [features]
-default = ["auditwheel", "log", "upload", "rustls", "human-panic"]
-auditwheel = []
+default = ["log", "upload", "rustls", "human-panic"]
 upload = ["reqwest", "rpassword", "configparser", "dirs"]
 password-storage = ["upload", "keyring"]
 log = ["pretty_env_logger"]

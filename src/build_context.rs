@@ -1,4 +1,3 @@
-#[cfg(feature = "auditwheel")]
 use crate::auditwheel::auditwheel_rs;
 use crate::auditwheel::policy::Policy;
 use crate::compile;
@@ -166,7 +165,6 @@ impl BuildContext {
         }
     }
 
-    #[cfg(feature = "auditwheel")]
     fn auditwheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
@@ -184,17 +182,6 @@ impl BuildContext {
         } else {
             Ok(None)
         }
-    }
-
-    #[cfg(not(feature = "auditwheel"))]
-    #[allow(clippy::unnecessary_wraps)]
-    fn auditwheel(
-        &self,
-        _python_interpreter: Option<&PythonInterpreter>,
-        _artifact: &Path,
-        _manylinux: &Manylinux,
-    ) -> Result<Option<Policy>> {
-        Ok(None)
     }
 
     fn write_binding_wheel_abi3(

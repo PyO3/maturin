@@ -39,7 +39,6 @@ impl PartialOrd for Policy {
 
 impl Policy {
     /// Get highest priority policy than self
-    #[cfg(feature = "auditwheel")]
     pub fn higher_priority_policies(&self) -> impl Iterator<Item = &Policy> {
         POLICIES.iter().filter(move |p| p.priority > self.priority)
     }

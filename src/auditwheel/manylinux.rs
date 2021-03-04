@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Decides how to handle manylinux compliance
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Copy)]
 pub enum Manylinux {
     /// Use the manylinux1 tag
     Manylinux1,

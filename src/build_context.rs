@@ -172,7 +172,7 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
-        manylinux: &Option<Manylinux>,
+        manylinux: Option<Manylinux>,
     ) -> Result<Policy> {
         if self.skip_auditwheel {
             return Ok(Policy::default());
@@ -237,7 +237,7 @@ impl BuildContext {
         // otherwise it's none
         let python_interpreter = self.interpreter.get(0);
         let artifact = self.compile_cdylib(python_interpreter, Some(&self.module_name))?;
-        let policy = self.auditwheel(python_interpreter, &artifact, &self.manylinux)?;
+        let policy = self.auditwheel(python_interpreter, &artifact, self.manylinux)?;
         let (wheel_path, tag) =
             self.write_binding_wheel_abi3(&artifact, &policy.manylinux_tag(), major, min_minor)?;
 
@@ -298,7 +298,7 @@ impl BuildContext {
         for python_interpreter in &self.interpreter {
             let artifact =
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
-            let policy = self.auditwheel(Some(&python_interpreter), &artifact, &self.manylinux)?;
+            let policy = self.auditwheel(Some(&python_interpreter), &artifact, self.manylinux)?;
             let (wheel_path, tag) =
                 self.write_binding_wheel(python_interpreter, &artifact, &policy.manylinux_tag())?;
             println!(
@@ -372,7 +372,7 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let policy = self.auditwheel(None, &artifact, &self.manylinux)?;
+        let policy = self.auditwheel(None, &artifact, self.manylinux)?;
         let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &policy.manylinux_tag())?;
 
         println!("📦 Built wheel to {}", wheel_path.display());
@@ -427,7 +427,7 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let policy = self.auditwheel(None, &artifact, &self.manylinux)?;
+        let policy = self.auditwheel(None, &artifact, self.manylinux)?;
 
         let (wheel_path, tag) = self.write_bin_wheel(&artifact, &policy.manylinux_tag())?;
         println!("📦 Built wheel to {}", wheel_path.display());

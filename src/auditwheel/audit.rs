@@ -242,15 +242,21 @@ fn policy_is_satisfied(
 }
 
 /// An reimplementation of auditwheel, which checks elf files for
-/// manylinux compliance. Returns an error for non compliant elf files
+/// manylinux compliance.
 ///
-/// Checks for the libraries marked as NEEDED and symbol versions
+/// If `manylinux`, is None, it returns the the highest matching manylinux policy, or `linux`
+/// if nothing else matches. It will error for bogus cases, e.g. if libpython is linked.
+///
+/// If a specific manylinux version is given, compliance is checked and a warning printed if
+/// a higher version would be possible.
+///
+/// Does nothing for manylinux set to off or non-linux platforms.  
 pub fn auditwheel_rs(
     path: &Path,
     target: &Target,
-    manylinux: &Option<Manylinux>,
+    manylinux: Option<Manylinux>,
 ) -> Result<Policy, AuditWheelError> {
-    if !target.is_linux() || manylinux == &Some(Manylinux::Off) {
+    if !target.is_linux() || manylinux == Some(Manylinux::Off) {
         return Ok(Policy::default());
     }
     let arch = target.target_arch().to_string();

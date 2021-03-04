@@ -174,9 +174,9 @@ There's a `cargo sdist` command for only building a source distribution as worka
 
 ## Manylinux and auditwheel
 
-For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0571/#the-manylinux2010-policy). If you want to publish wheels for linux pypi, **you need to use a manylinux docker image**. The rust compiler since version 1.47 [requires at least glibc 2.11](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1470-2020-10-08), so you need to use at least manylinux2010.
+For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux. The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0571/#the-manylinux2010-policy). If you want to publish widely usable wheels for linux pypi, **you need use a manylinux docker image**. The rust compiler since version 1.47 [requires at least glibc 2.11](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1470-2020-10-08), so you need to use at least manylinux2010. For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
 
-maturin contains a reimplementation of a major part of auditwheel automatically checking the generated library. If you want to disable those checks or build for native linux target, use the `--manylinux` flag.
+maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper. If your system's glibc is too new or you link other shared libraries, it will assign the `linux` tag. You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 
 For full manylinux compliance you need to compile in a CentOS 6 docker container. The [konstin2/maturin](https://hub.docker.com/r/konstin2/maturin) image is based on the official manylinux image. You can use it like this:
 
@@ -190,7 +190,7 @@ maturin itself is manylinux compliant when compiled for the musl target. The bin
 
 ## PyPy
 
-maturin can build wheels for pypy with pyo3. Note that pypy [is not compatible with manylinux1](https://github.com/antocuni/pypy-wheels#why-not-manylinux1-wheels) and you can't publish pypy wheel to pypi pypy has been only tested manually and on linux. See [#115](https://github.com/PyO3/maturin/issues/115) for more details.
+maturin can build and upload wheels for pypy with pyo3. This pypy has been only tested manually with pypy3.7-7.3 and on linux. See [#115](https://github.com/PyO3/maturin/issues/115) for more details.
 
 ### Build
 
@@ -217,7 +217,6 @@ FLAGS:
         --universal2
             Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets, do nothing
             otherwise
-
     -V, --version
             Prints version information
 
@@ -227,7 +226,7 @@ OPTIONS:
             The path to the Cargo.toml [default: Cargo.toml]
 
         --target <TRIPLE>
-            The --target option for cargo
+            The --target option for cargo [env: CARGO_BUILD_TARGET=]
 
     -b, --bindings <bindings>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
@@ -240,13 +239,14 @@ OPTIONS:
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set
         --manylinux <manylinux>
-            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014) and
-            `off` (for the native linux tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the
-            native tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
+            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014),
+            `2_24` (for manylinux_2_24) and `off` (for the native linux tag). Note that manylinux1 is unsupported by the
+            rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately
+            validated by `auditwheel`.
 
-            The default is the lowest supported value for a target, which is 2010 for x86 and 2014 for arm and powerpc.
+            The default is the lowest compatible, of plain `linux` if nothing matched
 
-            This option is ignored on all non-linux platforms [possible values: 2010, 2014, off]
+            This option is ignored on all non-linux platforms [possible values: 2010, 2014, 2_24, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -280,11 +280,9 @@ FLAGS:
         --skip-existing
             Continue uploading files if one already exists. (Only valid when uploading to PyPI. Other implementations
             may not support this.)
-
         --universal2
             Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets, do nothing
             otherwise
-
     -V, --version
             Prints version information
 
@@ -294,7 +292,7 @@ OPTIONS:
             The path to the Cargo.toml [default: Cargo.toml]
 
         --target <TRIPLE>
-            The --target option for cargo
+            The --target option for cargo [env: CARGO_BUILD_TARGET=]
 
     -b, --bindings <bindings>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
@@ -307,13 +305,14 @@ OPTIONS:
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set
         --manylinux <manylinux>
-            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014) and
-            `off` (for the native linux tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the
-            native tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
+            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014),
+            `2_24` (for manylinux_2_24) and `off` (for the native linux tag). Note that manylinux1 is unsupported by the
+            rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately
+            validated by `auditwheel`.
 
-            The default is the lowest supported value for a target, which is 2010 for x86 and 2014 for arm and powerpc.
+            The default is the lowest compatible, of plain `linux` if nothing matched
 
-            This option is ignored on all non-linux platforms [possible values: 2010, 2014, off]
+            This option is ignored on all non-linux platforms [possible values: 2010, 2014, 2_24, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory

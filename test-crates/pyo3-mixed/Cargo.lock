@@ -202,7 +202,7 @@ dependencies = [
 
 [[package]]
 name = "pyo3-mixed"
-version = "2.1.1"
+version = "2.1.3"
 dependencies = [
  "pyo3",
 ]

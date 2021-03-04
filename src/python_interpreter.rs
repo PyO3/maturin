@@ -1,5 +1,5 @@
-use crate::Target;
-use crate::{BridgeModel, Manylinux};
+use crate::auditwheel::Manylinux;
+use crate::{BridgeModel, Target};
 use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
 use serde::Deserialize;

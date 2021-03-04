@@ -1,13 +1,19 @@
-use crate::Manylinux;
+use crate::auditwheel::Manylinux;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::cmp::{Ordering, PartialOrd};
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
+/// The policies (allowed symbols) for the different manylinux tags, sorted from highest
+/// priority to lowest
 pub static POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
     // https://github.com/pypa/auditwheel/blob/master/auditwheel/policy/policy.json
-    serde_json::from_slice(include_bytes!("policy.json"))
-        .expect("invalid manylinux policy.json file")
+    let mut policies: Vec<Policy> = serde_json::from_slice(include_bytes!("policy.json"))
+        .expect("invalid manylinux policy.json file");
+    policies.sort_by_key(|policy| -policy.priority);
+    policies
 });
 
 /// Manylinux policy
@@ -15,7 +21,7 @@ pub static POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
 pub struct Policy {
     /// manylinux platform tag name
     pub name: String,
-    /// policy priority
+    /// policy priority. Tags supporting more platforms have higher priority
     pub priority: i64,
     /// platform architecture to symbol versions map
     #[serde(rename = "symbol_versions")]
@@ -28,6 +34,12 @@ impl Default for Policy {
     fn default() -> Self {
         // defaults to linux
         Policy::from_priority(0).unwrap()
+    }
+}
+
+impl Display for Policy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.name)
     }
 }
 
@@ -88,7 +100,7 @@ mod test {
 
     #[test]
     fn test_policy_from_name() {
-        use crate::Manylinux;
+        use crate::auditwheel::Manylinux;
 
         let tags = &[
             Manylinux::Manylinux1,

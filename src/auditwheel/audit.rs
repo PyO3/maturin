@@ -1,4 +1,5 @@
-use crate::Manylinux;
+use super::policy::{Policy, POLICIES};
+use crate::auditwheel::Manylinux;
 use crate::Target;
 use anyhow::Result;
 use fs_err::File;
@@ -11,8 +12,6 @@ use std::io;
 use std::io::Read;
 use std::path::Path;
 use thiserror::Error;
-
-use super::policy::{Policy, POLICIES};
 
 /// Error raised during auditing an elf file for manylinux compatibility
 #[derive(Error, Debug)]
@@ -33,9 +32,9 @@ pub enum AuditWheelError {
     /// The elf file isn't manylinux compatible. Contains the list of offending
     /// libraries.
     #[error(
-    "Your library is not manylinux compliant because it links the following forbidden libraries: {0:?}",
+    "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}",
     )]
-    ManylinuxValidationError(Vec<String>),
+    ManylinuxValidationError(Policy, Vec<String>),
     /// The elf file isn't manylinux compaible. Contains unsupported architecture
     #[error(
         "Your library is not manylinux compliant because it has unsupported architecture: {0}"
@@ -168,7 +167,7 @@ fn policy_is_satisfied(
     arch: &str,
     deps: &[String],
     versioned_libraries: &[VersionedLibrary],
-) -> Result<i64, AuditWheelError> {
+) -> Result<(), AuditWheelError> {
     let arch_versions = &policy
         .symbol_versions
         .get(arch)
@@ -231,11 +230,12 @@ fn policy_is_satisfied(
     let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
     let offenders: Vec<String> = offenders.into_iter().collect();
     match offenders.as_slice() {
-        [] => Ok(policy.priority),
+        [] => Ok(()),
         [lib] if is_libpython.is_match(lib) => {
             Err(AuditWheelError::LinksLibPythonError(lib.clone()))
         }
         offenders => Err(AuditWheelError::ManylinuxValidationError(
+            policy.clone(),
             offenders.to_vec(),
         )),
     }
@@ -248,10 +248,10 @@ fn policy_is_satisfied(
 pub fn auditwheel_rs(
     path: &Path,
     target: &Target,
-    manylinux: &Manylinux,
-) -> Result<Option<Policy>, AuditWheelError> {
-    if !target.is_linux() || matches!(manylinux, Manylinux::Off) {
-        return Ok(None);
+    manylinux: &Option<Manylinux>,
+) -> Result<Policy, AuditWheelError> {
+    if !target.is_linux() || manylinux == &Some(Manylinux::Off) {
+        return Ok(Policy::default());
     }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
@@ -263,18 +263,53 @@ pub fn auditwheel_rs(
     let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
     let versioned_libraries = find_versioned_libraries(&elf, &buffer)?;
 
-    let policy = POLICIES
-        .iter()
-        .find(|p| p.name == manylinux.to_string())
-        .unwrap();
-    let main_policy = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries)?;
-    let mut match_policies = vec![main_policy];
-    for policy in policy.higher_priority_policies() {
-        if let Ok(priority) = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries)
-        {
-            match_policies.push(priority);
+    // Find the highest possible manylinux policy, if any
+    let mut highest_policy = None;
+    for policy in POLICIES.iter() {
+        let result = policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries);
+        match result {
+            Ok(_) => {
+                highest_policy = Some(policy.clone());
+                break;
+            }
+            // UnsupportedArchitecture happens when trying 2010 with aarch64
+            Err(AuditWheelError::ManylinuxValidationError(_, _))
+            | Err(AuditWheelError::UnsupportedArchitecture(_)) => continue,
+            // If there was an error parsing the symbols or libpython was linked,
+            // we error no matter what the requested policy was
+            Err(err) => return Err(err),
         }
     }
-    let max_priority = match_policies.into_iter().max().unwrap_or_default();
-    Ok(Policy::from_priority(max_priority))
+
+    if let Some(manylinux) = manylinux {
+        let policy = POLICIES
+            .iter()
+            .find(|p| p.name == manylinux.to_string())
+            .unwrap();
+
+        if let Some(highest_policy) = highest_policy {
+            if policy.priority < highest_policy.priority {
+                println!(
+                    "📦 Wheel is eligible for a higher priority tag. \
+                    You requested {} but I have found this wheel is eligible for {}",
+                    policy.name, highest_policy.name,
+                );
+            }
+        }
+
+        match policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries) {
+            Ok(_) => Ok(policy.clone()),
+            Err(err) => Err(err),
+        }
+    } else if let Some(policy) = highest_policy {
+        Ok(policy)
+    } else {
+        println!(
+            "⚠  Warning: No compatible manylinux tag found, using the linux tag instead. \
+            You won't be able to upload those wheels to pypi."
+        );
+
+        // Fallback to linux
+        Ok(Policy::default())
+    }
 }

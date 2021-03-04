@@ -1,12 +1,12 @@
 use crate::auditwheel::auditwheel_rs;
-use crate::auditwheel::policy::Policy;
+use crate::auditwheel::Manylinux;
+use crate::auditwheel::Policy;
 use crate::compile;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
 use crate::source_distribution::{get_pyproject_toml, source_distribution};
-use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
@@ -109,7 +109,7 @@ pub struct BuildContext {
     /// Whether to skip checking the linked libraries for manylinux compliance
     pub skip_auditwheel: bool,
     /// Whether to use the the manylinux or use the native linux tag (off)
-    pub manylinux: Manylinux,
+    pub manylinux: Option<Manylinux>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
@@ -172,19 +172,24 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
-        manylinux: &Manylinux,
-    ) -> Result<Option<Policy>> {
-        if !self.skip_auditwheel {
-            let target = python_interpreter
-                .map(|x| &x.target)
-                .unwrap_or(&self.target);
-
-            let policy = auditwheel_rs(&artifact, target, manylinux)
-                .context(format!("Failed to ensure {} compliance", manylinux))?;
-            Ok(policy)
-        } else {
-            Ok(None)
+        manylinux: &Option<Manylinux>,
+    ) -> Result<Policy> {
+        if self.skip_auditwheel {
+            return Ok(Policy::default());
         }
+
+        let target = python_interpreter
+            .map(|x| &x.target)
+            .unwrap_or(&self.target);
+
+        let policy = auditwheel_rs(&artifact, target, manylinux).context(
+            if let Some(manylinux) = manylinux {
+                format!("Error ensuring {} compliance", manylinux)
+            } else {
+                "Error checking for manylinux compliance".to_string()
+            },
+        )?;
+        Ok(policy)
     }
 
     fn write_binding_wheel_abi3(
@@ -234,7 +239,7 @@ impl BuildContext {
         let artifact = self.compile_cdylib(python_interpreter, Some(&self.module_name))?;
         let policy = self.auditwheel(python_interpreter, &artifact, &self.manylinux)?;
         let (wheel_path, tag) =
-            self.write_binding_wheel_abi3(&artifact, &self.manylinux, major, min_minor)?;
+            self.write_binding_wheel_abi3(&artifact, &policy.manylinux_tag(), major, min_minor)?;
 
         println!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -243,26 +248,6 @@ impl BuildContext {
             wheel_path.display()
         );
         wheels.push((wheel_path, tag));
-
-        if let Some(policy) = policy {
-            if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
-                let manylinux = policy.manylinux_tag();
-                if self
-                    .auditwheel(python_interpreter, &artifact, &manylinux)
-                    .is_ok()
-                {
-                    println!(
-                        "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
-                        &self.manylinux,
-                        manylinux,
-                    );
-                    let (wheel_path, tag) =
-                        self.write_binding_wheel_abi3(&artifact, &manylinux, major, min_minor)?;
-                    println!("📦 Fixed-up wheel written to {}", wheel_path.display());
-                    wheels.push((wheel_path, tag));
-                }
-            }
-        }
 
         Ok(wheels)
     }
@@ -315,7 +300,7 @@ impl BuildContext {
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
             let policy = self.auditwheel(Some(&python_interpreter), &artifact, &self.manylinux)?;
             let (wheel_path, tag) =
-                self.write_binding_wheel(python_interpreter, &artifact, &self.manylinux)?;
+                self.write_binding_wheel(python_interpreter, &artifact, &policy.manylinux_tag())?;
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -326,26 +311,6 @@ impl BuildContext {
             );
 
             wheels.push((wheel_path, tag));
-
-            if let Some(policy) = policy {
-                if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
-                    let manylinux = policy.manylinux_tag();
-                    if self
-                        .auditwheel(Some(&python_interpreter), &artifact, &manylinux)
-                        .is_ok()
-                    {
-                        println!(
-                            "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
-                            &self.manylinux,
-                            manylinux,
-                        );
-                        let (wheel_path, tag) =
-                            self.write_binding_wheel(python_interpreter, &artifact, &manylinux)?;
-                        println!("📦 Fixed-up wheel written to {}", wheel_path.display());
-                        wheels.push((wheel_path, tag));
-                    }
-                }
-            }
         }
 
         Ok(wheels)
@@ -407,27 +372,11 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &self.manylinux)?;
         let policy = self.auditwheel(None, &artifact, &self.manylinux)?;
+        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &policy.manylinux_tag())?;
 
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
-
-        if let Some(policy) = policy {
-            if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
-                let manylinux = policy.manylinux_tag();
-                if self.auditwheel(None, &artifact, &manylinux).is_ok() {
-                    println!(
-                        "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
-                        &self.manylinux,
-                        manylinux,
-                    );
-                    let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &manylinux)?;
-                    println!("📦 Fixed-up wheel written to {}", wheel_path.display());
-                    wheels.push((wheel_path, tag));
-                }
-            }
-        }
 
         Ok(wheels)
     }
@@ -480,25 +429,9 @@ impl BuildContext {
 
         let policy = self.auditwheel(None, &artifact, &self.manylinux)?;
 
-        let (wheel_path, tag) = self.write_bin_wheel(&artifact, &self.manylinux)?;
+        let (wheel_path, tag) = self.write_bin_wheel(&artifact, &policy.manylinux_tag())?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
-
-        if let Some(policy) = policy {
-            if policy > Policy::from_name(&self.manylinux.to_string()).unwrap() {
-                let manylinux = policy.manylinux_tag();
-                if self.auditwheel(None, &artifact, &manylinux).is_ok() {
-                    println!(
-                        "📦 Wheel is eligible for a higher priority tag. You requested {} but I have found this wheel is eligible for {}",
-                        &self.manylinux,
-                        manylinux,
-                    );
-                    let (wheel_path, tag) = self.write_bin_wheel(&artifact, &manylinux)?;
-                    println!("📦 Fixed-up wheel written to {}", wheel_path.display());
-                    wheels.push((wheel_path, tag));
-                }
-            }
-        }
 
         Ok(wheels)
     }

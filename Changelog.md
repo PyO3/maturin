@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Add `--skip-existing` option to publish by messense [#444](https://github.com/PyO3/maturin/pull/444)
  * maturn develop install dependencies automatically by messense [#443](https://github.com/PyO3/maturin/pull/443)
  * Load credential from pypirc using repository name instead of package name by messense #[445](https://github.com/PyO3/maturin/pull/445)
+ * Add `manylinux_2_24` support in #[451](https://github.com/PyO3/maturin/pull/451)
+ * Improve error message when auditwheel failed to find versioned offending symbols in #[452](https://github.com/PyO3/maturin/pull/452)
+ * Add auditwheel test to CI in #[455](https://github.com/PyO3/maturin/pull/455)
+ * Fix sdist transitive path dependencies.
+ * auditwheel choose higher priority tag when possible in #[456](https://github.com/PyO3/maturin/pull/456), dropped `auditwheel` Cargo feature.
 
 ## 0.9.4 - 2021-02-18
 

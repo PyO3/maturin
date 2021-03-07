@@ -312,6 +312,7 @@ fn fun_with_abiflags(
             "linux" => target.is_linux(),
             "darwin" => target.is_macos(),
             "freebsd" => target.is_freebsd(),
+            "openbsd" => target.is_openbsd(),
             _ => false,
         };
 
@@ -436,7 +437,7 @@ impl PythonInterpreter {
                         minor = self.minor,
                         abiflags = self.abiflags,
                     )
-                } else if self.target.is_unix() {
+                } else if self.target.is_unix() || self.target.is_openbsd() {
                     format!(
                         "{base}.cpython-{major}{minor}{abiflags}-{platform}.so",
                         base = base,

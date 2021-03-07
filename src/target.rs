@@ -16,6 +16,7 @@ enum OS {
     Windows,
     Macos,
     FreeBSD,
+    OpenBSD,
 }
 
 /// Decides how to handle manylinux compliance
@@ -113,6 +114,7 @@ impl Target {
             platforms::target::OS::Windows => OS::Windows,
             platforms::target::OS::MacOS => OS::Macos,
             platforms::target::OS::FreeBSD => OS::FreeBSD,
+            platforms::target::OS::OpenBSD => OS::OpenBSD,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -145,7 +147,15 @@ impl Target {
                     Err(error) => bail!(error),
                 };
             }
-            (OS::Macos, Arch::ARMV7L) => bail!("armv7l is not supported for macOS"),
+            (OS::OpenBSD, Arch::AARCH64) => bail!("aarch64 is not supported for OpenBSD"),
+            (OS::OpenBSD, Arch::ARMV7L) => bail!("armv7l is not supported for OpenBSD"),
+            (OS::OpenBSD, Arch::X86) => bail!("32-bit wheels are not supported for OpenBSD"),
+            (OS::OpenBSD, Arch::X86_64) => {
+                match PlatformInfo::new() {
+                    Ok(_) => {}
+                    Err(error) => bail!(error),
+                };
+            }            (OS::Macos, Arch::ARMV7L) => bail!("armv7l is not supported for macOS"),
             (OS::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
             (OS::Windows, Arch::AARCH64) => bail!("aarch64 is not supported for Windows"),
             (OS::Windows, Arch::ARMV7L) => bail!("armv7l is not supported for Windows"),
@@ -196,6 +206,11 @@ impl Target {
         self.os == OS::FreeBSD
     }
 
+    /// Returns true if the current platform is openbsd
+    pub fn is_openbsd(&self) -> bool {
+        self.os == OS::OpenBSD
+    }
+
     /// Returns true if the current platform is mac os
     pub fn is_macos(&self) -> bool {
         self.os == OS::Macos
@@ -236,7 +251,14 @@ impl Target {
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!("freebsd_{}_amd64", release)
             }
-            (OS::Linux, _) => format!("{}_{}", manylinux, self.arch),
+            (OS::OpenBSD, Arch::X86_64) => {
+                let info = match PlatformInfo::new() {
+                    Ok(info) => info,
+                    Err(error) => panic!(error),
+                };
+                let release = info.release().replace(".", "_").replace("-", "_");
+                format!("openbsd_{}_amd64", release)
+            }            (OS::Linux, _) => format!("{}_{}", manylinux, self.arch),
             (OS::Macos, Arch::X86_64) => {
                 if universal2 {
                     "macosx_10_9_universal2".to_string()
@@ -269,6 +291,7 @@ impl Target {
     pub fn get_shared_platform_tag(&self) -> &'static str {
         match (&self.os, &self.arch) {
             (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
+            (OS::OpenBSD, _) => "",
             (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
             (OS::Linux, Arch::ARMV7L) => "arm-linux-gnueabihf",
             (OS::Linux, Arch::POWERPC64) => "powerpc64-linux-gnu",

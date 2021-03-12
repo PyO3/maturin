@@ -16,8 +16,8 @@ use human_panic::setup_panic;
 use keyring::{Keyring, KeyringError};
 use maturin::{
     develop, get_metadata_for_distribution, get_pyproject_toml, source_distribution,
-    write_dist_info, BridgeModel, BuildOptions, CargoToml, Manylinux, Metadata21, PathWriter,
-    PythonInterpreter, Target,
+    write_dist_info, BridgeModel, BuildOptions, BuiltWheelMetadata, CargoToml, Manylinux,
+    Metadata21, PathWriter, PythonInterpreter, Target,
 };
 use std::env;
 use std::path::PathBuf;
@@ -166,12 +166,6 @@ struct PublishOpt {
     /// Password for pypi or your custom registry. Note that you can also pass the password
     /// through MATURIN_PASSWORD
     password: Option<String>,
-    /// Do not pass --release to cargo
-    #[structopt(long)]
-    debug: bool,
-    /// Do not strip the library for minimum file size
-    #[structopt(long = "no-strip")]
-    no_strip: bool,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
     #[structopt(long = "skip-existing")]
@@ -205,11 +199,17 @@ enum Opt {
     Publish {
         #[structopt(flatten)]
         build: BuildOptions,
-        #[structopt(flatten)]
-        publish: PublishOpt,
+        /// Do not pass --release to cargo
+        #[structopt(long)]
+        debug: bool,
+        /// Do not strip the library for minimum file size
+        #[structopt(long = "no-strip")]
+        no_strip: bool,
         /// Don't build a source distribution
         #[structopt(long = "no-sdist")]
         no_sdist: bool,
+        #[structopt(flatten)]
+        publish: PublishOpt,
     },
     #[structopt(name = "list-python")]
     /// Searches and lists the available python installations
@@ -409,32 +409,17 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 
 /// Handles authentication/keyring integration and retrying of the publish subcommand
 #[cfg(feature = "upload")]
-fn upload_ui(build: BuildOptions, publish: &PublishOpt, no_sdist: bool) -> Result<()> {
-    let build_context = build.into_build_context(!publish.debug, !publish.no_strip)?;
-
-    if !build_context.release {
-        eprintln!("⚠  Warning: You're publishing debug wheels");
-    }
-
-    let mut wheels = build_context.build_wheels()?;
-
-    if !no_sdist {
-        if let Some(source_distribution) = build_context.build_source_distribution()? {
-            wheels.push(source_distribution);
-        }
-    }
-
+fn upload_ui(
+    wheels: &[BuiltWheelMetadata],
+    metadata: &[(String, String)],
+    publish: &PublishOpt,
+) -> Result<()> {
     let registry = complete_registry(&publish)?;
 
     println!("🚀 Uploading {} packages", wheels.len());
 
     for (wheel_path, supported_versions) in wheels {
-        let upload_result = upload(
-            &registry,
-            &wheel_path,
-            &build_context.metadata21.to_vec(),
-            &supported_versions,
-        );
+        let upload_result = upload(&registry, wheel_path, metadata, supported_versions);
         match upload_result {
             Ok(()) => (),
             Err(UploadError::AuthenticationError) => {
@@ -521,9 +506,24 @@ fn run() -> Result<()> {
         Opt::Publish {
             build,
             publish,
+            debug,
+            no_strip,
             no_sdist,
         } => {
-            upload_ui(build, &publish, no_sdist)?;
+            let build_context = build.into_build_context(!debug, !no_strip)?;
+
+            if !build_context.release {
+                eprintln!("⚠  Warning: You're publishing debug wheels");
+            }
+
+            let mut wheels = build_context.build_wheels()?;
+            if !no_sdist {
+                if let Some(sd) = build_context.build_source_distribution()? {
+                    wheels.push(sd);
+                }
+            }
+
+            upload_ui(&wheels, &build_context.metadata21.to_vec(), &publish)?
         }
         Opt::ListPython => {
             let target = Target::from_target_triple(None)?;

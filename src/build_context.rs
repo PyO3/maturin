@@ -66,8 +66,10 @@ impl ProjectLayout {
     pub fn determine(project_root: impl AsRef<Path>, module_name: &str) -> Result<ProjectLayout> {
         let python_package_dir = project_root.as_ref().join(module_name);
         if python_package_dir.is_dir() {
-            if !python_package_dir.join("__init__.py").is_file() {
-                bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
+            if !python_package_dir.join("__init__.py").is_file()
+                && !python_package_dir.join("__init__.pyi").is_file()
+            {
+                bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.{{py,pyi}} file.", module_name)
             }
 
             println!("🍹 Building a mixed python/rust project");

@@ -232,9 +232,12 @@ OPTIONS:
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo-extra-args>...
-            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
 
             Use as `--cargo-extra-args="--my-arg"`
+
+            Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`. maturin tries to
+            pass only the shared subset of options to cargo metadata, but this is may be a bit flaky.
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set
@@ -251,7 +254,7 @@ OPTIONS:
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
         --rustc-extra-args <rustc-extra-args>...
-            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
 ```
@@ -298,9 +301,12 @@ OPTIONS:
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
         --cargo-extra-args <cargo-extra-args>...
-            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
 
             Use as `--cargo-extra-args="--my-arg"`
+
+            Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`. maturin tries to
+            pass only the shared subset of options to cargo metadata, but this is may be a bit flaky.
     -i, --interpreter <interpreter>...
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set
@@ -323,7 +329,7 @@ OPTIONS:
             The url of registry where the wheels are uploaded to [default: https://upload.pypi.org/legacy/]
 
         --rustc-extra-args <rustc-extra-args>...
-            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
     -u, --username <username>

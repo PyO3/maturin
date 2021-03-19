@@ -85,6 +85,11 @@ fn pyo3_no_extension_module() {
 }
 
 #[test]
+fn locked_doesnt_build_without_cargo_lock() {
+    handle_result(errors::locked_doesnt_build_without_cargo_lock())
+}
+
+#[test]
 #[cfg(target_os = "linux")]
 fn musl() {
     let ran = handle_result(other::test_musl());

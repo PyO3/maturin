@@ -58,10 +58,6 @@ pub fn pyo3_no_extension_module() -> Result<()> {
     Ok(())
 }
 
-const MISSING_LOCK_FILE_ERROR_MESSAGE: &str = r#"`cargo metadata` exited with an error:     Updating crates.io index
-error: the lock file /home/konsti/maturin/test-crates/lib_with_path_dep/Cargo.lock needs to be updated but --locked was passed to prevent this
-If you want to try to generate the lock file without accessing the network, use the --offline flag."#;
-
 /// Make sure cargo metadata doesn't create a lock file when --locked was passed
 ///
 /// https://github.com/PyO3/maturin/issues/472
@@ -81,8 +77,9 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
             .source()
             .ok_or_else(|| format_err!("{}", err))?
             .to_string();
-        if err_string != MISSING_LOCK_FILE_ERROR_MESSAGE {
-            bail!("{:?}|{:?}", err_string, MISSING_LOCK_FILE_ERROR_MESSAGE);
+        let error_msg = "`cargo metadata` exited with an error:     Updating crates.io index\nerror: the lock file";
+        if !err_string.starts_with(error_msg) {
+            bail!("{:?}", err_string);
         }
     } else {
         bail!("Should have errored");

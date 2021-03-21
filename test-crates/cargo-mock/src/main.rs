@@ -99,8 +99,11 @@ fn run() -> Result<()> {
                     message => message,
                 };
 
-            let patched_line =
-                serde_json::to_string(&patched_message).expect("Failed to re-seralize");
+            let patched_line = match patched_message {
+                // FIXME: What's going on here?
+                cargo_metadata::Message::TextLine(text) => text,
+                _ => serde_json::to_string(&patched_message).expect("Failed to re-seralize"),
+            };
             println!("{}", patched_line);
             stdout_writer
                 .write_all(patched_line.as_bytes())

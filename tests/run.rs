@@ -1,8 +1,6 @@
 //! To speed up the tests, they are tests all collected in a single module
 
-#[cfg(target_os = "linux")]
-use common::other;
-use common::{develop, errors, handle_result, integration};
+use common::{develop, errors, handle_result, integration, other};
 
 mod common;
 

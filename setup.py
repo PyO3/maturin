@@ -83,7 +83,7 @@ class PostInstallCommand(install):
         self.copy_file(source, target)
         self.copy_tree(
             os.path.join(source_dir, "maturin"),
-            os.path.join(self.root or self.install_lib, "maturin"),
+            os.path.join(self.install_lib, "maturin"),
         )
 
 

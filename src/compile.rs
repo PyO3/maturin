@@ -255,7 +255,7 @@ fn compile_target(
                         .into_iter()
                         .zip(artifact.filenames);
                     for (crate_type, filename) in tuples {
-                        artifacts.insert(crate_type, filename);
+                        artifacts.insert(crate_type, filename.into());
                     }
                 }
             }

@@ -1,0 +1,1 @@
+This tests that we ignore non-existent Cargo.lock file listed by `cargo package --list`, which seems to only occur with workspaces. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660 and https://github.com/PyO3/maturin/issues/449

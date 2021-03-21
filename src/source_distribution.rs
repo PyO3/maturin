@@ -115,8 +115,18 @@ fn add_crate_to_source_distribution(
             (relative_to_manifests.to_path_buf(), relative_to_cwd)
         })
         // We rewrite Cargo.toml and add it separately
-        .filter(|(target, _)| {
-            target != Path::new("Cargo.toml.orig") && target != Path::new("Cargo.toml")
+        .filter(|(target, source)| {
+            // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
+            // and https://github.com/PyO3/maturin/issues/449
+            if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+                false
+            } else if target == Path::new(".cargo_vcs_info.json")
+                || target == Path::new("Cargo.lock")
+            {
+                source.exists()
+            } else {
+                true
+            }
         })
         .collect();
 

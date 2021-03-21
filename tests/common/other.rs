@@ -36,7 +36,7 @@ pub fn test_musl() -> Result<bool> {
     };
 
     // The first arg gets ignored
-    let options = BuildOptions::from_iter_safe(&[
+    let options: BuildOptions = BuildOptions::from_iter_safe(&[
         "build",
         "--manifest-path",
         "test-crates/pyo3-pure/Cargo.toml",
@@ -53,4 +53,25 @@ pub fn test_musl() -> Result<bool> {
     assert_eq!(wheels.len(), 1);
 
     Ok(true)
+}
+
+/// Test that we ignore non-existent Cargo.lock file listed by `cargo package --list`,
+/// which seems to only occur with workspaces.
+/// See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660 and
+/// https://github.com/PyO3/maturin/issues/449
+pub fn test_workspace_cargo_lock() -> Result<()> {
+    // The first arg gets ignored
+    let options: BuildOptions = BuildOptions::from_iter_safe(&[
+        "build",
+        "--manifest-path",
+        "test-crates/workspace/py/Cargo.toml",
+        "--manylinux",
+        "off",
+    ])?;
+
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let source_distribution = build_context.build_source_distribution()?;
+    assert!(source_distribution.is_some());
+
+    Ok(())
 }

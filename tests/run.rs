@@ -94,3 +94,8 @@ fn musl() {
         eprintln!("⚠  Warning: rustup and/or musl target not installed, test didn't run");
     }
 }
+
+#[test]
+fn workspace_cargo_lock() {
+    handle_result(other::test_workspace_cargo_lock())
+}

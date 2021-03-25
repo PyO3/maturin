@@ -7,7 +7,7 @@ use fs_err::{self as fs, File};
 use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
 
@@ -288,7 +288,7 @@ fn compile_target(
 /// to import the module with error if it's missing or named incorrectly
 ///
 /// Currently the check is only run on linux
-pub fn warn_missing_py_init(artifact: &PathBuf, module_name: &str) -> Result<()> {
+pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{}", module_name);
     let mut fd = File::open(&artifact)?;
     let mut buffer = Vec::new();

@@ -20,7 +20,7 @@ use super::policy::{Policy, POLICIES};
 pub enum AuditWheelError {
     /// The wheel couldn't be read
     #[error("Failed to read the wheel")]
-    IOError(#[source] io::Error),
+    IoError(#[source] io::Error),
     /// Reexports elfkit parsing errors
     #[error("Goblin failed to parse the elf file")]
     GoblinError(#[source] goblin::error::Error),
@@ -254,10 +254,10 @@ pub fn auditwheel_rs(
         return Ok(None);
     }
     let arch = target.target_arch().to_string();
-    let mut file = File::open(path).map_err(AuditWheelError::IOError)?;
+    let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
-        .map_err(AuditWheelError::IOError)?;
+        .map_err(AuditWheelError::IoError)?;
     let elf = Elf::parse(&buffer).map_err(AuditWheelError::GoblinError)?;
     // This returns essentially the same as ldd
     let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
@@ -267,14 +267,8 @@ pub fn auditwheel_rs(
         .iter()
         .find(|p| p.name == manylinux.to_string())
         .unwrap();
-    let mut match_policies = Vec::new();
-    match_policies.push(policy_is_satisfied(
-        policy,
-        &elf,
-        &arch,
-        &deps,
-        &versioned_libraries,
-    )?);
+    let main_policy = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries)?;
+    let mut match_policies = vec![main_policy];
     for policy in policy.higher_priority_policies() {
         if let Ok(priority) = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries)
         {

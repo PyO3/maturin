@@ -277,14 +277,14 @@ enum Opt {
     ///
     /// The commands are meant to be called from the python PEP 517
     #[structopt(name = "pep517", setting = structopt::clap::AppSettings::Hidden)]
-    PEP517(PEP517Command),
+    Pep517(Pep517Command),
 }
 
 /// Backend for the PEP 517 integration. Not for human consumption
 ///
 /// The commands are meant to be called from the python PEP 517
 #[derive(Debug, StructOpt)]
-enum PEP517Command {
+enum Pep517Command {
     /// The implementation of prepare_metadata_for_build_wheel
     #[structopt(name = "write-dist-info")]
     WriteDistInfo {
@@ -329,9 +329,9 @@ enum PEP517Command {
 /// Dispatches into the native implementations of the PEP 517 functions
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
-fn pep517(subcommand: PEP517Command) -> Result<()> {
+fn pep517(subcommand: Pep517Command) -> Result<()> {
     match subcommand {
-        PEP517Command::WriteDistInfo {
+        Pep517Command::WriteDistInfo {
             build_options,
             metadata_directory,
             strip,
@@ -363,13 +363,13 @@ fn pep517(subcommand: PEP517Command) -> Result<()> {
             write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
             println!("{}", context.metadata21.get_dist_info_dir().display());
         }
-        PEP517Command::BuildWheel { build, strip } => {
+        Pep517Command::BuildWheel { build, strip } => {
             let build_context = build.into_build_context(true, strip)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
         }
-        PEP517Command::WriteSDist {
+        Pep517Command::WriteSDist {
             sdist_directory,
             manifest_path,
         } => {
@@ -591,7 +591,7 @@ fn run() -> Result<()> {
             )
             .context("Failed to build source distribution")?;
         }
-        Opt::PEP517(subcommand) => pep517(subcommand)?,
+        Opt::Pep517(subcommand) => pep517(subcommand)?,
         Opt::Upload { files } => {
             if files.is_empty() {
                 println!("⚠  Warning: No files given, exiting.");

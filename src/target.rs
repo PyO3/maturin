@@ -11,11 +11,11 @@ use std::str::FromStr;
 
 /// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum OS {
+enum Os {
     Linux,
     Windows,
     Macos,
-    FreeBSD,
+    FreeBsd,
 }
 
 /// Decides how to handle manylinux compliance
@@ -64,10 +64,10 @@ impl FromStr for Manylinux {
 /// All supported CPU architectures
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Arch {
-    AARCH64,
-    ARMV7L,
-    POWERPC64LE,
-    POWERPC64,
+    Aarch64,
+    Armv7L,
+    Powerpc64Le,
+    Powerpc64,
     X86,
     X86_64,
 }
@@ -75,10 +75,10 @@ pub enum Arch {
 impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Arch::AARCH64 => write!(f, "aarch64"),
-            Arch::ARMV7L => write!(f, "armv7l"),
-            Arch::POWERPC64LE => write!(f, "ppc64le"),
-            Arch::POWERPC64 => write!(f, "ppc64"),
+            Arch::Aarch64 => write!(f, "aarch64"),
+            Arch::Armv7L => write!(f, "armv7l"),
+            Arch::Powerpc64Le => write!(f, "ppc64le"),
+            Arch::Powerpc64 => write!(f, "ppc64"),
             Arch::X86 => write!(f, "i686"),
             Arch::X86_64 => write!(f, "x86_64"),
         }
@@ -88,7 +88,7 @@ impl fmt::Display for Arch {
 /// The part of the current platform that is relevant when building wheels and is supported
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Target {
-    os: OS,
+    os: Os,
     arch: Arch,
     env: Option<Env>,
     triple: &'static str,
@@ -109,46 +109,46 @@ impl Target {
         };
 
         let os = match platform.target_os {
-            platforms::target::OS::Linux => OS::Linux,
-            platforms::target::OS::Windows => OS::Windows,
-            platforms::target::OS::MacOS => OS::Macos,
-            platforms::target::OS::FreeBSD => OS::FreeBSD,
+            platforms::target::OS::Linux => Os::Linux,
+            platforms::target::OS::Windows => Os::Windows,
+            platforms::target::OS::MacOS => Os::Macos,
+            platforms::target::OS::FreeBSD => Os::FreeBsd,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
         let arch = match platform.target_arch {
             platforms::target::Arch::X86_64 => Arch::X86_64,
             platforms::target::Arch::X86 => Arch::X86,
-            platforms::target::Arch::ARM => Arch::ARMV7L,
-            platforms::target::Arch::AARCH64 => Arch::AARCH64,
+            platforms::target::Arch::ARM => Arch::Armv7L,
+            platforms::target::Arch::AARCH64 => Arch::Aarch64,
             platforms::target::Arch::POWERPC64
                 if platform.target_triple.starts_with("powerpc64-") =>
             {
-                Arch::POWERPC64
+                Arch::Powerpc64
             }
             platforms::target::Arch::POWERPC64
                 if platform.target_triple.starts_with("powerpc64le-") =>
             {
-                Arch::POWERPC64LE
+                Arch::Powerpc64Le
             }
             unsupported => bail!("The architecture {:?} is not supported", unsupported),
         };
 
         // bail on any unsupported targets
         match (&os, &arch) {
-            (OS::FreeBSD, Arch::AARCH64) => bail!("aarch64 is not supported for FreeBSD"),
-            (OS::FreeBSD, Arch::ARMV7L) => bail!("armv7l is not supported for FreeBSD"),
-            (OS::FreeBSD, Arch::X86) => bail!("32-bit wheels are not supported for FreeBSD"),
-            (OS::FreeBSD, Arch::X86_64) => {
+            (Os::FreeBsd, Arch::Aarch64) => bail!("aarch64 is not supported for FreeBSD"),
+            (Os::FreeBsd, Arch::Armv7L) => bail!("armv7l is not supported for FreeBSD"),
+            (Os::FreeBsd, Arch::X86) => bail!("32-bit wheels are not supported for FreeBSD"),
+            (Os::FreeBsd, Arch::X86_64) => {
                 match PlatformInfo::new() {
                     Ok(_) => {}
                     Err(error) => bail!(error),
                 };
             }
-            (OS::Macos, Arch::ARMV7L) => bail!("armv7l is not supported for macOS"),
-            (OS::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
-            (OS::Windows, Arch::AARCH64) => bail!("aarch64 is not supported for Windows"),
-            (OS::Windows, Arch::ARMV7L) => bail!("armv7l is not supported for Windows"),
+            (Os::Macos, Arch::Armv7L) => bail!("armv7l is not supported for macOS"),
+            (Os::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
+            (Os::Windows, Arch::Aarch64) => bail!("aarch64 is not supported for Windows"),
+            (Os::Windows, Arch::Armv7L) => bail!("armv7l is not supported for Windows"),
             (_, _) => {}
         }
         Ok(Target {
@@ -162,10 +162,10 @@ impl Target {
     /// Returns whether the platform is 64 bit or 32 bit
     pub fn pointer_width(&self) -> usize {
         match self.arch {
-            Arch::AARCH64 => 64,
-            Arch::ARMV7L => 32,
-            Arch::POWERPC64 => 64,
-            Arch::POWERPC64LE => 64,
+            Arch::Aarch64 => 64,
+            Arch::Armv7L => 32,
+            Arch::Powerpc64 => 64,
+            Arch::Powerpc64Le => 64,
             Arch::X86 => 32,
             Arch::X86_64 => 64,
         }
@@ -183,27 +183,27 @@ impl Target {
 
     /// Returns true if the current platform is linux or mac os
     pub fn is_unix(&self) -> bool {
-        self.os != OS::Windows
+        self.os != Os::Windows
     }
 
     /// Returns true if the current platform is linux
     pub fn is_linux(&self) -> bool {
-        self.os == OS::Linux
+        self.os == Os::Linux
     }
 
     /// Returns true if the current platform is freebsd
     pub fn is_freebsd(&self) -> bool {
-        self.os == OS::FreeBSD
+        self.os == Os::FreeBsd
     }
 
     /// Returns true if the current platform is mac os
     pub fn is_macos(&self) -> bool {
-        self.os == OS::Macos
+        self.os == Os::Macos
     }
 
     /// Returns true if the current platform is windows
     pub fn is_windows(&self) -> bool {
-        self.os == OS::Windows
+        self.os == Os::Windows
     }
 
     /// Returns true if the current platform's target env is Musl
@@ -218,7 +218,7 @@ impl Target {
     /// Returns the default Manylinux tag for this architecture
     pub fn get_default_manylinux_tag(&self) -> Manylinux {
         match self.arch {
-            Arch::AARCH64 | Arch::ARMV7L | Arch::POWERPC64 | Arch::POWERPC64LE => {
+            Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le => {
                 Manylinux::Manylinux2014
             }
             Arch::X86 | Arch::X86_64 => Manylinux::Manylinux2010,
@@ -228,31 +228,31 @@ impl Target {
     /// Returns the platform part of the tag for the wheel name for cffi wheels
     pub fn get_platform_tag(&self, manylinux: &Manylinux, universal2: bool) -> String {
         match (&self.os, &self.arch) {
-            (OS::FreeBSD, Arch::X86_64) => {
+            (Os::FreeBsd, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
                     Ok(info) => info,
-                    Err(error) => panic!(error),
+                    Err(error) => panic!("{}", error),
                 };
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!("freebsd_{}_amd64", release)
             }
-            (OS::Linux, _) => format!("{}_{}", manylinux, self.arch),
-            (OS::Macos, Arch::X86_64) => {
+            (Os::Linux, _) => format!("{}_{}", manylinux, self.arch),
+            (Os::Macos, Arch::X86_64) => {
                 if universal2 {
                     "macosx_10_9_universal2".to_string()
                 } else {
                     "macosx_10_7_x86_64".to_string()
                 }
             }
-            (OS::Macos, Arch::AARCH64) => {
+            (Os::Macos, Arch::Aarch64) => {
                 if universal2 {
                     "macosx_10_9_universal2".to_string()
                 } else {
                     "macosx_11_0_arm64".to_string()
                 }
             }
-            (OS::Windows, Arch::X86) => "win32".to_string(),
-            (OS::Windows, Arch::X86_64) => "win_amd64".to_string(),
+            (Os::Windows, Arch::X86) => "win32".to_string(),
+            (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         }
     }
@@ -268,21 +268,21 @@ impl Target {
     /// Returns the platform for the tag in the shared libraries file name
     pub fn get_shared_platform_tag(&self) -> &'static str {
         match (&self.os, &self.arch) {
-            (OS::FreeBSD, _) => "", // according imp.get_suffixes(), there are no such
-            (OS::Linux, Arch::AARCH64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
-            (OS::Linux, Arch::ARMV7L) => "arm-linux-gnueabihf",
-            (OS::Linux, Arch::POWERPC64) => "powerpc64-linux-gnu",
-            (OS::Linux, Arch::POWERPC64LE) => "powerpc64le-linux-gnu",
-            (OS::Linux, Arch::X86) => "i386-linux-gnu", // not i686
-            (OS::Linux, Arch::X86_64) => "x86_64-linux-gnu",
-            (OS::Macos, Arch::X86_64) => "darwin",
-            (OS::Macos, Arch::AARCH64) => "darwin",
-            (OS::Windows, Arch::X86) => "win32",
-            (OS::Windows, Arch::X86_64) => "win_amd64",
-            (OS::Macos, _) => {
+            (Os::FreeBsd, _) => "", // according imp.get_suffixes(), there are no such
+            (Os::Linux, Arch::Aarch64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
+            (Os::Linux, Arch::Armv7L) => "arm-linux-gnueabihf",
+            (Os::Linux, Arch::Powerpc64) => "powerpc64-linux-gnu",
+            (Os::Linux, Arch::Powerpc64Le) => "powerpc64le-linux-gnu",
+            (Os::Linux, Arch::X86) => "i386-linux-gnu", // not i686
+            (Os::Linux, Arch::X86_64) => "x86_64-linux-gnu",
+            (Os::Macos, Arch::X86_64) => "darwin",
+            (Os::Macos, Arch::Aarch64) => "darwin",
+            (Os::Windows, Arch::X86) => "win32",
+            (Os::Windows, Arch::X86_64) => "win_amd64",
+            (Os::Macos, _) => {
                 panic!("unsupported macOS Arch should not have reached get_shared_platform_tag()")
             }
-            (OS::Windows, _) => {
+            (Os::Windows, _) => {
                 panic!("unsupported Windows Arch should not have reached get_shared_platform_tag()")
             }
         }

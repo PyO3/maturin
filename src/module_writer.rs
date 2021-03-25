@@ -411,10 +411,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Ok(Command::new(&python)
+    Command::new(&python)
         .args(args)
         .output()
-        .context(format!("Failed to run python at {:?}", &python))?)
+        .context(format!("Failed to run python at {:?}", &python))
 }
 
 /// Checks if user has provided their own header at `target/header.h`, otherwise
@@ -464,7 +464,7 @@ fn cffi_header(crate_dir: &Path, tempdir: &TempDir) -> Result<PathBuf> {
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-pub fn generate_cffi_declarations(crate_dir: &Path, python: &PathBuf) -> Result<String> {
+pub fn generate_cffi_declarations(crate_dir: &Path, python: &Path) -> Result<String> {
     let tempdir = tempdir()?;
     let header = cffi_header(&crate_dir, &tempdir)?;
 
@@ -547,7 +547,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
 fn handle_cffi_call_result(
     python: &Path,
     tempdir: TempDir,
-    ffi_py: &PathBuf,
+    ffi_py: &Path,
     output: &Output,
 ) -> Result<String> {
     if !output.status.success() {
@@ -626,7 +626,7 @@ pub fn write_cffi_module(
     crate_dir: &Path,
     module_name: &str,
     artifact: &Path,
-    python: &PathBuf,
+    python: &Path,
     develop: bool,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(&crate_dir, python)?;

@@ -29,7 +29,7 @@ pub fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
 }
 
 /// Check that the package is either not installed or works correctly
-pub fn check_installed(package: &Path, python: &PathBuf) -> Result<()> {
+pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     let check_installed = Path::new(package)
         .join("check_installed")
         .join("check_installed.py");

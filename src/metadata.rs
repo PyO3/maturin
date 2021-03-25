@@ -61,7 +61,7 @@ const GFM_CONTENT_TYPE: &str = "text/markdown; charset=UTF-8; variant=GFM";
 /// defaulting to plaintext if extension is unknown or empty.
 ///
 /// See https://packaging.python.org/specifications/core-metadata/#description-content-type
-fn path_to_content_type(path: &PathBuf) -> String {
+fn path_to_content_type(path: &Path) -> String {
     path.extension()
         .map_or(String::from(PLAINTEXT_CONTENT_TYPE), |ext| {
             let ext = ext.to_string_lossy().to_lowercase();

@@ -25,7 +25,7 @@ pub enum UploadError {
     AuthenticationError,
     /// Reading the wheel failed
     #[error("IO Error")]
-    IOError(#[source] io::Error),
+    IoError(#[source] io::Error),
     /// The registry returned something else than 200
     #[error("Failed to upload the wheel with status {0}: {1}")]
     StatusCodeError(String, String),
@@ -36,7 +36,7 @@ pub enum UploadError {
 
 impl From<io::Error> for UploadError {
     fn from(error: io::Error) -> Self {
-        UploadError::IOError(error)
+        UploadError::IoError(error)
     }
 }
 

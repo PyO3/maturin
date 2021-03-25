@@ -156,3 +156,12 @@ jobs:
         run: |
           sudo python3 -m pip install maturin
           maturin publish -u __token__ -b bin --no-sdist -o dist --target ${{ matrix.platform.target }} --manylinux ${{ matrix.platform.manylinux }}
+      - name: Archive binary
+        run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+      - name: Upload to gitHub release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          asset_name: maturin-${{ matrix.platform.target }}.tar.gz
+          file: target/release/maturin.tar.gz
+          tag: ${{ github.ref }}

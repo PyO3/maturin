@@ -2,7 +2,7 @@ use crate::Target;
 use crate::{BridgeModel, Manylinux};
 use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
 use std::io;
@@ -248,16 +248,13 @@ impl fmt::Display for InterpreterKind {
 }
 
 /// The output format of [GET_INTERPRETER_METADATA]
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct IntepreterMetadataMessage {
     major: usize,
     minor: usize,
     abiflags: Option<String>,
     interpreter: String,
     ext_suffix: Option<String>,
-    m: bool,
-    u: bool,
-    d: bool,
     platform: String,
     abi_tag: Option<String>,
     base_prefix: String,

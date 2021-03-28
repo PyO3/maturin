@@ -62,11 +62,26 @@ pub fn develop(
             .status()
             .context("Failed to run pip install")?;
         if !status.success() {
-            bail!(r#"pip install finished with "{}""#, status,)
+            bail!(r#"pip install finished with "{}""#, status)
         }
     }
 
-    let mut builder = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;
+    // First, uninstall the existing installation. Without this, the following can happen:
+    // * `pip install my-project`: Creates files that maturin would not create, e.g. `my_project-1.0.0.dist-info/direct_url.json`
+    // * `maturin develop`: Overwrites a RECORD file with one that doesn't list direct_url.json, while not removing the file
+    // * `pip uninstall my-project`: Removes most things, but notes that direct_url.json won't be removed
+    // * Any other pip action: Complains about my-project, crashes when trying to do anything with my-project
+    //
+    // Uninstalling the actual code is done individually for each bridge model
+    let dist_info_dir = build_context.metadata21.get_dist_info_dir();
+    if dist_info_dir.is_dir() {
+        fs::remove_dir_all(&dist_info_dir).context(format!(
+            "Failed to uninstall existing installation by removing {}",
+            dist_info_dir.display()
+        ))?;
+    }
+
+    let mut writer = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;
 
     let context = "Failed to build a native library through cargo";
 
@@ -81,6 +96,8 @@ pub fn develop(
             // Copy the artifact into the same folder as pip and python
             let bin_name = artifact.file_name().unwrap();
             let bin_path = target.get_venv_bin_dir(&venv_dir).join(bin_name);
+            // No need to uninstall since we're overwriting anyway
+            // TODO: Shouldn't this use a writer method so that it shows up in the RECORD?
             fs::copy(&artifact, &bin_path).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
@@ -90,10 +107,11 @@ pub fn develop(
         BridgeModel::Cffi => {
             let artifact = build_context.compile_cdylib(None, None).context(context)?;
 
-            builder.delete_dir(&build_context.module_name)?;
+            // Uninstall the old code
+            writer.delete_dir(&build_context.module_name)?;
 
             write_cffi_module(
-                &mut builder,
+                &mut writer,
                 &build_context.project_layout,
                 &build_context.manifest_path.parent().unwrap(),
                 &build_context.module_name,
@@ -107,8 +125,11 @@ pub fn develop(
                 .compile_cdylib(Some(&interpreter), Some(&build_context.module_name))
                 .context(context)?;
 
+            // Uninstall the old code
+            writer.delete_dir(&build_context.module_name)?;
+
             write_bindings_module(
-                &mut builder,
+                &mut writer,
                 &build_context.project_layout,
                 &build_context.module_name,
                 &artifact,
@@ -123,8 +144,11 @@ pub fn develop(
                 .compile_cdylib(Some(&interpreter), Some(&build_context.module_name))
                 .context(context)?;
 
+            // Uninstall the old code
+            writer.delete_dir(&build_context.module_name)?;
+
             write_bindings_module(
-                &mut builder,
+                &mut writer,
                 &build_context.project_layout,
                 &build_context.module_name,
                 &artifact,
@@ -155,13 +179,13 @@ pub fn develop(
     };
 
     write_dist_info(
-        &mut builder,
+        &mut writer,
         &build_context.metadata21,
         &build_context.scripts,
         &tags,
     )?;
 
-    builder.write_record(&build_context.metadata21)?;
+    writer.write_record(&build_context.metadata21)?;
 
     Ok(())
 }

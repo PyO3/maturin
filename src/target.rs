@@ -1,3 +1,4 @@
+use crate::PythonInterpreter;
 use anyhow::{bail, format_err, Result};
 use platform_info::*;
 use platforms::target::Env;
@@ -309,6 +310,26 @@ impl Target {
             venv_base.as_ref().join("Scripts")
         } else {
             venv_base.as_ref().join("bin")
+        }
+    }
+
+    /// Returns the site-packages directory inside a venv e.g.
+    /// {venv_base}/lib/python{x}.{y} on unix or {venv_base}/Lib on window
+    pub fn get_venv_site_package(
+        &self,
+        venv_base: impl AsRef<Path>,
+        interpreter: &PythonInterpreter,
+    ) -> PathBuf {
+        if self.is_unix() {
+            let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
+
+            venv_base
+                .as_ref()
+                .join("lib")
+                .join(python_dir)
+                .join("site-packages")
+        } else {
+            venv_base.as_ref().join("Lib").join("site-packages")
         }
     }
 

@@ -174,7 +174,7 @@ struct PublishOpt {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "maturin")]
+#[structopt(name = env!("CARGO_PKG_NAME"))]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages

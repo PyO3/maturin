@@ -92,13 +92,7 @@ impl PathWriter {
             anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
         })?;
 
-        let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
-
-        let base_path = if target.is_unix() {
-            venv_dir.join("lib").join(python_dir).join("site-packages")
-        } else {
-            venv_dir.join("Lib").join("site-packages")
-        };
+        let base_path = target.get_venv_site_package(venv_dir, &interpreter);
 
         Ok(PathWriter {
             base_path,

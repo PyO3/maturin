@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Add auditwheel test to CI in [#455](https://github.com/PyO3/maturin/pull/455)
  * Fix sdist transitive path dependencies.
  * auditwheel choose higher priority tag when possible in [#456](https://github.com/PyO3/maturin/pull/456), dropped `auditwheel` Cargo feature.
+ * develop now writes an [INSTALLER](https://packaging.python.org/specifications/recording-installed-packages/#the-installer-file) file
+ * develop removes an old .dist-info directory if it exists before installing the new one
+
 
 ## 0.9.4 - 2021-02-18
 

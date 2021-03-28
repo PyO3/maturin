@@ -1,10 +1,10 @@
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
 use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};
-use crate::Manylinux;
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::{write_dist_info, BuildOptions};
+use crate::{Manylinux, ModuleWriter};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use fs_err as fs;
 use std::path::Path;
@@ -73,7 +73,8 @@ pub fn develop(
     // * Any other pip action: Complains about my-project, crashes when trying to do anything with my-project
     //
     // Uninstalling the actual code is done individually for each bridge model
-    let dist_info_dir = build_context.metadata21.get_dist_info_dir();
+    let base_path = target.get_venv_site_package(venv_dir, &interpreter);
+    let dist_info_dir = base_path.join(build_context.metadata21.get_dist_info_dir());
     if dist_info_dir.is_dir() {
         fs::remove_dir_all(&dist_info_dir).context(format!(
             "Failed to uninstall existing installation by removing {}",
@@ -183,6 +184,15 @@ pub fn develop(
         &build_context.metadata21,
         &build_context.scripts,
         &tags,
+    )?;
+
+    // https://packaging.python.org/specifications/recording-installed-packages/#the-installer-file
+    writer.add_bytes(
+        build_context
+            .metadata21
+            .get_dist_info_dir()
+            .join("INSTALLER"),
+        env!("CARGO_PKG_NAME").as_bytes(),
     )?;
 
     writer.write_record(&build_context.metadata21)?;

@@ -9,6 +9,7 @@ use structopt::StructOpt;
 /// given that rustup and the the musl target are installed
 ///
 /// The bool in the Ok() response says whether the test was actually run
+#[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
     let get_target_list = Command::new("rustup")
         .args(&["target", "list", "--installed"])

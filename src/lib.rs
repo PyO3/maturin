@@ -27,8 +27,7 @@
 #![deny(missing_docs)]
 
 pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};
-pub use crate::build_context::BridgeModel;
-pub use crate::build_context::BuildContext;
+pub use crate::build_context::{BridgeModel, BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::BuildOptions;
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::compile;

@@ -122,12 +122,15 @@ pub struct BuildContext {
     pub universal2: bool,
 }
 
-type BuiltWheelMetadata = (PathBuf, String);
+/// The wheel file location and its Python version tag (e.g. `py3`).
+///
+/// For bindings the version tag contains the Python interpreter version
+/// they bind against (e.g. `cp37`).
+pub type BuiltWheelMetadata = (PathBuf, String);
 
 impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
-    /// correct builder. Returns a Vec that contains location, python tag (e.g. py3 or cp35)
-    /// and for bindings the python interpreter they bind against.
+    /// correct builder.
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
@@ -190,7 +193,7 @@ impl BuildContext {
         manylinux: &Manylinux,
         major: u8,
         min_minor: u8,
-    ) -> Result<(PathBuf, String)> {
+    ) -> Result<BuiltWheelMetadata> {
         let platform = self.target.get_platform_tag(&manylinux, self.universal2);
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
@@ -223,7 +226,7 @@ impl BuildContext {
         &self,
         major: u8,
         min_minor: u8,
-    ) -> Result<Vec<(PathBuf, String)>> {
+    ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         // On windows, we have picked an interpreter to set the location of python.lib,
         // otherwise it's none
@@ -269,7 +272,7 @@ impl BuildContext {
         python_interpreter: &PythonInterpreter,
         artifact: &Path,
         manylinux: &Manylinux,
-    ) -> Result<(PathBuf, String)> {
+    ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(manylinux, self.universal2);
 
         let mut writer = WheelWriter::new(
@@ -305,7 +308,7 @@ impl BuildContext {
     /// and silently ignores all non-existent python versions.
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_binding_wheels(&self) -> Result<Vec<(PathBuf, String)>> {
+    pub fn build_binding_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         for python_interpreter in &self.interpreter {
             let artifact =
@@ -380,7 +383,7 @@ impl BuildContext {
         &self,
         artifact: &Path,
         manylinux: &Manylinux,
-    ) -> Result<(PathBuf, String)> {
+    ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
 
         let mut builder =
@@ -401,7 +404,7 @@ impl BuildContext {
     }
 
     /// Builds a wheel with cffi bindings
-    pub fn build_cffi_wheel(&self) -> Result<Vec<(PathBuf, String)>> {
+    pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
         let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &self.manylinux)?;
@@ -429,7 +432,11 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    fn write_bin_wheel(&self, artifact: &Path, manylinux: &Manylinux) -> Result<(PathBuf, String)> {
+    fn write_bin_wheel(
+        &self,
+        artifact: &Path,
+        manylinux: &Manylinux,
+    ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
 
         if !self.scripts.is_empty() {
@@ -461,7 +468,7 @@ impl BuildContext {
     /// Builds a wheel that contains a binary
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_bin_wheel(&self) -> Result<Vec<(PathBuf, String)>> {
+    pub fn build_bin_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifacts = compile(&self, None, &self.bridge)
             .context("Failed to build a native library through cargo")?;

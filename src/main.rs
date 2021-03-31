@@ -15,9 +15,10 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, get_metadata_for_distribution, get_pyproject_toml, source_distribution,
-    write_dist_info, BridgeModel, BuildOptions, BuiltWheelMetadata, CargoToml, Manylinux,
-    Metadata21, PathWriter, PythonInterpreter, Target,
+    develop, get_metadata_for_distribution, get_pyproject_toml,
+    get_supported_version_for_distribution, source_distribution, write_dist_info, BridgeModel,
+    BuildOptions, BuiltWheelMetadata, CargoToml, Manylinux, Metadata21, PathWriter,
+    PythonInterpreter, Target,
 };
 use std::env;
 use std::path::PathBuf;
@@ -267,14 +268,15 @@ enum Opt {
         #[structopt(short, long, parse(from_os_str))]
         out: Option<PathBuf>,
     },
-    /// WIP Upload command, similar to twine
+    /// Uploads python packages to pypi
     ///
-    /// ```
-    /// maturin upload dist/*
-    /// ```
-    #[structopt(name = "upload", setting = structopt::clap::AppSettings::Hidden)]
+    /// It is mostly similar to `twine upload`, but can only upload python wheels
+    /// and source distributions.
+    #[structopt(name = "upload")]
     Upload {
-        /// Wheels and source distributions to upload
+        #[structopt(flatten)]
+        publish: PublishOpt,
+        /// The python packages to upload
         #[structopt(name = "FILE", parse(from_os_str))]
         files: Vec<PathBuf>,
     },
@@ -602,17 +604,39 @@ fn run() -> Result<()> {
             .context("Failed to build source distribution")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
-        Opt::Upload { files } => {
+        Opt::Upload { publish, files } => {
             if files.is_empty() {
                 println!("⚠  Warning: No files given, exiting.");
                 return Ok(());
             }
+
             let metadata: Vec<Vec<(String, String)>> = files
                 .iter()
                 .map(|path| get_metadata_for_distribution(&path))
                 .collect::<Result<_>>()?;
 
-            println!("{:?}", metadata);
+            // All uploaded files are expected to share the build context
+            // and to have identical package metadata as a result.
+            if !metadata.iter().all(|x| *x == metadata[0]) {
+                bail!(
+                    "Attempting to upload wheel and/or source distribution files \
+                     that belong to different python packages."
+                );
+            }
+
+            let supported_versions: Result<Vec<String>> = files
+                .iter()
+                .map(|path| get_supported_version_for_distribution(&path))
+                .collect();
+
+            // zip() works because `BuiltWheelMetadata` is a tuple type
+            let wheels: Vec<BuiltWheelMetadata> = files
+                .into_iter()
+                .zip(supported_versions?.into_iter())
+                .collect();
+
+            // All wheels have identical metadata - get it from metadata[0]
+            upload_ui(&wheels, &metadata[0], &publish)?
         }
     }
 

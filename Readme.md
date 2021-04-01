@@ -373,6 +373,44 @@ OPTIONS:
             Use as `--rustc-extra-args="--my-arg"`
 ```
 
+### Upload
+
+```
+Uploads python packages to pypi
+
+It is mostly similar to `twine upload`, but can only upload python wheels and source distributions.
+
+USAGE:
+    maturin upload [FLAGS] [OPTIONS] [FILE]...
+
+FLAGS:
+    -h, --help
+            Prints help information
+
+        --skip-existing
+            Continue uploading files if one already exists. (Only valid when uploading to PyPI. Other implementations
+            may not support this.)
+    -V, --version
+            Prints version information
+
+
+OPTIONS:
+    -p, --password <password>
+            Password for pypi or your custom registry. Note that you can also pass the password through MATURIN_PASSWORD
+
+    -r, --repository-url <registry>
+            The url of registry where the wheels are uploaded to [default: https://upload.pypi.org/legacy/]
+
+    -u, --username <username>
+            Username for pypi or your custom registry
+
+
+ARGS:
+    <FILE>...
+            The python packages to upload
+
+```
+
 ## Code
 
 The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.

@@ -1,8 +1,8 @@
+use crate::auditwheel::Manylinux;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::python_interpreter::InterpreterKind;
 use crate::BuildContext;
 use crate::CargoToml;
-use crate::Manylinux;
 use crate::Metadata21;
 use crate::PythonInterpreter;
 use crate::Target;
@@ -21,12 +21,10 @@ use structopt::StructOpt;
 pub struct BuildOptions {
     /// Control the platform tag on linux. Options are `2010` (for manylinux2010),
     /// `2014` (for manylinux2014), `2_24` (for manylinux_2_24) and `off` (for the native linux tag).
-    /// Note that manylinux1 is unsupported by the rust compiler. Wheels with the native tag
-    /// will be rejected by pypi, unless they are separately validated by
-    /// `auditwheel`.
+    /// Note that manylinux1 is unsupported by the rust compiler. Wheels with the native `linux` tag
+    /// will be rejected by pypi, unless they are separately validated by `auditwheel`.
     ///
-    /// The default is the lowest supported value for a target, which is 2010 for x86 and 2014 for
-    /// arm and powerpc.
+    /// The default is the lowest compatible, of plain `linux` if nothing matched
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
@@ -161,9 +159,6 @@ impl BuildOptions {
         }
 
         let target = Target::from_target_triple(self.target.clone())?;
-        let manylinux = self
-            .manylinux
-            .unwrap_or_else(|| target.get_default_manylinux_tag());
 
         let wheel_dir = match self.out {
             Some(ref dir) => dir.clone(),
@@ -213,7 +208,7 @@ impl BuildOptions {
             release,
             strip,
             skip_auditwheel: self.skip_auditwheel,
-            manylinux,
+            manylinux: self.manylinux,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

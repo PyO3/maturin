@@ -1,4 +1,3 @@
-use crate::auditwheel::Manylinux;
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
 use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};

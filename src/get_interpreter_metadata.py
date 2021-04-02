@@ -13,6 +13,7 @@ if platform.python_implementation() == "PyPy":
     # This workaround can probably be removed once PyPy for Python 3.8 is the
     # main PyPy version.
     import importlib.machinery
+
     ext_suffix = importlib.machinery.EXTENSION_SUFFIXES[0]
 else:
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")

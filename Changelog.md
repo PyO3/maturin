@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## 0.10.0 - Unreleased
+## 0.10.0 - 2021-04-02
 
  * Change manylinux default version based on target arch by messense in [#424](https://github.com/PyO3/maturin/pull/424)
  * Support local path dependencies in source distribution (i.e. you can now package a workspace into an sdist)
@@ -21,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * develop now writes an [INSTALLER](https://packaging.python.org/specifications/recording-installed-packages/#the-installer-file) file
  * develop removes an old .dist-info directory if it exists before installing the new one
  * Fix wheels for PyPy on windows containing extension modules with incorrect names. [#482](https://github.com/PyO3/maturin/pull/482)
-
 
 ## 0.9.4 - 2021-02-18
 

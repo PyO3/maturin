@@ -5,7 +5,7 @@ use std::io::ErrorKind;
 use std::process::Command;
 use structopt::StructOpt;
 
-/// Tries to compile a sample crate (pyo3-pure)  for musl,
+/// Tries to compile a sample crate (pyo3-pure) for musl,
 /// given that rustup and the the musl target are installed
 ///
 /// The bool in the Ok() response says whether the test was actually run

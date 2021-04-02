@@ -1,8 +1,5 @@
-use anyhow::bail;
 use anyhow::Result;
 use maturin::BuildOptions;
-use std::io::ErrorKind;
-use std::process::Command;
 use structopt::StructOpt;
 
 /// Tries to compile a sample crate (pyo3-pure) for musl,
@@ -11,6 +8,10 @@ use structopt::StructOpt;
 /// The bool in the Ok() response says whether the test was actually run
 #[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
+    use anyhow::bail;
+    use std::io::ErrorKind;
+    use std::process::Command;
+
     let get_target_list = Command::new("rustup")
         .args(&["target", "list", "--installed"])
         .output();

@@ -416,10 +416,7 @@ impl PythonInterpreter {
     /// Mac:     foobar.cpython-36m-darwin.so
     /// FreeBSD: foobar.cpython-36m.so
     ///
-    /// For pypy3, we read sysconfig.get_config_var("EXT_SUFFIX").
-    ///
-    /// The pypy3 value appears to be wrong for Windows: instead of
-    /// e.g., ".pypy3-70-x86_64-linux-gnu.so", it is just ".pyd".
+    /// For pypy3, we read importlib.machinery.EXTENSION_SUFFIXES[0].
     pub fn get_library_name(&self, base: &str) -> String {
         match self.interpreter_kind {
             InterpreterKind::CPython => {

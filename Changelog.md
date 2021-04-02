@@ -20,11 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * auditwheel choose higher priority tag when possible in [#456](https://github.com/PyO3/maturin/pull/456), dropped `auditwheel` Cargo feature.
  * develop now writes an [INSTALLER](https://packaging.python.org/specifications/recording-installed-packages/#the-installer-file) file
  * develop removes an old .dist-info directory if it exists before installing the new one
+ * Fix wheels for PyPy on windows containing extension modules with incorrect names. [#482](https://github.com/PyO3/maturin/pull/482)
 
 
 ## 0.9.4 - 2021-02-18
 
-* Fix building a bin with musl 
+* Fix building a bin with musl
 
 ## 0.9.3
 
@@ -34,14 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Escape version in wheel metadata by messense in [#420](https://github.com/PyO3/maturin/pull/420)
  * Set executable bit on shared library by messense in [#421](https://github.com/PyO3/maturin/pull/421)
- * Rename `classifier` to `classifiers` for pypi compatibility. The old `classifier` is still available and now also works with pypi 
- * Fix building for musl by automatically setting `-C target-feature=-crt-static` 
+ * Rename `classifier` to `classifiers` for pypi compatibility. The old `classifier` is still available and now also works with pypi
+ * Fix building for musl by automatically setting `-C target-feature=-crt-static`
 
 ## 0.9.1 - 2021-01-13
 
  * Error when the `abi3` feature is selected but no minimum version
  * Support building universal2 wheels (x86 and aarch64 in a single file) by messense in [#403](https://github.com/PyO3/maturin/pull/403)
- * Recognize `PYO3_CROSS_LIB_DIR` for cross compiling with abi3 targeting windows. 
+ * Recognize `PYO3_CROSS_LIB_DIR` for cross compiling with abi3 targeting windows.
  * `package.metadata.maturin.classifier` is renamed to `classifiers` by kngwyu in [#416](https://github.com/PyO3/maturin/pull/416)
  * Added more instructions to building complex manylinux setups
 
@@ -49,9 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * Added support for building abi3 wheels with pyo3 0.13.1
  * Python 3.9 is supported (it should have worked before, but it is now tested on ci)
- * There are 64-bit and aarch64 binary builds for linux and 64-bit builds for windows, mac and freebsd-12-1 
+ * There are 64-bit and aarch64 binary builds for linux and 64-bit builds for windows, mac and freebsd-12-1
  * The auditwheel options have changed to `--manylinux=[off|2010|2014]` with manylinux2010 as default, and optionally `--skip-auditwheel`.
- * Removed Python 3.5 since it is unsupported 
+ * Removed Python 3.5 since it is unsupported
  * The default and minimum manylinux version is now manylinux2010
  * restructured text (rst) readmes are now supported, by clbarnes in [#360](https://github.com/PyO3/maturin/pull/360)
  * Allow python 3 interpreter with debuginfo use maturin by inevity in [#370](https://github.com/PyO3/maturin/pull/370)

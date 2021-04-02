@@ -59,12 +59,16 @@ pub struct BuildOptions {
     /// The --target option for cargo
     #[structopt(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
     pub target: Option<String>,
-    /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+    /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
     ///
     /// Use as `--cargo-extra-args="--my-arg"`
+    ///
+    /// Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`.
+    /// maturin tries to pass only the shared subset of options to cargo metadata, but this is may
+    /// be a bit flaky.
     #[structopt(long = "cargo-extra-args")]
     pub cargo_extra_args: Vec<String>,
-    /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
+    /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
     ///
     /// Use as `--rustc-extra-args="--my-arg"`
     #[structopt(long = "rustc-extra-args")]
@@ -129,7 +133,7 @@ impl BuildOptions {
 
         let cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
 
-        let cargo_metadata_extra_args = extra_feature_args(&cargo_extra_args);
+        let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args)?;
 
         let result = MetadataCommand::new()
             .manifest_path(&self.manifest_path)
@@ -464,33 +468,49 @@ fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
     Ok(splitted_args)
 }
 
-/// We need to pass feature flags to cargo metadata
-/// (s. https://github.com/PyO3/maturin/issues/211), but we can't pass
-/// all the extra args, as e.g. `--target` isn't supported.
-/// So we try to extract all the arguments related to features and
-/// hope that that's sufficient
-fn extra_feature_args(cargo_extra_args: &[String]) -> Vec<String> {
+/// We need to pass the global flags to cargo metadata
+/// (https://github.com/PyO3/maturin/issues/211 and https://github.com/PyO3/maturin/issues/472),
+/// but we can't pass all the extra args, as e.g. `--target` isn't supported, so this tries to
+/// extract the arguments for cargo metadata
+///
+/// There are flags (without value) and options (with value). The options value be passed
+/// in the same string as its name or in the next one. For this naive parsing logic, we
+/// assume that the value is in the next argument if the argument string equals the name,
+/// otherwise it's in the same argument and the next argument is unrelated.
+fn extract_cargo_metadata_args(cargo_extra_args: &[String]) -> Result<Vec<String>> {
+    // flags name and whether it has a value
+    let known_prefixes = vec![
+        ("--frozen", false),
+        ("--locked", false),
+        ("--offline", false),
+        ("-Z", true),
+        ("--features", true),
+        ("--all-features", false),
+        ("--no-default-features", false),
+    ];
+
     let mut cargo_metadata_extra_args = vec![];
-    let mut feature_args = false;
-    for arg in cargo_extra_args {
-        if feature_args {
-            if arg.starts_with('-') {
-                feature_args = false;
-            } else {
-                cargo_metadata_extra_args.push(arg.clone());
+    let mut args_iter = cargo_extra_args.iter();
+    // We do manual iteration so we can take and skip the value of an option that is in the next
+    // argument
+    while let Some(arg) = args_iter.next() {
+        // Does it match any of the cargo metadata arguments?
+        if let Some((prefix, has_arg)) = known_prefixes
+            .iter()
+            .find(|(prefix, _)| arg.starts_with(prefix))
+        {
+            cargo_metadata_extra_args.push(arg.to_string());
+            // Do we also need to take the next argument?
+            if arg == prefix && *has_arg {
+                let value = args_iter.next().context(format!(
+                    "Can't parse cargo-extra-args: {} is expected to have an argument",
+                    prefix
+                ))?;
+                cargo_metadata_extra_args.push(value.to_owned());
             }
         }
-        if arg == "--features" {
-            cargo_metadata_extra_args.push(arg.clone());
-            feature_args = true;
-        } else if arg == "--all-features"
-            || arg == "--no-default-features"
-            || arg.starts_with("--features")
-        {
-            cargo_metadata_extra_args.push(arg.clone());
-        }
     }
-    cargo_metadata_extra_args
+    Ok(cargo_metadata_extra_args)
 }
 
 #[cfg(test)]
@@ -601,19 +621,40 @@ mod test {
     }
 
     #[test]
-    fn test_extra_feature_args() {
-        let cargo_extra_args = "--no-default-features --features a b --target x86_64-unknown-linux-musl --features=c --lib";
+    fn test_old_extra_feature_args() {
+        let cargo_extra_args = "--no-default-features --features a --target x86_64-unknown-linux-musl --features=c --lib";
         let cargo_extra_args = split_extra_args(&[cargo_extra_args.to_string()]).unwrap();
-        let cargo_metadata_extra_args = extra_feature_args(&cargo_extra_args);
+        let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args).unwrap();
         assert_eq!(
             cargo_metadata_extra_args,
-            vec![
-                "--no-default-features",
-                "--features",
-                "a",
-                "b",
-                "--features=c"
-            ]
+            vec!["--no-default-features", "--features", "a", "--features=c"]
         );
+    }
+
+    #[test]
+    fn test_extract_cargo_metadata_args() {
+        let args: Vec<_> = vec![
+            "--locked",
+            "--features=my-feature",
+            "--unbeknownst",
+            "--features",
+            "other-feature",
+            "--target",
+            "x86_64-unknown-linux-musl",
+            "-Zunstable-options",
+        ]
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+
+        let expected = vec![
+            "--locked",
+            "--features=my-feature",
+            "--features",
+            "other-feature",
+            "-Zunstable-options",
+        ];
+
+        assert_eq!(extract_cargo_metadata_args(&args).unwrap(), expected);
     }
 }

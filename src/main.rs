@@ -303,7 +303,7 @@ enum Pep517Command {
     /// --release and --strip are currently unused by the PEP 517 implementation
     BuildWheel {
         #[structopt(flatten)]
-        build: BuildOptions,
+        build_options: BuildOptions,
         /// Strip the library for minimum file size
         #[structopt(long)]
         strip: bool,
@@ -365,8 +365,11 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
             println!("{}", context.metadata21.get_dist_info_dir().display());
         }
-        Pep517Command::BuildWheel { build, strip } => {
-            let build_context = build.into_build_context(true, strip)?;
+        Pep517Command::BuildWheel {
+            build_options,
+            strip,
+        } => {
+            let build_context = build_options.into_build_context(true, strip)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());

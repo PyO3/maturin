@@ -20,70 +20,7 @@ pub fn compile(
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
     if context.target.is_macos() && context.universal2 {
-        let build_type = match bindings_crate {
-            BridgeModel::Bin => "bin",
-            _ => "cdylib",
-        };
-        let aarch64_artifact = compile_target(
-            context,
-            python_interpreter,
-            bindings_crate,
-            "aarch64-apple-darwin",
-        )
-        .context("Failed to build a aarch64 library through cargo")?
-        .get(build_type)
-        .cloned()
-        .ok_or_else(|| {
-            if build_type == "cdylib" {
-                anyhow!(
-                    "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?",
-                )
-            } else {
-                anyhow!("Cargo didn't build an aarch64 bin.")
-            }
-        })?;
-        let x86_64_artifact = compile_target(
-            context,
-            python_interpreter,
-            bindings_crate,
-            "x86_64-apple-darwin",
-        )
-        .context("Failed to build a x86_64 library through cargo")?
-        .get(build_type)
-        .cloned()
-        .ok_or_else(|| {
-            if build_type == "cdylib" {
-                anyhow!(
-                    "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?",
-                )
-            } else {
-                anyhow!("Cargo didn't build a x86_64 bin.")
-            }
-        })?;
-
-        // Create an universal dylib
-        let output_path = aarch64_artifact
-            .display()
-            .to_string()
-            .replace("aarch64-apple-darwin/", "");
-        let mut writer = FatWriter::new();
-        let aarch64_file = fs::read(aarch64_artifact)?;
-        let x86_64_file = fs::read(x86_64_artifact)?;
-        writer
-            .add(aarch64_file)
-            .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
-        writer
-            .add(x86_64_file)
-            .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
-        writer
-            .write_to_file(&output_path)
-            .map_err(|e| anyhow!("Failed to create unversal cdylib: {:?}", e))?;
-
-        let mut result = HashMap::new();
-        result.insert(build_type.to_string(), PathBuf::from(output_path));
-        Ok(result)
+        compile_universal2(context, python_interpreter, bindings_crate)
     } else {
         compile_target(
             context,
@@ -92,6 +29,78 @@ pub fn compile(
             context.target.target_triple(),
         )
     }
+}
+
+/// Build an universal2 wheel for macos which contains both an x86 and an aarch64 binary
+fn compile_universal2(
+    context: &BuildContext,
+    python_interpreter: Option<&PythonInterpreter>,
+    bindings_crate: &BridgeModel,
+) -> Result<HashMap<String, PathBuf>> {
+    let build_type = match bindings_crate {
+        BridgeModel::Bin => "bin",
+        _ => "cdylib",
+    };
+    let aarch64_artifact = compile_target(
+        context,
+        python_interpreter,
+        bindings_crate,
+        "aarch64-apple-darwin",
+    )
+    .context("Failed to build a aarch64 library through cargo")?
+    .get(build_type)
+    .cloned()
+    .ok_or_else(|| {
+        if build_type == "cdylib" {
+            anyhow!(
+                "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
+                 in the lib section of your Cargo.toml?",
+            )
+        } else {
+            anyhow!("Cargo didn't build an aarch64 bin.")
+        }
+    })?;
+    let x86_64_artifact = compile_target(
+        context,
+        python_interpreter,
+        bindings_crate,
+        "x86_64-apple-darwin",
+    )
+    .context("Failed to build a x86_64 library through cargo")?
+    .get(build_type)
+    .cloned()
+    .ok_or_else(|| {
+        if build_type == "cdylib" {
+            anyhow!(
+                "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
+                 in the lib section of your Cargo.toml?",
+            )
+        } else {
+            anyhow!("Cargo didn't build a x86_64 bin.")
+        }
+    })?;
+
+    // Create an universal dylib
+    let output_path = aarch64_artifact
+        .display()
+        .to_string()
+        .replace("aarch64-apple-darwin/", "");
+    let mut writer = FatWriter::new();
+    let aarch64_file = fs::read(aarch64_artifact)?;
+    let x86_64_file = fs::read(x86_64_artifact)?;
+    writer
+        .add(aarch64_file)
+        .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
+    writer
+        .add(x86_64_file)
+        .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
+    writer
+        .write_to_file(&output_path)
+        .map_err(|e| anyhow!("Failed to create unversal cdylib: {:?}", e))?;
+
+    let mut result = HashMap::new();
+    result.insert(build_type.to_string(), PathBuf::from(output_path));
+    Ok(result)
 }
 
 fn compile_target(

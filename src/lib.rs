@@ -37,7 +37,9 @@ pub use crate::module_writer::{
     write_dist_info, ModuleWriter, PathWriter, SDistWriter, WheelWriter,
 };
 pub use crate::python_interpreter::PythonInterpreter;
-pub use crate::read_distribution::get_metadata_for_distribution;
+pub use crate::read_distribution::{
+    get_metadata_for_distribution, get_supported_version_for_distribution,
+};
 pub use crate::target::Target;
 pub use auditwheel::Manylinux;
 pub use source_distribution::{get_pyproject_toml, source_distribution};

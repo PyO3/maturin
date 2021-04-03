@@ -17,6 +17,39 @@ fn filename_from_file(path: impl AsRef<Path>) -> Result<String> {
         .to_string())
 }
 
+/// Standard Python wheel filename components (tags)
+///
+/// The wheel filename is "<name>-<version>-<python_tag>-<abi_tag>-<platform_tag>.whl"
+struct WheelFilenameParts {
+    name: String,
+    version: String,
+    python_tag: String,
+    #[allow(dead_code)]
+    abi_tag: String,
+    #[allow(dead_code)]
+    platform_tag: String,
+}
+
+/// Parses the wheel filename into its components
+///
+/// The wheel filename _must_ end with ".whl"
+fn parse_wheel_filename(fname: &str) -> Result<WheelFilenameParts> {
+    let split: Vec<_> = fname.strip_suffix(".whl").unwrap().split('-').collect();
+
+    let parts = match split.as_slice() {
+        [name, version, python_tag, abi_tag, platform_tag] => WheelFilenameParts {
+            name: name.to_string(),
+            version: version.to_string(),
+            python_tag: python_tag.to_string(),
+            abi_tag: abi_tag.to_string(),
+            platform_tag: platform_tag.to_string(),
+        },
+        _ => bail!("The wheel filename is invalid: {}", fname),
+    };
+
+    Ok(parts)
+}
+
 /// Read the email format into key value pairs
 fn metadata_from_bytes(metadata_email: &mut Vec<u8>) -> Result<Vec<(String, String)>> {
     let metadata_email = parse_mail(&metadata_email).context("Failed to parse METADATA")?;
@@ -48,26 +81,20 @@ fn canonicalize_name(name: &str) -> String {
 /// the metadata (https://packaging.python.org/specifications/core-metadata/)
 /// as key value pairs
 fn read_metadata_for_wheel(path: impl AsRef<Path>) -> Result<Vec<(String, String)>> {
-    let filename = filename_from_file(&path)?
-        .strip_suffix(".whl")
-        // We checked that before entering this function
-        .unwrap()
-        .to_string();
-    let parts: Vec<_> = filename.split('-').collect();
-    let dist_name_version = match parts.as_slice() {
-        [name, version, _python_tag, _abi_tag, _platform_tag] => format!("{}-{}", name, version),
-        _ => bail!("The wheel name is invalid: {}", filename),
-    };
+    let filename = filename_from_file(path.as_ref())?;
+    let parts = parse_wheel_filename(&filename)?;
+
     let reader = BufReader::new(File::open(path.as_ref())?);
     let mut archive = ZipArchive::new(reader).context("Failed to read file as zip")?;
+
     // The METADATA format is an email (RFC 822)
     // pip's implementation: https://github.com/pypa/pip/blob/b33e791742570215f15663410c3ed987d2253d5b/src/pip/_internal/utils/wheel.py#L109-L144
     // twine's implementation: https://github.com/pypa/twine/blob/534385596820129b41cbcdcc83d34aa8788067f1/twine/wheel.py#L52-L56
     // We mostly follow pip
-    let name = format!("{}.dist-info/METADATA", dist_name_version);
     let mut metadata_email = Vec::new();
 
     // Find the metadata file
+    let name = format!("{}-{}.dist-info/METADATA", parts.name, parts.version);
     let metadata_files: Vec<_> = archive
         .file_names()
         .filter(|i| canonicalize_name(i) == canonicalize_name(&name))
@@ -140,6 +167,24 @@ pub fn get_metadata_for_distribution(path: &Path) -> Result<Vec<(String, String)
     }
 }
 
+/// Returns the supported Python interpreter version tag for a wheel or a source distribution
+///
+/// The version tag is encoded in the wheel file name and usually looks like "py3" or "cp37".
+/// For the source distributions the version tag is always "source".
+pub fn get_supported_version_for_distribution(path: &Path) -> Result<String> {
+    let filename = filename_from_file(path)?;
+
+    let python_tag = if filename.ends_with(".whl") {
+        parse_wheel_filename(&filename)?.python_tag
+    } else if filename.ends_with(".tar.gz") {
+        "source".to_string()
+    } else {
+        bail!("File has an unknown extension: {:?}", path)
+    };
+
+    Ok(python_tag)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -184,5 +229,20 @@ mod test {
         // Check the description
         assert!(metadata[7].1.starts_with("# pyo3-mixed"));
         assert!(metadata[7].1.ends_with("tox.ini\n\n"));
+    }
+
+    #[test]
+    fn test_supported_version() {
+        let path = Path::new("test-data/pyo3_mixed-2.1.1.tar.gz");
+        let supported_version = get_supported_version_for_distribution(path).unwrap();
+        assert_eq!(supported_version, "source");
+
+        let path = Path::new("test-data/pyo3_mixed-2.1.1-cp38-cp38-manylinux1_x86_64.whl");
+        let supported_version = get_supported_version_for_distribution(path).unwrap();
+        assert_eq!(supported_version, "cp38");
+
+        let path = Path::new("test_data/pyo3_stubs-2.1.1-py3-none-any.whl");
+        let supported_version = get_supported_version_for_distribution(path).unwrap();
+        assert_eq!(supported_version, "py3");
     }
 }

@@ -22,12 +22,7 @@ pub fn compile(
     if context.target.is_macos() && context.universal2 {
         compile_universal2(context, python_interpreter, bindings_crate)
     } else {
-        compile_target(
-            context,
-            python_interpreter,
-            bindings_crate,
-            context.target.target_triple(),
-        )
+        compile_target(context, python_interpreter, bindings_crate, None)
     }
 }
 
@@ -45,7 +40,7 @@ fn compile_universal2(
         context,
         python_interpreter,
         bindings_crate,
-        "aarch64-apple-darwin",
+        Some("aarch64-apple-darwin"),
     )
     .context("Failed to build a aarch64 library through cargo")?
     .get(build_type)
@@ -64,7 +59,7 @@ fn compile_universal2(
         context,
         python_interpreter,
         bindings_crate,
-        "x86_64-apple-darwin",
+        Some("x86_64-apple-darwin"),
     )
     .context("Failed to build a x86_64 library through cargo")?
     .get(build_type)
@@ -107,7 +102,7 @@ fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
-    target: &str,
+    target: Option<&str>,
 ) -> Result<HashMap<String, PathBuf>> {
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
@@ -116,8 +111,10 @@ fn compile_target(
     if context.release {
         shared_args.push("--release");
     }
-    shared_args.push("--target");
-    shared_args.push(target);
+    if let Some(target) = target {
+        shared_args.push("--target");
+        shared_args.push(target);
+    }
 
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args

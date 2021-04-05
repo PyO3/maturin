@@ -1,5 +1,5 @@
 use crate::{Manylinux, PythonInterpreter};
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, format_err, Context, Result};
 use platform_info::*;
 use platforms::target::Env;
 use platforms::Platform;
@@ -7,6 +7,8 @@ use std::env;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
+use std::str;
 
 /// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -47,7 +49,6 @@ pub struct Target {
     os: Os,
     arch: Arch,
     env: Option<Env>,
-    triple: &'static str,
 }
 
 impl Target {
@@ -60,8 +61,9 @@ impl Target {
             Platform::find(target_triple)
                 .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?
         } else {
-            Platform::guess_current()
-                .ok_or_else(|| format_err!("Could guess the current platform"))?
+            let target_triple = get_host_target()?;
+            Platform::find(&target_triple)
+                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?
         };
 
         let os = match platform.target_os {
@@ -111,7 +113,6 @@ impl Target {
             os,
             arch,
             env: platform.target_env,
-            triple: platform.target_triple,
         })
     }
 
@@ -130,11 +131,6 @@ impl Target {
     /// Returns target architecture
     pub fn target_arch(&self) -> Arch {
         self.arch
-    }
-
-    /// Returns target triple string
-    pub fn target_triple(&self) -> &str {
-        &self.triple
     }
 
     /// Returns true if the current platform is linux or mac os
@@ -315,4 +311,27 @@ impl Target {
         let tags = self.get_py3_tags(&manylinux, universal2);
         (tag, tags)
     }
+}
+
+fn get_host_target() -> Result<String> {
+    let output = Command::new("rustc")
+        .arg("-vV")
+        .output()
+        .context("Failed to run rustc to get the host target")?;
+    let output = str::from_utf8(&output.stdout).context("`rustc -vV` didn't return utf8 output")?;
+
+    let field = "host: ";
+    let host = output
+        .lines()
+        .find(|l| l.starts_with(field))
+        .map(|l| &l[field.len()..])
+        .ok_or_else(|| {
+            format_err!(
+                "`rustc -vV` didn't have a line for `{}`, got:\n{}",
+                field.trim(),
+                output
+            )
+        })?
+        .to_string();
+    Ok(host)
 }

@@ -76,7 +76,7 @@ jobs:
 
       - name: Install musl tools
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt install -y musl-tools
+        run: sudo apt-get install -y musl-tools
 
       # Those two will also create target/${{ matrix.target }}/maturin
       - name: Publish to pypi (with sdist)

@@ -112,14 +112,22 @@ impl Metadata21 {
             description = None;
             description_content_type = None;
         };
+        let name = extra_metadata
+            .name
+            .map(|name| {
+                if let Some(pos) = name.find('.') {
+                    name.split_at(pos).0.to_string()
+                } else {
+                    name.clone()
+                }
+            })
+            .unwrap_or_else(|| cargo_toml.package.name.clone());
 
         Ok(Metadata21 {
             metadata_version: "2.1".to_owned(),
 
             // Mapped from cargo metadata
-            name: extra_metadata
-                .name
-                .unwrap_or_else(|| cargo_toml.package.name.clone()),
+            name,
             version: cargo_toml.package.version.clone(),
             summary: cargo_toml.package.description.clone(),
             description,

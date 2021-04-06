@@ -117,9 +117,10 @@ impl BuildOptions {
         let manifest_dir = manifest_file.parent().unwrap();
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
+        let extra_metadata = cargo_toml.remaining_core_metadata();
         let scripts = cargo_toml.scripts();
 
-        let crate_name = cargo_toml.package.name;
+        let crate_name = &cargo_toml.package.name;
 
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name
@@ -129,8 +130,9 @@ impl BuildOptions {
             .and_then(|lib| lib.name.as_ref())
             .unwrap_or(&crate_name)
             .to_owned();
+        let extension_name = extra_metadata.name.as_ref().unwrap_or(&module_name);
 
-        let project_layout = ProjectLayout::determine(manifest_dir, &module_name)?;
+        let project_layout = ProjectLayout::determine(manifest_dir, &extension_name)?;
 
         let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
         if let Some(ref target) = self.target {
@@ -209,7 +211,7 @@ impl BuildOptions {
             project_layout,
             metadata21,
             scripts,
-            crate_name,
+            crate_name: crate_name.to_string(),
             module_name,
             manifest_path: self.manifest_path,
             out: wheel_dir,

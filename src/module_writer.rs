@@ -572,26 +572,31 @@ pub fn write_bindings_module(
     target: &Target,
     develop: bool,
 ) -> Result<()> {
+    let ext_name = project_layout.extension_name();
     let so_filename = match python_interpreter {
-        Some(python_interpreter) => python_interpreter.get_library_name(&module_name),
+        Some(python_interpreter) => python_interpreter.get_library_name(&ext_name),
         // abi3
         None => {
             if target.is_unix() {
-                format!("{base}.abi3.so", base = module_name)
+                format!("{base}.abi3.so", base = ext_name)
             } else {
                 // Apparently there is no tag for abi3 on windows
-                format!("{base}.pyd", base = module_name)
+                format!("{base}.pyd", base = ext_name)
             }
         }
     };
 
     match project_layout {
-        ProjectLayout::Mixed(ref python_module) => {
+        ProjectLayout::Mixed {
+            ref python_module,
+            ref rust_module,
+            ..
+        } => {
             write_python_part(writer, python_module, &module_name)
                 .context("Failed to add the python module to the package")?;
 
             if develop {
-                let target = python_module.join(&so_filename);
+                let target = rust_module.join(&so_filename);
                 fs::copy(&artifact, &target).context(format!(
                     "Failed to copy {} to {}",
                     artifact.display(),
@@ -599,13 +604,10 @@ pub fn write_bindings_module(
                 ))?;
             }
 
-            writer.add_file_with_permissions(
-                Path::new(&module_name).join(&so_filename),
-                &artifact,
-                0o755,
-            )?;
+            let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
+            writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
         }
-        ProjectLayout::PureRust => {
+        ProjectLayout::PureRust(_) => {
             writer.add_file_with_permissions(so_filename, &artifact, 0o755)?;
         }
     }
@@ -628,7 +630,11 @@ pub fn write_cffi_module(
     let module;
 
     match project_layout {
-        ProjectLayout::Mixed(ref python_module) => {
+        ProjectLayout::Mixed {
+            ref python_module,
+            ref rust_module,
+            ref extension_name,
+        } => {
             write_python_part(writer, python_module, &module_name)
                 .context("Failed to add the python module to the package")?;
 
@@ -646,9 +652,10 @@ pub fn write_cffi_module(
                 File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
             }
 
-            module = PathBuf::from(module_name).join(module_name);
+            let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
+            module = relative.join(extension_name);
         }
-        ProjectLayout::PureRust => module = PathBuf::from(module_name),
+        ProjectLayout::PureRust(_) => module = PathBuf::from(module_name),
     };
 
     writer.add_directory(&module)?;
@@ -690,24 +697,24 @@ pub fn write_python_part(
     for absolute in WalkDir::new(&python_module) {
         let absolute = absolute?.into_path();
 
-        let relaitve = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;
+        let relative = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;
 
         // Ignore the cffi folder from develop, if any
-        if relaitve.starts_with(module_name.as_ref().join(&module_name)) {
+        if relative.starts_with(module_name.as_ref().join(&module_name)) {
             continue;
         }
 
         if absolute.is_dir() {
-            writer.add_directory(relaitve)?;
+            writer.add_directory(relative)?;
         } else {
             // Ignore native libraries from develop, if any
-            if let Some(extension) = relaitve.extension() {
+            if let Some(extension) = relative.extension() {
                 if extension.to_string_lossy() == "so" {
                     continue;
                 }
             }
             writer
-                .add_file(relaitve, &absolute)
+                .add_file(relative, &absolute)
                 .context(format!("File to add file from {}", absolute.display()))?;
         }
     }

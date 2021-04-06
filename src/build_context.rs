@@ -55,27 +55,63 @@ impl BridgeModel {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProjectLayout {
     /// A rust crate compiled into a shared library with only some glue python for cffi
-    PureRust,
-    /// A python package that is extended by a native rust module.
     ///
-    /// Contains the canonicialized (i.e. absolute) path to the python part of the project
-    Mixed(PathBuf),
+    /// Contains the the rust extension name
+    PureRust(String),
+    /// A python package that is extended by a native rust module.
+    Mixed {
+        /// Contains the canonicialized (i.e. absolute) path to the python part of the project
+        python_module: PathBuf,
+        /// Contains the canonicialized (i.e. absolute) path to the rust part of the project
+        rust_module: PathBuf,
+        /// rust extension name
+        extension_name: String,
+    },
 }
 
 impl ProjectLayout {
     /// Checks whether a python module exists besides Cargo.toml with the right name
     pub fn determine(project_root: impl AsRef<Path>, module_name: &str) -> Result<ProjectLayout> {
-        let python_package_dir = project_root.as_ref().join(module_name);
-        if python_package_dir.is_dir() {
-            if !python_package_dir.join("__init__.py").is_file() {
+        // A dot in the module name means the extension module goes into the module folder specified by the path
+        let parts: Vec<&str> = module_name.split('.').collect();
+        let (python_module, rust_module, extension_name) = if parts.len() > 1 {
+            let mut rust_module = project_root.as_ref().to_path_buf();
+            rust_module.extend(&parts[0..parts.len() - 1]);
+            (
+                project_root.as_ref().join(parts[0]),
+                rust_module,
+                parts[parts.len() - 1].to_string(),
+            )
+        } else {
+            (
+                project_root.as_ref().join(module_name),
+                project_root.as_ref().join(module_name),
+                module_name.to_string(),
+            )
+        };
+        if python_module.is_dir() {
+            if !python_module.join("__init__.py").is_file() {
                 bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
             }
 
             println!("🍹 Building a mixed python/rust project");
 
-            Ok(ProjectLayout::Mixed(python_package_dir))
+            Ok(ProjectLayout::Mixed {
+                python_module,
+                rust_module,
+                extension_name,
+            })
         } else {
-            Ok(ProjectLayout::PureRust)
+            Ok(ProjectLayout::PureRust(extension_name))
+        }
+    }
+
+    pub fn extension_name(&self) -> &str {
+        match *self {
+            ProjectLayout::PureRust(ref name) => name,
+            ProjectLayout::Mixed {
+                ref extension_name, ..
+            } => extension_name,
         }
     }
 }
@@ -398,11 +434,15 @@ impl BuildContext {
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
 
         match self.project_layout {
-            ProjectLayout::Mixed(ref python_module) => {
-                write_python_part(&mut builder, python_module, &self.module_name)
+            ProjectLayout::Mixed {
+                ref python_module,
+                ref extension_name,
+                ..
+            } => {
+                write_python_part(&mut builder, python_module, extension_name)
                     .context("Failed to add the python module to the package")?;
             }
-            ProjectLayout::PureRust => {}
+            ProjectLayout::PureRust(_) => {}
         }
 
         // I wouldn't know of any case where this would be the wrong (and neither do

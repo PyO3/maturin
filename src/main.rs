@@ -131,7 +131,12 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
             if let Some(url) = pypirc.get(&opt.registry, "repository") {
                 (Some(opt.registry.as_str()), url)
             } else {
-                bail!("Failed to get registry {} in .pypirc", opt.registry);
+                bail!(
+                    "Failed to get registry {} in .pypirc. \
+                    Note: Your index didn't start with http:// or https://, \
+                    which is required for non-pypirc indices.",
+                    opt.registry
+                );
             }
         } else if opt.registry == "https://upload.pypi.org/legacy/" {
             (Some("pypi"), opt.registry.clone())

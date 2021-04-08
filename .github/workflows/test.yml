@@ -10,7 +10,6 @@ jobs:
   test:
     name: Test
     strategy:
-      fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
@@ -46,21 +45,6 @@ jobs:
       - name: Install musl tools
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y musl-tools
-      #- name: Cache cargo registry
-      #  uses: actions/cache@v2
-      #  with:
-      #    path: ~/.cargo/registry
-      #    key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-registry-${{ hashFiles('**/Cargo.lock') }}
-      #- name: Cache cargo index
-      #  uses: actions/cache@v2
-      #  with:
-      #    path: ~/.cargo/git
-      #    key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-index-${{ hashFiles('**/Cargo.lock') }}
-      #- name: Cache cargo build
-      #  uses: actions/cache@v2
-      #  with:
-      #    path: target
-      #    key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-target-${{ hashFiles('**/Cargo.lock') }}
       - name: Setup Xcode env
         if: matrix.os == 'macos-latest'
         shell: bash
@@ -71,6 +55,22 @@ jobs:
           echo "CC=${bindir}/clang" >> "${GITHUB_ENV}"
           echo "CXX=${bindir}/clang++" >> "${GITHUB_ENV}"
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
+
+      # Caching
+      - name: Cache cargo build
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - name: Cache test crates cargo build
+        uses: actions/cache@v2
+        with:
+          path: test-crates/*/target
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('test-crates/*/Cargo.lock') }}
+
       - name: cargo test
         uses: actions-rs/cargo@v1
         with:
@@ -87,39 +87,52 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        manylinux: ['2010', '2014']
+        manylinux: [ '2010', '2014' ]
+    env:
+      # Install rust in the workspace so it gets mounted into the docker container
+      RUSTUP_HOME: .rustup
+      CARGO_HOME: .cargo
     steps:
       - uses: actions/checkout@v2
-      - name: Build
-        run: |
-          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-          source ~/.cargo/env
-          for PYBIN in /opt/python/cp3[6789]*/bin; do
-            cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml -i "${PYBIN}/python" --manylinux ${{ matrix.manylinux }} -o dist
-          done
-          ' > build-wheel.sh
-          docker run --rm -v "$PWD":/io -w /io quay.io/pypa/manylinux${{ matrix.manylinux }}_x86_64 bash build-wheel.sh
-      - name: Imcompliant Build
+      # actions-rs/toolchain@v1 has some hiccups with the custom installation locations
+      - run: curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - run: echo "$(pwd)/.cargo/bin" >> $GITHUB_PATH
+
+      # Caching
+      - name: Cache cargo build
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: manylinux${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - name: Cache test crates cargo build
+        uses: actions/cache@v2
+        with:
+          path: test-crates/*/target
+          key: manylinux${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('test-crates/*/Cargo.lock') }}
+
+      # Do a bit of if-switching since the docker url doesn't support substitutions
+      - name: Compliant Build
+        if: matrix.manylinux == '2010'
+        uses: docker://quay.io/pypa/manylinux2010_x86_64
+        with:
+          entrypoint: /bin/bash
+          args: -c "PATH=/github/workspace/.cargo/bin:$PATH tests/manylinux_compliant.sh ${{ matrix.manylinux }}"
+      - name: Compliant Build
         if: matrix.manylinux == '2014'
-        run: |
-          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-          source ~/.cargo/env
-          for PYBIN in /opt/python/cp3[6]*/bin; do
-            if cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml -i "${PYBIN}/python" --manylinux 2010 -o dist; then
-              echo "maturin build unexpectedly succeeded"
-              exit 1
-            else
-              echo "maturin build failed as expected"
-            fi
-          done
-          yum install -y zlib-devel
-          for PYBIN in /opt/python/cp3[6]*/bin; do
-            if cargo run -- build --no-sdist -m test-crates/lib_with_disallowed_lib/Cargo.toml -i "${PYBIN}/python" --manylinux 2014 -o dist; then
-              echo "maturin build unexpectedly succeeded"
-              exit 1
-            else
-              echo "maturin build failed as expected"
-            fi
-          done
-          ' > build-wheel.sh
-          docker run --rm -v "$PWD":/io -w /io quay.io/pypa/manylinux${{ matrix.manylinux }}_x86_64 bash build-wheel.sh
+        uses: docker://quay.io/pypa/manylinux2014_x86_64
+        with:
+          entrypoint: /bin/bash
+          args: -c "PATH=/github/workspace/.cargo/bin:$PATH tests/manylinux_compliant.sh ${{ matrix.manylinux }}"
+
+      - name: Incompliant Build
+        if: matrix.manylinux == '2014'
+        uses: docker://quay.io/pypa/manylinux2014_x86_64
+        with:
+          entrypoint: /bin/bash
+          args: -c "PATH=/github/workspace/.cargo/bin:$PATH tests/manylinux_incompliant.sh ${{ matrix.manylinux }}"
+
+      # Fix permissions from docker for caching
+      - run: sudo chown $(id -u):$(id -g) -R target test-crates/*/target

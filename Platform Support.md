@@ -6,8 +6,8 @@ Being built on cargo and rustc, maturin is limited by [rust's platform support](
 
 **Releases**: The following targets are built into wheels and downloadable binaries:
 
- * windows: 32-bit and 64-bit x86 as well armv7 and aarch64
- * linux 32-bit and 64-bit x86 (musl)
+ * windows: 32-bit and 64-bit x86
+ * linux 32-bit and 64-bit x86 as well as armv7 and aarch64 (musl)
  * mac: 64-bit and aarch64
 
 **Other Operating Systems**: It should be possible to build maturin and for maturin to build wheels on other platforms supported by rust. To add a new os, add it in target.rs and, if it doesn't behave like the other unixes, in `PythonInterpreter::get_tag`. Please also submit the output of `python -m sysconfig` as a file in the `sysconfig` folder. It's ok to edit setup.py to deactivate default features so `pip install` works, but new platforms should not require complex workaround in compile.rs.

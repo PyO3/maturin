@@ -91,7 +91,7 @@ fn compile_universal2(
         .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
     writer
         .write_to_file(&output_path)
-        .map_err(|e| anyhow!("Failed to create unversal cdylib: {:?}", e))?;
+        .map_err(|e| anyhow!("Failed to create universal cdylib: {:?}", e))?;
 
     let mut result = HashMap::new();
     result.insert(build_type.to_string(), PathBuf::from(output_path));

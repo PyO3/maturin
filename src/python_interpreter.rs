@@ -304,15 +304,7 @@ fn fun_with_abiflags(
     bridge: &BridgeModel,
 ) -> Result<String> {
     if bridge != &BridgeModel::Cffi {
-        let sane_platform = match message.platform.as_ref() {
-            "windows" => target.is_windows(),
-            "linux" => target.is_linux(),
-            "darwin" => target.is_macos(),
-            "freebsd" => target.is_freebsd(),
-            _ => false,
-        };
-
-        if !sane_platform {
+        if target.get_python_os() != message.platform {
             bail!(
                 "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
                 message.platform,

@@ -41,6 +41,7 @@ pub enum Arch {
     Powerpc64,
     X86,
     X86_64,
+    S390X,
 }
 
 impl fmt::Display for Arch {
@@ -52,6 +53,7 @@ impl fmt::Display for Arch {
             Arch::Powerpc64 => write!(f, "ppc64"),
             Arch::X86 => write!(f, "i686"),
             Arch::X86_64 => write!(f, "x86_64"),
+            Arch::S390X => write!(f, "s390x"),
         }
     }
 }
@@ -133,70 +135,6 @@ impl Target {
         })
     }
 
-    /// Returns whether the platform is 64 bit or 32 bit
-    pub fn pointer_width(&self) -> usize {
-        match self.arch {
-            Arch::Aarch64 => 64,
-            Arch::Armv7L => 32,
-            Arch::Powerpc64 => 64,
-            Arch::Powerpc64Le => 64,
-            Arch::X86 => 32,
-            Arch::X86_64 => 64,
-        }
-    }
-
-    /// Returns target architecture
-    pub fn target_arch(&self) -> Arch {
-        self.arch
-    }
-
-    /// Returns true if the current platform is not windows
-    pub fn is_unix(&self) -> bool {
-        match self.os {
-            Os::Windows => false,
-            Os::Linux | Os::Macos | Os::FreeBsd => true,
-        }
-    }
-
-    /// Returns true if the current platform is linux
-    pub fn is_linux(&self) -> bool {
-        self.os == Os::Linux
-    }
-
-    /// Returns true if the current platform is freebsd
-    pub fn is_freebsd(&self) -> bool {
-        self.os == Os::FreeBsd
-    }
-
-    /// Returns true if the current platform is mac os
-    pub fn is_macos(&self) -> bool {
-        self.os == Os::Macos
-    }
-
-    /// Returns true if the current platform is windows
-    pub fn is_windows(&self) -> bool {
-        self.os == Os::Windows
-    }
-
-    /// Returns true if the current platform's target env is Musl
-    pub fn is_musl_target(&self) -> bool {
-        match self.env {
-            Some(Env::Musl) => true,
-            Some(_) => false,
-            None => false,
-        }
-    }
-
-    /// Returns the default Manylinux tag for this architecture
-    pub fn get_default_manylinux_tag(&self) -> Manylinux {
-        match self.arch {
-            Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le => {
-                Manylinux::Manylinux2014
-            }
-            Arch::X86 | Arch::X86_64 => Manylinux::Manylinux2010,
-        }
-    }
-
     /// Returns the platform part of the tag for the wheel name for cffi wheels
     pub fn get_platform_tag(&self, manylinux: &Manylinux, universal2: bool) -> String {
         match (&self.os, &self.arch) {
@@ -229,14 +167,6 @@ impl Target {
         }
     }
 
-    /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(&self, manylinux: &Manylinux, universal2: bool) -> Vec<String> {
-        vec![format!(
-            "py3-none-{}",
-            self.get_platform_tag(&manylinux, universal2)
-        )]
-    }
-
     /// Returns the platform for the tag in the shared libraries file name
     pub fn get_shared_platform_tag(&self) -> &'static str {
         match (&self.os, &self.arch) {
@@ -247,6 +177,7 @@ impl Target {
             (Os::Linux, Arch::Powerpc64Le) => "powerpc64le-linux-gnu",
             (Os::Linux, Arch::X86) => "i386-linux-gnu", // not i686
             (Os::Linux, Arch::X86_64) => "x86_64-linux-gnu",
+            (Os::Linux, Arch::S390X) => "s390x-linux-gnu",
             (Os::Macos, Arch::X86_64) => "darwin",
             (Os::Macos, Arch::Aarch64) => "darwin",
             (Os::Windows, Arch::X86) => "win32",
@@ -258,6 +189,89 @@ impl Target {
                 panic!("unsupported Windows Arch should not have reached get_shared_platform_tag()")
             }
         }
+    }
+
+    /// Returns the name python uses in `sys.platform` for this os
+    pub fn get_python_os(&self) -> &str {
+        match self.os {
+            Os::Windows => "windows",
+            Os::Linux => "linux",
+            Os::Macos => "darwin",
+            Os::FreeBsd => "freebsd",
+        }
+    }
+
+    /// Returns the default Manylinux tag for this architecture
+    pub fn get_default_manylinux_tag(&self) -> Manylinux {
+        match self.arch {
+            Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::S390X => {
+                Manylinux::Manylinux2014
+            }
+            Arch::X86 | Arch::X86_64 => Manylinux::Manylinux2010,
+        }
+    }
+
+    /// Returns whether the platform is 64 bit or 32 bit
+    pub fn pointer_width(&self) -> usize {
+        match self.arch {
+            Arch::Aarch64 => 64,
+            Arch::Armv7L => 32,
+            Arch::Powerpc64 => 64,
+            Arch::Powerpc64Le => 64,
+            Arch::X86 => 32,
+            Arch::X86_64 => 64,
+            Arch::S390X => 64,
+        }
+    }
+
+    /// Returns true if the current platform is not windows
+    pub fn is_unix(&self) -> bool {
+        match self.os {
+            Os::Windows => false,
+            Os::Linux | Os::Macos | Os::FreeBsd => true,
+        }
+    }
+
+    /// Returns target architecture
+    pub fn target_arch(&self) -> Arch {
+        self.arch
+    }
+
+    /// Returns true if the current platform is linux
+    pub fn is_linux(&self) -> bool {
+        self.os == Os::Linux
+    }
+
+    /// Returns true if the current platform is freebsd
+    pub fn is_freebsd(&self) -> bool {
+        self.os == Os::FreeBsd
+    }
+
+    /// Returns true if the current platform is mac os
+    pub fn is_macos(&self) -> bool {
+        self.os == Os::Macos
+    }
+
+    /// Returns true if the current platform is windows
+    pub fn is_windows(&self) -> bool {
+        self.os == Os::Windows
+    }
+
+    /// Returns true if the current platform's target env is Musl
+    pub fn is_musl_target(&self) -> bool {
+        match self.env {
+            Some(Env::Musl) => true,
+            Some(_) => false,
+            None => false,
+        }
+    }
+
+    /// Returns the tags for the WHEEL file for cffi wheels
+    pub fn get_py3_tags(&self, manylinux: &Manylinux, universal2: bool) -> Vec<String> {
+        vec![format!(
+            "py3-none-{}",
+            self.get_platform_tag(&manylinux, universal2)
+        )]
     }
 
     /// Returns the path to the python executable inside a venv

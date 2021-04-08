@@ -303,14 +303,12 @@ fn fun_with_abiflags(
     target: &Target,
     bridge: &BridgeModel,
 ) -> Result<String> {
-    if bridge != &BridgeModel::Cffi {
-        if target.get_python_os() != message.platform {
-            bail!(
-                "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
-                message.platform,
-                target,
-            )
-        }
+    if bridge != &BridgeModel::Cffi && target.get_python_os() != message.platform {
+        bail!(
+            "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
+            message.platform,
+            target,
+        )
     }
 
     if message.major != 3 || message.minor < 5 {

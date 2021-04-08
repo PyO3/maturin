@@ -1,14 +1,16 @@
-use crate::{Manylinux, PythonInterpreter};
-use anyhow::{bail, format_err, Context, Result};
-use platform_info::*;
-use platforms::target::Env;
-use platforms::Platform;
 use std::env;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str;
+
+use anyhow::{bail, format_err, Context, Result};
+use platform_info::*;
+use platforms::target::Env;
+use platforms::Platform;
+
+use crate::{Manylinux, PythonInterpreter};
 
 /// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -133,9 +135,12 @@ impl Target {
         self.arch
     }
 
-    /// Returns true if the current platform is linux or mac os
+    /// Returns true if the current platform is not windows
     pub fn is_unix(&self) -> bool {
-        self.os != Os::Windows
+        match self.os {
+            Os::Windows => false,
+            Os::Linux | Os::Macos | Os::FreeBsd => true,
+        }
     }
 
     /// Returns true if the current platform is linux

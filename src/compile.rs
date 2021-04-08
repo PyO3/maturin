@@ -22,7 +22,7 @@ pub fn compile(
     if context.target.is_macos() && context.universal2 {
         compile_universal2(context, python_interpreter, bindings_crate)
     } else {
-        compile_target(context, python_interpreter, bindings_crate, None)
+        compile_target(context, python_interpreter, bindings_crate)
     }
 }
 
@@ -36,44 +36,46 @@ fn compile_universal2(
         BridgeModel::Bin => "bin",
         _ => "cdylib",
     };
-    let aarch64_artifact = compile_target(
-        context,
-        python_interpreter,
-        bindings_crate,
-        Some("aarch64-apple-darwin"),
-    )
-    .context("Failed to build a aarch64 library through cargo")?
-    .get(build_type)
-    .cloned()
-    .ok_or_else(|| {
-        if build_type == "cdylib" {
-            anyhow!(
-                "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
+    let mut aarch64_context = context.clone();
+    aarch64_context.cargo_extra_args.extend(vec![
+        "--target".to_string(),
+        "aarch64-apple-darwin".to_string(),
+    ]);
+
+    let aarch64_artifact = compile_target(&aarch64_context, python_interpreter, bindings_crate)
+        .context("Failed to build a aarch64 library through cargo")?
+        .get(build_type)
+        .cloned()
+        .ok_or_else(|| {
+            if build_type == "cdylib" {
+                anyhow!(
+                    "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
-            )
-        } else {
-            anyhow!("Cargo didn't build an aarch64 bin.")
-        }
-    })?;
-    let x86_64_artifact = compile_target(
-        context,
-        python_interpreter,
-        bindings_crate,
-        Some("x86_64-apple-darwin"),
-    )
-    .context("Failed to build a x86_64 library through cargo")?
-    .get(build_type)
-    .cloned()
-    .ok_or_else(|| {
-        if build_type == "cdylib" {
-            anyhow!(
-                "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
+                )
+            } else {
+                anyhow!("Cargo didn't build an aarch64 bin.")
+            }
+        })?;
+    let mut x86_64_context = context.clone();
+    x86_64_context.cargo_extra_args.extend(vec![
+        "--target".to_string(),
+        "x86_64-apple-darwin".to_string(),
+    ]);
+
+    let x86_64_artifact = compile_target(&x86_64_context, python_interpreter, bindings_crate)
+        .context("Failed to build a x86_64 library through cargo")?
+        .get(build_type)
+        .cloned()
+        .ok_or_else(|| {
+            if build_type == "cdylib" {
+                anyhow!(
+                    "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
-            )
-        } else {
-            anyhow!("Cargo didn't build a x86_64 bin.")
-        }
-    })?;
+                )
+            } else {
+                anyhow!("Cargo didn't build a x86_64 bin.")
+            }
+        })?;
 
     // Create an universal dylib
     let output_path = aarch64_artifact
@@ -102,7 +104,6 @@ fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
-    target: Option<&str>,
 ) -> Result<HashMap<String, PathBuf>> {
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
@@ -111,11 +112,6 @@ fn compile_target(
     if context.release {
         shared_args.push("--release");
     }
-    if let Some(target) = target {
-        shared_args.push("--target");
-        shared_args.push(target);
-    }
-
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args
         .iter()

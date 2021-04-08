@@ -80,6 +80,7 @@ impl ProjectLayout {
 }
 
 /// Contains all the metadata required to build the crate
+#[derive(Clone)]
 pub struct BuildContext {
     /// The platform, i.e. os and pointer width
     pub target: Target,

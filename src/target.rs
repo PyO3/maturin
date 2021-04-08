@@ -21,6 +21,17 @@ enum Os {
     FreeBsd,
 }
 
+impl fmt::Display for Os {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Os::Linux => write!(f, "Linux"),
+            Os::Windows => write!(f, "Windows"),
+            Os::Macos => write!(f, "MacOS"),
+            Os::FreeBsd => write!(f, "FreeBSD"),
+        }
+    }
+}
+
 /// All supported CPU architectures
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Arch {
@@ -42,6 +53,23 @@ impl fmt::Display for Arch {
             Arch::X86 => write!(f, "i686"),
             Arch::X86_64 => write!(f, "x86_64"),
         }
+    }
+}
+
+// Returns the set of supported architectures for each operating system
+fn get_supported_architectures(os: &Os) -> Vec<Arch> {
+    match os {
+        Os::Linux => vec![
+            Arch::Aarch64,
+            Arch::Armv7L,
+            Arch::Powerpc64,
+            Arch::Powerpc64Le,
+            Arch::X86,
+            Arch::X86_64,
+        ],
+        Os::Windows => vec![Arch::X86, Arch::X86_64],
+        Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
+        Os::FreeBsd => vec![Arch::X86_64],
     }
 }
 
@@ -91,26 +119,13 @@ impl Target {
             {
                 Arch::Powerpc64Le
             }
-            unsupported => bail!("The architecture {:?} is not supported", unsupported),
+            unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
-        // bail on any unsupported targets
-        match (&os, &arch) {
-            (Os::FreeBsd, Arch::Aarch64) => bail!("aarch64 is not supported for FreeBSD"),
-            (Os::FreeBsd, Arch::Armv7L) => bail!("armv7l is not supported for FreeBSD"),
-            (Os::FreeBsd, Arch::X86) => bail!("32-bit wheels are not supported for FreeBSD"),
-            (Os::FreeBsd, Arch::X86_64) => {
-                match PlatformInfo::new() {
-                    Ok(_) => {}
-                    Err(error) => bail!(error),
-                };
-            }
-            (Os::Macos, Arch::Armv7L) => bail!("armv7l is not supported for macOS"),
-            (Os::Macos, Arch::X86) => bail!("32-bit wheels are not supported for macOS"),
-            (Os::Windows, Arch::Aarch64) => bail!("aarch64 is not supported for Windows"),
-            (Os::Windows, Arch::Armv7L) => bail!("armv7l is not supported for Windows"),
-            (_, _) => {}
+        if !get_supported_architectures(&os).contains(&arch) {
+            bail!("{} is not supported on {}", arch, os);
         }
+
         Ok(Target {
             os,
             arch,

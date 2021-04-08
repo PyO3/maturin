@@ -43,6 +43,9 @@ jobs:
       - name: Install x86_64-unknown-linux-musl Rust target
         if: matrix.os == 'ubuntu-latest'
         run: rustup target add x86_64-unknown-linux-musl
+      - name: Install musl tools
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y musl-tools
       #- name: Cache cargo registry
       #  uses: actions/cache@v2
       #  with:
@@ -72,6 +75,12 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+      - name: cargo test with musl
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --target x86_64-unknown-linux-musl
 
   test-auditwheel:
     name: Test Auditwheel

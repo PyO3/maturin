@@ -8,8 +8,12 @@ use structopt::StructOpt;
 /// The bool in the Ok() response says whether the test was actually run
 #[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
-    use anyhow::bail;
+    use anyhow::{bail, format_err};
+    use fs_err::File;
+    use goblin::elf::Elf;
+    use std::fs;
     use std::io::ErrorKind;
+    use std::io::Read;
     use std::process::Command;
 
     let get_target_list = Command::new("rustup")
@@ -41,7 +45,7 @@ pub fn test_musl() -> Result<bool> {
     let options: BuildOptions = BuildOptions::from_iter_safe(&[
         "build",
         "--manifest-path",
-        "test-crates/pyo3-pure/Cargo.toml",
+        "test-crates/hello-world/Cargo.toml",
         "--interpreter",
         "python3",
         "--target",
@@ -51,8 +55,24 @@ pub fn test_musl() -> Result<bool> {
     ])?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let built_lib = build_context
+        .manifest_path
+        .parent()
+        .ok_or(format_err!("Missing parent directory"))?
+        .join("target/x86_64-unknown-linux-musl/debug/hello-world");
+    if built_lib.is_file() {
+        fs::remove_file(&built_lib)?;
+    }
     let wheels = build_context.build_wheels()?;
     assert_eq!(wheels.len(), 1);
+
+    // Ensure that we've actually built for musl
+    assert!(built_lib.is_file());
+    let mut file = File::open(built_lib)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    let elf = Elf::parse(&buffer)?;
+    assert_eq!(elf.libraries, Vec::<&str>::new());
 
     Ok(true)
 }

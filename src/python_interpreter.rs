@@ -13,6 +13,9 @@ use std::str;
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
+const MINIMUM_PYTHON_MINOR: usize = 6;
+/// Be liberal here to include preview versions
+const MAXIMUM_PYTHON_MINOR: usize = 12;
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -27,7 +30,7 @@ fn windows_interpreter_no_build(
     }
 
     // Ignore python 3.0 - 3.5
-    if major == 3 && minor < 6 {
+    if major == 3 && minor < MINIMUM_PYTHON_MINOR {
         return true;
     }
 
@@ -218,18 +221,11 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>> {
 
 /// Since there is no known way to list the installed python versions on unix
 /// (or just generally to list all binaries in $PATH, which could then be
-/// filtered down), this is a workaround (which works until python 4 is
-/// released, which won't be too soon)
+/// filtered down), we use this workaround.
 fn find_all_unix() -> Vec<String> {
-    let interpreter = &[
-        "python3.5",
-        "python3.6",
-        "python3.7",
-        "python3.8",
-        "python3.9",
-    ];
-
-    interpreter.iter().map(ToString::to_string).collect()
+    (MINIMUM_PYTHON_MINOR..MAXIMUM_PYTHON_MINOR)
+        .map(|minor| format!("python3.{}", minor))
+        .collect()
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

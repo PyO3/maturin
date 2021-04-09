@@ -57,6 +57,13 @@ jobs:
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
 
       # Caching
+      # Install gnu-tar because BSD tar is buggy
+      # https://github.com/actions/cache/issues/403
+      - name: Install GNU tar (Macos)
+        if: matrix.build == 'macos'
+        run: |
+          brew install gnu-tar
+          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
       - name: Cache cargo build
         uses: actions/cache@v2
         with:
@@ -64,12 +71,12 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-maturin-${{ hashFiles('Cargo.lock') }}
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-test-crates-${{ hashFiles('test-crates/*/Cargo.lock') }}
 
       - name: cargo test
         uses: actions-rs/cargo@v1

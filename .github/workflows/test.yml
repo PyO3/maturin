@@ -60,7 +60,7 @@ jobs:
       # Install gnu-tar because BSD tar is buggy
       # https://github.com/actions/cache/issues/403
       - name: Install GNU tar (Macos)
-        if: matrix.build == 'macos'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH

@@ -8,6 +8,7 @@ use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand, Node};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -176,9 +177,9 @@ impl BuildOptions {
             // Only build a source distribution
             Some(ref interpreter) if interpreter.is_empty() => vec![],
             // User given list of interpreters
-            Some(interpreter) => find_interpreter(&bridge, &interpreter, &target)?,
+            Some(interpreter) => find_interpreter(&bridge, &interpreter, &target, None)?,
             // Auto-detect interpreters
-            None => find_interpreter(&bridge, &[], &target)?,
+            None => find_interpreter(&bridge, &[], &target, get_min_python_minor(&metadata21))?,
         };
 
         let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
@@ -222,6 +223,29 @@ impl BuildOptions {
             cargo_metadata,
             universal2,
         })
+    }
+}
+
+/// Uses very simple PEP 440 subset parsing to determine the
+/// minimum supported python minor version for interpreter search
+fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
+    if let Some(requires_python) = &metadata21.requires_python {
+        let regex = Regex::new(r#"(?:\^|>=)3\.(\d+)(?:\.\d)?"#).unwrap();
+        if let Some(captures) = regex.captures(&requires_python) {
+            let min_python_minor = captures[1]
+                .parse::<usize>()
+                .expect("Regex must only match usize");
+            Some(min_python_minor)
+        } else {
+            println!(
+                "⚠  Couldn't parse the value of requires-python, \
+                    not taking it into account when searching for python interpreter.\
+                    Note: Only the forms `^3.x` and `>=3.x.y` are currently supported."
+            );
+            None
+        }
+    } else {
+        None
     }
 }
 
@@ -384,6 +408,7 @@ pub fn find_interpreter(
     bridge: &BridgeModel,
     interpreter: &[PathBuf],
     target: &Target,
+    min_python_minor: Option<usize>,
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
         BridgeModel::Bindings(_) => {
@@ -391,7 +416,7 @@ pub fn find_interpreter(
                 PythonInterpreter::check_executables(&interpreter, &target, &bridge)
                     .context("The given list of python interpreters is invalid")?
             } else {
-                PythonInterpreter::find_all(&target, &bridge)
+                PythonInterpreter::find_all(&target, &bridge, min_python_minor)
                     .context("Finding python interpreters failed")?
             };
 
@@ -659,5 +684,19 @@ mod test {
         ];
 
         assert_eq!(extract_cargo_metadata_args(&args).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_get_min_python_minor() {
+        // Nothing specified
+        let cargo_toml = CargoToml::from_path("test-crates/pyo3-pure/Cargo.toml").unwrap();
+        let metadata21 =
+            Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-pure").unwrap();
+        assert_eq!(get_min_python_minor(&metadata21), None);
+        // ^3.7
+        let cargo_toml = CargoToml::from_path("test-crates/pyo3-mixed/Cargo.toml").unwrap();
+        let metadata21 =
+            Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-mixed").unwrap();
+        assert_eq!(get_min_python_minor(&metadata21), Some(7));
     }
 }

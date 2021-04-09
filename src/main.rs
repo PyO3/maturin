@@ -529,7 +529,7 @@ fn run() -> Result<()> {
         Opt::ListPython => {
             let target = Target::from_target_triple(None)?;
             // We don't know the targeted bindings yet, so we use the most lenient
-            let found = PythonInterpreter::find_all(&target, &BridgeModel::Cffi)?;
+            let found = PythonInterpreter::find_all(&target, &BridgeModel::Cffi, None)?;
             println!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
                 println!(" - {}", interpreter);

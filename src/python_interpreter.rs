@@ -408,7 +408,7 @@ impl PythonInterpreter {
             InterpreterKind::CPython => {
                 let platform = self.target.get_shared_platform_tag();
 
-                if self.target.is_freebsd() {
+                if platform.is_empty() {
                     format!(
                         "{base}.cpython-{major}{minor}{abiflags}.so",
                         base = base,

@@ -44,7 +44,7 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
         .to_string();
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
-    for ((filename, supported_version), python_interpreter) in
+    for ((filename, supported_version), ref python_interpreter) in
         wheels.iter().zip(build_context.interpreter)
     {
         let venv_name = if supported_version == "py3" {

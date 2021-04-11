@@ -404,46 +404,14 @@ impl PythonInterpreter {
     ///
     /// For pypy3, we read importlib.machinery.EXTENSION_SUFFIXES[0].
     pub fn get_library_name(&self, base: &str) -> String {
-        match self.interpreter_kind {
-            InterpreterKind::CPython => {
-                let platform = self.target.get_shared_platform_tag();
-
-                if platform.is_empty() {
-                    format!(
-                        "{base}.cpython-{major}{minor}{abiflags}.so",
-                        base = base,
-                        major = self.major,
-                        minor = self.minor,
-                        abiflags = self.abiflags,
-                    )
-                } else if self.target.is_unix() {
-                    format!(
-                        "{base}.cpython-{major}{minor}{abiflags}-{platform}.so",
-                        base = base,
-                        major = self.major,
-                        minor = self.minor,
-                        abiflags = self.abiflags,
-                        platform = platform,
-                    )
-                } else {
-                    format!(
-                        "{base}.cp{major}{minor}-{platform}.pyd",
-                        base = base,
-                        major = self.major,
-                        minor = self.minor,
-                        platform = platform
-                    )
-                }
-            }
-            InterpreterKind::PyPy => format!(
-                "{base}{ext_suffix}",
-                base = base,
-                ext_suffix = self
-                    .ext_suffix
-                    .clone()
-                    .expect("PyPy's syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")
-            ),
-        }
+        format!(
+            "{base}{ext_suffix}",
+            base = base,
+            ext_suffix = self
+                .ext_suffix
+                .clone()
+                .expect("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")
+        )
     }
 
     /// Checks whether the given command is a python interpreter and returns a

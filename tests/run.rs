@@ -79,7 +79,7 @@ fn abi3_without_version() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 fn pyo3_no_extension_module() {
     handle_result(errors::pyo3_no_extension_module())
 }

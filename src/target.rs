@@ -19,6 +19,7 @@ enum Os {
     Windows,
     Macos,
     FreeBsd,
+    OpenBsd,
 }
 
 impl fmt::Display for Os {
@@ -28,6 +29,7 @@ impl fmt::Display for Os {
             Os::Windows => write!(f, "Windows"),
             Os::Macos => write!(f, "MacOS"),
             Os::FreeBsd => write!(f, "FreeBSD"),
+            Os::OpenBsd => write!(f, "OpenBSD"),
         }
     }
 }
@@ -72,6 +74,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Windows => vec![Arch::X86, Arch::X86_64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
         Os::FreeBsd => vec![Arch::X86_64],
+        Os::OpenBsd => vec![Arch::X86_64],
     }
 }
 
@@ -103,6 +106,7 @@ impl Target {
             platforms::target::OS::Windows => Os::Windows,
             platforms::target::OS::MacOS => Os::Macos,
             platforms::target::OS::FreeBSD => Os::FreeBsd,
+            platforms::target::OS::OpenBSD => Os::OpenBsd,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -146,6 +150,14 @@ impl Target {
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!("freebsd_{}_amd64", release)
             }
+            (Os::OpenBsd, Arch::X86_64) => {
+                let info = match PlatformInfo::new() {
+                    Ok(info) => info,
+                    Err(error) => panic!("{}", error),
+                };
+                let release = info.release().replace(".", "_").replace("-", "_");
+                format!("openbsd_{}_amd64", release)
+            }
             (Os::Linux, _) => format!("{}_{}", manylinux, self.arch),
             (Os::Macos, Arch::X86_64) => {
                 if universal2 {
@@ -171,6 +183,7 @@ impl Target {
     pub fn get_shared_platform_tag(&self) -> &'static str {
         match (&self.os, &self.arch) {
             (Os::FreeBsd, _) => "", // according imp.get_suffixes(), there are no such
+            (Os::OpenBsd, _) => "", // according imp.get_suffixes(), there are no such
             (Os::Linux, Arch::Aarch64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
             (Os::Linux, Arch::Armv7L) => "arm-linux-gnueabihf",
             (Os::Linux, Arch::Powerpc64) => "powerpc64-linux-gnu",
@@ -198,6 +211,7 @@ impl Target {
             Os::Linux => "linux",
             Os::Macos => "darwin",
             Os::FreeBsd => "freebsd",
+            Os::OpenBsd => "openbsd",
         }
     }
 
@@ -228,7 +242,7 @@ impl Target {
     pub fn is_unix(&self) -> bool {
         match self.os {
             Os::Windows => false,
-            Os::Linux | Os::Macos | Os::FreeBsd => true,
+            Os::Linux | Os::Macos | Os::FreeBsd | Os::OpenBsd => true,
         }
     }
 

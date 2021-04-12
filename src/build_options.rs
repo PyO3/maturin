@@ -431,7 +431,7 @@ pub fn find_interpreter(
                         abiflags: "".to_string(),
                         target: target.clone(),
                         executable: PathBuf::new(),
-                        ext_suffix: Some(".pyd".to_string()),
+                        ext_suffix: ".pyd".to_string(),
                         interpreter_kind: InterpreterKind::CPython,
                         abi_tag: None,
                         libs_dir: PathBuf::from(manual_base_prefix),

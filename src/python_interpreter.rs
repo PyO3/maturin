@@ -277,7 +277,7 @@ pub struct PythonInterpreter {
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
     pub executable: PathBuf,
     /// Suffix to use for extension modules as given by sysconfig.
-    pub ext_suffix: Option<String>,
+    pub ext_suffix: String,
     /// cpython or pypy
     pub interpreter_kind: InterpreterKind,
     /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
@@ -386,7 +386,7 @@ impl PythonInterpreter {
         }
     }
 
-    /// Generates the correct suffix for shared libraries and adds it to the base name
+    /// Adds the ext_suffix we read from python or know (.pyd/.abi3.so) and adds it to the base name
     ///
     /// For CPython, generate extensions as follows:
     ///
@@ -407,10 +407,7 @@ impl PythonInterpreter {
         format!(
             "{base}{ext_suffix}",
             base = base,
-            ext_suffix = self
-                .ext_suffix
-                .clone()
-                .expect("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")
+            ext_suffix = self.ext_suffix
         )
     }
 
@@ -474,7 +471,9 @@ impl PythonInterpreter {
             abiflags,
             target: target.clone(),
             executable: executable.as_ref().to_path_buf(),
-            ext_suffix: message.ext_suffix,
+            ext_suffix: message
+                .ext_suffix
+                .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
             interpreter_kind: interpreter,
             abi_tag: message.abi_tag,
             libs_dir: PathBuf::from(message.base_prefix).join("libs"),

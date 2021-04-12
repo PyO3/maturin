@@ -179,31 +179,6 @@ impl Target {
         }
     }
 
-    /// Returns the platform for the tag in the shared libraries file name
-    pub fn get_shared_platform_tag(&self) -> &'static str {
-        match (&self.os, &self.arch) {
-            (Os::FreeBsd, _) => "", // according imp.get_suffixes(), there are no such
-            (Os::OpenBsd, _) => "", // according imp.get_suffixes(), there are no such
-            (Os::Linux, Arch::Aarch64) => "aarch64-linux-gnu", // aka armv8-linux-gnueabihf
-            (Os::Linux, Arch::Armv7L) => "arm-linux-gnueabihf",
-            (Os::Linux, Arch::Powerpc64) => "powerpc64-linux-gnu",
-            (Os::Linux, Arch::Powerpc64Le) => "powerpc64le-linux-gnu",
-            (Os::Linux, Arch::X86) => "i386-linux-gnu", // not i686
-            (Os::Linux, Arch::X86_64) => "x86_64-linux-gnu",
-            (Os::Linux, Arch::S390X) => "s390x-linux-gnu",
-            (Os::Macos, Arch::X86_64) => "darwin",
-            (Os::Macos, Arch::Aarch64) => "darwin",
-            (Os::Windows, Arch::X86) => "win32",
-            (Os::Windows, Arch::X86_64) => "win_amd64",
-            (Os::Macos, _) => {
-                panic!("unsupported macOS Arch should not have reached get_shared_platform_tag()")
-            }
-            (Os::Windows, _) => {
-                panic!("unsupported Windows Arch should not have reached get_shared_platform_tag()")
-            }
-        }
-    }
-
     /// Returns the name python uses in `sys.platform` for this os
     pub fn get_python_os(&self) -> &str {
         match self.os {

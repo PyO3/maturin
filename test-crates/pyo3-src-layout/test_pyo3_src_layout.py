@@ -7,5 +7,5 @@ def test_get_42():
     assert pyo3_mixed2.get_42() == 42
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_get_42()

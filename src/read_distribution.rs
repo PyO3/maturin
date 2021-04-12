@@ -125,6 +125,12 @@ fn read_metadata_for_wheel(path: impl AsRef<Path>) -> Result<Vec<(String, String
 /// Only parses the filename since dist-info is not part of source
 /// distributions
 fn read_metadata_for_source_distribution(path: impl AsRef<Path>) -> Result<Vec<(String, String)>> {
+    // "dist/foo_ext-1.0.1.tar.gz" -> "foo_ext-1.0.1/PKG-INFO"
+    let mut pkginfo: PathBuf = path.as_ref().file_name().unwrap().into();
+    pkginfo.set_extension("");
+    pkginfo.set_extension("");
+    pkginfo.push("PKG-INFO");
+
     let mut reader = tar::Archive::new(GzDecoder::new(BufReader::new(File::open(path.as_ref())?)));
     // Unlike for wheels, in source distributions the metadata is stored in a file called PKG-INFO
     // try_find would be ideal here, but it's nightly only
@@ -132,7 +138,7 @@ fn read_metadata_for_source_distribution(path: impl AsRef<Path>) -> Result<Vec<(
         .entries()?
         .map(|entry| -> Result<_> {
             let entry = entry?;
-            if entry.path()? == PathBuf::from("PKG-INFO") {
+            if entry.path()? == pkginfo {
                 Ok(Some(entry))
             } else {
                 Ok(None)

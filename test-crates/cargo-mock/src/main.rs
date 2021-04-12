@@ -11,7 +11,7 @@ use std::env;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::process::Command;
 
@@ -38,10 +38,12 @@ fn run() -> Result<()> {
     let stdout_path = cache_path.join("cargo.stdout");
     let stderr_path = cache_path.join("cargo.stderr");
 
-    if stderr_path.is_file() {
+    let is_cached = stderr_path.is_file();
+    if is_cached {
         let context_message: &'static str = "Failed to read from capture file";
+
         // Write the capture stdout and stderr back out
-        let mut stdout_file = File::open(stdout_path).context(context_message)?;
+        let mut stdout_file = File::open(&stdout_path).context(context_message)?;
         let mut stdout = io::stdout();
         io::copy(&mut stdout_file, &mut stdout).context(context_message)?;
 
@@ -73,40 +75,13 @@ fn run() -> Result<()> {
         }
 
         let mut stdout_writer =
-            BufWriter::new(File::create(stdout_path).context("Failed to create stdout path")?);
+            BufWriter::new(File::create(&stdout_path).context("Failed to create stdout path")?);
 
-        // Copy over the artifacts
-        for message in Message::parse_stream(&*output.stdout) {
-            let patched_message =
-                match message.context("Failed to parse message coming from cargo")? {
-                    cargo_metadata::Message::CompilerArtifact(mut artifact) => {
-                        let crates_types = artifact.target.crate_types.clone();
-                        for (pos, artifact_type) in crates_types.into_iter().enumerate() {
-                            if artifact_type != "lib" {
-                                let original_path = artifact.filenames[pos].clone();
-                                let new_path = cache_path.join(
-                                    original_path
-                                        .file_name()
-                                        .expect("Path from cargo should have a filename"),
-                                );
-                                fs::copy(&original_path, new_path)
-                                    .context("Failed to copy the artifact to the cache")?;
-                                artifact.filenames[pos] = original_path;
-                            }
-                        }
-                        cargo_metadata::Message::CompilerArtifact(artifact)
-                    }
-                    message => message,
-                };
-
-            let patched_line = match patched_message {
-                // FIXME: What's going on here?
-                cargo_metadata::Message::TextLine(text) => text,
-                _ => serde_json::to_string(&patched_message).expect("Failed to re-seralize"),
-            };
-            println!("{}", patched_line);
+        for line in output.stdout.lines() {
+            let line = line.context("Failed to read line from stdout")?;
+            println!("{}", line);
             stdout_writer
-                .write_all(patched_line.as_bytes())
+                .write_all(line.as_bytes())
                 .context("Failed to write to stdout file")?;
             stdout_writer
                 .write_all(b"\n")
@@ -116,6 +91,49 @@ fn run() -> Result<()> {
         File::create(stderr_path)
             .and_then(|mut file| file.write_all(&output.stderr))
             .context("Failed to write to stderr file")?;
+    }
+
+    copy_artifacts(&cache_path, &stdout_path, is_cached).context("Copying the artifacts failed")?;
+
+    Ok(())
+}
+
+/// Copy over the compiler artifacts (binaries and .so)
+/// If this is a new run, copy it to the cache, otherwise copy it back to its original location
+fn copy_artifacts(cache_path: &Path, stdout_path: &Path, is_cached: bool) -> Result<()> {
+    // Re-reading the file makes the code a lot easier
+    let reader = BufReader::new(File::open(&stdout_path).context("Failed to create stdout path")?);
+    for message in Message::parse_stream(reader) {
+        match message.context("Failed to parse message coming from cargo")? {
+            cargo_metadata::Message::CompilerArtifact(artifact) => {
+                let artifacts = artifact
+                    .target
+                    .crate_types
+                    .clone()
+                    .into_iter()
+                    .zip(artifact.filenames.clone());
+                for (artifact_type, original_path) in artifacts {
+                    if artifact_type == "lib" {
+                        continue;
+                    }
+                    let cached_path = cache_path.join(
+                        original_path
+                            .file_name()
+                            .expect("Path from cargo should have a filename"),
+                    );
+                    if is_cached {
+                        if !original_path.is_file() {
+                            fs::copy(cached_path, original_path)
+                                .context("Failed to copy the artifact from the cache")?;
+                        }
+                    } else {
+                        fs::copy(original_path, cached_path)
+                            .context("Failed to copy the artifact to the cache")?;
+                    };
+                }
+            }
+            _ => {}
+        }
     }
     Ok(())
 }

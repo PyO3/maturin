@@ -69,7 +69,7 @@ pub fn maybe_mock_cargo() {
     if mock_cargo_path.join("cargo").is_file() || mock_cargo_path.join("cargo.exe").is_file() {
         let old_path = env::var_os("PATH").expect("PATH must be set");
         let mut path_split: Vec<PathBuf> = env::split_paths(&old_path).collect();
-        // Another thread might have aready modified the path
+        // Another thread might have already modified the path
         if mock_cargo_path != path_split[0] {
             path_split.insert(0, mock_cargo_path);
             let new_path =

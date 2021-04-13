@@ -81,3 +81,7 @@ log = ["pretty_env_logger"]
 rustls = ["reqwest/rustls-tls"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
+
+# Without this, compressing the .gz archive becomes notably slow for debug builds
+[profile.dev.package.miniz_oxide]
+opt-level = 3

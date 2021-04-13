@@ -77,8 +77,11 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
             .source()
             .ok_or_else(|| format_err!("{}", err))?
             .to_string();
-        let error_msg = "`cargo metadata` exited with an error:     Updating crates.io index\nerror: the lock file";
-        if !err_string.starts_with(error_msg) {
+        // Sometimes the first message is "waiting for file lock on package cache",
+        // so we can only check if the lock file is in the message somewhere
+        if !err_string.starts_with("`cargo metadata` exited with an error:")
+            || !err_string.contains("lock file")
+        {
             bail!("{:?}", err_string);
         }
     } else {

@@ -64,7 +64,7 @@ class PostInstallCommand(install):
 
             if platform.machine() in ("ppc64le", "ppc64", "powerpc"):
                 cargo_args.extend(
-                    ["--no-default-features", "--features=auditwheel,log,human-panic"]
+                    ["--no-default-features", "--features=upload,log,human-panic"]
                 )
 
             cargo_args.extend(["--", "-C", "link-arg=-s"])

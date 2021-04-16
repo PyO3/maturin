@@ -27,7 +27,7 @@ pub fn abi3_without_version() -> Result<()> {
 }
 
 /// Check that you get a good error message if you forgot to set the extension-module feature
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 pub fn pyo3_no_extension_module() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![

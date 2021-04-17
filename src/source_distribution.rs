@@ -1,10 +1,9 @@
 use crate::module_writer::ModuleWriter;
 use crate::{Metadata21, SDistWriter};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -245,55 +244,4 @@ pub fn source_distribution(
     );
 
     Ok(source_distribution_path)
-}
-
-/// The `[build-system]` section of a pyproject.toml as specified in PEP 517
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct BuildSystem {
-    requires: Vec<String>,
-    build_backend: String,
-}
-
-/// The `[tool]` section of a pyproject.toml
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct Tool {
-    maturin: Option<ToolMaturin>,
-}
-
-/// The `[tool.maturin]` section of a pyproject.toml
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct ToolMaturin {
-    sdist_include: Option<Vec<String>>,
-}
-
-/// A pyproject.toml as specified in PEP 517
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct PyProjectToml {
-    build_system: BuildSystem,
-    tool: Option<Tool>,
-}
-
-impl PyProjectToml {
-    pub fn sdist_include(&self) -> Option<&Vec<String>> {
-        self.tool.as_ref()?.maturin.as_ref()?.sdist_include.as_ref()
-    }
-}
-
-/// Returns the contents of a pyproject.toml with a `[build-system]` entry or an error
-///
-/// Does no specific error handling because it's only used to check whether or not to build
-/// source distributions
-pub fn get_pyproject_toml(project_root: impl AsRef<Path>) -> Result<PyProjectToml> {
-    let path = project_root.as_ref().join("pyproject.toml");
-    let contents = fs::read_to_string(&path).context(format!(
-        "Couldn't find pyproject.toml at {}",
-        path.display()
-    ))?;
-    let cargo_toml = toml::from_str(&contents)
-        .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
-    Ok(cargo_toml)
 }

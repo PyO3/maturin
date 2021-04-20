@@ -6,8 +6,9 @@ use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
-use crate::source_distribution::{get_pyproject_toml, source_distribution};
+use crate::source_distribution::source_distribution;
 use crate::Metadata21;
+use crate::PyProjectToml;
 use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
@@ -153,7 +154,7 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the source distribution")?;
 
-        match get_pyproject_toml(self.manifest_path.parent().unwrap()) {
+        match PyProjectToml::new(self.manifest_path.parent().unwrap()) {
             Ok(pyproject) => {
                 let sdist_path = source_distribution(
                     &self.out,

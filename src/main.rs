@@ -15,10 +15,9 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, get_metadata_for_distribution, get_pyproject_toml,
-    get_supported_version_for_distribution, source_distribution, write_dist_info, BridgeModel,
-    BuildOptions, BuiltWheelMetadata, CargoToml, Manylinux, Metadata21, PathWriter,
-    PythonInterpreter, Target,
+    develop, get_metadata_for_distribution, get_supported_version_for_distribution,
+    source_distribution, write_dist_info, BridgeModel, BuildOptions, BuiltWheelMetadata, CargoToml,
+    Manylinux, Metadata21, PathWriter, PyProjectToml, PythonInterpreter, Target,
 };
 use std::env;
 use std::path::PathBuf;
@@ -574,7 +573,7 @@ fn run() -> Result<()> {
             let manifest_dir = manifest_path.parent().unwrap();
 
             // Ensure the project has a compliant pyproject.toml
-            let pyproject = get_pyproject_toml(&manifest_dir)
+            let pyproject = PyProjectToml::new(&manifest_dir)
                 .context("A pyproject.toml with a PEP 517 compliant `[build-system]` table is required to build a source distribution")?;
 
             let cargo_toml = CargoToml::from_path(&manifest_path)?;

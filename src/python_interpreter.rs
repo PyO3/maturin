@@ -23,6 +23,7 @@ fn windows_interpreter_no_build(
     minor: usize,
     target_width: usize,
     pointer_width: usize,
+    min_python_minor: usize,
 ) -> bool {
     // Python 2 support has been dropped
     if major == 2 {
@@ -30,7 +31,7 @@ fn windows_interpreter_no_build(
     }
 
     // Ignore python 3.0 - 3.5
-    if major == 3 && minor < MINIMUM_PYTHON_MINOR {
+    if major == 3 && minor < min_python_minor {
         return true;
     }
 
@@ -83,7 +84,7 @@ fn windows_interpreter_no_build(
 /// As well as the version numbers, etc. of the interpreters we also have to find the
 /// pointer width to make sure that the pointer width (32-bit or 64-bit) matches across
 /// platforms.
-fn find_all_windows(target: &Target) -> Result<Vec<String>> {
+fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<String>> {
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
@@ -123,6 +124,7 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>> {
                         minor,
                         target.pointer_width(),
                         pointer_width,
+                        min_python_minor,
                     ) {
                         continue;
                     }
@@ -201,6 +203,7 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>> {
                         minor,
                         target.pointer_width(),
                         pointer_width,
+                        min_python_minor,
                     ) {
                         continue;
                     }
@@ -217,15 +220,6 @@ fn find_all_windows(target: &Target) -> Result<Vec<String>> {
         );
     };
     Ok(interpreter)
-}
-
-/// Since there is no known way to list the installed python versions on unix
-/// (or just generally to list all binaries in $PATH, which could then be
-/// filtered down), we use this workaround.
-fn find_all_unix() -> Vec<String> {
-    (MINIMUM_PYTHON_MINOR..MAXIMUM_PYTHON_MINOR)
-        .map(|minor| format!("python3.{}", minor))
-        .collect()
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -482,11 +476,18 @@ impl PythonInterpreter {
 
     /// Tries to find all installed python versions using the heuristic for the
     /// given platform
-    pub fn find_all(target: &Target, bridge: &BridgeModel) -> Result<Vec<PythonInterpreter>> {
+    pub fn find_all(
+        target: &Target,
+        bridge: &BridgeModel,
+        min_python_minor: Option<usize>,
+    ) -> Result<Vec<PythonInterpreter>> {
+        let min_python_minor = min_python_minor.unwrap_or(MINIMUM_PYTHON_MINOR);
         let executables = if target.is_windows() {
-            find_all_windows(&target)?
+            find_all_windows(&target, min_python_minor)?
         } else {
-            find_all_unix()
+            (min_python_minor..MAXIMUM_PYTHON_MINOR)
+                .map(|minor| format!("python3.{}", minor))
+                .collect()
         };
         let mut available_versions = Vec::new();
         for executable in executables {

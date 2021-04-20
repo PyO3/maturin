@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+ * Interpreter search now uses python 3.6 to 3.12
+ * Consider requires-python when searching for interpreters
+
 ## 0.10.3 - 2021-04-13
 
  * The `upload` command is now implemented, it is mostly similar to `twine upload`. [#484](https://github.com/PyO3/maturin/pull/484)

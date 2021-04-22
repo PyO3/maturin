@@ -20,6 +20,9 @@ RUN mkdir /maturin/src && \
 
 ADD . /maturin/
 
+# Add keeps the local timestamp, so cargo otherwise believes the cache is fresh
+RUN touch /maturin/src/lib.rs /maturin/src/main.rs
+
 RUN cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release -- -C link-arg=-s \
     && mv /maturin/target/release/maturin /usr/bin/maturin \
     && rm -rf /maturin

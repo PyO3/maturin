@@ -13,7 +13,7 @@ source venv-docker/bin/activate
 
 venv-docker/bin/pip install -U pip cffi
 
-docker run -e RUST_BACKTRACE=1 --rm -v $(pwd)/test-crates/hello-world:/io maturin build --no-sdist -b bin
+docker run -e RUST_BACKTRACE=1 --rm -v $(pwd):/io -w /io/test-crates/hello-world maturin build --no-sdist -b bin
 
 venv-docker/bin/pip install hello-world --no-index --find-links test-crates/hello-world/target/wheels/
 

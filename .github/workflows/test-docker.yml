@@ -17,7 +17,7 @@ jobs:
           python-version: 3.8
       - name: Build Docker container
         run: |
-          docker pull konstin2/maturin
-          docker build --cache-from konstin2/maturin -t maturin .
+          docker pull konstin2/maturin:main
+          docker build --cache-from konstin2/maturin:main -t maturin .
       - name: Test the Docker container
         run: ./test-dockerfile.sh

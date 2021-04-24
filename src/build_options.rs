@@ -100,10 +100,10 @@ impl Default for BuildOptions {
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
-        let manifest_file = self
-            .manifest_path
-            .canonicalize()
-            .context(format_err!("Can't find {}", self.manifest_path.display()))?;
+        let manifest_file = &self.manifest_path;
+        if !manifest_file.exists() {
+            bail!("Can't find {}", self.manifest_path.display(),);
+        }
 
         if !manifest_file.is_file() {
             bail!(
@@ -111,7 +111,7 @@ impl BuildOptions {
                 self.manifest_path.display(),
                 manifest_file.display()
             );
-        };
+        }
 
         let cargo_toml = CargoToml::from_path(&manifest_file)?;
         let manifest_dir = manifest_file.parent().unwrap();

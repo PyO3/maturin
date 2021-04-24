@@ -2,7 +2,7 @@ use crate::common::{adjust_canonicalization, check_installed, maybe_mock_cargo};
 use anyhow::{bail, Context, Result};
 use maturin::{BuildOptions, Target};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::str;
 use structopt::StructOpt;
 
@@ -85,22 +85,31 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
         let command = [
             "-m",
             "pip",
+            "--disable-pip-version-check",
             "install",
             "--force-reinstall",
             &adjust_canonicalization(filename),
         ];
         let output = Command::new(&python)
             .args(&command)
-            .stderr(Stdio::inherit())
             .output()
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
             bail!(
-                "pip install failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                "pip install failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
                 &command,
                 output.status,
-                str::from_utf8(&output.stdout)?,
-                str::from_utf8(&output.stderr)?,
+                str::from_utf8(&output.stdout)?.trim(),
+                str::from_utf8(&output.stderr)?.trim(),
+            );
+        }
+        if !output.stderr.is_empty() {
+            bail!(
+                "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+                &command,
+                output.status,
+                str::from_utf8(&output.stdout)?.trim(),
+                str::from_utf8(&output.stderr)?.trim(),
             );
         }
 
@@ -184,6 +193,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
             .args(&[
                 "-m",
                 "pip",
+                "--disable-pip-version-check",
                 "install",
                 "--force-reinstall",
                 &adjust_canonicalization(wheel_file),

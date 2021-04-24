@@ -230,7 +230,7 @@ impl BuildOptions {
 /// minimum supported python minor version for interpreter search
 fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
     if let Some(requires_python) = &metadata21.requires_python {
-        let regex = Regex::new(r#"(?:\^|>=)3\.(\d+)(?:\.\d)?"#).unwrap();
+        let regex = Regex::new(r#">=3\.(\d+)(?:\.\d)?"#).unwrap();
         if let Some(captures) = regex.captures(&requires_python) {
             let min_python_minor = captures[1]
                 .parse::<usize>()
@@ -239,8 +239,8 @@ fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
         } else {
             println!(
                 "⚠  Couldn't parse the value of requires-python, \
-                    not taking it into account when searching for python interpreter.\
-                    Note: Only the forms `^3.x` and `>=3.x.y` are currently supported."
+                    not taking it into account when searching for python interpreter. \
+                    Note: Only `>=3.x.y` is currently supported."
             );
             None
         }
@@ -693,10 +693,5 @@ mod test {
         let metadata21 =
             Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-pure").unwrap();
         assert_eq!(get_min_python_minor(&metadata21), None);
-        // ^3.7
-        let cargo_toml = CargoToml::from_path("test-crates/pyo3-mixed/Cargo.toml").unwrap();
-        let metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-mixed").unwrap();
-        assert_eq!(get_min_python_minor(&metadata21), Some(7));
     }
 }

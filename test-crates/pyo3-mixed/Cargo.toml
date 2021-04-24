@@ -15,7 +15,7 @@ classifier = [
     "Programming Language :: Rust"
 ]
 requires-dist = ["boltons"]
-requires-python = "^3.7"
+requires-python = ">=3.7"
 
 [dependencies]
 pyo3 = { version = "0.13.2", features = ["extension-module"] }

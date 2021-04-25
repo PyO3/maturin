@@ -69,7 +69,12 @@ class PostInstallCommand(install):
 
             cargo_args.extend(["--", "-C", "link-arg=-s"])
 
-            metadata = json.loads(subprocess.check_output(cargo_args).splitlines()[-2])
+            try:
+                metadata = json.loads(
+                    subprocess.check_output(cargo_args).splitlines()[-2]
+                )
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError("build maturin failed:\n" + exc.output.decode())
             print(metadata)
             assert metadata["target"]["name"] == "maturin"
             source = metadata["filenames"][0]

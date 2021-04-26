@@ -10,7 +10,7 @@ class Line:
         self.end = ffi.new("Point *", (x2, y2))
 
     def length(self) -> float:
-        """ Returns the length of the line. """
+        """Returns the length of the line."""
         return math.sqrt(
             (self.end.x - self.start.x) ** 2 + (self.end.y - self.start.y) ** 2
         )

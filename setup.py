@@ -74,8 +74,6 @@ class PostInstallCommand(install):
                     ["--no-default-features", "--features=upload,log,human-panic"]
                 )
 
-            cargo_args.extend(["--", "-C", "link-arg=-s"])
-
             try:
                 metadata = json.loads(
                     subprocess.check_output(cargo_args).splitlines()[-2]

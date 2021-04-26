@@ -60,7 +60,14 @@ class PostInstallCommand(install):
                     "(https://www.rust-lang.org/tools/install) and try again"
                 )
 
-            cargo_args = [cargo, "rustc", "--bin", "maturin", "--message-format=json"]
+            cargo_args = [
+                cargo,
+                "rustc",
+                "--release",
+                "--bin",
+                "maturin",
+                "--message-format=json",
+            ]
 
             if platform.machine() in ("ppc64le", "ppc64", "powerpc"):
                 cargo_args.extend(

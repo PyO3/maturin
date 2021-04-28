@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
- * Interpreter search now uses python 3.6 to 3.12
- * Consider requires-python when searching for interpreters
+ * Interpreter search now uses python 3.6 to 3.12 in [#495](https://github.com/PyO3/maturin/pull/495)
+ * Consider requires-python when searching for interpreters in [#495](https://github.com/PyO3/maturin/pull/495)
+ * Support Rust extension as a submodule in mixed Python/Rust projects in [#489](https://github.com/PyO3/maturin/pull/489)
 
 ## 0.10.3 - 2021-04-13
 

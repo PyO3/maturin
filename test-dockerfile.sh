@@ -53,4 +53,12 @@ if [[ $(venv-docker/bin/python test-crates/pyo3-mixed/check_installed/check_inst
   exit 1
 fi
 
+docker run -e RUST_BACKTRACE=1 --rm -v $(pwd)/test-crates/pyo3-mixed-submodule:/io maturin build --no-sdist -i python3.8
+
+venv-docker/bin/pip install pyo3-mixed-submodule --find-links test-crates/pyo3-mixed-submodule/target/wheels/
+
+if [[ $(venv-docker/bin/python test-crates/pyo3-mixed-submodule/check_installed/check_installed.py) != 'SUCCESS' ]]; then
+  exit 1
+fi
+
 deactivate

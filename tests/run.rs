@@ -15,6 +15,14 @@ fn develop_pyo3_mixed() {
 }
 
 #[test]
+fn develop_pyo3_mixed_submodule() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-mixed-submodule",
+        None,
+    ));
+}
+
+#[test]
 fn develop_cffi_pure() {
     handle_result(develop::test_develop("test-crates/cffi-pure", None));
 }
@@ -38,6 +46,14 @@ fn integration_pyo3_pure() {
 fn integration_pyo3_mixed() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed",
+        None,
+    ));
+}
+
+#[test]
+fn integration_pyo3_mixed_submodule() {
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-mixed-submodule",
         None,
     ));
 }

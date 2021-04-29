@@ -298,7 +298,7 @@ pub fn auditwheel_rs(
                 println!(
                     "📦 Wheel is eligible for a higher priority tag. \
                     You requested {} but this wheel is eligible for {}",
-                    policy.name, highest_policy.name,
+                    policy, highest_policy,
                 );
             }
         }

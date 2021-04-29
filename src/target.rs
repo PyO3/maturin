@@ -194,9 +194,9 @@ impl Target {
     pub fn get_default_manylinux_tag(&self) -> Manylinux {
         match self.arch {
             Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::S390X => {
-                Manylinux::Manylinux2014
+                Manylinux::manylinux2014()
             }
-            Arch::X86 | Arch::X86_64 => Manylinux::Manylinux2010,
+            Arch::X86 | Arch::X86_64 => Manylinux::manylinux2010(),
         }
     }
 

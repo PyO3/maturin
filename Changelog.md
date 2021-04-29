@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
+## Unreleased
+
+* Add `manylinux_2_27` support in [#521](https://github.com/PyO3/maturin/pull/521)
+
 ## 0.10.4 - 2021-04-28
 
  * Interpreter search now uses python 3.6 to 3.12 in [#495](https://github.com/PyO3/maturin/pull/495)

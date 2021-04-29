@@ -178,10 +178,10 @@ For portability reasons, native python modules on linux must only dynamically li
 
 maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper. If your system's glibc is too new or you link other shared libraries, it will assign the `linux` tag. You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 
-For full manylinux compliance you need to compile in a CentOS 6 docker container. The [konstin2/maturin](https://hub.docker.com/r/konstin2/maturin) image is based on the official manylinux image. You can use it like this:
+For full manylinux compliance you need to compile in a CentOS 6 docker container. The [konstin2/maturin](https://hub.docker.com/r/konstin2/maturin) image is based on the official manylinux image, and passes arguments to the `maturin` binary. You can use it like this:
 
 ```
-docker run --rm -v $(pwd):/io konstin2/maturin build
+docker run --rm -v $(pwd):/io konstin2/maturin build --release  # or other maturin arguments
 ```
 
 Note that this image is very basic and only contains python, maturin and stable rust. If you need additional tools, you can run commands inside the manylinux container. See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode/blob/b226ea0f2b2f4f474eff47349703d57d2ea4801b/.github/workflows/publish.yml) for a real world setup.

@@ -616,7 +616,14 @@ fn run() -> Result<()> {
 
             // All uploaded files are expected to share the build context
             // and to have identical package metadata as a result.
-            if !metadata.iter().all(|x| *x == metadata[0]) {
+            let first_metadata = &metadata[0];
+            let is_same_package = metadata.iter().all(|x| {
+                x.iter().zip(first_metadata).all(|(next, first)| {
+                    // Ignore Description field difference
+                    next == first || (next.0 == first.0 && next.0 == "Description")
+                })
+            });
+            if !is_same_package {
                 bail!(
                     "Attempting to upload wheel and/or source distribution files \
                      that belong to different python packages."

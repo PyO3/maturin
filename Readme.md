@@ -242,14 +242,14 @@ OPTIONS:
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set
         --manylinux <manylinux>
-            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014),
-            `2_24` (for manylinux_2_24) and `off` (for the native linux tag). Note that manylinux1 is unsupported by the
-            rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately
-            validated by `auditwheel`.
+            Control the platform tag on linux. Options are `2010`/`2_12` (for manylinux2010), `2014`/`2_17` (for
+            manylinux2014), `2_24` (for manylinux_2_24), `2_27` (for manylinux_2_27) and `off` (for the native linux
+            tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the native `linux` tag will be
+            rejected by pypi, unless they are separately validated by `auditwheel`.
 
             The default is the lowest compatible, of plain `linux` if nothing matched
 
-            This option is ignored on all non-linux platforms [possible values: 2010, 2014, 2_24, off]
+            This option is ignored on all non-linux platforms [possible values: 2010, 2014, 2_12, 2_17, 2_24, 2_27, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory
@@ -311,14 +311,14 @@ OPTIONS:
             The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
             explicitly set
         --manylinux <manylinux>
-            Control the platform tag on linux. Options are `2010` (for manylinux2010), `2014` (for manylinux2014),
-            `2_24` (for manylinux_2_24) and `off` (for the native linux tag). Note that manylinux1 is unsupported by the
-            rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately
-            validated by `auditwheel`.
+            Control the platform tag on linux. Options are `2010`/`2_12` (for manylinux2010), `2014`/`2_17` (for
+            manylinux2014), `2_24` (for manylinux_2_24), `2_27` (for manylinux_2_27) and `off` (for the native linux
+            tag). Note that manylinux1 is unsupported by the rust compiler. Wheels with the native `linux` tag will be
+            rejected by pypi, unless they are separately validated by `auditwheel`.
 
             The default is the lowest compatible, of plain `linux` if nothing matched
 
-            This option is ignored on all non-linux platforms [possible values: 2010, 2014, 2_24, off]
+            This option is ignored on all non-linux platforms [possible values: 2010, 2014, 2_12, 2_17, 2_24, 2_27, off]
     -o, --out <out>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
             directory

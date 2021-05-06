@@ -5,26 +5,42 @@ use std::str::FromStr;
 /// Decides how to handle manylinux compliance
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Copy)]
 pub enum Manylinux {
-    /// Use the manylinux1 tag
-    Manylinux1,
-    /// Use the manylinux2010 tag
-    Manylinux2010,
-    /// Use the manylinux2014 tag
-    Manylinux2014,
-    /// Use the manylinux_2_24 tag
-    #[allow(non_camel_case_types)]
-    Manylinux_2_24,
+    /// Use the manylinux_x_y tag
+    Manylinux {
+        /// GLIBC version major
+        x: u16,
+        /// GLIBC version minor
+        y: u16,
+    },
     /// Use the native linux tag
     Off,
+}
+
+impl Manylinux {
+    fn new(x: u16, y: u16) -> Self {
+        Self::Manylinux { x, y }
+    }
+
+    /// `manylinux1` aka `manylinux_2_5`
+    pub fn manylinux1() -> Self {
+        Self::Manylinux { x: 2, y: 5 }
+    }
+
+    /// `manylinux2010` aka `manylinux_2_12`
+    pub fn manylinux2010() -> Self {
+        Self::Manylinux { x: 2, y: 12 }
+    }
+
+    /// `manylinux2014` aka `manylinux_2_17`
+    pub fn manylinux2014() -> Self {
+        Self::Manylinux { x: 2, y: 17 }
+    }
 }
 
 impl fmt::Display for Manylinux {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Manylinux::Manylinux1 => write!(f, "manylinux1"),
-            Manylinux::Manylinux2010 => write!(f, "manylinux2010"),
-            Manylinux::Manylinux2014 => write!(f, "manylinux2014"),
-            Manylinux::Manylinux_2_24 => write!(f, "manylinux_2_24"),
+            Manylinux::Manylinux { x, y } => write!(f, "manylinux_{}_{}", x, y),
             Manylinux::Off => write!(f, "linux"),
         }
     }
@@ -35,13 +51,23 @@ impl FromStr for Manylinux {
 
     fn from_str(value: &str) -> anyhow::Result<Self, Self::Err> {
         match value {
-            "auto" => Ok(Manylinux::Manylinux1),
-            "1" | "manylinux1" => Ok(Manylinux::Manylinux1),
-            "2010" | "manylinux2010" => Ok(Manylinux::Manylinux2010),
-            "2014" | "manylinux2014" => Ok(Manylinux::Manylinux2014),
-            "2_24" | "manylinux_2_24" => Ok(Manylinux::Manylinux_2_24),
             "off" | "linux" => Ok(Manylinux::Off),
-            _ => Err("Invalid value for the manylinux option"),
+            "auto" | "1" | "manylinux1" => Ok(Manylinux::manylinux1()),
+            "2010" | "manylinux2010" => Ok(Manylinux::manylinux2010()),
+            "2014" | "manylinux2014" => Ok(Manylinux::manylinux2014()),
+            _ => {
+                let value = value.strip_prefix("manylinux_").unwrap_or(value);
+                let mut parts = value.split('_');
+                let x = parts
+                    .next()
+                    .and_then(|x| x.parse::<u16>().ok())
+                    .ok_or("invalid manylinux option")?;
+                let y = parts
+                    .next()
+                    .and_then(|y| y.parse::<u16>().ok())
+                    .ok_or("invalid manylinux option")?;
+                Ok(Manylinux::new(x, y))
+            }
         }
     }
 }

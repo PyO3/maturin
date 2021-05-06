@@ -274,7 +274,10 @@ impl BuildContext {
         // On windows, we have picked an interpreter to set the location of python.lib,
         // otherwise it's none
         let python_interpreter = self.interpreter.get(0);
-        let artifact = self.compile_cdylib(python_interpreter, Some(&self.module_name))?;
+        let artifact = self.compile_cdylib(
+            python_interpreter,
+            Some(self.project_layout.extension_name()),
+        )?;
         let policy = self.auditwheel(python_interpreter, &artifact, self.manylinux)?;
         let (wheel_path, tag) =
             self.write_binding_wheel_abi3(&artifact, policy.manylinux_tag(), major, min_minor)?;
@@ -334,8 +337,10 @@ impl BuildContext {
     pub fn build_binding_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         for python_interpreter in &self.interpreter {
-            let artifact =
-                self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
+            let artifact = self.compile_cdylib(
+                Some(&python_interpreter),
+                Some(self.project_layout.extension_name()),
+            )?;
             let policy = self.auditwheel(Some(&python_interpreter), &artifact, self.manylinux)?;
             let (wheel_path, tag) =
                 self.write_binding_wheel(python_interpreter, &artifact, policy.manylinux_tag())?;
@@ -362,7 +367,7 @@ impl BuildContext {
     pub fn compile_cdylib(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
-        module_name: Option<&str>,
+        extension_name: Option<&str>,
     ) -> Result<PathBuf> {
         let artifacts = compile(&self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
@@ -374,8 +379,8 @@ impl BuildContext {
             )
         })?;
 
-        if let Some(module_name) = module_name {
-            warn_missing_py_init(&artifact, module_name)
+        if let Some(extension_name) = extension_name {
+            warn_missing_py_init(&artifact, extension_name)
                 .context("Failed to parse the native library")?;
         }
 

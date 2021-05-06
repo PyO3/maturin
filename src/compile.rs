@@ -289,7 +289,7 @@ fn compile_target(
 /// That function is the python's entrypoint for loading native extensions, i.e. python will fail
 /// to import the module with error if it's missing or named incorrectly
 ///
-/// Currently the check is only run on linux
+/// Currently the check is only run on linux and macOS
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{}", module_name);
     let mut fd = File::open(&artifact)?;
@@ -305,8 +305,26 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
                 }
             }
         }
+        goblin::Object::Mach(mach) => {
+            match mach {
+                goblin::mach::Mach::Binary(macho) => {
+                    for sym in macho.exports()? {
+                        let sym_name = sym.name;
+                        if py_init == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                goblin::mach::Mach::Fat(_) => {
+                    // Ignore fat macho,
+                    // we only generate them by combining thin binaries which is handled above
+                    found = true
+                }
+            }
+        }
         _ => {
-            // Currently, only linux is implemented
+            // Currently, only linux and macOS are implemented
             found = true
         }
     }

@@ -139,8 +139,8 @@ impl Target {
         })
     }
 
-    /// Returns the platform part of the tag for the wheel name for cffi wheels
-    pub fn get_platform_tag(&self, manylinux: &Manylinux, universal2: bool) -> String {
+    /// Returns the platform part of the tag for the wheel name
+    pub fn get_platform_tag(&self, manylinux: Manylinux, universal2: bool) -> String {
         match (&self.os, &self.arch) {
             (Os::FreeBsd, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
@@ -256,10 +256,10 @@ impl Target {
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(&self, manylinux: &Manylinux, universal2: bool) -> Vec<String> {
+    pub fn get_py3_tags(&self, manylinux: Manylinux, universal2: bool) -> Vec<String> {
         vec![format!(
             "py3-none-{}",
-            self.get_platform_tag(&manylinux, universal2)
+            self.get_platform_tag(manylinux, universal2)
         )]
     }
 
@@ -324,14 +324,14 @@ impl Target {
     /// Returns the tags for the platform without python version
     pub fn get_universal_tags(
         &self,
-        manylinux: &Manylinux,
+        manylinux: Manylinux,
         universal2: bool,
     ) -> (String, Vec<String>) {
         let tag = format!(
             "py3-none-{platform}",
-            platform = self.get_platform_tag(&manylinux, universal2)
+            platform = self.get_platform_tag(manylinux, universal2)
         );
-        let tags = self.get_py3_tags(&manylinux, universal2);
+        let tags = self.get_py3_tags(manylinux, universal2);
         (tag, tags)
     }
 }

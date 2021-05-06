@@ -158,17 +158,23 @@ impl Target {
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!("openbsd_{}_amd64", release)
             }
-            (Os::Linux, _) => format!("{}_{}", manylinux, self.arch),
+            (Os::Linux, _) => {
+                let mut tags = vec![format!("{}_{}", manylinux, self.arch)];
+                for alias in manylinux.aliases() {
+                    tags.push(format!("{}_{}", alias, self.arch));
+                }
+                tags.join(".")
+            }
             (Os::Macos, Arch::X86_64) => {
                 if universal2 {
-                    "macosx_10_9_universal2".to_string()
+                    "macosx_10_9_x86_64.macosx_11_0_arm64.macosx_10_9_universal2".to_string()
                 } else {
                     "macosx_10_7_x86_64".to_string()
                 }
             }
             (Os::Macos, Arch::Aarch64) => {
                 if universal2 {
-                    "macosx_10_9_universal2".to_string()
+                    "macosx_10_9_x86_64.macosx_11_0_arm64.macosx_10_9_universal2".to_string()
                 } else {
                     "macosx_11_0_arm64".to_string()
                 }

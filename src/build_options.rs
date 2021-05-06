@@ -1,5 +1,6 @@
 use crate::auditwheel::Manylinux;
 use crate::build_context::{BridgeModel, ProjectLayout};
+use crate::cross_compile::{find_sysconfigdata, is_cross_compiling, parse_sysconfigdata};
 use crate::python_interpreter::InterpreterKind;
 use crate::BuildContext;
 use crate::CargoToml;
@@ -420,8 +421,8 @@ pub fn find_interpreter(
     min_python_minor: Option<usize>,
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
-        BridgeModel::Bindings(_) => {
-            let interpreter = if !interpreter.is_empty() {
+        BridgeModel::Bindings(binding_name) => {
+            let mut interpreter = if !interpreter.is_empty() {
                 PythonInterpreter::check_executables(&interpreter, &target, &bridge)
                     .context("The given list of python interpreters is invalid")?
             } else {
@@ -431,6 +432,56 @@ pub fn find_interpreter(
 
             if interpreter.is_empty() {
                 bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+            }
+
+            if binding_name == "pyo3" && target.is_unix() && is_cross_compiling(target)? {
+                if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
+                    println!("⚠ Cross-compiling is poorly supported");
+                    let host_python = &interpreter[0];
+                    println!(
+                        "🐍 Using host {} for cross-compiling preparation",
+                        host_python
+                    );
+                    // pyo3
+                    env::set_var("PYO3_PYTHON", &host_python.executable);
+                    // rust-cpython, and legacy pyo3 versions
+                    env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
+
+                    let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref())?;
+                    let sysconfig_data =
+                        parse_sysconfigdata(&host_python.executable, sysconfig_path)?;
+                    let major = sysconfig_data
+                        .get("version_major")
+                        .context("version_major is not defined")?
+                        .parse::<usize>()
+                        .context("Could not parse value of version_major")?;
+                    let minor = sysconfig_data
+                        .get("version_minor")
+                        .context("version_minor is not defined")?
+                        .parse::<usize>()
+                        .context("Could not parse value of version_minor")?;
+                    let abiflags = sysconfig_data
+                        .get("ABIFLAGS")
+                        .map(ToString::to_string)
+                        .unwrap_or_default();
+                    let ext_suffix = sysconfig_data
+                        .get("EXT_SUFFIX")
+                        .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
+                    let abi_tag = sysconfig_data
+                        .get("SOABI")
+                        .and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
+                    interpreter = vec![PythonInterpreter {
+                        major,
+                        minor,
+                        abiflags,
+                        target: target.clone(),
+                        executable: PathBuf::new(),
+                        ext_suffix: ext_suffix.to_string(),
+                        interpreter_kind: InterpreterKind::CPython,
+                        abi_tag,
+                        libs_dir: PathBuf::from(cross_lib_dir),
+                    }];
+                }
             }
 
             println!(
@@ -525,7 +576,6 @@ fn extract_cargo_metadata_args(cargo_extra_args: &[String]) -> Result<Vec<String
         ("--all-features", false),
         ("--no-default-features", false),
     ];
-
     let mut cargo_metadata_extra_args = vec![];
     let mut args_iter = cargo_extra_args.iter();
     // We do manual iteration so we can take and skip the value of an option that is in the next

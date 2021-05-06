@@ -71,7 +71,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86,
             Arch::X86_64,
         ],
-        Os::Windows => vec![Arch::X86, Arch::X86_64],
+        Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
         Os::FreeBsd => vec![Arch::X86_64],
         Os::OpenBsd => vec![Arch::X86_64],
@@ -181,6 +181,7 @@ impl Target {
             }
             (Os::Windows, Arch::X86) => "win32".to_string(),
             (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
+            (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         }
     }

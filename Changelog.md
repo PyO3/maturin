@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add `manylinux_2_27` support in [#521](https://github.com/PyO3/maturin/pull/521)
 * Always output PEP 600 platform tags in [#525](https://github.com/PyO3/maturin/pull/525)
+* Generate single wheel for multiple eligible manylinux tags in [#526](https://github.com/PyO3/maturin/pull/526)
 
 ## 0.10.4 - 2021-04-28
 

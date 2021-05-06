@@ -17,7 +17,7 @@ use keyring::{Keyring, KeyringError};
 use maturin::{
     develop, get_metadata_for_distribution, get_supported_version_for_distribution,
     source_distribution, write_dist_info, BridgeModel, BuildOptions, BuiltWheelMetadata, CargoToml,
-    Manylinux, Metadata21, PathWriter, PyProjectToml, PythonInterpreter, Target,
+    ManylinuxPolicy, Metadata21, PathWriter, PyProjectToml, PythonInterpreter, Target,
 };
 use std::env;
 use std::path::PathBuf;
@@ -351,18 +351,19 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge {
                 BridgeModel::Bindings(_) => {
-                    vec![context.interpreter[0].get_tag(Manylinux::Off, context.universal2)]
+                    vec![context.interpreter[0]
+                        .get_tag(ManylinuxPolicy::default(), context.universal2)]
                 }
                 BridgeModel::BindingsAbi3(major, minor) => {
                     let platform = context
                         .target
-                        .get_platform_tag(Manylinux::Off, context.universal2);
+                        .get_platform_tag(ManylinuxPolicy::default(), context.universal2);
                     vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
                 }
                 BridgeModel::Bin | BridgeModel::Cffi => {
                     context
                         .target
-                        .get_universal_tags(Manylinux::Off, context.universal2)
+                        .get_universal_tags(ManylinuxPolicy::default(), context.universal2)
                         .1
                 }
             };

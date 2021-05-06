@@ -60,11 +60,6 @@ impl PartialOrd for Policy {
 }
 
 impl Policy {
-    /// Get highest priority policy than self
-    pub fn higher_priority_policies(&self) -> impl Iterator<Item = &Policy> {
-        POLICIES.iter().filter(move |p| p.priority > self.priority)
-    }
-
     /// Get manylinux platform tag from this policy
     pub fn manylinux_tag(&self) -> Manylinux {
         self.name.parse().expect("Manylinux variants is incomplete")

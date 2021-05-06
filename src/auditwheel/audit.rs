@@ -1,5 +1,5 @@
 use super::policy::{Policy, POLICIES};
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::{Manylinux, ManylinuxPolicy};
 use crate::Target;
 use anyhow::Result;
 use fs_err::File;
@@ -247,17 +247,17 @@ fn policy_is_satisfied(
 /// If `manylinux`, is None, it returns the the highest matching manylinux policy, or `linux`
 /// if nothing else matches. It will error for bogus cases, e.g. if libpython is linked.
 ///
-/// If a specific manylinux version is given, compliance is checked and a warning printed if
+/// If a specific `manylinux` version is given, compliance is checked and a warning printed if
 /// a higher version would be possible.
 ///
-/// Does nothing for manylinux set to off or non-linux platforms.  
+/// Does nothing for manylinux set to off or non-linux platforms.
 pub fn auditwheel_rs(
     path: &Path,
     target: &Target,
     manylinux: Option<Manylinux>,
-) -> Result<Policy, AuditWheelError> {
+) -> Result<ManylinuxPolicy, AuditWheelError> {
     if !target.is_linux() || manylinux == Some(Manylinux::Off) {
-        return Ok(Policy::default());
+        return Ok(ManylinuxPolicy::default());
     }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
@@ -289,23 +289,33 @@ pub fn auditwheel_rs(
 
     if let Some(manylinux) = manylinux {
         let policy = Policy::from_name(&manylinux.to_string()).unwrap();
-
-        if let Some(highest_policy) = highest_policy {
-            if policy.priority < highest_policy.priority {
-                println!(
-                    "📦 Wheel is eligible for a higher priority tag. \
-                    You requested {} but this wheel is eligible for {}",
-                    policy, highest_policy,
-                );
-            }
-        }
-
         match policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries) {
-            Ok(_) => Ok(policy),
+            Ok(_) => {
+                if let Some(ref highest_policy_ref) = highest_policy {
+                    if policy.priority < highest_policy_ref.priority {
+                        println!(
+                            "📦 Wheel is eligible for a higher priority tag. \
+                    You requested {} but this wheel is eligible for {}",
+                            policy, highest_policy_ref,
+                        );
+                        return Ok(ManylinuxPolicy {
+                            policy,
+                            highest_policy,
+                        });
+                    }
+                }
+                Ok(ManylinuxPolicy {
+                    policy,
+                    highest_policy: None,
+                })
+            }
             Err(err) => Err(err),
         }
     } else if let Some(policy) = highest_policy {
-        Ok(policy)
+        Ok(ManylinuxPolicy {
+            policy,
+            highest_policy: None,
+        })
     } else {
         println!(
             "⚠  Warning: No compatible manylinux tag found, using the linux tag instead. \
@@ -313,6 +323,6 @@ pub fn auditwheel_rs(
         );
 
         // Fallback to linux
-        Ok(Policy::default())
+        Ok(ManylinuxPolicy::default())
     }
 }

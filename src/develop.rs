@@ -1,3 +1,4 @@
+use crate::auditwheel::ManylinuxPolicy;
 use crate::build_context::BridgeModel;
 use crate::compile::compile;
 use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};
@@ -164,16 +165,18 @@ pub fn develop(
     // We skip running auditwheel and simply tag as linux
     let tags = match build_context.bridge {
         BridgeModel::Bindings(_) => {
-            vec![build_context.interpreter[0].get_tag(Manylinux::Off, build_context.universal2)]
+            vec![build_context.interpreter[0]
+                .get_tag(ManylinuxPolicy::default(), build_context.universal2)]
         }
         BridgeModel::BindingsAbi3(major, minor) => {
-            let platform = target.get_platform_tag(Manylinux::Off, build_context.universal2);
+            let platform =
+                target.get_platform_tag(ManylinuxPolicy::default(), build_context.universal2);
             vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
         }
         BridgeModel::Bin | BridgeModel::Cffi => {
             build_context
                 .target
-                .get_universal_tags(Manylinux::Off, build_context.universal2)
+                .get_universal_tags(ManylinuxPolicy::default(), build_context.universal2)
                 .1
         }
     };

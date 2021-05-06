@@ -42,7 +42,7 @@ pub use crate::read_distribution::{
     get_metadata_for_distribution, get_supported_version_for_distribution,
 };
 pub use crate::target::Target;
-pub use auditwheel::Manylinux;
+pub use auditwheel::{Manylinux, ManylinuxPolicy};
 pub use source_distribution::source_distribution;
 #[cfg(feature = "upload")]
 pub use {

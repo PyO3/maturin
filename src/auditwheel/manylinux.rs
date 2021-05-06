@@ -1,4 +1,3 @@
-use crate::auditwheel::Policy;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -35,20 +34,6 @@ impl Manylinux {
     /// `manylinux2014` aka `manylinux_2_17`
     pub fn manylinux2014() -> Self {
         Self::Manylinux { x: 2, y: 17 }
-    }
-
-    /// manylinux aliases
-    pub fn aliases(&self) -> Vec<String> {
-        match self {
-            Manylinux::Manylinux { .. } => {
-                if let Some(policy) = Policy::from_name(&self.to_string()) {
-                    policy.aliases
-                } else {
-                    Vec::new()
-                }
-            }
-            Manylinux::Off => Vec::new(),
-        }
     }
 }
 

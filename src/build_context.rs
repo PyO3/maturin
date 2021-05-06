@@ -1,6 +1,5 @@
 use crate::auditwheel::auditwheel_rs;
-use crate::auditwheel::Manylinux;
-use crate::auditwheel::Policy;
+use crate::auditwheel::{Manylinux, ManylinuxPolicy};
 use crate::compile;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
@@ -211,9 +210,9 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
         manylinux: Option<Manylinux>,
-    ) -> Result<Policy> {
+    ) -> Result<ManylinuxPolicy> {
         if self.skip_auditwheel {
-            return Ok(Policy::default());
+            return Ok(ManylinuxPolicy::default());
         }
 
         let target = python_interpreter
@@ -233,7 +232,7 @@ impl BuildContext {
     fn write_binding_wheel_abi3(
         &self,
         artifact: &Path,
-        manylinux: Manylinux,
+        manylinux: ManylinuxPolicy,
         major: u8,
         min_minor: u8,
     ) -> Result<BuiltWheelMetadata> {
@@ -277,7 +276,7 @@ impl BuildContext {
         let artifact = self.compile_cdylib(python_interpreter, Some(&self.module_name))?;
         let policy = self.auditwheel(python_interpreter, &artifact, self.manylinux)?;
         let (wheel_path, tag) =
-            self.write_binding_wheel_abi3(&artifact, policy.manylinux_tag(), major, min_minor)?;
+            self.write_binding_wheel_abi3(&artifact, policy, major, min_minor)?;
 
         println!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -294,7 +293,7 @@ impl BuildContext {
         &self,
         python_interpreter: &PythonInterpreter,
         artifact: &Path,
-        manylinux: Manylinux,
+        manylinux: ManylinuxPolicy,
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(manylinux, self.universal2);
 
@@ -338,7 +337,7 @@ impl BuildContext {
                 self.compile_cdylib(Some(&python_interpreter), Some(&self.module_name))?;
             let policy = self.auditwheel(Some(&python_interpreter), &artifact, self.manylinux)?;
             let (wheel_path, tag) =
-                self.write_binding_wheel(python_interpreter, &artifact, policy.manylinux_tag())?;
+                self.write_binding_wheel(python_interpreter, &artifact, policy)?;
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -385,7 +384,7 @@ impl BuildContext {
     fn write_cffi_wheel(
         &self,
         artifact: &Path,
-        manylinux: Manylinux,
+        manylinux: ManylinuxPolicy,
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
 
@@ -411,7 +410,7 @@ impl BuildContext {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
         let policy = self.auditwheel(None, &artifact, self.manylinux)?;
-        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, policy.manylinux_tag())?;
+        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, policy)?;
 
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
@@ -419,7 +418,11 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    fn write_bin_wheel(&self, artifact: &Path, manylinux: Manylinux) -> Result<BuiltWheelMetadata> {
+    fn write_bin_wheel(
+        &self,
+        artifact: &Path,
+        manylinux: ManylinuxPolicy,
+    ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
 
         if !self.scripts.is_empty() {
@@ -467,7 +470,7 @@ impl BuildContext {
 
         let policy = self.auditwheel(None, &artifact, self.manylinux)?;
 
-        let (wheel_path, tag) = self.write_bin_wheel(&artifact, policy.manylinux_tag())?;
+        let (wheel_path, tag) = self.write_bin_wheel(&artifact, policy)?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 

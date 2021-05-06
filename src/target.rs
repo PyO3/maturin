@@ -10,6 +10,7 @@ use platform_info::*;
 use platforms::target::Env;
 use platforms::Platform;
 
+use crate::auditwheel::ManylinuxPolicy;
 use crate::{Manylinux, PythonInterpreter};
 
 /// All supported operating system
@@ -140,7 +141,7 @@ impl Target {
     }
 
     /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(&self, manylinux: Manylinux, universal2: bool) -> String {
+    pub fn get_platform_tag(&self, manylinux: ManylinuxPolicy, universal2: bool) -> String {
         match (&self.os, &self.arch) {
             (Os::FreeBsd, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
@@ -159,8 +160,20 @@ impl Target {
                 format!("openbsd_{}_amd64", release)
             }
             (Os::Linux, _) => {
-                let mut tags = vec![format!("{}_{}", manylinux, self.arch)];
-                for alias in manylinux.aliases() {
+                let ManylinuxPolicy {
+                    policy,
+                    highest_policy,
+                } = manylinux;
+                let mut tags = Vec::new();
+                if let Some(highest_policy) = highest_policy {
+                    tags.push(format!("{}_{}", highest_policy.name, self.arch));
+                    for alias in &highest_policy.aliases {
+                        tags.push(format!("{}_{}", alias, self.arch));
+                    }
+                }
+                // Put specified policy after highest matching policy
+                tags.push(format!("{}_{}", policy.name, self.arch));
+                for alias in &policy.aliases {
                     tags.push(format!("{}_{}", alias, self.arch));
                 }
                 tags.join(".")
@@ -262,7 +275,7 @@ impl Target {
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(&self, manylinux: Manylinux, universal2: bool) -> Vec<String> {
+    pub fn get_py3_tags(&self, manylinux: ManylinuxPolicy, universal2: bool) -> Vec<String> {
         vec![format!(
             "py3-none-{}",
             self.get_platform_tag(manylinux, universal2)
@@ -330,12 +343,12 @@ impl Target {
     /// Returns the tags for the platform without python version
     pub fn get_universal_tags(
         &self,
-        manylinux: Manylinux,
+        manylinux: ManylinuxPolicy,
         universal2: bool,
     ) -> (String, Vec<String>) {
         let tag = format!(
             "py3-none-{platform}",
-            platform = self.get_platform_tag(manylinux, universal2)
+            platform = self.get_platform_tag(manylinux.clone(), universal2)
         );
         let tags = self.get_py3_tags(manylinux, universal2);
         (tag, tags)

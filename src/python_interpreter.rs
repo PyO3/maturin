@@ -1,4 +1,4 @@
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::ManylinuxPolicy;
 use crate::{BridgeModel, Target};
 use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
@@ -339,7 +339,7 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, manylinux: Manylinux, universal2: bool) -> String {
+    pub fn get_tag(&self, manylinux: ManylinuxPolicy, universal2: bool) -> String {
         match self.interpreter_kind {
             InterpreterKind::CPython => {
                 let platform = self.target.get_platform_tag(manylinux, universal2);

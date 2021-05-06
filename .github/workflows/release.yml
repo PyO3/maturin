@@ -133,6 +133,7 @@ jobs:
           file: '*.{tar.gz,zip,deb}'
           file_glob: true
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
 
   release-musl-pypi:
     runs-on: ubuntu-latest

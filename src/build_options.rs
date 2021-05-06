@@ -103,7 +103,13 @@ impl BuildOptions {
     pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
-            bail!("Can't find {}", self.manifest_path.display(),);
+            let current_dir =
+                env::current_dir().context("Failed to detect current directory ಠ_ಠ")?;
+            bail!(
+                "Can't find {} (in {})",
+                self.manifest_path.display(),
+                current_dir.display()
+            );
         }
 
         if !manifest_file.is_file() {

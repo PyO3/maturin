@@ -288,10 +288,7 @@ pub fn auditwheel_rs(
     }
 
     if let Some(manylinux) = manylinux {
-        let policy = POLICIES
-            .iter()
-            .find(|p| p.name == manylinux.to_string())
-            .unwrap();
+        let policy = Policy::from_name(&manylinux.to_string()).unwrap();
 
         if let Some(highest_policy) = highest_policy {
             if policy.priority < highest_policy.priority {
@@ -303,8 +300,8 @@ pub fn auditwheel_rs(
             }
         }
 
-        match policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries) {
-            Ok(_) => Ok(policy.clone()),
+        match policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries) {
+            Ok(_) => Ok(policy),
             Err(err) => Err(err),
         }
     } else if let Some(policy) = highest_policy {

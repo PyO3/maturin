@@ -352,7 +352,7 @@ impl Target {
     }
 }
 
-fn get_host_target() -> Result<String> {
+pub(crate) fn get_host_target() -> Result<String> {
     let output = Command::new("rustc")
         .arg("-vV")
         .output()

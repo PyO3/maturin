@@ -166,3 +166,4 @@ jobs:
           asset_name: maturin-${{ matrix.platform.target }}.tar.gz
           file: target/release/maturin.tar.gz
           tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}

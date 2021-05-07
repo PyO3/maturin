@@ -292,7 +292,7 @@ fn compile_target(
 /// That function is the python's entrypoint for loading native extensions, i.e. python will fail
 /// to import the module with error if it's missing or named incorrectly
 ///
-/// Currently the check is only run on linux and macOS
+/// Currently the check is only run on linux, macOS and Windows
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{}", module_name);
     let mut fd = File::open(&artifact)?;
@@ -326,8 +326,18 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
                 }
             }
         }
+        goblin::Object::PE(pe) => {
+            for sym in &pe.exports {
+                if let Some(sym_name) = sym.name {
+                    if py_init == sym_name {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
         _ => {
-            // Currently, only linux and macOS are implemented
+            // Currently, only linux, macOS and Windows are implemented
             found = true
         }
     }

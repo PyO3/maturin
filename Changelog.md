@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Always output PEP 600 platform tags in [#525](https://github.com/PyO3/maturin/pull/525)
 * Fix missing `PyInit_<module_name>` warning with Rust submodule in [#528](https://github.com/PyO3/maturin/pull/528)
 * Better cross compiling support for PyO3 binding on Unix in [#454](https://github.com/PyO3/maturin/pull/454)
+* Fix s390x architecture support in [#530](https://github.com/PyO3/maturin/pull/530)
 
 ## 0.10.4 - 2021-04-28
 

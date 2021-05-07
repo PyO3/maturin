@@ -68,6 +68,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Armv7L,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
+            Arch::S390X,
             Arch::X86,
             Arch::X86_64,
         ],
@@ -128,6 +129,7 @@ impl Target {
             {
                 Arch::Powerpc64Le
             }
+            platforms::target::Arch::S390X => Arch::S390X,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 

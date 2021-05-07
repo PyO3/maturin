@@ -1,5 +1,6 @@
+use crate::target::get_host_target;
 use crate::Target;
-use anyhow::{bail, format_err, Result};
+use anyhow::{bail, Result};
 use fs_err::{self as fs, DirEntry};
 use std::collections::HashMap;
 use std::env;
@@ -9,9 +10,7 @@ use std::process::{Command, Stdio};
 
 pub fn is_cross_compiling(target: &Target) -> Result<bool> {
     let target_triple = target.target_triple();
-    let host = platforms::Platform::guess_current()
-        .map(|platform| platform.target_triple)
-        .ok_or_else(|| format_err!("Couldn't guess the current host platform"))?;
+    let host = get_host_target()?;
     if target_triple == host {
         // Not cross-compiling
         return Ok(false);

@@ -20,7 +20,7 @@ pub enum AuditWheelError {
     /// The wheel couldn't be read
     #[error("Failed to read the wheel")]
     IoError(#[source] io::Error),
-    /// Reexports elfkit parsing errors
+    /// Reexports goblin parsing errors
     #[error("Goblin failed to parse the elf file")]
     GoblinError(#[source] goblin::error::Error),
     /// The elf file isn't manylinux compatible. Contains the list of offending
@@ -121,18 +121,22 @@ fn find_versioned_libraries(
                     .gread::<GnuVersionNeedAux>(&mut offset)
                     .map_err(goblin::error::Error::Scroll)
                     .map_err(AuditWheelError::GoblinError)?;
-                let aux_name = &strtab[ver_aux.name as usize];
-                versions.insert(aux_name.to_string());
+                if let Some(aux_name) = strtab.get(ver_aux.name as usize) {
+                    let aux_name = aux_name.map_err(AuditWheelError::GoblinError)?;
+                    versions.insert(aux_name.to_string());
+                }
             }
-            let name = &strtab[ver.file as usize];
-            // Skip dynamic linker/loader
-            if name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1" {
-                continue;
+            if let Some(name) = strtab.get(ver.file as usize) {
+                let name = name.map_err(AuditWheelError::GoblinError)?;
+                // Skip dynamic linker/loader
+                if name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1" {
+                    continue;
+                }
+                symbols.push(VersionedLibrary {
+                    name: name.to_string(),
+                    versions,
+                });
             }
-            symbols.push(VersionedLibrary {
-                name: name.to_string(),
-                versions,
-            });
         }
     }
     Ok(symbols)

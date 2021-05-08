@@ -2,7 +2,10 @@ FROM quay.io/pypa/manylinux2010_x86_64 as builder
 
 ENV PATH /root/.cargo/bin:$PATH
 
-RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# Use an explicit version to actually install the version we require instead of using the cache
+# It would be even cooler to invalidate the cache depending on when the official rust image changes,
+# but I don't know how to do that
+RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.55.0 -y
 
 # Compile dependencies only for build caching
 ADD Cargo.toml /maturin/Cargo.toml
@@ -30,7 +33,10 @@ ENV PATH /opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp3
 ENV USER root
 
 RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && python3 -m pip install --no-cache-dir cffi \
+    && python3.6 -m pip install --no-cache-dir cffi \
+    && python3.7 -m pip install --no-cache-dir cffi \
+    && python3.8 -m pip install --no-cache-dir cffi \
+    && python3.9 -m pip install --no-cache-dir cffi \
     && mkdir /io
 
 COPY --from=builder /usr/bin/maturin /usr/bin/maturin

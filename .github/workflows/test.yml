@@ -152,6 +152,7 @@ jobs:
         platform: [
           { target: "aarch64-unknown-linux-gnu", arch: "aarch64" },
           { target: "armv7-unknown-linux-gnueabihf", arch: "armv7" },
+          { target: "s390x-unknown-linux-gnu", arch: "s390x" },
         ]
     steps:
       - uses: actions/checkout@v2

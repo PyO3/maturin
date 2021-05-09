@@ -119,6 +119,17 @@ fn compile_target(
         .collect();
 
     let mut rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
+    // Merge target specific RUSTFLAGS
+    let target_uppercase = context
+        .target
+        .target_triple()
+        .replace("-", "_")
+        .to_ascii_uppercase();
+    if let Some(target_rust_flags) =
+        env::var_os(format!("CARGO_TARGET_{}_RUSTFLAGS", target_uppercase))
+    {
+        rust_flags.push(target_rust_flags);
+    }
 
     // We need to pass --bins / --lib to set the rustc extra args later
     // TODO: What do we do when there are multiple bin targets?

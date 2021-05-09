@@ -156,7 +156,7 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin
-          maturin publish -u __token__ -b bin --no-sdist -o dist --target ${{ matrix.platform.target }} --manylinux ${{ matrix.platform.manylinux }}
+          maturin publish -u __token__ -b bin --no-sdist --target ${{ matrix.platform.target }} --manylinux ${{ matrix.platform.manylinux }}
       - name: Archive binary
         run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload to gitHub release
@@ -190,7 +190,7 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin==0.10.5_beta.4
-          maturin publish -u __token__ -b bin --no-sdist -o dist \
+          maturin publish -u __token__ -b bin --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} \
             --cargo-extra-args="--no-default-features" \

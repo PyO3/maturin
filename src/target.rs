@@ -7,8 +7,7 @@ use std::str;
 
 use anyhow::{bail, format_err, Context, Result};
 use platform_info::*;
-use platforms::target::Env;
-use platforms::Platform;
+use target_lexicon::{Environment, Triple};
 
 use crate::{Manylinux, PythonInterpreter};
 
@@ -84,7 +83,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
 pub struct Target {
     os: Os,
     arch: Arch,
-    env: Option<Env>,
+    env: Environment,
     triple: String,
 }
 
@@ -95,41 +94,36 @@ impl Target {
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
         let (platform, triple) = if let Some(ref target_triple) = target_triple {
-            let platform = Platform::find(target_triple)
-                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?;
+            let platform: Triple = target_triple
+                .parse()
+                .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
             (platform, target_triple.to_string())
         } else {
             let target_triple = get_host_target()?;
-            let platform = Platform::find(&target_triple)
-                .ok_or_else(|| format_err!("Unknown target triple {}", target_triple))?;
+            let platform: Triple = target_triple
+                .parse()
+                .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
             (platform, target_triple)
         };
 
-        let os = match platform.target_os {
-            platforms::target::OS::Linux => Os::Linux,
-            platforms::target::OS::Windows => Os::Windows,
-            platforms::target::OS::MacOS => Os::Macos,
-            platforms::target::OS::FreeBSD => Os::FreeBsd,
-            platforms::target::OS::OpenBSD => Os::OpenBsd,
+        let os = match platform.operating_system {
+            target_lexicon::OperatingSystem::Linux => Os::Linux,
+            target_lexicon::OperatingSystem::Windows => Os::Windows,
+            target_lexicon::OperatingSystem::MacOSX { .. }
+            | target_lexicon::OperatingSystem::Darwin => Os::Macos,
+            target_lexicon::OperatingSystem::Freebsd => Os::FreeBsd,
+            target_lexicon::OperatingSystem::Openbsd => Os::OpenBsd,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
-        let arch = match platform.target_arch {
-            platforms::target::Arch::X86_64 => Arch::X86_64,
-            platforms::target::Arch::X86 => Arch::X86,
-            platforms::target::Arch::ARM => Arch::Armv7L,
-            platforms::target::Arch::AARCH64 => Arch::Aarch64,
-            platforms::target::Arch::POWERPC64
-                if platform.target_triple.starts_with("powerpc64-") =>
-            {
-                Arch::Powerpc64
-            }
-            platforms::target::Arch::POWERPC64
-                if platform.target_triple.starts_with("powerpc64le-") =>
-            {
-                Arch::Powerpc64Le
-            }
-            platforms::target::Arch::S390X => Arch::S390X,
+        let arch = match platform.architecture {
+            target_lexicon::Architecture::X86_64 => Arch::X86_64,
+            target_lexicon::Architecture::X86_32(_) => Arch::X86,
+            target_lexicon::Architecture::Arm(_) => Arch::Armv7L,
+            target_lexicon::Architecture::Aarch64(_) => Arch::Aarch64,
+            target_lexicon::Architecture::Powerpc64 => Arch::Powerpc64,
+            target_lexicon::Architecture::Powerpc64le => Arch::Powerpc64Le,
+            target_lexicon::Architecture::S390x => Arch::S390X,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -140,7 +134,7 @@ impl Target {
         Ok(Target {
             os,
             arch,
-            env: platform.target_env,
+            env: platform.environment,
             triple,
         })
     }
@@ -266,11 +260,13 @@ impl Target {
 
     /// Returns true if the current platform's target env is Musl
     pub fn is_musl_target(&self) -> bool {
-        match self.env {
-            Some(Env::Musl) => true,
-            Some(_) => false,
-            None => false,
-        }
+        matches!(
+            self.env,
+            Environment::Musl
+                | Environment::Musleabi
+                | Environment::Musleabihf
+                | Environment::Muslabi64
+        )
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels

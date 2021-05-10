@@ -698,9 +698,9 @@ dependencies = [
 
 [[package]]
 name = "http-body"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dfb77c123b4e2f72a2069aeae0b4b4949cc7e966df277813fc16347e7549737"
+checksum = "60daa14be0e0786db0f03a9e57cb404c9d756eed2b6c62b9ea98ec5743ec75a9"
 dependencies = [
  "bytes",
  "http",
@@ -920,7 +920,6 @@ dependencies = [
  "mailparse",
  "once_cell",
  "platform-info",
- "platforms",
  "pretty_env_logger",
  "regex",
  "reqwest",
@@ -932,6 +931,7 @@ dependencies = [
  "shlex",
  "structopt",
  "tar",
+ "target-lexicon",
  "tempfile",
  "thiserror",
  "toml",
@@ -1206,12 +1206,6 @@ dependencies = [
  "libc",
  "winapi",
 ]
-
-[[package]]
-name = "platforms"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "989d43012e2ca1c4a02507c67282691a0a3207f9dc67cec596b43fe925b3d325"
 
 [[package]]
 name = "ppv-lite86"
@@ -1754,6 +1748,12 @@ dependencies = [
  "libc",
  "xattr",
 ]
+
+[[package]]
+name = "target-lexicon"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64ae3b39281e4b14b8123bdbaddd472b7dfe215e444181f2f9d2443c2444f834"
 
 [[package]]
 name = "tempfile"

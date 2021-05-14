@@ -138,7 +138,13 @@ impl BuildOptions {
             .and_then(|lib| lib.name.as_ref())
             .unwrap_or(&crate_name)
             .to_owned();
-        let extension_name = extra_metadata.name.as_ref().unwrap_or(&module_name);
+
+        // Only use extension name from extra metadata if it contains dot
+        let extension_name = extra_metadata
+            .name
+            .as_ref()
+            .filter(|name| name.contains('.'))
+            .unwrap_or(&module_name);
 
         let project_layout = ProjectLayout::determine(manifest_dir, &extension_name)?;
 

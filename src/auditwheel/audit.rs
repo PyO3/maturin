@@ -260,6 +260,7 @@ pub fn auditwheel_rs(
     target: &Target,
     manylinux: Option<Manylinux>,
 ) -> Result<Policy, AuditWheelError> {
+    // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
     if !target.is_linux() || manylinux == Some(Manylinux::Off) {
         return Ok(Policy::default());
     }

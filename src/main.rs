@@ -30,6 +30,45 @@ use {
     std::io,
 };
 
+#[cfg(feature = "upload")]
+/// Upload item descriptor used by `upload_ui()`
+struct UploadItem {
+    /// Built wheel file path
+    wheel_path: PathBuf,
+    /// Supported Python versions tag (e.g. "cp39")
+    supported_versions: String,
+    /// Wheel metadata in the (key, value) format
+    metadata: Vec<(String, String)>,
+}
+
+#[cfg(feature = "upload")]
+impl UploadItem {
+    /// Creates a new upload item descriptor from the built wheel and its metadata.
+    fn from_built_wheel(wheel: BuiltWheelMetadata, metadata: Vec<(String, String)>) -> Self {
+        let (wheel_path, supported_versions) = wheel;
+
+        UploadItem {
+            wheel_path,
+            supported_versions,
+            metadata,
+        }
+    }
+
+    /// Attempts to create a new upload item descriptor from the third-party wheel file path.
+    ///
+    /// Fails with the wheel metadata extraction errors.
+    fn try_from_wheel_path(wheel_path: PathBuf) -> Result<Self> {
+        let supported_versions = get_supported_version_for_distribution(&wheel_path)?;
+        let metadata = get_metadata_for_distribution(&wheel_path)?;
+
+        Ok(UploadItem {
+            wheel_path,
+            supported_versions,
+            metadata,
+        })
+    }
+}
+
 /// Returns the password and a bool that states whether to ask for re-entering the password
 /// after a failed authentication
 ///
@@ -410,17 +449,14 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 
 /// Handles authentication/keyring integration and retrying of the publish subcommand
 #[cfg(feature = "upload")]
-fn upload_ui(
-    wheels: &[BuiltWheelMetadata],
-    metadata: &[(String, String)],
-    publish: &PublishOpt,
-) -> Result<()> {
+fn upload_ui(items: &[UploadItem], publish: &PublishOpt) -> Result<()> {
     let registry = complete_registry(&publish)?;
 
-    println!("🚀 Uploading {} packages", wheels.len());
+    println!("🚀 Uploading {} packages", items.len());
 
-    for (wheel_path, supported_versions) in wheels {
-        let upload_result = upload(&registry, wheel_path, metadata, supported_versions);
+    for i in items {
+        let upload_result = upload(&registry, &i.wheel_path, &i.metadata, &i.supported_versions);
+
         match upload_result {
             Ok(()) => (),
             Err(UploadError::AuthenticationError) => {
@@ -443,7 +479,10 @@ fn upload_ui(
                 bail!("Username and/or password are wrong");
             }
             Err(err) => {
-                let filename = wheel_path.file_name().unwrap_or(&wheel_path.as_os_str());
+                let filename = i
+                    .wheel_path
+                    .file_name()
+                    .unwrap_or_else(|| i.wheel_path.as_os_str());
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
                         eprintln!(
@@ -453,10 +492,10 @@ fn upload_ui(
                         continue;
                     }
                 }
-                let filesize = fs::metadata(&wheel_path)
+                let filesize = fs::metadata(&i.wheel_path)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| {
-                        format!("Failed to get the filesize of {:?}: {}", &wheel_path, e)
+                        format!("Failed to get the filesize of {:?}: {}", &i.wheel_path, e)
                     });
                 return Err(err)
                     .context(format!("💥 Failed to upload {:?} ({})", filename, filesize));
@@ -517,6 +556,7 @@ fn run() -> Result<()> {
                 eprintln!("⚠  Warning: You're publishing debug wheels");
             }
 
+            let metadata21 = build_context.metadata21.to_vec();
             let mut wheels = build_context.build_wheels()?;
             if !no_sdist {
                 if let Some(sd) = build_context.build_source_distribution()? {
@@ -524,7 +564,12 @@ fn run() -> Result<()> {
                 }
             }
 
-            upload_ui(&wheels, &build_context.metadata21.to_vec(), &publish)?
+            let items = wheels
+                .into_iter()
+                .map(|wheel| UploadItem::from_built_wheel(wheel, metadata21.clone()))
+                .collect::<Vec<_>>();
+
+            upload_ui(&items, &publish)?
         }
         Opt::ListPython => {
             let target = Target::from_target_triple(None)?;
@@ -609,40 +654,12 @@ fn run() -> Result<()> {
                 return Ok(());
             }
 
-            let metadata: Vec<Vec<(String, String)>> = files
-                .iter()
-                .map(|path| get_metadata_for_distribution(&path))
-                .collect::<Result<_>>()?;
-
-            // All uploaded files are expected to share the build context
-            // and to have identical package metadata as a result.
-            let first_metadata = &metadata[0];
-            let is_same_package = metadata.iter().all(|x| {
-                x.iter().zip(first_metadata).all(|(next, first)| {
-                    // Ignore Description field difference
-                    next == first || (next.0 == first.0 && next.0 == "Description")
-                })
-            });
-            if !is_same_package {
-                bail!(
-                    "Attempting to upload wheel and/or source distribution files \
-                     that belong to different python packages."
-                );
-            }
-
-            let supported_versions: Result<Vec<String>> = files
-                .iter()
-                .map(|path| get_supported_version_for_distribution(&path))
-                .collect();
-
-            // zip() works because `BuiltWheelMetadata` is a tuple type
-            let wheels: Vec<BuiltWheelMetadata> = files
+            let items = files
                 .into_iter()
-                .zip(supported_versions?.into_iter())
-                .collect();
+                .map(UploadItem::try_from_wheel_path)
+                .collect::<Result<Vec<_>>>()?;
 
-            // All wheels have identical metadata - get it from metadata[0]
-            upload_ui(&wheels, &metadata[0], &publish)?
+            upload_ui(&items, &publish)?
         }
     }
 

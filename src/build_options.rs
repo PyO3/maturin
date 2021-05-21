@@ -1,4 +1,4 @@
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cross_compile::{find_sysconfigdata, is_cross_compiling, parse_sysconfigdata};
 use crate::python_interpreter::InterpreterKind;
@@ -35,7 +35,7 @@ pub struct BuildOptions {
         possible_values = &["2010", "2014", "2_12", "2_17", "2_24", "2_27", "off"],
         case_insensitive = true,
     )]
-    pub manylinux: Option<Manylinux>,
+    pub manylinux: Option<PlatformTag>,
     #[structopt(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
@@ -232,7 +232,7 @@ impl BuildOptions {
             release,
             strip,
             skip_auditwheel: self.skip_auditwheel,
-            manylinux: self.manylinux,
+            platform_tag: self.manylinux,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

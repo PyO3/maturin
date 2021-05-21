@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 /// Decides how to handle manylinux and musllinux compliance
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Copy)]
-pub enum Manylinux {
+pub enum PlatformTag {
     /// Use the manylinux_x_y tag
     Manylinux {
         /// GLIBC version major
@@ -21,10 +21,10 @@ pub enum Manylinux {
         y: u16,
     },
     /// Use the native linux tag
-    Off,
+    Linux,
 }
 
-impl Manylinux {
+impl PlatformTag {
     /// `manylinux1` aka `manylinux_2_5`
     pub fn manylinux1() -> Self {
         Self::Manylinux { x: 2, y: 5 }
@@ -43,38 +43,38 @@ impl Manylinux {
     /// manylinux aliases
     pub fn aliases(&self) -> Vec<String> {
         match self {
-            Manylinux::Manylinux { .. } => {
+            PlatformTag::Manylinux { .. } => {
                 if let Some(policy) = Policy::from_name(&self.to_string()) {
                     policy.aliases
                 } else {
                     Vec::new()
                 }
             }
-            Manylinux::Musllinux { .. } => Vec::new(),
-            Manylinux::Off => Vec::new(),
+            PlatformTag::Musllinux { .. } => Vec::new(),
+            PlatformTag::Linux => Vec::new(),
         }
     }
 }
 
-impl fmt::Display for Manylinux {
+impl fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Manylinux::Manylinux { x, y } => write!(f, "manylinux_{}_{}", x, y),
-            Manylinux::Musllinux { x, y } => write!(f, "musllinux_{}_{}", x, y),
-            Manylinux::Off => write!(f, "linux"),
+            PlatformTag::Manylinux { x, y } => write!(f, "manylinux_{}_{}", x, y),
+            PlatformTag::Musllinux { x, y } => write!(f, "musllinux_{}_{}", x, y),
+            PlatformTag::Linux => write!(f, "linux"),
         }
     }
 }
 
-impl FromStr for Manylinux {
+impl FromStr for PlatformTag {
     type Err = &'static str;
 
     fn from_str(value: &str) -> anyhow::Result<Self, Self::Err> {
         match value {
-            "off" | "linux" => Ok(Manylinux::Off),
-            "auto" | "1" | "manylinux1" => Ok(Manylinux::manylinux1()),
-            "2010" | "manylinux2010" => Ok(Manylinux::manylinux2010()),
-            "2014" | "manylinux2014" => Ok(Manylinux::manylinux2014()),
+            "off" | "linux" => Ok(PlatformTag::Linux),
+            "auto" | "1" | "manylinux1" => Ok(PlatformTag::manylinux1()),
+            "2010" | "manylinux2010" => Ok(PlatformTag::manylinux2010()),
+            "2014" | "manylinux2014" => Ok(PlatformTag::manylinux2014()),
             _ => {
                 if let Some(value) = value.strip_prefix("musllinux_") {
                     let mut parts = value.split('_');
@@ -86,7 +86,7 @@ impl FromStr for Manylinux {
                         .next()
                         .and_then(|y| y.parse::<u16>().ok())
                         .ok_or("invalid musllinux option")?;
-                    Ok(Manylinux::Musllinux { x, y })
+                    Ok(PlatformTag::Musllinux { x, y })
                 } else {
                     let value = value.strip_prefix("manylinux_").unwrap_or(value);
                     let mut parts = value.split('_');
@@ -98,7 +98,7 @@ impl FromStr for Manylinux {
                         .next()
                         .and_then(|y| y.parse::<u16>().ok())
                         .ok_or("invalid manylinux option")?;
-                    Ok(Manylinux::Manylinux { x, y })
+                    Ok(PlatformTag::Manylinux { x, y })
                 }
             }
         }

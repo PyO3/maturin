@@ -4,7 +4,7 @@ use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter}
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::{write_dist_info, BuildOptions};
-use crate::{Manylinux, ModuleWriter};
+use crate::{ModuleWriter, PlatformTag};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use fs_err as fs;
 use std::path::Path;
@@ -28,7 +28,7 @@ pub fn develop(
     let python = target.get_venv_python(&venv_dir);
 
     let build_options = BuildOptions {
-        manylinux: Some(Manylinux::Off),
+        manylinux: Some(PlatformTag::Linux),
         interpreter: Some(vec![target.get_python()]),
         bindings,
         manifest_path: manifest_file.to_path_buf(),
@@ -164,16 +164,16 @@ pub fn develop(
     // We skip running auditwheel and simply tag as linux
     let tags = match build_context.bridge {
         BridgeModel::Bindings(_) => {
-            vec![build_context.interpreter[0].get_tag(Manylinux::Off, build_context.universal2)]
+            vec![build_context.interpreter[0].get_tag(PlatformTag::Linux, build_context.universal2)]
         }
         BridgeModel::BindingsAbi3(major, minor) => {
-            let platform = target.get_platform_tag(Manylinux::Off, build_context.universal2);
+            let platform = target.get_platform_tag(PlatformTag::Linux, build_context.universal2);
             vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
         }
         BridgeModel::Bin | BridgeModel::Cffi => {
             build_context
                 .target
-                .get_universal_tags(Manylinux::Off, build_context.universal2)
+                .get_universal_tags(PlatformTag::Linux, build_context.universal2)
                 .1
         }
     };

@@ -1,5 +1,5 @@
 use crate::auditwheel::auditwheel_rs;
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::PlatformTag;
 use crate::auditwheel::Policy;
 use crate::compile;
 use crate::compile::warn_missing_py_init;
@@ -144,10 +144,10 @@ pub struct BuildContext {
     pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
-    /// Whether to skip checking the linked libraries for manylinux compliance
+    /// Whether to skip checking the linked libraries for manylinux/musllinux compliance
     pub skip_auditwheel: bool,
-    /// Whether to use the the manylinux or use the native linux tag (off)
-    pub manylinux: Option<Manylinux>,
+    /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
+    pub platform_tag: Option<PlatformTag>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
@@ -210,7 +210,7 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
-        manylinux: Option<Manylinux>,
+        platform_tag: Option<PlatformTag>,
     ) -> Result<Policy> {
         if self.skip_auditwheel {
             return Ok(Policy::default());
@@ -220,11 +220,11 @@ impl BuildContext {
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        let policy = auditwheel_rs(&artifact, target, manylinux).context(
-            if let Some(manylinux) = manylinux {
-                format!("Error ensuring {} compliance", manylinux)
+        let policy = auditwheel_rs(&artifact, target, platform_tag).context(
+            if let Some(platform_tag) = platform_tag {
+                format!("Error ensuring {} compliance", platform_tag)
             } else {
-                "Error checking for manylinux compliance".to_string()
+                "Error checking for manylinux/musllinux compliance".to_string()
             },
         )?;
         Ok(policy)
@@ -233,11 +233,11 @@ impl BuildContext {
     fn write_binding_wheel_abi3(
         &self,
         artifact: &Path,
-        manylinux: Manylinux,
+        platform_tag: PlatformTag,
         major: u8,
         min_minor: u8,
     ) -> Result<BuiltWheelMetadata> {
-        let platform = self.target.get_platform_tag(manylinux, self.universal2);
+        let platform = self.target.get_platform_tag(platform_tag, self.universal2);
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(
@@ -278,9 +278,9 @@ impl BuildContext {
             python_interpreter,
             Some(self.project_layout.extension_name()),
         )?;
-        let policy = self.auditwheel(python_interpreter, &artifact, self.manylinux)?;
+        let policy = self.auditwheel(python_interpreter, &artifact, self.platform_tag)?;
         let (wheel_path, tag) =
-            self.write_binding_wheel_abi3(&artifact, policy.manylinux_tag(), major, min_minor)?;
+            self.write_binding_wheel_abi3(&artifact, policy.platform_tag(), major, min_minor)?;
 
         println!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -297,9 +297,9 @@ impl BuildContext {
         &self,
         python_interpreter: &PythonInterpreter,
         artifact: &Path,
-        manylinux: Manylinux,
+        platform_tag: PlatformTag,
     ) -> Result<BuiltWheelMetadata> {
-        let tag = python_interpreter.get_tag(manylinux, self.universal2);
+        let tag = python_interpreter.get_tag(platform_tag, self.universal2);
 
         let mut writer = WheelWriter::new(
             &tag,
@@ -341,9 +341,10 @@ impl BuildContext {
                 Some(&python_interpreter),
                 Some(self.project_layout.extension_name()),
             )?;
-            let policy = self.auditwheel(Some(&python_interpreter), &artifact, self.manylinux)?;
+            let policy =
+                self.auditwheel(Some(&python_interpreter), &artifact, self.platform_tag)?;
             let (wheel_path, tag) =
-                self.write_binding_wheel(python_interpreter, &artifact, policy.manylinux_tag())?;
+                self.write_binding_wheel(python_interpreter, &artifact, policy.platform_tag())?;
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -390,9 +391,11 @@ impl BuildContext {
     fn write_cffi_wheel(
         &self,
         artifact: &Path,
-        manylinux: Manylinux,
+        platform_tag: PlatformTag,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
+        let (tag, tags) = self
+            .target
+            .get_universal_tags(platform_tag, self.universal2);
 
         let mut builder =
             WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
@@ -415,8 +418,8 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let policy = self.auditwheel(None, &artifact, self.manylinux)?;
-        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, policy.manylinux_tag())?;
+        let policy = self.auditwheel(None, &artifact, self.platform_tag)?;
+        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, policy.platform_tag())?;
 
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
@@ -424,8 +427,14 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    fn write_bin_wheel(&self, artifact: &Path, manylinux: Manylinux) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self.target.get_universal_tags(manylinux, self.universal2);
+    fn write_bin_wheel(
+        &self,
+        artifact: &Path,
+        platform_tag: PlatformTag,
+    ) -> Result<BuiltWheelMetadata> {
+        let (tag, tags) = self
+            .target
+            .get_universal_tags(platform_tag, self.universal2);
 
         if !self.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
@@ -470,9 +479,9 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let policy = self.auditwheel(None, &artifact, self.manylinux)?;
+        let policy = self.auditwheel(None, &artifact, self.platform_tag)?;
 
-        let (wheel_path, tag) = self.write_bin_wheel(&artifact, policy.manylinux_tag())?;
+        let (wheel_path, tag) = self.write_bin_wheel(&artifact, policy.platform_tag())?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 

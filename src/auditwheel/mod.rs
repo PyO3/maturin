@@ -1,7 +1,7 @@
 mod audit;
-mod manylinux;
+mod platform_tag;
 mod policy;
 
 pub use self::audit::*;
-pub use manylinux::Manylinux;
+pub use platform_tag::PlatformTag;
 pub use policy::{Policy, POLICIES};

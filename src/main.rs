@@ -15,16 +15,18 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, get_metadata_for_distribution, get_supported_version_for_distribution,
-    source_distribution, write_dist_info, BridgeModel, BuildOptions, BuiltWheelMetadata, CargoToml,
-    Manylinux, Metadata21, PathWriter, PyProjectToml, PythonInterpreter, Target,
+    develop, source_distribution, write_dist_info, BridgeModel, BuildOptions, CargoToml, Manylinux,
+    Metadata21, PathWriter, PyProjectToml, PythonInterpreter, Target,
 };
 use std::env;
 use std::path::PathBuf;
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
-    maturin::{upload, Registry, UploadError},
+    maturin::{
+        get_metadata_for_distribution, get_supported_version_for_distribution, upload,
+        BuiltWheelMetadata, Registry, UploadError,
+    },
     reqwest::Url,
     rpassword,
     std::io,
@@ -310,6 +312,7 @@ enum Opt {
     ///
     /// It is mostly similar to `twine upload`, but can only upload python wheels
     /// and source distributions.
+    #[cfg(feature = "upload")]
     #[structopt(name = "upload")]
     Upload {
         #[structopt(flatten)]
@@ -648,6 +651,7 @@ fn run() -> Result<()> {
             .context("Failed to build source distribution")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
+        #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {
                 println!("⚠  Warning: No files given, exiting.");

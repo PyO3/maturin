@@ -73,7 +73,7 @@ impl FromStr for PlatformTag {
         let value = value.to_ascii_lowercase();
         match value.as_str() {
             "off" | "linux" => Ok(PlatformTag::Linux),
-            "auto" | "1" | "manylinux1" => Ok(PlatformTag::manylinux1()),
+            "1" | "manylinux1" => Ok(PlatformTag::manylinux1()),
             "2010" | "manylinux2010" => Ok(PlatformTag::manylinux2010()),
             "2014" | "manylinux2014" => Ok(PlatformTag::manylinux2014()),
             _ => {

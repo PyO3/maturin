@@ -21,21 +21,23 @@ use structopt::StructOpt;
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
-    /// Control the platform tag on linux. Options are `2010`/`2_12` (for manylinux2010),
-    /// `2014`/`2_17` (for manylinux2014), `2_24` (for manylinux_2_24), `2_27` (for manylinux_2_27)
-    /// and `off` (for the native linux tag).
-    /// Note that manylinux1 is unsupported by the rust compiler. Wheels with the native `linux` tag
+    /// Control the platform tag on linux.
+    ///
+    /// Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`)
+    /// or `musllinux` tags (for example `musllinux_1_2`)
+    /// and `linux` for the native linux tag.
+    ///
+    /// Note that `manylinux1` is unsupported by the rust compiler. Wheels with the native `linux` tag
     /// will be rejected by pypi, unless they are separately validated by `auditwheel`.
     ///
-    /// The default is the lowest compatible, of plain `linux` if nothing matched
+    /// The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
         name = "compatibility",
         long = "compatibility",
         alias = "manylinux",
-        possible_values = &["2010", "2014", "2_12", "2_17", "2_24", "2_27", "off", "linux"],
-        case_insensitive = true,
+        parse(try_from_str)
     )]
     pub platform_tag: Option<PlatformTag>,
     #[structopt(short, long)]

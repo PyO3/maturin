@@ -70,7 +70,8 @@ impl FromStr for PlatformTag {
     type Err = &'static str;
 
     fn from_str(value: &str) -> anyhow::Result<Self, Self::Err> {
-        match value {
+        let value = value.to_ascii_lowercase();
+        match value.as_str() {
             "off" | "linux" => Ok(PlatformTag::Linux),
             "auto" | "1" | "manylinux1" => Ok(PlatformTag::manylinux1()),
             "2010" | "manylinux2010" => Ok(PlatformTag::manylinux2010()),
@@ -88,7 +89,7 @@ impl FromStr for PlatformTag {
                         .ok_or("invalid musllinux option")?;
                     Ok(PlatformTag::Musllinux { x, y })
                 } else {
-                    let value = value.strip_prefix("manylinux_").unwrap_or(value);
+                    let value = value.strip_prefix("manylinux_").unwrap_or(&value);
                     let mut parts = value.split('_');
                     let x = parts
                         .next()

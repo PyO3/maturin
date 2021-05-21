@@ -31,11 +31,13 @@ pub struct BuildOptions {
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
-        long,
-        possible_values = &["2010", "2014", "2_12", "2_17", "2_24", "2_27", "off"],
+        name = "compatibility",
+        long = "compatibility",
+        alias = "manylinux",
+        possible_values = &["2010", "2014", "2_12", "2_17", "2_24", "2_27", "off", "linux"],
         case_insensitive = true,
     )]
-    pub manylinux: Option<PlatformTag>,
+    pub platform_tag: Option<PlatformTag>,
     #[structopt(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
@@ -85,7 +87,7 @@ pub struct BuildOptions {
 impl Default for BuildOptions {
     fn default() -> Self {
         BuildOptions {
-            manylinux: None,
+            platform_tag: None,
             interpreter: Some(vec![]),
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
@@ -232,7 +234,7 @@ impl BuildOptions {
             release,
             strip,
             skip_auditwheel: self.skip_auditwheel,
-            platform_tag: self.manylinux,
+            platform_tag: self.platform_tag,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

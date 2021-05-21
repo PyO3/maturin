@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## Unreleased
+## 0.10.5 - 2021-05-21
 
 * Add `manylinux_2_27` support in [#521](https://github.com/PyO3/maturin/pull/521)
 * Add support for Windows arm64 target in [#524](https://github.com/PyO3/maturin/pull/524)
@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix missing `PyInit_<module_name>` warning with Rust submodule in [#528](https://github.com/PyO3/maturin/pull/528)
 * Better cross compiling support for PyO3 binding on Unix in [#454](https://github.com/PyO3/maturin/pull/454)
 * Fix s390x architecture support in [#530](https://github.com/PyO3/maturin/pull/530)
+* Fix auditwheel panic with s390x wheels in [#532](https://github.com/PyO3/maturin/pull/532)
+* Support uploading heterogenous wheels by ravenexp in [#544](https://github.com/PyO3/maturin/pull/544)
+* Warn about `pyproject.toml` missing maturin version constraint in [#545](https://github.com/PyO3/maturin/pull/545)
 
 ## 0.10.4 - 2021-04-28
 

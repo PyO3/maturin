@@ -55,7 +55,7 @@ jobs:
             os: ubuntu-latest
             name: maturin-x86_64-unknown-linux-musl.tar.gz
           - target: x86_64-apple-darwin
-            os: macOS-latest
+            os: macos-latest
             name: maturin-x86_64-apple-darwin.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
@@ -77,6 +77,14 @@ jobs:
       - name: Install musl tools
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y musl-tools
+
+      # Install gnu-tar because BSD tar is buggy
+      # https://github.com/actions/cache/issues/403
+      - name: Install GNU tar (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install gnu-tar
+          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
 
       # Those two will also create target/${{ matrix.target }}/maturin
       - name: Publish to pypi (with sdist)

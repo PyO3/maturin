@@ -108,6 +108,15 @@ my-project
     └── lib.rs
 ```
 
+## Python type information stubs
+
+maturin can automatically build and publish PEP 561 compatible type information stubs packages
+for Rust-only extensions when a type information source file name `<module_name>.pyi` exists
+in the project directory. As with mixed Rust/Python projects, `<module_name>` corresponds
+to `lib.name` in `Cargo.toml`.
+
+The type stubs package can be also built manually by running `maturin stubs`.
+
 ## Python metadata
 
 To specify python dependencies, add a list `requires-dist` in a `[package.metadata.maturin]` section in the Cargo.toml. This list is equivalent to `install_requires` in setuptools:

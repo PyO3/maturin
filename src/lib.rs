@@ -45,6 +45,7 @@ pub use crate::target::Target;
 pub use auditwheel::PlatformTag;
 pub use sdist_context::SDistContext;
 pub use source_distribution::source_distribution;
+pub use stubs_package::stubs_package;
 #[cfg(feature = "upload")]
 pub use {
     crate::registry::Registry,
@@ -67,6 +68,7 @@ mod read_distribution;
 mod registry;
 mod sdist_context;
 mod source_distribution;
+mod stubs_package;
 mod target;
 #[cfg(feature = "upload")]
 mod upload;

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unrelease
 
 * Add PEP 656 musllinux support in [#543](https://github.com/PyO3/maturin/pull/543)
+* Build PEP 561 compatible type information stubs packages
 
 ## 0.10.6 - 2021-05-21
 

@@ -14,7 +14,7 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, write_dist_info, BridgeModel, BuildOptions, PathWriter, PlatformTag,
+    develop, stubs_package, write_dist_info, BridgeModel, BuildOptions, PathWriter, PlatformTag,
     PythonInterpreter, SDistContext, Target,
 };
 use std::env;
@@ -232,6 +232,9 @@ enum Opt {
         /// Don't build a source distribution
         #[structopt(long = "no-sdist")]
         no_sdist: bool,
+        /// Don't build a type information stubs package
+        #[structopt(long = "no-stubs")]
+        no_stubs: bool,
     },
     #[cfg(feature = "upload")]
     #[structopt(name = "publish")]
@@ -248,6 +251,9 @@ enum Opt {
         /// Don't build a source distribution
         #[structopt(long = "no-sdist")]
         no_sdist: bool,
+        /// Don't build a type information stubs package
+        #[structopt(long = "no-stubs")]
+        no_stubs: bool,
         #[structopt(flatten)]
         publish: PublishOpt,
     },
@@ -325,6 +331,25 @@ enum Opt {
     /// The commands are meant to be called from the python PEP 517
     #[structopt(name = "pep517", setting = structopt::clap::AppSettings::Hidden)]
     Pep517(Pep517Command),
+    /// Build only a PEP 561 type information stubs package for the extension module.
+    ///
+    /// The type information source file '<module_name>.pyi' must be present in
+    /// the top level project directory.
+    #[structopt(name = "stubs")]
+    Stubs {
+        #[structopt(
+            short = "m",
+            long = "manifest-path",
+            parse(from_os_str),
+            default_value = "Cargo.toml"
+        )]
+        /// The path to the Cargo.toml
+        manifest_path: PathBuf,
+        /// The directory to store the built wheels in. Defaults to a new "wheels"
+        /// directory in the project's target directory
+        #[structopt(short, long, parse(from_os_str))]
+        out: Option<PathBuf>,
+    },
 }
 
 /// Backend for the PEP 517 integration. Not for human consumption
@@ -522,12 +547,20 @@ fn run() -> Result<()> {
             release,
             strip,
             no_sdist,
+            no_stubs,
         } => {
             let build_context = build.into_build_context(release, strip)?;
+            build_context.build_wheels()?;
             if !no_sdist {
                 build_context.build_source_distribution()?;
             }
-            build_context.build_wheels()?;
+            if !no_stubs {
+                stubs_package(
+                    &build_context.out,
+                    &build_context.module_name,
+                    &build_context.metadata21,
+                )?;
+            }
         }
         #[cfg(feature = "upload")]
         Opt::Publish {
@@ -536,6 +569,7 @@ fn run() -> Result<()> {
             debug,
             no_strip,
             no_sdist,
+            no_stubs,
         } => {
             let build_context = build.into_build_context(!debug, !no_strip)?;
 
@@ -551,10 +585,23 @@ fn run() -> Result<()> {
                 }
             }
 
-            let items = wheels
+            let mut items = wheels
                 .into_iter()
                 .map(|wheel| UploadItem::from_built_wheel(wheel, metadata21.clone()))
                 .collect::<Vec<_>>();
+
+            if !no_stubs {
+                if let Some((stubs_path, stubs_metadata21)) = stubs_package(
+                    &build_context.out,
+                    &build_context.module_name,
+                    &build_context.metadata21,
+                )? {
+                    items.push(UploadItem::from_built_wheel(
+                        (stubs_path, "py3".to_string()),
+                        stubs_metadata21.to_vec(),
+                    ));
+                }
+            }
 
             upload_ui(&items, &publish)?
         }
@@ -603,6 +650,16 @@ fn run() -> Result<()> {
         }
         Opt::SDist { manifest_path, out } => {
             SDistContext::new(manifest_path, out)?.build_source_distribution()?;
+        }
+        Opt::Stubs { manifest_path, out } => {
+            let context = SDistContext::new(manifest_path, out)?;
+
+            if stubs_package(&context.out, &context.module_name, &context.metadata21)?.is_none() {
+                bail!(
+                    "Type information source file '{}.pyi' not found",
+                    &context.module_name
+                );
+            }
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
         #[cfg(feature = "upload")]

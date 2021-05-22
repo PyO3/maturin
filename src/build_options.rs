@@ -106,6 +106,9 @@ impl Default for BuildOptions {
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
+        if self.platform_tag == Some(PlatformTag::manylinux1()) {
+            eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
+        }
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
             let current_dir =

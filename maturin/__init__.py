@@ -26,6 +26,7 @@ create_only_options = [
 available_options = [
     "bindings",
     "cargo-extra-args",
+    "compatibility",
     "manylinux",
     "rustc-extra-args",
     "skip-auditwheel",

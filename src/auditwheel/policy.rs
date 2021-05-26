@@ -1,4 +1,4 @@
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::PlatformTag;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::cmp::{Ordering, PartialOrd};
@@ -65,12 +65,12 @@ impl Policy {
         POLICIES.iter().filter(move |p| p.priority > self.priority)
     }
 
-    /// Get manylinux platform tag from this policy
-    pub fn manylinux_tag(&self) -> Manylinux {
-        self.name.parse().expect("Manylinux variants is incomplete")
+    /// Get platform tag from this policy
+    pub fn platform_tag(&self) -> PlatformTag {
+        self.name.parse().expect("unknown platform tag")
     }
 
-    /// Get policy by it's manylinux platform tag name
+    /// Get policy by it's platform tag name
     pub fn from_name(name: &str) -> Option<Self> {
         POLICIES
             .iter()
@@ -107,7 +107,7 @@ mod test {
     #[test]
     fn test_policy_manylinux_tag() {
         for policy in POLICIES.iter() {
-            let _tag = policy.manylinux_tag();
+            let _tag = policy.platform_tag();
         }
     }
 }

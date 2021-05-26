@@ -1,4 +1,4 @@
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cross_compile::{find_sysconfigdata, is_cross_compiling, parse_sysconfigdata};
 use crate::python_interpreter::InterpreterKind;
@@ -21,21 +21,25 @@ use structopt::StructOpt;
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
-    /// Control the platform tag on linux. Options are `2010`/`2_12` (for manylinux2010),
-    /// `2014`/`2_17` (for manylinux2014), `2_24` (for manylinux_2_24), `2_27` (for manylinux_2_27)
-    /// and `off` (for the native linux tag).
-    /// Note that manylinux1 is unsupported by the rust compiler. Wheels with the native `linux` tag
+    /// Control the platform tag on linux.
+    ///
+    /// Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`)
+    /// or `musllinux` tags (for example `musllinux_1_2`)
+    /// and `linux` for the native linux tag.
+    ///
+    /// Note that `manylinux1` is unsupported by the rust compiler. Wheels with the native `linux` tag
     /// will be rejected by pypi, unless they are separately validated by `auditwheel`.
     ///
-    /// The default is the lowest compatible, of plain `linux` if nothing matched
+    /// The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
     ///
     /// This option is ignored on all non-linux platforms
     #[structopt(
-        long,
-        possible_values = &["2010", "2014", "2_12", "2_17", "2_24", "2_27", "off"],
-        case_insensitive = true,
+        name = "compatibility",
+        long = "compatibility",
+        alias = "manylinux",
+        parse(try_from_str)
     )]
-    pub manylinux: Option<Manylinux>,
+    pub platform_tag: Option<PlatformTag>,
     #[structopt(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
@@ -85,7 +89,7 @@ pub struct BuildOptions {
 impl Default for BuildOptions {
     fn default() -> Self {
         BuildOptions {
-            manylinux: None,
+            platform_tag: None,
             interpreter: Some(vec![]),
             bindings: None,
             manifest_path: PathBuf::from("Cargo.toml"),
@@ -102,6 +106,9 @@ impl Default for BuildOptions {
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
+        if self.platform_tag == Some(PlatformTag::manylinux1()) {
+            eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
+        }
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
             let current_dir =
@@ -232,7 +239,7 @@ impl BuildOptions {
             release,
             strip,
             skip_auditwheel: self.skip_auditwheel,
-            manylinux: self.manylinux,
+            platform_tag: self.platform_tag,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

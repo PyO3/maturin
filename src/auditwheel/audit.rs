@@ -1,5 +1,5 @@
 use super::policy::{Policy, POLICIES};
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::PlatformTag;
 use crate::Target;
 use anyhow::Result;
 use fs_err::File;
@@ -13,9 +13,9 @@ use std::io::Read;
 use std::path::Path;
 use thiserror::Error;
 
-/// Error raised during auditing an elf file for manylinux compatibility
+/// Error raised during auditing an elf file for manylinux/musllinux compatibility
 #[derive(Error, Debug)]
-#[error("Ensuring manylinux compliance failed")]
+#[error("Ensuring manylinux/musllinux compliance failed")]
 pub enum AuditWheelError {
     /// The wheel couldn't be read
     #[error("Failed to read the wheel")]
@@ -23,23 +23,21 @@ pub enum AuditWheelError {
     /// Reexports goblin parsing errors
     #[error("Goblin failed to parse the elf file")]
     GoblinError(#[source] goblin::error::Error),
-    /// The elf file isn't manylinux compatible. Contains the list of offending
+    /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
     /// libraries.
     #[error(
     "Your library links libpython ({0}), which libraries must not do. Have you forgotten to activate the extension-module feature?",
     )]
     LinksLibPythonError(String),
-    /// The elf file isn't manylinux compatible. Contains the list of offending
+    /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
     /// libraries.
     #[error(
     "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}",
     )]
-    ManylinuxValidationError(Policy, Vec<String>),
-    /// The elf file isn't manylinux compaible. Contains unsupported architecture
-    #[error(
-        "Your library is not manylinux compliant because it has unsupported architecture: {0}"
-    )]
-    UnsupportedArchitecture(String),
+    PlatformTagValidationError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compaible. Contains unsupported architecture
+    #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
+    UnsupportedArchitecture(Policy, String),
 }
 
 /// Structure of "version needed" entries is documented in
@@ -172,10 +170,9 @@ fn policy_is_satisfied(
     deps: &[String],
     versioned_libraries: &[VersionedLibrary],
 ) -> Result<(), AuditWheelError> {
-    let arch_versions = &policy
-        .symbol_versions
-        .get(arch)
-        .ok_or_else(|| AuditWheelError::UnsupportedArchitecture(arch.to_string()))?;
+    let arch_versions = &policy.symbol_versions.get(arch).ok_or_else(|| {
+        AuditWheelError::UnsupportedArchitecture(policy.clone(), arch.to_string())
+    })?;
     let mut offenders = HashSet::new();
     for dep in deps {
         // Skip dynamic linker/loader
@@ -238,7 +235,7 @@ fn policy_is_satisfied(
         [lib] if is_libpython.is_match(lib) => {
             Err(AuditWheelError::LinksLibPythonError(lib.clone()))
         }
-        offenders => Err(AuditWheelError::ManylinuxValidationError(
+        offenders => Err(AuditWheelError::PlatformTagValidationError(
             policy.clone(),
             offenders.to_vec(),
         )),
@@ -246,22 +243,34 @@ fn policy_is_satisfied(
 }
 
 /// An reimplementation of auditwheel, which checks elf files for
-/// manylinux compliance.
+/// manylinux/musllinux compliance.
 ///
-/// If `manylinux`, is None, it returns the the highest matching manylinux policy, or `linux`
+/// If `platform_tag`, is None, it returns the the highest matching manylinux/musllinux policy, or `linux`
 /// if nothing else matches. It will error for bogus cases, e.g. if libpython is linked.
 ///
-/// If a specific manylinux version is given, compliance is checked and a warning printed if
+/// If a specific manylinux/musllinux version is given, compliance is checked and a warning printed if
 /// a higher version would be possible.
 ///
-/// Does nothing for manylinux set to off or non-linux platforms.  
+/// Does nothing for `platform_tag` set to `Off`/`Linux` or non-linux platforms.
 pub fn auditwheel_rs(
     path: &Path,
     target: &Target,
-    manylinux: Option<Manylinux>,
+    platform_tag: Option<PlatformTag>,
 ) -> Result<Policy, AuditWheelError> {
-    if !target.is_linux() || manylinux == Some(Manylinux::Off) {
+    if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok(Policy::default());
+    }
+    if let Some(musl_tag @ PlatformTag::Musllinux { .. }) = platform_tag {
+        // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
+        eprintln!("⚠  Warning: no auditwheel support for musllinux yet");
+        // HACK: fake a musllinux policy
+        return Ok(Policy {
+            name: musl_tag.to_string(),
+            aliases: Vec::new(),
+            priority: 0,
+            symbol_versions: Default::default(),
+            lib_whitelist: Default::default(),
+        });
     }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
@@ -273,7 +282,7 @@ pub fn auditwheel_rs(
     let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
     let versioned_libraries = find_versioned_libraries(&elf, &buffer)?;
 
-    // Find the highest possible manylinux policy, if any
+    // Find the highest possible policy, if any
     let mut highest_policy = None;
     for policy in POLICIES.iter() {
         let result = policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries);
@@ -283,16 +292,16 @@ pub fn auditwheel_rs(
                 break;
             }
             // UnsupportedArchitecture happens when trying 2010 with aarch64
-            Err(AuditWheelError::ManylinuxValidationError(_, _))
-            | Err(AuditWheelError::UnsupportedArchitecture(_)) => continue,
+            Err(AuditWheelError::PlatformTagValidationError(_, _))
+            | Err(AuditWheelError::UnsupportedArchitecture(..)) => continue,
             // If there was an error parsing the symbols or libpython was linked,
             // we error no matter what the requested policy was
             Err(err) => return Err(err),
         }
     }
 
-    if let Some(manylinux) = manylinux {
-        let policy = Policy::from_name(&manylinux.to_string()).unwrap();
+    if let Some(platform_tag) = platform_tag {
+        let policy = Policy::from_name(&platform_tag.to_string()).unwrap();
 
         if let Some(highest_policy) = highest_policy {
             if policy.priority < highest_policy.priority {
@@ -312,7 +321,7 @@ pub fn auditwheel_rs(
         Ok(policy)
     } else {
         println!(
-            "⚠  Warning: No compatible manylinux tag found, using the linux tag instead. \
+            "⚠  Warning: No compatible platform tag found, using the linux tag instead. \
             You won't be able to upload those wheels to pypi."
         );
 

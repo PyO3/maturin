@@ -14,7 +14,7 @@
 //!
 //! - upload: Uses reqwest to add the upload command.
 //!
-//! - rustls: Makes reqwest use the rustls stack so that we can build maturin in a cent os 5
+//! - rustls: Makes reqwest use the rustls stack so that we can build maturin in a CentOS 6
 //! docker container and which maturin itself manylinux compliant.
 //!
 //! - human-panic: Adds https://github.com/rust-clique/human-panic
@@ -42,7 +42,7 @@ pub use crate::read_distribution::{
     get_metadata_for_distribution, get_supported_version_for_distribution,
 };
 pub use crate::target::Target;
-pub use auditwheel::Manylinux;
+pub use auditwheel::PlatformTag;
 pub use source_distribution::source_distribution;
 #[cfg(feature = "upload")]
 pub use {

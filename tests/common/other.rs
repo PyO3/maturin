@@ -50,8 +50,8 @@ pub fn test_musl() -> Result<bool> {
         "python3",
         "--target",
         "x86_64-unknown-linux-musl",
-        "--manylinux",
-        "off",
+        "--compatibility",
+        "linux",
     ])?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
@@ -87,8 +87,8 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "build",
         "--manifest-path",
         "test-crates/workspace/py/Cargo.toml",
-        "--manylinux",
-        "off",
+        "--compatibility",
+        "linux",
     ])?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;

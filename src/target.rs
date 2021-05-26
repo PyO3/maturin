@@ -9,7 +9,7 @@ use anyhow::{bail, format_err, Context, Result};
 use platform_info::*;
 use target_lexicon::{Environment, Triple};
 
-use crate::{Manylinux, PythonInterpreter};
+use crate::{PlatformTag, PythonInterpreter};
 
 /// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -140,7 +140,7 @@ impl Target {
     }
 
     /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(&self, manylinux: Manylinux, universal2: bool) -> String {
+    pub fn get_platform_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
         match (&self.os, &self.arch) {
             (Os::FreeBsd, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
@@ -159,8 +159,8 @@ impl Target {
                 format!("openbsd_{}_amd64", release)
             }
             (Os::Linux, _) => {
-                let mut tags = vec![format!("{}_{}", manylinux, self.arch)];
-                for alias in manylinux.aliases() {
+                let mut tags = vec![format!("{}_{}", platform_tag, self.arch)];
+                for alias in platform_tag.aliases() {
                     tags.push(format!("{}_{}", alias, self.arch));
                 }
                 tags.join(".")
@@ -198,12 +198,12 @@ impl Target {
     }
 
     /// Returns the default Manylinux tag for this architecture
-    pub fn get_default_manylinux_tag(&self) -> Manylinux {
+    pub fn get_default_manylinux_tag(&self) -> PlatformTag {
         match self.arch {
             Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::S390X => {
-                Manylinux::manylinux2014()
+                PlatformTag::manylinux2014()
             }
-            Arch::X86 | Arch::X86_64 => Manylinux::manylinux2010(),
+            Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
         }
     }
 
@@ -270,10 +270,10 @@ impl Target {
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(&self, manylinux: Manylinux, universal2: bool) -> Vec<String> {
+    pub fn get_py3_tags(&self, platform_tag: PlatformTag, universal2: bool) -> Vec<String> {
         vec![format!(
             "py3-none-{}",
-            self.get_platform_tag(manylinux, universal2)
+            self.get_platform_tag(platform_tag, universal2)
         )]
     }
 
@@ -338,14 +338,14 @@ impl Target {
     /// Returns the tags for the platform without python version
     pub fn get_universal_tags(
         &self,
-        manylinux: Manylinux,
+        platform_tag: PlatformTag,
         universal2: bool,
     ) -> (String, Vec<String>) {
         let tag = format!(
             "py3-none-{platform}",
-            platform = self.get_platform_tag(manylinux, universal2)
+            platform = self.get_platform_tag(platform_tag, universal2)
         );
-        let tags = self.get_py3_tags(manylinux, universal2);
+        let tags = self.get_py3_tags(platform_tag, universal2);
         (tag, tags)
     }
 }

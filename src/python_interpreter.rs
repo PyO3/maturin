@@ -1,4 +1,4 @@
-use crate::auditwheel::Manylinux;
+use crate::auditwheel::PlatformTag;
 use crate::{BridgeModel, Target};
 use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
@@ -339,10 +339,10 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, manylinux: Manylinux, universal2: bool) -> String {
+    pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
         match self.interpreter_kind {
             InterpreterKind::CPython => {
-                let platform = self.target.get_platform_tag(manylinux, universal2);
+                let platform = self.target.get_platform_tag(platform_tag, universal2);
                 if self.target.is_unix() {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
@@ -362,7 +362,7 @@ impl PythonInterpreter {
                 }
             }
             InterpreterKind::PyPy => {
-                let platform = self.target.get_platform_tag(manylinux, universal2);
+                let platform = self.target.get_platform_tag(platform_tag, universal2);
                 // pypy uses its version as part of the ABI, e.g.
                 // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2010_x86_64.whl
                 format!(

@@ -257,9 +257,20 @@ pub fn auditwheel_rs(
     target: &Target,
     platform_tag: Option<PlatformTag>,
 ) -> Result<Policy, AuditWheelError> {
-    // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok(Policy::default());
+    }
+    if let Some(musl_tag @ PlatformTag::Musllinux { .. }) = platform_tag {
+        // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
+        eprintln!("⚠  Warning: no auditwheel support for musllinux yet");
+        // HACK: fake a musllinux policy
+        return Ok(Policy {
+            name: musl_tag.to_string(),
+            aliases: Vec::new(),
+            priority: 0,
+            symbol_versions: Default::default(),
+            lib_whitelist: Default::default(),
+        });
     }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;

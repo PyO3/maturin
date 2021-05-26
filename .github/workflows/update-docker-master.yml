@@ -3,7 +3,7 @@ name: Update the master tag of the Docker container
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   update-docker-master:

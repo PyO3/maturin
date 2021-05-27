@@ -6,7 +6,6 @@
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "upload")]
 use bytesize::ByteSize;
-use cargo_metadata::MetadataCommand;
 #[cfg(feature = "upload")]
 use configparser::ini::Ini;
 use fs_err as fs;
@@ -15,8 +14,8 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, source_distribution, write_dist_info, BridgeModel, BuildOptions, CargoToml,
-    Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter, Target,
+    develop, write_dist_info, BridgeModel, BuildOptions, PathWriter, PlatformTag,
+    PythonInterpreter, SDistContext, Target,
 };
 use std::env;
 use std::path::PathBuf;
@@ -426,23 +425,8 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             sdist_directory,
             manifest_path,
         } => {
-            let cargo_toml = CargoToml::from_path(&manifest_path)?;
-            let manifest_dir = manifest_path.parent().unwrap();
-            let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-                .context("Failed to parse Cargo.toml into python metadata")?;
-            let cargo_metadata = MetadataCommand::new()
-                .manifest_path(&manifest_path)
-                .exec()
-                .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
-
-            let path = source_distribution(
-                sdist_directory,
-                &metadata21,
-                &manifest_path,
-                &cargo_metadata,
-                None,
-            )
-            .context("Failed to build source distribution")?;
+            let path = SDistContext::new(manifest_path, Some(sdist_directory))?
+                .build_source_distribution()?;
             println!("{}", path.file_name().unwrap().to_str().unwrap());
         }
     };
@@ -618,37 +602,7 @@ fn run() -> Result<()> {
             )?;
         }
         Opt::SDist { manifest_path, out } => {
-            let manifest_dir = manifest_path.parent().unwrap();
-
-            // Ensure the project has a compliant pyproject.toml
-            let pyproject = PyProjectToml::new(&manifest_dir)
-                .context("A pyproject.toml with a PEP 517 compliant `[build-system]` table is required to build a source distribution")?;
-
-            let cargo_toml = CargoToml::from_path(&manifest_path)?;
-            let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-                .context("Failed to parse Cargo.toml into python metadata")?;
-
-            let cargo_metadata = MetadataCommand::new()
-                .manifest_path(&manifest_path)
-                .exec()
-                .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
-
-            let wheel_dir = match out {
-                Some(ref dir) => dir.clone(),
-                None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
-            };
-
-            fs::create_dir_all(&wheel_dir)
-                .context("Failed to create the target directory for the source distribution")?;
-
-            source_distribution(
-                &wheel_dir,
-                &metadata21,
-                &manifest_path,
-                &cargo_metadata,
-                pyproject.sdist_include(),
-            )
-            .context("Failed to build source distribution")?;
+            SDistContext::new(manifest_path, out)?.build_source_distribution()?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
         #[cfg(feature = "upload")]

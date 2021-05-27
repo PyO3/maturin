@@ -43,6 +43,7 @@ pub use crate::read_distribution::{
 };
 pub use crate::target::Target;
 pub use auditwheel::PlatformTag;
+pub use sdist_context::SDistContext;
 pub use source_distribution::source_distribution;
 #[cfg(feature = "upload")]
 pub use {
@@ -64,6 +65,7 @@ mod python_interpreter;
 mod read_distribution;
 #[cfg(feature = "upload")]
 mod registry;
+mod sdist_context;
 mod source_distribution;
 mod target;
 #[cfg(feature = "upload")]

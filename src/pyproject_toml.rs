@@ -1,20 +1,8 @@
 use anyhow::{format_err, Context, Result};
+use pyproject_toml::PyProjectToml as ProjectToml;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-
-/// The `[build-system]` section of a pyproject.toml as specified in PEP 517
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct BuildSystem {
-    /// PEP 518: This key must have a value of a list of strings representing PEP 508 dependencies
-    /// required to execute the build system (currently that means what dependencies are required
-    /// to execute a setup.py file).
-    pub requires: Vec<String>,
-    /// PEP 517: `build-backend` is a string naming a Python object that will be used to perform
-    /// the build
-    pub build_backend: String,
-}
 
 /// The `[tool]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,20 +22,22 @@ pub struct ToolMaturin {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
-    /// PEP 518: The [build-system] table is used to store build-related data. Initially only one
-    /// key of the table will be valid and is mandatory for the table: requires. This key must have
-    /// a value of a list of strings representing PEP 508 dependencies required to execute the
-    /// build system (currently that means what dependencies are required to execute a setup.py
-    /// file).
-    ///
-    /// We also mandate `build_backend`
-    pub build_system: BuildSystem,
+    #[serde(flatten)]
+    inner: ProjectToml,
     /// PEP 518: The `[tool]` table is where any tool related to your Python project, not just build
     /// tools, can have users specify configuration data as long as they use a sub-table within
     /// `[tool]`, e.g. the flit tool would store its configuration in `[tool.flit]`.
     ///
     /// We use it for `[tool.maturin]`
     pub tool: Option<Tool>,
+}
+
+impl std::ops::Deref for PyProjectToml {
+    type Target = ProjectToml;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 impl PyProjectToml {

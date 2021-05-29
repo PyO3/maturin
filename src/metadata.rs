@@ -1,5 +1,5 @@
-use crate::CargoToml;
-use anyhow::{Context, Result};
+use crate::{CargoToml, PyProjectToml};
+use anyhow::{bail, Context, Result};
 use fs_err as fs;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -52,6 +52,9 @@ pub struct Metadata21 {
     pub requires_external: Vec<String>,
     pub project_url: HashMap<String, String>,
     pub provides_extra: Vec<String>,
+    pub scripts: HashMap<String, String>,
+    pub gui_scripts: HashMap<String, String>,
+    pub entry_points: HashMap<String, HashMap<String, String>>,
 }
 
 const PLAINTEXT_CONTENT_TYPE: &str = "text/plain; charset=UTF-8";
@@ -76,6 +79,176 @@ fn path_to_content_type(path: &Path) -> String {
 }
 
 impl Metadata21 {
+    /// Merge metadata with pyproject.toml, where pyproject.toml takes precedence
+    ///
+    /// manifest_path must be the directory, not the file
+    fn merge_pyproject_toml(&mut self, manifest_path: impl AsRef<Path>) -> Result<()> {
+        let manifest_path = manifest_path.as_ref();
+        if !manifest_path.join("pyproject.toml").is_file() {
+            return Ok(());
+        }
+        let pyproject_toml =
+            PyProjectToml::new(manifest_path).context("pyproject.toml is invalid")?;
+        if let Some(project) = &pyproject_toml.project {
+            self.name = project.name.clone();
+
+            if let Some(version) = &project.version {
+                self.version = version.clone();
+            }
+
+            if let Some(description) = &project.description {
+                self.summary = Some(description.clone());
+            }
+
+            match &project.readme {
+                Some(pyproject_toml::ReadMe::RelativePath(readme_path)) => {
+                    let readme_path = manifest_path.join(readme_path);
+                    let description = Some(fs::read_to_string(&readme_path).context(format!(
+                        "Failed to read readme specified in pyproject.toml, which should be at {}",
+                        readme_path.display()
+                    ))?);
+                    self.description = description;
+                    self.description_content_type = Some(path_to_content_type(&readme_path));
+                }
+                Some(pyproject_toml::ReadMe::Table {
+                    file,
+                    text,
+                    content_type,
+                }) => {
+                    if file.is_some() && text.is_some() {
+                        bail!("file and text fields of 'project.readme' are mutually-exclusive, only one of them should be specified");
+                    }
+                    if let Some(readme_path) = file {
+                        let readme_path = manifest_path.join(readme_path);
+                        let description = Some(fs::read_to_string(&readme_path).context(format!(
+                                "Failed to read readme specified in pyproject.toml, which should be at {}",
+                                readme_path.display()
+                            ))?);
+                        self.description = description;
+                    }
+                    if let Some(description) = text {
+                        self.description = Some(description.clone());
+                    }
+                    self.description_content_type = content_type.clone();
+                }
+                None => {}
+            }
+
+            if let Some(requires_python) = &project.requires_python {
+                self.requires_python = Some(requires_python.clone());
+            }
+
+            if let Some(pyproject_toml::License { file, text }) = &project.license {
+                if file.is_some() && text.is_some() {
+                    bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
+                }
+                if let Some(license_path) = file {
+                    let license_path = manifest_path.join(license_path);
+                    self.license = Some(fs::read_to_string(&license_path).context(format!(
+                            "Failed to read license file specified in pyproject.toml, which should be at {}",
+                            license_path.display()
+                        ))?);
+                }
+                if let Some(license_text) = text {
+                    self.license = Some(license_text.clone());
+                }
+            }
+
+            if let Some(authors) = &project.authors {
+                let mut names = Vec::with_capacity(authors.len());
+                let mut emails = Vec::with_capacity(authors.len());
+                for author in authors {
+                    match (&author.name, &author.email) {
+                        (Some(name), Some(email)) => {
+                            emails.push(format!("{} <{}>", name, email));
+                        }
+                        (Some(name), None) => {
+                            names.push(name.as_str());
+                        }
+                        (None, Some(email)) => {
+                            emails.push(email.clone());
+                        }
+                        (None, None) => {}
+                    }
+                }
+                self.author = Some(names.join(", "));
+                self.author_email = Some(emails.join(", "));
+            }
+
+            if let Some(maintainers) = &project.maintainers {
+                let mut names = Vec::with_capacity(maintainers.len());
+                let mut emails = Vec::with_capacity(maintainers.len());
+                for maintainer in maintainers {
+                    match (&maintainer.name, &maintainer.email) {
+                        (Some(name), Some(email)) => {
+                            emails.push(format!("{} <{}>", name, email));
+                        }
+                        (Some(name), None) => {
+                            names.push(name.as_str());
+                        }
+                        (None, Some(email)) => {
+                            emails.push(email.clone());
+                        }
+                        (None, None) => {}
+                    }
+                }
+                self.maintainer = Some(names.join(", "));
+                self.maintainer_email = Some(emails.join(", "));
+            }
+
+            if let Some(keywords) = &project.keywords {
+                self.keywords = Some(keywords.join(" "));
+            }
+
+            if let Some(classifiers) = &project.classifiers {
+                self.classifiers = classifiers.clone();
+            }
+
+            if let Some(urls) = &project.urls {
+                self.project_url = urls.clone();
+            }
+
+            if let Some(dependencies) = &project.dependencies {
+                self.requires_dist = dependencies.clone();
+            }
+
+            if let Some(dependencies) = &project.optional_dependencies {
+                for (extra, deps) in dependencies {
+                    self.provides_extra.push(extra.clone());
+                    for dep in deps {
+                        let dist = if let Some((dep, marker)) = dep.split_once(';') {
+                            // optional dependency already has environment markers
+                            let new_marker =
+                                format!("({}) and extra == '{}'", marker.trim(), extra);
+                            format!("{}; {}", dep, new_marker)
+                        } else {
+                            format!("{}; extra == '{}'", dep, extra)
+                        };
+                        self.requires_dist.push(dist);
+                    }
+                }
+            }
+
+            if let Some(scripts) = &project.scripts {
+                self.scripts = scripts.clone();
+            }
+            if let Some(gui_scripts) = &project.gui_scripts {
+                self.gui_scripts = gui_scripts.clone();
+            }
+            if let Some(entry_points) = &project.entry_points {
+                // Raise error on ambiguous entry points: https://www.python.org/dev/peps/pep-0621/#entry-points
+                if entry_points.contains_key("console_scripts") {
+                    bail!("console_scripts is not allowed in project.entry-points table");
+                }
+                if entry_points.contains_key("gui_scripts") {
+                    bail!("gui_scripts is not allowed in project.entry-points table");
+                }
+                self.entry_points = entry_points.clone();
+            }
+        }
+        Ok(())
+    }
+
     /// Uses a Cargo.toml to create the metadata for python packages
     ///
     /// manifest_path must be the directory, not the file
@@ -123,7 +296,7 @@ impl Metadata21 {
             })
             .unwrap_or_else(|| cargo_toml.package.name.clone());
 
-        Ok(Metadata21 {
+        let mut metadata = Metadata21 {
             metadata_version: "2.1".to_owned(),
 
             // Mapped from cargo metadata
@@ -161,7 +334,12 @@ impl Metadata21 {
             // Open question: Should those also be supported? And if so, how?
             platform: Vec::new(),
             supported_platform: Vec::new(),
-        })
+            scripts: cargo_toml.scripts(),
+            gui_scripts: HashMap::new(),
+            entry_points: HashMap::new(),
+        };
+        metadata.merge_pyproject_toml(manifest_path)?;
+        Ok(metadata)
     }
 
     /// Formats the metadata into a list where keys with multiple values
@@ -518,5 +696,38 @@ mod test {
                 result
             );
         }
+    }
+
+    #[test]
+    fn test_merge_metadata_from_pyproject_toml() {
+        let cargo_toml_str = fs_err::read_to_string("test-crates/pyo3-pure/Cargo.toml").unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
+        let metadata = Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure").unwrap();
+        assert_eq!(
+            metadata.summary,
+            Some("Implements a dummy function in Rust".to_string())
+        );
+        assert_eq!(
+            metadata.description,
+            Some(fs_err::read_to_string("test-crates/pyo3-pure/Readme.md").unwrap())
+        );
+        assert_eq!(metadata.classifiers, &["Programming Language :: Rust"]);
+        assert_eq!(
+            metadata.maintainer_email,
+            Some("messense <messense@icloud.com>".to_string())
+        );
+        assert_eq!(metadata.scripts["get_42"], "pyo3_pure:DummyClass.get_42");
+        assert_eq!(
+            metadata.gui_scripts["get_42_gui"],
+            "pyo3_pure:DummyClass.get_42"
+        );
+        assert_eq!(metadata.provides_extra, &["test"]);
+        assert_eq!(
+            metadata.requires_dist,
+            &[
+                "attrs; extra == 'test'",
+                "boltons; (sys_platform == 'win32') and extra == 'test'"
+            ]
+        )
     }
 }

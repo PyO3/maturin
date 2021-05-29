@@ -410,7 +410,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             };
 
             let mut writer = PathWriter::from_path(metadata_directory);
-            write_dist_info(&mut writer, &context.metadata21, &context.scripts, &tags)?;
+            write_dist_info(&mut writer, &context.metadata21, &tags)?;
             println!("{}", context.metadata21.get_dist_info_dir().display());
         }
         Pep517Command::BuildWheel {

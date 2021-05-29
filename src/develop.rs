@@ -178,12 +178,7 @@ pub fn develop(
         }
     };
 
-    write_dist_info(
-        &mut writer,
-        &build_context.metadata21,
-        &build_context.scripts,
-        &tags,
-    )?;
+    write_dist_info(&mut writer, &build_context.metadata21, &tags)?;
 
     // https://packaging.python.org/specifications/recording-installed-packages/#the-installer-file
     writer.add_bytes(

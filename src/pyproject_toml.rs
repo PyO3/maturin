@@ -51,10 +51,10 @@ impl PyProjectToml {
             "Couldn't find pyproject.toml at {}",
             path.display()
         ))?;
-        let cargo_toml: PyProjectToml = toml::from_str(&contents)
+        let pyproject: PyProjectToml = toml::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
-        cargo_toml.warn_missing_maturin_version();
-        Ok(cargo_toml)
+        pyproject.warn_missing_maturin_version();
+        Ok(pyproject)
     }
 
     /// Returns the value of `[maturin.sdist-include]` in pyproject.toml

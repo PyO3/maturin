@@ -1,3 +1,26 @@
 [build-system]
 requires = ["maturin>=0.10,<0.11"]
 build-backend = "maturin"
+
+[project]
+name = "pyo3-pure"
+classifiers = [
+    "Programming Language :: Rust"
+]
+description = "Implements a dummy function in Rust"
+readme = "Readme.md"
+maintainers = [
+    {name = "messense", email = "messense@icloud.com"}
+]
+
+[project.optional-dependencies]
+test = [
+    "attrs",
+    "boltons; sys_platform == 'win32'"
+]
+
+[project.scripts]
+get_42 = "pyo3_pure:DummyClass.get_42"
+
+[project.gui-scripts]
+get_42_gui = "pyo3_pure:DummyClass.get_42"

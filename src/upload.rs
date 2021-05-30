@@ -77,7 +77,15 @@ pub fn upload(
         // Type system shenanigans
         .chain(metadata21.to_vec().into_iter())
         // All fields must be lower case and with underscores or they will be ignored by warehouse
-        .map(|(key, value)| (key.to_lowercase().replace("-", "_"), value))
+        .map(|(key, value)| {
+            let mut key = key.to_lowercase().replace("-", "_");
+            if key == "classifier" {
+                // PyPI upload api expects `classifiers` instead of `classifier`
+                // See https://github.com/pypa/warehouse/issues/3151#issuecomment-796965735
+                key = "classifiers".to_string();
+            }
+            (key, value)
+        })
         .collect();
 
     let mut form = Form::new();

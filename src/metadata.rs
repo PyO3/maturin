@@ -361,7 +361,7 @@ impl Metadata21 {
         add_vec("Supported-Platform", &self.supported_platform);
         add_vec("Platform", &self.platform);
         add_vec("Supported-Platform", &self.supported_platform);
-        add_vec("Classifiers", &self.classifiers);
+        add_vec("Classifier", &self.classifiers);
         add_vec("Requires-Dist", &self.requires_dist);
         add_vec("Provides-Dist", &self.provides_dist);
         add_vec("Obsoletes-Dist", &self.obsoletes_dist);
@@ -542,7 +542,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
-            Classifiers: Programming Language :: Python
+            Classifier: Programming Language :: Python
             Requires-Dist: flask~=1.1.0
             Requires-Dist: toml==0.10.0
             Summary: A test project
@@ -601,7 +601,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
-            Classifiers: Programming Language :: Python
+            Classifier: Programming Language :: Python
             Requires-Dist: flask~=1.1.0
             Requires-Dist: toml==0.10.0
             Summary: A test project
@@ -649,7 +649,7 @@ mod test {
             Metadata-Version: 2.1
             Name: info
             Version: 0.1.0
-            Classifiers: Programming Language :: Python
+            Classifier: Programming Language :: Python
             Summary: A test project
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>

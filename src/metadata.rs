@@ -197,7 +197,7 @@ impl Metadata21 {
             }
 
             if let Some(keywords) = &project.keywords {
-                self.keywords = Some(keywords.join(" "));
+                self.keywords = Some(keywords.join(","));
             }
 
             if let Some(classifiers) = &project.classifiers {
@@ -309,7 +309,7 @@ impl Metadata21 {
                 .package
                 .keywords
                 .clone()
-                .map(|keywords| keywords.join(" ")),
+                .map(|keywords| keywords.join(",")),
             home_page: cargo_toml.package.homepage.clone(),
             download_url: None,
             // Cargo.toml has no distinction between author and author email
@@ -546,7 +546,7 @@ mod test {
             Requires-Dist: flask~=1.1.0
             Requires-Dist: toml==0.10.0
             Summary: A test project
-            Keywords: ffi test
+            Keywords: ffi,test
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-Email: konstin <konstin@mailbox.org>
@@ -605,7 +605,7 @@ mod test {
             Requires-Dist: flask~=1.1.0
             Requires-Dist: toml==0.10.0
             Summary: A test project
-            Keywords: ffi test
+            Keywords: ffi,test
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-Email: konstin <konstin@mailbox.org>

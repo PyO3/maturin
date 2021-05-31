@@ -1,6 +1,6 @@
 use crate::common::{adjust_canonicalization, check_installed, maybe_mock_cargo};
 use anyhow::{bail, Context, Result};
-use maturin::{BuildOptions, Target};
+use maturin::{BuildOptions, PythonInterpreter, Target};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -30,7 +30,7 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
         cli.push(bindings);
     }
 
-    let options = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
     let wheels = build_context.build_wheels()?;
@@ -42,11 +42,23 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
         .to_str()
         .unwrap()
         .to_string();
+    // For abi3 on unix, we didn't use a python interpreter, but we need one here
+    let interpreter = if build_context.interpreter.is_empty() {
+        let error_message = "python3 should be a python interpreter";
+        let venv_interpreter = PythonInterpreter::check_executable(
+            "python3",
+            &build_context.target,
+            &build_context.bridge,
+        )
+        .context(error_message)?
+        .context(error_message)?;
+        vec![venv_interpreter]
+    } else {
+        build_context.interpreter
+    };
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
-    for ((filename, supported_version), ref python_interpreter) in
-        wheels.iter().zip(build_context.interpreter)
-    {
+    for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
         let venv_name = if supported_version == "py3" {
             format!("{}-cffi", test_name)
         } else {
@@ -96,7 +108,8 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
             bail!(
-                "pip install failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+                "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+                venv_dir.display(),
                 &command,
                 output.status,
                 str::from_utf8(&output.stdout)?.trim(),

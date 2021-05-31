@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add PEP 656 musllinux support in [#543](https://github.com/PyO3/maturin/pull/543)
 * `--manylinux` is now called `--compatibility` and supports musllinux
+* The pure rust install layout changed from just the shared library to a python module that reexports the shared library. This should have now observable consequences for users of the created wheel expect that `my_project.my_project` is now also importable (and equal to just `my_project`)
 
 ## 0.10.6 - 2021-05-21
 

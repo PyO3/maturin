@@ -608,7 +608,14 @@ pub fn write_bindings_module(
             writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
         }
         ProjectLayout::PureRust(_) => {
-            writer.add_file_with_permissions(so_filename, &artifact, 0o755)?;
+            let module = PathBuf::from(module_name);
+            writer.add_directory(&module)?;
+            // Reexport the shared library as if it were the top level module
+            writer.add_bytes(
+                &module.join("__init__.py"),
+                format!("from .{} import *\n", module_name).as_bytes(),
+            )?;
+            writer.add_file_with_permissions(&module.join(so_filename), &artifact, 0o755)?;
         }
     }
 

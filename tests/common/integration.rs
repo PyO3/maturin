@@ -64,9 +64,7 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
         } else {
             format!(
                 "{}-{}.{}",
-                test_name,
-                supported_version.chars().nth(2usize).unwrap(),
-                supported_version.chars().nth(3usize).unwrap()
+                test_name, python_interpreter.major, python_interpreter.minor,
             )
         };
         let venv_dir = PathBuf::from("test-crates")

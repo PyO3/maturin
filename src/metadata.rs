@@ -358,7 +358,6 @@ impl Metadata21 {
             }
         };
 
-        add_vec("Supported-Platform", &self.supported_platform);
         add_vec("Platform", &self.platform);
         add_vec("Supported-Platform", &self.supported_platform);
         add_vec("Classifier", &self.classifiers);
@@ -377,11 +376,11 @@ impl Metadata21 {
         add_option("Summary", &self.summary);
         add_option("Keywords", &self.keywords);
         add_option("Home-Page", &self.home_page);
-        add_option("Download-Url", &self.download_url);
+        add_option("Download-URL", &self.download_url);
         add_option("Author", &self.author);
-        add_option("Author-Email", &self.author_email);
+        add_option("Author-email", &self.author_email);
         add_option("Maintainer", &self.maintainer);
-        add_option("Maintainer-Email", &self.maintainer_email);
+        add_option("Maintainer-email", &self.maintainer_email);
         add_option("License", &self.license);
         add_option("Requires-Python", &self.requires_python);
         add_option("Description-Content-Type", &self.description_content_type);
@@ -549,7 +548,7 @@ mod test {
             Keywords: ffi,test
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
-            Author-Email: konstin <konstin@mailbox.org>
+            Author-email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/plain; charset=UTF-8
             Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/
 
@@ -608,7 +607,7 @@ mod test {
             Keywords: ffi,test
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
-            Author-Email: konstin <konstin@mailbox.org>
+            Author-email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/x-rst
 
             Some test package
@@ -653,7 +652,7 @@ mod test {
             Summary: A test project
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
-            Author-Email: konstin <konstin@mailbox.org>
+            Author-email: konstin <konstin@mailbox.org>
         "#
         );
 

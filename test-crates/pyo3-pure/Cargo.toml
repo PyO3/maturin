@@ -2,17 +2,8 @@
 authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-pure"
 version = "2.1.2"
-description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
-readme = "Readme.md"
 edition = "2018"
-
-[package.metadata.maturin.scripts]
-get_42 = "pyo3_pure:DummyClass.get_42"
-
-[package.metadata.maturin]
-classifier = [
-    "Programming Language :: Rust"
-]
+description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
 
 [dependencies]
 pyo3 = { version = "0.13.2", features = ["abi3-py36", "extension-module"] }

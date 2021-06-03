@@ -14,7 +14,6 @@ use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The way the rust code is used in the wheel
@@ -127,8 +126,6 @@ pub struct BuildContext {
     pub project_layout: ProjectLayout,
     /// Python Package Metadata 2.1
     pub metadata21: Metadata21,
-    /// The `[console_scripts]` for the entry_points.txt
-    pub scripts: HashMap<String, String>,
     /// The name of the crate
     pub crate_name: String,
     /// The name of the module can be distinct from the package name, mostly
@@ -240,13 +237,7 @@ impl BuildContext {
         let platform = self.target.get_platform_tag(platform_tag, self.universal2);
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata21,
-            &self.scripts,
-            &[tag.clone()],
-        )?;
+        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
 
         write_bindings_module(
             &mut writer,
@@ -301,13 +292,7 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(platform_tag, self.universal2);
 
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata21,
-            &self.scripts,
-            &[tag.clone()],
-        )?;
+        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
 
         write_bindings_module(
             &mut writer,
@@ -397,8 +382,7 @@ impl BuildContext {
             .target
             .get_universal_tags(platform_tag, self.universal2);
 
-        let mut builder =
-            WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
+        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
 
         write_cffi_module(
             &mut builder,
@@ -436,12 +420,11 @@ impl BuildContext {
             .target
             .get_universal_tags(platform_tag, self.universal2);
 
-        if !self.scripts.is_empty() {
+        if !self.metadata21.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
         }
 
-        let mut builder =
-            WheelWriter::new(&tag, &self.out, &self.metadata21, &self.scripts, &tags)?;
+        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
 
         match self.project_layout {
             ProjectLayout::Mixed {

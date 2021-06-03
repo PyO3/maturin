@@ -133,7 +133,6 @@ impl BuildOptions {
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
         let extra_metadata = cargo_toml.remaining_core_metadata();
-        let scripts = cargo_toml.scripts();
 
         let crate_name = &cargo_toml.package.name;
 
@@ -231,7 +230,6 @@ impl BuildOptions {
             bridge,
             project_layout,
             metadata21,
-            scripts,
             crate_name: crate_name.to_string(),
             module_name,
             manifest_path: self.manifest_path,

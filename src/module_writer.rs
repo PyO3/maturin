@@ -248,7 +248,6 @@ impl WheelWriter {
         tag: &str,
         wheel_dir: &Path,
         metadata21: &Metadata21,
-        scripts: &HashMap<String, String>,
         tags: &[String],
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
@@ -267,7 +266,7 @@ impl WheelWriter {
             wheel_path,
         };
 
-        write_dist_info(&mut builder, &metadata21, &scripts, &tags)?;
+        write_dist_info(&mut builder, &metadata21, &tags)?;
 
         Ok(builder)
     }
@@ -379,10 +378,13 @@ Root-Is-Purelib: false
 }
 
 /// https://packaging.python.org/specifications/entry-points/
-fn entry_points_txt(entrypoints: &HashMap<String, String, impl std::hash::BuildHasher>) -> String {
+fn entry_points_txt(
+    entry_type: &str,
+    entrypoints: &HashMap<String, String, impl std::hash::BuildHasher>,
+) -> String {
     entrypoints
         .iter()
-        .fold("[console_scripts]\n".to_owned(), |text, (k, v)| {
+        .fold(format!("[{}]\n", entry_type), |text, (k, v)| {
             text + k + "=" + v + "\n"
         })
 }
@@ -733,7 +735,6 @@ pub fn write_python_part(
 pub fn write_dist_info(
     writer: &mut impl ModuleWriter,
     metadata21: &Metadata21,
-    scripts: &HashMap<String, String, impl std::hash::BuildHasher>,
     tags: &[String],
 ) -> Result<()> {
     let dist_info_dir = metadata21.get_dist_info_dir();
@@ -747,10 +748,20 @@ pub fn write_dist_info(
 
     writer.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags).as_bytes())?;
 
-    if !scripts.is_empty() {
+    let mut entry_points = String::new();
+    if !metadata21.scripts.is_empty() {
+        entry_points.push_str(&entry_points_txt("console_scripts", &metadata21.scripts));
+    }
+    if !metadata21.gui_scripts.is_empty() {
+        entry_points.push_str(&entry_points_txt("gui_scripts", &metadata21.gui_scripts));
+    }
+    for (entry_type, scripts) in &metadata21.entry_points {
+        entry_points.push_str(&entry_points_txt(entry_type, scripts));
+    }
+    if !entry_points.is_empty() {
         writer.add_bytes(
             &dist_info_dir.join("entry_points.txt"),
-            entry_points_txt(scripts).as_bytes(),
+            entry_points.as_bytes(),
         )?;
     }
 

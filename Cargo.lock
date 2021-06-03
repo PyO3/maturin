@@ -923,6 +923,7 @@ dependencies = [
  "once_cell",
  "platform-info",
  "pretty_env_logger",
+ "pyproject-toml",
  "regex",
  "reqwest",
  "rpassword",
@@ -1277,6 +1278,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0d8caf72986c1a598726adc988bb5984792ef84f5ee5aa50209145ee8077038"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "pyproject-toml"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e623b250f749d036a4a60f41fdc7bc0c214491a0241c889abdc18fd9ee9c155d"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]

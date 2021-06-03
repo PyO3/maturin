@@ -23,53 +23,11 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
-    maturin::{
-        get_metadata_for_distribution, get_supported_version_for_distribution, upload,
-        BuiltWheelMetadata, Registry, UploadError,
-    },
+    maturin::{upload, Registry, UploadError},
     reqwest::Url,
     rpassword,
     std::io,
 };
-
-#[cfg(feature = "upload")]
-/// Upload item descriptor used by `upload_ui()`
-struct UploadItem {
-    /// Built wheel file path
-    wheel_path: PathBuf,
-    /// Supported Python versions tag (e.g. "cp39")
-    supported_versions: String,
-    /// Wheel metadata in the (key, value) format
-    metadata: Vec<(String, String)>,
-}
-
-#[cfg(feature = "upload")]
-impl UploadItem {
-    /// Creates a new upload item descriptor from the built wheel and its metadata.
-    fn from_built_wheel(wheel: BuiltWheelMetadata, metadata: Vec<(String, String)>) -> Self {
-        let (wheel_path, supported_versions) = wheel;
-
-        UploadItem {
-            wheel_path,
-            supported_versions,
-            metadata,
-        }
-    }
-
-    /// Attempts to create a new upload item descriptor from the third-party wheel file path.
-    ///
-    /// Fails with the wheel metadata extraction errors.
-    fn try_from_wheel_path(wheel_path: PathBuf) -> Result<Self> {
-        let supported_versions = get_supported_version_for_distribution(&wheel_path)?;
-        let metadata = get_metadata_for_distribution(&wheel_path)?;
-
-        Ok(UploadItem {
-            wheel_path,
-            supported_versions,
-            metadata,
-        })
-    }
-}
 
 /// Returns the password and a bool that states whether to ask for re-entering the password
 /// after a failed authentication
@@ -452,13 +410,13 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 
 /// Handles authentication/keyring integration and retrying of the publish subcommand
 #[cfg(feature = "upload")]
-fn upload_ui(items: &[UploadItem], publish: &PublishOpt) -> Result<()> {
+fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
     let registry = complete_registry(&publish)?;
 
     println!("🚀 Uploading {} packages", items.len());
 
     for i in items {
-        let upload_result = upload(&registry, &i.wheel_path, &i.metadata, &i.supported_versions);
+        let upload_result = upload(&registry, &i);
 
         match upload_result {
             Ok(()) => (),
@@ -482,10 +440,7 @@ fn upload_ui(items: &[UploadItem], publish: &PublishOpt) -> Result<()> {
                 bail!("Username and/or password are wrong");
             }
             Err(err) => {
-                let filename = i
-                    .wheel_path
-                    .file_name()
-                    .unwrap_or_else(|| i.wheel_path.as_os_str());
+                let filename = i.file_name().unwrap_or_else(|| i.as_os_str());
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
                         eprintln!(
@@ -495,11 +450,9 @@ fn upload_ui(items: &[UploadItem], publish: &PublishOpt) -> Result<()> {
                         continue;
                     }
                 }
-                let filesize = fs::metadata(&i.wheel_path)
+                let filesize = fs::metadata(&i)
                     .map(|x| ByteSize(x.len()).to_string())
-                    .unwrap_or_else(|e| {
-                        format!("Failed to get the filesize of {:?}: {}", &i.wheel_path, e)
-                    });
+                    .unwrap_or_else(|e| format!("Failed to get the filesize of {:?}: {}", &i, e));
                 return Err(err)
                     .context(format!("💥 Failed to upload {:?} ({})", filename, filesize));
             }
@@ -559,7 +512,6 @@ fn run() -> Result<()> {
                 eprintln!("⚠  Warning: You're publishing debug wheels");
             }
 
-            let metadata21 = build_context.metadata21.to_vec();
             let mut wheels = build_context.build_wheels()?;
             if !no_sdist {
                 if let Some(sd) = build_context.build_source_distribution()? {
@@ -567,10 +519,7 @@ fn run() -> Result<()> {
                 }
             }
 
-            let items = wheels
-                .into_iter()
-                .map(|wheel| UploadItem::from_built_wheel(wheel, metadata21.clone()))
-                .collect::<Vec<_>>();
+            let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();
 
             upload_ui(&items, &publish)?
         }
@@ -658,12 +607,7 @@ fn run() -> Result<()> {
                 return Ok(());
             }
 
-            let items = files
-                .into_iter()
-                .map(UploadItem::try_from_wheel_path)
-                .collect::<Result<Vec<_>>>()?;
-
-            upload_ui(&items, &publish)?
+            upload_ui(&files, &publish)?
         }
     }
 

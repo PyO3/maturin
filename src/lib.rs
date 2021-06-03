@@ -38,9 +38,6 @@ pub use crate::module_writer::{
 };
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
-pub use crate::read_distribution::{
-    get_metadata_for_distribution, get_supported_version_for_distribution,
-};
 pub use crate::target::Target;
 pub use auditwheel::PlatformTag;
 pub use source_distribution::source_distribution;
@@ -61,7 +58,6 @@ mod metadata;
 mod module_writer;
 mod pyproject_toml;
 mod python_interpreter;
-mod read_distribution;
 #[cfg(feature = "upload")]
 mod registry;
 mod source_distribution;

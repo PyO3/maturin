@@ -1,3 +1,15 @@
 [build-system]
 requires = ["maturin>=0.10,<0.11"]
 build-backend = "maturin"
+
+[project]
+name = "pyo3-mixed"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Rust"
+]
+requires-python = ">=3.7"
+dependencies = ["boltons"]
+
+[project.scripts]
+get_42 = "pyo3_mixed:get_42"

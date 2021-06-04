@@ -1,3 +1,10 @@
 [build-system]
 requires = ["maturin>=0.10,<0.11"]
 build-backend = "maturin"
+
+[project]
+name = "pyo3-mixed-submodule"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Rust"
+]

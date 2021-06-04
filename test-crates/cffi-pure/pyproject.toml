@@ -2,5 +2,9 @@
 requires = ["maturin>=0.10,<0.11"]
 build-backend = "maturin"
 
+[project]
+name = "cffi-pure"
+dependencies = ["cffi"]
+
 [tool.maturin]
 bindings = "cffi"

@@ -8,10 +8,6 @@ edition = "2018"
 
 [package.metadata.maturin]
 name = "pyo3_mixed_submodule.rust_module.rust"
-classifier = [
-    "Programming Language :: Python",
-    "Programming Language :: Rust"
-]
 
 [dependencies]
 pyo3 = { version = "0.13.2", features = ["extension-module"] }

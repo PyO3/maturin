@@ -657,7 +657,8 @@ mod test {
         );
 
         let cargo_toml_struct: CargoToml = toml::from_str(&cargo_toml).unwrap();
-        let metadata = Metadata21::from_cargo_toml(&cargo_toml_struct, "").unwrap();
+        let metadata =
+            Metadata21::from_cargo_toml(&cargo_toml_struct, "/not/exist/manifest/path").unwrap();
         let actual = metadata.to_file_contents();
 
         assert_eq!(

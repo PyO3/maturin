@@ -11,16 +11,6 @@ keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 edition = "2018"
 
-[package.metadata.maturin]
-requires-python = ">=3.6"
-classifiers = [
-    "Topic :: Software Development :: Build Tools",
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
-requires-dist = ["toml~=0.10.2"]
-
 [badges]
 travis-ci = { repository = "PyO3/maturin" }
 appveyor = { repository = "konstin/pyo3" }

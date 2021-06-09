@@ -458,7 +458,7 @@ pub fn find_interpreter(
                     // rust-cpython, and legacy pyo3 versions
                     env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
-                    let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref())?;
+                    let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
                     let sysconfig_data =
                         parse_sysconfigdata(&host_python.executable, sysconfig_path)?;
                     let major = sysconfig_data

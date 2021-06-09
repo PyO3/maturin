@@ -154,8 +154,8 @@ fn ends_with(entry: &DirEntry, pat: &str) -> bool {
 /// ```
 ///
 /// [1]: https://github.com/python/cpython/blob/3.5/Lib/sysconfig.py#L389
-pub fn find_sysconfigdata(lib_dir: &Path) -> Result<PathBuf> {
-    let sysconfig_paths = search_lib_dir(lib_dir);
+pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
+    let sysconfig_paths = search_lib_dir(lib_dir, target);
     let mut sysconfig_paths = sysconfig_paths
         .iter()
         .filter_map(|p| fs::canonicalize(p).ok())
@@ -178,7 +178,7 @@ pub fn find_sysconfigdata(lib_dir: &Path) -> Result<PathBuf> {
 }
 
 /// recursive search for _sysconfigdata, returns all possibilities of sysconfigdata paths
-fn search_lib_dir(path: impl AsRef<Path>) -> Vec<PathBuf> {
+fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
     let mut sysconfig_paths = vec![];
     let version_pat = if let Some(v) =
         env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap())
@@ -190,27 +190,23 @@ fn search_lib_dir(path: impl AsRef<Path>) -> Vec<PathBuf> {
     for f in fs::read_dir(path.as_ref()).expect("Path does not exist") {
         let sysc = match &f {
             Ok(f) if starts_with(f, "_sysconfigdata") && ends_with(f, "py") => vec![f.path()],
-            Ok(f) if starts_with(f, "build") => search_lib_dir(f.path()),
+            Ok(f) if starts_with(f, "build") => search_lib_dir(f.path(), target),
             Ok(f) if starts_with(f, "lib.") => {
                 let name = f.file_name();
                 // check if right target os
-                let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-                if !name
-                    .to_string_lossy()
-                    .contains(if os == "android" { "linux" } else { &os })
-                {
+                if !name.to_string_lossy().contains(target.get_python_os()) {
                     continue;
                 }
                 // Check if right arch
                 if !name
                     .to_string_lossy()
-                    .contains(&env::var("CARGO_CFG_TARGET_ARCH").unwrap())
+                    .contains(&target.target_arch().to_string())
                 {
                     continue;
                 }
-                search_lib_dir(f.path())
+                search_lib_dir(f.path(), target)
             }
-            Ok(f) if starts_with(f, &version_pat) => search_lib_dir(f.path()),
+            Ok(f) if starts_with(f, &version_pat) => search_lib_dir(f.path(), target),
             _ => continue,
         };
         sysconfig_paths.extend(sysc);

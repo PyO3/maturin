@@ -481,6 +481,18 @@ pub fn find_interpreter(
                     let abi_tag = sysconfig_data
                         .get("SOABI")
                         .and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
+                    let interpreter_kind = sysconfig_data
+                        .get("SOABI")
+                        .and_then(|tag| {
+                            if tag.starts_with("pypy") {
+                                Some(InterpreterKind::PyPy)
+                            } else if tag.starts_with("cpython") {
+                                Some(InterpreterKind::CPython)
+                            } else {
+                                None
+                            }
+                        })
+                        .context("unsupported Python interpreter")?;
                     interpreter = vec![PythonInterpreter {
                         major,
                         minor,
@@ -488,7 +500,7 @@ pub fn find_interpreter(
                         target: target.clone(),
                         executable: PathBuf::new(),
                         ext_suffix: ext_suffix.to_string(),
-                        interpreter_kind: InterpreterKind::CPython,
+                        interpreter_kind,
                         abi_tag,
                         libs_dir: PathBuf::from(cross_lib_dir),
                     }];

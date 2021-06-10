@@ -3,10 +3,11 @@
 
 use crate::Registry;
 use fs_err::File;
+use regex::Regex;
 use reqwest::{self, blocking::multipart::Form, blocking::Client, StatusCode};
 use sha2::{Digest, Sha256};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Error type for different types of errors that can happen when uploading a
@@ -32,6 +33,9 @@ pub enum UploadError {
     /// File already exists
     #[error("File already exists: {0}")]
     FileExistsError(String),
+    /// Read package metadata error
+    #[error("Could not read the metadata from the package at {0}")]
+    PkgInfoError(PathBuf, #[source] python_pkginfo::Error),
 }
 
 impl From<io::Error> for UploadError {
@@ -46,51 +50,78 @@ impl From<reqwest::Error> for UploadError {
     }
 }
 
+/// Port of pip's `canonicalize_name`
+/// https://github.com/pypa/pip/blob/b33e791742570215f15663410c3ed987d2253d5b/src/pip/_vendor/packaging/utils.py#L18-L25
+fn canonicalize_name(name: &str) -> String {
+    Regex::new("[-_.]+")
+        .unwrap()
+        .replace(name, "-")
+        .to_lowercase()
+}
+
 /// Uploads a single wheel to the registry
-pub fn upload(
-    registry: &Registry,
-    wheel_path: &Path,
-    metadata21: &[(String, String)],
-    supported_version: &str,
-) -> Result<(), UploadError> {
+pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
     let mut wheel = File::open(&wheel_path)?;
     let mut hasher = Sha256::new();
     io::copy(&mut wheel, &mut hasher)?;
     let hash_hex = format!("{:x}", hasher.finalize());
 
+    let dist = python_pkginfo::Distribution::new(wheel_path)
+        .map_err(|err| UploadError::PkgInfoError(wheel_path.to_owned(), err))?;
+    let metadata = dist.metadata();
+
     let mut api_metadata = vec![
-        (":action".to_string(), "file_upload".to_string()),
-        ("sha256_digest".to_string(), hash_hex),
-        ("protocol_version".to_string(), "1".to_string()),
+        (":action", "file_upload".to_string()),
+        ("sha256_digest", hash_hex),
+        ("protocol_version", "1".to_string()),
+        ("metadata_version", metadata.metadata_version.clone()),
+        ("name", canonicalize_name(&metadata.name)),
+        ("version", metadata.version.clone()),
+        ("pyversion", dist.python_version().to_string()),
+        ("filetype", dist.r#type().to_string()),
     ];
 
-    api_metadata.push(("pyversion".to_string(), supported_version.to_string()));
+    let mut add_option = |name, value: &Option<String>| {
+        if let Some(some) = value.clone() {
+            api_metadata.push((name, some));
+        }
+    };
 
-    if supported_version != "source" {
-        api_metadata.push(("filetype".to_string(), "bdist_wheel".to_string()));
-    } else {
-        api_metadata.push(("filetype".to_string(), "sdist".to_string()));
-    }
+    // https://github.com/pypa/warehouse/blob/75061540e6ab5aae3f8758b569e926b6355abea8/warehouse/forklift/legacy.py#L424
+    add_option("summary", &metadata.summary);
+    add_option("description", &metadata.description);
+    add_option(
+        "description_content_type",
+        &metadata.description_content_type,
+    );
+    add_option("author", &metadata.author);
+    add_option("author_email", &metadata.author_email);
+    add_option("maintainer", &metadata.maintainer);
+    add_option("maintainer_email", &metadata.maintainer_email);
+    add_option("license", &metadata.license);
+    add_option("keywords", &metadata.keywords);
+    add_option("home_page", &metadata.home_page);
+    add_option("download_url", &metadata.download_url);
+    add_option("requires_path", &metadata.requires_python);
+    add_option("summary", &metadata.summary);
 
-    let joined_metadata: Vec<(String, String)> = api_metadata
-        .into_iter()
-        // Type system shenanigans
-        .chain(metadata21.to_vec().into_iter())
-        // All fields must be lower case and with underscores or they will be ignored by warehouse
-        .map(|(key, value)| {
-            let mut key = key.to_lowercase().replace("-", "_");
-            if key == "classifier" {
-                // PyPI upload api expects `classifiers` instead of `classifier`
-                // See https://github.com/pypa/warehouse/issues/3151#issuecomment-796965735
-                key = "classifiers".to_string();
-            }
-            (key, value)
-        })
-        .collect();
+    let mut add_vec = |name, values: &[String]| {
+        for i in values {
+            api_metadata.push((name, i.clone()));
+        }
+    };
+
+    add_vec("classifiers", &metadata.classifiers);
+    add_vec("platform", &metadata.platforms);
+    add_vec("requires_dist", &metadata.requires_dist);
+    add_vec("provides_dist", &metadata.provides_dist);
+    add_vec("obsoletes_dist", &metadata.obsoletes_dist);
+    add_vec("requires_external", &metadata.requires_external);
+    add_vec("project_urls", &metadata.project_urls);
 
     let mut form = Form::new();
-    for (key, value) in joined_metadata {
-        form = form.text(key, value.to_owned())
+    for (key, value) in api_metadata {
+        form = form.text(key, value);
     }
 
     form = form.file("content", &wheel_path)?;

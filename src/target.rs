@@ -74,7 +74,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
         Os::FreeBsd => vec![Arch::X86_64],
-        Os::OpenBsd => vec![Arch::X86_64],
+        Os::OpenBsd => vec![Arch::X86, Arch::X86_64],
     }
 }
 
@@ -149,6 +149,14 @@ impl Target {
                 };
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!("freebsd_{}_amd64", release)
+            }
+            (Os::OpenBsd, Arch::X86) => {
+                let info = match PlatformInfo::new() {
+                    Ok(info) => info,
+                    Err(error) => panic!("{}", error),
+                };
+                let release = info.release().replace(".", "_").replace("-", "_");
+                format!("openbsd_{}_i386", release)
             }
             (Os::OpenBsd, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {

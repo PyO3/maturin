@@ -74,7 +74,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
         Os::FreeBsd => vec![Arch::X86_64],
-        Os::OpenBsd => vec![Arch::X86, Arch::X86_64],
+        Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
     }
 }
 
@@ -144,7 +144,8 @@ impl Target {
         match (&self.os, &self.arch) {
             (Os::FreeBsd, Arch::X86_64)
             | (Os::OpenBsd, Arch::X86)
-            | (Os::OpenBsd, Arch::X86_64) => {
+            | (Os::OpenBsd, Arch::X86_64)
+            | (Os::OpenBsd, Arch::Aarch64) => {
                 let info = match PlatformInfo::new() {
                     Ok(info) => info,
                     Err(error) => panic!("{}", error),
@@ -153,6 +154,7 @@ impl Target {
                 let arch = match self.arch {
                     Arch::X86_64 => "amd64",
                     Arch::X86 => "i386",
+                    Arch::Aarch64 => "arm64",
                     _ => panic!(
                         "unsupported architecutre should not have reached get_platform_tag()"
                     ),

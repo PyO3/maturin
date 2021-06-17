@@ -142,29 +142,27 @@ impl Target {
     /// Returns the platform part of the tag for the wheel name
     pub fn get_platform_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
         match (&self.os, &self.arch) {
-            (Os::FreeBsd, Arch::X86_64) => {
+            (Os::FreeBsd, Arch::X86_64)
+            | (Os::OpenBsd, Arch::X86)
+            | (Os::OpenBsd, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
                     Ok(info) => info,
                     Err(error) => panic!("{}", error),
                 };
                 let release = info.release().replace(".", "_").replace("-", "_");
-                format!("freebsd_{}_amd64", release)
-            }
-            (Os::OpenBsd, Arch::X86) => {
-                let info = match PlatformInfo::new() {
-                    Ok(info) => info,
-                    Err(error) => panic!("{}", error),
+                let arch = match self.arch {
+                    Arch::X86_64 => "amd64",
+                    Arch::X86 => "i386",
+                    _ => panic!(
+                        "unsupported architecutre should not have reached get_platform_tag()"
+                    ),
                 };
-                let release = info.release().replace(".", "_").replace("-", "_");
-                format!("openbsd_{}_i386", release)
-            }
-            (Os::OpenBsd, Arch::X86_64) => {
-                let info = match PlatformInfo::new() {
-                    Ok(info) => info,
-                    Err(error) => panic!("{}", error),
-                };
-                let release = info.release().replace(".", "_").replace("-", "_");
-                format!("openbsd_{}_amd64", release)
+                format!(
+                    "{}_{}_{}",
+                    self.os.to_string().to_ascii_lowercase(),
+                    release,
+                    arch
+                )
             }
             (Os::Linux, _) => {
                 let mut tags = vec![format!("{}_{}", platform_tag, self.arch)];

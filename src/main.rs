@@ -25,7 +25,6 @@ use structopt::StructOpt;
 use {
     maturin::{upload, Registry, UploadError},
     reqwest::Url,
-    rpassword,
     std::io,
 };
 

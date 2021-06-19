@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * The pure rust install layout changed from just the shared library to a python module that reexports the shared library. This should have now observable consequences for users of the created wheel expect that `my_project.my_project` is now also importable (and equal to just `my_project`)
 * Support i386 on OpenBSD in [#568](https://github.com/PyO3/maturin/pull/568)
 * Support Aarch64 on OpenBSD in [#570](https://github.com/PyO3/maturin/pull/570)
+* Support Aarch64 on FreeBSD in [#571](https://github.com/PyO3/maturin/pull/571)
 
 ## 0.10.6 - 2021-05-21
 

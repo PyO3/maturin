@@ -609,7 +609,9 @@ pub fn write_bindings_module(
             let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
             writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
         }
-        ProjectLayout::PureRust(_) => {
+        ProjectLayout::PureRust {
+            ref rust_module, ..
+        } => {
             let module = PathBuf::from(module_name);
             writer.add_directory(&module)?;
             // Reexport the shared library as if it were the top level module
@@ -617,6 +619,15 @@ pub fn write_bindings_module(
                 &module.join("__init__.py"),
                 format!("from .{} import *\n", module_name).as_bytes(),
             )?;
+            let type_stub = rust_module.join(format!("{}.pyi", module_name));
+            if type_stub.exists() {
+                writer.add_bytes(
+                    &module.join("__init__.pyi"),
+                    &fs_err::read(type_stub).context("Failed to read type stub file")?,
+                )?;
+                writer.add_bytes(&module.join("py.typed"), b"")?;
+                println!("📖 Found type stub file at {}.pyi", module_name);
+            }
             writer.add_file_with_permissions(&module.join(so_filename), &artifact, 0o755)?;
         }
     }
@@ -663,11 +674,25 @@ pub fn write_cffi_module(
 
             let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
             module = relative.join(extension_name);
+            writer.add_directory(&module)?;
         }
-        ProjectLayout::PureRust(_) => module = PathBuf::from(module_name),
+        ProjectLayout::PureRust {
+            ref rust_module, ..
+        } => {
+            module = PathBuf::from(module_name);
+            writer.add_directory(&module)?;
+            let type_stub = rust_module.join(format!("{}.pyi", module_name));
+            if type_stub.exists() {
+                writer.add_bytes(
+                    &module.join("__init__.pyi"),
+                    &fs_err::read(type_stub).context("Failed to read type stub file")?,
+                )?;
+                writer.add_bytes(&module.join("py.typed"), b"")?;
+                println!("📖 Found type stub file at {}.pyi", module_name);
+            }
+        }
     };
 
-    writer.add_directory(&module)?;
     writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
     writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
     writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;

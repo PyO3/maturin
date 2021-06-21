@@ -20,8 +20,8 @@ pub(crate) struct CargoTomlPackage {
     // https://doc.rust-lang.org/cargo/reference/manifest.html#the-package-section
     pub(crate) name: String,
     pub(crate) version: String,
-    pub(crate) authors: Vec<String>,
     // All other fields are optional
+    pub(crate) authors: Option<Vec<String>>,
     pub(crate) description: Option<String>,
     pub(crate) documentation: Option<String>,
     pub(crate) homepage: Option<String>,
@@ -199,5 +199,33 @@ mod test {
         let classifiers = vec!["Programming Language :: Python".to_string()];
 
         assert_eq!(cargo_toml.classifiers(), classifiers);
+    }
+
+    #[test]
+    fn test_metadata_from_cargo_toml_without_authors() {
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            name = "info-project"
+            version = "0.1.0"
+            description = "A test project"
+            homepage = "https://example.org"
+            keywords = ["ffi", "test"]
+
+            [lib]
+            crate-type = ["cdylib"]
+            name = "pyo3_pure"
+
+            [package.metadata.maturin.scripts]
+            ph = "maturin:print_hello"
+
+            [package.metadata.maturin]
+            classifiers = ["Programming Language :: Python"]
+            requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
+        "#
+        );
+
+        let cargo_toml: Result<CargoToml, _> = toml::from_str(&cargo_toml);
+        assert!(cargo_toml.is_ok());
     }
 }

@@ -256,15 +256,21 @@ impl Metadata21 {
         cargo_toml: &CargoToml,
         manifest_path: impl AsRef<Path>,
     ) -> Result<Metadata21> {
-        let authors = cargo_toml.package.authors.join(", ");
+        let authors = cargo_toml
+            .package
+            .authors
+            .as_ref()
+            .map(|authors| authors.join(", "));
 
         let classifiers = cargo_toml.classifiers();
 
-        let author_email = if authors.contains('@') {
-            Some(authors.clone())
-        } else {
-            None
-        };
+        let author_email = authors.as_ref().and_then(|authors| {
+            if authors.contains('@') {
+                Some(authors.clone())
+            } else {
+                None
+            }
+        });
 
         let extra_metadata = cargo_toml.remaining_core_metadata();
 
@@ -313,7 +319,7 @@ impl Metadata21 {
             home_page: cargo_toml.package.homepage.clone(),
             download_url: None,
             // Cargo.toml has no distinction between author and author email
-            author: Some(authors),
+            author: authors,
             author_email,
             license: cargo_toml.package.license.clone(),
 

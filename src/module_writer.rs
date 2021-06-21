@@ -327,6 +327,13 @@ impl ModuleWriter for SDistWriter {
     }
 
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
+        if source.as_ref() == self.path {
+            bail!(
+            "Attempting to include the sdist output tarball {} into itself! Check 'cargo package --list' output.",
+            source.as_ref().display()
+            );
+        }
+
         self.tar
             .append_path_with_name(&source, &target)
             .context(format!(

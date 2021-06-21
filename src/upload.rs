@@ -102,7 +102,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     add_option("keywords", &metadata.keywords);
     add_option("home_page", &metadata.home_page);
     add_option("download_url", &metadata.download_url);
-    add_option("requires_path", &metadata.requires_python);
+    add_option("requires_python", &metadata.requires_python);
     add_option("summary", &metadata.summary);
 
     let mut add_vec = |name, values: &[String]| {

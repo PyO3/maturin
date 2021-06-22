@@ -1,15 +1,13 @@
+use crate::{PlatformTag, PythonInterpreter};
+use anyhow::{bail, format_err, Context, Result};
+use platform_info::*;
 use std::env;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str;
-
-use anyhow::{bail, format_err, Context, Result};
-use platform_info::*;
 use target_lexicon::{Environment, Triple};
-
-use crate::{PlatformTag, PythonInterpreter};
 
 /// All supported operating system
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -360,10 +358,21 @@ impl Target {
 }
 
 pub(crate) fn get_host_target() -> Result<String> {
-    let output = Command::new("rustc")
-        .arg("-vV")
-        .output()
-        .context("Failed to run rustc to get the host target")?;
+    let output = Command::new("rustc").arg("-vV").output();
+    let output = match output {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            bail!(
+                "rustc, the rust compiler, is not installed or not in PATH. \
+                This package requires Rust and Cargo to compile extensions. \
+                Install it through the system's package manager or via https://rustup.rs/.",
+            );
+        }
+        Err(err) => {
+            return Err(err).context("Failed to run rustc to get the host target");
+        }
+        Ok(output) => output,
+    };
+
     let output = str::from_utf8(&output.stdout).context("`rustc -vV` didn't return utf8 output")?;
 
     let field = "host: ";

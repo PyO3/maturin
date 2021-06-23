@@ -30,16 +30,14 @@ fn rewrite_cargo_toml(
         "Failed to parse Cargo.toml at {}",
         manifest_path.as_ref().display()
     ))?;
+    let mut rewritten = false;
     //  ˇˇˇˇˇˇˇˇˇˇˇˇ dep_category
     // [dependencies]
     // some_path_dep = { path = "../some_path_dep" }
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(table) = data
-            .get_mut(&dep_category.to_string())
-            .and_then(|x| x.as_table_mut())
-        {
+        if let Some(table) = data.get_mut(*dep_category).and_then(|x| x.as_table_mut()) {
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
                 // There should either be no value for path, or it should be a string
@@ -61,6 +59,7 @@ fn rewrite_cargo_toml(
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     format!("../{}", dep_name).into()
                 };
+                rewritten = true;
                 if !known_path_deps.contains_key(&dep_name) {
                     bail!(
                         "cargo metadata does not know about the path for {}.{} present in {}, \
@@ -73,7 +72,11 @@ fn rewrite_cargo_toml(
             }
         }
     }
-    Ok(toml::to_string(&data)?)
+    if rewritten {
+        Ok(toml::to_string(&data)?)
+    } else {
+        Ok(text)
+    }
 }
 
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies

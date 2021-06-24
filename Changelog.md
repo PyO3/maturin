@@ -11,12 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Users should migrate away from the old `[package.metadata.maturin]` table of `Cargo.toml` to this new `[project]` table of `pyproject.toml`
 * Add PEP 656 musllinux support in [#543](https://github.com/PyO3/maturin/pull/543)
 * `--manylinux` is now called `--compatibility` and supports musllinux
-* The pure rust install layout changed from just the shared library to a python module that reexports the shared library. This should have now observable consequences for users of the created wheel expect that `my_project.my_project` is now also importable (and equal to just `my_project`)
+* The pure rust install layout changed from just the shared library to a python module that reexports the shared library. This should have no observable consequences for users of the created wheel expect that `my_project.my_project` is now also importable (and equal to just `my_project`)
 * Add support for packaging type stubs in pure Rust project layout in [#567](https://github.com/PyO3/maturin/pull/567)
 * Support i386 on OpenBSD in [#568](https://github.com/PyO3/maturin/pull/568)
 * Support Aarch64 on OpenBSD in [#570](https://github.com/PyO3/maturin/pull/570)
 * Support Aarch64 on FreeBSD in [#571](https://github.com/PyO3/maturin/pull/571)
 * `Cargo.toml`'s `authors` field is now optional per Rust [RFC 3052](https://github.com/rust-lang/rfcs/blob/master/text/3052-optional-authors-field.md) in [#573](https://github.com/PyO3/maturin/pull/573)
+* `maturin build --skip-auditwheel` with a `--manylinux` argument other than `off` was made an error in [#578](https://github.com/PyO3/maturin/pull/578)
 
 ## 0.10.6 - 2021-05-21
 
@@ -44,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.10.3 - 2021-04-13
 
  * The `upload` command is now implemented, it is mostly similar to `twine upload`. [#484](https://github.com/PyO3/maturin/pull/484)
- * Interpreter search now uses python 3.6 to 3.12 
+ * Interpreter search now uses python 3.6 to 3.12
  * Add basic support for OpenBSD in [#496](https://github.com/PyO3/maturin/pull/496)
  * Fix the PowerPC platform by messense in [#503](https://github.com/PyO3/maturin/pull/503)
 

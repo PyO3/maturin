@@ -109,6 +109,16 @@ impl BuildOptions {
         if self.platform_tag == Some(PlatformTag::manylinux1()) {
             eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
         }
+
+        match (self.platform_tag, self.skip_auditwheel) {
+            (None, _) => {}
+            (Some(PlatformTag::Linux), _) => {}
+            (Some(_), false) => {}
+            (_, true) => {
+                bail!("--skip-auditwheel can only be specified with --manylinux=off")
+            }
+        }
+
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
             let current_dir =

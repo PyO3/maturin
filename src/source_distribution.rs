@@ -170,9 +170,14 @@ pub fn source_distribution(
     sdist_include: Option<&Vec<String>>,
 ) -> Result<PathBuf> {
     // Parse ids in the format:
-    // some_path_dep 0.1.0 (path+file:///home/konsti/maturin/test-crates/some_path_dep)
+    // on unix:    some_path_dep 0.1.0 (path+file:///home/konsti/maturin/test-crates/some_path_dep)
+    // on windows: some_path_dep 0.1.0 (path+file:///C:/konsti/maturin/test-crates/some_path_dep)
     // This is not a good way to identify path dependencies, but I don't know a better one
-    let matcher = Regex::new(r"^(.*) .* \(path\+file://(.*)\)$").unwrap();
+    let matcher = if cfg!(windows) {
+        Regex::new(r"^(.*) .* \(path\+file:///(.*)\)$").unwrap()
+    } else {
+        Regex::new(r"^(.*) .* \(path\+file://(.*)\)$").unwrap()
+    };
     let resolve = cargo_metadata
         .resolve
         .as_ref()

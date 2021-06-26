@@ -3,7 +3,6 @@ use crate::{Metadata21, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
-use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -20,7 +19,7 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// This method is rather frail, but unfortunately I don't know a better solution.
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, String>,
+    known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<String> {
     let text = fs::read_to_string(&manifest_path).context(format!(
@@ -82,7 +81,7 @@ fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, String>,
+    known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<()> {
     let output = Command::new("cargo")
@@ -173,21 +172,25 @@ pub fn source_distribution(
     // on unix:    some_path_dep 0.1.0 (path+file:///home/konsti/maturin/test-crates/some_path_dep)
     // on windows: some_path_dep 0.1.0 (path+file:///C:/konsti/maturin/test-crates/some_path_dep)
     // This is not a good way to identify path dependencies, but I don't know a better one
-    let matcher = if cfg!(windows) {
-        Regex::new(r"^(.*) .* \(path\+file:///(.*)\)$").unwrap()
-    } else {
-        Regex::new(r"^(.*) .* \(path\+file://(.*)\)$").unwrap()
-    };
     let resolve = cargo_metadata
         .resolve
         .as_ref()
         .context("Expected to get a dependency graph from cargo")?;
-    let known_path_deps: HashMap<String, String> = resolve
+    let known_path_deps: HashMap<String, PathBuf> = resolve
         .nodes
         .iter()
-        .filter(|node| &node.id != resolve.root.as_ref().unwrap())
-        .filter_map(|node| matcher.captures(&node.id.repr))
-        .map(|captures| (captures[1].to_string(), captures[2].to_string()))
+        .filter(|node| {
+            &node.id != resolve.root.as_ref().unwrap() && node.id.repr.contains("path+file://")
+        })
+        .filter_map(|node| {
+            cargo_metadata.packages.iter().find_map(|pkg| {
+                if pkg.id.repr == node.id.repr {
+                    Some((pkg.name.clone(), PathBuf::from(&pkg.manifest_path)))
+                } else {
+                    None
+                }
+            })
+        })
         .collect();
 
     let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
@@ -201,14 +204,15 @@ pub fn source_distribution(
     for (name, path) in known_path_deps.iter() {
         add_crate_to_source_distribution(
             &mut writer,
-            &PathBuf::from(path).join("Cargo.toml"),
+            &path,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
             false,
         )
         .context(format!(
             "Failed to add local dependency {} at {} to the source distribution",
-            name, path
+            name,
+            path.display()
         ))?;
     }
 

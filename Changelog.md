@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Support Aarch64 on OpenBSD in [#570](https://github.com/PyO3/maturin/pull/570)
 * Support Aarch64 on FreeBSD in [#571](https://github.com/PyO3/maturin/pull/571)
 * `Cargo.toml`'s `authors` field is now optional per Rust [RFC 3052](https://github.com/rust-lang/rfcs/blob/master/text/3052-optional-authors-field.md) in [#573](https://github.com/PyO3/maturin/pull/573)
+* Fix source distribution with local path dependencies on Windows in [#580](https://github.com/PyO3/maturin/pull/580)
 
 ## 0.10.6 - 2021-05-21
 

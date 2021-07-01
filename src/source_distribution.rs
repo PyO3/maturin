@@ -14,7 +14,7 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// distribution. Since there is no cargo-backed way to replace dependencies
 /// (see https://github.com/rust-lang/cargo/issues/9170), we do a simple
 /// Cargo.toml rewrite ourselves.
-/// A big chunk of that (including toml_edit) comes from cargo edit, and esp.
+/// A big chunk of that comes from cargo edit, and esp.
 /// https://github.com/killercup/cargo-edit/blob/2a08f0311bcb61690d71d39cb9e55e69b256c8e1/src/manifest.rs
 /// This method is rather frail, but unfortunately I don't know a better solution.
 fn rewrite_cargo_toml(
@@ -26,21 +26,22 @@ fn rewrite_cargo_toml(
         "Can't read Cargo.toml at {}",
         manifest_path.as_ref().display(),
     ))?;
-    let mut data = text.parse::<toml_edit::Document>().context(format!(
+    let mut data = toml::from_str::<toml::value::Table>(&text).context(format!(
         "Failed to parse Cargo.toml at {}",
         manifest_path.as_ref().display()
     ))?;
+    let mut rewritten = false;
     //  ˇˇˇˇˇˇˇˇˇˇˇˇ dep_category
     // [dependencies]
     // some_path_dep = { path = "../some_path_dep" }
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(table) = data[&dep_category].as_table_mut() {
+        if let Some(table) = data.get_mut(*dep_category).and_then(|x| x.as_table_mut()) {
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
                 // There should either be no value for path, or it should be a string
-                if table[&dep_name]["path"].is_none() {
+                if table.get(&dep_name).and_then(|x| x.get("path")).is_none() {
                     continue;
                 }
                 if !table[&dep_name]["path"].is_str() {
@@ -53,11 +54,12 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
+                    format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name).into()
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    toml_edit::value(format!("../{}", dep_name))
+                    format!("../{}", dep_name).into()
                 };
+                rewritten = true;
                 if !known_path_deps.contains_key(&dep_name) {
                     bail!(
                         "cargo metadata does not know about the path for {}.{} present in {}, \
@@ -70,7 +72,11 @@ fn rewrite_cargo_toml(
             }
         }
     }
-    Ok(data.to_string_in_original_order())
+    if rewritten {
+        Ok(toml::to_string(&data)?)
+    } else {
+        Ok(text)
+    }
 }
 
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## Unrelease
+## 0.11.0 - 2021-07-04
 
 * Add support for reading metadata from [PEP 621](https://www.python.org/dev/peps/pep-0621/) project table in `pyproject.toml` in [#555](https://github.com/PyO3/maturin/pull/555)
 * Users should migrate away from the old `[package.metadata.maturin]` table of `Cargo.toml` to this new `[project]` table of `pyproject.toml`

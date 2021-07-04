@@ -442,7 +442,11 @@ pub fn find_interpreter(
             };
 
             if interpreter.is_empty() {
-                bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+                if let Some(minor) = min_python_minor {
+                    bail!("Couldn't find any python interpreters with version >= 3.{}. Please specify at least one with -i", minor);
+                } else {
+                    bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+                }
             }
 
             if binding_name == "pyo3" && target.is_unix() && is_cross_compiling(target)? {

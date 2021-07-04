@@ -10,4 +10,4 @@ crate-type = ["cdylib"]
 [dependencies]
 libz-sys = { version = "1.1.2", default-features = false }
 # Don't use the macros feature, which makes compilation much faster
-pyo3 = { version = "0.13.2", default-features = false, features = ["extension-module"] }
+pyo3 = { version = "0.14.0", default-features = false, features = ["extension-module"] }

@@ -152,7 +152,11 @@ impl BuildOptions {
             .filter(|name| name.contains('.'))
             .unwrap_or(&module_name);
 
-        let project_layout = ProjectLayout::determine(manifest_dir, extension_name)?;
+        let project_layout = ProjectLayout::determine(
+            manifest_dir,
+            extension_name,
+            extra_metadata.python_source.as_deref(),
+        )?;
 
         let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
         if let Some(ref target) = self.target {

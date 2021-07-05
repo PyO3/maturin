@@ -98,6 +98,30 @@ my-project
 ├── my_project
 │   ├── __init__.py
 │   └── bar.py
+├── pyproject.toml
+├── Readme.md
+└── src
+    └── lib.rs
+```
+
+You can specify a different python source directory in `Cargo.toml` by setting `package.metadata.maturin.python-source`, for example
+
+```toml
+[package.metadata.maturin]
+python-source = "python"
+```
+
+then the project structure would look like this:
+
+```
+my-project
+├── Cargo.toml
+├── python
+│   ├── my_project
+│   │   ├── __init__.py
+│   │   ├── __init__.py
+│   │   └── bar.py
+│   └── pyproject.toml
 ├── Readme.md
 └── src
     └── lib.rs

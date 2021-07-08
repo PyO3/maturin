@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+* Fix sdist error when VCS has uncommitted renamed files in [#585](https://github.com/PyO3/maturin/pull/585)
 * Add `maturin completions <shell>` command to generate shell completions in [#586](https://github.com/PyO3/maturin/pull/586)
 
 ## 0.11.0 - 2021-07-04

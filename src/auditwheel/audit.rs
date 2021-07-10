@@ -119,13 +119,11 @@ fn find_versioned_libraries(
                     .gread::<GnuVersionNeedAux>(&mut offset)
                     .map_err(goblin::error::Error::Scroll)
                     .map_err(AuditWheelError::GoblinError)?;
-                if let Some(aux_name) = strtab.get(ver_aux.name as usize) {
-                    let aux_name = aux_name.map_err(AuditWheelError::GoblinError)?;
+                if let Some(aux_name) = strtab.get_at(ver_aux.name as usize) {
                     versions.insert(aux_name.to_string());
                 }
             }
-            if let Some(name) = strtab.get(ver.file as usize) {
-                let name = name.map_err(AuditWheelError::GoblinError)?;
+            if let Some(name) = strtab.get_at(ver.file as usize) {
                 // Skip dynamic linker/loader
                 if name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1" {
                     continue;
@@ -149,10 +147,7 @@ fn find_incompliant_symbols(
     let strtab = &elf.strtab;
     for sym in &elf.syms {
         if sym.st_type() == STT_FUNC {
-            let name = strtab
-                .get(sym.st_name)
-                .unwrap_or(Ok("BAD NAME"))
-                .map_err(AuditWheelError::GoblinError)?;
+            let name = strtab.get_at(sym.st_name).unwrap_or("BAD NAME");
             for symbol_version in symbol_versions {
                 if name.ends_with(&format!("@{}", symbol_version)) {
                     symbols.push(name.to_string());

@@ -124,12 +124,8 @@ fn add_crate_to_source_distribution(
             // and https://github.com/PyO3/maturin/issues/449
             if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
                 false
-            } else if target == Path::new(".cargo_vcs_info.json")
-                || target == Path::new("Cargo.lock")
-            {
-                source.exists()
             } else {
-                true
+                source.exists()
             }
         })
         .collect();

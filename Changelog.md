@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## Unreleased
+## 0.11.1 - 2021-07-10
 
 * Fix sdist error when VCS has uncommitted renamed files in [#585](https://github.com/PyO3/maturin/pull/585)
 * Add `maturin completions <shell>` command to generate shell completions in [#586](https://github.com/PyO3/maturin/pull/586)

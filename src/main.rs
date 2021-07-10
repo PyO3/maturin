@@ -19,13 +19,13 @@ use maturin::{
     Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter, Target,
 };
 use std::env;
+use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
 #[cfg(feature = "upload")]
 use {
     maturin::{upload, Registry, UploadError},
     reqwest::Url,
-    std::io,
 };
 
 /// Returns the password and a bool that states whether to ask for re-entering the password
@@ -283,6 +283,12 @@ enum Opt {
     /// The commands are meant to be called from the python PEP 517
     #[structopt(name = "pep517", setting = structopt::clap::AppSettings::Hidden)]
     Pep517(Pep517Command),
+    /// Generate shell completions
+    #[structopt(name = "completions", setting = structopt::clap::AppSettings::Hidden)]
+    Completions {
+        #[structopt(name = "SHELL", parse(try_from_str))]
+        shell: structopt::clap::Shell,
+    },
 }
 
 /// Backend for the PEP 517 integration. Not for human consumption
@@ -607,6 +613,9 @@ fn run() -> Result<()> {
             }
 
             upload_ui(&files, &publish)?
+        }
+        Opt::Completions { shell } => {
+            Opt::clap().gen_completions_to(env!("CARGO_BIN_NAME"), shell, &mut io::stdout());
         }
     }
 

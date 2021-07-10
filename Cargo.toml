@@ -26,7 +26,7 @@ anyhow = "1.0.39"
 base64 = "0.13.0"
 bytesize = "1.0.1"
 glob = "0.3.0"
-cargo_metadata = "0.13.1"
+cargo_metadata = "0.14.0"
 cbindgen = { version = "0.19.0", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.4.0"

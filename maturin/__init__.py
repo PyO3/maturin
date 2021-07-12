@@ -35,7 +35,7 @@ available_options = [
 
 
 def get_config() -> Dict[str, str]:
-    with open("pyproject.toml") as fp:
+    with open("pyproject.toml", encoding="utf-8") as fp:
         pyproject_toml = toml.load(fp)
     return pyproject_toml.get("tool", {}).get("maturin", {})
 

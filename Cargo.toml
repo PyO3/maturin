@@ -4,6 +4,7 @@ name = "maturin"
 version = "0.11.1"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
 exclude = ["test-crates/**/*", "sysconfig/*", "test-data/*", "ci/*", "tests/*"]
+homepage = "https://github.com/pyo3/maturin"
 readme = "Readme.md"
 repository = "https://github.com/pyo3/maturin"
 license = "MIT OR Apache-2.0"

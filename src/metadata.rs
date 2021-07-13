@@ -301,6 +301,10 @@ impl Metadata21 {
                 }
             })
             .unwrap_or_else(|| cargo_toml.package.name.clone());
+        let mut project_url = extra_metadata.project_url.unwrap_or_default();
+        if let Some(repository) = cargo_toml.package.repository.as_ref() {
+            project_url.insert("Source Code".to_string(), repository.clone());
+        }
 
         let mut metadata = Metadata21 {
             metadata_version: "2.1".to_owned(),
@@ -330,7 +334,7 @@ impl Metadata21 {
             requires_dist: extra_metadata.requires_dist.unwrap_or_default(),
             requires_python: extra_metadata.requires_python,
             requires_external: extra_metadata.requires_external.unwrap_or_default(),
-            project_url: extra_metadata.project_url.unwrap_or_default(),
+            project_url,
             provides_extra: extra_metadata.provides_extra.unwrap_or_default(),
 
             // Officially rarely used, and afaik not applicable with pyo3
@@ -584,6 +588,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
+            repository = "https://example.org"
             readme = "REPLACE_README_PATH"
             keywords = ["ffi", "test"]
 
@@ -615,6 +620,7 @@ mod test {
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/x-rst
+            Project-URL: Source Code, https://example.org
 
             Some test package
             =================

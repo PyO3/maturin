@@ -5,12 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
 
-## 0.11.1 - 2021-07-10
+## [Unreleased]
+
+* Use Cargo's `repository` field as `Source Code` in project URL in [#590](https://github.com/PyO3/maturin/pull/590)
+
+## [0.11.1] - 2021-07-10
 
 * Fix sdist error when VCS has uncommitted renamed files in [#585](https://github.com/PyO3/maturin/pull/585)
 * Add `maturin completions <shell>` command to generate shell completions in [#586](https://github.com/PyO3/maturin/pull/586)
 
-## 0.11.0 - 2021-07-04
+## [0.11.0] - 2021-07-04
 
 * Add support for reading metadata from [PEP 621](https://www.python.org/dev/peps/pep-0621/) project table in `pyproject.toml` in [#555](https://github.com/PyO3/maturin/pull/555)
 * Users should migrate away from the old `[package.metadata.maturin]` table of `Cargo.toml` to this new `[project]` table of `pyproject.toml`
@@ -25,12 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Allow dotted keys in `Cargo.toml` by switch from `toml_edit` to `toml` crate in [#577](https://github.com/PyO3/maturin/pull/577)
 * Fix source distribution with local path dependencies on Windows in [#580](https://github.com/PyO3/maturin/pull/580)
 
-## 0.10.6 - 2021-05-21
+## [0.10.6] - 2021-05-21
 
 * Fix corrupted macOS binary release in [#547](https://github.com/PyO3/maturin/pull/547)
 * Fix build with the "upload" feature disabled by ravenexp in [#548](https://github.com/PyO3/maturin/pull/548)
 
-## 0.10.5 - 2021-05-21
+## [0.10.5] - 2021-05-21
 
 * Add `manylinux_2_27` support in [#521](https://github.com/PyO3/maturin/pull/521)
 * Add support for Windows arm64 target in [#524](https://github.com/PyO3/maturin/pull/524)
@@ -42,29 +46,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Support uploading heterogenous wheels by ravenexp in [#544](https://github.com/PyO3/maturin/pull/544)
 * Warn about `pyproject.toml` missing maturin version constraint in [#545](https://github.com/PyO3/maturin/pull/545)
 
-## 0.10.4 - 2021-04-28
+## [0.10.4] - 2021-04-28
 
  * Interpreter search now uses python 3.6 to 3.12 in [#495](https://github.com/PyO3/maturin/pull/495)
  * Consider requires-python when searching for interpreters in [#495](https://github.com/PyO3/maturin/pull/495)
  * Support Rust extension as a submodule in mixed Python/Rust projects in [#489](https://github.com/PyO3/maturin/pull/489)
 
-## 0.10.3 - 2021-04-13
+## [0.10.3] - 2021-04-13
 
  * The `upload` command is now implemented, it is mostly similar to `twine upload`. [#484](https://github.com/PyO3/maturin/pull/484)
  * Interpreter search now uses python 3.6 to 3.12 
  * Add basic support for OpenBSD in [#496](https://github.com/PyO3/maturin/pull/496)
  * Fix the PowerPC platform by messense in [#503](https://github.com/PyO3/maturin/pull/503)
 
-## 0.10.2 - 2021-04-03
+## [0.10.2] - 2021-04-03
 
  * Fix `--target` being silently ignored
 
-## 0.10.1 - 2021-04-03
+## [0.10.1] - 2021-04-03
 
  * Fix a regression in 0.10.0 that would incorrectly assume we're building for musl instead of gnu by messense in [#487](https://github.com/PyO3/maturin/pull/487)
  * Basic s390x support
 
-## 0.10.0 - 2021-04-02
+## [0.10.0] - 2021-04-02
 
  * Change manylinux default version based on target arch by messense in [#424](https://github.com/PyO3/maturin/pull/424)
  * Support local path dependencies in source distribution (i.e. you can now package a workspace into an sdist)
@@ -81,22 +85,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * develop removes an old .dist-info directory if it exists before installing the new one
  * Fix wheels for PyPy on windows containing extension modules with incorrect names. [#482](https://github.com/PyO3/maturin/pull/482)
 
-## 0.9.4 - 2021-02-18
+## [0.9.4] - 2021-02-18
 
 * Fix building a bin with musl
 
-## 0.9.3
+## [0.9.3]
 
 * CI failure
 
-## 0.9.2 - 2021-02-17
+## [0.9.2] - 2021-02-17
 
  * Escape version in wheel metadata by messense in [#420](https://github.com/PyO3/maturin/pull/420)
  * Set executable bit on shared library by messense in [#421](https://github.com/PyO3/maturin/pull/421)
  * Rename `classifier` to `classifiers` for pypi compatibility. The old `classifier` is still available and now also works with pypi
  * Fix building for musl by automatically setting `-C target-feature=-crt-static`
 
-## 0.9.1 - 2021-01-13
+## [0.9.1] - 2021-01-13
 
  * Error when the `abi3` feature is selected but no minimum version
  * Support building universal2 wheels (x86 and aarch64 in a single file) by messense in [#403](https://github.com/PyO3/maturin/pull/403)
@@ -104,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * `package.metadata.maturin.classifier` is renamed to `classifiers` by kngwyu in [#416](https://github.com/PyO3/maturin/pull/416)
  * Added more instructions to building complex manylinux setups
 
-## 0.9.0 - 2021-01-10
+## [0.9.0] - 2021-01-10
 
  * Added support for building abi3 wheels with pyo3 0.13.1
  * Python 3.9 is supported (it should have worked before, but it is now tested on ci)
@@ -120,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * No more retry loop when the password was wrong
  * When bootstrapping, also search for `cargo.exe` if `cargo` was not found
 
-## 0.8.3 - 2020-08-17
+## [0.8.3] - 2020-08-17
 
 ### Added
 
@@ -134,19 +138,19 @@ include arbitrary files in source distributions ([#296](https://github.com/PyO3/
  * Fix incorrectly returning full path (not basename) from PEP 517 `build_sdist` hook. This fixes tox support from maturin's side
  * Packages installed with `maturin develop` are now visible to pip and can be uninstalled with pip
 
-## 0.8.2 - 2020-06-29
+## [0.8.2] - 2020-06-29
 
 ### Added
 
  * Python 3.8 was added to PATH in the docker image by oconnor663 in [#302](https://github.com/PyO3/maturin/pull/302)
 
-## 0.8.1 - 2020-04-30
+## [0.8.1] - 2020-04-30
 
 ### Added
 
  * cffi is installed if it's missing and python is running inside a virtualenv.
 
-## 0.8.0 - 2020-04-03
+## [0.8.0] - 2020-04-03
 
 ### Added
 
@@ -157,13 +161,13 @@ include arbitrary files in source distributions ([#296](https://github.com/PyO3/
 
  * Omit author_email if `@` is not found in authors by evandrocoan in [#290](https://github.com/PyO3/maturin/pull/290)
 
-## 0.7.9 - 2020-03-06
+## [0.7.9] - 2020-03-06
 
 ### Fixed
 
  * This release includes binary wheels for mac os
 
-## 0.7.8 - 2020-03-06
+## [0.7.8] - 2020-03-06
 
 ### Added
 
@@ -176,7 +180,7 @@ include arbitrary files in source distributions ([#296](https://github.com/PyO3/
  * 32-bit wheels didn't work on linux. This has been fixed by dae in [#250](https://github.com/PyO3/maturin/pull/250)
  * The path of the RECORD file on windows used a backward slash instead of a forward slash
 
-## 0.7.7 - 2019-11-12
+## [0.7.7] - 2019-11-12
 
 ### Added
 
@@ -421,16 +425,37 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.7.6...HEAD
-[0.7.6]: https://github.com/pyo3/maturin/compare/v0.7.5...0.7.6
-[0.7.5]: https://github.com/pyo3/maturin/compare/v0.7.4...0.7.5
-[0.7.4]: https://github.com/pyo3/maturin/compare/v0.7.3...0.7.4
-[0.7.3]: https://github.com/pyo3/maturin/compare/v0.7.2...0.7.3
-[0.7.2]: https://github.com/pyo3/maturin/compare/v0.7.1...0.7.2
-[0.7.1]: https://github.com/pyo3/maturin/compare/v0.7.0...0.7.1
-[0.7.0]: https://github.com/pyo3/maturin/compare/v0.6.1...0.7.0
-[0.6.1]: https://github.com/pyo3/maturin/compare/v0.6.0...0.6.1
-[0.6.0]: https://github.com/pyo3/maturin/compare/v0.5.0...0.6.0
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/pyo3/maturin/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/pyo3/maturin/compare/v0.10.6...v0.11.0
+[0.10.6]: https://github.com/pyo3/maturin/compare/v0.10.5...v0.10.6
+[0.10.5]: https://github.com/pyo3/maturin/compare/v0.10.4...v0.10.5
+[0.10.4]: https://github.com/pyo3/maturin/compare/v0.10.3...v0.10.4
+[0.10.3]: https://github.com/pyo3/maturin/compare/v0.10.2...v0.10.3
+[0.10.2]: https://github.com/pyo3/maturin/compare/v0.10.1...v0.10.2
+[0.10.1]: https://github.com/pyo3/maturin/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/pyo3/maturin/compare/v0.9.4...v0.10.0
+[0.9.4]: https://github.com/pyo3/maturin/compare/v0.9.3...v0.9.4
+[0.9.3]: https://github.com/pyo3/maturin/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/pyo3/maturin/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/pyo3/maturin/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/pyo3/maturin/compare/v0.8.3...v0.9.0
+[0.8.3]: https://github.com/pyo3/maturin/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/pyo3/maturin/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/pyo3/maturin/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/pyo3/maturin/compare/v0.7.9...v0.8.0
+[0.7.9]: https://github.com/pyo3/maturin/compare/v0.7.8...v0.7.9
+[0.7.8]: https://github.com/pyo3/maturin/compare/v0.7.7...v0.7.8
+[0.7.7]: https://github.com/pyo3/maturin/compare/v0.7.6...v0.7.7
+[0.7.6]: https://github.com/pyo3/maturin/compare/v0.7.5...v0.7.6
+[0.7.5]: https://github.com/pyo3/maturin/compare/v0.7.4...v0.7.5
+[0.7.4]: https://github.com/pyo3/maturin/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/pyo3/maturin/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/pyo3/maturin/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/pyo3/maturin/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/pyo3/maturin/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/pyo3/maturin/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/pyo3/maturin/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/pyo3/maturin/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/pyo3/maturin/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/pyo3/maturin/compare/v0.4.0...v0.4.1

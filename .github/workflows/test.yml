@@ -26,7 +26,7 @@ jobs:
           python-version: 3.8
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: 3.9.5
       - name: Install cffi and virtualenv
         run: pip install cffi virtualenv
       - uses: actions-rs/toolchain@v1

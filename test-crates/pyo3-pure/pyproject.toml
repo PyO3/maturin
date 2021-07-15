@@ -12,6 +12,7 @@ readme = "Readme.md"
 maintainers = [
     {name = "messense", email = "messense@icloud.com"}
 ]
+license = { file = "LICENSE" }
 
 [project.optional-dependencies]
 test = [

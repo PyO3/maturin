@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Use UTF-8 encoding when reading `pyproject.toml` by domdfcoding in [#588](https://github.com/PyO3/maturin/pull/588)
 * Use Cargo's `repository` field as `Source Code` in project URL in [#590](https://github.com/PyO3/maturin/pull/590)
+* Fold long header fields in Python metadata in [#594](https://github.com/PyO3/maturin/pull/594)
 
 ## [0.11.1] - 2021-07-10
 

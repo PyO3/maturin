@@ -171,8 +171,12 @@ impl Metadata21 {
                         (None, None) => {}
                     }
                 }
-                self.author = Some(names.join(", "));
-                self.author_email = Some(emails.join(", "));
+                if !names.is_empty() {
+                    self.author = Some(names.join(", "));
+                }
+                if !emails.is_empty() {
+                    self.author_email = Some(emails.join(", "));
+                }
             }
 
             if let Some(maintainers) = &project.maintainers {
@@ -192,8 +196,12 @@ impl Metadata21 {
                         (None, None) => {}
                     }
                 }
-                self.maintainer = Some(names.join(", "));
-                self.maintainer_email = Some(emails.join(", "));
+                if !names.is_empty() {
+                    self.maintainer = Some(names.join(", "));
+                }
+                if !emails.is_empty() {
+                    self.maintainer_email = Some(emails.join(", "));
+                }
             }
 
             if let Some(keywords) = &project.keywords {
@@ -383,7 +391,7 @@ impl Metadata21 {
             }
         };
 
-        add_option("Summary", &self.summary);
+        add_option("Summary", &self.summary.as_deref().map(fold_header));
         add_option("Keywords", &self.keywords);
         add_option("Home-Page", &self.home_page);
         add_option("Download-URL", &self.download_url);
@@ -391,7 +399,7 @@ impl Metadata21 {
         add_option("Author-email", &self.author_email);
         add_option("Maintainer", &self.maintainer);
         add_option("Maintainer-email", &self.maintainer_email);
-        add_option("License", &self.license);
+        add_option("License", &self.license.as_deref().map(fold_header));
         add_option("Requires-Python", &self.requires_python);
         add_option("Description-Content-Type", &self.description_content_type);
         // Project-URL is special
@@ -461,6 +469,28 @@ impl Metadata21 {
             &self.get_version_escaped()
         ))
     }
+}
+
+/// Fold long header field according to RFC 5322 section 2.2.3
+/// https://datatracker.ietf.org/doc/html/rfc5322#section-2.2.3
+fn fold_header(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+
+    let options = textwrap::Options::new(78)
+        .initial_indent("")
+        .subsequent_indent("\t");
+    for (i, line) in textwrap::wrap(text, options).iter().enumerate() {
+        if i > 0 {
+            result.push_str("\r\n");
+        }
+        if line.is_empty() {
+            result.push('\t');
+        } else {
+            result.push_str(&line);
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -740,6 +770,10 @@ mod test {
                 "attrs; extra == 'test'",
                 "boltons; (sys_platform == 'win32') and extra == 'test'"
             ]
-        )
+        );
+
+        let content = metadata.to_file_contents();
+        let pkginfo: Result<python_pkginfo::Metadata, _> = content.parse();
+        assert!(pkginfo.is_ok());
     }
 }

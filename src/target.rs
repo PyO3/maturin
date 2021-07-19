@@ -1,3 +1,4 @@
+use crate::python_interpreter::InterpreterKind;
 use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{bail, format_err, Context, Result};
 use platform_info::*;
@@ -316,13 +317,17 @@ impl Target {
         interpreter: &PythonInterpreter,
     ) -> PathBuf {
         if self.is_unix() {
-            let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
-
-            venv_base
-                .as_ref()
-                .join("lib")
-                .join(python_dir)
-                .join("site-packages")
+            match interpreter.interpreter_kind {
+                InterpreterKind::CPython => {
+                    let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
+                    venv_base
+                        .as_ref()
+                        .join("lib")
+                        .join(python_dir)
+                        .join("site-packages")
+                }
+                InterpreterKind::PyPy => venv_base.as_ref().join("site-packages"),
+            }
         } else {
             venv_base.as_ref().join("Lib").join("site-packages")
         }

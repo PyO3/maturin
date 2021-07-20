@@ -1,4 +1,4 @@
-use super::policy::{Policy, MANYLINUX_POLICIES};
+use super::policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
 use crate::auditwheel::PlatformTag;
 use crate::Target;
 use anyhow::Result;
@@ -124,8 +124,12 @@ fn find_versioned_libraries(
                 }
             }
             if let Some(name) = strtab.get_at(ver.file as usize) {
-                // Skip dynamic linker/loader
+                // Skip glibc dynamic linker/loader
                 if name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1" {
+                    continue;
+                }
+                // Skip musl libc dynamic linker/loader
+                if name.starts_with("ld-musl") {
                     continue;
                 }
                 symbols.push(VersionedLibrary {
@@ -255,18 +259,6 @@ pub fn auditwheel_rs(
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok(Policy::default());
     }
-    if let Some(musl_tag @ PlatformTag::Musllinux { .. }) = platform_tag {
-        // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
-        eprintln!("⚠  Warning: no auditwheel support for musllinux yet");
-        // HACK: fake a musllinux policy
-        return Ok(Policy {
-            name: musl_tag.to_string(),
-            aliases: Vec::new(),
-            priority: 0,
-            symbol_versions: Default::default(),
-            lib_whitelist: Default::default(),
-        });
-    }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
     let mut buffer = Vec::new();
@@ -278,8 +270,13 @@ pub fn auditwheel_rs(
     let versioned_libraries = find_versioned_libraries(&elf, &buffer)?;
 
     // Find the highest possible policy, if any
+    let platform_policies = match platform_tag {
+        Some(PlatformTag::Manylinux { .. }) | None => &MANYLINUX_POLICIES,
+        Some(PlatformTag::Musllinux { .. }) => &MUSLLINUX_POLICIES,
+        Some(PlatformTag::Linux) => unreachable!(),
+    };
     let mut highest_policy = None;
-    for policy in MANYLINUX_POLICIES.iter() {
+    for policy in platform_policies.iter() {
         let result = policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries);
         match result {
             Ok(_) => {

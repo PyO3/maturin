@@ -10,7 +10,7 @@ use std::fmt::{Display, Formatter};
 /// priority to lowest
 pub static POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
     // https://github.com/pypa/auditwheel/blob/master/auditwheel/policy/policy.json
-    let mut policies: Vec<Policy> = serde_json::from_slice(include_bytes!("policy.json"))
+    let mut policies: Vec<Policy> = serde_json::from_slice(include_bytes!("manylinux-policy.json"))
         .expect("invalid manylinux policy.json file");
     policies.sort_by_key(|policy| -policy.priority);
     policies

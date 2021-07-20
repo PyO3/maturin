@@ -1,4 +1,4 @@
-use super::policy::{Policy, POLICIES};
+use super::policy::{Policy, MANYLINUX_POLICIES};
 use crate::auditwheel::PlatformTag;
 use crate::Target;
 use anyhow::Result;
@@ -279,7 +279,7 @@ pub fn auditwheel_rs(
 
     // Find the highest possible policy, if any
     let mut highest_policy = None;
-    for policy in POLICIES.iter() {
+    for policy in MANYLINUX_POLICIES.iter() {
         let result = policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries);
         match result {
             Ok(_) => {

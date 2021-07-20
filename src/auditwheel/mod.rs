@@ -4,4 +4,4 @@ mod policy;
 
 pub use self::audit::*;
 pub use platform_tag::PlatformTag;
-pub use policy::{Policy, POLICIES};
+pub use policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};

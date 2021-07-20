@@ -246,9 +246,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.68"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
+checksum = "e70cc2f62c6ce1868963827bd677764c62d07c3d9a3e1fb1177ee1a9ab199eb2"
 
 [[package]]
 name = "cfg-if"
@@ -821,9 +821,9 @@ dependencies = [
 
 [[package]]
 name = "mailparse"
-version = "0.13.4"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62db73ff1a42b0e3a8858cf0d5c183bdfc23491f7294ae4a8200c83577457386"
+checksum = "c06f526fc13a50f46a3689a6f438cb833c59817c898bb40a3954f341ddf74ce1"
 dependencies = [
  "base64 0.13.0",
  "charset",
@@ -838,7 +838,7 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "maturin"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "anyhow",
  "base64 0.13.0",
@@ -1624,9 +1624,9 @@ dependencies = [
 
 [[package]]
 name = "subtle"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
+checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
@@ -1652,9 +1652,9 @@ dependencies = [
 
 [[package]]
 name = "target-lexicon"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64ae3b39281e4b14b8123bdbaddd472b7dfe215e444181f2f9d2443c2444f834"
+checksum = "b0652da4c4121005e9ed22b79f6c5f2d9e2752906b53a33e9490489ba421a6fb"
 
 [[package]]
 name = "tempfile"
@@ -1746,9 +1746,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98c8b05dc14c75ea83d63dd391100353789f5f24b8b3866542a5e85c8be8e985"
+checksum = "c2602b8af3767c285202012822834005f596c811042315fa7e9f5b12b2a43207"
 dependencies = [
  "autocfg",
  "bytes",

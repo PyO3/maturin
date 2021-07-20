@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2021-07-20
+
 * Use UTF-8 encoding when reading `pyproject.toml` by domdfcoding in [#588](https://github.com/PyO3/maturin/pull/588)
 * Use Cargo's `repository` field as `Source Code` in project URL in [#590](https://github.com/PyO3/maturin/pull/590)
 * Fold long header fields in Python metadata in [#594](https://github.com/PyO3/maturin/pull/594)
@@ -428,7 +430,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/pyo3/maturin/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/pyo3/maturin/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/pyo3/maturin/compare/v0.10.6...v0.11.0
 [0.10.6]: https://github.com/pyo3/maturin/compare/v0.10.5...v0.10.6

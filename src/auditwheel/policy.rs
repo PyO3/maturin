@@ -8,10 +8,20 @@ use std::fmt::{Display, Formatter};
 
 /// The policies (allowed symbols) for the different manylinux tags, sorted from highest
 /// priority to lowest
-pub static POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
-    // https://github.com/pypa/auditwheel/blob/master/auditwheel/policy/policy.json
-    let mut policies: Vec<Policy> = serde_json::from_slice(include_bytes!("policy.json"))
+pub static MANYLINUX_POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
+    // https://github.com/pypa/auditwheel/blob/master/auditwheel/policy/manylinux-policy.json
+    let mut policies: Vec<Policy> = serde_json::from_slice(include_bytes!("manylinux-policy.json"))
         .expect("invalid manylinux policy.json file");
+    policies.sort_by_key(|policy| -policy.priority);
+    policies
+});
+
+/// The policies (allowed symbols) for the different musllinux tags, sorted from highest
+/// priority to lowest
+pub static MUSLLINUX_POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
+    // https://github.com/pypa/auditwheel/blob/master/auditwheel/policy/musllinux-policy.json
+    let mut policies: Vec<Policy> = serde_json::from_slice(include_bytes!("musllinux-policy.json"))
+        .expect("invalid musllinux policy.json file");
     policies.sort_by_key(|policy| -policy.priority);
     policies
 });
@@ -35,7 +45,7 @@ pub struct Policy {
 impl Default for Policy {
     fn default() -> Self {
         // defaults to linux
-        Policy::from_priority(0).unwrap()
+        Policy::from_name("linux").unwrap()
     }
 }
 
@@ -62,7 +72,12 @@ impl PartialOrd for Policy {
 impl Policy {
     /// Get highest priority policy than self
     pub fn higher_priority_policies(&self) -> impl Iterator<Item = &Policy> {
-        POLICIES.iter().filter(move |p| p.priority > self.priority)
+        let policies = if self.name.starts_with("musllinux") {
+            &MUSLLINUX_POLICIES
+        } else {
+            &MANYLINUX_POLICIES
+        };
+        policies.iter().filter(move |p| p.priority > self.priority)
     }
 
     /// Get platform tag from this policy
@@ -72,21 +87,21 @@ impl Policy {
 
     /// Get policy by it's platform tag name
     pub fn from_name(name: &str) -> Option<Self> {
-        POLICIES
+        let policies = if name.starts_with("musllinux") {
+            &MUSLLINUX_POLICIES
+        } else {
+            &MANYLINUX_POLICIES
+        };
+        policies
             .iter()
             .find(|p| p.name == name || p.aliases.iter().any(|alias| alias == name))
             .cloned()
-    }
-
-    /// Get policy by it's priority
-    pub fn from_priority(priority: i64) -> Option<Self> {
-        POLICIES.iter().find(|p| p.priority == priority).cloned()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Policy, POLICIES};
+    use super::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
 
     #[test]
     fn test_load_policy() {
@@ -106,7 +121,14 @@ mod test {
 
     #[test]
     fn test_policy_manylinux_tag() {
-        for policy in POLICIES.iter() {
+        for policy in MANYLINUX_POLICIES.iter() {
+            let _tag = policy.platform_tag();
+        }
+    }
+
+    #[test]
+    fn test_policy_musllinux_tag() {
+        for policy in MUSLLINUX_POLICIES.iter() {
             let _tag = policy.platform_tag();
         }
     }

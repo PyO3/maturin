@@ -69,8 +69,8 @@ fn parse_script_output(output: &str) -> HashMap<String, String> {
     output
         .lines()
         .filter_map(|line| {
-            let mut i = line.splitn(2, ' ');
-            Some((i.next()?.into(), i.next()?.into()))
+            line.split_once(' ')
+                .map(|(x, y)| (x.to_string(), y.to_string()))
         })
         .collect()
 }

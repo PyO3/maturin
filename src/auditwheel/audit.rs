@@ -185,9 +185,7 @@ fn policy_is_satisfied(
         }
         let mut versions: HashMap<String, HashSet<String>> = HashMap::new();
         for v in &library.versions {
-            let mut parts = v.splitn(2, '_');
-            let name = parts.next().unwrap();
-            let version = parts.next().unwrap();
+            let (name, version) = v.split_once('_').unwrap();
             versions
                 .entry(name.to_string())
                 .or_default()

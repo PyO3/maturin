@@ -486,7 +486,7 @@ fn fold_header(text: &str) -> String {
         if line.is_empty() {
             result.push('\t');
         } else {
-            result.push_str(&line);
+            result.push_str(line);
         }
     }
 

@@ -141,7 +141,7 @@ fn add_crate_to_source_distribution(
         )
     }
 
-    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, &known_path_deps, root_crate)?;
+    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, known_path_deps, root_crate)?;
 
     writer.add_directory(&prefix)?;
     writer.add_bytes(
@@ -195,7 +195,7 @@ pub fn source_distribution(
         })
         .collect();
 
-    let mut writer = SDistWriter::new(wheel_dir, &metadata21)?;
+    let mut writer = SDistWriter::new(wheel_dir, metadata21)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
         &metadata21.get_distribution_escaped(),

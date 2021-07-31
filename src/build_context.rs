@@ -36,7 +36,7 @@ impl BridgeModel {
     /// Returns the name of the bindings crate
     pub fn unwrap_bindings(&self) -> &str {
         match self {
-            BridgeModel::Bindings(value) => &value,
+            BridgeModel::Bindings(value) => value,
             _ => panic!("Expected Bindings"),
         }
     }
@@ -226,7 +226,7 @@ impl BuildContext {
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        let policy = auditwheel_rs(&artifact, target, platform_tag).context(
+        let policy = auditwheel_rs(artifact, target, platform_tag).context(
             if let Some(platform_tag) = platform_tag {
                 format!("Error ensuring {} compliance", platform_tag)
             } else {
@@ -307,8 +307,8 @@ impl BuildContext {
             &mut writer,
             &self.project_layout,
             &self.module_name,
-            &artifact,
-            Some(&python_interpreter),
+            artifact,
+            Some(python_interpreter),
             &self.target,
             false,
         )
@@ -332,11 +332,10 @@ impl BuildContext {
         let mut wheels = Vec::new();
         for python_interpreter in &self.interpreter {
             let artifact = self.compile_cdylib(
-                Some(&python_interpreter),
+                Some(python_interpreter),
                 Some(self.project_layout.extension_name()),
             )?;
-            let policy =
-                self.auditwheel(Some(&python_interpreter), &artifact, self.platform_tag)?;
+            let policy = self.auditwheel(Some(python_interpreter), &artifact, self.platform_tag)?;
             let (wheel_path, tag) =
                 self.write_binding_wheel(python_interpreter, &artifact, policy.platform_tag())?;
             println!(
@@ -364,7 +363,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
     ) -> Result<PathBuf> {
-        let artifacts = compile(&self, python_interpreter, &self.bridge)
+        let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts.get("cdylib").cloned().ok_or_else(|| {
@@ -398,7 +397,7 @@ impl BuildContext {
             &self.project_layout,
             self.manifest_path.parent().unwrap(),
             &self.module_name,
-            &artifact,
+            artifact,
             &self.interpreter[0].executable,
             false,
         )?;
@@ -452,7 +451,7 @@ impl BuildContext {
         let bin_name = artifact
             .file_name()
             .expect("Couldn't get the filename from the binary produced by cargo");
-        write_bin(&mut builder, &artifact, &self.metadata21, bin_name)?;
+        write_bin(&mut builder, artifact, &self.metadata21, bin_name)?;
 
         let wheel_path = builder.finish()?;
         Ok((wheel_path, "py3".to_string()))
@@ -463,7 +462,7 @@ impl BuildContext {
     /// Runs [auditwheel_rs()] if not deactivated
     pub fn build_bin_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifacts = compile(&self, None, &self.bridge)
+        let artifacts = compile(self, None, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts

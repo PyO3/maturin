@@ -103,7 +103,7 @@ fn resolve_pypi_cred(
     }
 
     if let Some((username, password)) =
-        registry_name.and_then(|name| load_pypi_cred_from_config(&config, name))
+        registry_name.and_then(|name| load_pypi_cred_from_config(config, name))
     {
         println!("🔐 Using credential in pypirc for upload");
         return (username, password);
@@ -416,12 +416,12 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 /// Handles authentication/keyring integration and retrying of the publish subcommand
 #[cfg(feature = "upload")]
 fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
-    let registry = complete_registry(&publish)?;
+    let registry = complete_registry(publish)?;
 
     println!("🚀 Uploading {} packages", items.len());
 
     for i in items {
-        let upload_result = upload(&registry, &i);
+        let upload_result = upload(&registry, i);
 
         match upload_result {
             Ok(()) => (),

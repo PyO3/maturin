@@ -142,7 +142,7 @@ impl BuildOptions {
             .lib
             .as_ref()
             .and_then(|lib| lib.name.as_ref())
-            .unwrap_or(&crate_name)
+            .unwrap_or(crate_name)
             .to_owned();
 
         // Only use extension name from extra metadata if it contains dot
@@ -152,7 +152,7 @@ impl BuildOptions {
             .filter(|name| name.contains('.'))
             .unwrap_or(&module_name);
 
-        let project_layout = ProjectLayout::determine(manifest_dir, &extension_name)?;
+        let project_layout = ProjectLayout::determine(manifest_dir, extension_name)?;
 
         let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
         if let Some(ref target) = self.target {
@@ -252,7 +252,7 @@ impl BuildOptions {
 fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
     if let Some(requires_python) = &metadata21.requires_python {
         let regex = Regex::new(r#">=3\.(\d+)(?:\.\d)?"#).unwrap();
-        if let Some(captures) = regex.captures(&requires_python) {
+        if let Some(captures) = regex.captures(requires_python) {
             let min_python_minor = captures[1]
                 .parse::<usize>()
                 .expect("Regex must only match usize");
@@ -381,16 +381,16 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             );
         }
 
-        if let Some((major, minor)) = has_abi3(&cargo_metadata)? {
+        return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
             println!(
                 "🔗 Found pyo3 bindings with abi3 support for Python ≥ {}.{}",
                 major, minor
             );
-            return Ok(BridgeModel::BindingsAbi3(major, minor));
+            Ok(BridgeModel::BindingsAbi3(major, minor))
         } else {
             println!("🔗 Found pyo3 bindings");
-            return Ok(bridge);
-        }
+            Ok(bridge)
+        };
     }
 
     Ok(bridge)
@@ -416,7 +416,7 @@ fn find_single_python_interpreter(
         );
     };
 
-    let interpreter = PythonInterpreter::check_executable(executable, &target, &bridge)
+    let interpreter = PythonInterpreter::check_executable(executable, target, bridge)
         .context(format_err!(err_message))?
         .ok_or_else(|| format_err!(err_message))?;
     Ok(interpreter)
@@ -434,10 +434,10 @@ pub fn find_interpreter(
     match bridge {
         BridgeModel::Bindings(binding_name) => {
             let mut interpreter = if !interpreter.is_empty() {
-                PythonInterpreter::check_executables(&interpreter, &target, &bridge)
+                PythonInterpreter::check_executables(interpreter, target, bridge)
                     .context("The given list of python interpreters is invalid")?
             } else {
-                PythonInterpreter::find_all(&target, &bridge, min_python_minor)
+                PythonInterpreter::find_all(target, bridge, min_python_minor)
                     .context("Finding python interpreters failed")?
             };
 
@@ -570,7 +570,7 @@ pub fn find_interpreter(
 fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
     let mut splitted_args = vec![];
     for arg in given_args {
-        match shlex::split(&arg) {
+        match shlex::split(arg) {
             Some(split) => splitted_args.extend(split),
             None => {
                 bail!(

@@ -156,7 +156,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
         let re = Regex::new(r"^([^#].*?)[\s*]+([\w\\:.-]+)\s*$").unwrap();
         let mut paths = vec![];
         for i in lines {
-            if let Some(capture) = re.captures(&i) {
+            if let Some(capture) = re.captures(i) {
                 if &capture[1] == "base" {
                     continue;
                 }
@@ -454,7 +454,7 @@ impl PythonInterpreter {
             }
         };
 
-        let abiflags = fun_with_abiflags(&message, &target, &bridge).context(format_err!(
+        let abiflags = fun_with_abiflags(&message, target, bridge).context(format_err!(
             "Failed to get information from the python interpreter at {}",
             executable.as_ref().display()
         ))?;
@@ -483,7 +483,7 @@ impl PythonInterpreter {
     ) -> Result<Vec<PythonInterpreter>> {
         let min_python_minor = min_python_minor.unwrap_or(MINIMUM_PYTHON_MINOR);
         let executables = if target.is_windows() {
-            find_all_windows(&target, min_python_minor)?
+            find_all_windows(target, min_python_minor)?
         } else {
             (min_python_minor..MAXIMUM_PYTHON_MINOR)
                 .map(|minor| format!("python3.{}", minor))
@@ -491,8 +491,7 @@ impl PythonInterpreter {
         };
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) =
-                PythonInterpreter::check_executable(&executable, &target, &bridge)?
+            if let Some(version) = PythonInterpreter::check_executable(&executable, target, bridge)?
             {
                 available_versions.push(version);
             }
@@ -511,11 +510,11 @@ impl PythonInterpreter {
     ) -> Result<Vec<PythonInterpreter>> {
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) =
-                PythonInterpreter::check_executable(executable, &target, &bridge).context(
-                    format!("{} is not a valid python interpreter", executable.display()),
-                )?
-            {
+            if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)
+                .context(format!(
+                "{} is not a valid python interpreter",
+                executable.display()
+            ))? {
                 available_versions.push(version);
             } else {
                 bail!(

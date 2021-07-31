@@ -82,7 +82,7 @@ pub fn develop(
         ))?;
     }
 
-    let mut writer = PathWriter::venv(&target, &venv_dir, &build_context.bridge)?;
+    let mut writer = PathWriter::venv(&target, venv_dir, &build_context.bridge)?;
 
     let context = "Failed to build a native library through cargo";
 
@@ -114,7 +114,7 @@ pub fn develop(
             write_cffi_module(
                 &mut writer,
                 &build_context.project_layout,
-                &build_context.manifest_path.parent().unwrap(),
+                build_context.manifest_path.parent().unwrap(),
                 &build_context.module_name,
                 &artifact,
                 &interpreter.executable,

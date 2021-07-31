@@ -202,7 +202,7 @@ fn policy_is_satisfied(
                     .iter()
                     .map(|v| format!("{}_{}", name, v))
                     .collect();
-                let offending_symbols = find_incompliant_symbols(&elf, &offending_symbol_versions)?;
+                let offending_symbols = find_incompliant_symbols(elf, &offending_symbol_versions)?;
                 let offender = if offending_symbols.is_empty() {
                     format!(
                         "{} offending versions: {}",
@@ -278,7 +278,7 @@ pub fn auditwheel_rs(
     // Find the highest possible policy, if any
     let mut highest_policy = None;
     for policy in POLICIES.iter() {
-        let result = policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries);
+        let result = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries);
         match result {
             Ok(_) => {
                 highest_policy = Some(policy.clone());

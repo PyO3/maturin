@@ -83,14 +83,11 @@ pub struct PathWriter {
 impl PathWriter {
     /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self> {
-        let interpreter = PythonInterpreter::check_executable(
-            target.get_venv_python(&venv_dir),
-            &target,
-            &bridge,
-        )?
-        .ok_or_else(|| {
-            anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-        })?;
+        let interpreter =
+            PythonInterpreter::check_executable(target.get_venv_python(&venv_dir), target, bridge)?
+                .ok_or_else(|| {
+                    anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+                })?;
 
         let base_path = target.get_venv_site_package(venv_dir, &interpreter);
 
@@ -231,7 +228,7 @@ impl ModuleWriter for WheelWriter {
             .unix_permissions(permissions)
             .compression_method(compression_method);
         self.zip.start_file(target.clone(), options)?;
-        self.zip.write_all(&bytes)?;
+        self.zip.write_all(bytes)?;
 
         let hash = base64::encode_config(&Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
         self.record.push((target, hash, bytes.len()));
@@ -266,7 +263,7 @@ impl WheelWriter {
             wheel_path,
         };
 
-        write_dist_info(&mut builder, &metadata21, &tags)?;
+        write_dist_info(&mut builder, metadata21, tags)?;
 
         Ok(builder)
     }
@@ -469,7 +466,7 @@ fn cffi_header(crate_dir: &Path, tempdir: &TempDir) -> Result<PathBuf> {
 /// in `__init__.py` to load the shared library into a module called `lib`.
 pub fn generate_cffi_declarations(crate_dir: &Path, python: &Path) -> Result<String> {
     let tempdir = tempdir()?;
-    let header = cffi_header(&crate_dir, &tempdir)?;
+    let header = cffi_header(crate_dir, &tempdir)?;
 
     let ffi_py = tempdir.as_ref().join("ffi.py");
 
@@ -490,7 +487,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
         header = header.display(),
     );
 
-    let output = call_python(&python, &["-c", &cffi_invocation])?;
+    let output = call_python(python, &["-c", &cffi_invocation])?;
     let install_cffi = if !output.status.success() {
         // First, check whether the error was cffi not being installed
         let last_line = str::from_utf8(&output.stderr)?.lines().last().unwrap_or("");
@@ -499,7 +496,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
             // We don't want to modify any global environment
             // https://stackoverflow.com/a/42580137/3549270
             let output = call_python(
-                &python,
+                python,
                 &["-c", "import sys\nprint(sys.base_prefix != sys.prefix)"],
             )?;
 
@@ -523,13 +520,13 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
 
     // If there was success or an error that was not missing cffi, return here
     if !install_cffi {
-        return handle_cffi_call_result(&python, tempdir, &ffi_py, &output);
+        return handle_cffi_call_result(python, tempdir, &ffi_py, &output);
     }
 
     println!("⚠  cffi not found. Trying to install it");
     // Call pip through python to don't do the wrong thing when python and pip
     // are coming from different environments
-    let output = call_python(&python, &["-m", "pip", "install", "cffi"])?;
+    let output = call_python(python, &["-m", "pip", "install", "cffi"])?;
     if !output.status.success() {
         bail!(
             "Installing cffi with `{:?} -m pip install cffi` failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\nPlease install cffi yourself.",
@@ -542,8 +539,8 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
     println!("🎁 Installed cffi");
 
     // Try again
-    let output = call_python(&python, &["-c", &cffi_invocation])?;
-    handle_cffi_call_result(&python, tempdir, &ffi_py, &output)
+    let output = call_python(python, &["-c", &cffi_invocation])?;
+    handle_cffi_call_result(python, tempdir, &ffi_py, &output)
 }
 
 /// Extracted into a function because this is needed twice
@@ -583,7 +580,7 @@ pub fn write_bindings_module(
 ) -> Result<()> {
     let ext_name = project_layout.extension_name();
     let so_filename = match python_interpreter {
-        Some(python_interpreter) => python_interpreter.get_library_name(&ext_name),
+        Some(python_interpreter) => python_interpreter.get_library_name(ext_name),
         // abi3
         None => {
             if target.is_unix() {
@@ -652,7 +649,7 @@ pub fn write_cffi_module(
     python: &Path,
     develop: bool,
 ) -> Result<()> {
-    let cffi_declarations = generate_cffi_declarations(&crate_dir, python)?;
+    let cffi_declarations = generate_cffi_declarations(crate_dir, python)?;
 
     let module;
 

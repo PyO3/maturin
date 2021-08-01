@@ -50,6 +50,7 @@ jobs:
           - x86_64-apple-darwin
           - x86_64-pc-windows-msvc
           - i686-pc-windows-msvc
+          - aarch64-pc-windows-msvc
         include:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
@@ -63,6 +64,9 @@ jobs:
           - target: i686-pc-windows-msvc
             os: windows-latest
             name: maturin-i686-pc-windows-msvc.zip
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            name: maturin-aarch64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
@@ -92,9 +96,16 @@ jobs:
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }}
+      
+      # ring doesn't support aarch64 windows yet
+      - name: Publish to pypi (windows aarch64)
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --cargo-extra-args="--no-default-features" --cargo-extra-args="--features log,upload,human-panic"
 
       - name: Publish to pypi (without sdist)
-        if: matrix.target != 'x86_64-unknown-linux-musl'
+        if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist

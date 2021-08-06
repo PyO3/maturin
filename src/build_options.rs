@@ -5,6 +5,7 @@ use crate::python_interpreter::InterpreterKind;
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Metadata21;
+use crate::PyProjectToml;
 use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::{bail, format_err, Context, Result};
@@ -106,9 +107,6 @@ impl Default for BuildOptions {
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
-        if self.platform_tag == Some(PlatformTag::manylinux1()) {
-            eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
-        }
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
             let current_dir =
@@ -130,6 +128,12 @@ impl BuildOptions {
 
         let cargo_toml = CargoToml::from_path(&manifest_file)?;
         let manifest_dir = manifest_file.parent().unwrap();
+        let pyproject: Option<PyProjectToml> = if manifest_dir.join("pyproject.toml").is_file() {
+            Some(PyProjectToml::new(manifest_dir).context("pyproject.toml is invalid")?)
+        } else {
+            None
+        };
+        let pyproject = pyproject.as_ref();
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
         let extra_metadata = cargo_toml.remaining_core_metadata();
@@ -158,7 +162,14 @@ impl BuildOptions {
             extra_metadata.python_source.as_deref(),
         )?;
 
-        let mut cargo_extra_args = split_extra_args(&self.cargo_extra_args)?;
+        let mut cargo_extra_args = self.cargo_extra_args.clone();
+        if cargo_extra_args.is_empty() {
+            // if not supplied on command line, try pyproject.toml
+            if let Some(args) = pyproject.and_then(|x| x.cargo_extra_args()) {
+                cargo_extra_args.push(args.to_string());
+            }
+        }
+        cargo_extra_args = split_extra_args(&cargo_extra_args)?;
         if let Some(ref target) = self.target {
             cargo_extra_args.extend(vec!["--target".to_string(), target.clone()]);
         }
@@ -183,7 +194,12 @@ impl BuildOptions {
             }
         };
 
-        let bridge = find_bridge(&cargo_metadata, self.bindings.as_deref())?;
+        let bridge = find_bridge(
+            &cargo_metadata,
+            self.bindings
+                .as_deref()
+                .or_else(|| pyproject.and_then(|x| x.bindings())),
+        )?;
 
         if bridge != BridgeModel::Bin && module_name.contains('-') {
             bail!(
@@ -208,7 +224,14 @@ impl BuildOptions {
             None => find_interpreter(&bridge, &[], &target, get_min_python_minor(&metadata21))?,
         };
 
-        let rustc_extra_args = split_extra_args(&self.rustc_extra_args)?;
+        let mut rustc_extra_args = self.rustc_extra_args.clone();
+        if rustc_extra_args.is_empty() {
+            // if not supplied on command line, try pyproject.toml
+            if let Some(args) = pyproject.and_then(|x| x.rustc_extra_args()) {
+                rustc_extra_args.push(args.to_string());
+            }
+        }
+        rustc_extra_args = split_extra_args(&rustc_extra_args)?;
 
         let mut universal2 = self.universal2;
         // Also try to determine universal2 from ARCHFLAGS environment variable
@@ -228,6 +251,15 @@ impl BuildOptions {
                 universal2 = true;
             }
         };
+        let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
+        let skip_auditwheel =
+            pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
+        let platform_tag = self
+            .platform_tag
+            .or_else(|| pyproject.and_then(|x| x.compatibility()));
+        if platform_tag == Some(PlatformTag::manylinux1()) {
+            eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
+        }
 
         Ok(BuildContext {
             target,
@@ -240,8 +272,8 @@ impl BuildOptions {
             out: wheel_dir,
             release,
             strip,
-            skip_auditwheel: self.skip_auditwheel,
-            platform_tag: self.platform_tag,
+            skip_auditwheel,
+            platform_tag,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

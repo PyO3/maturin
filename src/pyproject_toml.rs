@@ -1,3 +1,4 @@
+use crate::PlatformTag;
 use anyhow::{format_err, Context, Result};
 use pyproject_toml::PyProjectToml as ProjectToml;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,15 @@ pub struct Tool {
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     sdist_include: Option<Vec<String>>,
+    bindings: Option<String>,
+    cargo_extra_args: Option<String>,
+    #[serde(alias = "manylinux")]
+    compatibility: Option<PlatformTag>,
+    rustc_extra_args: Option<String>,
+    #[serde(default)]
+    skip_auditwheel: bool,
+    #[serde(default)]
+    strip: bool,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -57,9 +67,57 @@ impl PyProjectToml {
         Ok(pyproject)
     }
 
-    /// Returns the value of `[maturin.sdist-include]` in pyproject.toml
+    /// Returns the value of `[tool.maturin.sdist-include]` in pyproject.toml
     pub fn sdist_include(&self) -> Option<&Vec<String>> {
         self.tool.as_ref()?.maturin.as_ref()?.sdist_include.as_ref()
+    }
+
+    /// Returns the value of `[tool.maturin.bindings]` in pyproject.toml
+    pub fn bindings(&self) -> Option<&str> {
+        self.tool.as_ref()?.maturin.as_ref()?.bindings.as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.cargo-extra-args]` in pyproject.toml
+    pub fn cargo_extra_args(&self) -> Option<&str> {
+        self.tool
+            .as_ref()?
+            .maturin
+            .as_ref()?
+            .cargo_extra_args
+            .as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
+    pub fn compatibility(&self) -> Option<PlatformTag> {
+        self.tool.as_ref()?.maturin.as_ref()?.compatibility
+    }
+
+    /// Returns the value of `[tool.maturin.rustc-extra-args]` in pyproject.toml
+    pub fn rustc_extra_args(&self) -> Option<&str> {
+        self.tool
+            .as_ref()?
+            .maturin
+            .as_ref()?
+            .rustc_extra_args
+            .as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.skip-auditwheel]` in pyproject.toml
+    pub fn skip_auditwheel(&self) -> bool {
+        self.tool
+            .as_ref()
+            .and_then(|tool| tool.maturin.as_ref())
+            .map(|maturin| maturin.skip_auditwheel)
+            .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.strip]` in pyproject.toml
+    pub fn strip(&self) -> bool {
+        self.tool
+            .as_ref()
+            .and_then(|tool| tool.maturin.as_ref())
+            .map(|maturin| maturin.strip)
+            .unwrap_or_default()
     }
 
     /// Having a pyproject.toml without a version constraint is a bad idea

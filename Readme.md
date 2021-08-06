@@ -117,11 +117,11 @@ then the project structure would look like this:
 my-project
 ├── Cargo.toml
 ├── python
-│   ├── my_project
-│   │   ├── __init__.py
-│   │   ├── __init__.py
-│   │   └── bar.py
-│   └── pyproject.toml
+│   └── my_project
+│       ├── __init__.py
+│       ├── __init__.py
+│       └── bar.py
+├── pyproject.toml
 ├── Readme.md
 └── src
     └── lib.rs

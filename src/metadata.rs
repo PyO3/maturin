@@ -3,7 +3,6 @@ use anyhow::{bail, Context, Result};
 use fs_err as fs;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str;
@@ -359,12 +358,7 @@ impl Metadata21 {
         };
 
         let manifest_path = manifest_path.as_ref();
-        let py_src = extra_metadata
-            .python_source
-            .map_or(Cow::Borrowed(manifest_path), |src| {
-                Cow::Owned(manifest_path.join(src))
-            });
-        metadata.merge_pyproject_toml(&*py_src)?;
+        metadata.merge_pyproject_toml(manifest_path)?;
         Ok(metadata)
     }
 

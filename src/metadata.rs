@@ -3,6 +3,7 @@ use anyhow::{bail, Context, Result};
 use fs_err as fs;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str;
@@ -356,7 +357,14 @@ impl Metadata21 {
             gui_scripts: HashMap::new(),
             entry_points: HashMap::new(),
         };
-        metadata.merge_pyproject_toml(manifest_path)?;
+
+        let manifest_path = manifest_path.as_ref();
+        let py_src = extra_metadata
+            .python_source
+            .map_or(Cow::Borrowed(manifest_path), |src| {
+                Cow::Owned(manifest_path.join(src))
+            });
+        metadata.merge_pyproject_toml(&*py_src)?;
         Ok(metadata)
     }
 
@@ -775,5 +783,21 @@ mod test {
         let content = metadata.to_file_contents();
         let pkginfo: Result<python_pkginfo::Metadata, _> = content.parse();
         assert!(pkginfo.is_ok());
+    }
+
+    #[test]
+    fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
+        let cargo_toml_str =
+            fs_err::read_to_string("test-crates/pyo3-mixed-py-subdir/Cargo.toml").unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
+        let metadata =
+            Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-mixed-py-subdir").unwrap();
+        // defined in Cargo.toml
+        assert_eq!(
+            metadata.summary,
+            Some("Implements a dummy function combining rust and python".to_string())
+        );
+        // defined in pyproject.toml
+        assert_eq!(metadata.scripts["get_42"], "pyo3_mixed_py_subdir:get_42");
     }
 }

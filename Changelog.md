@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add path option for Python source in [#584](https://github.com/PyO3/maturin/pull/584)
+
 ## [0.11.2] - 2021-07-20
 
 * Use UTF-8 encoding when reading `pyproject.toml` by domdfcoding in [#588](https://github.com/PyO3/maturin/pull/588)

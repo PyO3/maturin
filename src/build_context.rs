@@ -14,6 +14,7 @@ use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 /// The way the rust code is used in the wheel
@@ -73,22 +74,29 @@ pub enum ProjectLayout {
 
 impl ProjectLayout {
     /// Checks whether a python module exists besides Cargo.toml with the right name
-    pub fn determine(project_root: impl AsRef<Path>, module_name: &str) -> Result<ProjectLayout> {
+    pub fn determine(
+        project_root: impl AsRef<Path>,
+        module_name: &str,
+        py_src: Option<impl AsRef<Path>>,
+    ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
         let parts: Vec<&str> = module_name.split('.').collect();
         let project_root = project_root.as_ref();
+        let python_root = py_src.map_or(Cow::Borrowed(project_root), |py_src| {
+            Cow::Owned(project_root.join(py_src))
+        });
         let (python_module, rust_module, extension_name) = if parts.len() > 1 {
             let mut rust_module = project_root.to_path_buf();
             rust_module.extend(&parts[0..parts.len() - 1]);
             (
-                project_root.join(parts[0]),
+                python_root.join(parts[0]),
                 rust_module,
                 parts[parts.len() - 1].to_string(),
             )
         } else {
             (
-                project_root.join(module_name),
-                project_root.join(module_name),
+                python_root.join(module_name),
+                python_root.join(module_name),
                 module_name.to_string(),
             )
         };

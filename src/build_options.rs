@@ -162,11 +162,13 @@ impl BuildOptions {
             extra_metadata.python_source.as_deref(),
         )?;
 
+        let mut args_from_pyproject = Vec::new();
         let mut cargo_extra_args = self.cargo_extra_args.clone();
         if cargo_extra_args.is_empty() {
             // if not supplied on command line, try pyproject.toml
             if let Some(args) = pyproject.and_then(|x| x.cargo_extra_args()) {
                 cargo_extra_args.push(args.to_string());
+                args_from_pyproject.push("cargo-extra-args");
             }
         }
         cargo_extra_args = split_extra_args(&cargo_extra_args)?;
@@ -196,9 +198,14 @@ impl BuildOptions {
 
         let bridge = find_bridge(
             &cargo_metadata,
-            self.bindings
-                .as_deref()
-                .or_else(|| pyproject.and_then(|x| x.bindings())),
+            self.bindings.as_deref().or_else(|| {
+                pyproject.and_then(|x| {
+                    if x.bindings().is_some() {
+                        args_from_pyproject.push("bindings");
+                    }
+                    x.bindings()
+                })
+            }),
         )?;
 
         if bridge != BridgeModel::Bin && module_name.contains('-') {
@@ -229,6 +236,7 @@ impl BuildOptions {
             // if not supplied on command line, try pyproject.toml
             if let Some(args) = pyproject.and_then(|x| x.rustc_extra_args()) {
                 rustc_extra_args.push(args.to_string());
+                args_from_pyproject.push("rustc-extra-args");
             }
         }
         rustc_extra_args = split_extra_args(&rustc_extra_args)?;
@@ -254,11 +262,23 @@ impl BuildOptions {
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
-        let platform_tag = self
-            .platform_tag
-            .or_else(|| pyproject.and_then(|x| x.compatibility()));
+        let platform_tag = self.platform_tag.or_else(|| {
+            pyproject.and_then(|x| {
+                if x.compatibility().is_some() {
+                    args_from_pyproject.push("compatibility");
+                }
+                x.compatibility()
+            })
+        });
         if platform_tag == Some(PlatformTag::manylinux1()) {
             eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
+        }
+
+        if !args_from_pyproject.is_empty() {
+            eprintln!(
+                "📡 Using build options {} from pyproject.toml",
+                args_from_pyproject.join(", ")
+            );
         }
 
         Ok(BuildContext {

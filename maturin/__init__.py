@@ -14,24 +14,9 @@ import shutil
 import subprocess
 import sys
 from subprocess import SubprocessError
-from typing import List, Dict
+from typing import Dict
 
 import toml
-
-# these are only used when creating the sdist, not when building it
-create_only_options = [
-    "sdist-include",
-]
-
-available_options = [
-    "bindings",
-    "cargo-extra-args",
-    "compatibility",
-    "manylinux",
-    "rustc-extra-args",
-    "skip-auditwheel",
-    "strip",
-]
 
 
 def get_config() -> Dict[str, str]:
@@ -40,25 +25,11 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
-def get_config_options() -> List[str]:
-    config = get_config()
-    options = []
-    for key, value in config.items():
-        if key in create_only_options:
-            continue
-        if key not in available_options:
-            # attempt to install even if keys from newer or older versions are present
-            sys.stderr.write(f"WARNING: {key} is not a recognized option for maturin\n")
-        options.append("--{}={}".format(key, value))
-    return options
-
-
 # noinspection PyUnusedLocal
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     # PEP 517 specifies that only `sys.executable` points to the correct
     # python interpreter
     command = ["maturin", "pep517", "build-wheel", "-i", sys.executable]
-    command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
@@ -140,7 +111,6 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
         "--interpreter",
         sys.executable,
     ]
-    command.extend(get_config_options())
 
     print("Running `{}`".format(" ".join(command)))
     try:

@@ -211,7 +211,7 @@ To include arbitrary files in the sdist for use during compilation specify `sdis
 sdist-include = ["path/**/*"]
 ```
 
-There's a `cargo sdist` command for only building a source distribution as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041).
+There's a `maturin sdist` command for only building a source distribution as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041).
 
 ## Manylinux and auditwheel
 

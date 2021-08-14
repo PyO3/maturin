@@ -63,7 +63,6 @@ impl PyProjectToml {
         ))?;
         let pyproject: PyProjectToml = toml::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
-        pyproject.warn_missing_maturin_version();
         Ok(pyproject)
     }
 

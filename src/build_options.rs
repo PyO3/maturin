@@ -131,6 +131,7 @@ impl BuildOptions {
         let pyproject: Option<PyProjectToml> = if manifest_dir.join("pyproject.toml").is_file() {
             let pyproject =
                 PyProjectToml::new(manifest_dir).context("pyproject.toml is invalid")?;
+            pyproject.warn_missing_maturin_version();
             pyproject.warn_missing_build_backend();
             Some(pyproject)
         } else {

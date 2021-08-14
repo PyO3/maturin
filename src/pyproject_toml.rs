@@ -137,7 +137,7 @@ impl PyProjectToml {
             let current_minor: usize = env!("CARGO_PKG_VERSION_MINOR").parse().unwrap();
             if requires_maturin == maturin {
                 eprintln!(
-                    "⚠  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
+                    "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
                     e.g. `requires = [\"{maturin}>=0.{current},<0.{next}\"]`. \
                     This will become an error.",
                     maturin = maturin,
@@ -159,7 +159,7 @@ impl PyProjectToml {
             let maturin = env!("CARGO_PKG_NAME");
             if backend != maturin {
                 eprintln!(
-                    "⚠  Warning: `build-backend` in pyproject.toml isn't '{maturin}', \
+                    "⚠️  Warning: `build-backend` in pyproject.toml isn't '{maturin}', \
                     source distribution may not build properly.",
                     maturin = maturin
                 );
@@ -167,7 +167,7 @@ impl PyProjectToml {
             }
             return true;
         }
-        eprintln!("⚠  Warning: missing `build-backend` in pyproject.toml, source distribution may not build properly.");
+        eprintln!("⚠️  Warning: missing `build-backend` in pyproject.toml, source distribution may not build properly.");
         false
     }
 }

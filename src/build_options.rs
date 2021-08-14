@@ -275,7 +275,7 @@ impl BuildOptions {
             })
         });
         if platform_tag == Some(PlatformTag::manylinux1()) {
-            eprintln!("⚠  Warning: manylinux1 is unsupported by the Rust compiler.");
+            eprintln!("⚠️  Warning: manylinux1 is unsupported by the Rust compiler.");
         }
 
         if !args_from_pyproject.is_empty() {
@@ -434,7 +434,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         if !pyo3_node.features.contains(&"extension-module".to_string()) {
             let version = cargo_metadata[&pyo3_node.id].version.to_string();
             println!(
-                "⚠  Warning: You're building a library without activating pyo3's \
+                "⚠️  Warning: You're building a library without activating pyo3's \
                  `extension-module` feature. \
                  See https://pyo3.rs/v{}/building_and_distribution.html#linking",
                 version

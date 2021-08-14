@@ -514,7 +514,7 @@ fn run() -> Result<()> {
             let build_context = build.into_build_context(!debug, !no_strip)?;
 
             if !build_context.release {
-                eprintln!("⚠  Warning: You're publishing debug wheels");
+                eprintln!("⚠️  Warning: You're publishing debug wheels");
             }
 
             let mut wheels = build_context.build_wheels()?;
@@ -608,7 +608,7 @@ fn run() -> Result<()> {
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {
-                println!("⚠  Warning: No files given, exiting.");
+                println!("⚠️  Warning: No files given, exiting.");
                 return Ok(());
             }
 

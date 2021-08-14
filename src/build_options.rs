@@ -129,7 +129,10 @@ impl BuildOptions {
         let cargo_toml = CargoToml::from_path(&manifest_file)?;
         let manifest_dir = manifest_file.parent().unwrap();
         let pyproject: Option<PyProjectToml> = if manifest_dir.join("pyproject.toml").is_file() {
-            Some(PyProjectToml::new(manifest_dir).context("pyproject.toml is invalid")?)
+            let pyproject =
+                PyProjectToml::new(manifest_dir).context("pyproject.toml is invalid")?;
+            pyproject.warn_missing_build_backend();
+            Some(pyproject)
         } else {
             None
         };

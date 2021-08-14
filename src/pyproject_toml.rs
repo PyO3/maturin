@@ -150,6 +150,27 @@ impl PyProjectToml {
         }
         true
     }
+
+    /// Having a pyproject.toml without `build-backend` set to `maturin`
+    /// may result in build errors when build from source distribution
+    ///
+    /// Returns true if the pyproject.toml has `build-backend` set to `maturin`
+    pub fn warn_missing_build_backend(&self) -> bool {
+        if let Some(backend) = self.build_system.build_backend.as_ref() {
+            let maturin = env!("CARGO_PKG_NAME");
+            if backend != maturin {
+                eprintln!(
+                    "⚠  Warning: `build-backend` in pyproject.toml isn't '{maturin}', \
+                    source distribution may not build properly.",
+                    maturin = maturin
+                );
+                return false;
+            }
+            return true;
+        }
+        eprintln!("⚠  Warning: missing `build-backend` in pyproject.toml, source distribution may not build properly.");
+        false
+    }
 }
 
 #[cfg(test)]

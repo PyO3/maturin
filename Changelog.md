@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Add path option for Python source in [#584](https://github.com/PyO3/maturin/pull/584)
+* `[tool.maturin]` options from `pyproject.toml` will be used automatically in [#605](https://github.com/PyO3/maturin/pull/605)
 
 ## [0.11.2] - 2021-07-20
 

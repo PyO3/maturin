@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::str;
 
 /// This snippets will give us information about the python interpreter's
@@ -414,7 +414,6 @@ impl PythonInterpreter {
     ) -> Result<Option<PythonInterpreter>> {
         let output = Command::new(&executable.as_ref())
             .args(&["-c", GET_INTERPRETER_METADATA])
-            .stderr(Stdio::inherit())
             .output();
 
         let err_msg = format!(
@@ -426,7 +425,20 @@ impl PythonInterpreter {
                 if output.status.success() {
                     output
                 } else {
-                    bail!(err_msg);
+                    let stderr = str::from_utf8(&output.stderr).unwrap();
+                    if stderr.starts_with(&format!(
+                        "pyenv: {}: command not found",
+                        executable.as_ref().display()
+                    )) {
+                        eprintln!(
+                            "⚠️  Warning: skipped unavailable python interpreter '{}' from pyenv",
+                            executable.as_ref().display()
+                        );
+                        return Ok(None);
+                    } else {
+                        eprintln!("{}", stderr);
+                        bail!(err_msg);
+                    }
                 }
             }
             Err(err) => {

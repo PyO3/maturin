@@ -126,7 +126,7 @@ fn locked_doesnt_build_without_cargo_lock() {
 fn musl() {
     let ran = handle_result(other::test_musl());
     if !ran {
-        eprintln!("⚠  Warning: rustup and/or musl target not installed, test didn't run");
+        eprintln!("⚠️  Warning: rustup and/or musl target not installed, test didn't run");
     }
 }
 

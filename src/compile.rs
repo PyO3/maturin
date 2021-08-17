@@ -245,7 +245,7 @@ fn compile_target(
                     None => {
                         // This is a spurious error I don't really understand
                         println!(
-                            "⚠  Warning: The package {} wasn't listed in `cargo metadata`",
+                            "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
                             artifact.package_id
                         );
                         continue;
@@ -344,7 +344,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
 
     if !found {
         println!(
-            "⚠  Warning: Couldn't find the symbol `{}` in the native library. \
+            "⚠️  Warning: Couldn't find the symbol `{}` in the native library. \
              Python will fail to import this module. \
              If you're using pyo3, check that `#[pymodule]` uses `{}` as module name",
             py_init, module_name

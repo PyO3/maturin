@@ -255,7 +255,7 @@ pub fn auditwheel_rs(
     }
     if let Some(musl_tag @ PlatformTag::Musllinux { .. }) = platform_tag {
         // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
-        eprintln!("⚠  Warning: no auditwheel support for musllinux yet");
+        eprintln!("⚠️  Warning: no auditwheel support for musllinux yet");
         // HACK: fake a musllinux policy
         return Ok(Policy {
             name: musl_tag.to_string(),
@@ -314,8 +314,8 @@ pub fn auditwheel_rs(
         Ok(policy)
     } else {
         println!(
-            "⚠  Warning: No compatible platform tag found, using the linux tag instead. \
-            You won't be able to upload those wheels to pypi."
+            "⚠️  Warning: No compatible platform tag found, using the linux tag instead. \
+            You won't be able to upload those wheels to PyPI."
         );
 
         // Fallback to linux

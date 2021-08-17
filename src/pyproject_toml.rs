@@ -63,7 +63,6 @@ impl PyProjectToml {
         ))?;
         let pyproject: PyProjectToml = toml::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
-        pyproject.warn_missing_maturin_version();
         Ok(pyproject)
     }
 
@@ -138,7 +137,7 @@ impl PyProjectToml {
             let current_minor: usize = env!("CARGO_PKG_VERSION_MINOR").parse().unwrap();
             if requires_maturin == maturin {
                 eprintln!(
-                    "⚠  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
+                    "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
                     e.g. `requires = [\"{maturin}>=0.{current},<0.{next}\"]`. \
                     This will become an error.",
                     maturin = maturin,
@@ -147,6 +146,23 @@ impl PyProjectToml {
                 );
                 return false;
             }
+        }
+        true
+    }
+
+    /// Having a pyproject.toml without `build-backend` set to `maturin`
+    /// may result in build errors when build from source distribution
+    ///
+    /// Returns true if the pyproject.toml has `build-backend` set to `maturin`
+    pub fn warn_missing_build_backend(&self) -> bool {
+        let maturin = env!("CARGO_PKG_NAME");
+        if self.build_system.build_backend.as_deref() != Some(maturin) {
+            eprintln!(
+                "⚠️  Warning: `build-backend` in pyproject.toml is not set to `{maturin}`, \
+                    packaging tools such as pip will not use maturin to build this project.",
+                maturin = maturin
+            );
+            return false;
         }
         true
     }

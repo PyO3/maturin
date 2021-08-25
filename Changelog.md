@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3] - 2021-08-25
+
 * Add path option for Python source in [#584](https://github.com/PyO3/maturin/pull/584)
 * Add auditwheel support for musllinux in [#597](https://github.com/PyO3/maturin/pull/597)
 * `[tool.maturin]` options from `pyproject.toml` will be used automatically in [#605](https://github.com/PyO3/maturin/pull/605)
@@ -435,7 +437,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.3...HEAD
+[0.11.3]: https://github.com/pyo3/maturin/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/pyo3/maturin/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/pyo3/maturin/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/pyo3/maturin/compare/v0.10.6...v0.11.0

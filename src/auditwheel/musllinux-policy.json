@@ -1,0 +1,48 @@
+[
+  {"name": "linux",
+   "aliases": [],
+   "priority": 0,
+   "symbol_versions": {},
+   "lib_whitelist": []
+  },
+  {"name": "musllinux_1_1",
+    "aliases": [],
+    "priority": 100,
+    "symbol_versions": {
+      "i686": {
+      },
+      "x86_64": {
+      },
+      "aarch64": {
+      },
+      "ppc64le": {
+      },
+      "s390x": {
+      },
+      "armv7l": {
+      }
+    },
+    "lib_whitelist": [
+      "libc.so"
+    ]},
+    {"name": "musllinux_1_2",
+    "aliases": [],
+    "priority": 90,
+    "symbol_versions": {
+      "i686": {
+      },
+      "x86_64": {
+      },
+      "aarch64": {
+      },
+      "ppc64le": {
+      },
+      "s390x": {
+      },
+      "armv7l": {
+      }
+    },
+    "lib_whitelist": [
+      "libc.so"
+    ]}
+]

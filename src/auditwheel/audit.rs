@@ -1,6 +1,6 @@
-use super::policy::{Policy, POLICIES};
+use super::policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
 use crate::auditwheel::PlatformTag;
-use crate::Target;
+use crate::target::{Arch, Target};
 use anyhow::Result;
 use fs_err::File;
 use goblin::elf::{sym::STT_FUNC, Elf};
@@ -253,18 +253,6 @@ pub fn auditwheel_rs(
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok(Policy::default());
     }
-    if let Some(musl_tag @ PlatformTag::Musllinux { .. }) = platform_tag {
-        // TODO: add support for musllinux: https://github.com/pypa/auditwheel/issues/305
-        eprintln!("⚠️  Warning: no auditwheel support for musllinux yet");
-        // HACK: fake a musllinux policy
-        return Ok(Policy {
-            name: musl_tag.to_string(),
-            aliases: Vec::new(),
-            priority: 0,
-            symbol_versions: Default::default(),
-            lib_whitelist: Default::default(),
-        });
-    }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
     let mut buffer = Vec::new();
@@ -276,8 +264,36 @@ pub fn auditwheel_rs(
     let versioned_libraries = find_versioned_libraries(&elf, &buffer)?;
 
     // Find the highest possible policy, if any
+    let platform_policies = match platform_tag {
+        Some(PlatformTag::Manylinux { .. }) | None => MANYLINUX_POLICIES.clone(),
+        Some(PlatformTag::Musllinux { .. }) => {
+            MUSLLINUX_POLICIES
+                .clone()
+                .into_iter()
+                .map(|mut policy| {
+                    // Fixup musl libc lib_whitelist
+                    if policy.lib_whitelist.remove("libc.so") {
+                        let new_soname = match target.target_arch() {
+                            Arch::Aarch64 => "libc.musl-aarch64.so.1",
+                            Arch::Armv7L => "libc.musl-armv7.so.1",
+                            Arch::Powerpc64Le => "libc.musl-ppc64le.so.1",
+                            Arch::Powerpc64 => "", // musllinux doesn't support ppc64
+                            Arch::X86 => "libc.musl-x86.so.1",
+                            Arch::X86_64 => "libc.musl-x86_64.so.1",
+                            Arch::S390X => "libc.musl-s390x.so.1",
+                        };
+                        if !new_soname.is_empty() {
+                            policy.lib_whitelist.insert(new_soname.to_string());
+                        }
+                    }
+                    policy
+                })
+                .collect()
+        }
+        Some(PlatformTag::Linux) => unreachable!(),
+    };
     let mut highest_policy = None;
-    for policy in POLICIES.iter() {
+    for policy in platform_policies.iter() {
         let result = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries);
         match result {
             Ok(_) => {

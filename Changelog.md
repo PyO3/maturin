@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Autodetect PyPy executables in [#617](https://github.com/PyO3/maturin/pull/617)
+
 ## [0.11.3] - 2021-08-25
 
 * Add path option for Python source in [#584](https://github.com/PyO3/maturin/pull/584)

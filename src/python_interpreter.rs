@@ -16,6 +16,7 @@ const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py
 const MINIMUM_PYTHON_MINOR: usize = 6;
 /// Be liberal here to include preview versions
 const MAXIMUM_PYTHON_MINOR: usize = 12;
+const MAXIMUM_PYPY_MINOR: usize = 8;
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -497,9 +498,16 @@ impl PythonInterpreter {
         let executables = if target.is_windows() {
             find_all_windows(target, min_python_minor)?
         } else {
-            (min_python_minor..MAXIMUM_PYTHON_MINOR)
+            let mut executables: Vec<String> = (min_python_minor..MAXIMUM_PYTHON_MINOR)
                 .map(|minor| format!("python3.{}", minor))
-                .collect()
+                .collect();
+            // Also try to find PyPy for cffi and pyo3 bindings
+            if matches!(bridge, BridgeModel::Cffi) || bridge.is_bindings("pyo3") {
+                executables.extend(
+                    (min_python_minor..MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{}", minor)),
+                );
+            }
+            executables
         };
         let mut available_versions = Vec::new();
         for executable in executables {

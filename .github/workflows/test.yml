@@ -88,6 +88,15 @@ jobs:
         with:
           command: test
           args: --target x86_64-unknown-linux-musl
+      - uses: actions/setup-python@v2
+        with:
+          python-version: pypy-3.7
+      - name: test build pypy wheel
+        run: |
+          cargo run -- build -i pypy3 -m test-crates/pyo3-mixed-submodule/Cargo.toml
+          pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-mixed-submodule/target/wheels pyo3-mixed-submodule
+          pypy3 -m pip install pytest
+          pypy3 -m pytest test-crates/pyo3-mixed-submodule/test_pyo3_mixed_submodule.py
 
   test-auditwheel:
     name: Test Auditwheel

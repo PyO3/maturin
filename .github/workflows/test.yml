@@ -49,7 +49,6 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          echo "PYO3_CROSS_LIB_DIR=/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.8/lib" >> "${GITHUB_ENV}"
           sudo xcode-select -s /Applications/Xcode_12.3.app
           bindir="$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/bin"
           echo "CC=${bindir}/clang" >> "${GITHUB_ENV}"
@@ -88,6 +87,15 @@ jobs:
         with:
           command: test
           args: --target x86_64-unknown-linux-musl
+      - uses: actions/setup-python@v2
+        with:
+          python-version: pypy-3.7
+      - name: test build pypy wheel
+        run: |
+          cargo run -- build -i pypy3 -m test-crates/pyo3-mixed-submodule/Cargo.toml
+          pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-mixed-submodule/target/wheels pyo3-mixed-submodule
+          pypy3 -m pip install pytest
+          pypy3 -m pytest test-crates/pyo3-mixed-submodule/tests/
 
   test-auditwheel:
     name: Test Auditwheel

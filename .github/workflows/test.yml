@@ -49,7 +49,6 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          echo "PYO3_CROSS_LIB_DIR=/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.8/lib" >> "${GITHUB_ENV}"
           sudo xcode-select -s /Applications/Xcode_12.3.app
           bindir="$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/bin"
           echo "CC=${bindir}/clang" >> "${GITHUB_ENV}"

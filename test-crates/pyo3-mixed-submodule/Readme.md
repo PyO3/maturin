@@ -27,4 +27,4 @@ Run it:
 tox
 ```
 
-The tests are in `test_pyo3_mixed_submodule.py`, while the configuration is in tox.ini
+The tests are in `tests/test_pyo3_mixed_submodule.py`, while the configuration is in tox.ini

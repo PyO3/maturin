@@ -96,7 +96,7 @@ jobs:
           cargo run -- build -i pypy3 -m test-crates/pyo3-mixed-submodule/Cargo.toml
           pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-mixed-submodule/target/wheels pyo3-mixed-submodule
           pypy3 -m pip install pytest
-          pypy3 -m pytest test-crates/pyo3-mixed-submodule/test_pyo3_mixed_submodule.py
+          pypy3 -m pytest test-crates/pyo3-mixed-submodule/tests/
 
   test-auditwheel:
     name: Test Auditwheel

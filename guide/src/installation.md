@@ -28,9 +28,9 @@ You can install maturin from [crates.io](https://crates.io/crates/maturin) using
 cargo install maturin
 ```
 
-## Install from conda-forge
+## Install using conda
 
-Installing from the `conda-forge` channel can be achieved by adding `conda-forge` to your channels with:
+Installing from the `conda-forge` channel can be achieved by adding `conda-forge` to your conda channels with:
 
 ```
 conda config --add channels conda-forge

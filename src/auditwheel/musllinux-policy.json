@@ -3,7 +3,8 @@
    "aliases": [],
    "priority": 0,
    "symbol_versions": {},
-   "lib_whitelist": []
+   "lib_whitelist": [],
+   "blacklist": {}
   },
   {"name": "musllinux_1_1",
     "aliases": [],
@@ -22,9 +23,10 @@
       "armv7l": {
       }
     },
-    "lib_whitelist": [
-      "libc.so"
-    ]},
+    "lib_whitelist": ["libc.so", "libz.so.1"],
+    "blacklist": {
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "bi_windup", "crc32_vpmsum", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+    }},
     {"name": "musllinux_1_2",
     "aliases": [],
     "priority": 90,
@@ -42,7 +44,8 @@
       "armv7l": {
       }
     },
-    "lib_whitelist": [
-      "libc.so"
-    ]}
+    "lib_whitelist": ["libc.so", "libz.so.1"],
+    "blacklist": {
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "bi_windup", "crc32_vpmsum", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+    }}
 ]

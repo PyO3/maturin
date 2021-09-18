@@ -177,8 +177,6 @@ jobs:
           key: docker-test-crates-${{ hashFiles('Dockerfile', 'test-crates/*/Cargo.lock') }}
       - name: Test the Docker container
         run: ./test-dockerfile.sh
-      # Fix permissions from docker for caching
-      - run: sudo chown $(id -u):$(id -g) -R target test-crates/*/target
 
   test-cross-compile:
     name: Test Cross Compile

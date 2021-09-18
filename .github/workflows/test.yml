@@ -70,12 +70,12 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-maturin-${{ hashFiles('Cargo.lock') }}
+          key: maturin-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('Cargo.lock') }}
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-test-crates-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
 
       - name: cargo test
         uses: actions-rs/cargo@v1
@@ -121,12 +121,12 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: manylinux${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('Cargo.lock') }}
+          key: manylinux-cargo-${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('Cargo.lock') }}
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: manylinux${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-cargo-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: manylinux-test-crates-${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
 
       # Do a bit of if-switching since the docker url doesn't support substitutions
       - name: Compliant Build
@@ -173,9 +173,12 @@ jobs:
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-test-crates-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          # Dockerfile contains the rustc version
+          key: docker-test-crates-${{ hashFiles('Dockerfile', 'test-crates/*/Cargo.lock') }}
       - name: Test the Docker container
         run: ./test-dockerfile.sh
+      # Fix permissions from docker for caching
+      - run: sudo chown $(id -u):$(id -g) -R target test-crates/*/target
 
   test-cross-compile:
     name: Test Cross Compile

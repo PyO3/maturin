@@ -169,6 +169,11 @@ jobs:
           tags: maturin
           load: true
           cache-from: type=registry,ref=pyo3/maturin:buildcache
+      - name: Cache test crates cargo build
+        uses: actions/cache@v2
+        with:
+          path: test-crates/*/target
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-test-crates-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Test the Docker container
         run: ./test-dockerfile.sh
 

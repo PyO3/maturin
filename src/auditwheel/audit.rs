@@ -168,19 +168,38 @@ fn policy_is_satisfied(
     let arch_versions = &policy.symbol_versions.get(arch).ok_or_else(|| {
         AuditWheelError::UnsupportedArchitecture(policy.clone(), arch.to_string())
     })?;
-    let mut offenders = HashSet::new();
+    let mut offending_libs = HashSet::new();
+    let mut offending_blacklist_syms = HashMap::new();
+    let undef_symbols: HashSet<String> = elf
+        .dynsyms
+        .iter()
+        .filter_map(|sym| {
+            if sym.st_shndx == goblin::elf::section_header::SHN_UNDEF as usize {
+                elf.dynstrtab.get_at(sym.st_name).map(ToString::to_string)
+            } else {
+                None
+            }
+        })
+        .collect();
     for dep in deps {
         // Skip dynamic linker/loader
         if dep.starts_with("ld-linux") || dep == "ld64.so.2" || dep == "ld64.so.1" {
             continue;
         }
         if !policy.lib_whitelist.contains(dep) {
-            offenders.insert(dep.clone());
+            offending_libs.insert(dep.clone());
+        }
+        if let Some(sym_list) = policy.blacklist.get(dep) {
+            let mut intersection: Vec<_> = sym_list.intersection(&undef_symbols).cloned().collect();
+            if !intersection.is_empty() {
+                intersection.sort();
+                offending_blacklist_syms.insert(dep, intersection);
+            }
         }
     }
     for library in versioned_libraries {
         if !policy.lib_whitelist.contains(&library.name) {
-            offenders.insert(library.name.clone());
+            offending_libs.insert(library.name.clone());
             continue;
         }
         let mut versions: HashMap<String, HashSet<String>> = HashMap::new();
@@ -216,13 +235,20 @@ fn policy_is_satisfied(
                         offending_symbols.join(", ")
                     )
                 };
-                offenders.insert(offender);
+                offending_libs.insert(offender);
             }
         }
     }
     // Checks if we can give a more helpful error message
     let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
-    let offenders: Vec<String> = offenders.into_iter().collect();
+    let mut offenders: Vec<String> = offending_libs.into_iter().collect();
+    for (lib, syms) in offending_blacklist_syms {
+        offenders.push(format!(
+            "{} offending black-listed symbols: {}",
+            lib,
+            syms.join(", ")
+        ));
+    }
     match offenders.as_slice() {
         [] => Ok(()),
         [lib] if is_libpython.is_match(lib) => {

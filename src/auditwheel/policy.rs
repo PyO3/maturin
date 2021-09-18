@@ -29,17 +29,20 @@ pub static MUSLLINUX_POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
 /// Manylinux policy
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Policy {
-    /// manylinux platform tag name
+    /// platform tag name
     pub name: String,
-    /// manylinux platform tag aliases
+    /// platform tag aliases
     pub aliases: Vec<String>,
     /// policy priority. Tags supporting more platforms have higher priority
     pub priority: i64,
     /// platform architecture to symbol versions map
     #[serde(rename = "symbol_versions")]
     pub symbol_versions: HashMap<String, HashMap<String, HashSet<String>>>,
+    /// whitelisted libraries
     #[serde(rename = "lib_whitelist")]
     pub lib_whitelist: HashSet<String>,
+    /// blacklisted symbols of whitelisted libraries
+    pub blacklist: HashMap<String, HashSet<String>>,
 }
 
 impl Default for Policy {

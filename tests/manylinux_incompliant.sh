@@ -10,7 +10,7 @@ for PYBIN in /opt/python/cp3[6]*/bin; do
   fi
 done
 
-# Fail because we're linking zlib, which is not allowed in manylinux
+# Fail because we're linking zlib with black-listed symbols(gzflags), which is not allowed in manylinux
 yum install -y zlib-devel
 for PYBIN in /opt/python/cp3[6]*/bin; do
   if cargo run -- build --no-sdist -m test-crates/lib_with_disallowed_lib/Cargo.toml -i "${PYBIN}/python" --manylinux 2014 -o dist; then

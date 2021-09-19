@@ -153,7 +153,7 @@ jobs:
       - run: sudo chown $(id -u):$(id -g) -R target test-crates/*/target
 
   test-docker:
-    name: Test docker image
+    name: Test Docker
     runs-on: ubuntu-latest
 
     steps:

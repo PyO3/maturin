@@ -4,9 +4,7 @@ use crate::target::{Arch, Target};
 use anyhow::Result;
 use fs_err::File;
 use goblin::elf::{sym::STT_FUNC, Elf};
-use goblin::strtab::Strtab;
 use regex::Regex;
-use scroll::Pread;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::io::Read;
@@ -40,42 +38,6 @@ pub enum AuditWheelError {
     UnsupportedArchitecture(Policy, String),
 }
 
-/// Structure of "version needed" entries is documented in
-/// https://refspecs.linuxfoundation.org/LSB_3.0.0/LSB-PDA/LSB-PDA.junk/symversion.html
-#[derive(Clone, Copy, Debug, Pread)]
-#[repr(C)]
-struct GnuVersionNeed {
-    /// Version of structure. This value is currently set to 1,
-    /// and will be reset if the versioning implementation is incompatibly altered.
-    version: u16,
-    /// Number of associated verneed array entries.
-    cnt: u16,
-    /// Offset to the file name string in the section header, in bytes.
-    file: u32,
-    /// Offset to a corresponding entry in the vernaux array, in bytes.
-    aux: u32,
-    /// Offset to the next verneed entry, in bytes.
-    next: u32,
-}
-
-/// Version Needed Auxiliary Entries
-#[derive(Clone, Copy, Debug, Pread)]
-#[repr(C)]
-struct GnuVersionNeedAux {
-    /// Dependency name hash value (ELF hash function).
-    hash: u32,
-    /// Dependency information flag bitmask.
-    flags: u16,
-    /// Object file version identifier used in the .gnu.version symbol version array.
-    /// Bit number 15 controls whether or not the object is hidden; if this bit is set,
-    /// the object cannot be used and the static linker will ignore the symbol's presence in the object.
-    other: u16,
-    /// Offset to the dependency name string in the section header, in bytes.
-    name: u32,
-    /// Offset to the next vernaux entry, in bytes.
-    next: u32,
-}
-
 #[derive(Clone, Debug)]
 struct VersionedLibrary {
     /// library name
@@ -85,48 +47,20 @@ struct VersionedLibrary {
 }
 
 /// Find required dynamic linked libraries with version information
-fn find_versioned_libraries(
-    elf: &Elf,
-    buffer: &[u8],
-) -> Result<Vec<VersionedLibrary>, AuditWheelError> {
+fn find_versioned_libraries(elf: &Elf) -> Result<Vec<VersionedLibrary>, AuditWheelError> {
     let mut symbols = Vec::new();
-    let section = elf
-        .section_headers
-        .iter()
-        .find(|h| &elf.shdr_strtab[h.sh_name] == ".gnu.version_r");
-    if let Some(section) = section {
-        let linked_section = &elf.section_headers[section.sh_link as usize];
-        linked_section
-            .check_size(buffer.len())
-            .map_err(AuditWheelError::GoblinError)?;
-        let strtab = Strtab::parse(
-            buffer,
-            linked_section.sh_offset as usize,
-            linked_section.sh_size as usize,
-            0x0,
-        )
-        .map_err(AuditWheelError::GoblinError)?;
-        let num_versions = section.sh_info as usize;
-        let mut offset = section.sh_offset as usize;
-        for _ in 0..num_versions {
-            let ver = buffer
-                .gread::<GnuVersionNeed>(&mut offset)
-                .map_err(goblin::error::Error::Scroll)
-                .map_err(AuditWheelError::GoblinError)?;
-            let mut versions = HashSet::new();
-            for _ in 0..ver.cnt {
-                let ver_aux = buffer
-                    .gread::<GnuVersionNeedAux>(&mut offset)
-                    .map_err(goblin::error::Error::Scroll)
-                    .map_err(AuditWheelError::GoblinError)?;
-                if let Some(aux_name) = strtab.get_at(ver_aux.name as usize) {
-                    versions.insert(aux_name.to_string());
-                }
-            }
-            if let Some(name) = strtab.get_at(ver.file as usize) {
+    if let Some(verneed) = &elf.verneed {
+        for need_file in verneed.iter() {
+            if let Some(name) = elf.dynstrtab.get_at(need_file.vn_file) {
                 // Skip dynamic linker/loader
                 if name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1" {
                     continue;
+                }
+                let mut versions = HashSet::new();
+                for need_ver in need_file.iter() {
+                    if let Some(aux_name) = elf.dynstrtab.get_at(need_ver.vna_name) {
+                        versions.insert(aux_name.to_string());
+                    }
                 }
                 symbols.push(VersionedLibrary {
                     name: name.to_string(),
@@ -287,7 +221,7 @@ pub fn auditwheel_rs(
     let elf = Elf::parse(&buffer).map_err(AuditWheelError::GoblinError)?;
     // This returns essentially the same as ldd
     let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
-    let versioned_libraries = find_versioned_libraries(&elf, &buffer)?;
+    let versioned_libraries = find_versioned_libraries(&elf)?;
 
     // Find the highest possible policy, if any
     let platform_policies = match platform_tag {

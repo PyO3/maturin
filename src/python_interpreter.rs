@@ -94,7 +94,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     // which is used to find the installed interpreters
     let execution = Command::new("py").arg("-0").output();
     if let Ok(output) = execution {
-        let expr = Regex::new(r" -(\d).(\d)-(\d+)(?: .*)?").unwrap();
+        let expr = Regex::new(r" -(\d).(\d+)-(\d+)(?: .*)?").unwrap();
         let lines = str::from_utf8(&output.stdout).unwrap().lines();
         for line in lines {
             if let Some(capture) = expr.captures(line) {

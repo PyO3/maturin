@@ -1,4 +1,5 @@
 use crate::auditwheel::PlatformTag;
+use crate::target::Arch;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::cmp::{Ordering, PartialOrd};
@@ -99,6 +100,24 @@ impl Policy {
             .iter()
             .find(|p| p.name == name || p.aliases.iter().any(|alias| alias == name))
             .cloned()
+    }
+
+    pub(crate) fn fixup_musl_libc_so_name(&mut self, target_arch: Arch) {
+        // Fixup musl libc lib_whitelist
+        if self.lib_whitelist.remove("libc.so") {
+            let new_soname = match target_arch {
+                Arch::Aarch64 => "libc.musl-aarch64.so.1",
+                Arch::Armv7L => "libc.musl-armv7.so.1",
+                Arch::Powerpc64Le => "libc.musl-ppc64le.so.1",
+                Arch::Powerpc64 => "", // musllinux doesn't support ppc64
+                Arch::X86 => "libc.musl-x86.so.1",
+                Arch::X86_64 => "libc.musl-x86_64.so.1",
+                Arch::S390X => "libc.musl-s390x.so.1",
+            };
+            if !new_soname.is_empty() {
+                self.lib_whitelist.insert(new_soname.to_string());
+            }
+        }
     }
 }
 

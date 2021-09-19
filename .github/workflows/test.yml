@@ -168,7 +168,7 @@ jobs:
           push: false
           tags: maturin
           load: true
-          cache-from: type=registry,ref=pyo3/maturin:buildcache
+          cache-from: type=registry,ref=konstin2/maturin:buildcache
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:

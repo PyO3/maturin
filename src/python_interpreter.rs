@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str;
 
 /// This snippets will give us information about the python interpreter's
@@ -545,6 +545,45 @@ impl PythonInterpreter {
         }
 
         Ok(available_versions)
+    }
+
+    /// Run a python script using this Python interpreter.
+    pub fn run_script(&self, script: &str) -> Result<String> {
+        let out = Command::new(&self.executable)
+            .env("PYTHONIOENCODING", "utf-8")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                child
+                    .stdin
+                    .as_mut()
+                    .expect("piped stdin")
+                    .write_all(script.as_bytes())?;
+                child.wait_with_output()
+            });
+
+        match out {
+            Err(err) => {
+                if err.kind() == io::ErrorKind::NotFound {
+                    bail!(
+                        "Could not find any interpreter at {}, \
+                     are you sure you have Python installed on your PATH?",
+                        self.executable.display()
+                    );
+                } else {
+                    bail!(
+                        "Failed to run the Python interpreter at {}: {}",
+                        self.executable.display(),
+                        err
+                    );
+                }
+            }
+            Ok(ok) if !ok.status.success() => bail!("Python script failed"),
+            Ok(ok) => Ok(String::from_utf8(ok.stdout)?),
+        }
     }
 }
 

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * auditwheel: add `libz.so.1` to whitelisted libraries in [#625](https://github.com/PyO3/maturin/pull/625)
 * auditwheel: detect musl libc in [#629](https://github.com/PyO3/maturin/pull/629)
 * Fixed Python 3.10 and later versions detection on Windows in [#630](https://github.com/PyO3/maturin/pull/630)
+* Install entrypoint scripts in `maturin develop` command on Unix in [#633](https://github.com/PyO3/maturin/pull/633)
 
 ## [0.11.3] - 2021-08-25
 

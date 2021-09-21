@@ -3,10 +3,15 @@ use crate::compile::compile;
 use crate::module_writer::{write_bindings_module, write_cffi_module, PathWriter};
 use crate::PythonInterpreter;
 use crate::Target;
-use crate::{write_dist_info, BuildOptions};
+use crate::{write_dist_info, BuildOptions, Metadata21};
 use crate::{ModuleWriter, PlatformTag};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use fs_err as fs;
+#[cfg(not(target_os = "windows"))]
+use std::fs::OpenOptions;
+use std::io::Write;
+#[cfg(not(target_os = "windows"))]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::process::Command;
 
@@ -190,6 +195,110 @@ pub fn develop(
     )?;
 
     writer.write_record(&build_context.metadata21)?;
+
+    write_entry_points(&interpreter, &build_context.metadata21)?;
+
+    Ok(())
+}
+
+/// https://packaging.python.org/specifications/entry-points/
+///
+/// entry points examples:
+/// 1. `foomod:main`
+/// 2. `foomod:main_bar [bar,baz]` where `bar` and `baz` are extra requires
+fn parse_entry_point(entry: &str) -> Option<(&str, &str)> {
+    // remove extras since we don't care about them
+    let entry = entry
+        .split_once(' ')
+        .map(|(first, _)| first)
+        .unwrap_or(entry);
+    entry.split_once(':')
+}
+
+/// Build a shebang line. In the simple case (on Windows, or a shebang line
+/// which is not too long or contains spaces) use a simple formulation for
+/// the shebang. Otherwise, use /bin/sh as the executable, with a contrived
+/// shebang which allows the script to run either under Python or sh, using
+/// suitable quoting. Thanks to Harald Nordgren for his input.
+/// See also: http://www.in-ulm.de/~mascheck/various/shebang/#length
+///           https://hg.mozilla.org/mozilla-central/file/tip/mach
+fn get_shebang(executable: &Path) -> String {
+    let executable = executable.display().to_string();
+    if cfg!(unix) {
+        let max_length = if cfg!(target_os = "macos") { 512 } else { 127 };
+        // Add 3 for '#!' prefix and newline suffix.
+        let shebang_length = executable.len() + 3;
+        if !executable.contains(' ') && shebang_length <= max_length {
+            return format!("#!{}\n", executable);
+        }
+        let mut shebang = "#!/bin/sh\n".to_string();
+        shebang.push_str(&format!("'''exec' {} \"$0\" \"$@\"\n' '''", executable));
+        shebang
+    } else {
+        format!("#!{}\n", executable)
+    }
+}
+
+fn write_entry_points(interpreter: &PythonInterpreter, metadata21: &Metadata21) -> Result<()> {
+    if cfg!(target_os = "windows") {
+        // FIXME: add Windows support
+        return Ok(());
+    }
+    let code = "import sysconfig; print(sysconfig.get_path('scripts'))";
+    let script_dir = interpreter.run_script(code)?;
+    let script_dir = Path::new(script_dir.trim());
+    // FIXME: On Windows shebang has to be used with Python launcher
+    let shebang = get_shebang(&interpreter.executable);
+    for (name, entry) in metadata21
+        .scripts
+        .iter()
+        .chain(metadata21.gui_scripts.iter())
+    {
+        let (module, func) =
+            parse_entry_point(entry).context("Invalid entry point specification")?;
+        let import_name = func.split_once('.').map(|(first, _)| first).unwrap_or(func);
+        let script = format!(
+            r#"# -*- coding: utf-8 -*-
+import re
+import sys
+from {module} import {import_name}
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
+    sys.exit({func}())
+"#,
+            module = module,
+            import_name = import_name,
+            func = func,
+        );
+        let script = shebang.clone() + &script;
+        // FIXME: on Windows scripts needs to have .exe extension
+        let script_path = script_dir.join(name);
+        // We only need to set the executable bit on unix
+        let mut file = {
+            #[cfg(not(target_os = "windows"))]
+            {
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .mode(0o755)
+                    .open(&script_path)
+            }
+            #[cfg(target_os = "windows")]
+            {
+                fs::File::create(&script_path)
+            }
+        }
+        .context(format!(
+            "Failed to create a file at {}",
+            script_path.display()
+        ))?;
+
+        file.write_all(script.as_bytes()).context(format!(
+            "Failed to write to file at {}",
+            script_path.display()
+        ))?;
+    }
 
     Ok(())
 }

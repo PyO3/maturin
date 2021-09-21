@@ -1,12 +1,10 @@
 use crate::target::get_host_target;
-use crate::Target;
+use crate::{PythonInterpreter, Target};
 use anyhow::{bail, Result};
 use fs_err::{self as fs, DirEntry};
 use std::collections::HashMap;
 use std::env;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 pub fn is_cross_compiling(target: &Target) -> Result<bool> {
     let target_triple = target.target_triple();
@@ -45,7 +43,7 @@ pub fn is_cross_compiling(target: &Target) -> Result<bool> {
 /// python executable and library. Here it is read and added to a script to extract only what is
 /// necessary. This necessitates a python interpreter for the host machine to work.
 pub fn parse_sysconfigdata(
-    interpreter: &Path,
+    interpreter: &PythonInterpreter,
     config_path: impl AsRef<Path>,
 ) -> Result<HashMap<String, String>> {
     let mut script = fs::read_to_string(config_path)?;
@@ -60,7 +58,7 @@ KEYS = [
 for key in KEYS:
     print(key, build_time_vars.get(key, ""))
 "#;
-    let output = run_python_script(interpreter, &script)?;
+    let output = interpreter.run_script(&script)?;
 
     Ok(parse_script_output(&output))
 }
@@ -73,45 +71,6 @@ fn parse_script_output(output: &str) -> HashMap<String, String> {
                 .map(|(x, y)| (x.to_string(), y.to_string()))
         })
         .collect()
-}
-
-/// Run a python script using the specified interpreter binary.
-fn run_python_script(interpreter: &Path, script: &str) -> Result<String> {
-    let out = Command::new(interpreter)
-        .env("PYTHONIOENCODING", "utf-8")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            child
-                .stdin
-                .as_mut()
-                .expect("piped stdin")
-                .write_all(script.as_bytes())?;
-            child.wait_with_output()
-        });
-
-    match out {
-        Err(err) => {
-            if err.kind() == io::ErrorKind::NotFound {
-                bail!(
-                    "Could not find any interpreter at {}, \
-                     are you sure you have Python installed on your PATH?",
-                    interpreter.display()
-                );
-            } else {
-                bail!(
-                    "Failed to run the Python interpreter at {}: {}",
-                    interpreter.display(),
-                    err
-                );
-            }
-        }
-        Ok(ok) if !ok.status.success() => bail!("Python script failed"),
-        Ok(ok) => Ok(String::from_utf8(ok.stdout)?),
-    }
 }
 
 fn starts_with(entry: &DirEntry, pat: &str) -> bool {

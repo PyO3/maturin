@@ -240,19 +240,20 @@ fn get_shebang(executable: &Path) -> String {
 }
 
 fn write_entry_points(interpreter: &PythonInterpreter, metadata21: &Metadata21) -> Result<()> {
-    if cfg!(target_os = "windows") {
-        // FIXME: add Windows support
-        return Ok(());
-    }
     let code = "import sysconfig; print(sysconfig.get_path('scripts'))";
     let script_dir = interpreter.run_script(code)?;
     let script_dir = Path::new(script_dir.trim());
-    // FIXME: On Windows shebang has to be used with Python launcher
     let shebang = get_shebang(&interpreter.executable);
-    for (name, entry) in metadata21
+    for (name, entry, gui) in metadata21
         .scripts
         .iter()
-        .chain(metadata21.gui_scripts.iter())
+        .map(|(name, entry)| (name, entry, false))
+        .chain(
+            metadata21
+                .gui_scripts
+                .iter()
+                .map(|(name, entry)| (name, entry, true)),
+        )
     {
         let (module, func) =
             parse_entry_point(entry).context("Invalid entry point specification")?;
@@ -271,7 +272,13 @@ if __name__ == '__main__':
             func = func,
         );
         let script = shebang.clone() + &script;
-        // FIXME: on Windows scripts needs to have .exe extension
+        // Only support launch scripts with PEP 397 launcher on Windows now
+        let ext = if gui { ".pyw" } else { ".py" };
+        let name = if cfg!(target_os = "windows") && !name.ends_with(ext) {
+            format!("{}{}", name, ext)
+        } else {
+            name.to_string()
+        };
         let script_path = script_dir.join(name);
         // We only need to set the executable bit on unix
         let mut file = {

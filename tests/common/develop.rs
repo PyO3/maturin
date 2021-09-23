@@ -70,6 +70,7 @@ pub fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
         &venv_dir,
         false,
         cfg!(feature = "faster-tests"),
+        vec![],
     )?;
 
     check_installed(&package.as_ref(), &python)?;

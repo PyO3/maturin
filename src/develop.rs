@@ -36,6 +36,7 @@ static WIN_LAUNCHER_W64_ARM: &[u8] = include_bytes!("resources/w64-arm.exe");
 /// Also adds the dist-info directory to make sure pip and other tools detect the library
 ///
 /// Works only in a virtualenv.
+#[allow(clippy::too_many_arguments)]
 pub fn develop(
     bindings: Option<String>,
     manifest_file: &Path,
@@ -44,6 +45,7 @@ pub fn develop(
     venv_dir: &Path,
     release: bool,
     strip: bool,
+    extras: Vec<String>,
 ) -> Result<()> {
     let target = Target::from_target_triple(None)?;
 
@@ -71,14 +73,17 @@ pub fn develop(
 
     // Install dependencies
     if !build_context.metadata21.requires_dist.is_empty() {
-        let mut args = vec!["-m", "pip", "install"];
-        args.extend(
-            build_context
-                .metadata21
-                .requires_dist
-                .iter()
-                .map(|x| x.as_str()),
-        );
+        let mut args = vec!["-m".to_string(), "pip".to_string(), "install".to_string()];
+        args.extend(build_context.metadata21.requires_dist.iter().map(|x| {
+            let mut pkg = x.clone();
+            // Remove extra marker to make it installable with pip
+            for extra in &extras {
+                pkg = pkg
+                    .replace(&format!(" and extra == '{}'", extra), "")
+                    .replace(&format!("; extra == '{}'", extra), "");
+            }
+            pkg
+        }));
         let status = Command::new(&interpreter.executable)
             .args(&args)
             .status()

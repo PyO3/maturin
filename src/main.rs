@@ -244,6 +244,11 @@ enum Opt {
         /// Use as `--rustc-extra-args="--my-arg"`
         #[structopt(long = "rustc-extra-args")]
         rustc_extra_args: Vec<String>,
+        /// Install extra requires aka. optional dependencies
+        ///
+        /// Use as `--extras=extra1,extra2`
+        #[structopt(short = "E", long, use_delimiter = true, multiple = false)]
+        extras: Vec<String>,
     },
     /// Build only a source distribution (sdist) without compiling.
     ///
@@ -549,6 +554,7 @@ fn run() -> Result<()> {
             rustc_extra_args,
             release,
             strip,
+            extras,
         } => {
             let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
                 (Some(dir), None) => PathBuf::from(dir),
@@ -574,6 +580,7 @@ fn run() -> Result<()> {
                 &venv_dir,
                 release,
                 strip,
+                extras,
             )?;
         }
         Opt::SDist { manifest_path, out } => {

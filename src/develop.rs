@@ -9,11 +9,28 @@ use anyhow::{anyhow, bail, format_err, Context, Result};
 use fs_err as fs;
 #[cfg(not(target_os = "windows"))]
 use std::fs::OpenOptions;
+#[cfg(target_os = "windows")]
+use std::io::Cursor;
 use std::io::Write;
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::process::Command;
+
+// Windows launcher comes from https://bitbucket.org/vinay.sajip/simple_launcher/
+// Pre-compiled binaries come from https://github.com/vsajip/distlib/blob/master/distlib/
+#[cfg(target_os = "windows")]
+static WIN_LAUNCHER_T32: &[u8] = include_bytes!("resources/t32.exe");
+#[cfg(target_os = "windows")]
+static WIN_LAUNCHER_T64: &[u8] = include_bytes!("resources/t64.exe");
+#[cfg(target_os = "windows")]
+static WIN_LAUNCHER_W32: &[u8] = include_bytes!("resources/w32.exe");
+#[cfg(target_os = "windows")]
+static WIN_LAUNCHER_W64: &[u8] = include_bytes!("resources/w64.exe");
+#[cfg(target_os = "windows")]
+static WIN_LAUNCHER_T64_ARM: &[u8] = include_bytes!("resources/t64-arm.exe");
+#[cfg(target_os = "windows")]
+static WIN_LAUNCHER_W64_ARM: &[u8] = include_bytes!("resources/w64-arm.exe");
 
 /// Installs a crate by compiling it and copying the shared library to site-packages.
 /// Also adds the dist-info directory to make sure pip and other tools detect the library
@@ -239,20 +256,39 @@ fn get_shebang(executable: &Path) -> String {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn get_launcher(interpreter: &PythonInterpreter, gui: bool) -> Result<&[u8]> {
+    let pointer_size =
+        interpreter.run_script("import struct; print(struct.calcsize('P'), end='')")?;
+    let platform = interpreter
+        .run_script("from sysconfig import get_platform; print(get_platform(), end='')")?;
+    let launcher = match (pointer_size.trim(), platform.as_str(), gui) {
+        ("8", "win-amd64", true) => WIN_LAUNCHER_W64,
+        ("4", "win-amd64", true) => WIN_LAUNCHER_W32,
+        ("8", "win-amd64", false) => WIN_LAUNCHER_T64,
+        ("4", "win-amd64", false) => WIN_LAUNCHER_T32,
+        ("8", "win-arm64", true) => WIN_LAUNCHER_W64_ARM,
+        ("8", "win-arm64", false) => WIN_LAUNCHER_T64_ARM,
+        (_, _, _) => bail!("unsupported python interpreter"),
+    };
+    Ok(launcher)
+}
+
 fn write_entry_points(interpreter: &PythonInterpreter, metadata21: &Metadata21) -> Result<()> {
-    if cfg!(target_os = "windows") {
-        // FIXME: add Windows support
-        return Ok(());
-    }
     let code = "import sysconfig; print(sysconfig.get_path('scripts'))";
     let script_dir = interpreter.run_script(code)?;
     let script_dir = Path::new(script_dir.trim());
-    // FIXME: On Windows shebang has to be used with Python launcher
     let shebang = get_shebang(&interpreter.executable);
-    for (name, entry) in metadata21
+    for (name, entry, _gui) in metadata21
         .scripts
         .iter()
-        .chain(metadata21.gui_scripts.iter())
+        .map(|(name, entry)| (name, entry, false))
+        .chain(
+            metadata21
+                .gui_scripts
+                .iter()
+                .map(|(name, entry)| (name, entry, true)),
+        )
     {
         let (module, func) =
             parse_entry_point(entry).context("Invalid entry point specification")?;
@@ -270,9 +306,10 @@ if __name__ == '__main__':
             import_name = import_name,
             func = func,
         );
-        let script = shebang.clone() + &script;
-        // FIXME: on Windows scripts needs to have .exe extension
-        let script_path = script_dir.join(name);
+        // Only support launch scripts with PEP 397 launcher on Windows now
+        let ext = interpreter
+            .run_script("import sysconfig; print(sysconfig.get_config_var('EXE'), end='')")?;
+        let script_path = script_dir.join(format!("{}{}", name, ext));
         // We only need to set the executable bit on unix
         let mut file = {
             #[cfg(not(target_os = "windows"))]
@@ -294,10 +331,30 @@ if __name__ == '__main__':
             script_path.display()
         ))?;
 
-        file.write_all(script.as_bytes()).context(format!(
-            "Failed to write to file at {}",
-            script_path.display()
-        ))?;
+        let mut write_all = |bytes: &[u8]| -> Result<()> {
+            file.write_all(bytes).context(format!(
+                "Failed to write to file at {}",
+                script_path.display()
+            ))
+        };
+
+        #[cfg(target_os = "windows")]
+        {
+            let launcher = get_launcher(interpreter, _gui)?;
+            let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            zip.start_file("__main__.py", zip::write::FileOptions::default())?;
+            zip.write_all(script.as_bytes())?;
+            let archive = zip.finish()?;
+            write_all(launcher)?;
+            write_all(shebang.as_bytes())?;
+            write_all(&archive.into_inner())?;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let script = shebang.clone() + &script;
+            write_all(script.as_bytes())?;
+        }
     }
 
     Ok(())

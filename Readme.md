@@ -421,6 +421,10 @@ OPTIONS:
             Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
 
             Use as `--cargo-extra-args="--my-arg"`
+    -E, --extras <extras>
+            Install extra requires aka. optional dependencies
+
+            Use as `--extras=extra1,extra2`
     -m, --manifest-path <manifest-path>
             The path to the Cargo.toml [default: Cargo.toml]
 

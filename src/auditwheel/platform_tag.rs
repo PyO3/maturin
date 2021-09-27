@@ -1,10 +1,10 @@
 use crate::auditwheel::Policy;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
 /// Decides how to handle manylinux and musllinux compliance
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Copy)]
+#[derive(Serialize, Debug, Clone, Eq, PartialEq, Copy)]
 pub enum PlatformTag {
     /// Use the manylinux_x_y tag
     Manylinux {
@@ -103,5 +103,15 @@ impl FromStr for PlatformTag {
                 }
             }
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for PlatformTag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(serde::de::Error::custom)
     }
 }

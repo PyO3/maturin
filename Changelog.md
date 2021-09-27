@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed Python 3.10 and later versions detection on Windows in [#630](https://github.com/PyO3/maturin/pull/630)
 * Install entrypoint scripts in `maturin develop` command in [#633](https://github.com/PyO3/maturin/pull/633) and [#634](https://github.com/PyO3/maturin/pull/634)
 * Add support for installing optional dependencies in `maturin develop` command in [#635](https://github.com/PyO3/maturin/pull/635)
+* Fixed build error when `manylinux`/`compatibility` options is specified in `pyproject.toml` in [#637](https://github.com/PyO3/maturin/pull/637)
 
 ## [0.11.3] - 2021-08-25
 

@@ -184,7 +184,10 @@ mod tests {
             without_constraint_dir.path().join("pyproject.toml"),
             r#"[build-system]
             requires = ["maturin"]
-            build-backend = "maturin""#,
+            build-backend = "maturin"
+
+            [tool.maturin]
+            manylinux = "2010""#,
         )
         .unwrap();
         let without_constraint = PyProjectToml::new(without_constraint_dir).unwrap();

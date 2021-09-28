@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4] - 2021-09-28
+
 * Autodetect PyPy executables in [#617](https://github.com/PyO3/maturin/pull/617)
 * auditwheel: add `libz.so.1` to whitelisted libraries in [#625](https://github.com/PyO3/maturin/pull/625)
 * auditwheel: detect musl libc in [#629](https://github.com/PyO3/maturin/pull/629)
@@ -445,7 +447,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.3...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.4...HEAD
+[0.11.4]: https://github.com/pyo3/maturin/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/pyo3/maturin/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/pyo3/maturin/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/pyo3/maturin/compare/v0.11.0...v0.11.1

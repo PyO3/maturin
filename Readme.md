@@ -119,7 +119,6 @@ my-project
 ├── python
 │   └── my_project
 │       ├── __init__.py
-│       ├── __init__.py
 │       └── bar.py
 ├── pyproject.toml
 ├── Readme.md

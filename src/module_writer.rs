@@ -621,7 +621,11 @@ pub fn write_bindings_module(
             // Reexport the shared library as if it were the top level module
             writer.add_bytes(
                 &module.join("__init__.py"),
-                format!("from .{} import *\n", module_name).as_bytes(),
+                format!(
+                    "from .{module_name} import *\n\n__doc__ = {module_name}.__doc__\n",
+                    module_name = module_name
+                )
+                .as_bytes(),
             )?;
             let type_stub = rust_module.join(format!("{}.pyi", module_name));
             if type_stub.exists() {

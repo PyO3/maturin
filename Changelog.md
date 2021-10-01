@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fixed module documentation missing bug of pyo3 bindings in [#639](https://github.com/PyO3/maturin/pull/639)
+
 ## [0.11.4] - 2021-09-28
 
 * Autodetect PyPy executables in [#617](https://github.com/PyO3/maturin/pull/617)

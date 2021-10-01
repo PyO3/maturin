@@ -11,6 +11,7 @@ impl DummyClass {
     }
 }
 
+/// module level doc string
 #[pymodule]
 fn pyo3_pure(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<DummyClass>()?;

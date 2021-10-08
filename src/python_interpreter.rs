@@ -166,7 +166,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
         }
 
         for path in paths {
-            let executable = Path::new(&path).join("python");
+            let executable = Path::new(&path).join("python.exe").exists() ?: Path::new(&path).join("python");
             let python_info = Command::new(&executable)
                 .arg("-c")
                 .arg("import sys; print(sys.version)")

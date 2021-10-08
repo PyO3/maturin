@@ -167,7 +167,6 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
 
         for path in paths {
             let executable_win = Path::new(&path).join("python.exe");
-            let executable = if (executable_win.exists()) { executable_win } else { Path::new(&path).join("python") };
             let executable = if (executable_win.exists()) {
                 executable_win
             } else {

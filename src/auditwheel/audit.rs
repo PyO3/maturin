@@ -257,9 +257,7 @@ pub fn auditwheel_rs(
         None => {
             let mut policies = get_default_platform_policies();
             for policy in &mut policies {
-                if policy.name.starts_with("musllinux") {
-                    policy.fixup_musl_libc_so_name(target.target_arch());
-                }
+                policy.fixup_musl_libc_so_name(target.target_arch());
             }
             policies
         }
@@ -283,7 +281,8 @@ pub fn auditwheel_rs(
     }
 
     if let Some(platform_tag) = platform_tag {
-        let policy = Policy::from_name(&platform_tag.to_string()).unwrap();
+        let mut policy = Policy::from_name(&platform_tag.to_string()).unwrap();
+        policy.fixup_musl_libc_so_name(target.target_arch());
 
         if let Some(highest_policy) = highest_policy {
             if policy.priority < highest_policy.priority {

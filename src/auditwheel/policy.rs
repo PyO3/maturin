@@ -104,7 +104,7 @@ impl Policy {
 
     pub(crate) fn fixup_musl_libc_so_name(&mut self, target_arch: Arch) {
         // Fixup musl libc lib_whitelist
-        if self.lib_whitelist.remove("libc.so") {
+        if self.name.starts_with("musllinux") && self.lib_whitelist.remove("libc.so") {
             let new_soname = match target_arch {
                 Arch::Aarch64 => "libc.musl-aarch64.so.1",
                 Arch::Armv7L => "libc.musl-armv7.so.1",
@@ -123,7 +123,7 @@ impl Policy {
 
 #[cfg(test)]
 mod test {
-    use super::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
+    use super::{Arch, Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
 
     #[test]
     fn test_load_policy() {
@@ -153,5 +153,12 @@ mod test {
         for policy in MUSLLINUX_POLICIES.iter() {
             let _tag = policy.platform_tag();
         }
+    }
+
+    #[test]
+    fn test_policy_musllinux_fixup_libc_so_name() {
+        let mut policy = Policy::from_name("musllinux_1_1").unwrap();
+        policy.fixup_musl_libc_so_name(Arch::Aarch64);
+        assert!(policy.lib_whitelist.contains("libc.musl-aarch64.so.1"));
     }
 }

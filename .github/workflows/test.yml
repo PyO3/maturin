@@ -49,7 +49,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          sudo xcode-select -s /Applications/Xcode_12.3.app
+          sudo xcode-select -s /Applications/Xcode.app
           bindir="$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/bin"
           echo "CC=${bindir}/clang" >> "${GITHUB_ENV}"
           echo "CXX=${bindir}/clang++" >> "${GITHUB_ENV}"

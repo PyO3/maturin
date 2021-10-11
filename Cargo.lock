@@ -1170,13 +1170,14 @@ dependencies = [
 
 [[package]]
 name = "python-pkginfo"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ae411f3584c4447905a0d7ee7af5c3bb5f8dff76df588a4bbff9a230545a1e3"
+checksum = "b982302a7155b37d512dfe015460ef4119c6c6dcdfcc745f73c8f17c37aeb742"
 dependencies = [
  "flate2",
  "fs-err",
  "mailparse",
+ "rfc2047-decoder",
  "tar",
  "zip",
 ]
@@ -1363,6 +1364,17 @@ dependencies = [
  "web-sys",
  "webpki-roots",
  "winreg",
+]
+
+[[package]]
+name = "rfc2047-decoder"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ecf2ba387f446155e26796aabb727e9ae1427dd13ac9cc21773a3fbda19d77"
+dependencies = [
+ "base64 0.13.0",
+ "charset",
+ "quoted_printable",
 ]
 
 [[package]]

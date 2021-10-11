@@ -393,7 +393,7 @@ impl Metadata21 {
             }
         };
 
-        add_option("Summary", &self.summary.as_deref().map(fold_header));
+        add_option("Summary", &self.summary);
         add_option("Keywords", &self.keywords);
         add_option("Home-Page", &self.home_page);
         add_option("Download-URL", &self.download_url);

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix musllinux auditwheel wrongly detects libc forbidden link in [#643](https://github.com/PyO3/maturin/pull/643)
 * Fix finding conda Python interpreters on Windows by RobertColton in [#644](https://github.com/PyO3/maturin/pull/644)
 * Fix Unicode metadata when uploading to PyPI in [#645](https://github.com/PyO3/maturin/pull/645)
+* Fix incorrectly folded long `Summary` metadata
 
 ## [0.11.4] - 2021-09-28
 

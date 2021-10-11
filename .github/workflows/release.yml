@@ -165,7 +165,7 @@ jobs:
             --manylinux ${{ matrix.platform.manylinux }}
       - name: Archive binary
         run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
-      - name: Upload to gitHub release
+      - name: Upload to github release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -206,7 +206,7 @@ jobs:
             --cargo-extra-args="--features log,upload,human-panic"
       - name: Archive binary
         run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
-      - name: Upload to gitHub release
+      - name: Upload to github release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
 //! To speed up the tests, they are tests all collected in a single module
 
-use common::{develop, errors, handle_result, integration, other};
+use common::{develop, editable, errors, handle_result, integration, other};
 
 mod common;
 
@@ -43,6 +43,24 @@ fn develop_cffi_mixed() {
 #[test]
 fn develop_hello_world() {
     handle_result(develop::test_develop("test-crates/hello-world", None));
+}
+
+#[test]
+fn editable_pyo3_pure() {
+    handle_result(editable::test_editable("test-crates/pyo3-pure", None));
+}
+
+#[test]
+fn editable_pyo3_mixed() {
+    handle_result(editable::test_editable("test-crates/pyo3-mixed", None));
+}
+
+#[test]
+fn editable_pyo3_mixed_py_subdir() {
+    handle_result(editable::test_editable(
+        "test-crates/pyo3-mixed-py-subdir",
+        None,
+    ));
 }
 
 #[test]

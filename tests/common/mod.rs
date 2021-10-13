@@ -1,10 +1,13 @@
 use anyhow::{bail, Result};
+use fs_err as fs;
+use maturin::Target;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::{env, io, str};
 
 pub mod develop;
+pub mod editable;
 pub mod errors;
 pub mod integration;
 pub mod other;
@@ -91,4 +94,45 @@ pub fn handle_result<T>(result: Result<T>) -> T {
         }
         Ok(result) => result,
     }
+}
+
+/// Create virtualenv
+pub fn create_virtualenv(
+    package: impl AsRef<Path>,
+    venv_suffix: &str,
+) -> Result<(PathBuf, PathBuf)> {
+    let test_name = package
+        .as_ref()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let venv_dir = PathBuf::from("test-crates")
+        .canonicalize()?
+        .join("venvs")
+        .join(format!("{}-{}", test_name, venv_suffix));
+    let target = Target::from_target_triple(None)?;
+
+    if venv_dir.is_dir() {
+        fs::remove_dir_all(&venv_dir)?;
+    }
+
+    let output = Command::new("virtualenv")
+        .arg(adjust_canonicalization(&venv_dir))
+        .stderr(Stdio::inherit())
+        .output()
+        .expect("Failed to create a virtualenv");
+    if !output.status.success() {
+        panic!(
+            "Failed to run virtualenv: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
+    let python = target.get_venv_python(&venv_dir);
+    Ok((venv_dir, python))
 }

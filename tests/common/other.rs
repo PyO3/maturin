@@ -54,7 +54,7 @@ pub fn test_musl() -> Result<bool> {
         "linux",
     ])?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let built_lib = build_context
         .manifest_path
         .parent()
@@ -91,7 +91,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "linux",
     ])?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let source_distribution = build_context.build_source_distribution()?;
     assert!(source_distribution.is_some());
 

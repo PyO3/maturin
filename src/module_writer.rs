@@ -268,6 +268,29 @@ impl WheelWriter {
         Ok(builder)
     }
 
+    /// Add a pth file to wheel root for editable installs
+    pub fn add_pth(
+        &mut self,
+        project_layout: &ProjectLayout,
+        metadata21: &Metadata21,
+    ) -> Result<()> {
+        match project_layout {
+            ProjectLayout::Mixed {
+                ref python_module, ..
+            } => {
+                let absolute_path = python_module.canonicalize()?;
+                if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
+                    let name = metadata21.get_distribution_escaped();
+                    self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;
+                } else {
+                    println!("⚠  source code path contains non-Unicode sequences, editable installs may not work.");
+                }
+            }
+            ProjectLayout::PureRust { .. } => {}
+        }
+        Ok(())
+    }
+
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
         let compression_method = if cfg!(feature = "faster-tests") {

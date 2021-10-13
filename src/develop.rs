@@ -64,7 +64,7 @@ pub fn develop(
         universal2: false,
     };
 
-    let build_context = build_options.into_build_context(release, strip)?;
+    let build_context = build_options.into_build_context(release, strip, false)?;
 
     let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
         .ok_or_else(|| {

@@ -208,9 +208,9 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
             abi: cp39-cp39
-          - target: s390x-unknown-linux-gnu
-            arch: s390x
-            abi: cp310-cp310
+          # - target: s390x-unknown-linux-gnu
+          #   arch: s390x
+          #   abi: cp310-cp310
     steps:
       - uses: actions/checkout@v2
       - name: Build Wheels

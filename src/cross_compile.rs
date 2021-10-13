@@ -49,7 +49,7 @@ pub fn parse_sysconfigdata(
     let mut script = fs::read_to_string(config_path)?;
     script += r#"
 print("version_major", build_time_vars["VERSION"][0])  # 3
-print("version_minor", build_time_vars["VERSION"][2])  # E.g., 8
+print("version_minor", build_time_vars["VERSION"][2:])  # E.g., 8, 10
 KEYS = [
     "ABIFLAGS",
     "EXT_SUFFIX",

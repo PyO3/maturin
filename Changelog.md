@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5] - 2021-10-13
+
 * Fixed module documentation missing bug of pyo3 bindings in [#639](https://github.com/PyO3/maturin/pull/639)
 * Fix musllinux auditwheel wrongly detects libc forbidden link in [#643](https://github.com/PyO3/maturin/pull/643)
 * Fix finding conda Python interpreters on Windows by RobertColton in [#644](https://github.com/PyO3/maturin/pull/644)
@@ -454,7 +456,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.4...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.5...HEAD
+[0.11.5]: https://github.com/pyo3/maturin/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/pyo3/maturin/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/pyo3/maturin/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/pyo3/maturin/compare/v0.11.1...v0.11.2

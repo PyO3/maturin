@@ -13,7 +13,7 @@ pub fn abi3_without_version() -> Result<()> {
     ];
 
     let options = BuildOptions::from_iter_safe(cli)?;
-    let result = options.into_build_context(false, cfg!(feature = "faster-tests"));
+    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
     if let Err(err) = result {
         assert_eq!(err.to_string(),
             "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
@@ -40,7 +40,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
 
     let options = BuildOptions::from_iter_safe(cli)?;
     let result = options
-        .into_build_context(false, cfg!(feature = "faster-tests"))?
+        .into_build_context(false, cfg!(feature = "faster-tests"), false)?
         .build_wheels();
     if let Err(err) = result {
         if !(err
@@ -71,7 +71,7 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
         "-i=python",
     ];
     let options = BuildOptions::from_iter_safe(cli)?;
-    let result = options.into_build_context(false, cfg!(feature = "faster-tests"));
+    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
     if let Err(err) = result {
         let err_string = err
             .source()

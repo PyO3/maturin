@@ -64,7 +64,7 @@ pub fn develop(
         universal2: false,
     };
 
-    let build_context = build_options.into_build_context(release, strip)?;
+    let build_context = build_options.into_build_context(release, strip, false)?;
 
     let interpreter = PythonInterpreter::check_executable(python, &target, &build_context.bridge)?
         .ok_or_else(|| {
@@ -146,6 +146,7 @@ pub fn develop(
                 &artifact,
                 &interpreter.executable,
                 true,
+                false,
             )?;
         }
         BridgeModel::Bindings(_) => {
@@ -164,6 +165,7 @@ pub fn develop(
                 Some(&interpreter),
                 &target,
                 true,
+                false,
             )?;
         }
         BridgeModel::BindingsAbi3(_, _) => {
@@ -183,6 +185,7 @@ pub fn develop(
                 None,
                 &target,
                 true,
+                false,
             )?;
         }
     }

@@ -32,7 +32,7 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
 
     let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
     let test_name = package
@@ -184,7 +184,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
 
     let options = BuildOptions::from_iter_safe(cli)?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"))?;
+    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];

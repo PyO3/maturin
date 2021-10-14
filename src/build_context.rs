@@ -172,6 +172,8 @@ pub struct BuildContext {
     pub cargo_metadata: Metadata,
     /// Whether to use universal2 or use the native macOS tag (off)
     pub universal2: bool,
+    /// Build editable wheels
+    pub editable: bool,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -244,6 +246,13 @@ impl BuildContext {
         Ok(policy)
     }
 
+    fn add_pth(&self, writer: &mut WheelWriter) -> Result<()> {
+        if self.editable {
+            writer.add_pth(&self.project_layout, &self.metadata21)?;
+        }
+        Ok(())
+    }
+
     fn write_binding_wheel_abi3(
         &self,
         artifact: &Path,
@@ -264,8 +273,11 @@ impl BuildContext {
             None,
             &self.target,
             false,
+            self.editable,
         )
         .context("Failed to add the files to the wheel")?;
+
+        self.add_pth(&mut writer)?;
 
         let wheel_path = writer.finish()?;
         Ok((wheel_path, format!("cp{}{}", major, min_minor)))
@@ -319,8 +331,11 @@ impl BuildContext {
             Some(python_interpreter),
             &self.target,
             false,
+            self.editable,
         )
         .context("Failed to add the files to the wheel")?;
+
+        self.add_pth(&mut writer)?;
 
         let wheel_path = writer.finish()?;
         Ok((
@@ -398,19 +413,22 @@ impl BuildContext {
             .target
             .get_universal_tags(platform_tag, self.universal2);
 
-        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
+        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
 
         write_cffi_module(
-            &mut builder,
+            &mut writer,
             &self.project_layout,
             self.manifest_path.parent().unwrap(),
             &self.module_name,
             artifact,
             &self.interpreter[0].executable,
             false,
+            self.editable,
         )?;
 
-        let wheel_path = builder.finish()?;
+        self.add_pth(&mut writer)?;
+
+        let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }
 
@@ -440,7 +458,7 @@ impl BuildContext {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
         }
 
-        let mut builder = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
+        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
 
         match self.project_layout {
             ProjectLayout::Mixed {
@@ -448,8 +466,10 @@ impl BuildContext {
                 ref extension_name,
                 ..
             } => {
-                write_python_part(&mut builder, python_module, extension_name)
-                    .context("Failed to add the python module to the package")?;
+                if !self.editable {
+                    write_python_part(&mut writer, python_module, extension_name)
+                        .context("Failed to add the python module to the package")?;
+                }
             }
             ProjectLayout::PureRust { .. } => {}
         }
@@ -459,9 +479,11 @@ impl BuildContext {
         let bin_name = artifact
             .file_name()
             .expect("Couldn't get the filename from the binary produced by cargo");
-        write_bin(&mut builder, artifact, &self.metadata21, bin_name)?;
+        write_bin(&mut writer, artifact, &self.metadata21, bin_name)?;
 
-        let wheel_path = builder.finish()?;
+        self.add_pth(&mut writer)?;
+
+        let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }
 

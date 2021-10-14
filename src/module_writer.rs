@@ -268,6 +268,29 @@ impl WheelWriter {
         Ok(builder)
     }
 
+    /// Add a pth file to wheel root for editable installs
+    pub fn add_pth(
+        &mut self,
+        project_layout: &ProjectLayout,
+        metadata21: &Metadata21,
+    ) -> Result<()> {
+        match project_layout {
+            ProjectLayout::Mixed {
+                ref python_module, ..
+            } => {
+                let absolute_path = python_module.canonicalize()?;
+                if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
+                    let name = metadata21.get_distribution_escaped();
+                    self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;
+                } else {
+                    println!("⚠  source code path contains non-Unicode sequences, editable installs may not work.");
+                }
+            }
+            ProjectLayout::PureRust { .. } => {}
+        }
+        Ok(())
+    }
+
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
         let compression_method = if cfg!(feature = "faster-tests") {
@@ -569,6 +592,7 @@ fn handle_cffi_call_result(
 }
 
 /// Copies the shared library into the module, which is the only extra file needed with bindings
+#[allow(clippy::too_many_arguments)]
 pub fn write_bindings_module(
     writer: &mut impl ModuleWriter,
     project_layout: &ProjectLayout,
@@ -577,6 +601,7 @@ pub fn write_bindings_module(
     python_interpreter: Option<&PythonInterpreter>,
     target: &Target,
     develop: bool,
+    editable: bool,
 ) -> Result<()> {
     let ext_name = project_layout.extension_name();
     let so_filename = match python_interpreter {
@@ -598,10 +623,12 @@ pub fn write_bindings_module(
             ref rust_module,
             ..
         } => {
-            write_python_part(writer, python_module, &module_name)
-                .context("Failed to add the python module to the package")?;
+            if !editable {
+                write_python_part(writer, python_module, &module_name)
+                    .context("Failed to add the python module to the package")?;
+            }
 
-            if develop {
+            if develop || editable {
                 let target = rust_module.join(&so_filename);
                 fs::copy(&artifact, &target).context(format!(
                     "Failed to copy {} to {}",
@@ -610,8 +637,10 @@ pub fn write_bindings_module(
                 ))?;
             }
 
-            let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
-            writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
+            if !editable {
+                let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
+                writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
+            }
         }
         ProjectLayout::PureRust {
             ref rust_module, ..
@@ -644,6 +673,7 @@ pub fn write_bindings_module(
 }
 
 /// Creates the cffi module with the shared library, the cffi declarations and the cffi loader
+#[allow(clippy::too_many_arguments)]
 pub fn write_cffi_module(
     writer: &mut impl ModuleWriter,
     project_layout: &ProjectLayout,
@@ -652,6 +682,7 @@ pub fn write_cffi_module(
     artifact: &Path,
     python: &Path,
     develop: bool,
+    editable: bool,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, python)?;
 
@@ -663,10 +694,12 @@ pub fn write_cffi_module(
             ref rust_module,
             ref extension_name,
         } => {
-            write_python_part(writer, python_module, &module_name)
-                .context("Failed to add the python module to the package")?;
+            if !editable {
+                write_python_part(writer, python_module, &module_name)
+                    .context("Failed to add the python module to the package")?;
+            }
 
-            if develop {
+            if develop || editable {
                 let base_path = python_module.join(&module_name);
                 fs::create_dir_all(&base_path)?;
                 let target = base_path.join("native.so");
@@ -682,7 +715,9 @@ pub fn write_cffi_module(
 
             let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
             module = relative.join(extension_name);
-            writer.add_directory(&module)?;
+            if !editable {
+                writer.add_directory(&module)?;
+            }
         }
         ProjectLayout::PureRust {
             ref rust_module, ..
@@ -701,9 +736,11 @@ pub fn write_cffi_module(
         }
     };
 
-    writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
-    writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
-    writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;
+    if !editable {
+        writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
+        writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
+        writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;
+    }
 
     Ok(())
 }

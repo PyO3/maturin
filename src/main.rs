@@ -323,6 +323,9 @@ enum Pep517Command {
         /// Strip the library for minimum file size
         #[structopt(long)]
         strip: bool,
+        /// Build editable wheels
+        #[structopt(long)]
+        editable: bool,
     },
     /// The implementation of build_sdist
     #[structopt(name = "write-sdist")]
@@ -356,7 +359,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 build_options.interpreter.as_ref(),
                 Some(version) if version.len() == 1
             ));
-            let context = build_options.into_build_context(true, strip)?;
+            let context = build_options.into_build_context(true, strip, false)?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge {
@@ -384,8 +387,9 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
         Pep517Command::BuildWheel {
             build_options,
             strip,
+            editable,
         } => {
-            let build_context = build_options.into_build_context(true, strip)?;
+            let build_context = build_options.into_build_context(true, strip, editable)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
@@ -507,7 +511,7 @@ fn run() -> Result<()> {
             strip,
             no_sdist,
         } => {
-            let build_context = build.into_build_context(release, strip)?;
+            let build_context = build.into_build_context(release, strip, false)?;
             if !no_sdist {
                 build_context.build_source_distribution()?;
             }
@@ -521,7 +525,7 @@ fn run() -> Result<()> {
             no_strip,
             no_sdist,
         } => {
-            let build_context = build.into_build_context(!debug, !no_strip)?;
+            let build_context = build.into_build_context(!debug, !no_strip, false)?;
 
             if !build_context.release {
                 eprintln!("⚠️  Warning: You're publishing debug wheels");

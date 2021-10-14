@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for PEP 660 editable installs in [#648](https://github.com/PyO3/maturin/pull/648)
 * Publish musllinux_1_1 wheels for maturin in [#651](https://github.com/PyO3/maturin/pull/651)
 
 ## [0.11.5] - 2021-10-13

@@ -106,7 +106,12 @@ impl Default for BuildOptions {
 
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
-    pub fn into_build_context(self, release: bool, strip: bool) -> Result<BuildContext> {
+    pub fn into_build_context(
+        self,
+        release: bool,
+        strip: bool,
+        editable: bool,
+    ) -> Result<BuildContext> {
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
             let current_dir =
@@ -303,6 +308,7 @@ impl BuildOptions {
             interpreter,
             cargo_metadata,
             universal2,
+            editable,
         })
     }
 }
@@ -789,7 +795,7 @@ mod test {
         let mut options = BuildOptions::default();
         options.cargo_extra_args.push("--features log".to_string());
         options.bindings = Some("bin".to_string());
-        let context = options.into_build_context(false, false).unwrap();
+        let context = options.into_build_context(false, false, false).unwrap();
         assert_eq!(context.cargo_extra_args, vec!["--features", "log"])
     }
 

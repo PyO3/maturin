@@ -26,10 +26,14 @@ def get_config() -> Dict[str, str]:
 
 
 # noinspection PyUnusedLocal
-def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+def _build_wheel(
+    wheel_directory, config_settings=None, metadata_directory=None, editable=False
+):
     # PEP 517 specifies that only `sys.executable` points to the correct
     # python interpreter
     command = ["maturin", "pep517", "build-wheel", "-i", sys.executable]
+    if editable:
+        command.append("--editable")
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
@@ -46,6 +50,11 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     filename = os.path.basename(wheel_path)
     shutil.copy2(wheel_path, os.path.join(wheel_directory, filename))
     return filename
+
+
+# noinspection PyUnusedLocal
+def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+    return _build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 # noinspection PyUnusedLocal
@@ -72,6 +81,17 @@ def get_requires_for_build_wheel(config_settings=None):
         return ["cffi"]
     else:
         return []
+
+
+# noinspection PyUnusedLocal
+def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
+    return _build_wheel(
+        wheel_directory, config_settings, metadata_directory, editable=True
+    )
+
+
+# Requirements to build an editable are the same as for a wheel
+get_requires_for_build_editable = get_requires_for_build_wheel
 
 
 # noinspection PyUnusedLocal
@@ -122,3 +142,7 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
     sys.stdout.flush()
     output = output.decode(errors="replace")
     return output.strip().splitlines()[-1]
+
+
+# Metadata for editable are the same as for a wheel
+prepare_metadata_for_build_editable = prepare_metadata_for_build_wheel

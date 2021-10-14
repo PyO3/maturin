@@ -78,8 +78,12 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }}
-      
+        run: |
+          # manylinux
+          cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }}
+          # musllinux
+          cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --compatibility musllinux_1_1
+
       # ring doesn't support aarch64 windows yet
       # PyPI doesn't support uploading windows arm64 wheels yet, so we only upload it to GitHub releases
       # https://github.com/pypa/warehouse/blob/4a085e98a8ead333bb7c600a464ed7aec33de4d1/warehouse/forklift/legacy.py#L107-L125
@@ -115,7 +119,6 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           MACOSX_DEPLOYMENT_TARGET: '10.9'
-          PYO3_CROSS_LIB_DIR: /Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.8/lib
         run: |
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
@@ -160,9 +163,14 @@ jobs:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin
+          # manylinux
           maturin publish -u __token__ -b bin --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }}
+          # musllinux
+          maturin publish -u __token__ -b bin --no-sdist \
+            --target ${{ matrix.platform.target }} \
+            --compatibility musllinux_1_1
       - name: Archive binary
         run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload to github release
@@ -178,10 +186,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [
-          { target: "powerpc64le-unknown-linux-musl", image: "messense/rust-musl-cross:powerpc64le-musl", manylinux: "2014" },
-          { target: "s390x-unknown-linux-gnu", image: "messense/manylinux2014-cross:s390x", manylinux: "2014" },
-        ]
+        platform:
+          - target: "powerpc64le-unknown-linux-musl"
+            image: "messense/rust-musl-cross:powerpc64le-musl"
+            manylinux: "2014"
+            musllinux: "musllinux_1_1"
+          - target: "s390x-unknown-linux-gnu"
+            image: "messense/manylinux2014-cross:s390x"
+            manylinux: "2014"
+            musllinux: ""
     container:
       image: docker://${{ matrix.platform.image }}
     steps:
@@ -194,14 +207,24 @@ jobs:
           toolchain: stable
           override: true
           target: ${{ matrix.platform.target }}
-      - name: Build and publish wheel
+      - name: Build and publish manylinux wheel
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
-          sudo python3 -m pip install maturin==0.10.5_beta.5
+          sudo python3 -m pip install maturin
           maturin publish -u __token__ -b bin --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} \
+            --cargo-extra-args="--no-default-features" \
+            --cargo-extra-args="--features log,upload,human-panic"
+      - name: Build and publish musllinux wheel
+        if: matrix.platform.musllinux != ''
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+        run: |
+          maturin publish -u __token__ -b bin --no-sdist \
+            --target ${{ matrix.platform.target }} \
+            --compatibility ${{ matrix.platform.musllinux }} \
             --cargo-extra-args="--no-default-features" \
             --cargo-extra-args="--features log,upload,human-panic"
       - name: Archive binary

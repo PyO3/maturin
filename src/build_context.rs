@@ -273,6 +273,7 @@ impl BuildContext {
             None,
             &self.target,
             false,
+            self.editable,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -330,6 +331,7 @@ impl BuildContext {
             Some(python_interpreter),
             &self.target,
             false,
+            self.editable,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -421,6 +423,7 @@ impl BuildContext {
             artifact,
             &self.interpreter[0].executable,
             false,
+            self.editable,
         )?;
 
         self.add_pth(&mut writer)?;
@@ -463,8 +466,10 @@ impl BuildContext {
                 ref extension_name,
                 ..
             } => {
-                write_python_part(&mut writer, python_module, extension_name)
-                    .context("Failed to add the python module to the package")?;
+                if !self.editable {
+                    write_python_part(&mut writer, python_module, extension_name)
+                        .context("Failed to add the python module to the package")?;
+                }
             }
             ProjectLayout::PureRust { .. } => {}
         }

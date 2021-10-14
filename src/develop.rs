@@ -146,6 +146,7 @@ pub fn develop(
                 &artifact,
                 &interpreter.executable,
                 true,
+                false,
             )?;
         }
         BridgeModel::Bindings(_) => {
@@ -164,6 +165,7 @@ pub fn develop(
                 Some(&interpreter),
                 &target,
                 true,
+                false,
             )?;
         }
         BridgeModel::BindingsAbi3(_, _) => {
@@ -183,6 +185,7 @@ pub fn develop(
                 None,
                 &target,
                 true,
+                false,
             )?;
         }
     }

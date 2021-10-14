@@ -600,7 +600,6 @@ pub fn write_bindings_module(
     artifact: &Path,
     python_interpreter: Option<&PythonInterpreter>,
     target: &Target,
-    develop: bool,
     editable: bool,
 ) -> Result<()> {
     let ext_name = project_layout.extension_name();
@@ -628,7 +627,7 @@ pub fn write_bindings_module(
                     .context("Failed to add the python module to the package")?;
             }
 
-            if develop || editable {
+            if editable {
                 let target = rust_module.join(&so_filename);
                 fs::copy(&artifact, &target).context(format!(
                     "Failed to copy {} to {}",
@@ -681,7 +680,6 @@ pub fn write_cffi_module(
     module_name: &str,
     artifact: &Path,
     python: &Path,
-    develop: bool,
     editable: bool,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, python)?;
@@ -699,7 +697,7 @@ pub fn write_cffi_module(
                     .context("Failed to add the python module to the package")?;
             }
 
-            if develop || editable {
+            if editable {
                 let base_path = python_module.join(&module_name);
                 fs::create_dir_all(&base_path)?;
                 let target = base_path.join("native.so");
@@ -736,7 +734,7 @@ pub fn write_cffi_module(
         }
     };
 
-    if !editable {
+    if !editable || matches!(project_layout, ProjectLayout::PureRust { .. }) {
         writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
         writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
         writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;

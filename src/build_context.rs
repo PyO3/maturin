@@ -272,7 +272,6 @@ impl BuildContext {
             artifact,
             None,
             &self.target,
-            false,
             self.editable,
         )
         .context("Failed to add the files to the wheel")?;
@@ -330,7 +329,6 @@ impl BuildContext {
             artifact,
             Some(python_interpreter),
             &self.target,
-            false,
             self.editable,
         )
         .context("Failed to add the files to the wheel")?;
@@ -422,7 +420,6 @@ impl BuildContext {
             &self.module_name,
             artifact,
             &self.interpreter[0].executable,
-            false,
             self.editable,
         )?;
 

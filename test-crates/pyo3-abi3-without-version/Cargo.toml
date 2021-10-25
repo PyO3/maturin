@@ -2,7 +2,7 @@
 name = "pyo3-abi3-without-version"
 version = "0.1.0"
 authors = ["konstin <konstin@mailbox.org>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 pyo3 = { version = "0.14.0", features = ["abi3", "extension-module"] }

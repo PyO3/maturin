@@ -3,7 +3,7 @@ authors = ["konstin <konstin@mailbox.org>"]
 name = "pyo3-no-extension-module"
 version = "2.1.0"
 description = "Does not use the extension-module feature, thus errorneously linking libpython"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 pyo3 = { version = "0.14.0", default-features = false }

@@ -10,7 +10,7 @@ repository = "https://github.com/pyo3/maturin"
 license = "MIT OR Apache-2.0"
 keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
-edition = "2018"
+edition = "2021"
 
 [badges]
 travis-ci = { repository = "PyO3/maturin" }

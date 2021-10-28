@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Publish musllinux_1_1 wheels for maturin in [#651](https://github.com/PyO3/maturin/pull/651)
 * Refactor `develop` command to act identical to PEP 660 editable wheels in [#653](https://github.com/PyO3/maturin/pull/653)
 * Upgrade to Rust 2021 edition in [#655](https://github.com/PyO3/maturin/pull/655)
+* Add support for powerpc64 and powerpc64le on FreeBSD by pkubaj in [#656](https://github.com/PyO3/maturin/pull/656)
 
 ## [0.11.5] - 2021-10-13
 

@@ -11,7 +11,6 @@ guessing-game`. This will create a directory with the following structure.
 
 ```
 guessing-game/
-├── Cargo.lock
 ├── Cargo.toml
 └── src
     └── lib.rs
@@ -63,7 +62,6 @@ of your project tree:
 
 ```
 guessing-game/
-├── Cargo.lock
 ├── Cargo.toml
 ├── pyproject.toml  #  <<< add this file
 └── src

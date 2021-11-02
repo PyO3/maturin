@@ -10,13 +10,13 @@ For a pure Rust project, the structure is as expected and what you get from `car
 ```
 my-rust-project/
 ├── Cargo.toml
-├── pyproject.toml  # required for maturing configuration
+├── pyproject.toml  # required for maturin configuration
 └── src
     ├── lib.rs  # default for library crates
     └── main.rs  # default for binary crates
 ```
 
-maturin will add a necessary `__init__.py` to the package when building the
+Maturin will add a necessary `__init__.py` to the package when building the
 wheel. For convenience, this file includes the following:
 
 ```python
@@ -38,9 +38,9 @@ rather than:
 from my_project import my_project
 ```
 
-N.B.: there is currently no way to tell maturin to include extra data (e.g.
-type stubs or `package_data` in setuptools) for a pure Rust project. Instead,
-consider using the layout described below for the mixed Rust/Python project.
+> **Note**: there is currently no way to tell maturin to include extra data (e.g.
+`package_data` in setuptools) for a pure Rust project. Instead, consider using
+the layout described below for the mixed Rust/Python project.
 
 ## Mixed Rust/Python project
 
@@ -101,17 +101,31 @@ my-rust-and-python-project
     └── lib.rs
 ```
 
-### Adding type information
-
-The simplest way to add type information for distribution is to use the mixed
-Rust/Python projcet layout. In this layout, additional files in the Python
-source dir (but not in `.gitignore`) will be automatically included in the
-build outputs (source distribution and/or wheel).
+## Adding Python type information
 
 To distribute typing information, you need to add:
 
 * an empty marker file called `py.typed` in the root of the Python package
 * inline types in Python files and/or `.pyi` "stub" files
+
+In a pure Rust project, add type stubs in a `<module_name>.pyi` file in the
+project root. Maturin will automatically include this file along with the
+required `py.typed` file for you.
+
+```
+my-rust-project/
+├── Cargo.toml
+├── my_project.pyi  # <<< add type stubs for Rust functions in the my_project module here
+├── pyproject.toml
+└── src
+    └── lib.rs
+```
+
+In a mixed Rust/Python project, additional files in the Python source dir (but
+not in `.gitignore`) will be automatically included in the build outputs
+(source distribution and/or wheel). Type information can be therefore added to
+the root Python package directory as you might do in a pure Python package.
+This requires you to add the `py.typed` marker file yourself.
 
 ```
 my-project

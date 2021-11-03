@@ -45,7 +45,7 @@ Maturin uses cbindgen to generate a header file for [supported Rust
 types](https://github.com/eqrion/cbindgen/blob/master/docs.md#supported-types).
 The header file can be customized by configuring cbindgen through a
 `cbindgen.toml` file inside your project root. Aternatively you can use a build
-script that writes a header file to `$PROJECT_ROOT/target/header.h, like so:
+script that writes a header file to `$PROJECT_ROOT/target/header.h`, like so:
 
 ```rust
 use cbindgen;

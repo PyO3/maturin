@@ -23,7 +23,7 @@ name = "maturin"
 name = "maturin"
 
 [dependencies]
-anyhow = "1.0.39"
+anyhow = "1.0.45"
 base64 = "0.13.0"
 bytesize = "1.0.1"
 glob = "0.3.0"

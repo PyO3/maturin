@@ -76,7 +76,7 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
             let output = Command::new("virtualenv")
                 .arg("-p")
                 .arg(python_interpreter.executable.clone())
-                .arg(&venv_dir)
+                .arg(&adjust_canonicalization(&venv_dir))
                 .output()?;
 
             if !output.status.success() {

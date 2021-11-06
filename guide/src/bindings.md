@@ -21,7 +21,7 @@ pyo3 = { version = "0.14", features = ["abi3"] }
 ```
 
 You may additionally specify a minimum Python version by using the `abi3-pyXX`
-format for the pyo3 features, where `XX` is corresponds to a Python verison.
+format for the pyo3 features, where `XX` is corresponds to a Python version.
 For example `abi3-py37` will indicate a minimum Python version of 3.7.
 
 > **Note**: Read more about abi3 support in [pyo3's
@@ -67,7 +67,7 @@ fn main() {
 
 Maturin uses the cbindgen-generated header to create a module that exposes `ffi` and
 `lib` objects as attributes. See the [cffi docs](https://cffi.readthedocs.io/en/latest/using.html)
-for more information on using theses `ffi`/`lib` objects to call the Rust code
+for more information on using these `ffi`/`lib` objects to call the Rust code
 from Python.
 
 > **Note**: Maturin _does not_ automatically detect `cffi` bindings. You _must_
@@ -76,7 +76,7 @@ from Python.
 ## `rust-cpython`
 
 [rust-cpython](https://github.com/dgrunwald/rust-cpython) is Rust bindings for
-the Python interperter. Currently it only supports CPython.
+the Python interpreter. Currently it only supports CPython.
 
 Maturin automatically detects rust-cpython bindings when it's added as a
 dependency in `Cargo.toml`.

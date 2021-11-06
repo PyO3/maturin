@@ -89,7 +89,7 @@ When you create a `lib` projectg with `cargo new` it creates a file
 code with the code below. As mentioned, we will implement a slightly
 modified version of [the guessing game from The Rust
 Book](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html).
-Instead of implemeting as a `bin` crate, we're using a `lib` and will expose
+Instead of implementing as a `bin` crate, we're using a `lib` and will expose
 the main logic as a Python function.
 
 ```rust

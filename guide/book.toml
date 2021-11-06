@@ -1,0 +1,10 @@
+[book]
+author = ["PyO3 Project and Contributors"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Maturin User Guide"
+
+[output.html]
+git-repository-url = "https://github.com/PyO3/maturin/tree/main/guide"
+edit-url-template = "https://github.com/PyO3/maturin/edit/main/guide/{path}"

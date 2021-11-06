@@ -143,7 +143,7 @@ fn compile_target(
             format!("{base}.abi3.so", base = module_name)
         }
     };
-    // Change LC_ID_DYLIB to the finaly .so name for macOS targets to avoid linking with
+    // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
     // non-existent library.
     // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
     let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);

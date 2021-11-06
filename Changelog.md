@@ -80,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Better cross compiling support for PyO3 binding on Unix in [#454](https://github.com/PyO3/maturin/pull/454)
 * Fix s390x architecture support in [#530](https://github.com/PyO3/maturin/pull/530)
 * Fix auditwheel panic with s390x wheels in [#532](https://github.com/PyO3/maturin/pull/532)
-* Support uploading heterogenous wheels by ravenexp in [#544](https://github.com/PyO3/maturin/pull/544)
+* Support uploading heterogeneous wheels by ravenexp in [#544](https://github.com/PyO3/maturin/pull/544)
 * Warn about `pyproject.toml` missing maturin version constraint in [#545](https://github.com/PyO3/maturin/pull/545)
 
 ## [0.10.4] - 2021-04-28

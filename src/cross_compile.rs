@@ -91,7 +91,7 @@ fn ends_with(entry: &DirEntry, pat: &str) -> bool {
 /// pybuilddir = 'build/lib.%s-%s' % (get_platform(), sys.version_info[:2])
 /// ```
 ///
-/// Where get_platform returns a kebab-case formated string containing the os, the architecture and
+/// Where get_platform returns a kebab-case formatted string containing the os, the architecture and
 /// possibly the os' kernel version (not the case on linux). However, when installed using a package
 /// manager, the `_sysconfigdata*.py` file is installed in the `${PREFIX}/lib/python3.Y/` directory.
 /// The `_sysconfigdata*.py` is generally in a sub-directory of the location of `libpython3.Y.so`.

@@ -47,3 +47,6 @@ jobs:
       - uses: psf/black@21.4b0
         with:
           args: ". --check"
+      - uses: codespell-project/actions-codespell@master
+        with:
+          ignore_words_list: crate

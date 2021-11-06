@@ -525,7 +525,7 @@ impl PythonInterpreter {
         Ok(available_versions)
     }
 
-    /// Checks that given list of executables are all valid python intepreters,
+    /// Checks that given list of executables are all valid python interpreters,
     /// determines the abiflags and versions of those interpreters and
     /// returns them as [PythonInterpreter]
     pub fn check_executables(

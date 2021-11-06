@@ -81,7 +81,7 @@ pub struct PathWriter {
 }
 
 impl PathWriter {
-    /// Creates a [ModuleWriter] that adds the modul to the current virtualenv
+    /// Creates a [ModuleWriter] that adds the module to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self> {
         let interpreter =
             PythonInterpreter::check_executable(target.get_venv_python(&venv_dir), target, bridge)?

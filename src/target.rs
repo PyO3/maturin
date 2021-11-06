@@ -165,7 +165,7 @@ impl Target {
                     Arch::Powerpc64 => "powerpc64",
                     Arch::Powerpc64Le => "powerpc64le",
                     _ => panic!(
-                        "unsupported architecutre should not have reached get_platform_tag()"
+                        "unsupported architecture should not have reached get_platform_tag()"
                     ),
                 };
                 format!(

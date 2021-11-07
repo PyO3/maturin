@@ -4,6 +4,12 @@ import subprocess
 from pathlib import Path
 
 
+FILES = [
+    "Readme.md",
+    "guide/src/develop.md",
+]
+
+
 def main():
     root = Path(
         subprocess.check_output(
@@ -11,23 +17,27 @@ def main():
         ).strip()
     )
 
-    readme = root.joinpath("Readme.md").read_text()
+    for path in FILES:
+        content = root.joinpath(path).read_text()
 
-    matcher = re.compile(r"### (\w+)\n\n```\n(USAGE:.*?)```", re.MULTILINE | re.DOTALL)
-
-    replaces = {}
-    for command, old in matcher.findall(readme):
-        command_output = subprocess.check_output(
-            ["cargo", "run", "--", command.lower(), "--help"], text=True
+        matcher = re.compile(
+            r"```\nUSAGE:\n    maturin (\w+) (.*?)```", re.MULTILINE | re.DOTALL
         )
-        new = "USAGE:" + command_output.strip().split("USAGE:")[1] + "\n"
-        # Remove trailing whitespace
-        new = re.sub(" +\n", "\n", new)
-        replaces[old] = new
 
-    for old, new in replaces.items():
-        readme = readme.replace(old, new)
-    root.joinpath("Readme.md").write_text(readme)
+        replaces = {}
+        for command, old in matcher.findall(content):
+            command_output = subprocess.check_output(
+                ["cargo", "run", "--", command.lower(), "--help"], text=True
+            )
+            new = "USAGE:" + command_output.strip().split("USAGE:")[1] + "\n"
+            # Remove trailing whitespace
+            new = re.sub(" +\n", "\n", new)
+            old = "USAGE:\n    maturin " + command + " " + old
+            replaces[old] = new
+
+        for old, new in replaces.items():
+            content = content.replace(old, new)
+        root.joinpath(path).write_text(content)
 
 
 if __name__ == "__main__":

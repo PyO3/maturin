@@ -435,11 +435,12 @@ OPTIONS:
 
 ### Upload
 
-```
 Uploads python packages to pypi
 
 It is mostly similar to `twine upload`, but can only upload python wheels and source distributions.
 
+
+```
 USAGE:
     maturin upload [FLAGS] [OPTIONS] [FILE]...
 
@@ -468,7 +469,6 @@ OPTIONS:
 ARGS:
     <FILE>...
             The python packages to upload
-
 ```
 
 ## Code

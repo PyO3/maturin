@@ -47,6 +47,9 @@ jobs:
       - uses: psf/black@21.4b0
         with:
           args: ". --check"
+
+  spellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
       - uses: codespell-project/actions-codespell@master
-        with:
-          ignore_words_list: crate

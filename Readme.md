@@ -6,7 +6,7 @@ _formerly pyo3-pack_
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Crates.io](https://img.shields.io/crates/v/maturin.svg?style=flat-square)](https://crates.io/crates/maturin)
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?style=flat-square)](https://pypi.org/project/maturin/)
-[![Netlify Status](https://api.netlify.com/api/v1/badges/ad885289-32c1-4ea7-b357-07b458a3731f/deploy-status)](https://maturin-guide.netlify.app/)
+[![Maturin User Guide](https://img.shields.io/badge/user-guide-brightgreen?style=flat-square)](https://maturin-guide.netlify.app/)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?style=flat-square)](https://gitter.im/PyO3/Lobby)
 
 Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages.

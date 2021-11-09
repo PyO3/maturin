@@ -318,6 +318,15 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
                             break;
                         }
                     }
+                    if !found {
+                        for sym in macho.symbols() {
+                            let (sym_name, _) = sym?;
+                            if py_init == sym_name.strip_prefix('_').unwrap_or(sym_name) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
                 }
                 goblin::mach::Mach::Fat(_) => {
                     // Ignore fat macho,

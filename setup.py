@@ -19,6 +19,7 @@ import sys
 import toml
 from setuptools import setup
 from setuptools.command.install import install
+from setuptools._distutils.util import get_platform
 
 # Force the wheel to be platform specific
 # https://stackoverflow.com/a/45150383/3549270
@@ -69,7 +70,7 @@ class PostInstallCommand(install):
                 "--message-format=json",
             ]
 
-            if platform.machine() in ("ppc64le", "ppc64", "powerpc"):
+            if platform.machine() in ("ppc64le", "ppc64", "powerpc") or get_platform() == "win-arm64":
                 cargo_args.extend(
                     ["--no-default-features", "--features=upload,log,human-panic"]
                 )

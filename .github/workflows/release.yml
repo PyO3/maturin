@@ -85,13 +85,11 @@ jobs:
           cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --compatibility musllinux_1_1
 
       # ring doesn't support aarch64 windows yet
-      # PyPI doesn't support uploading windows arm64 wheels yet, so we only upload it to GitHub releases
-      # https://github.com/pypa/warehouse/blob/4a085e98a8ead333bb7c600a464ed7aec33de4d1/warehouse/forklift/legacy.py#L107-L125
       - name: Publish to pypi (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
         env:
           MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-        run: cargo run -- build --release -b bin --target ${{ matrix.target }} --no-sdist --cargo-extra-args="--no-default-features" --cargo-extra-args="--features log,upload,human-panic"
+        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --cargo-extra-args="--no-default-features" --cargo-extra-args="--features log,upload,human-panic"
 
       - name: Publish to pypi (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}

@@ -70,7 +70,10 @@ class PostInstallCommand(install):
                 "--message-format=json",
             ]
 
-            if platform.machine() in ("ppc64le", "ppc64", "powerpc") or get_platform() == "win-arm64":
+            if (
+                platform.machine() in ("ppc64le", "ppc64", "powerpc")
+                or get_platform() == "win-arm64"
+            ):
                 cargo_args.extend(
                     ["--no-default-features", "--features=upload,log,human-panic"]
                 )

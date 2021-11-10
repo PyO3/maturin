@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Upgrade to Rust 2021 edition in [#655](https://github.com/PyO3/maturin/pull/655)
 * Add support for powerpc64 and powerpc64le on FreeBSD by pkubaj in [#656](https://github.com/PyO3/maturin/pull/656)
 * Fix false positive missing pyinit warning on arm64 macOS in [#673](https://github.com/PyO3/maturin/pull/673)
+* Build without rustls on arm64 Windows by nsait-linaro in [#674](https://github.com/PyO3/maturin/pull/674)
 
 ## [0.11.5] - 2021-10-13
 

@@ -24,7 +24,7 @@ With this `pip install .` should work when invoked in the project directory.
 
 To build documentation on [Read The Docs](https://readthedocs.org/), you need
 to tell it to install the Rust compiler and Python interpreter in its build environment,
-you can do it by adding a `.readthedocs.yml` in your project root:
+you can do it by adding a `.readthedocs.yaml` in your project root:
 
 ```yaml
 # https://docs.readthedocs.io/en/stable/config-file/v2.html#supported-settings
@@ -50,6 +50,21 @@ If you're using a mixed Rust/Python project layout, make sure you didn't add the
 Python project path to `sys.path` in `conf.py` of Sphinx. Read The Docs
 doesn't install your project in editable mode, adding it to `sys.path` will make
 your project fail to import which breaks documentation generation.
+
+If you need to install a specified version of Sphinx or adding Sphinx
+themes/extensions, you can change the `python.install` section a bit to add an
+extra installation step, for example:
+
+```yaml
+python:
+  install:
+    - requirements: docs/requirements.txt
+    - method: pip
+      path: .
+```
+
+In `docs/requirements.txt` you can add some Python package requirements you
+needs build the documentation.
 
 ## Netlify Integration
 

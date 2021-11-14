@@ -26,7 +26,7 @@ metadata = {
     "ext_suffix": ext_suffix,
     "abi_tag": (sysconfig.get_config_var("SOABI") or "-").split("-")[1] or None,
     # This one isn't technically necessary, but still very useful for sanity checks
-    "platform": platform.system().lower(),
+    "system": platform.system().lower(),
     # We need this one for windows abi3 builds
     "base_prefix": sys.base_prefix,
 }

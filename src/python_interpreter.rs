@@ -252,7 +252,7 @@ struct IntepreterMetadataMessage {
     abiflags: Option<String>,
     interpreter: String,
     ext_suffix: Option<String>,
-    platform: String,
+    system: String,
     abi_tag: Option<String>,
     base_prefix: String,
 }
@@ -301,12 +301,12 @@ fn fun_with_abiflags(
     bridge: &BridgeModel,
 ) -> Result<String> {
     if bridge != &BridgeModel::Cffi
-        && target.get_python_os() != message.platform
+        && target.get_python_os() != message.system
         && !is_cross_compiling(target)?
     {
         bail!(
-            "sys.platform in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
-            message.platform,
+            "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
+            message.system,
             target,
         )
     }
@@ -322,11 +322,11 @@ fn fun_with_abiflags(
     if message.interpreter == "pypy" {
         // pypy does not specify abi flags
         Ok("".to_string())
-    } else if message.platform == "windows" {
-        if message.abiflags.is_some() {
-            bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
-        } else {
+    } else if message.system == "windows" {
+        if matches!(message.abiflags.as_deref(), Some("") | None) {
             Ok("".to_string())
+        } else {
+            bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
         }
     } else if let Some(ref abiflags) = message.abiflags {
         if message.minor >= 8 {

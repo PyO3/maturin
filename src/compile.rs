@@ -1,4 +1,5 @@
 use crate::build_context::BridgeModel;
+use crate::python_interpreter::InterpreterKind;
 use crate::BuildContext;
 use crate::PythonInterpreter;
 use anyhow::{anyhow, bail, Context, Result};
@@ -207,9 +208,14 @@ fn compile_target(
         .stderr(Stdio::inherit());
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
-        // This will make pyo3's build script only set some predefined linker
-        // arguments without trying to read any python configuration
-        build_command.env("PYO3_NO_PYTHON", "1");
+        let is_pypy = python_interpreter
+            .map(|p| p.interpreter_kind == InterpreterKind::PyPy)
+            .unwrap_or(false);
+        if !is_pypy {
+            // This will make pyo3's build script only set some predefined linker
+            // arguments without trying to read any python configuration
+            build_command.env("PYO3_NO_PYTHON", "1");
+        }
     }
 
     if let Some(python_interpreter) = python_interpreter {

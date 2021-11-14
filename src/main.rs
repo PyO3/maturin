@@ -448,7 +448,7 @@ fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                         }
                         Err(KeyringError::NoPasswordFound) | Err(KeyringError::NoBackendFound) => {}
                         Err(err) => {
-                            eprintln!("⚠ Warning: Failed to remove password from keyring: {}", err)
+                            eprintln!("⚠️ Warning: Failed to remove password from keyring: {}", err)
                         }
                     }
                 }
@@ -460,7 +460,7 @@ fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
                         println!(
-                            "⚠  Note: Skipping {:?} because it appears to already exist",
+                            "⚠️ Note: Skipping {:?} because it appears to already exist",
                             filename
                         );
                         continue;
@@ -488,7 +488,7 @@ fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
             Err(KeyringError::NoBackendFound) => {}
             Err(err) => {
                 eprintln!(
-                    "⚠ Warning: Failed to store the password in the keyring: {:?}",
+                    "⚠️ Warning: Failed to store the password in the keyring: {:?}",
                     err
                 );
             }

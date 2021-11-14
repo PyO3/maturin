@@ -6,6 +6,7 @@ use crate::compile::warn_missing_py_init;
 use crate::module_writer::write_python_part;
 use crate::module_writer::WheelWriter;
 use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
+use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::Metadata21;
 use crate::PyProjectToml;
@@ -192,9 +193,32 @@ impl BuildContext {
         let wheels = match &self.bridge {
             BridgeModel::Cffi => self.build_cffi_wheel()?,
             BridgeModel::Bin => self.build_bin_wheel()?,
-            BridgeModel::Bindings(_) => self.build_binding_wheels()?,
+            BridgeModel::Bindings(_) => self.build_binding_wheels(&self.interpreter)?,
             BridgeModel::BindingsAbi3(major, minor) => {
-                self.build_binding_wheel_abi3(*major, *minor)?
+                let cpythons: Vec<_> = self
+                    .interpreter
+                    .iter()
+                    .filter(|interp| interp.interpreter_kind == InterpreterKind::CPython)
+                    .cloned()
+                    .collect();
+                let pypys: Vec<_> = self
+                    .interpreter
+                    .iter()
+                    .filter(|interp| interp.interpreter_kind == InterpreterKind::PyPy)
+                    .cloned()
+                    .collect();
+                let mut built_wheels = Vec::new();
+                if !cpythons.is_empty() {
+                    built_wheels.extend(self.build_binding_wheel_abi3(&cpythons, *major, *minor)?);
+                }
+                if !pypys.is_empty() {
+                    println!(
+                        "⚠️ Warning: PyPy does not yet support abi3 so the build artifacts will be version-specific. \
+                        See https://foss.heptapod.net/pypy/pypy/-/issues/3397 for more information."
+                    );
+                    built_wheels.extend(self.build_binding_wheels(&pypys)?);
+                }
+                built_wheels
             }
         };
 
@@ -286,13 +310,14 @@ impl BuildContext {
     /// for it
     pub fn build_binding_wheel_abi3(
         &self,
+        interpreters: &[PythonInterpreter],
         major: u8,
         min_minor: u8,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         // On windows, we have picked an interpreter to set the location of python.lib,
         // otherwise it's none
-        let python_interpreter = self.interpreter.get(0);
+        let python_interpreter = interpreters.get(0);
         let artifact = self.compile_cdylib(
             python_interpreter,
             Some(self.project_layout.extension_name()),
@@ -349,9 +374,12 @@ impl BuildContext {
     /// and silently ignores all non-existent python versions.
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_binding_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub fn build_binding_wheels(
+        &self,
+        interpreters: &[PythonInterpreter],
+    ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        for python_interpreter in &self.interpreter {
+        for python_interpreter in interpreters {
             let artifact = self.compile_cdylib(
                 Some(python_interpreter),
                 Some(self.project_layout.extension_name()),

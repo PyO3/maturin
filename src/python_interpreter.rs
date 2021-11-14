@@ -252,6 +252,9 @@ struct IntepreterMetadataMessage {
     abiflags: Option<String>,
     interpreter: String,
     ext_suffix: Option<String>,
+    // comes from `sysconfig.get_platform()`
+    platform: String,
+    // comes from `platform.system()`
     system: String,
     abi_tag: Option<String>,
     base_prefix: String,
@@ -287,6 +290,10 @@ pub struct PythonInterpreter {
     pub abi_tag: Option<String>,
     /// We need this value for windows abi3 linking
     pub libs_dir: PathBuf,
+    /// Comes from `sysconfig.get_platform()`
+    ///
+    /// Note that this can be `None` when cross compiling
+    pub platform: Option<String>,
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -350,9 +357,17 @@ impl PythonInterpreter {
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
     pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
+        let platform = if self.target.is_windows() {
+            // Restrict `sysconfig.get_platform()` usage to Windows only for now
+            // so we don't need to deal with macOS deployment target
+            self.platform
+                .clone()
+                .unwrap_or_else(|| self.target.get_platform_tag(platform_tag, universal2))
+        } else {
+            self.target.get_platform_tag(platform_tag, universal2)
+        };
         match self.interpreter_kind {
             InterpreterKind::CPython => {
-                let platform = self.target.get_platform_tag(platform_tag, universal2);
                 if self.target.is_unix() {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
@@ -372,7 +387,6 @@ impl PythonInterpreter {
                 }
             }
             InterpreterKind::PyPy => {
-                let platform = self.target.get_platform_tag(platform_tag, universal2);
                 // pypy uses its version as part of the ABI, e.g.
                 // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2010_x86_64.whl
                 format!(
@@ -471,8 +485,8 @@ impl PythonInterpreter {
         match message.interpreter.as_str() {
             "cpython" => interpreter = InterpreterKind::CPython,
             "pypy" => interpreter = InterpreterKind::PyPy,
-            _ => {
-                bail!("Invalid interpreter");
+            other => {
+                bail!("Unsupported interpreter {}", other);
             }
         };
 
@@ -480,6 +494,23 @@ impl PythonInterpreter {
             "Failed to get information from the python interpreter at {}",
             executable.as_ref().display()
         ))?;
+
+        let platform = if message.platform.starts_with("macosx") {
+            // macOS contains system version in platform name so need special handle
+            let mut parts = message.platform.splitn(3, '-');
+            let err_ctx = "Invalid platform string from `sysconfig.get_platform()`";
+            let prefix = parts.next().context(err_ctx)?;
+            let base_version = parts.next().context(err_ctx)?;
+            let suffix = parts.next().context(err_ctx)?;
+            let (major_ver, minor_ver) = base_version.split_once('.').context(err_ctx)?;
+            let major_ver: u64 = major_ver.parse()?;
+            let minor_ver = if major_ver > 10 { "0" } else { minor_ver };
+            // FIXME: We should also take MACOSX_DEPLOYMENT_TARGET env var into account
+            format!("{}_{}_{}_{}", prefix, major_ver, minor_ver, suffix)
+        } else {
+            message.platform
+        };
+        let platform = platform.to_lowercase().replace('-', "_").replace('.', "_");
 
         Ok(Some(PythonInterpreter {
             major: message.major,
@@ -493,6 +524,7 @@ impl PythonInterpreter {
             interpreter_kind: interpreter,
             abi_tag: message.abi_tag,
             libs_dir: PathBuf::from(message.base_prefix).join("libs"),
+            platform: Some(platform),
         }))
     }
 

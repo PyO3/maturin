@@ -572,6 +572,7 @@ pub fn find_interpreter(
                         interpreter_kind,
                         abi_tag,
                         libs_dir: PathBuf::from(cross_lib_dir),
+                        platform: None,
                     }];
                 }
             }
@@ -618,6 +619,7 @@ pub fn find_interpreter(
                         interpreter_kind: InterpreterKind::CPython,
                         abi_tag: None,
                         libs_dir: PathBuf::from(manual_base_prefix),
+                        platform: None,
                     }])
                 } else {
                     let interp = interpreter

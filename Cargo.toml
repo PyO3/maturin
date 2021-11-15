@@ -39,7 +39,7 @@ regex = "1.4.5"
 reqwest = { version = "0.11.2", optional = true, default-features = false, features = ["blocking", "multipart"] }
 rpassword = { version = "5.0.1", optional = true }
 serde = { version = "1.0.124", features = ["derive"] }
-serde_json = "1.0.69"
+serde_json = "1.0.70"
 sha2 = "0.9.3"
 shlex = "1.0.0"
 structopt = "0.3.21"

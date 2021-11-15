@@ -283,7 +283,7 @@ impl WheelWriter {
                     let name = metadata21.get_distribution_escaped();
                     self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;
                 } else {
-                    println!("⚠  source code path contains non-Unicode sequences, editable installs may not work.");
+                    println!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
                 }
             }
             ProjectLayout::PureRust { .. } => {}
@@ -528,7 +528,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
                 "False" => false,
                 _ => {
                     println!(
-                        "⚠  Failed to determine whether python at {:?} is running inside a virtualenv",
+                        "⚠️ Failed to determine whether python at {:?} is running inside a virtualenv",
                         &python
                     );
                     false
@@ -546,7 +546,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
         return handle_cffi_call_result(python, tempdir, &ffi_py, &output);
     }
 
-    println!("⚠  cffi not found. Trying to install it");
+    println!("⚠️ cffi not found. Trying to install it");
     // Call pip through python to don't do the wrong thing when python and pip
     // are coming from different environments
     let output = call_python(python, &["-m", "pip", "install", "cffi"])?;

@@ -325,7 +325,7 @@ fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
             Some(min_python_minor)
         } else {
             println!(
-                "⚠  Couldn't parse the value of requires-python, \
+                "⚠️ Couldn't parse the value of requires-python, \
                     not taking it into account when searching for python interpreter. \
                     Note: Only `>=3.x.y` is currently supported."
             );
@@ -517,7 +517,7 @@ pub fn find_interpreter(
 
             if binding_name == "pyo3" && target.is_unix() && is_cross_compiling(target)? {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
-                    println!("⚠ Cross-compiling is poorly supported");
+                    println!("⚠️ Cross-compiling is poorly supported");
                     let host_python = &interpreter[0];
                     println!(
                         "🐍 Using host {} for cross-compiling preparation",
@@ -594,6 +594,12 @@ pub fn find_interpreter(
         }
         BridgeModel::Bin => Ok(vec![]),
         BridgeModel::BindingsAbi3(major, minor) => {
+            let interpreter = if !interpreter.is_empty() {
+                PythonInterpreter::check_executables(interpreter, target, bridge)
+                    .unwrap_or_default()
+            } else {
+                PythonInterpreter::find_all(target, bridge, min_python_minor).unwrap_or_default()
+            };
             // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
             // Unfortunately, on windows we need one to figure out base_prefix for a linker
             // argument.
@@ -601,7 +607,7 @@ pub fn find_interpreter(
                 if let Some(manual_base_prefix) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
                     // when cross compiling, so we fake a python interpreter matching it
-                    println!("⚠ Cross-compiling is poorly supported");
+                    println!("⚠️  Cross-compiling is poorly supported");
                     Ok(vec![PythonInterpreter {
                         major: *major as usize,
                         minor: *minor as usize,
@@ -614,18 +620,15 @@ pub fn find_interpreter(
                         libs_dir: PathBuf::from(manual_base_prefix),
                     }])
                 } else {
-                    let interpreter = find_single_python_interpreter(
-                        bridge,
-                        interpreter,
-                        target,
-                        "abi3 on windows",
-                    )?;
-                    println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interpreter);
-                    Ok(vec![interpreter])
+                    let interp = interpreter
+                        .get(0)
+                        .context("Failed to find a python interpreter")?;
+                    println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interp);
+                    Ok(interpreter)
                 }
             } else {
                 println!("🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)");
-                Ok(vec![])
+                Ok(interpreter)
             }
         }
     }

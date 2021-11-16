@@ -9,6 +9,9 @@ on:
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
+    environment:
+      name: Docker Hub
+      url: https://hub.docker.com/r/konstin2/maturin
     steps:
       - uses: actions/checkout@v2
       - uses: crazy-max/ghaction-docker-meta@v2

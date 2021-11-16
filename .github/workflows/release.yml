@@ -8,6 +8,9 @@ jobs:
   release-crates-io:
     name: Release crates.io
     runs-on: ubuntu-latest
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/maturin
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -51,6 +54,9 @@ jobs:
             os: windows-latest
             name: maturin-aarch64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
+    environment:
+      name: PyPI
+      url: https://pypi.org/project/maturin/
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
       - uses: actions/checkout@v2
@@ -142,6 +148,9 @@ jobs:
 
   release-musl-pypi:
     runs-on: ubuntu-latest
+    environment:
+      name: PyPI
+      url: https://pypi.org/project/maturin/
     strategy:
       matrix:
         platform: [
@@ -182,6 +191,9 @@ jobs:
 
   release-no-rustls-pypi:
     runs-on: ubuntu-latest
+    environment:
+      name: PyPI
+      url: https://pypi.org/project/maturin/
     strategy:
       matrix:
         platform:

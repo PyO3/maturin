@@ -147,12 +147,12 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
 /// recursive search for _sysconfigdata, returns all possibilities of sysconfigdata paths
 fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
     let mut sysconfig_paths = vec![];
-    let version_pat = if let Some(v) =
+    let (cpython_version_pat, pypy_version_pat) = if let Some(v) =
         env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap())
     {
-        format!("python{}", v)
+        (format!("python{}", v), format!("pypy{}", v))
     } else {
-        "python3.".into()
+        ("python3.".into(), "pypy3.".into())
     };
     for f in fs::read_dir(path.as_ref()).expect("Path does not exist") {
         let sysc = match &f {
@@ -173,7 +173,12 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
                 }
                 search_lib_dir(f.path(), target)
             }
-            Ok(f) if starts_with(f, &version_pat) => search_lib_dir(f.path(), target),
+            Ok(f) if starts_with(f, &cpython_version_pat) => search_lib_dir(f.path(), target),
+            // PyPy 3.7: /opt/python/pp37-pypy37_pp73/lib_pypy/_sysconfigdata__linux_x86_64-linux-gnu.py
+            Ok(f) if starts_with(f, "lib_pypy") => search_lib_dir(f.path(), target),
+            // PyPy 3.8: /opt/python/pp38-pypy38_pp73/lib/pypy3.8/_sysconfigdata__linux_x86_64-linux-gnu.py
+            Ok(f) if starts_with(f, &pypy_version_pat) => search_lib_dir(f.path(), target),
+            Ok(f) if starts_with(f, "lib") && f.path().is_dir() => search_lib_dir(f.path(), target),
             _ => continue,
         };
         sysconfig_paths.extend(sysc);

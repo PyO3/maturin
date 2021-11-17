@@ -230,6 +230,10 @@ fn compile_target(
         }
     }
 
+    if let Some(lib_dir) = env::var_os("MATURIN_PYTHON_SYSCONFIGDATA_DIR") {
+        build_command.env("PYO3_CROSS_LIB_DIR", lib_dir);
+    }
+
     let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
 
     let mut artifacts = HashMap::new();

@@ -152,6 +152,7 @@ jobs:
       name: PyPI
       url: https://pypi.org/project/maturin/
     strategy:
+      fail-fast: false
       matrix:
         platform: [
           { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl", manylinux: "2014" },
@@ -195,6 +196,7 @@ jobs:
       name: PyPI
       url: https://pypi.org/project/maturin/
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - target: "powerpc64le-unknown-linux-musl"

@@ -75,7 +75,7 @@ build-backend (Python supports a number of build-backends since [PEP
 
 ```toml
 [build-system]
-requires = ["maturin>=0.11,<0.12"]
+requires = ["maturin>=0.12,<0.13"]
 build-backend = "maturin"
 ```
 

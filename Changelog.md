@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2021-11-19
+
 * Add support for PEP 660 editable installs in [#648](https://github.com/PyO3/maturin/pull/648)
 * Publish musllinux_1_1 wheels for maturin in [#651](https://github.com/PyO3/maturin/pull/651)
 * Refactor `develop` command to act identical to PEP 660 editable wheels in [#653](https://github.com/PyO3/maturin/pull/653)
@@ -468,7 +470,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.11.5...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/pyo3/maturin/compare/v0.11.5...v0.12.0
 [0.11.5]: https://github.com/pyo3/maturin/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/pyo3/maturin/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/pyo3/maturin/compare/v0.11.2...v0.11.3

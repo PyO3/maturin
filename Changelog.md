@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix `sysconfig.get_platform` parsing for macOS in [#690](https://github.com/PyO3/maturin/pull/690)
+
 ## [0.12.0] - 2021-11-19
 
 * Add support for PEP 660 editable installs in [#648](https://github.com/PyO3/maturin/pull/648)

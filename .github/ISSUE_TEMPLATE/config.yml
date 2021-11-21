@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: ❓ Question
+    url: https://github.com/PyO3/maturin/discussions
+    about: Ask and answer questions about maturin on Discussions
+  - name: 🔧 Troubleshooting
+    url: https://github.com/PyO3/maturin/discussions
+    about: For troubleshooting help, see the Discussions

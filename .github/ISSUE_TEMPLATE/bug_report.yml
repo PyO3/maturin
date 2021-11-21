@@ -1,0 +1,67 @@
+name: 🐛 Bug Report
+description: Create a bug report
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to fill out this bug report!
+        Please fill out the form below...
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Please provide a clear and concise description of what the bug is.
+      placeholder: The bug is...
+    validations:
+      required: true
+  - type: input
+    id: py_version
+    attributes:
+      label: Your Python version (`python -V`)
+      placeholder: ex. Python 3.10.0
+    validations:
+      required: true
+  - type: input
+    id: pip_version
+    attributes:
+      label: Your pip version (`pip -V`)
+      placeholder: ex. pip 21.1.3
+    validations:
+      required: true
+  - type: dropdown
+    id: bindings
+    attributes:
+      label: What bindings you're using
+      options:
+        - "pyo3"
+        - "rust-cpython"
+        - "cffi"
+        - "bin"
+    validations:
+      required: false
+  - type: checkboxes
+    id: cargo-build
+    attributes:
+      label: Does `cargo build` work?
+      options:
+        - label: Yes
+          required: false
+  - type: checkboxes
+    id: windows-unix-path
+    attributes:
+      label: If on windows, have you checked that you aren't accidentally using unix path (those with the forward slash `/`)?
+      options:
+        - label: Yes
+          required: false
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Please list the exact steps required to reproduce your error with all command output and if possible with a repository
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true

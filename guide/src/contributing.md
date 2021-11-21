@@ -53,6 +53,8 @@ Ready to contribute? Here's how to setup maturin for local development.
    $ cargo clippy
    $ cargo test
    ```
+   Note that in order to run tests you need to install `virtualenv` and
+   `cffi` (`pip3 install cffi virtualenv`).
 6. Commit your changes and push your branch to GitHub:
    ```bash
    $ git add .
@@ -60,3 +62,12 @@ Ready to contribute? Here's how to setup maturin for local development.
    $ git push origin branch-name
    ```
 7. Submit a pull request through the [GitHub website](https://github.com/PyO3/maturin/pulls).
+
+## Pull Request Guidelines
+
+Before you submit a pull request, check that it meets these guidelines:
+
+1. The pull request should include tests if it adds or changes functionalities.
+2. Add a [changelog](https://github.com/PyO3/maturin/blob/main/Changelog.md)
+   entry.
+3. When command line interface changes, run `python3 test-crates/update_readme.py` to update related documentation.

@@ -529,6 +529,11 @@ pub fn find_interpreter(
                     env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
                     let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
+                    env::set_var(
+                        "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
+                        sysconfig_path.parent().unwrap(),
+                    );
+
                     let sysconfig_data = parse_sysconfigdata(host_python, sysconfig_path)?;
                     let major = sysconfig_data
                         .get("version_major")

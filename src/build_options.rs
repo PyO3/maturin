@@ -578,6 +578,7 @@ pub fn find_interpreter(
                         abi_tag,
                         libs_dir: PathBuf::from(cross_lib_dir),
                         platform: None,
+                        runnable: false,
                     }];
                 }
             }
@@ -625,6 +626,7 @@ pub fn find_interpreter(
                         abi_tag: None,
                         libs_dir: PathBuf::from(manual_base_prefix),
                         platform: None,
+                        runnable: false,
                     }])
                 } else {
                     let interp = interpreter

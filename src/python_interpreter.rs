@@ -294,6 +294,11 @@ pub struct PythonInterpreter {
     ///
     /// Note that this can be `None` when cross compiling
     pub platform: Option<String>,
+    /// Is this interpreter runnable
+    ///
+    /// When cross compile the target interpreter isn't runnable,
+    /// and it's `executable` is empty
+    pub runnable: bool,
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -532,6 +537,7 @@ impl PythonInterpreter {
             abi_tag: message.abi_tag,
             libs_dir: PathBuf::from(message.base_prefix).join("libs"),
             platform: Some(platform),
+            runnable: true,
         }))
     }
 
@@ -597,6 +603,9 @@ impl PythonInterpreter {
 
     /// Run a python script using this Python interpreter.
     pub fn run_script(&self, script: &str) -> Result<String> {
+        if !self.runnable {
+            bail!("This {} isn't runnable", self);
+        }
         let out = Command::new(&self.executable)
             .env("PYTHONIOENCODING", "utf-8")
             .stdin(Stdio::piped())
@@ -637,15 +646,23 @@ impl PythonInterpreter {
 
 impl fmt::Display for PythonInterpreter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {}.{}{} at {}",
-            self.interpreter_kind,
-            self.major,
-            self.minor,
-            self.abiflags,
-            self.executable.display()
-        )
+        if self.runnable {
+            write!(
+                f,
+                "{} {}.{}{} at {}",
+                self.interpreter_kind,
+                self.major,
+                self.minor,
+                self.abiflags,
+                self.executable.display()
+            )
+        } else {
+            write!(
+                f,
+                "cross compiling target {} {}.{}{}",
+                self.interpreter_kind, self.major, self.minor, self.abiflags,
+            )
+        }
     }
 }
 

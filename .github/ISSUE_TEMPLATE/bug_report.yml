@@ -45,14 +45,14 @@ body:
     attributes:
       label: Does `cargo build` work?
       options:
-        - label: Yes
+        - label: Yes, it works
           required: false
   - type: checkboxes
     id: windows-unix-path
     attributes:
       label: If on windows, have you checked that you aren't accidentally using unix path (those with the forward slash `/`)?
       options:
-        - label: Yes
+        - label: 'Yes'
           required: false
   - type: textarea
     id: reproduce

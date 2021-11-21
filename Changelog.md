@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2021-11-21
+
+* Add support for cross compiling PyPy wheels in [#687](https://github.com/PyO3/maturin/pull/687)
 * Fix `sysconfig.get_platform` parsing for macOS in [#690](https://github.com/PyO3/maturin/pull/690)
 
 ## [0.12.0] - 2021-11-19
@@ -472,7 +475,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/pyo3/maturin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/pyo3/maturin/compare/v0.11.5...v0.12.0
 [0.11.5]: https://github.com/pyo3/maturin/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/pyo3/maturin/compare/v0.11.3...v0.11.4

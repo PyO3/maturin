@@ -12,3 +12,4 @@
 - [Local Development](./develop.md)
 - [Distribution](./distribution.md)
 - [Sphinx Integration](./sphinx.md)
+- [Contributing](./contributing.md)

@@ -46,7 +46,6 @@ structopt = "0.3.21"
 tar = "0.4.33"
 tempfile = "3.2.0"
 toml = "0.5.8"
-walkdir = "2.3.1"
 zip = "0.5.5"
 thiserror = "1.0.24"
 dirs = { version = "4.0.0", optional = true }
@@ -58,6 +57,7 @@ target-lexicon = "0.12.0"
 pyproject-toml = "0.3.0"
 python-pkginfo = "0.5.0"
 textwrap = "0.14.2"
+ignore = "0.4.18"
 
 [dev-dependencies]
 indoc = "1.0.3"

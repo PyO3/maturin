@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for excluding files from wheels by `.gitignore` in [#695](https://github.com/PyO3/maturin/pull/695)
+
 ## [0.12.1] - 2021-11-21
 
 * Add support for cross compiling PyPy wheels in [#687](https://github.com/PyO3/maturin/pull/687)

@@ -22,7 +22,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 use tempfile::{tempdir, TempDir};
-use walkdir::WalkDir;
 use zip::{self, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
@@ -771,7 +770,9 @@ pub fn write_python_part(
     python_module: impl AsRef<Path>,
     module_name: impl AsRef<Path>,
 ) -> Result<()> {
-    for absolute in WalkDir::new(&python_module) {
+    use ignore::WalkBuilder;
+
+    for absolute in WalkBuilder::new(&python_module).hidden(false).build() {
         let absolute = absolute?.into_path();
 
         let relative = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;

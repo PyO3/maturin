@@ -27,8 +27,8 @@ jobs:
         with:
           command: publish
 
-  release-github:
-    name: Release Github
+  release-build:
+    name: Release build
     strategy:
       fail-fast: false
       matrix:
@@ -95,20 +95,6 @@ jobs:
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
         run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist
 
-      - name: Archive binary (windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
-          cd -
-
-      - name: Archive binary (linux and mac)
-        if: matrix.os != 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
-          cd -
-
       - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
         env:
@@ -119,6 +105,27 @@ jobs:
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
           cargo run -- build --release -b bin -o dist --no-sdist --universal2
+
+      - name: Archive binary (windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
+          cd -
+
+      - name: Archive binary (linux and macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
+          cd -
+
+      - name: Archive binary (macOS aarch64)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar czvf ../../../maturin-aarch64-apple-darwin.tar.gz ${{ github.event.repository.name }}
+          cd -
 
       - name: Build debian package
         if: ${{ matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/') }}
@@ -134,17 +141,17 @@ jobs:
           name: wheels
           path: dist
 
-      - name: Upload to github release
-        if: "startsWith(github.ref, 'refs/tags/')"
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: '*.{tar.gz,zip,deb}'
-          file_glob: true
-          tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          name: binaries
+          path: |
+            *.tar.gz
+            *.zip
+            *.deb
 
   release-musl:
+    name: Release musl build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -173,23 +180,20 @@ jobs:
             --target ${{ matrix.platform.target }} \
             --compatibility musllinux_1_1
       - name: Archive binary
-        run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v2
         with:
           name: wheels
           path: dist
-      - name: Upload to github release
-        if: "startsWith(github.ref, 'refs/tags/')"
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          asset_name: maturin-${{ matrix.platform.target }}.tar.gz
-          file: target/release/maturin.tar.gz
-          tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          name: binaries
+          path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
 
   release-no-rustls:
+    name: Release build without rustls
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -232,21 +236,17 @@ jobs:
             --cargo-extra-args="--no-default-features" \
             --cargo-extra-args="--features log,upload,human-panic"
       - name: Archive binary
-        run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v2
         with:
           name: wheels
           path: dist
-      - name: Upload to github release
-        if: "startsWith(github.ref, 'refs/tags/')"
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          asset_name: maturin-${{ matrix.platform.target }}.tar.gz
-          file: target/release/maturin.tar.gz
-          tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          name: binaries
+          path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
 
   release-pypi:
     name: Publish to PyPI
@@ -255,7 +255,7 @@ jobs:
       name: PyPI
       url: https://pypi.org/project/maturin/
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ release-github, release-musl, release-no-rustls ]
+    needs: [ release-build, release-musl, release-no-rustls ]
     steps:
       - uses: actions/download-artifact@v2
         with:
@@ -269,3 +269,20 @@ jobs:
         run: |
           pip install maturin
           maturin upload -u __token__ --skip-existing *
+
+  release-github:
+    name: Publish to GitHub releases
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [ release-build, release-musl, release-no-rustls ]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: binaries
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            *.tar.gz
+            *.zip
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}

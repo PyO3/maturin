@@ -8,6 +8,7 @@ jobs:
   release-crates-io:
     name: Release crates.io
     runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
     environment:
       name: crates.io
       url: https://crates.io/crates/maturin
@@ -26,8 +27,8 @@ jobs:
         with:
           command: publish
 
-  release-github-pypi:
-    name: Release Github and PyPI
+  release-github:
+    name: Release Github
     strategy:
       fail-fast: false
       matrix:
@@ -54,9 +55,6 @@ jobs:
             os: windows-latest
             name: maturin-aarch64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
-    environment:
-      name: PyPI
-      url: https://pypi.org/project/maturin/
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
       - uses: actions/checkout@v2
@@ -80,28 +78,22 @@ jobs:
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
 
       # Those two will also create target/${{ matrix.target }}/maturin
-      - name: Publish to pypi (with sdist)
+      - name: Build wheel (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           # manylinux
-          cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }}
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }}
           # musllinux
-          cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --compatibility musllinux_1_1
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist --compatibility musllinux_1_1
 
       # ring doesn't support aarch64 windows yet
-      - name: Publish to pypi (windows aarch64)
+      - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist --cargo-extra-args="--no-default-features" --cargo-extra-args="--features log,upload,human-panic"
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist --cargo-extra-args="--no-default-features" --cargo-extra-args="--features log,upload,human-panic"
 
-      - name: Publish to pypi (without sdist)
+      - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
-        run: cargo run -- publish -u __token__ -b bin --target ${{ matrix.target }} --no-sdist
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
@@ -117,27 +109,33 @@ jobs:
           tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
           cd -
 
-      - name: Publish to pypi (macOS universal2)
+      - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
         env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           MACOSX_DEPLOYMENT_TARGET: '10.9'
         run: |
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- publish -u __token__ -b bin --no-sdist --universal2
+          cargo run -- build --release -b bin -o dist --no-sdist --universal2
 
       - name: Build debian package
-        if: matrix.os == 'ubuntu-latest'
+        if: ${{ matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/') }}
         env:
           BINARY_NAME: ${{ github.event.repository.name }}
           TARGET: ${{ matrix.target }}
           VERSION: ${{ github.ref }}
         run: ci/build_deb.sh
 
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: dist
+
       - name: Upload to github release
+        if: "startsWith(github.ref, 'refs/tags/')"
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -146,11 +144,8 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
 
-  release-musl-pypi:
+  release-musl:
     runs-on: ubuntu-latest
-    environment:
-      name: PyPI
-      url: https://pypi.org/project/maturin/
     strategy:
       fail-fast: false
       matrix:
@@ -167,21 +162,25 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build and publish wheel
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin
           # manylinux
-          maturin publish -u __token__ -b bin --no-sdist \
+          maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }}
           # musllinux
-          maturin publish -u __token__ -b bin --no-sdist \
+          maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --compatibility musllinux_1_1
       - name: Archive binary
         run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: dist
       - name: Upload to github release
+        if: "startsWith(github.ref, 'refs/tags/')"
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -190,11 +189,8 @@ jobs:
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
 
-  release-no-rustls-pypi:
+  release-no-rustls:
     runs-on: ubuntu-latest
-    environment:
-      name: PyPI
-      url: https://pypi.org/project/maturin/
     strategy:
       fail-fast: false
       matrix:
@@ -220,28 +216,30 @@ jobs:
           override: true
           target: ${{ matrix.platform.target }}
       - name: Build and publish manylinux wheel
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           sudo python3 -m pip install maturin
-          maturin publish -u __token__ -b bin --no-sdist \
+          maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} \
             --cargo-extra-args="--no-default-features" \
             --cargo-extra-args="--features log,upload,human-panic"
       - name: Build and publish musllinux wheel
         if: matrix.platform.musllinux != ''
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
-          maturin publish -u __token__ -b bin --no-sdist \
+          maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --compatibility ${{ matrix.platform.musllinux }} \
             --cargo-extra-args="--no-default-features" \
             --cargo-extra-args="--features log,upload,human-panic"
       - name: Archive binary
         run: tar czvf target/release/maturin.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: dist
       - name: Upload to github release
+        if: "startsWith(github.ref, 'refs/tags/')"
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -249,3 +247,25 @@ jobs:
           file: target/release/maturin.tar.gz
           tag: ${{ github.ref }}
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+
+  release-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: PyPI
+      url: https://pypi.org/project/maturin/
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [ release-github, release-musl, release-no-rustls ]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: wheels
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Publish
+        env:
+          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
+        run: |
+          pip install maturin
+          maturin upload -u __token__ --skip-existing *

@@ -285,4 +285,5 @@ jobs:
           files: |
             *.tar.gz
             *.zip
+            *.deb
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}

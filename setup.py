@@ -84,7 +84,10 @@ class PostInstallCommand(install):
                 raise RuntimeError("build maturin failed:\n" + exc.output.decode())
             print(metadata)
             assert metadata["target"]["name"] == "maturin"
-            source = metadata["filenames"][0]
+            filenames = metadata["filenames"]
+            # somehow on openbsd `filenames` is empty but we can use the
+            # `executable` instead, see https://github.com/PyO3/maturin/issues/481
+            source = filenames[0] if filenames else metadata["executable"]
 
         # run this after trying to build with cargo (as otherwise this leaves
         # venv in a bad state: https://github.com/benfred/py-spy/issues/69)

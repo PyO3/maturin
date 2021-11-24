@@ -1,8 +1,16 @@
+[placeholders.mixed_layout]
+type = "bool"
+prompt = "Use mixed Rust/Python project layout?"
+default = false
+
 [placeholders.binding]
 type = "string"
 prompt = "What binding to use?"
 choices = ["pyo3", "rust-cpython", "cffi", "bin"]
 default = "pyo3"
+
+[conditional.'mixed_layout != true']
+ignore = [ "{{crate_name}}/" ]
 
 [conditional.'binding != "bin"']
 ignore = [ "src/main.rs" ]

@@ -21,5 +21,5 @@ bindings = "bin"
 target_version = ['py36']
 extend-exclude = '''
 # Ignore cargo-generate templates
-^/templates/mixed
+^/templates
 '''

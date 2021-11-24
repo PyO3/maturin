@@ -11,7 +11,7 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     environment:
       name: crates.io
-      url: https://crates.io/crates/maturin
+      url: ${{ steps.set_url.outputs.env_url }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -26,6 +26,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: publish
+      - name: Set environment url
+        id: set_url
+        run: |
+          VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
+          echo "::set-output name=env_url::https://crates.io/crates/maturin/$VERSION"
 
   release-build:
     name: Release build
@@ -253,7 +258,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: PyPI
-      url: https://pypi.org/project/maturin/
+      url: ${{ steps.set_url.outputs.env_url }}
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [ release-build, release-musl, release-no-rustls ]
     steps:
@@ -269,6 +274,11 @@ jobs:
         run: |
           pip install maturin
           maturin upload -u __token__ --skip-existing *
+      - name: Set environment url
+        id: set_url
+        run: |
+          VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
+          echo "::set-output name=env_url::https://pypi.org/project/maturin/$VERSION"
 
   release-github:
     name: Publish to GitHub releases

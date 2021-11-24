@@ -10,3 +10,8 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+{% if binding == "cffi" -%}
+dependencies = ["cffi"]
+{%- endif %}
+[tool.maturin]
+bindings = "{{binding}}"

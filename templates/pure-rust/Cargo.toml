@@ -11,4 +11,10 @@ name = "{{crate_name}}"
 crate-type = ["cdylib"]
 
 [dependencies]
+{% case binding -%}
+{%- when "pyo3" -%}
 pyo3 = { version = "0.15.1", features = ["extension-module"] }
+{%- when "rust-cpython" -%}
+cpython = { version = "0.7.0", features = ["extension-module"] }
+{%- else -%}
+{%- endcase %}

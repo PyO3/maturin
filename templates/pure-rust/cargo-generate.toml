@@ -1,0 +1,11 @@
+[placeholders.binding]
+type = "string"
+prompt = "What binding to use?"
+choices = ["pyo3", "rust-cpython", "cffi", "bin"]
+default = "pyo3"
+
+[conditional.'binding != "bin"']
+ignore = [ "src/main.rs" ]
+
+[conditional.'binding == "bin"']
+ignore = [ "src/lib.rs" ]

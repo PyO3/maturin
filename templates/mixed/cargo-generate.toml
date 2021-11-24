@@ -1,0 +1,5 @@
+[placeholders.binding]
+type = "string"
+prompt = "What binding to use?"
+choices = ["pyo3", "rust-cpython", "cffi"]
+default = "pyo3"

@@ -1,0 +1,19 @@
+[package]
+name = "{{ name }}"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+{%- if bindings != "bin" -%}
+[lib]
+name = "{{ crate_name }}"
+crate-type = ["cdylib"]
+{%- endif -%}
+
+[dependencies]
+{%- if bindings == "pyo3" -%}
+pyo3 = { version = "0.15.1", features = ["extension-module"] }
+{%- elif bindings == "rust-cpython" -%}
+cpython = { version = "0.7.0", features = ["extension-module"] }
+{%- endif -%}

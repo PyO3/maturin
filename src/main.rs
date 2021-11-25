@@ -15,8 +15,8 @@ use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
 use maturin::{
-    develop, source_distribution, write_dist_info, BridgeModel, BuildOptions, CargoToml,
-    Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter, Target,
+    develop, new_project, source_distribution, write_dist_info, BridgeModel, BuildOptions,
+    CargoToml, Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter, Target,
 };
 use std::env;
 use std::io;
@@ -269,6 +269,19 @@ enum Opt {
         /// directory in the project's target directory
         #[structopt(short, long, parse(from_os_str))]
         out: Option<PathBuf>,
+    },
+    /// Create a new cargo project
+    #[structopt(name = "new")]
+    NewProject {
+        /// Project name
+        #[structopt()]
+        name: String,
+        /// Use mixed Rust/Python project layout?
+        #[structopt(long)]
+        mixed: bool,
+        /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+        #[structopt(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
+        bindings: Option<String>,
     },
     /// Uploads python packages to pypi
     ///
@@ -621,6 +634,11 @@ fn run() -> Result<()> {
             .context("Failed to build source distribution")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
+        Opt::NewProject {
+            name,
+            mixed,
+            bindings,
+        } => new_project(name, mixed, bindings)?,
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {

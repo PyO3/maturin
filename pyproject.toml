@@ -19,3 +19,7 @@ bindings = "bin"
 
 [tool.black]
 target_version = ['py36']
+extend-exclude = '''
+# Ignore cargo-generate templates
+^/src/templates
+'''

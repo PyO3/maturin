@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for excluding files from wheels by `.gitignore` in [#695](https://github.com/PyO3/maturin/pull/695)
 * Fix `pip install maturin` on OpenBSD 6.8 in [#697](https://github.com/PyO3/maturin/pull/697)
 * Add support for x86, x86_64 and aarch64 on NetBSD in [#704](https://github.com/PyO3/maturin/pull/704)
+* Add a `maturin new` command for bootstrapping new projects in [#705](https://github.com/PyO3/maturin/pull/705)
 
 ## [0.12.1] - 2021-11-21
 

@@ -58,6 +58,9 @@ pyproject-toml = "0.3.0"
 python-pkginfo = "0.5.0"
 textwrap = "0.14.2"
 ignore = "0.4.18"
+dialoguer = "0.9.0"
+console = "0.15.0"
+minijinja = "0.8.2"
 
 [dev-dependencies]
 indoc = "1.0.3"

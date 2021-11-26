@@ -26,6 +26,7 @@ impl<'a> ProjectGenerator<'a> {
         env.add_template("lib.rs", include_str!("templates/lib.rs.j2"))?;
         env.add_template("main.rs", include_str!("templates/main.rs.j2"))?;
         env.add_template("__init__.py", include_str!("templates/__init__.py.j2"))?;
+        env.add_template("CI.yml", include_str!("templates/CI.yml.j2"))?;
         Ok(Self {
             env,
             project_name,
@@ -60,6 +61,11 @@ impl<'a> ProjectGenerator<'a> {
             let lib_rs = self.render_template("lib.rs")?;
             fs::write(src_path.join("lib.rs"), lib_rs)?;
         }
+
+        let gh_action_path = project_path.join(".github").join("workflows");
+        fs::create_dir_all(&gh_action_path)?;
+        let ci_yml = self.render_template("CI.yml")?;
+        fs::write(gh_action_path.join("CI.yml"), ci_yml)?;
 
         if self.mixed {
             let py_path = project_path.join(&self.crate_name);

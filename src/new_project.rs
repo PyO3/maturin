@@ -17,12 +17,15 @@ impl<'a> ProjectGenerator<'a> {
     fn new(project_name: String, mixed: bool, bindings: String) -> Result<Self> {
         let crate_name = project_name.replace('-', "_");
         let mut env = Environment::new();
-        env.add_template(".gitignore", include_str!("templates/.gitignore"))?;
-        env.add_template("Cargo.toml", include_str!("templates/Cargo.toml"))?;
-        env.add_template("pyproject.toml", include_str!("templates/pyproject.toml"))?;
-        env.add_template("lib.rs", include_str!("templates/lib.rs"))?;
-        env.add_template("main.rs", include_str!("templates/main.rs"))?;
-        env.add_template("__init__.py", include_str!("templates/__init__.py"))?;
+        env.add_template(".gitignore", include_str!("templates/.gitignore.j2"))?;
+        env.add_template("Cargo.toml", include_str!("templates/Cargo.toml.j2"))?;
+        env.add_template(
+            "pyproject.toml",
+            include_str!("templates/pyproject.toml.j2"),
+        )?;
+        env.add_template("lib.rs", include_str!("templates/lib.rs.j2"))?;
+        env.add_template("main.rs", include_str!("templates/main.rs.j2"))?;
+        env.add_template("__init__.py", include_str!("templates/__init__.py.j2"))?;
         Ok(Self {
             env,
             project_name,

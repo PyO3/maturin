@@ -7,6 +7,7 @@ from pathlib import Path
 FILES = [
     "Readme.md",
     "guide/src/develop.md",
+    "guide/src/tutorial.md",
 ]
 
 

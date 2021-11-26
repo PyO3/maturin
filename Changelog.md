@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] - 2021-11-26
+
 * Add support for excluding files from wheels by `.gitignore` in [#695](https://github.com/PyO3/maturin/pull/695)
 * Fix `pip install maturin` on OpenBSD 6.8 in [#697](https://github.com/PyO3/maturin/pull/697)
 * Add support for x86, x86_64 and aarch64 on NetBSD in [#704](https://github.com/PyO3/maturin/pull/704)
@@ -480,7 +482,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.2...HEAD
+[0.12.2]: https://github.com/pyo3/maturin/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/pyo3/maturin/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/pyo3/maturin/compare/v0.11.5...v0.12.0
 [0.11.5]: https://github.com/pyo3/maturin/compare/v0.11.4...v0.11.5

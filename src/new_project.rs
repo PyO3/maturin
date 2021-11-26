@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
 use fs_err as fs;
@@ -36,12 +36,7 @@ impl<'a> ProjectGenerator<'a> {
         })
     }
 
-    fn generate(&self) -> Result<()> {
-        let project_path = Path::new(&self.project_name);
-        if project_path.exists() {
-            bail!("destination `{}` already exists", project_path.display());
-        }
-
+    fn generate(&self, project_path: &Path) -> Result<()> {
         let src_path = project_path.join("src");
         fs::create_dir_all(&src_path)?;
 
@@ -92,7 +87,28 @@ impl<'a> ProjectGenerator<'a> {
 }
 
 /// Generate a new cargo project
-pub fn new_project(name: String, mixed: bool, bindings: Option<String>) -> Result<()> {
+pub fn new_project(
+    path: String,
+    name: Option<String>,
+    mixed: bool,
+    bindings: Option<String>,
+) -> Result<()> {
+    let project_path = Path::new(&path);
+    if project_path.exists() {
+        bail!("destination `{}` already exists", project_path.display());
+    }
+
+    let name = if let Some(name) = name {
+        name
+    } else {
+        let file_name = project_path
+            .file_name()
+            .context("Fail to get name from path")?;
+        file_name
+            .to_str()
+            .context("Filename isn't valid Unicode")?
+            .to_string()
+    };
     let bindings_items = if mixed {
         vec!["pyo3", "rust-cpython", "cffi"]
     } else {
@@ -113,5 +129,5 @@ pub fn new_project(name: String, mixed: bool, bindings: Option<String>) -> Resul
     };
 
     let generator = ProjectGenerator::new(name, mixed, bindings)?;
-    generator.generate()
+    generator.generate(project_path)
 }

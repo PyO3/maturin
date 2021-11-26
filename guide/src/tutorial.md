@@ -48,7 +48,7 @@ New projects can also be quickly created using the `maturin new` command:
 
 ```
 USAGE:
-    maturin new [FLAGS] [OPTIONS] <name>
+    maturin new [FLAGS] [OPTIONS] <path>
 
 FLAGS:
     -h, --help       Prints help information
@@ -57,9 +57,10 @@ FLAGS:
 
 OPTIONS:
     -b, --bindings <bindings>    Which kind of bindings to use [possible values: pyo3, rust-cpython, cffi, bin]
+        --name <name>            Set the resulting package name, defaults to the directory name
 
 ARGS:
-    <name>    Project name
+    <path>    Project path
 ```
 
 The above process can be achieved by running `maturin new -b pyo3 guessing_game`

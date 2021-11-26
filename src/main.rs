@@ -273,9 +273,11 @@ enum Opt {
     /// Create a new cargo project
     #[structopt(name = "new")]
     NewProject {
-        /// Project name
-        #[structopt()]
-        name: String,
+        /// Project path
+        path: String,
+        /// Set the resulting package name, defaults to the directory name
+        #[structopt(long)]
+        name: Option<String>,
         /// Use mixed Rust/Python project layout
         #[structopt(long)]
         mixed: bool,
@@ -635,10 +637,11 @@ fn run() -> Result<()> {
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
         Opt::NewProject {
+            path,
             name,
             mixed,
             bindings,
-        } => new_project(name, mixed, bindings)?,
+        } => new_project(path, name, mixed, bindings)?,
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {

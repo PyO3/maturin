@@ -276,10 +276,10 @@ enum Opt {
         /// Project name
         #[structopt()]
         name: String,
-        /// Use mixed Rust/Python project layout?
+        /// Use mixed Rust/Python project layout
         #[structopt(long)]
         mixed: bool,
-        /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+        /// Which kind of bindings to use
         #[structopt(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
         bindings: Option<String>,
     },

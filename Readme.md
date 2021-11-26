@@ -22,8 +22,9 @@ You can either download binaries from the [latest release](https://github.com/Py
 pip install maturin
 ```
 
-There are three main commands:
+There are four main commands:
 
+ * `maturin new` creates a new cargo project with maturin configured.
  * `maturin publish` builds the crate into python packages and publishes them to pypi.
  * `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine).
  * `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.

@@ -42,6 +42,29 @@ version = "0.14.5"
 features = ["extension-module", "abi3-py36"]
 ```
 
+### Use `maturin new`
+
+New projects can also be quickly created using the `maturin new` command:
+
+```
+USAGE:
+    maturin new [FLAGS] [OPTIONS] <name>
+
+FLAGS:
+    -h, --help       Prints help information
+        --mixed      Use mixed Rust/Python project layout
+    -V, --version    Prints version information
+
+OPTIONS:
+    -b, --bindings <bindings>    Which kind of bindings to use [possible values: pyo3, rust-cpython, cffi, bin]
+
+ARGS:
+    <name>    Project name
+```
+
+The above process can be achieved by running `maturin new -b pyo3 guessing_game`
+then edit `Cargo.toml` to add `abi3-py36` feature.
+
 ## Install and configure maturin (in a virtual environment)
 
 Create a virtual environment and install maturin. Note maturin has minimal

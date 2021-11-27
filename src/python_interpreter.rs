@@ -379,9 +379,11 @@ impl PythonInterpreter {
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
     pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
-        let platform = if self.target.is_windows() {
-            // Restrict `sysconfig.get_platform()` usage to Windows only for now
-            // so we don't need to deal with macOS deployment target
+        // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
+        // so we don't need to deal with macOS deployment target
+        let use_sysconfig_platform =
+            self.target.is_windows() || (self.target.is_linux() && !platform_tag.is_portable());
+        let platform = if use_sysconfig_platform {
             self.platform
                 .clone()
                 .unwrap_or_else(|| self.target.get_platform_tag(platform_tag, universal2))

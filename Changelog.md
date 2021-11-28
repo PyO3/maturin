@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Consider current machine architecture when generating platform tags for abi3
   wheels on linux in [#709](https://github.com/PyO3/maturin/pull/709)
 * Revert back to Rust 2018 edition in [#710](https://github.com/PyO3/maturin/pull/710)
+* Warn missing `cffi` package dependency in [#711](https://github.com/PyO3/maturin/pull/711)
 
 ## [0.12.2] - 2021-11-26
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Use platform tag from `sysconfig.platform` on non-portable Linux in [#709](https://github.com/PyO3/maturin/pull/709)
+* Consider current machine architecture when generating platform tags for abi3
+  wheels on linux in [#709](https://github.com/PyO3/maturin/pull/709)
+
 ## [0.12.2] - 2021-11-26
 
 * Add support for excluding files from wheels by `.gitignore` in [#695](https://github.com/PyO3/maturin/pull/695)

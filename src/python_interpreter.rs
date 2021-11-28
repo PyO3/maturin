@@ -380,8 +380,9 @@ impl PythonInterpreter {
     pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
-        let use_sysconfig_platform =
-            self.target.is_windows() || (self.target.is_linux() && !platform_tag.is_portable());
+        let use_sysconfig_platform = self.target.is_windows()
+            || (self.target.is_linux() && !platform_tag.is_portable())
+            || self.target.is_illumos();
         let platform = if use_sysconfig_platform {
             self.platform
                 .clone()

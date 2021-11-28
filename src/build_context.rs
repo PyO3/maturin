@@ -464,6 +464,19 @@ impl BuildContext {
         let policy = self.auditwheel(None, &artifact, self.platform_tag)?;
         let (wheel_path, tag) = self.write_cffi_wheel(&artifact, policy.platform_tag())?;
 
+        // Warn if cffi isn't specified in the requirements
+        if !self
+            .metadata21
+            .requires_dist
+            .iter()
+            .any(|dep| dep.to_ascii_lowercase().starts_with("cffi"))
+        {
+            eprintln!(
+                "⚠️  Warning: missing cffi package dependency, please add it to pyproject.toml. \
+                e.g: `dependencies = [\"cffi\"]`. This will become an error."
+            );
+        }
+
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 

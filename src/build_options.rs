@@ -1,6 +1,6 @@
 use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
-use crate::cross_compile::{find_sysconfigdata, is_cross_compiling, parse_sysconfigdata};
+use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::python_interpreter::InterpreterKind;
 use crate::BuildContext;
 use crate::CargoToml;
@@ -515,7 +515,7 @@ pub fn find_interpreter(
                 }
             }
 
-            if binding_name == "pyo3" && target.is_unix() && is_cross_compiling(target)? {
+            if binding_name == "pyo3" && target.is_unix() && target.cross_compiling() {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     println!("⚠️ Cross-compiling is poorly supported");
                     let host_python = &interpreter[0];

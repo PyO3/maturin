@@ -23,6 +23,8 @@ pub fn test_editable(package: impl AsRef<Path>, bindings: Option<String>) -> Res
         &interpreter,
         "--manifest-path",
         &package_string,
+        "--compatibility",
+        "linux",
         "--cargo-extra-args='--quiet'",
     ];
 

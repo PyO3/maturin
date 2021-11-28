@@ -54,6 +54,13 @@ impl PlatformTag {
             PlatformTag::Linux => Vec::new(),
         }
     }
+
+    /// Is this a portable linux platform tag
+    ///
+    /// Only manylinux and musllinux are portable
+    pub fn is_portable(&self) -> bool {
+        !matches!(self, PlatformTag::Linux)
+    }
 }
 
 impl fmt::Display for PlatformTag {

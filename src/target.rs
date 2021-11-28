@@ -1,3 +1,4 @@
+use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{bail, format_err, Context, Result};
@@ -92,6 +93,7 @@ pub struct Target {
     arch: Arch,
     env: Environment,
     triple: String,
+    cross_compiling: bool,
 }
 
 impl Target {
@@ -139,12 +141,15 @@ impl Target {
             bail!("{} is not supported on {}", arch, os);
         }
 
-        Ok(Target {
+        let mut target = Target {
             os,
             arch,
             env: platform.environment,
             triple,
-        })
+            cross_compiling: false,
+        };
+        target.cross_compiling = is_cross_compiling(&target)?;
+        Ok(target)
     }
 
     /// Returns the platform part of the tag for the wheel name
@@ -186,9 +191,16 @@ impl Target {
                 )
             }
             (Os::Linux, _) => {
-                let mut tags = vec![format!("{}_{}", platform_tag, self.arch)];
+                let arch = if self.cross_compiling {
+                    self.arch.to_string()
+                } else {
+                    PlatformInfo::new()
+                        .map(|info| info.machine().into_owned())
+                        .unwrap_or_else(|_| self.arch.to_string())
+                };
+                let mut tags = vec![format!("{}_{}", platform_tag, arch)];
                 for alias in platform_tag.aliases() {
-                    tags.push(format!("{}_{}", alias, self.arch));
+                    tags.push(format!("{}_{}", alias, arch));
                 }
                 tags.join(".")
             }
@@ -295,6 +307,11 @@ impl Target {
                 | Environment::Musleabihf
                 | Environment::Muslabi64
         )
+    }
+
+    /// Is cross compiling for this target
+    pub fn cross_compiling(&self) -> bool {
+        self.cross_compiling
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels

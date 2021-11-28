@@ -1,5 +1,4 @@
 use crate::auditwheel::PlatformTag;
-use crate::cross_compile::is_cross_compiling;
 use crate::{BridgeModel, Target};
 use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
@@ -314,7 +313,7 @@ fn fun_with_abiflags(
 ) -> Result<String> {
     if bridge != &BridgeModel::Cffi
         && target.get_python_os() != message.system
-        && !is_cross_compiling(target)?
+        && !target.cross_compiling()
     {
         bail!(
             "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",

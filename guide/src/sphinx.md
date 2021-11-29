@@ -51,7 +51,7 @@ Python project path to `sys.path` in `conf.py` of Sphinx. Read The Docs
 doesn't install your project in editable mode, adding it to `sys.path` will make
 your project fail to import which breaks documentation generation.
 
-If you need to install a specified version of Sphinx or adding Sphinx
+If you need to install a specific version of Sphinx or adding Sphinx
 themes/extensions, you can change the `python.install` section a bit to add an
 extra installation step, for example:
 

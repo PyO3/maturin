@@ -506,9 +506,14 @@ impl PythonInterpreter {
             // We don't use platform from sysconfig on macOS
             None
         } else {
-            message.platform
+            Some(
+                message
+                    .platform
+                    .to_lowercase()
+                    .replace('-', "_")
+                    .replace('.', "_"),
+            )
         };
-        let platform = platform.to_lowercase().replace('-', "_").replace('.', "_");
 
         Ok(Some(PythonInterpreter {
             major: message.major,
@@ -522,7 +527,7 @@ impl PythonInterpreter {
             interpreter_kind: interpreter,
             abi_tag: message.abi_tag,
             libs_dir: PathBuf::from(message.base_prefix).join("libs"),
-            platform: Some(platform),
+            platform,
             runnable: true,
         }))
     }

@@ -20,6 +20,7 @@ enum Os {
     FreeBsd,
     NetBsd,
     OpenBsd,
+    Illumos,
 }
 
 impl fmt::Display for Os {
@@ -31,6 +32,7 @@ impl fmt::Display for Os {
             Os::FreeBsd => write!(f, "FreeBSD"),
             Os::NetBsd => write!(f, "NetBSD"),
             Os::OpenBsd => write!(f, "OpenBSD"),
+            Os::Illumos => write!(f, "Illumos"),
         }
     }
 }
@@ -83,6 +85,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86_64,
         ],
         Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
+        Os::Illumos => vec![Arch::X86, Arch::X86_64],
     }
 }
 
@@ -123,6 +126,7 @@ impl Target {
             target_lexicon::OperatingSystem::Netbsd => Os::NetBsd,
             target_lexicon::OperatingSystem::Freebsd => Os::FreeBsd,
             target_lexicon::OperatingSystem::Openbsd => Os::OpenBsd,
+            target_lexicon::OperatingSystem::Illumos => Os::Illumos,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -190,6 +194,40 @@ impl Target {
                     arch
                 )
             }
+            (Os::Illumos, Arch::X86)
+            | (Os::Illumos, Arch::X86_64) => {
+                let info = match PlatformInfo::new() {
+                    Ok(info) => info,
+                    Err(error) => panic!("{}", error),
+                };
+                let mut release = info.release().replace(".", "_").replace("-", "_");
+                let mut arch = info.machine().replace(' ', "_").replace('/', "_");
+
+                let mut os = self.os.to_string().to_ascii_lowercase();
+                // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
+                if let Some((major, other)) = release.split_once('_') {
+                    let major_ver: u64 = major.parse().expect("illumos major version is not a number");
+                    if major_ver >= 5 {
+                        // SunOS 5 == Solaris 2
+                        os = "solaris".to_string();
+                        release = format!("{}_{}", major_ver - 3, other);
+                        let bitness = match self.arch {
+                            Arch::X86_64 => "64bit".to_string(),
+                            Arch::X86 => "32bit".to_string(),
+                            _ => panic!(
+                                "unsupported architecture should not have reached get_platform_tag()"
+                            ),
+                        };
+                        arch = format!("{}_{}", arch, bitness);
+                    }
+                }
+                format!(
+                    "{}_{}_{}",
+                    os,
+                    release,
+                    arch
+                )
+            }
             (Os::Linux, _) => {
                 let arch = if self.cross_compiling {
                     self.arch.to_string()
@@ -234,6 +272,7 @@ impl Target {
             Os::FreeBsd => "freebsd",
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
+            Os::Illumos => "sunos",
         }
     }
 
@@ -269,7 +308,7 @@ impl Target {
     pub fn is_unix(&self) -> bool {
         match self.os {
             Os::Windows => false,
-            Os::Linux | Os::Macos | Os::FreeBsd | Os::NetBsd | Os::OpenBsd => true,
+            Os::Linux | Os::Macos | Os::FreeBsd | Os::NetBsd | Os::OpenBsd | Os::Illumos => true,
         }
     }
 
@@ -296,6 +335,11 @@ impl Target {
     /// Returns true if the current platform is windows
     pub fn is_windows(&self) -> bool {
         self.os == Os::Windows
+    }
+
+    /// Returns true if the current platform is illumos
+    pub fn is_illumos(&self) -> bool {
+        self.os == Os::Illumos
     }
 
     /// Returns true if the current platform's target env is Musl

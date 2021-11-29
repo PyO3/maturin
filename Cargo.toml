@@ -33,7 +33,7 @@ flate2 = "1.0.18"
 goblin = "0.4.3"
 human-panic = { version = "1.0.3", optional = true }
 keyring = { version = "0.10.4", optional = true }
-platform-info = "0.1.0"
+platform-info = "0.2.0"
 pretty_env_logger = { version = "0.4.0", optional = true }
 regex = "1.4.5"
 reqwest = { version = "0.11.2", optional = true, default-features = false, features = ["blocking", "multipart"] }

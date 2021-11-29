@@ -85,7 +85,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86_64,
         ],
         Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
-        Os::Illumos => vec![Arch::X86, Arch::X86_64],
+        Os::Illumos => vec![Arch::X86_64],
     }
 }
 
@@ -194,8 +194,7 @@ impl Target {
                     arch
                 )
             }
-            (Os::Illumos, Arch::X86)
-            | (Os::Illumos, Arch::X86_64) => {
+            (Os::Illumos, Arch::X86_64) => {
                 let info = match PlatformInfo::new() {
                     Ok(info) => info,
                     Err(error) => panic!("{}", error),
@@ -211,14 +210,7 @@ impl Target {
                         // SunOS 5 == Solaris 2
                         os = "solaris".to_string();
                         release = format!("{}_{}", major_ver - 3, other);
-                        let bitness = match self.arch {
-                            Arch::X86_64 => "64bit".to_string(),
-                            Arch::X86 => "32bit".to_string(),
-                            _ => panic!(
-                                "unsupported architecture should not have reached get_platform_tag()"
-                            ),
-                        };
-                        arch = format!("{}_{}", arch, bitness);
+                        arch = format!("{}_64bit", arch);
                     }
                 }
                 format!(

@@ -79,9 +79,16 @@ impl<'a> ProjectGenerator<'a> {
     }
 
     fn render_template(&self, tmpl_name: &str) -> Result<String> {
+        let version_major: usize = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
+        let version_minor: usize = env!("CARGO_PKG_VERSION_MINOR").parse().unwrap();
         let tmpl = self.env.get_template(tmpl_name)?;
-        let out =
-            tmpl.render(context!(name => self.project_name, crate_name => self.crate_name, bindings => self.bindings))?;
+        let out = tmpl.render(context!(
+            name => self.project_name,
+            crate_name => self.crate_name,
+            bindings => self.bindings,
+            version_major => version_major,
+            version_minor => version_minor
+        ))?;
         Ok(out)
     }
 }

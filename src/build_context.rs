@@ -284,7 +284,9 @@ impl BuildContext {
         major: u8,
         min_minor: u8,
     ) -> Result<BuiltWheelMetadata> {
-        let platform = self.target.get_platform_tag(platform_tag, self.universal2);
+        let platform = self
+            .target
+            .get_platform_tag(platform_tag, self.universal2)?;
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
@@ -343,7 +345,7 @@ impl BuildContext {
         artifact: &Path,
         platform_tag: PlatformTag,
     ) -> Result<BuiltWheelMetadata> {
-        let tag = python_interpreter.get_tag(platform_tag, self.universal2);
+        let tag = python_interpreter.get_tag(platform_tag, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
 
@@ -437,7 +439,7 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self
             .target
-            .get_universal_tags(platform_tag, self.universal2);
+            .get_universal_tags(platform_tag, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
 
@@ -490,7 +492,7 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self
             .target
-            .get_universal_tags(platform_tag, self.universal2);
+            .get_universal_tags(platform_tag, self.universal2)?;
 
         if !self.metadata21.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");

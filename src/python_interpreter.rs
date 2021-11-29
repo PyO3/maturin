@@ -360,20 +360,22 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> String {
+    pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> Result<String> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
         let use_sysconfig_platform = self.target.is_windows()
             || (self.target.is_linux() && !platform_tag.is_portable())
             || self.target.is_illumos();
         let platform = if use_sysconfig_platform {
-            self.platform
-                .clone()
-                .unwrap_or_else(|| self.target.get_platform_tag(platform_tag, universal2))
+            if let Some(platform) = self.platform.clone() {
+                platform
+            } else {
+                self.target.get_platform_tag(platform_tag, universal2)?
+            }
         } else {
-            self.target.get_platform_tag(platform_tag, universal2)
+            self.target.get_platform_tag(platform_tag, universal2)?
         };
-        match self.interpreter_kind {
+        let tag = match self.interpreter_kind {
             InterpreterKind::CPython => {
                 if self.target.is_unix() {
                     format!(
@@ -408,7 +410,8 @@ impl PythonInterpreter {
                     platform = platform,
                 )
             }
-        }
+        };
+        Ok(tag)
     }
 
     /// Adds the ext_suffix we read from python or know (.pyd/.abi3.so) and adds it to the base name

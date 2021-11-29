@@ -353,23 +353,6 @@ fn fun_with_abiflags(
     }
 }
 
-/// macOS contains system version in platform name so need special handle
-///
-/// See https://github.com/pypa/wheel/blob/0acd203cd896afec7f715aa2ff5980a403459a3b/src/wheel/macosx_libfile.py#L359-L428
-fn calculate_macosx_platform_tag(platform: &str) -> Result<String> {
-    let mut parts = platform.splitn(3, '-');
-    let err_ctx = "Invalid platform string from `sysconfig.get_platform()`";
-    let prefix = parts.next().context(err_ctx)?;
-    let base_version = parts.next().context(err_ctx)?;
-    let suffix = parts.next().context(err_ctx)?;
-    let (major_ver, minor_ver) = base_version.split_once('.').unwrap_or((base_version, "0"));
-    let major_ver: u64 = major_ver.parse()?;
-    let minor_ver = if major_ver > 10 { "0" } else { minor_ver };
-    // FIXME: We should also take MACOSX_DEPLOYMENT_TARGET env var into account
-    let new_platform = format!("{}_{}_{}_{}", prefix, major_ver, minor_ver, suffix);
-    Ok(new_platform)
-}
-
 impl PythonInterpreter {
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:
     /// {python tag}-{abi tag}-{platform tag}
@@ -520,7 +503,8 @@ impl PythonInterpreter {
         ))?;
 
         let platform = if message.platform.starts_with("macosx") {
-            calculate_macosx_platform_tag(&message.platform)?
+            // We don't use platform from sysconfig on macOS
+            None
         } else {
             message.platform
         };
@@ -665,30 +649,5 @@ impl fmt::Display for PythonInterpreter {
                 self.interpreter_kind, self.major, self.minor, self.abiflags,
             )
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::calculate_macosx_platform_tag;
-
-    #[test]
-    fn test_calculate_macosx_platform_tag() {
-        assert_eq!(
-            calculate_macosx_platform_tag("macosx-10.7-x86_64").unwrap(),
-            "macosx_10_7_x86_64"
-        );
-        assert_eq!(
-            calculate_macosx_platform_tag("macosx-11-x86_64").unwrap(),
-            "macosx_11_0_x86_64"
-        );
-        assert_eq!(
-            calculate_macosx_platform_tag("macosx-11-arm64").unwrap(),
-            "macosx_11_0_arm64"
-        );
-        assert_eq!(
-            calculate_macosx_platform_tag("macosx-11.1-arm64").unwrap(),
-            "macosx_11_0_arm64"
-        );
     }
 }

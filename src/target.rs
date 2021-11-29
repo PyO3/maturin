@@ -229,17 +229,31 @@ impl Target {
                 tags.join(".")
             }
             (Os::Macos, Arch::X86_64) => {
+                let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
                 if universal2 {
-                    "macosx_10_9_x86_64.macosx_11_0_arm64.macosx_10_9_universal2".to_string()
+                    format!(
+                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2",
+                        x86_64_major = x86_64_major,
+                        x86_64_minor = x86_64_minor,
+                        arm64_major = arm64_major,
+                        arm64_minor = arm64_minor
+                    )
                 } else {
-                    "macosx_10_7_x86_64".to_string()
+                    format!("macosx_{}_{}_x86_64", x86_64_major, x86_64_minor)
                 }
             }
             (Os::Macos, Arch::Aarch64) => {
+                let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
                 if universal2 {
-                    "macosx_10_9_x86_64.macosx_11_0_arm64.macosx_10_9_universal2".to_string()
+                    format!(
+                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2",
+                        x86_64_major = x86_64_major,
+                        x86_64_minor = x86_64_minor,
+                        arm64_major = arm64_major,
+                        arm64_minor = arm64_minor
+                    )
                 } else {
-                    "macosx_11_0_arm64".to_string()
+                    format!("macosx_{}_{}_arm64", arm64_major, arm64_minor)
                 }
             }
             (Os::Windows, Arch::X86) => "win32".to_string(),
@@ -463,4 +477,66 @@ pub(crate) fn get_host_target() -> Result<String> {
         })?
         .to_string();
     Ok(host)
+}
+
+fn macosx_deployment_target(
+    deploy_target: Option<&str>,
+    universal2: bool,
+) -> Result<((usize, usize), (usize, usize))> {
+    let x86_64_default = if universal2 { (10, 9) } else { (10, 7) };
+    let arm64_default = (11, 0);
+    let mut x86_64_ver = x86_64_default;
+    let mut arm64_ver = arm64_default;
+    if let Some(deploy_target) = deploy_target {
+        let err_ctx = "MACOSX_DEPLOYMENT_TARGET is invalid";
+        let mut parts = deploy_target.split('.');
+        let major = parts.next().context(err_ctx)?;
+        let major: usize = major.parse().context(err_ctx)?;
+        let minor = parts.next().context(err_ctx)?;
+        let minor: usize = minor.parse().context(err_ctx)?;
+        if (major, minor) > x86_64_default {
+            x86_64_ver = (major, minor);
+        }
+        if (major, minor) > arm64_default {
+            arm64_ver = (major, minor);
+        }
+    }
+    Ok((x86_64_ver, arm64_ver))
+}
+
+#[cfg(test)]
+mod test {
+    use super::macosx_deployment_target;
+
+    #[test]
+    fn test_macosx_deployment_target() {
+        assert_eq!(
+            macosx_deployment_target(None, false).unwrap(),
+            (((10, 7), (11, 0)))
+        );
+        assert_eq!(
+            macosx_deployment_target(None, true).unwrap(),
+            (((10, 9), (11, 0)))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("10.6"), false).unwrap(),
+            (((10, 7), (11, 0)))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("10.6"), true).unwrap(),
+            (((10, 9), (11, 0)))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("10.9"), false).unwrap(),
+            (((10, 9), (11, 0)))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("11.0.0"), false).unwrap(),
+            (((11, 0), (11, 0)))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("11.1"), false).unwrap(),
+            (((11, 1), (11, 1)))
+        );
+    }
 }

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Revert back to Rust 2018 edition in [#710](https://github.com/PyO3/maturin/pull/710)
 * Warn missing `cffi` package dependency in [#711](https://github.com/PyO3/maturin/pull/711)
 * Add support for Illumos in [#712](https://github.com/PyO3/maturin/pull/712)
+* Account for `MACOSX_DEPLOYMENT_TARGET` env var in wheel platform tag in [#716](https://github.com/PyO3/maturin/pull/716)
 
 ## [0.12.2] - 2021-11-26
 

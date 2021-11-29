@@ -12,10 +12,6 @@ keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 edition = "2018"
 
-[badges]
-travis-ci = { repository = "PyO3/maturin" }
-appveyor = { repository = "konstin/pyo3" }
-
 [[bin]]
 name = "maturin"
 

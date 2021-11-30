@@ -2,6 +2,8 @@
 
 ## Install from package managers
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/maturin.svg?columns=4)](https://repology.org/project/maturin/versions)
+
 ### PyPI
 
 maturin is published as Python binary wheel to PyPI, you can install it using pip:

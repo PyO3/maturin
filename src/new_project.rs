@@ -4,6 +4,7 @@ use dialoguer::{theme::ColorfulTheme, Select};
 use fs_err as fs;
 use minijinja::{context, Environment};
 use std::path::Path;
+use structopt::StructOpt;
 
 struct ProjectGenerator<'a> {
     env: Environment<'a>,
@@ -11,10 +12,11 @@ struct ProjectGenerator<'a> {
     crate_name: String,
     bindings: String,
     mixed: bool,
+    overwrite: bool,
 }
 
 impl<'a> ProjectGenerator<'a> {
-    fn new(project_name: String, mixed: bool, bindings: String) -> Result<Self> {
+    fn new(project_name: String, mixed: bool, bindings: String, overwrite: bool) -> Result<Self> {
         let crate_name = project_name.replace('-', "_");
         let mut env = Environment::new();
         env.add_template(".gitignore", include_str!("templates/.gitignore.j2"))?;
@@ -33,6 +35,7 @@ impl<'a> ProjectGenerator<'a> {
             crate_name,
             bindings,
             mixed,
+            overwrite,
         })
     }
 
@@ -40,41 +43,26 @@ impl<'a> ProjectGenerator<'a> {
         let src_path = project_path.join("src");
         fs::create_dir_all(&src_path)?;
 
-        let gitignore = self.render_template(".gitignore")?;
-        fs::write(project_path.join(".gitignore"), gitignore)?;
-
-        let cargo_toml = self.render_template("Cargo.toml")?;
-        fs::write(project_path.join("Cargo.toml"), cargo_toml)?;
-
-        let pyproject_toml = self.render_template("pyproject.toml")?;
-        fs::write(project_path.join("pyproject.toml"), pyproject_toml)?;
+        self.write_project_file(project_path, ".gitignore")?;
+        self.write_project_file(project_path, "Cargo.toml")?;
+        self.write_project_file(project_path, "pyproject.toml")?;
 
         if self.bindings == "bin" {
-            let main_rs = self.render_template("main.rs")?;
-            fs::write(src_path.join("main.rs"), main_rs)?;
+            self.write_project_file(&src_path, "main.rs")?;
         } else {
-            let lib_rs = self.render_template("lib.rs")?;
-            fs::write(src_path.join("lib.rs"), lib_rs)?;
+            self.write_project_file(&src_path, "lib.rs")?;
         }
 
         let gh_action_path = project_path.join(".github").join("workflows");
         fs::create_dir_all(&gh_action_path)?;
-        let ci_yml = self.render_template("CI.yml")?;
-        fs::write(gh_action_path.join("CI.yml"), ci_yml)?;
+        self.write_project_file(&gh_action_path, "CI.yml")?;
 
         if self.mixed {
             let py_path = project_path.join(&self.crate_name);
             fs::create_dir_all(&py_path)?;
-            let init_py = self.render_template("__init__.py")?;
-            fs::write(py_path.join("__init__.py"), init_py)?;
+            self.write_project_file(&py_path, "__init__.py")?;
         }
 
-        println!(
-            "  ✨ {} {} {}",
-            style("Done!").bold().green(),
-            style("New project created").bold(),
-            style(&project_path.display()).underlined()
-        );
         Ok(())
     }
 
@@ -91,37 +79,86 @@ impl<'a> ProjectGenerator<'a> {
         ))?;
         Ok(out)
     }
+
+    fn write_project_file(&self, directory: &Path, file: &str) -> Result<()> {
+        let path = directory.join(file);
+        if self.overwrite || !path.exists() {
+            fs::write(path, self.render_template(file)?)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, StructOpt)]
+/// Options common to `maturin new` and `maturin init`.
+pub struct GenerateProjectOptions {
+    /// Set the resulting package name, defaults to the directory name
+    #[structopt(long)]
+    name: Option<String>,
+    /// Use mixed Rust/Python project layout
+    #[structopt(long)]
+    mixed: bool,
+    /// Which kind of bindings to use
+    #[structopt(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
+    bindings: Option<String>,
 }
 
 /// Generate a new cargo project
-pub fn new_project(
-    path: String,
-    name: Option<String>,
-    mixed: bool,
-    bindings: Option<String>,
-) -> Result<()> {
+pub fn new_project(path: String, options: GenerateProjectOptions) -> Result<()> {
     let project_path = Path::new(&path);
     if project_path.exists() {
         bail!("destination `{}` already exists", project_path.display());
     }
+    generate_project(project_path, options, true)?;
+    println!(
+        "  ✨ {} {} {}",
+        style("Done!").bold().green(),
+        style("New project created").bold(),
+        style(&project_path.display()).underlined()
+    );
+    Ok(())
+}
 
-    let name = if let Some(name) = name {
+/// Generate a new cargo project in an existing directory
+pub fn init_project(path: Option<String>, options: GenerateProjectOptions) -> Result<()> {
+    let project_path = path
+        .map(Into::into)
+        .map_or_else(std::env::current_dir, Ok)?;
+    if project_path.join("pyproject.toml").exists() || project_path.join("Cargo.toml").exists() {
+        bail!("`maturin init` cannot be run on existing projects");
+    }
+    generate_project(&project_path, options, false)?;
+    println!(
+        "  ✨ {} {} {}",
+        style("Done!").bold().green(),
+        style("Initialized project").bold(),
+        style(&project_path.display()).underlined()
+    );
+    Ok(())
+}
+
+fn generate_project(
+    project_path: &Path,
+    options: GenerateProjectOptions,
+    overwrite: bool,
+) -> Result<()> {
+    let name = if let Some(name) = options.name {
         name
     } else {
-        let file_name = project_path
-            .file_name()
-            .context("Fail to get name from path")?;
+        let file_name = project_path.file_name().with_context(|| {
+            format!("Failed to get name from path '{}'", project_path.display())
+        })?;
         file_name
             .to_str()
             .context("Filename isn't valid Unicode")?
             .to_string()
     };
-    let bindings_items = if mixed {
+    let bindings_items = if options.mixed {
         vec!["pyo3", "rust-cpython", "cffi"]
     } else {
         vec!["pyo3", "rust-cpython", "cffi", "bin"]
     };
-    let bindings = if let Some(bindings) = bindings {
+    let bindings = if let Some(bindings) = options.bindings {
         bindings
     } else {
         let selection = Select::with_theme(&ColorfulTheme::default())
@@ -135,6 +172,6 @@ pub fn new_project(
         bindings_items[selection].to_string()
     };
 
-    let generator = ProjectGenerator::new(name, mixed, bindings)?;
+    let generator = ProjectGenerator::new(name, options.mixed, bindings, overwrite)?;
     generator.generate(project_path)
 }

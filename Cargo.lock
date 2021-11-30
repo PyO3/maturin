@@ -1043,6 +1043,7 @@ dependencies = [
  "once_cell",
  "platform-info",
  "pretty_env_logger",
+ "pyo3-build-config",
  "pyproject-toml",
  "python-pkginfo",
  "regex",
@@ -1398,6 +1399,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb37d2df5df740e582f28f8560cf425f52bb267d872fe58358eadb554909f07a"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "pyo3-build-config"
+version = "0.15.1"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#79565d73df6d92bcb0201ca5ffc92b1e65d159b1"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]

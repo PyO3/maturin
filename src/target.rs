@@ -12,8 +12,8 @@ use std::str;
 use target_lexicon::{Environment, Triple};
 
 /// All supported operating system
-#[derive(Debug, Clone, Eq, PartialEq)]
-enum Os {
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Os {
     Linux,
     Windows,
     Macos,
@@ -35,6 +35,25 @@ impl fmt::Display for Os {
             Os::OpenBsd => write!(f, "OpenBSD"),
             Os::Dragonfly => write!(f, "DragonFly"),
             Os::Illumos => write!(f, "Illumos"),
+        }
+    }
+}
+
+// TODO: need to make sure this is a comprehensive list of supported vendors
+/// All supported vendors
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Vendor {
+    Apple,
+    Pc,
+    Unknown,
+}
+
+impl fmt::Display for Vendor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Vendor::Apple => write!(f, "apple"),
+            Vendor::Pc => write!(f, "pc"),
+            Vendor::Unknown => write!(f, "unknown"),
         }
     }
 }
@@ -96,6 +115,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Target {
     os: Os,
+    vendor: Vendor,
     arch: Arch,
     env: Environment,
     triple: String,
@@ -145,12 +165,20 @@ impl Target {
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
+        let vendor = match platform.vendor {
+            target_lexicon::Vendor::Apple => Vendor::Apple,
+            target_lexicon::Vendor::Pc => Vendor::Pc,
+            target_lexicon::Vendor::Unknown => Vendor::Unknown,
+            unsupported => bail!("The vendor {} is not supported", unsupported),
+        };
+
         if !get_supported_architectures(&os).contains(&arch) {
             bail!("{} is not supported on {}", arch, os);
         }
 
         let mut target = Target {
             os,
+            vendor,
             arch,
             env: platform.environment,
             triple,
@@ -337,6 +365,16 @@ impl Target {
     /// Returns target architecture
     pub fn target_arch(&self) -> Arch {
         self.arch
+    }
+
+    /// Returns target architecture
+    pub fn target_vendor(&self) -> Vendor {
+        self.vendor
+    }
+
+    /// Returns target os
+    pub fn target_os(&self) -> Os {
+        self.os
     }
 
     /// Returns true if the current platform is linux

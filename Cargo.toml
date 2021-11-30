@@ -57,12 +57,13 @@ ignore = "0.4.18"
 dialoguer = "0.9.0"
 console = "0.15.0"
 minijinja = "0.8.2"
+pyo3-build-config = { git = "https://github.com/aganders3/pyo3", branch = "expose-cross-compiling", optional = true, default-features = false}
 
 [dev-dependencies]
 indoc = "1.0.3"
 
 [features]
-default = ["log", "upload", "rustls", "human-panic"]
+default = ["log", "upload", "rustls", "human-panic", "pyo3buildconfig"]
 upload = ["reqwest", "rpassword", "configparser", "dirs"]
 password-storage = ["upload", "keyring"]
 log = ["pretty_env_logger"]
@@ -71,6 +72,7 @@ log = ["pretty_env_logger"]
 rustls = ["reqwest/rustls-tls"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
+pyo3buildconfig = ["pyo3-build-config"]
 
 # Without this, compressing the .gz archive becomes notably slow for debug builds
 [profile.dev.package.miniz_oxide]

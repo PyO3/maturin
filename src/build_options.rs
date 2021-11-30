@@ -1,13 +1,14 @@
 use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
-use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::python_interpreter::InterpreterKind;
+use crate::target::get_host_target;
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Metadata21;
 use crate::PyProjectToml;
 use crate::PythonInterpreter;
 use crate::Target;
+
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand, Node};
 use regex::Regex;
@@ -17,6 +18,9 @@ use std::env;
 use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+#[cfg(feature = "pyo3buildconfig")]
+use pyo3_build_config::{cross_compiling, find_all_sysconfigdata, parse_sysconfigdata};
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
@@ -515,8 +519,13 @@ pub fn find_interpreter(
                 }
             }
 
-            if binding_name == "pyo3" && target.is_unix() && target.cross_compiling() {
-                if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
+            if binding_name == "pyo3" && target.is_unix() {
+                if let Ok(Some(cross_config)) = cross_compiling(
+                    &get_host_target()?,
+                    &target.target_arch().to_string(),
+                    &target.target_vendor().to_string(),
+                    target.get_python_os(),
+                ) {
                     println!("⚠️ Cross-compiling is poorly supported");
                     let host_python = &interpreter[0];
                     println!(
@@ -528,58 +537,59 @@ pub fn find_interpreter(
                     // rust-cpython, and legacy pyo3 versions
                     env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
-                    let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
+                    let sysconfig_path = find_all_sysconfigdata(&cross_config)
+                        .first()
+                        .expect("unable to find sysconfigdata file")
+                        .to_owned();
                     env::set_var(
                         "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
                         sysconfig_path.parent().unwrap(),
                     );
 
-                    let sysconfig_data = parse_sysconfigdata(host_python, sysconfig_path)?;
-                    let major = sysconfig_data
-                        .get("version_major")
-                        .context("version_major is not defined")?
-                        .parse::<usize>()
-                        .context("Could not parse value of version_major")?;
-                    let minor = sysconfig_data
-                        .get("version_minor")
-                        .context("version_minor is not defined")?
-                        .parse::<usize>()
-                        .context("Could not parse value of version_minor")?;
-                    let abiflags = sysconfig_data
-                        .get("ABIFLAGS")
-                        .map(ToString::to_string)
-                        .unwrap_or_default();
-                    let ext_suffix = sysconfig_data
-                        .get("EXT_SUFFIX")
-                        .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
-                    let abi_tag = sysconfig_data
-                        .get("SOABI")
-                        .and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
-                    let interpreter_kind = sysconfig_data
-                        .get("SOABI")
-                        .and_then(|tag| {
-                            if tag.starts_with("pypy") {
-                                Some(InterpreterKind::PyPy)
-                            } else if tag.starts_with("cpython") {
-                                Some(InterpreterKind::CPython)
-                            } else {
-                                None
-                            }
-                        })
-                        .context("unsupported Python interpreter")?;
-                    interpreter = vec![PythonInterpreter {
-                        major,
-                        minor,
-                        abiflags,
-                        target: target.clone(),
-                        executable: PathBuf::new(),
-                        ext_suffix: ext_suffix.to_string(),
-                        interpreter_kind,
-                        abi_tag,
-                        libs_dir: PathBuf::from(cross_lib_dir),
-                        platform: None,
-                        runnable: false,
-                    }];
+                    if let Ok(sysconfig_data) = parse_sysconfigdata(sysconfig_path) {
+                        let abiflags = sysconfig_data
+                            .get_value("ABIFLAGS")
+                            .unwrap_or_default()
+                            .to_string();
+                        let ext_suffix = sysconfig_data
+                            .get_value("EXT_SUFFIX")
+                            .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?
+                            .to_string();
+                        let abi_tag = sysconfig_data
+                            .get_value("SOABI")
+                            .and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
+                        let interpreter_kind = sysconfig_data
+                            .get_value("SOABI")
+                            .and_then(|tag| {
+                                if tag.starts_with("pypy") {
+                                    Some(InterpreterKind::PyPy)
+                                } else if tag.starts_with("cpython") {
+                                    Some(InterpreterKind::CPython)
+                                } else {
+                                    None
+                                }
+                            })
+                            .context("unsupported Python interpreter")?;
+                        let (major, minor) = sysconfig_data
+                            .get_value("VERSION")
+                            .expect("no version found in sysconfigdata")
+                            .split_once(".")
+                            .expect("could not split version into major and minor");
+
+                        interpreter = vec![PythonInterpreter {
+                            major: major.parse()?,
+                            minor: minor.parse()?,
+                            abiflags,
+                            target: target.clone(),
+                            executable: PathBuf::new(),
+                            ext_suffix,
+                            interpreter_kind,
+                            abi_tag,
+                            libs_dir: cross_config.lib_dir,
+                            platform: None,
+                            runnable: false,
+                        }];
+                    }
                 }
             }
 

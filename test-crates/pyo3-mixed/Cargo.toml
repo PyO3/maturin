@@ -7,7 +7,8 @@ readme = "Readme.md"
 edition = "2018"
 
 [dependencies]
-pyo3 = { version = "0.15.1", features = ["extension-module"] }
+# pyo3 = { version = "0.15.1", features = ["extension-module"] }
+pyo3 = { git = "https://github.com/aganders3/pyo3", branch = "expose-cross-compiling", features = ["extension-module"] }
 
 [lib]
 name = "pyo3_mixed"

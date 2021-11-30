@@ -541,10 +541,6 @@ pub fn find_interpreter(
                         .first()
                         .expect("unable to find sysconfigdata file")
                         .to_owned();
-                    env::set_var(
-                        "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
-                        sysconfig_path.parent().unwrap(),
-                    );
 
                     if let Ok(sysconfig_data) = parse_sysconfigdata(sysconfig_path) {
                         let abiflags = sysconfig_data

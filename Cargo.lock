@@ -1404,7 +1404,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#79565d73df6d92bcb0201ca5ffc92b1e65d159b1"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#bc128e10b40f053cd90345ba9f8c892be86dcc39"
 dependencies = [
  "once_cell",
 ]

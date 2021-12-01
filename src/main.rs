@@ -12,8 +12,6 @@ use configparser::ini::Ini;
 use fs_err as fs;
 #[cfg(feature = "human-panic")]
 use human_panic::setup_panic;
-#[cfg(feature = "password-storage")]
-use keyring::{Keyring, KeyringError};
 use maturin::GenerateProjectOptions;
 use maturin::{
     develop, init_project, new_project, source_distribution, write_dist_info, BridgeModel,
@@ -46,7 +44,7 @@ fn get_password(_username: &str) -> String {
     #[cfg(feature = "keyring")]
     {
         let service = env!("CARGO_PKG_NAME");
-        let keyring = Keyring::new(&service, &_username);
+        let keyring = keyring::Entry::new(service, _username);
         if let Ok(password) = keyring.get_password() {
             return password;
         };
@@ -458,13 +456,13 @@ fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 #[cfg(feature = "keyring")]
                 {
                     // Delete the wrong password from the keyring
-                    let old_username = registry.username.clone();
-                    let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &old_username);
+                    let old_username = registry.username;
+                    let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &old_username);
                     match keyring.delete_password() {
                         Ok(()) => {
                             println!("🔑 Removed wrong password from keyring")
                         }
-                        Err(KeyringError::NoPasswordFound) | Err(KeyringError::NoBackendFound) => {}
+                        Err(keyring::Error::NoEntry) | Err(keyring::Error::NoStorageAccess(_)) => {}
                         Err(err) => {
                             eprintln!("⚠️ Warning: Failed to remove password from keyring: {}", err)
                         }
@@ -499,11 +497,10 @@ fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
     {
         // We know the password is correct, so we can save it in the keyring
         let username = registry.username.clone();
-        let keyring = Keyring::new(&env!("CARGO_PKG_NAME"), &username);
-        let password = registry.password.clone();
+        let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &username);
+        let password = registry.password;
         match keyring.set_password(&password) {
             Ok(()) => {}
-            Err(KeyringError::NoBackendFound) => {}
             Err(err) => {
                 eprintln!(
                     "⚠️ Warning: Failed to store the password in the keyring: {:?}",

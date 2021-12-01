@@ -21,6 +21,9 @@ version = "0.1.0"
 [[package]]
 name = "generic_lib"
 version = "0.1.0"
+dependencies = [
+ "transitive_lib",
+]
 
 [[package]]
 name = "indoc"
@@ -222,6 +225,10 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
+
+[[package]]
+name = "transitive_lib"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-xid"

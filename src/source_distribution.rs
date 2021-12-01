@@ -178,15 +178,22 @@ pub fn source_distribution(
         .resolve
         .as_ref()
         .context("Expected to get a dependency graph from cargo")?;
-    let known_path_deps: HashMap<String, PathBuf> = resolve
+    let root = resolve
+        .root
+        .as_ref()
+        .context("Expected to get a root package id of dependency graph from cargo")?;
+    let root_node = resolve
         .nodes
         .iter()
-        .filter(|node| {
-            &node.id != resolve.root.as_ref().unwrap() && node.id.repr.contains("path+file://")
-        })
+        .find(|node| &node.id == root)
+        .context("Expected to get a root node of dependency graph from cargo")?;
+    let known_path_deps: HashMap<String, PathBuf> = root_node
+        .deps
+        .iter()
+        .filter(|node| node.pkg.repr.contains("path+file://"))
         .filter_map(|node| {
             cargo_metadata.packages.iter().find_map(|pkg| {
-                if pkg.id.repr == node.id.repr {
+                if pkg.id.repr == node.pkg.repr {
                     Some((pkg.name.clone(), PathBuf::from(&pkg.manifest_path)))
                 } else {
                     None

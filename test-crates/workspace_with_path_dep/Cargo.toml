@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "generic_lib",
+  "transitive_lib",
+  "dont_include_in_sdist",
+  "python"
+]

@@ -34,9 +34,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.107"
+version = "0.2.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
+checksum = "8521a1b57e76b1ec69af7599e75e38e7b7fad6610f037db8c79b127201b5d119"
 
 [[package]]
 name = "lock_api"
@@ -96,7 +96,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#bc128e10b40f053cd90345ba9f8c892be86dcc39"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
 dependencies = [
  "cfg-if",
  "indoc",
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#bc128e10b40f053cd90345ba9f8c892be86dcc39"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
 dependencies = [
  "once_cell",
 ]
@@ -119,7 +119,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#bc128e10b40f053cd90345ba9f8c892be86dcc39"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
 dependencies = [
  "pyo3-macros-backend",
  "quote",
@@ -129,7 +129,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#bc128e10b40f053cd90345ba9f8c892be86dcc39"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
 dependencies = [
  "proc-macro2",
  "pyo3-build-config",
@@ -176,9 +176,9 @@ checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
 name = "syn"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2afee18b8beb5a596ecb4a2dce128c719b4ba399d34126b9e4396e3f9860966"
+checksum = "8daf5dd0bb60cbd4137b1b587d2fc0ae729bc07cf01cd70b36a1ed5ade3b9d59"
 dependencies = [
  "proc-macro2",
  "quote",

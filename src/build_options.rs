@@ -19,7 +19,6 @@ use std::io;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-#[cfg(feature = "pyo3buildconfig")]
 use pyo3_build_config::{cross_compiling, find_all_sysconfigdata, parse_sysconfigdata};
 
 /// High level API for building wheels from a crate which is also used for the CLI

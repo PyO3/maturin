@@ -215,7 +215,7 @@ jobs:
           # CPython
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
-            abi: cp36-cp36m
+            abi: cp37-cp37m
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
             abi: cp39-cp39

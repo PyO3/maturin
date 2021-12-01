@@ -96,7 +96,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#c0f5ce57c689fb62728b57db776becc576e877ea"
 dependencies = [
  "cfg-if",
  "indoc",
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#c0f5ce57c689fb62728b57db776becc576e877ea"
 dependencies = [
  "once_cell",
 ]
@@ -119,7 +119,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#c0f5ce57c689fb62728b57db776becc576e877ea"
 dependencies = [
  "pyo3-macros-backend",
  "quote",
@@ -129,7 +129,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#edb59c3be2793efc01aade80d1772bfe1217272b"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#c0f5ce57c689fb62728b57db776becc576e877ea"
 dependencies = [
  "proc-macro2",
  "pyo3-build-config",

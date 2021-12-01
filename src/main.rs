@@ -14,9 +14,11 @@ use fs_err as fs;
 use human_panic::setup_panic;
 #[cfg(feature = "password-storage")]
 use keyring::{Keyring, KeyringError};
+use maturin::GenerateProjectOptions;
 use maturin::{
-    develop, new_project, source_distribution, write_dist_info, BridgeModel, BuildOptions,
-    CargoToml, Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter, Target,
+    develop, init_project, new_project, source_distribution, write_dist_info, BridgeModel,
+    BuildOptions, CargoToml, Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter,
+    Target,
 };
 use std::env;
 use std::io;
@@ -270,20 +272,21 @@ enum Opt {
         #[structopt(short, long, parse(from_os_str))]
         out: Option<PathBuf>,
     },
+    /// Create a new cargo project in an existing directory
+    #[structopt(name = "init")]
+    InitProject {
+        /// Project path
+        path: Option<String>,
+        #[structopt(flatten)]
+        options: GenerateProjectOptions,
+    },
     /// Create a new cargo project
     #[structopt(name = "new")]
     NewProject {
         /// Project path
         path: String,
-        /// Set the resulting package name, defaults to the directory name
-        #[structopt(long)]
-        name: Option<String>,
-        /// Use mixed Rust/Python project layout
-        #[structopt(long)]
-        mixed: bool,
-        /// Which kind of bindings to use
-        #[structopt(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
-        bindings: Option<String>,
+        #[structopt(flatten)]
+        options: GenerateProjectOptions,
     },
     /// Uploads python packages to pypi
     ///
@@ -636,12 +639,8 @@ fn run() -> Result<()> {
             .context("Failed to build source distribution")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
-        Opt::NewProject {
-            path,
-            name,
-            mixed,
-            bindings,
-        } => new_project(path, name, mixed, bindings)?,
+        Opt::InitProject { path, options } => init_project(path, options)?,
+        Opt::NewProject { path, options } => new_project(path, options)?,
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add a `maturin init` command as a companion to `maturin new` in [#719](https://github.com/PyO3/maturin/pull/719)
+
 ## [0.12.3] - 2021-11-29
 
 * Use platform tag from `sysconfig.platform` on non-portable Linux in [#709](https://github.com/PyO3/maturin/pull/709)
@@ -122,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.3] - 2021-04-13
 
  * The `upload` command is now implemented, it is mostly similar to `twine upload`. [#484](https://github.com/PyO3/maturin/pull/484)
- * Interpreter search now uses python 3.6 to 3.12 
+ * Interpreter search now uses python 3.6 to 3.12
  * Add basic support for OpenBSD in [#496](https://github.com/PyO3/maturin/pull/496)
  * Fix the PowerPC platform by messense in [#503](https://github.com/PyO3/maturin/pull/503)
 

@@ -62,6 +62,8 @@ pub fn pyo3_no_extension_module() -> Result<()> {
 ///
 /// https://github.com/PyO3/maturin/issues/472
 pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
+    // rm Cargo.lock first
+    let _ = fs_err::remove_file("test-crates/lib_with_path_dep/Cargo.lock");
     // The first argument is ignored by clap
     let cli = vec![
         "build",

@@ -84,12 +84,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --features password-storage
       - name: cargo test with musl
         if: matrix.os == 'ubuntu-latest'
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --target x86_64-unknown-linux-musl
+          args: --features password-storage --target x86_64-unknown-linux-musl
       - uses: actions/setup-python@v2
         with:
           python-version: "pypy-3.7"

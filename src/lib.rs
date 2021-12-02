@@ -5,10 +5,7 @@
 //!
 //! # Cargo features
 //!
-//! Default features: auditwheel, log, upload, rustls
-//!
-//! - auditwheel: Reimplements the more important part of the auditwheel
-//! package in rust. A wheel is checked by default, unless deactivated by cli arguments
+//! Default features: log, upload, rustls, human-panic
 //!
 //! - log: Configures pretty-env-logger, even though maturin doesn't use logging itself.
 //!

@@ -45,7 +45,7 @@ pub use source_distribution::source_distribution;
 #[cfg(feature = "upload")]
 pub use {
     crate::registry::Registry,
-    crate::upload::{upload, UploadError},
+    crate::upload::{upload, upload_ui, PublishOpt, UploadError},
 };
 
 mod auditwheel;

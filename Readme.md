@@ -238,7 +238,7 @@ docker run --rm -v $(pwd):/io konstin2/maturin build --release  # or other matur
 Note that this image is very basic and only contains python, maturin and stable rust. If you need additional tools, you can run commands inside the manylinux container.
 See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode/blob/b226ea0f2b2f4f474eff47349703d57d2ea4801b/.github/workflows/publish.yml) for a real world setup.
 
-maturin itself is manylinux compliant when compiled for the musl target. The binaries on the release pages have additional keyring integration (through the `password-storage` feature), which is not manylinux compliant.
+maturin itself is manylinux compliant when compiled for the musl target.
 
 ## PyPy
 

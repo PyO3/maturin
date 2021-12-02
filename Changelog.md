@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add a `maturin init` command as a companion to `maturin new` in [#719](https://github.com/PyO3/maturin/pull/719)
 * Don't package non-path-dep crates in sdist for workspaces in [#720](https://github.com/PyO3/maturin/pull/720)
+* Build release packages with `password-storage` feature in [#725](https://github.com/PyO3/maturin/pull/725)
 
 ## [0.12.3] - 2021-11-29
 

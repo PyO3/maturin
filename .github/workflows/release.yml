@@ -87,9 +87,9 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           # manylinux
-          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }}
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage"
           # musllinux
-          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist --compatibility musllinux_1_1
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage" --no-sdist --compatibility musllinux_1_1
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
@@ -98,7 +98,7 @@ jobs:
 
       - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-sdist --cargo-extra-args="--features password-storage"
 
       - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
@@ -109,7 +109,7 @@ jobs:
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --no-sdist --universal2
+          cargo run -- build --release -b bin -o dist --no-sdist --universal2 --cargo-extra-args="--features password-storage"
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
@@ -173,17 +173,19 @@ jobs:
         CARGO_HOME: /root/.cargo
     steps:
       - uses: actions/checkout@v2
-      - name: Build and publish wheel
+      - name: Build wheel
         run: |
           sudo python3 -m pip install maturin
           # manylinux
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
-            --manylinux ${{ matrix.platform.manylinux }}
+            --manylinux ${{ matrix.platform.manylinux }} \
+            --cargo-extra-args="--features password-storage"
           # musllinux
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
-            --compatibility musllinux_1_1
+            --compatibility musllinux_1_1 \
+            --cargo-extra-args="--features password-storage"
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
@@ -224,22 +226,22 @@ jobs:
           toolchain: stable
           override: true
           target: ${{ matrix.platform.target }}
-      - name: Build and publish manylinux wheel
+      - name: Build manylinux wheel
         run: |
           sudo python3 -m pip install maturin
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} \
             --cargo-extra-args="--no-default-features" \
-            --cargo-extra-args="--features log,upload,human-panic"
-      - name: Build and publish musllinux wheel
+            --cargo-extra-args="--features log,upload,human-panic,password-storage"
+      - name: Build musllinux wheel
         if: matrix.platform.musllinux != ''
         run: |
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --compatibility ${{ matrix.platform.musllinux }} \
             --cargo-extra-args="--no-default-features" \
-            --cargo-extra-args="--features log,upload,human-panic"
+            --cargo-extra-args="--features log,upload,human-panic,password-storage"
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts

@@ -57,7 +57,8 @@ ignore = "0.4.18"
 dialoguer = "0.9.0"
 console = "0.15.0"
 minijinja = "0.8.2"
-pyo3-build-config = { git = "https://github.com/aganders3/pyo3", branch = "expose-cross-compiling" }
+pyo3-build-config = { git = "https://github.com/aganders3/pyo3", branch = "expose-cross-compiling" }  # TODO: update after merge/release in pyo3
+# pyo3-build-config = { path = "/io/pyo3/pyo3-build-config" }  # for local dev TODO: remove this line
 
 [dev-dependencies]
 indoc = "1.0.3"

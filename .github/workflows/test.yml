@@ -211,11 +211,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        crate:
+          # this crate depends on a current/new version of pyo3
+          - name: pyo3-mixed
+            lib_dir: ""
+          # this crate depends on an older version of pyo3 (0.15.1)
+          # previous versions of pyo3 required PYO3_CROSS_LIB_DIR to have /lib at the end
+          - name: pyo3-mixed-legacy
+            lib_dir: /lib
         platform:
           # CPython
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
-            abi: cp37-cp37m
+            abi: cp36-cp36m
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
             abi: cp39-cp39
@@ -229,6 +237,15 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
             abi: pp38-pypy38_pp73
+        exclude:
+          # pyo3-mixed-legacy depends on older pyo3 which does not support pypy cross-compilation
+          - crate: { name: pyo3-mixed-legacy }
+            platform: { abi: pp37-pypy37_pp73 }
+          - crate: { name: pyo3-mixed-legacy }
+            platform: { abi: pp38-pypy38_pp73 }
+          # pyo3-mixed depends on newer pyo3 which does not support Python 3.6
+          - crate: { name: pyo3-mixed }
+            platform: { abi: cp36-cp36m }
     steps:
       - uses: actions/checkout@v2
       - name: Build Wheels
@@ -236,7 +253,7 @@ jobs:
           echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
           source ~/.cargo/env
           rustup target add ${{ matrix.platform.target }}
-          export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          cargo run --target x86_64-unknown-linux-gnu -- build -i python3.9 --release --out dist --no-sdist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}${{ matrix.crate.lib_dir }}
+          cargo run --target x86_64-unknown-linux-gnu -- build -i python3.9 --release --out dist --no-sdist --target ${{ matrix.platform.target }} -m test-crates/${{ matrix.crate.name }}/Cargo.toml
           ' > build-wheel.sh
           docker run --rm -v "$PWD":/io -w /io messense/manylinux2014-cross:${{ matrix.platform.arch }} bash build-wheel.sh

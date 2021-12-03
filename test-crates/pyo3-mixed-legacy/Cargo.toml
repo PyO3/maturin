@@ -7,10 +7,7 @@ readme = "Readme.md"
 edition = "2018"
 
 [dependencies]
-# TODO: update after merge/release in pyo3
-pyo3 = { git = "https://github.com/aganders3/pyo3", branch = "expose-cross-compiling", features = ["extension-module"] }
-# for local dev TODO: remove this line
-# pyo3 = { path = "/io/pyo3", features = ["extension-module"] }
+pyo3 = { version = "0.15.1", features = ["extension-module"] }
 
 [lib]
 name = "pyo3_mixed"

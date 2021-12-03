@@ -20,6 +20,7 @@ enum Os {
     FreeBsd,
     NetBsd,
     OpenBsd,
+    Dragonfly,
     Illumos,
 }
 
@@ -32,6 +33,7 @@ impl fmt::Display for Os {
             Os::FreeBsd => write!(f, "FreeBSD"),
             Os::NetBsd => write!(f, "NetBSD"),
             Os::OpenBsd => write!(f, "OpenBSD"),
+            Os::Dragonfly => write!(f, "DragonFly"),
             Os::Illumos => write!(f, "Illumos"),
         }
     }
@@ -85,6 +87,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86_64,
         ],
         Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
+        Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
     }
 }
@@ -126,6 +129,7 @@ impl Target {
             target_lexicon::OperatingSystem::Netbsd => Os::NetBsd,
             target_lexicon::OperatingSystem::Freebsd => Os::FreeBsd,
             target_lexicon::OperatingSystem::Openbsd => Os::OpenBsd,
+            target_lexicon::OperatingSystem::Dragonfly => Os::Dragonfly,
             target_lexicon::OperatingSystem::Illumos => Os::Illumos,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
@@ -189,6 +193,16 @@ impl Target {
                     self.os.to_string().to_ascii_lowercase(),
                     release,
                     arch
+                )
+            }
+            (Os::Dragonfly, Arch::X86_64) => {
+                let info = PlatformInfo::new()?;
+                let release = info.release().replace(".", "_").replace("-", "_");
+                format!(
+                    "{}_{}_{}",
+                    self.os.to_string().to_ascii_lowercase(),
+                    release.to_ascii_lowercase(),
+                    "x86_64"
                 )
             }
             (Os::Illumos, Arch::X86_64) => {
@@ -273,6 +287,7 @@ impl Target {
             Os::FreeBsd => "freebsd",
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
+            Os::Dragonfly => "dragonfly",
             Os::Illumos => "sunos",
         }
     }
@@ -309,7 +324,13 @@ impl Target {
     pub fn is_unix(&self) -> bool {
         match self.os {
             Os::Windows => false,
-            Os::Linux | Os::Macos | Os::FreeBsd | Os::NetBsd | Os::OpenBsd | Os::Illumos => true,
+            Os::Linux
+            | Os::Macos
+            | Os::FreeBsd
+            | Os::NetBsd
+            | Os::OpenBsd
+            | Os::Dragonfly
+            | Os::Illumos => true,
         }
     }
 

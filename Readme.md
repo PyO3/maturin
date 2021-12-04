@@ -155,6 +155,7 @@ To specify python dependencies, add a list `dependencies` in a `[project]` secti
 
 ```toml
 [project]
+name = "my-project"
 dependencies = ["flask~=1.1.0", "toml==0.10.0"]
 ```
 
@@ -170,6 +171,7 @@ You can also specify [trove classifiers](https://pypi.org/classifiers/) in your 
 
 ```toml
 [project]
+name = "my-project"
 classifiers = ["Programming Language :: Python"]
 ```
 

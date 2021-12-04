@@ -33,8 +33,18 @@ pub enum AuditWheelError {
     #[error(
     "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}",
     )]
-    PlatformTagValidationError(Policy, Vec<String>),
-    /// The elf file isn't manylinux/musllinux compatible. Contains unsupported architecture
+    LinksForbiddenLibrariesError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
+    /// libraries.
+    #[error(
+    "Your library is not {0} compliant because of the presence of too-recent versioned symbols: {1:?}",
+    )]
+    VersionedSymbolTooNewError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
+    /// libraries with blacked-list symbols.
+    #[error("Your library is not {0} compliant because it depends on black-listed symbols: {1:?}")]
+    BlackListedSymbolsError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compaible. Contains unsupported architecture
     #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
     UnsupportedArchitecture(Policy, String),
     /// This platform tag isn't defined by auditwheel yet
@@ -107,6 +117,7 @@ fn policy_is_satisfied(
         AuditWheelError::UnsupportedArchitecture(policy.clone(), arch.to_string())
     })?;
     let mut offending_libs = HashSet::new();
+    let mut offending_versioned_syms = HashSet::new();
     let mut offending_blacklist_syms = HashMap::new();
     let undef_symbols: HashSet<String> = elf
         .dynsyms
@@ -173,26 +184,37 @@ fn policy_is_satisfied(
                         offending_symbols.join(", ")
                     )
                 };
-                offending_libs.insert(offender);
+                offending_versioned_syms.insert(offender);
             }
         }
     }
-    // Checks if we can give a more helpful error message
-    let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
-    let mut offenders: Vec<String> = offending_libs.into_iter().collect();
-    for (lib, syms) in offending_blacklist_syms {
-        offenders.push(format!(
-            "{} offending black-listed symbols: {}",
-            lib,
-            syms.join(", ")
+    // Check for black-listed symbols
+    if !offending_blacklist_syms.is_empty() {
+        let offenders = offending_blacklist_syms
+            .into_iter()
+            .map(|(lib, syms)| format!("{}: {}", lib, syms.join(", ")))
+            .collect();
+        return Err(AuditWheelError::BlackListedSymbolsError(
+            policy.clone(),
+            offenders,
         ));
     }
+    // Check for too-recent versioned symbols
+    if !offending_versioned_syms.is_empty() {
+        return Err(AuditWheelError::VersionedSymbolTooNewError(
+            policy.clone(),
+            offending_versioned_syms.into_iter().collect(),
+        ));
+    }
+    // Check for libpython and forbidden libraries
+    let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
+    let offenders: Vec<String> = offending_libs.into_iter().collect();
     match offenders.as_slice() {
         [] => Ok(()),
         [lib] if is_libpython.is_match(lib) => {
             Err(AuditWheelError::LinksLibPythonError(lib.clone()))
         }
-        offenders => Err(AuditWheelError::PlatformTagValidationError(
+        offenders => Err(AuditWheelError::LinksForbiddenLibrariesError(
             policy.clone(),
             offenders.to_vec(),
         )),
@@ -275,7 +297,8 @@ pub fn auditwheel_rs(
                 break;
             }
             // UnsupportedArchitecture happens when trying 2010 with aarch64
-            Err(AuditWheelError::PlatformTagValidationError(_, _))
+            Err(AuditWheelError::LinksForbiddenLibrariesError(..))
+            | Err(AuditWheelError::BlackListedSymbolsError(..))
             | Err(AuditWheelError::UnsupportedArchitecture(..)) => continue,
             // If there was an error parsing the symbols or libpython was linked,
             // we error no matter what the requested policy was

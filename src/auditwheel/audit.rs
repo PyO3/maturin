@@ -53,15 +53,15 @@ pub enum AuditWheelError {
 }
 
 #[derive(Clone, Debug)]
-struct VersionedLibrary {
+pub struct VersionedLibrary {
     /// library name
-    name: String,
+    pub name: String,
     /// versions needed
     versions: HashSet<String>,
 }
 
 /// Find required dynamic linked libraries with version information
-fn find_versioned_libraries(elf: &Elf) -> Result<Vec<VersionedLibrary>, AuditWheelError> {
+pub fn find_versioned_libraries(elf: &Elf) -> Vec<VersionedLibrary> {
     let mut symbols = Vec::new();
     if let Some(verneed) = &elf.verneed {
         for need_file in verneed.iter() {
@@ -83,7 +83,7 @@ fn find_versioned_libraries(elf: &Elf) -> Result<Vec<VersionedLibrary>, AuditWhe
             }
         }
     }
-    Ok(symbols)
+    symbols
 }
 
 /// Find incompliant symbols from symbol versions
@@ -251,9 +251,9 @@ pub fn auditwheel_rs(
     path: &Path,
     target: &Target,
     platform_tag: Option<PlatformTag>,
-) -> Result<Policy, AuditWheelError> {
+) -> Result<(Policy, bool), AuditWheelError> {
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
-        return Ok(Policy::default());
+        return Ok((Policy::default(), false));
     }
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
@@ -263,7 +263,7 @@ pub fn auditwheel_rs(
     let elf = Elf::parse(&buffer).map_err(AuditWheelError::GoblinError)?;
     // This returns essentially the same as ldd
     let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
-    let versioned_libraries = find_versioned_libraries(&elf)?;
+    let versioned_libraries = find_versioned_libraries(&elf);
 
     // Find the highest possible policy, if any
     let platform_policies = match platform_tag {
@@ -289,16 +289,23 @@ pub fn auditwheel_rs(
         Some(PlatformTag::Linux) => unreachable!(),
     };
     let mut highest_policy = None;
+    let mut should_repair = false;
     for policy in platform_policies.iter() {
         let result = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries);
         match result {
             Ok(_) => {
                 highest_policy = Some(policy.clone());
+                should_repair = false;
                 break;
             }
-            // UnsupportedArchitecture happens when trying 2010 with aarch64
-            Err(AuditWheelError::LinksForbiddenLibrariesError(..))
+            Err(AuditWheelError::LinksForbiddenLibrariesError(..)) => {
+                highest_policy = Some(policy.clone());
+                should_repair = true;
+                break;
+            }
+            Err(AuditWheelError::VersionedSymbolTooNewError(..))
             | Err(AuditWheelError::BlackListedSymbolsError(..))
+            // UnsupportedArchitecture happens when trying 2010 with aarch64
             | Err(AuditWheelError::UnsupportedArchitecture(..)) => continue,
             // If there was an error parsing the symbols or libpython was linked,
             // we error no matter what the requested policy was
@@ -306,7 +313,7 @@ pub fn auditwheel_rs(
         }
     }
 
-    if let Some(platform_tag) = platform_tag {
+    let policy = if let Some(platform_tag) = platform_tag {
         let tag = platform_tag.to_string();
         let mut policy = Policy::from_name(&tag).ok_or(AuditWheelError::UndefinedPolicy(tag))?;
         policy.fixup_musl_libc_so_name(target.target_arch());
@@ -322,7 +329,14 @@ pub fn auditwheel_rs(
         }
 
         match policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries) {
-            Ok(_) => Ok(policy),
+            Ok(_) => {
+                should_repair = false;
+                Ok(policy)
+            }
+            Err(AuditWheelError::LinksForbiddenLibrariesError(..)) => {
+                should_repair = true;
+                Ok(policy)
+            }
             Err(err) => Err(err),
         }
     } else if let Some(policy) = highest_policy {
@@ -335,5 +349,6 @@ pub fn auditwheel_rs(
 
         // Fallback to linux
         Ok(Policy::default())
-    }
+    }?;
+    Ok((policy, should_repair))
 }

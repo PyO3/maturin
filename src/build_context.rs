@@ -1,17 +1,11 @@
-use crate::auditwheel::auditwheel_rs;
-use crate::auditwheel::PlatformTag;
-use crate::auditwheel::Policy;
-use crate::compile;
+use crate::auditwheel::{auditwheel_rs, repair, PlatformTag, Policy};
 use crate::compile::warn_missing_py_init;
-use crate::module_writer::write_python_part;
-use crate::module_writer::WheelWriter;
-use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
+use crate::module_writer::{
+    write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
+};
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
-use crate::Metadata21;
-use crate::PyProjectToml;
-use crate::PythonInterpreter;
-use crate::Target;
+use crate::{compile, Metadata21, PyProjectToml, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -265,13 +259,23 @@ impl BuildContext {
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        let policy = auditwheel_rs(artifact, target, platform_tag).context(
-            if let Some(platform_tag) = platform_tag {
-                format!("Error ensuring {} compliance", platform_tag)
-            } else {
-                "Error checking for manylinux/musllinux compliance".to_string()
-            },
-        )?;
+        let (policy, should_repair) =
+            auditwheel_rs(&artifact, target, platform_tag).with_context(|| {
+                if let Some(platform_tag) = platform_tag {
+                    format!("Error ensuring {} compliance", platform_tag)
+                } else {
+                    "Error checking for manylinux/musllinux compliance".to_string()
+                }
+            })?;
+        if should_repair {
+            repair(&artifact).with_context(|| {
+                if let Some(platform_tag) = platform_tag {
+                    format!("Error repairing wheel for {} compliance", platform_tag)
+                } else {
+                    "Error repairing wheel for manylinux/musllinux compliance".to_string()
+                }
+            })?;
+        }
         Ok(policy)
     }
 

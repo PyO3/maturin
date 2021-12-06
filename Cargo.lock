@@ -987,9 +987,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.108"
+version = "0.2.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8521a1b57e76b1ec69af7599e75e38e7b7fad6610f037db8c79b127201b5d119"
+checksum = "f98a04dce437184842841303488f70d0188c5f51437d2a834dc097eafa909a01"
 
 [[package]]
 name = "log"
@@ -1002,9 +1002,9 @@ dependencies = [
 
 [[package]]
 name = "mailparse"
-version = "0.13.6"
+version = "0.13.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ee6e1ca1c8396da58f8128176f6980dd57bec84c8670a479519d3655f2d6734"
+checksum = "d70ae0840b192a2f7d1dc46e75f38720a7e3c52dfdc968ba3202fa270668dc67"
 dependencies = [
  "base64",
  "charset",
@@ -1019,7 +1019,7 @@ checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
 name = "maturin"
-version = "0.12.4-beta.2"
+version = "0.12.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -1393,9 +1393,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.32"
+version = "1.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba508cc11742c0dc5c1659771673afbab7a0efab23aa17e854cbab0837ed0b43"
+checksum = "fb37d2df5df740e582f28f8560cf425f52bb267d872fe58358eadb554909f07a"
 dependencies = [
  "unicode-xid",
 ]

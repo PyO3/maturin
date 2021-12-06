@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.4] - 2021-12-06
+
 * Add a `maturin init` command as a companion to `maturin new` in [#719](https://github.com/PyO3/maturin/pull/719)
 * Don't package non-path-dep crates in sdist for workspaces in [#720](https://github.com/PyO3/maturin/pull/720)
 * Build release packages with `password-storage` feature in [#725](https://github.com/PyO3/maturin/pull/725)
 * Add support for x86_64 DargonFly BSD in [#727](https://github.com/PyO3/maturin/pull/727)
 * Add a Python import hook in [#729](https://github.com/PyO3/maturin/pull/729)
+* Allow pip warnings in `maturin develop` command in [#732](https://github.com/PyO3/maturin/pull/732)
 
 ## [0.12.3] - 2021-11-29
 
@@ -498,7 +501,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.3...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.4...HEAD
+[0.12.4]: https://github.com/pyo3/maturin/compare/v0.12.3...v0.12.4
 [0.12.3]: https://github.com/pyo3/maturin/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/pyo3/maturin/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/pyo3/maturin/compare/v0.12.0...v0.12.1

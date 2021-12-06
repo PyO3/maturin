@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - uses: psf/black@21.4b0
+      - uses: psf/black@21.12b0
         with:
           args: ". --check"
 

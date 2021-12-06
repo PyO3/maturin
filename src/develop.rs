@@ -93,11 +93,9 @@ pub fn develop(
             );
         }
         if !output.stderr.is_empty() {
-            bail!(
-                "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            eprintln!(
+                "⚠️  Warning: pip raised a warning running {:?}:\n{}",
                 &command,
-                output.status,
-                str::from_utf8(&output.stdout)?.trim(),
                 str::from_utf8(&output.stderr)?.trim(),
             );
         }

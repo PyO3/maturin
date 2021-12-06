@@ -1,8 +1,8 @@
-use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{bail, format_err, Context, Result};
 use platform_info::*;
+use pyo3_build_config::cross_compiling;
 use std::env;
 use std::fmt;
 use std::path::Path;
@@ -135,7 +135,7 @@ impl Target {
                 .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
             (platform, target_triple.to_string())
         } else {
-            let target_triple = host; // get_host_target()?;
+            let target_triple = host.clone();
             let platform: Triple = target_triple
                 .parse()
                 .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
@@ -185,8 +185,18 @@ impl Target {
             triple,
             cross_compiling: false,
         };
-        // TODO: replace with pyo3-build-config::cross_compiling
-        target.cross_compiling = is_cross_compiling(&target)?;
+
+        if let Ok(cross_compiling) = cross_compiling(
+            &host,
+            &target.target_arch().to_string(),
+            &target.target_vendor().to_string(),
+            target.get_python_os(),
+        ) {
+            target.cross_compiling = cross_compiling.is_some();
+        } else {
+            bail!("Failed when detecting cross whether compiling!");
+        }
+
         Ok(target)
     }
 

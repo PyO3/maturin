@@ -50,7 +50,6 @@ mod build_context;
 mod build_options;
 mod cargo_toml;
 mod compile;
-mod cross_compile;
 mod develop;
 mod metadata;
 mod module_writer;

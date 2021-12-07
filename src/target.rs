@@ -22,6 +22,7 @@ enum Os {
     OpenBsd,
     Dragonfly,
     Illumos,
+    Haiku,
 }
 
 impl fmt::Display for Os {
@@ -35,6 +36,7 @@ impl fmt::Display for Os {
             Os::OpenBsd => write!(f, "OpenBSD"),
             Os::Dragonfly => write!(f, "DragonFly"),
             Os::Illumos => write!(f, "Illumos"),
+            Os::Haiku => write!(f, "Haiku"),
         }
     }
 }
@@ -89,6 +91,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
+        Os::Haiku => vec![Arch::X86_64],
     }
 }
 
@@ -131,6 +134,7 @@ impl Target {
             target_lexicon::OperatingSystem::Openbsd => Os::OpenBsd,
             target_lexicon::OperatingSystem::Dragonfly => Os::Dragonfly,
             target_lexicon::OperatingSystem::Illumos => Os::Illumos,
+            target_lexicon::OperatingSystem::Haiku => Os::Haiku,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -195,7 +199,10 @@ impl Target {
                     arch
                 )
             }
-            (Os::Dragonfly, Arch::X86_64) => {
+            // DragonFly
+            (Os::Dragonfly, Arch::X86_64)
+            // Haiku
+            | (Os::Haiku, Arch::X86_64) => {
                 let info = PlatformInfo::new()?;
                 let release = info.release().replace(".", "_").replace("-", "_");
                 format!(
@@ -289,6 +296,7 @@ impl Target {
             Os::OpenBsd => "openbsd",
             Os::Dragonfly => "dragonfly",
             Os::Illumos => "sunos",
+            Os::Haiku => "haiku",
         }
     }
 
@@ -330,7 +338,8 @@ impl Target {
             | Os::NetBsd
             | Os::OpenBsd
             | Os::Dragonfly
-            | Os::Illumos => true,
+            | Os::Illumos
+            | Os::Haiku => true,
         }
     }
 
@@ -362,6 +371,11 @@ impl Target {
     /// Returns true if the current platform is illumos
     pub fn is_illumos(&self) -> bool {
         self.os == Os::Illumos
+    }
+
+    /// Returns true if the current platform is haiku
+    pub fn is_haiku(&self) -> bool {
+        self.os == Os::Haiku
     }
 
     /// Returns true if the current platform's target env is Musl

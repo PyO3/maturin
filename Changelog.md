@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix docs for `new` and `init` commands in `maturin --help` in [#734](https://github.com/PyO3/maturin/pull/734)
+
 ## [0.12.4] - 2021-12-06
 
 * Add a `maturin init` command as a companion to `maturin new` in [#719](https://github.com/PyO3/maturin/pull/719)

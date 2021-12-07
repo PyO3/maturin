@@ -89,8 +89,10 @@ impl<'a> ProjectGenerator<'a> {
     }
 }
 
+// workaround for https://github.com/TeXitoi/structopt/issues/333#issuecomment-712265332
+#[cfg_attr(not(doc), allow(missing_docs))]
+#[cfg_attr(doc, doc = "Options common to `maturin new` and `maturin init`.")]
 #[derive(Debug, StructOpt)]
-/// Options common to `maturin new` and `maturin init`.
 pub struct GenerateProjectOptions {
     /// Set the resulting package name, defaults to the directory name
     #[structopt(long)]

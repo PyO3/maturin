@@ -74,6 +74,11 @@ class PostInstallCommand(install):
                 cargo_args.extend(
                     ["--no-default-features", "--features=upload,log,human-panic"]
                 )
+            elif sys.platform.startswith("haiku"):
+                # mio and ring doesn't build on haiku
+                cargo_args.extend(
+                    ["--no-default-features", "--features=log,human-panic"]
+                )
 
             try:
                 metadata = json.loads(

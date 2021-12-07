@@ -6,11 +6,10 @@
 use anyhow::{bail, Context, Result};
 use cargo_metadata::MetadataCommand;
 use fs_err as fs;
-use maturin::GenerateProjectOptions;
 use maturin::{
     develop, init_project, new_project, source_distribution, write_dist_info, BridgeModel,
-    BuildOptions, CargoToml, Metadata21, PathWriter, PlatformTag, PyProjectToml, PythonInterpreter,
-    Target,
+    BuildOptions, CargoToml, GenerateProjectOptions, Metadata21, PathWriter, PlatformTag,
+    PyProjectToml, PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};

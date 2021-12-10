@@ -16,10 +16,9 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
 /// High level API for building wheels from a crate which is also used for the CLI
-#[derive(Debug, Serialize, Deserialize, StructOpt, Clone, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
     /// Control the platform tag on linux.
@@ -34,22 +33,22 @@ pub struct BuildOptions {
     /// The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
     ///
     /// This option is ignored on all non-linux platforms
-    #[structopt(
+    #[clap(
         name = "compatibility",
         long = "compatibility",
         alias = "manylinux",
         parse(try_from_str)
     )]
     pub platform_tag: Option<PlatformTag>,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
     pub interpreter: Option<Vec<PathBuf>>,
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pub bindings: Option<String>,
-    #[structopt(
-        short = "m",
+    #[clap(
+        short = 'm',
         long = "manifest-path",
         parse(from_os_str),
         default_value = "Cargo.toml",
@@ -59,10 +58,10 @@ pub struct BuildOptions {
     pub manifest_path: PathBuf,
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
-    #[structopt(short, long, parse(from_os_str))]
+    #[clap(short, long, parse(from_os_str))]
     pub out: Option<PathBuf>,
     /// Don't check for manylinux compliance
-    #[structopt(long = "skip-auditwheel")]
+    #[clap(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
     /// For manylinux targets, use zig to ensure compliance for the chosen manylinux version
     ///
@@ -72,7 +71,7 @@ pub struct BuildOptions {
     #[structopt(long)]
     pub zig: bool,
     /// The --target option for cargo
-    #[structopt(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
+    #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
     pub target: Option<String>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
     ///
@@ -81,16 +80,16 @@ pub struct BuildOptions {
     /// Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`.
     /// maturin tries to pass only the shared subset of options to cargo metadata, but this is may
     /// be a bit flaky.
-    #[structopt(long = "cargo-extra-args")]
+    #[clap(long = "cargo-extra-args")]
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
     ///
     /// Use as `--rustc-extra-args="--my-arg"`
-    #[structopt(long = "rustc-extra-args")]
+    #[clap(long = "rustc-extra-args")]
     pub rustc_extra_args: Vec<String>,
     /// Control whether to build universal2 wheel for macOS or not.
     /// Only applies to macOS targets, do nothing otherwise.
-    #[structopt(long)]
+    #[clap(long)]
     pub universal2: bool,
 }
 

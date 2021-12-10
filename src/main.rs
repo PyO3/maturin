@@ -4,6 +4,7 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
+use clap::{IntoApp, Parser};
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
     GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
@@ -13,60 +14,59 @@ use maturin::{upload_ui, PublishOpt};
 use std::env;
 use std::io;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = env!("CARGO_PKG_NAME"))]
+#[derive(Debug, Parser)]
+#[clap(name = env!("CARGO_PKG_NAME"))]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
 enum Opt {
-    #[structopt(name = "build")]
+    #[clap(name = "build")]
     /// Build the crate into python packages
     Build {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         build: BuildOptions,
         /// Pass --release to cargo
-        #[structopt(long)]
+        #[clap(long)]
         release: bool,
         /// Strip the library for minimum file size
-        #[structopt(long)]
+        #[clap(long)]
         strip: bool,
         /// Don't build a source distribution
-        #[structopt(long = "no-sdist")]
+        #[clap(long = "no-sdist")]
         no_sdist: bool,
     },
     #[cfg(feature = "upload")]
-    #[structopt(name = "publish")]
+    #[clap(name = "publish")]
     /// Build and publish the crate as python packages to pypi
     Publish {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         build: BuildOptions,
         /// Do not pass --release to cargo
-        #[structopt(long)]
+        #[clap(long)]
         debug: bool,
         /// Do not strip the library for minimum file size
-        #[structopt(long = "no-strip")]
+        #[clap(long = "no-strip")]
         no_strip: bool,
         /// Don't build a source distribution
-        #[structopt(long = "no-sdist")]
+        #[clap(long = "no-sdist")]
         no_sdist: bool,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         publish: PublishOpt,
     },
-    #[structopt(name = "list-python")]
+    #[clap(name = "list-python")]
     /// Searches and lists the available python installations
     ListPython,
-    #[structopt(name = "develop")]
+    #[clap(name = "develop")]
     /// Installs the crate as module in the current virtualenv
     ///
     /// Note that this command doesn't create entrypoints
     Develop {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-        #[structopt(short = "b", long = "binding-crate")]
+        #[clap(short = 'b', long = "binding-crate")]
         binding_crate: Option<String>,
-        #[structopt(
-            short = "m",
+        #[clap(
+            short = 'm',
             long = "manifest-path",
             parse(from_os_str),
             default_value = "Cargo.toml"
@@ -74,25 +74,31 @@ enum Opt {
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
         /// Pass --release to cargo
-        #[structopt(long)]
+        #[clap(long)]
         release: bool,
         /// Strip the library for minimum file size
-        #[structopt(long)]
+        #[clap(long)]
         strip: bool,
         /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
         ///
         /// Use as `--cargo-extra-args="--my-arg"`
-        #[structopt(long = "cargo-extra-args")]
+        #[clap(long = "cargo-extra-args")]
         cargo_extra_args: Vec<String>,
         /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
         ///
         /// Use as `--rustc-extra-args="--my-arg"`
-        #[structopt(long = "rustc-extra-args")]
+        #[clap(long = "rustc-extra-args")]
         rustc_extra_args: Vec<String>,
         /// Install extra requires aka. optional dependencies
         ///
         /// Use as `--extras=extra1,extra2`
-        #[structopt(short = "E", long, use_delimiter = true, multiple = false)]
+        #[clap(
+            short = 'E',
+            long,
+            use_delimiter = true,
+            multiple_values = false,
+            multiple_occurrences = false
+        )]
         extras: Vec<String>,
     },
     /// Build only a source distribution (sdist) without compiling.
@@ -100,10 +106,10 @@ enum Opt {
     /// Building a source distribution requires a pyproject.toml with a `[build-system]` table.
     ///
     /// This command is a workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
-    #[structopt(name = "sdist")]
+    #[clap(name = "sdist")]
     SDist {
-        #[structopt(
-            short = "m",
+        #[clap(
+            short = 'm',
             long = "manifest-path",
             parse(from_os_str),
             default_value = "Cargo.toml"
@@ -112,23 +118,23 @@ enum Opt {
         manifest_path: PathBuf,
         /// The directory to store the built wheels in. Defaults to a new "wheels"
         /// directory in the project's target directory
-        #[structopt(short, long, parse(from_os_str))]
+        #[clap(short, long, parse(from_os_str))]
         out: Option<PathBuf>,
     },
     /// Create a new cargo project in an existing directory
-    #[structopt(name = "init")]
+    #[clap(name = "init")]
     InitProject {
         /// Project path
         path: Option<String>,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         options: GenerateProjectOptions,
     },
     /// Create a new cargo project
-    #[structopt(name = "new")]
+    #[clap(name = "new")]
     NewProject {
         /// Project path
         path: String,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         options: GenerateProjectOptions,
     },
     /// Uploads python packages to pypi
@@ -136,66 +142,67 @@ enum Opt {
     /// It is mostly similar to `twine upload`, but can only upload python wheels
     /// and source distributions.
     #[cfg(feature = "upload")]
-    #[structopt(name = "upload")]
+    #[clap(name = "upload")]
     Upload {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         publish: PublishOpt,
         /// The python packages to upload
-        #[structopt(name = "FILE", parse(from_os_str))]
+        #[clap(name = "FILE", parse(from_os_str))]
         files: Vec<PathBuf>,
     },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
     /// The commands are meant to be called from the python PEP 517
-    #[structopt(name = "pep517", setting = structopt::clap::AppSettings::Hidden)]
+    #[clap(subcommand)]
     Pep517(Pep517Command),
     /// Generate shell completions
-    #[structopt(name = "completions", setting = structopt::clap::AppSettings::Hidden)]
+    #[clap(name = "completions", setting = clap::AppSettings::Hidden)]
     Completions {
-        #[structopt(name = "SHELL", parse(try_from_str))]
-        shell: structopt::clap::Shell,
+        #[clap(name = "SHELL", parse(try_from_str))]
+        shell: clap_generate::Shell,
     },
 }
 
 /// Backend for the PEP 517 integration. Not for human consumption
 ///
 /// The commands are meant to be called from the python PEP 517
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
+#[clap(name = "pep517", setting = clap::AppSettings::Hidden)]
 enum Pep517Command {
     /// The implementation of prepare_metadata_for_build_wheel
-    #[structopt(name = "write-dist-info")]
+    #[clap(name = "write-dist-info")]
     WriteDistInfo {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         build_options: BuildOptions,
         /// The metadata_directory argument to prepare_metadata_for_build_wheel
-        #[structopt(long = "metadata-directory", parse(from_os_str))]
+        #[clap(long = "metadata-directory", parse(from_os_str))]
         metadata_directory: PathBuf,
         /// Strip the library for minimum file size
-        #[structopt(long)]
+        #[clap(long)]
         strip: bool,
     },
-    #[structopt(name = "build-wheel")]
+    #[clap(name = "build-wheel")]
     /// Implementation of build_wheel
     ///
     /// --release and --strip are currently unused by the PEP 517 implementation
     BuildWheel {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         build_options: BuildOptions,
         /// Strip the library for minimum file size
-        #[structopt(long)]
+        #[clap(long)]
         strip: bool,
         /// Build editable wheels
-        #[structopt(long)]
+        #[clap(long)]
         editable: bool,
     },
     /// The implementation of build_sdist
-    #[structopt(name = "write-sdist")]
+    #[clap(name = "write-sdist")]
     WriteSDist {
         /// The sdist_directory argument to build_sdist
-        #[structopt(long = "sdist-directory", parse(from_os_str))]
+        #[clap(long = "sdist-directory", parse(from_os_str))]
         sdist_directory: PathBuf,
-        #[structopt(
-            short = "m",
+        #[clap(
+            short = 'm',
             long = "manifest-path",
             parse(from_os_str),
             default_value = "Cargo.toml",
@@ -279,7 +286,7 @@ fn run() -> Result<()> {
     #[cfg(feature = "log")]
     pretty_env_logger::init();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     match opt {
         Opt::Build {
@@ -388,7 +395,8 @@ fn run() -> Result<()> {
             upload_ui(&files, &publish)?
         }
         Opt::Completions { shell } => {
-            Opt::clap().gen_completions_to(env!("CARGO_BIN_NAME"), shell, &mut io::stdout());
+            let mut app = Opt::into_app();
+            clap_generate::generate(shell, &mut app, env!("CARGO_BIN_NAME"), &mut io::stdout());
         }
     }
 

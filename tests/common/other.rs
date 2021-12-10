@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
+use clap::Parser;
 use flate2::read::GzDecoder;
 use maturin::BuildOptions;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::path::Path;
-use structopt::StructOpt;
 use tar::Archive;
 
 /// Tries to compile a sample crate (pyo3-pure) for musl,
@@ -48,7 +48,7 @@ pub fn test_musl() -> Result<bool> {
     };
 
     // The first arg gets ignored
-    let options: BuildOptions = BuildOptions::from_iter_safe(&[
+    let options: BuildOptions = BuildOptions::try_parse_from(&[
         "build",
         "--manifest-path",
         "test-crates/hello-world/Cargo.toml",
@@ -89,7 +89,7 @@ pub fn test_musl() -> Result<bool> {
 /// https://github.com/PyO3/maturin/issues/449
 pub fn test_workspace_cargo_lock() -> Result<()> {
     // The first arg gets ignored
-    let options: BuildOptions = BuildOptions::from_iter_safe(&[
+    let options: BuildOptions = BuildOptions::try_parse_from(&[
         "build",
         "--manifest-path",
         "test-crates/workspace/py/Cargo.toml",

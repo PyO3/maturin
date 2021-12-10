@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Fix docs for `new` and `init` commands in `maturin --help` in [#734](https://github.com/PyO3/maturin/pull/734)
 * Add support for x86_64 Haiku in [#735](https://github.com/PyO3/maturin/pull/735)
+* Fix undefined auditwheel policy panic in [#740](https://github.com/PyO3/maturin/pull/740)
 
 ## [0.12.4] - 2021-12-06
 

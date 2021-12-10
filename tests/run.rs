@@ -156,17 +156,16 @@ fn workspace_cargo_lock() {
 #[test]
 fn lib_with_path_dep_sdist() {
     handle_result(other::test_source_distribution(
-        "test-crates/lib_with_path_dep",
+        "test-crates/sdist_with_path_dep",
         vec![
-            "lib_with_path_dep-0.1.0/local_dependencies/some_path_dep/Cargo.toml",
-            "lib_with_path_dep-0.1.0/local_dependencies/some_path_dep/src/lib.rs",
-            "lib_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/Cargo.toml",
-            "lib_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/src/lib.rs",
-            "lib_with_path_dep-0.1.0/Cargo.toml",
-            "lib_with_path_dep-0.1.0/pyproject.toml",
-            "lib_with_path_dep-0.1.0/src/lib.rs",
-            "lib_with_path_dep-0.1.0/test.sh",
-            "lib_with_path_dep-0.1.0/PKG-INFO",
+            "sdist_with_path_dep-0.1.0/local_dependencies/some_path_dep/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/local_dependencies/some_path_dep/src/lib.rs",
+            "sdist_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/src/lib.rs",
+            "sdist_with_path_dep-0.1.0/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/pyproject.toml",
+            "sdist_with_path_dep-0.1.0/src/lib.rs",
+            "sdist_with_path_dep-0.1.0/PKG-INFO",
         ],
     ))
 }

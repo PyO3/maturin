@@ -1,0 +1,13 @@
+[package]
+name = "sdist_with_path_dep"
+version = "0.1.0"
+authors = ["konstin <konstin@mailbox.org>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Don't use the macros feature, which makes compilation much faster
+pyo3 = { version = "0.15.1", default-features = false, features = ["extension-module"] }
+some_path_dep = { path = "../some_path_dep" }

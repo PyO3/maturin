@@ -34,9 +34,12 @@ pub enum AuditWheelError {
     "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}",
     )]
     PlatformTagValidationError(Policy, Vec<String>),
-    /// The elf file isn't manylinux/musllinux compaible. Contains unsupported architecture
+    /// The elf file isn't manylinux/musllinux compatible. Contains unsupported architecture
     #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
     UnsupportedArchitecture(Policy, String),
+    /// This platform tag isn't defined by auditwheel yet
+    #[error("{0} compatibility policy is not defined by auditwheel yet, pass `--skip-auditwheel` to proceed anyway")]
+    UndefinedPolicy(String),
 }
 
 #[derive(Clone, Debug)]
@@ -281,7 +284,8 @@ pub fn auditwheel_rs(
     }
 
     if let Some(platform_tag) = platform_tag {
-        let mut policy = Policy::from_name(&platform_tag.to_string()).unwrap();
+        let tag = platform_tag.to_string();
+        let mut policy = Policy::from_name(&tag).ok_or(AuditWheelError::UndefinedPolicy(tag))?;
         policy.fixup_musl_libc_so_name(target.target_arch());
 
         if let Some(highest_policy) = highest_policy {

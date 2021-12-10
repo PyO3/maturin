@@ -198,7 +198,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
 fn canonicalize_name(name: &str) -> String {
     Regex::new("[-_.]+")
         .unwrap()
-        .replace(name, "-")
+        .replace_all(name, "-")
         .to_lowercase()
 }
 

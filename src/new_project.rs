@@ -88,9 +88,7 @@ impl<'a> ProjectGenerator<'a> {
     }
 }
 
-// workaround for https://github.com/TeXitoi/structopt/issues/333#issuecomment-712265332
-#[cfg_attr(not(doc), allow(missing_docs))]
-#[cfg_attr(doc, doc = "Options common to `maturin new` and `maturin init`.")]
+/// Options common to `maturin new` and `maturin init`.
 #[derive(Debug, clap::Parser)]
 pub struct GenerateProjectOptions {
     /// Set the resulting package name, defaults to the directory name
@@ -165,7 +163,7 @@ fn generate_project(
         let selection = Select::with_theme(&ColorfulTheme::default())
             .with_prompt(format!(
                 "🤷 {}",
-                style("What kind of bindings to use?").bold()
+                style("Which kind of bindings to use?").bold()
             ))
             .items(&bindings_items)
             .default(0)

@@ -347,6 +347,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_generate_fig"
+version = "3.0.0-rc.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4b537a62c0e558c8e6648e474c6507d2e920745319f3880ba6f831ab0c9d5d7"
+dependencies = [
+ "clap",
+ "clap_generate",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1091,6 +1101,7 @@ dependencies = [
  "cc",
  "clap",
  "clap_generate",
+ "clap_generate_fig",
  "configparser",
  "console",
  "dialoguer",

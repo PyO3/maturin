@@ -61,7 +61,6 @@ pub fn pyo3_no_extension_module() -> Result<()> {
 /// Make sure cargo metadata doesn't create a lock file when --locked was passed
 ///
 /// https://github.com/PyO3/maturin/issues/472
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
 pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![
@@ -95,7 +94,8 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
 /// Don't panic if the manylinux version doesn't exit
 ///
 /// https://github.com/PyO3/maturin/issues/739
-pub fn invalid_manylinux_doesnt_panic() -> Result<()> {
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+pub fn invalid_manylinux_does_not_panic() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![
         "build",

@@ -141,8 +141,8 @@ fn locked_doesnt_build_without_cargo_lock() {
 
 #[test]
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
-fn invalid_manylinux_doesnt_panic() {
-    handle_result(errors::invalid_manylinux_doesnt_panic())
+fn invalid_manylinux_does_not_panic() {
+    handle_result(errors::invalid_manylinux_does_not_panic())
 }
 
 #[test]

@@ -135,6 +135,7 @@ fn pyo3_no_extension_module() {
 }
 
 #[test]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 fn locked_doesnt_build_without_cargo_lock() {
     handle_result(errors::locked_doesnt_build_without_cargo_lock())
 }

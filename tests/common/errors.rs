@@ -61,6 +61,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
 /// Make sure cargo metadata doesn't create a lock file when --locked was passed
 ///
 /// https://github.com/PyO3/maturin/issues/472
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![

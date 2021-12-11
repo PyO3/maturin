@@ -70,7 +70,7 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
         "--cargo-extra-args='--locked'",
         "-i=python",
     ];
-    let options = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
     let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
     if let Err(err) = result {
         let err_string = err
@@ -84,6 +84,37 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
         {
             bail!("{:?}", err_string);
         }
+    } else {
+        bail!("Should have errored");
+    }
+
+    Ok(())
+}
+
+/// Don't panic if the manylinux version doesn't exit
+///
+/// https://github.com/PyO3/maturin/issues/739
+pub fn invalid_manylinux_doesnt_panic() -> Result<()> {
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "-m",
+        "test-crates/pyo3-mixed/Cargo.toml",
+        "-i=python",
+        "--compatibility",
+        "manylinux_2_99",
+    ];
+    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let result = options
+        .into_build_context(false, cfg!(feature = "faster-tests"), false)?
+        .build_wheels();
+    if let Err(err) = result {
+        assert_eq!(err.to_string(), "Error ensuring manylinux_2_99 compliance");
+        let err_string = err
+            .source()
+            .ok_or_else(|| format_err!("{}", err))?
+            .to_string();
+        assert_eq!(err_string, "manylinux_2_99 compatibility policy is not defined by auditwheel yet, pass `--skip-auditwheel` to proceed anyway");
     } else {
         bail!("Should have errored");
     }

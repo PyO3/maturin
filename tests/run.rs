@@ -140,6 +140,11 @@ fn locked_doesnt_build_without_cargo_lock() {
 }
 
 #[test]
+fn invalid_manylinux_doesnt_panic() {
+    handle_result(errors::invalid_manylinux_doesnt_panic())
+}
+
+#[test]
 #[cfg(target_os = "linux")]
 fn musl() {
     let ran = handle_result(other::test_musl());

@@ -20,13 +20,3 @@ for PYBIN in /opt/python/cp3[9]*/bin; do
     echo "maturin build failed as expected"
   fi
 done
-
-# Fail because manylinux_2_99 policy is not defined by auditwheel
-for PYBIN in /opt/python/cp3[9]*/bin; do
-  if cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml -i "${PYBIN}/python" --compatibility manylinux_2_99 -o dist; then
-    echo "maturin build unexpectedly succeeded"
-    exit 1
-  else
-    echo "maturin build failed as expected"
-  fi
-done

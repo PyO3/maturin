@@ -14,3 +14,4 @@
 - [Sphinx Integration](./sphinx.md)
 - [Contributing](./contributing.md)
     - [Platform Support](./platform_support.md)
+- [Changelog](./changelog.md)

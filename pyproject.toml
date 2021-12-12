@@ -14,6 +14,12 @@ classifiers = [
 ]
 dependencies = ["toml~=0.10.2"]
 
+[project.urls]
+"Source Code" = "https://github.com/PyO3/maturin"
+Issues = "https://github.com/PyO3/maturin/issues"
+Documentation = "https://maturin.rs"
+Changelog = "https://maturin.rs/changelog.html"
+
 [tool.maturin]
 bindings = "bin"
 

@@ -264,7 +264,7 @@ impl BuildContext {
             .unwrap_or(&self.target);
 
         let (policy, should_repair) =
-            auditwheel_rs(&artifact, target, platform_tag).with_context(|| {
+            auditwheel_rs(artifact, target, platform_tag).with_context(|| {
                 if let Some(platform_tag) = platform_tag {
                     format!("Error ensuring {} compliance", platform_tag)
                 } else {

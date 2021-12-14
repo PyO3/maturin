@@ -9,7 +9,7 @@ run in Python using pyo3.
 First, create a new Rust library project using `cargo new --lib --edition 2018
 guessing-game`. This will create a directory with the following structure.
 
-```
+```ignore
 guessing-game/
 ├── Cargo.toml
 └── src
@@ -46,7 +46,7 @@ features = ["extension-module", "abi3-py36"]
 
 New projects can also be quickly created using the `maturin new` command:
 
-```
+```bash
 USAGE:
     maturin new [FLAGS] [OPTIONS] <path>
 
@@ -84,7 +84,7 @@ maturin is configured in `pyproject.toml` as introduced by [PEP
 518](https://www.python.org/dev/peps/pep-0518/).  This file lives in the root
 of your project tree:
 
-```
+```ignore
 guessing-game/
 ├── Cargo.toml
 ├── pyproject.toml  #  <<< add this file
@@ -116,7 +116,7 @@ Book](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html).
 Instead of implementing as a `bin` crate, we're using a `lib` and will expose
 the main logic as a Python function.
 
-```rust
+```rust,no_run
 use pyo3::prelude::*;
 use rand::Rng;
 use std::cmp::Ordering;
@@ -148,7 +148,7 @@ fn guess_the_number() {
             Ordering::Less => println!("Too small!"),
             Ordering::Greater => println!("Too big!"),
             Ordering::Equal => {
-                println!("You win!", guesses);
+                println!("You win!");
                 break;
             }
         }

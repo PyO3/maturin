@@ -37,7 +37,7 @@ pub enum AuditWheelError {
     /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
     /// libraries.
     #[error(
-    "Your library is not {0} compliant because of the presence of too-recent versioned symbols: {1:?}",
+    "Your library is not {0} compliant because of the presence of too-recent versioned symbols: {1:?}. Consider building in a manylinux docker container",
     )]
     VersionedSymbolTooNewError(Policy, Vec<String>),
     /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
@@ -240,8 +240,9 @@ fn get_default_platform_policies() -> Vec<Policy> {
 /// An reimplementation of auditwheel, which checks elf files for
 /// manylinux/musllinux compliance.
 ///
-/// If `platform_tag`, is None, it returns the the highest matching manylinux/musllinux policy, or `linux`
-/// if nothing else matches. It will error for bogus cases, e.g. if libpython is linked.
+/// If `platform_tag`, is None, it returns the the highest matching manylinux/musllinux policy
+/// and whether we need to repair with patchelf,, or `linux` if nothing else matches.
+/// It will error for bogus cases, e.g. if libpython is linked.
 ///
 /// If a specific manylinux/musllinux version is given, compliance is checked and a warning printed if
 /// a higher version would be possible.

@@ -34,9 +34,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.108"
+version = "0.2.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8521a1b57e76b1ec69af7599e75e38e7b7fad6610f037db8c79b127201b5d119"
+checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
 
 [[package]]
 name = "lock_api"
@@ -49,9 +49,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
 name = "parking_lot"
@@ -86,9 +86,9 @@ checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.32"
+version = "1.0.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba508cc11742c0dc5c1659771673afbab7a0efab23aa17e854cbab0837ed0b43"
+checksum = "2f84e92c0f7c9d58328b85a78557813e4bd845130db68d7184635344399423b1"
 dependencies = [
  "unicode-xid",
 ]
@@ -96,7 +96,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#2986aca0f60f2968ef60b32fd6caeb98b2b18290"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#fa09343e2bf0a438f07ecd8a6fb73d149916713b"
 dependencies = [
  "cfg-if",
  "indoc",
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#2986aca0f60f2968ef60b32fd6caeb98b2b18290"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#fa09343e2bf0a438f07ecd8a6fb73d149916713b"
 dependencies = [
  "once_cell",
 ]
@@ -119,7 +119,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#2986aca0f60f2968ef60b32fd6caeb98b2b18290"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#fa09343e2bf0a438f07ecd8a6fb73d149916713b"
 dependencies = [
  "pyo3-macros-backend",
  "quote",
@@ -129,7 +129,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.15.1"
-source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#2986aca0f60f2968ef60b32fd6caeb98b2b18290"
+source = "git+https://github.com/aganders3/pyo3?branch=expose-cross-compiling#fa09343e2bf0a438f07ecd8a6fb73d149916713b"
 dependencies = [
  "proc-macro2",
  "pyo3-build-config",

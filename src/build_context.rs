@@ -230,6 +230,10 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the source distribution")?;
 
+        let include_cargo_lock = self
+            .cargo_extra_args
+            .iter()
+            .any(|arg| arg == "--locked" || arg == "--frozen");
         match PyProjectToml::new(self.manifest_path.parent().unwrap()) {
             Ok(pyproject) => {
                 let sdist_path = source_distribution(
@@ -238,6 +242,7 @@ impl BuildContext {
                     &self.manifest_path,
                     &self.cargo_metadata,
                     pyproject.sdist_include(),
+                    include_cargo_lock,
                 )
                 .context("Failed to build source distribution")?;
                 Ok(Some((sdist_path, "source".to_string())))

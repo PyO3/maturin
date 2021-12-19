@@ -1,8 +1,6 @@
 use anyhow::{Context, Result};
-use cargo_metadata::MetadataCommand;
 use flate2::read::GzDecoder;
 use maturin::BuildOptions;
-use maturin::{source_distribution, CargoToml, Metadata21};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::path::Path;
@@ -98,7 +96,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "linux",
     ])?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options.into_build_context(false, false, false)?;
     let source_distribution = build_context.build_source_distribution()?;
     assert!(source_distribution.is_some());
 
@@ -111,23 +109,17 @@ pub fn test_source_distribution(
 ) -> Result<()> {
     let manifest_dir = package.as_ref();
     let manifest_path = manifest_dir.join("Cargo.toml");
-    let cargo_toml = CargoToml::from_path(&manifest_path)?;
-    let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-        .context("Failed to parse Cargo.toml into python metadata")?;
-    let cargo_metadata = MetadataCommand::new()
-        .manifest_path(&manifest_path)
-        .exec()
-        .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
-
     let sdist_directory = tempfile::tempdir()?;
-    let path = source_distribution(
-        &sdist_directory,
-        &metadata21,
-        &manifest_path,
-        &cargo_metadata,
-        None,
-    )
-    .context("Failed to build source distribution")?;
+    let build_options = BuildOptions {
+        manifest_path,
+        out: Some(sdist_directory.into_path()),
+        ..Default::default()
+    };
+
+    let build_context = build_options.into_build_context(false, false, false)?;
+    let (path, _) = build_context
+        .build_source_distribution()?
+        .context("Failed to build source distribution")?;
 
     let tar_gz = fs_err::File::open(path)?;
     let tar = GzDecoder::new(tar_gz);

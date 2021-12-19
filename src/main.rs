@@ -4,12 +4,9 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
-use cargo_metadata::MetadataCommand;
-use fs_err as fs;
 use maturin::{
-    develop, init_project, new_project, source_distribution, write_dist_info, BridgeModel,
-    BuildOptions, CargoToml, GenerateProjectOptions, Metadata21, PathWriter, PlatformTag,
-    PyProjectToml, PythonInterpreter, Target,
+    develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
+    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
@@ -262,23 +259,15 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             sdist_directory,
             manifest_path,
         } => {
-            let cargo_toml = CargoToml::from_path(&manifest_path)?;
-            let manifest_dir = manifest_path.parent().unwrap();
-            let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-                .context("Failed to parse Cargo.toml into python metadata")?;
-            let cargo_metadata = MetadataCommand::new()
-                .manifest_path(&manifest_path)
-                .exec()
-                .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
-
-            let path = source_distribution(
-                sdist_directory,
-                &metadata21,
-                &manifest_path,
-                &cargo_metadata,
-                None,
-            )
-            .context("Failed to build source distribution")?;
+            let build_options = BuildOptions {
+                manifest_path,
+                out: Some(sdist_directory),
+                ..Default::default()
+            };
+            let build_context = build_options.into_build_context(false, false, false)?;
+            let (path, _) = build_context
+                .build_source_distribution()?
+                .context("Failed to build source distribution")?;
             println!("{}", path.file_name().unwrap().to_str().unwrap());
         }
     };
@@ -376,37 +365,15 @@ fn run() -> Result<()> {
             )?;
         }
         Opt::SDist { manifest_path, out } => {
-            let manifest_dir = manifest_path.parent().unwrap();
-
-            // Ensure the project has a compliant pyproject.toml
-            let pyproject = PyProjectToml::new(&manifest_dir)
-                .context("A pyproject.toml with a PEP 517 compliant `[build-system]` table is required to build a source distribution")?;
-
-            let cargo_toml = CargoToml::from_path(&manifest_path)?;
-            let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-                .context("Failed to parse Cargo.toml into python metadata")?;
-
-            let cargo_metadata = MetadataCommand::new()
-                .manifest_path(&manifest_path)
-                .exec()
-                .context("Cargo metadata failed. Do you have cargo in your PATH?")?;
-
-            let wheel_dir = match out {
-                Some(ref dir) => dir.clone(),
-                None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
+            let build_options = BuildOptions {
+                manifest_path,
+                out,
+                ..Default::default()
             };
-
-            fs::create_dir_all(&wheel_dir)
-                .context("Failed to create the target directory for the source distribution")?;
-
-            source_distribution(
-                &wheel_dir,
-                &metadata21,
-                &manifest_path,
-                &cargo_metadata,
-                pyproject.sdist_include(),
-            )
-            .context("Failed to build source distribution")?;
+            let build_context = build_options.into_build_context(false, false, false)?;
+            build_context
+                .build_source_distribution()?
+                .context("Failed to build source distribution")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
         Opt::InitProject { path, options } => init_project(path, options)?,

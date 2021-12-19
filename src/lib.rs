@@ -38,7 +38,6 @@ pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::Target;
 pub use auditwheel::PlatformTag;
-pub use source_distribution::source_distribution;
 #[cfg(feature = "upload")]
 pub use {
     crate::registry::Registry,

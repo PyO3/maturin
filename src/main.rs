@@ -65,8 +65,8 @@ enum Opt {
     /// Note that this command doesn't create entrypoints
     Develop {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-        #[clap(short = 'b', long = "binding-crate")]
-        binding_crate: Option<String>,
+        #[clap(short = 'b', long = "bindings", alias = "binding-crate")]
+        bindings: Option<String>,
         #[clap(
             short = 'm',
             long = "manifest-path",
@@ -365,7 +365,7 @@ fn run() -> Result<()> {
             }
         }
         Opt::Develop {
-            binding_crate,
+            bindings,
             manifest_path,
             cargo_extra_args,
             rustc_extra_args,
@@ -390,7 +390,7 @@ fn run() -> Result<()> {
             };
 
             develop(
-                binding_crate,
+                bindings,
                 &manifest_path,
                 cargo_extra_args,
                 rustc_extra_args,

@@ -235,6 +235,7 @@ pub fn source_distribution(
     manifest_path: impl AsRef<Path>,
     cargo_metadata: &Metadata,
     sdist_include: Option<&Vec<String>>,
+    include_cargo_lock: bool,
 ) -> Result<PathBuf> {
     let known_path_deps = find_path_deps(cargo_metadata)?;
 
@@ -271,6 +272,11 @@ pub fn source_distribution(
     )?;
 
     let manifest_dir = manifest_path.as_ref().parent().unwrap();
+    if include_cargo_lock {
+        let cargo_lock_path = manifest_dir.join("Cargo.lock");
+        let target = root_dir.join("Cargo.lock");
+        writer.add_file(&target, &cargo_lock_path)?;
+    }
 
     if let Some(include_targets) = sdist_include {
         for pattern in include_targets {

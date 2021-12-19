@@ -33,8 +33,18 @@ pub enum AuditWheelError {
     #[error(
     "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}",
     )]
-    PlatformTagValidationError(Policy, Vec<String>),
-    /// The elf file isn't manylinux/musllinux compatible. Contains unsupported architecture
+    LinksForbiddenLibrariesError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
+    /// libraries.
+    #[error(
+    "Your library is not {0} compliant because of the presence of too-recent versioned symbols: {1:?}. Consider building in a manylinux docker container",
+    )]
+    VersionedSymbolTooNewError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
+    /// libraries with blacked-list symbols.
+    #[error("Your library is not {0} compliant because it depends on black-listed symbols: {1:?}")]
+    BlackListedSymbolsError(Policy, Vec<String>),
+    /// The elf file isn't manylinux/musllinux compaible. Contains unsupported architecture
     #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
     UnsupportedArchitecture(Policy, String),
     /// This platform tag isn't defined by auditwheel yet
@@ -43,15 +53,15 @@ pub enum AuditWheelError {
 }
 
 #[derive(Clone, Debug)]
-struct VersionedLibrary {
+pub struct VersionedLibrary {
     /// library name
-    name: String,
+    pub name: String,
     /// versions needed
     versions: HashSet<String>,
 }
 
 /// Find required dynamic linked libraries with version information
-fn find_versioned_libraries(elf: &Elf) -> Result<Vec<VersionedLibrary>, AuditWheelError> {
+pub fn find_versioned_libraries(elf: &Elf) -> Vec<VersionedLibrary> {
     let mut symbols = Vec::new();
     if let Some(verneed) = &elf.verneed {
         for need_file in verneed.iter() {
@@ -73,7 +83,7 @@ fn find_versioned_libraries(elf: &Elf) -> Result<Vec<VersionedLibrary>, AuditWhe
             }
         }
     }
-    Ok(symbols)
+    symbols
 }
 
 /// Find incompliant symbols from symbol versions
@@ -107,6 +117,7 @@ fn policy_is_satisfied(
         AuditWheelError::UnsupportedArchitecture(policy.clone(), arch.to_string())
     })?;
     let mut offending_libs = HashSet::new();
+    let mut offending_versioned_syms = HashSet::new();
     let mut offending_blacklist_syms = HashMap::new();
     let undef_symbols: HashSet<String> = elf
         .dynsyms
@@ -173,26 +184,37 @@ fn policy_is_satisfied(
                         offending_symbols.join(", ")
                     )
                 };
-                offending_libs.insert(offender);
+                offending_versioned_syms.insert(offender);
             }
         }
     }
-    // Checks if we can give a more helpful error message
-    let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
-    let mut offenders: Vec<String> = offending_libs.into_iter().collect();
-    for (lib, syms) in offending_blacklist_syms {
-        offenders.push(format!(
-            "{} offending black-listed symbols: {}",
-            lib,
-            syms.join(", ")
+    // Check for black-listed symbols
+    if !offending_blacklist_syms.is_empty() {
+        let offenders = offending_blacklist_syms
+            .into_iter()
+            .map(|(lib, syms)| format!("{}: {}", lib, syms.join(", ")))
+            .collect();
+        return Err(AuditWheelError::BlackListedSymbolsError(
+            policy.clone(),
+            offenders,
         ));
     }
+    // Check for too-recent versioned symbols
+    if !offending_versioned_syms.is_empty() {
+        return Err(AuditWheelError::VersionedSymbolTooNewError(
+            policy.clone(),
+            offending_versioned_syms.into_iter().collect(),
+        ));
+    }
+    // Check for libpython and forbidden libraries
+    let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
+    let offenders: Vec<String> = offending_libs.into_iter().collect();
     match offenders.as_slice() {
         [] => Ok(()),
         [lib] if is_libpython.is_match(lib) => {
             Err(AuditWheelError::LinksLibPythonError(lib.clone()))
         }
-        offenders => Err(AuditWheelError::PlatformTagValidationError(
+        offenders => Err(AuditWheelError::LinksForbiddenLibrariesError(
             policy.clone(),
             offenders.to_vec(),
         )),
@@ -218,8 +240,9 @@ fn get_default_platform_policies() -> Vec<Policy> {
 /// An reimplementation of auditwheel, which checks elf files for
 /// manylinux/musllinux compliance.
 ///
-/// If `platform_tag`, is None, it returns the the highest matching manylinux/musllinux policy, or `linux`
-/// if nothing else matches. It will error for bogus cases, e.g. if libpython is linked.
+/// If `platform_tag`, is None, it returns the the highest matching manylinux/musllinux policy
+/// and whether we need to repair with patchelf,, or `linux` if nothing else matches.
+/// It will error for bogus cases, e.g. if libpython is linked.
 ///
 /// If a specific manylinux/musllinux version is given, compliance is checked and a warning printed if
 /// a higher version would be possible.
@@ -229,10 +252,11 @@ pub fn auditwheel_rs(
     path: &Path,
     target: &Target,
     platform_tag: Option<PlatformTag>,
-) -> Result<Policy, AuditWheelError> {
+) -> Result<(Policy, bool), AuditWheelError> {
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
-        return Ok(Policy::default());
+        return Ok((Policy::default(), false));
     }
+    let cross_compiling = target.cross_compiling();
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
     let mut buffer = Vec::new();
@@ -241,7 +265,7 @@ pub fn auditwheel_rs(
     let elf = Elf::parse(&buffer).map_err(AuditWheelError::GoblinError)?;
     // This returns essentially the same as ldd
     let deps: Vec<String> = elf.libraries.iter().map(ToString::to_string).collect();
-    let versioned_libraries = find_versioned_libraries(&elf)?;
+    let versioned_libraries = find_versioned_libraries(&elf);
 
     // Find the highest possible policy, if any
     let platform_policies = match platform_tag {
@@ -267,15 +291,28 @@ pub fn auditwheel_rs(
         Some(PlatformTag::Linux) => unreachable!(),
     };
     let mut highest_policy = None;
+    let mut should_repair = false;
     for policy in platform_policies.iter() {
         let result = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries);
         match result {
             Ok(_) => {
                 highest_policy = Some(policy.clone());
+                should_repair = false;
                 break;
             }
+            Err(err @ AuditWheelError::LinksForbiddenLibrariesError(..)) => {
+                // TODO: support repair for cross compiled wheels
+                if !cross_compiling {
+                    highest_policy = Some(policy.clone());
+                    should_repair = true;
+                    break;
+                } else {
+                    return Err(err);
+                }
+            }
+            Err(AuditWheelError::VersionedSymbolTooNewError(..))
+            | Err(AuditWheelError::BlackListedSymbolsError(..))
             // UnsupportedArchitecture happens when trying 2010 with aarch64
-            Err(AuditWheelError::PlatformTagValidationError(_, _))
             | Err(AuditWheelError::UnsupportedArchitecture(..)) => continue,
             // If there was an error parsing the symbols or libpython was linked,
             // we error no matter what the requested policy was
@@ -283,7 +320,7 @@ pub fn auditwheel_rs(
         }
     }
 
-    if let Some(platform_tag) = platform_tag {
+    let policy = if let Some(platform_tag) = platform_tag {
         let tag = platform_tag.to_string();
         let mut policy = Policy::from_name(&tag).ok_or(AuditWheelError::UndefinedPolicy(tag))?;
         policy.fixup_musl_libc_so_name(target.target_arch());
@@ -299,7 +336,19 @@ pub fn auditwheel_rs(
         }
 
         match policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries) {
-            Ok(_) => Ok(policy),
+            Ok(_) => {
+                should_repair = false;
+                Ok(policy)
+            }
+            Err(err @ AuditWheelError::LinksForbiddenLibrariesError(..)) => {
+                // TODO: support repair for cross compiled wheels
+                if !cross_compiling {
+                    should_repair = true;
+                    Ok(policy)
+                } else {
+                    Err(err)
+                }
+            }
             Err(err) => Err(err),
         }
     } else if let Some(policy) = highest_policy {
@@ -312,5 +361,6 @@ pub fn auditwheel_rs(
 
         // Fallback to linux
         Ok(Policy::default())
-    }
+    }?;
+    Ok((policy, should_repair))
 }

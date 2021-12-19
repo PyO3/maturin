@@ -1021,6 +1021,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
+name = "lddtree"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f5d1501bcbb2572cd5aaec64307faf409b52f25c0d8adbaeaa8afe01387f467"
+dependencies = [
+ "fs-err",
+ "glob",
+ "goblin",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1074,6 +1085,7 @@ dependencies = [
  "ignore",
  "indoc",
  "keyring",
+ "lddtree",
  "minijinja",
  "once_cell",
  "platform-info",

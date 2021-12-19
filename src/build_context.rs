@@ -1,21 +1,19 @@
-use crate::auditwheel::auditwheel_rs;
-use crate::auditwheel::PlatformTag;
-use crate::auditwheel::Policy;
-use crate::compile;
+use crate::auditwheel::{
+    auditwheel_rs, get_external_libs, hash_file, patchelf, PlatformTag, Policy,
+};
 use crate::compile::warn_missing_py_init;
-use crate::module_writer::write_python_part;
-use crate::module_writer::WheelWriter;
-use crate::module_writer::{write_bin, write_bindings_module, write_cffi_module};
+use crate::module_writer::{
+    write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
+};
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
-use crate::Metadata21;
-use crate::PyProjectToml;
-use crate::PythonInterpreter;
-use crate::Target;
+use crate::{compile, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
+use lddtree::Library;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The way the rust code is used in the wheel
@@ -256,23 +254,105 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
         platform_tag: Option<PlatformTag>,
-    ) -> Result<Policy> {
+    ) -> Result<(Policy, Vec<Library>)> {
         if self.skip_auditwheel {
-            return Ok(Policy::default());
+            return Ok((Policy::default(), Vec::new()));
         }
 
         let target = python_interpreter
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        let policy = auditwheel_rs(artifact, target, platform_tag).context(
-            if let Some(platform_tag) = platform_tag {
-                format!("Error ensuring {} compliance", platform_tag)
+        let (policy, should_repair) =
+            auditwheel_rs(artifact, target, platform_tag).with_context(|| {
+                if let Some(platform_tag) = platform_tag {
+                    format!("Error ensuring {} compliance", platform_tag)
+                } else {
+                    "Error checking for manylinux/musllinux compliance".to_string()
+                }
+            })?;
+        let external_libs = if should_repair && !self.editable {
+            get_external_libs(&artifact, &policy).with_context(|| {
+                if let Some(platform_tag) = platform_tag {
+                    format!("Error repairing wheel for {} compliance", platform_tag)
+                } else {
+                    "Error repairing wheel for manylinux/musllinux compliance".to_string()
+                }
+            })?
+        } else {
+            Vec::new()
+        };
+        Ok((policy, external_libs))
+    }
+
+    fn add_external_libs(
+        &self,
+        writer: &mut WheelWriter,
+        artifact: &Path,
+        ext_libs: &[Library],
+    ) -> Result<()> {
+        if ext_libs.is_empty() {
+            return Ok(());
+        }
+        // Put external libs to ${module_name}.libs directory
+        // See https://github.com/pypa/auditwheel/issues/89
+        let libs_dir = PathBuf::from(format!("{}.libs", self.module_name));
+        writer.add_directory(&libs_dir)?;
+
+        let temp_dir = tempfile::tempdir()?;
+        let mut soname_map = HashMap::new();
+        for lib in ext_libs {
+            let lib_path = lib.realpath.clone().with_context(|| {
+                format!(
+                    "Cannot repair wheel, because required library {} could not be located.",
+                    lib.path.display()
+                )
+            })?;
+            let short_hash = &hash_file(&lib_path)?[..8];
+            let (file_stem, file_ext) = lib.name.split_once('.').unwrap();
+            let new_soname = if !file_stem.ends_with(&format!("-{}", short_hash)) {
+                format!("{}-{}.{}", file_stem, short_hash, file_ext)
             } else {
-                "Error checking for manylinux/musllinux compliance".to_string()
-            },
-        )?;
-        Ok(policy)
+                format!("{}.{}", file_stem, file_ext)
+            };
+            let dest_path = temp_dir.path().join(&new_soname);
+            fs::copy(&lib_path, &dest_path)?;
+            patchelf::set_soname(&dest_path, &new_soname)?;
+            if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
+                patchelf::set_rpath(&dest_path, &libs_dir)?;
+            }
+            soname_map.insert(
+                lib.name.clone(),
+                (new_soname.clone(), dest_path.clone(), lib.needed.clone()),
+            );
+
+            patchelf::replace_needed(artifact, &lib.name, &new_soname)?;
+        }
+
+        // we grafted in a bunch of libraries and modified their sonames, but
+        // they may have internal dependencies (DT_NEEDED) on one another, so
+        // we need to update those records so each now knows about the new
+        // name of the other.
+        for (new_soname, path, needed) in soname_map.values() {
+            for n in needed {
+                if soname_map.contains_key(n) {
+                    patchelf::replace_needed(path, n, &soname_map[n].0)?;
+                }
+            }
+            writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
+        }
+
+        // Currently artifact .so file always resides at ${module_name}/${module_name}.so
+        let artifact_dir = Path::new(&self.module_name);
+        let old_rpaths = patchelf::get_rpath(artifact)?;
+        // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
+        // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
+        let mut new_rpaths: Vec<&str> = old_rpaths.split(':').collect();
+        let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, artifact_dir));
+        new_rpaths.push(new_rpath.to_str().unwrap());
+        let new_rpath = new_rpaths.join(":");
+        patchelf::set_rpath(artifact, &new_rpath)?;
+        Ok(())
     }
 
     fn add_pth(&self, writer: &mut WheelWriter) -> Result<()> {
@@ -286,6 +366,7 @@ impl BuildContext {
         &self,
         artifact: &Path,
         platform_tag: PlatformTag,
+        ext_libs: &[Library],
         major: u8,
         min_minor: u8,
     ) -> Result<BuiltWheelMetadata> {
@@ -295,6 +376,7 @@ impl BuildContext {
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
+        self.add_external_libs(&mut writer, artifact, ext_libs)?;
 
         write_bindings_module(
             &mut writer,
@@ -329,9 +411,15 @@ impl BuildContext {
             python_interpreter,
             Some(self.project_layout.extension_name()),
         )?;
-        let policy = self.auditwheel(python_interpreter, &artifact, self.platform_tag)?;
-        let (wheel_path, tag) =
-            self.write_binding_wheel_abi3(&artifact, policy.platform_tag(), major, min_minor)?;
+        let (policy, external_libs) =
+            self.auditwheel(python_interpreter, &artifact, self.platform_tag)?;
+        let (wheel_path, tag) = self.write_binding_wheel_abi3(
+            &artifact,
+            policy.platform_tag(),
+            &external_libs,
+            major,
+            min_minor,
+        )?;
 
         println!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -349,10 +437,12 @@ impl BuildContext {
         python_interpreter: &PythonInterpreter,
         artifact: &Path,
         platform_tag: PlatformTag,
+        ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(platform_tag, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
+        self.add_external_libs(&mut writer, artifact, ext_libs)?;
 
         write_bindings_module(
             &mut writer,
@@ -391,9 +481,14 @@ impl BuildContext {
                 Some(python_interpreter),
                 Some(self.project_layout.extension_name()),
             )?;
-            let policy = self.auditwheel(Some(python_interpreter), &artifact, self.platform_tag)?;
-            let (wheel_path, tag) =
-                self.write_binding_wheel(python_interpreter, &artifact, policy.platform_tag())?;
+            let (policy, external_libs) =
+                self.auditwheel(Some(python_interpreter), &artifact, self.platform_tag)?;
+            let (wheel_path, tag) = self.write_binding_wheel(
+                python_interpreter,
+                &artifact,
+                policy.platform_tag(),
+                &external_libs,
+            )?;
             println!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -409,8 +504,7 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    /// Runs cargo build, extracts the cdylib from the output, runs auditwheel and returns the
-    /// artifact
+    /// Runs cargo build, extracts the cdylib from the output and returns the path to it
     ///
     /// The module name is used to warn about missing a `PyInit_<module name>` function for
     /// bindings modules.
@@ -434,19 +528,29 @@ impl BuildContext {
                 .context("Failed to parse the native library")?;
         }
 
-        Ok(artifact)
+        if self.editable || self.skip_auditwheel {
+            return Ok(artifact);
+        }
+        // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns
+        let maturin_build = artifact.parent().unwrap().join("maturin");
+        fs::create_dir_all(&maturin_build)?;
+        let new_artifact = maturin_build.join(artifact.file_name().unwrap());
+        fs::copy(&artifact, &new_artifact)?;
+        Ok(new_artifact)
     }
 
     fn write_cffi_wheel(
         &self,
         artifact: &Path,
         platform_tag: PlatformTag,
+        ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self
             .target
             .get_universal_tags(platform_tag, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
+        self.add_external_libs(&mut writer, artifact, ext_libs)?;
 
         write_cffi_module(
             &mut writer,
@@ -468,8 +572,9 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let policy = self.auditwheel(None, &artifact, self.platform_tag)?;
-        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, policy.platform_tag())?;
+        let (policy, external_libs) = self.auditwheel(None, &artifact, self.platform_tag)?;
+        let (wheel_path, tag) =
+            self.write_cffi_wheel(&artifact, policy.platform_tag(), &external_libs)?;
 
         // Warn if cffi isn't specified in the requirements
         if !self
@@ -494,6 +599,7 @@ impl BuildContext {
         &self,
         artifact: &Path,
         platform_tag: PlatformTag,
+        ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self
             .target
@@ -524,6 +630,8 @@ impl BuildContext {
         let bin_name = artifact
             .file_name()
             .expect("Couldn't get the filename from the binary produced by cargo");
+        self.add_external_libs(&mut writer, artifact, ext_libs)?;
+
         write_bin(&mut writer, artifact, &self.metadata21, bin_name)?;
 
         self.add_pth(&mut writer)?;
@@ -545,12 +653,55 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let policy = self.auditwheel(None, &artifact, self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(None, &artifact, self.platform_tag)?;
 
-        let (wheel_path, tag) = self.write_bin_wheel(&artifact, policy.platform_tag())?;
+        let (wheel_path, tag) =
+            self.write_bin_wheel(&artifact, policy.platform_tag(), &external_libs)?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
+    }
+}
+
+fn relpath(to: &Path, from: &Path) -> PathBuf {
+    let mut suffix_pos = 0;
+    for (f, t) in from.components().zip(to.components()) {
+        if f == t {
+            suffix_pos += 1;
+        } else {
+            break;
+        }
+    }
+    let mut result = PathBuf::new();
+    from.components()
+        .skip(suffix_pos)
+        .map(|_| result.push(".."))
+        .last();
+    to.components()
+        .skip(suffix_pos)
+        .map(|x| result.push(x.as_os_str()))
+        .last();
+    result
+}
+
+#[cfg(test)]
+mod test {
+    use super::relpath;
+    use std::path::Path;
+
+    #[test]
+    fn test_relpath() {
+        let cases = [
+            ("", "", ""),
+            ("/", "/usr", ".."),
+            ("/", "/usr/lib", "../.."),
+        ];
+        for (from, to, expected) in cases {
+            let from = Path::new(from);
+            let to = Path::new(to);
+            let result = relpath(from, to);
+            assert_eq!(result, Path::new(expected));
+        }
     }
 }

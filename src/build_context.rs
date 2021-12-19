@@ -344,9 +344,13 @@ impl BuildContext {
 
         // Currently artifact .so file always resides at ${module_name}/${module_name}.so
         let artifact_dir = Path::new(&self.module_name);
-        let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, artifact_dir));
-        // FIXME: preserving existing rpath entries
+        let old_rpaths = patchelf::get_rpath(artifact)?;
+        // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
         // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
+        let mut new_rpaths: Vec<&str> = old_rpaths.split(':').collect();
+        let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, artifact_dir));
+        new_rpaths.push(new_rpath.to_str().unwrap());
+        let new_rpath = new_rpaths.join(":");
         patchelf::set_rpath(artifact, &new_rpath)?;
         Ok(())
     }

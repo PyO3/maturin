@@ -138,4 +138,8 @@ OPTIONS:
 
 ### Cross Compiling
 
-TODO
+Maturin has decent cross compilation support for `pyo3` and `bin` bindings,
+other kind of bindings may work but aren't tested regularly.
+
+For manylinux support the [manylinux-cross](https://github.com/messense/manylinux-cross) docker images can be used.
+And [maturin-action](https://github.com/messense/maturin-action) makes it easy to do cross compilation on GitHub Actions.

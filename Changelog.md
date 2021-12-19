@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for x86_64 Haiku in [#735](https://github.com/PyO3/maturin/pull/735)
 * Fix undefined auditwheel policy panic in [#740](https://github.com/PyO3/maturin/pull/740)
 * Fix sdist upload for packages where the pkgname contains multiple underscores in [#741](https://github.com/PyO3/maturin/pull/741)
-* Add `Cargo.lock` to sdist when `--locked` or `--frozen` specified in [#749](https://github.com/PyO3/maturin/pull/749)
 * Implement auditwheel repair with patchelf in [#742](https://github.com/PyO3/maturin/pull/742)
+* Add `Cargo.lock` to sdist when `--locked` or `--frozen` specified in [#749](https://github.com/PyO3/maturin/pull/749)
 
 ## [0.12.4] - 2021-12-06
 

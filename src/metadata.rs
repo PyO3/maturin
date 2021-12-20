@@ -301,7 +301,9 @@ impl Metadata21 {
         } else {
             // > If no value is specified for this field, and a file named
             // > README.md, README.txt or README exists in the package root
-            for readme_guess in ["README.md", "README.txt", "README"] {
+            // Even though it's not what cargo does, we also search for README.rst
+            // since it's still popular in the python world
+            for readme_guess in ["README.md", "README.txt", "README.rst", "README"] {
                 let guessed_readme = manifest_path.as_ref().join(readme_guess);
                 if guessed_readme.exists() {
                     let context = format!(

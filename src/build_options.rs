@@ -356,11 +356,11 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
             let min_abi3_version = pyo3_crate
                 .features
                 .iter()
-                .filter(|x| x.starts_with("abi3-py") && x.len() == "abi3-pyxx".len())
+                .filter(|x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
                 .map(|x| {
                     Ok((
                         (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
-                        (x.as_bytes()[8] as char).to_string().parse::<u8>()?,
+                        x[8..].parse::<u8>()?,
                     ))
                 })
                 .collect::<Result<Vec<(u8, u8)>>>()

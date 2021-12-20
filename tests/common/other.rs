@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
-use maturin::BuildOptions;
+use maturin::{BuildOptions, Metadata21};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::path::Path;

@@ -282,13 +282,16 @@ impl Metadata21 {
 
         let extra_metadata = cargo_toml.remaining_core_metadata();
 
-        let description: Option<String>;
-        let description_content_type: Option<String>;
+        let mut description: Option<String> = None;
+        let mut description_content_type: Option<String> = None;
         // See https://packaging.python.org/specifications/core-metadata/#description
-        if let Some(ref readme) = cargo_toml.package.readme {
+        // and https://doc.rust-lang.org/cargo/reference/manifest.html#the-readme-field
+        if cargo_toml.package.readme == Some("false".to_string()) {
+            // > You can suppress this behavior by setting this field to false
+        } else if let Some(ref readme) = cargo_toml.package.readme {
             let readme_path = manifest_path.as_ref().join(readme);
             description = Some(fs::read_to_string(&readme_path).context(format!(
-                "Failed to read readme specified in Cargo.toml, which should be at {}",
+                "Failed to read Readme specified in Cargo.toml, which should be at {}",
                 readme_path.display()
             ))?);
 
@@ -296,8 +299,20 @@ impl Metadata21 {
                 .description_content_type
                 .or_else(|| Some(path_to_content_type(&readme_path)));
         } else {
-            description = None;
-            description_content_type = None;
+            // > If no value is specified for this field, and a file named
+            // > README.md, README.txt or README exists in the package root
+            for readme_guess in ["README.md", "README.txt", "README"] {
+                let guessed_readme = manifest_path.as_ref().join(readme_guess);
+                if guessed_readme.exists() {
+                    let context = format!(
+                        "Readme at {} exists, but can't be read",
+                        guessed_readme.display()
+                    );
+                    description = Some(fs::read_to_string(&guessed_readme).context(context)?);
+                    description_content_type = Some(path_to_content_type(&guessed_readme));
+                    break;
+                }
+            }
         };
         let name = extra_metadata
             .name
@@ -793,5 +808,17 @@ mod test {
         );
         // defined in pyproject.toml
         assert_eq!(metadata.scripts["get_42"], "pyo3_mixed_py_subdir:get_42");
+    }
+
+    #[test]
+    fn test_implicit_readme() {
+        let cargo_toml_str = fs_err::read_to_string("test-crates/pyo3-mixed/Cargo.toml").unwrap();
+        let cargo_toml = toml::from_str(&cargo_toml_str).unwrap();
+        let metadata = Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-mixed").unwrap();
+        assert!(metadata.description.unwrap().starts_with("# pyo3-mixed"));
+        assert_eq!(
+            metadata.description_content_type.unwrap(),
+            "text/markdown; charset=UTF-8; variant=GFM"
+        );
     }
 }

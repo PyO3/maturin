@@ -49,7 +49,7 @@ which requires the right compilers to be installed. Installing a wheel is much f
 
 When you publish a package to be installable with `pip install`, you upload it to [pypi](https://pypi.org/), the official package repository.
 For testing, you can use [test pypi](https://test.pypi.org/) instead, which you can use with `pip install --index-url https://test.pypi.org/simple/`.
-Note that for publishing for linux, [you need to use the manylinux docker container](#manylinux-and-auditwheel).
+Note that for publishing for linux, [you need to use the manylinux docker container](#manylinux-and-auditwheel), while for publishing from your repository you can use the [messense/maturin-action github action](https://github.com/messense/maturin-action).
 
 ## pyo3 and rust-cpython
 

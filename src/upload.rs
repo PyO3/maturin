@@ -345,7 +345,9 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                         Ok(()) => {
                             println!("🔑 Removed wrong password from keyring")
                         }
-                        Err(keyring::Error::NoEntry) | Err(keyring::Error::NoStorageAccess(_)) => {}
+                        Err(keyring::Error::NoEntry)
+                        | Err(keyring::Error::NoStorageAccess(_))
+                        | Err(keyring::Error::PlatformFailure(_)) => {}
                         Err(err) => {
                             eprintln!("⚠️ Warning: Failed to remove password from keyring: {}", err)
                         }
@@ -383,7 +385,9 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
         let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &username);
         let password = registry.password;
         match keyring.set_password(&password) {
-            Ok(()) => {}
+            Ok(())
+            | Err(keyring::Error::NoStorageAccess(_))
+            | Err(keyring::Error::PlatformFailure(_)) => {}
             Err(err) => {
                 eprintln!(
                     "⚠️ Warning: Failed to store the password in the keyring: {:?}",

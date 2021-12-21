@@ -256,7 +256,6 @@ pub fn auditwheel_rs(
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok((Policy::default(), false));
     }
-    let cross_compiling = target.cross_compiling();
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
     let mut buffer = Vec::new();
@@ -300,15 +299,10 @@ pub fn auditwheel_rs(
                 should_repair = false;
                 break;
             }
-            Err(err @ AuditWheelError::LinksForbiddenLibrariesError(..)) => {
-                // TODO: support repair for cross compiled wheels
-                if !cross_compiling {
-                    highest_policy = Some(policy.clone());
-                    should_repair = true;
-                    break;
-                } else {
-                    return Err(err);
-                }
+            Err(AuditWheelError::LinksForbiddenLibrariesError(..)) => {
+                highest_policy = Some(policy.clone());
+                should_repair = true;
+                break;
             }
             Err(AuditWheelError::VersionedSymbolTooNewError(..))
             | Err(AuditWheelError::BlackListedSymbolsError(..))
@@ -340,14 +334,9 @@ pub fn auditwheel_rs(
                 should_repair = false;
                 Ok(policy)
             }
-            Err(err @ AuditWheelError::LinksForbiddenLibrariesError(..)) => {
-                // TODO: support repair for cross compiled wheels
-                if !cross_compiling {
-                    should_repair = true;
-                    Ok(policy)
-                } else {
-                    Err(err)
-                }
+            Err(AuditWheelError::LinksForbiddenLibrariesError(..)) => {
+                should_repair = true;
+                Ok(policy)
             }
             Err(err) => Err(err),
         }

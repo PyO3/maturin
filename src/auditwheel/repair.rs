@@ -5,13 +5,14 @@ use fs_err as fs;
 use lddtree::DependencyAnalyzer;
 use sha2::{Digest, Sha256};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn get_external_libs(
     artifact: impl AsRef<Path>,
     policy: &Policy,
 ) -> Result<Vec<lddtree::Library>, AuditWheelError> {
-    let dep_analyzer = DependencyAnalyzer::new();
+    let root = PathBuf::from("/");
+    let dep_analyzer = DependencyAnalyzer::new(root);
     let deps = dep_analyzer.analyze(artifact).unwrap();
     let mut ext_libs = Vec::new();
     for (name, lib) in deps.libraries {

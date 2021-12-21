@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 pub fn get_external_libs(
     artifact: impl AsRef<Path>,
     policy: &Policy,
+    sysroot: PathBuf,
 ) -> Result<Vec<lddtree::Library>, AuditWheelError> {
-    let root = PathBuf::from("/");
-    let dep_analyzer = DependencyAnalyzer::new(root);
+    let dep_analyzer = DependencyAnalyzer::new(sysroot);
     let deps = dep_analyzer.analyze(artifact).unwrap();
     let mut ext_libs = Vec::new();
     for (name, lib) in deps.libraries {

@@ -1072,6 +1072,7 @@ dependencies = [
  "bytesize",
  "cargo_metadata",
  "cbindgen",
+ "cc",
  "configparser",
  "console",
  "dialoguer",

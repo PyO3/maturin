@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for repairing cross compiled linux wheels in [#754](https://github.com/PyO3/maturin/pull/754)
+
 ## [0.12.5] - 2021-12-20
 
 * Fix docs for `new` and `init` commands in `maturin --help` in [#734](https://github.com/PyO3/maturin/pull/734)

@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::io;
 use std::path::{Path, PathBuf};
 
-pub fn get_external_libs(
+pub fn find_external_libs(
     artifact: impl AsRef<Path>,
     policy: &Policy,
     sysroot: PathBuf,

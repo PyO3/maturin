@@ -1,5 +1,5 @@
 use crate::auditwheel::{
-    auditwheel_rs, get_external_libs, hash_file, patchelf, PlatformTag, Policy,
+    auditwheel_rs, find_external_libs, hash_file, patchelf, PlatformTag, Policy,
 };
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
@@ -274,7 +274,7 @@ impl BuildContext {
             })?;
         let external_libs = if should_repair && !self.editable {
             let sysroot = get_sysroot_path(&self.target)?;
-            get_external_libs(&artifact, &policy, sysroot).with_context(|| {
+            find_external_libs(&artifact, &policy, sysroot).with_context(|| {
                 if let Some(platform_tag) = platform_tag {
                     format!("Error repairing wheel for {} compliance", platform_tag)
                 } else {

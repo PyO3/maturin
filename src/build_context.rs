@@ -303,6 +303,7 @@ impl BuildContext {
 
         let temp_dir = tempfile::tempdir()?;
         let mut soname_map = HashMap::new();
+        let mut libs_copied = Vec::new();
         for lib in ext_libs {
             let lib_path = lib.realpath.clone().with_context(|| {
                 format!(
@@ -310,6 +311,7 @@ impl BuildContext {
                     lib.path.display()
                 )
             })?;
+            // Generate a new soname with a short hash
             let short_hash = &hash_file(&lib_path)?[..8];
             let (file_stem, file_ext) = lib.name.split_once('.').unwrap();
             let new_soname = if !file_stem.ends_with(&format!("-{}", short_hash)) {
@@ -317,8 +319,13 @@ impl BuildContext {
             } else {
                 format!("{}.{}", file_stem, file_ext)
             };
+
+            // Copy the original lib to a tmpdir and modify some of its properties
+            // for example soname and rpath
             let dest_path = temp_dir.path().join(&new_soname);
             fs::copy(&lib_path, &dest_path)?;
+            libs_copied.push(lib_path);
+
             patchelf::set_soname(&dest_path, &new_soname)?;
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
                 patchelf::set_rpath(&dest_path, &libs_dir)?;
@@ -342,6 +349,14 @@ impl BuildContext {
                 }
             }
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
+        }
+
+        println!(
+            "🖨  Copied external shared libraries to package {} directory:",
+            libs_dir.display()
+        );
+        for lib_path in libs_copied {
+            println!("    {}", lib_path.display());
         }
 
         // Currently artifact .so file always resides at ${module_name}/${module_name}.so

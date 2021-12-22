@@ -1,5 +1,5 @@
 use crate::auditwheel::{
-    auditwheel_rs, get_external_libs, hash_file, patchelf, PlatformTag, Policy,
+    auditwheel_rs, find_external_libs, hash_file, patchelf, PlatformTag, Policy,
 };
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
@@ -15,6 +15,7 @@ use lddtree::Library;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -272,7 +273,8 @@ impl BuildContext {
                 }
             })?;
         let external_libs = if should_repair && !self.editable {
-            get_external_libs(&artifact, &policy).with_context(|| {
+            let sysroot = get_sysroot_path(&self.target)?;
+            find_external_libs(&artifact, &policy, sysroot).with_context(|| {
                 if let Some(platform_tag) = platform_tag {
                     format!("Error repairing wheel for {} compliance", platform_tag)
                 } else {
@@ -683,6 +685,50 @@ fn relpath(to: &Path, from: &Path) -> PathBuf {
         .map(|x| result.push(x.as_os_str()))
         .last();
     result
+}
+
+/// Get sysroot path from target C compiler
+///
+/// Currently only gcc is supported, clang doesn't have a `--print-sysroot` option
+/// TODO: allow specify sysroot from environment variable?
+fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
+    use crate::target::get_host_target;
+
+    let host_triple = get_host_target()?;
+    let target_triple = target.target_triple();
+    if host_triple != target_triple {
+        let mut build = cc::Build::new();
+        build
+            // Suppress cargo metadata for example env vars printing
+            .cargo_metadata(false)
+            // opt_level, host and target are required
+            .opt_level(0)
+            .host(&host_triple)
+            .target(target_triple);
+        let compiler = build
+            .try_get_compiler()
+            .with_context(|| format!("Failed to get compiler for {}", target_triple))?;
+        let path = compiler.path();
+        let out = Command::new(path)
+            .arg("--print-sysroot")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .with_context(|| format!("Failed to run `{} --print-sysroot`", path.display()))?;
+        if out.status.success() {
+            let sysroot = String::from_utf8(out.stdout)
+                .context("Failed to read the sysroot path")?
+                .trim()
+                .to_owned();
+            return Ok(PathBuf::from(sysroot));
+        } else {
+            bail!(
+                "Failed to get the sysroot path: {}",
+                String::from_utf8(out.stderr)?
+            );
+        }
+    }
+    Ok(PathBuf::from("/"))
 }
 
 #[cfg(test)]

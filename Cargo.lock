@@ -1022,9 +1022,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lddtree"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f5d1501bcbb2572cd5aaec64307faf409b52f25c0d8adbaeaa8afe01387f467"
+checksum = "c530d2918615bf5a01051451a5cd07be67d076fc8242c99e877cf9abc90fdf07"
 dependencies = [
  "fs-err",
  "glob",
@@ -1072,6 +1072,7 @@ dependencies = [
  "bytesize",
  "cargo_metadata",
  "cbindgen",
+ "cc",
  "configparser",
  "console",
  "dialoguer",
@@ -1282,9 +1283,9 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05499f3756671c15885fee9034446956fff3f243d6077b91e5767df161f766b3"
+checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -1579,9 +1580,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.7"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07bea77bc708afa10e59905c3d4af7c8fd43c9214251673095ff8b14345fcbc5"
+checksum = "7c4e0a76dc12a116108933f6301b95e83634e0c47b0afbed6abbaa0601e99258"
 dependencies = [
  "base64",
  "bytes",
@@ -1666,7 +1667,7 @@ dependencies = [
  "log",
  "ring",
  "sct",
- "webpki 0.22.0",
+ "webpki",
 ]
 
 [[package]]
@@ -2093,7 +2094,7 @@ checksum = "a27d5f2b839802bd8267fa19b0530f5a08b9c08cd417976be2a65d130fe1c11b"
 dependencies = [
  "rustls",
  "tokio",
- "webpki 0.22.0",
+ "webpki",
 ]
 
 [[package]]
@@ -2370,16 +2371,6 @@ dependencies = [
 
 [[package]]
 name = "webpki"
-version = "0.21.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
-dependencies = [
- "ring",
- "untrusted",
-]
-
-[[package]]
-name = "webpki"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f095d78192e208183081cc07bc5515ef55216397af48b873e5edcd72637fa1bd"
@@ -2390,11 +2381,11 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.21.1"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aabe153544e473b775453675851ecc86863d2a81d786d741f6b76778f2a48940"
+checksum = "c475786c6f47219345717a043a37ec04cb4bc185e28853adcc4fa0a947eba630"
 dependencies = [
- "webpki 0.21.4",
+ "webpki",
 ]
 
 [[package]]

@@ -68,9 +68,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.51"
+version = "1.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b26702f315f53b6071259e15dd9d64528213b44d61de1ec926eca7715d62203"
+checksum = "84450d0b4a8bd1ba4144ce8ce718fbc5d071358b1e5384bace6536b3d1f2d5b3"
 
 [[package]]
 name = "async-io"
@@ -1022,9 +1022,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lddtree"
-version = "0.2.0"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c530d2918615bf5a01051451a5cd07be67d076fc8242c99e877cf9abc90fdf07"
+checksum = "738eccba56c448014efe5a639caf93eb67c3c73d0443e2be7c874bd642d9c718"
 dependencies = [
  "fs-err",
  "glob",
@@ -1134,9 +1134,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "0.8.2"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c8de52c925a3f40bd30cb2041440eb3d11658b9a2b8564c1d66fba41c890dc6"
+checksum = "f5845fa23c29f4e18dae729732238a41b836ca9de8604162b2422139bd26c089"
 dependencies = [
  "serde",
 ]
@@ -1938,9 +1938,9 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
-version = "1.0.82"
+version = "1.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8daf5dd0bb60cbd4137b1b587d2fc0ae729bc07cf01cd70b36a1ed5ade3b9d59"
+checksum = "23a1dfb999630e338648c83e91c59a4e9fb7620f520c3194b6b89e276f2f1959"
 dependencies = [
  "proc-macro2",
  "quote",

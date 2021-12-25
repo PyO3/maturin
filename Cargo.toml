@@ -58,9 +58,9 @@ console = "0.15.0"
 minijinja = "0.10.0"
 lddtree = "0.2.0"
 cc = "1.0.72"
-clap = { version = "3.0.0-rc.7", features = ["derive", "env", "wrap_help"] }
-clap_generate = "3.0.0-rc.7"
-clap_generate_fig = "3.0.0-rc.7"
+clap = { version = "3.0.0", features = ["derive", "env", "wrap_help"] }
+clap_complete = "3.0.0"
+clap_complete_fig = "3.0.0"
 
 [dev-dependencies]
 indoc = "1.0.3"

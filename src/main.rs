@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{ArgEnum, IntoApp, Parser};
-use clap_generate::Generator;
+use clap_complete::Generator;
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
     GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
@@ -428,19 +428,19 @@ fn run() -> Result<()> {
             match shell {
                 Shell::Fig => {
                     app.set_bin_name(env!("CARGO_BIN_NAME"));
-                    let fig = clap_generate_fig::Fig;
+                    let fig = clap_complete_fig::Fig;
                     fig.generate(&app, &mut io::stdout());
                 }
                 _ => {
                     let shell = match shell {
-                        Shell::Bash => clap_generate::Shell::Bash,
-                        Shell::Elvish => clap_generate::Shell::Elvish,
-                        Shell::Fish => clap_generate::Shell::Fish,
-                        Shell::PowerShell => clap_generate::Shell::PowerShell,
-                        Shell::Zsh => clap_generate::Shell::Zsh,
+                        Shell::Bash => clap_complete::Shell::Bash,
+                        Shell::Elvish => clap_complete::Shell::Elvish,
+                        Shell::Fish => clap_complete::Shell::Fish,
+                        Shell::PowerShell => clap_complete::Shell::PowerShell,
+                        Shell::Zsh => clap_complete::Shell::Zsh,
                         Shell::Fig => unreachable!(),
                     };
-                    clap_generate::generate(
+                    clap_complete::generate(
                         shell,
                         &mut app,
                         env!("CARGO_BIN_NAME"),

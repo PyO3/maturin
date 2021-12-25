@@ -68,7 +68,7 @@ pub struct BuildOptions {
     /// Default to manylinux2010/manylinux_2_12 if you do not specify an `--compatibility`
     ///
     /// Make sure you installed zig with `pip install maturin[zig]`
-    #[structopt(long)]
+    #[clap(long)]
     pub zig: bool,
     /// The --target option for cargo
     #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]

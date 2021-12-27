@@ -100,6 +100,7 @@ fn integration_pyo3_pure() {
         "test-crates/pyo3-pure",
         None,
         "integration_pyo3_pure",
+        false,
     ));
 }
 
@@ -109,6 +110,7 @@ fn integration_pyo3_mixed() {
         "test-crates/pyo3-mixed",
         None,
         "integration_pyo3_mixed",
+        false,
     ));
 }
 
@@ -118,6 +120,7 @@ fn integration_pyo3_mixed_submodule() {
         "test-crates/pyo3-mixed-submodule",
         None,
         "integration_pyo3_mixed_submodule",
+        false,
     ));
 }
 
@@ -127,6 +130,7 @@ fn integration_pyo3_mixed_py_subdir() {
         "test-crates/pyo3-mixed-py-subdir",
         None,
         "integration_pyo3_mixed_py_subdir",
+        true,
     ));
 }
 
@@ -146,6 +150,7 @@ fn integration_cffi_pure() {
         "test-crates/cffi-pure",
         None,
         "integration_cffi_pure",
+        false,
     ));
 }
 
@@ -155,6 +160,7 @@ fn integration_cffi_mixed() {
         "test-crates/cffi-mixed",
         None,
         "integration_cffi_mixed",
+        false,
     ));
 }
 
@@ -164,6 +170,7 @@ fn integration_hello_world() {
         "test-crates/hello-world",
         None,
         "integration_hello_world",
+        false,
     ));
 }
 

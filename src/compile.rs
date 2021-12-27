@@ -112,18 +112,26 @@ fn compile_universal2(
 /// We create different files for different args because otherwise cargo might skip recompiling even
 /// if the linker target changed
 fn prepare_zig_linker(context: &BuildContext) -> Result<PathBuf> {
-    let (zig_linker, target) = match context.platform_tag {
+    let (zig_linker, cc_args) = match context.platform_tag {
+        // Not sure branch even has any use case, but it doesn't hurt to support it
         None | Some(PlatformTag::Linux) => (
             "./zigcc-gnu.sh".to_string(),
             "native-native-gnu".to_string(),
         ),
-        Some(PlatformTag::Musllinux { x, y }) => (
-            format!("./zigcc-musl-{}-{}.sh", x, y),
-            format!("native-native-musl.{}.{}", x, y),
-        ),
+        Some(PlatformTag::Musllinux { x, y }) => {
+            println!("⚠️  Warning: zig with musl is unstable");
+            (
+                format!("./zigcc-musl-{}-{}.sh", x, y),
+                format!("-target native-native-musl.{}.{}", x, y),
+            )
+        }
         Some(PlatformTag::Manylinux { x, y }) => (
             format!("./zigcc-gnu-{}-{}.sh", x, y),
-            format!("native-native-gnu.{}.{}", x, y),
+            // https://github.com/ziglang/zig/issues/10050#issuecomment-956204098
+            format!(
+                "${{@/-lgcc_s/-lunwind}} -target native-native-gnu.{}.{}",
+                x, y
+            ),
         ),
     };
 
@@ -144,16 +152,8 @@ fn prepare_zig_linker(context: &BuildContext) -> Result<PathBuf> {
         .open(&zig_linker)?;
     #[cfg(not(target_family = "unix"))]
     let mut custom_linker_file = File::create(&zig_linker)?;
-    // https://github.com/ziglang/zig/issues/10050#issuecomment-956204098
-    custom_linker_file.write_all(
-        format!(
-            r##"#!/bin/bash
-python -m ziglang cc ${{@/-lgcc_s/-lunwind}} -target {}
-"##,
-            target
-        )
-        .as_bytes(),
-    )?;
+    writeln!(&mut custom_linker_file, "#!/bin/bash")?;
+    writeln!(&mut custom_linker_file, "python -m ziglang cc {}", cc_args)?;
     drop(custom_linker_file);
     Ok(zig_linker)
 }

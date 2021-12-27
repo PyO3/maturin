@@ -12,11 +12,11 @@ use fs_err::File;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_family = "unix")]
 use std::fs::OpenOptions;
 use std::io;
 use std::io::{Read, Write};
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_family = "unix")]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -164,7 +164,7 @@ impl ModuleWriter for PathWriter {
 
         // We only need to set the executable bit on unix
         let mut file = {
-            #[cfg(not(target_os = "windows"))]
+            #[cfg(target_family = "unix")]
             {
                 OpenOptions::new()
                     .create(true)

@@ -1,13 +1,17 @@
 use crate::build_context::BridgeModel;
 use crate::python_interpreter::InterpreterKind;
-use crate::BuildContext;
 use crate::PythonInterpreter;
+use crate::{BuildContext, PlatformTag};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use std::collections::HashMap;
 use std::env;
-use std::io::{BufReader, Read};
+#[cfg(target_family = "unix")]
+use std::fs::OpenOptions;
+use std::io::{BufReader, Read, Write};
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
@@ -101,11 +105,70 @@ fn compile_universal2(
     Ok(result)
 }
 
+/// We want to use `zig cc` as linker and c compiler. We want to call `python -m ziglang cc`, but
+/// cargo only accepts a path to an executable as linker, so we add a wrapper script. We then also
+/// use the wrapper script to pass arguments and substitute an unsupported argument.
+///
+/// We create different files for different args because otherwise cargo might skip recompiling even
+/// if the linker target changed
+fn prepare_zig_linker(context: &BuildContext) -> Result<PathBuf> {
+    let (zig_linker, target) = match context.platform_tag {
+        None | Some(PlatformTag::Linux) => (
+            "./zigcc-gnu.sh".to_string(),
+            "native-native-gnu".to_string(),
+        ),
+        Some(PlatformTag::Musllinux { x, y }) => (
+            format!("./zigcc-musl-{}-{}.sh", x, y),
+            format!("native-native-musl.{}.{}", x, y),
+        ),
+        Some(PlatformTag::Manylinux { x, y }) => (
+            format!("./zigcc-gnu-{}-{}.sh", x, y),
+            format!("native-native-gnu.{}.{}", x, y),
+        ),
+    };
+
+    let zig_linker_dir = dirs::cache_dir()
+        // If the really is no cache dir, cwd will also do
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(env!("CARGO_PKG_NAME"))
+        .join(env!("CARGO_PKG_VERSION"));
+    fs::create_dir_all(&zig_linker_dir)?;
+    let zig_linker = zig_linker_dir.join(zig_linker);
+
+    #[cfg(target_family = "unix")]
+    let mut custom_linker_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .mode(0o700)
+        .open(&zig_linker)?;
+    #[cfg(not(target_family = "unix"))]
+    let mut custom_linker_file = File::create(&zig_linker)?;
+    // https://github.com/ziglang/zig/issues/10050#issuecomment-956204098
+    custom_linker_file.write_all(
+        format!(
+            r##"#!/bin/bash
+python -m ziglang cc ${{@/-lgcc_s/-lunwind}} -target {}
+"##,
+            target
+        )
+        .as_bytes(),
+    )?;
+    drop(custom_linker_file);
+    Ok(zig_linker)
+}
+
 fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
+    let zig_linker = if context.zig && context.target.is_linux() {
+        Some(prepare_zig_linker(context).context("Failed to create zig linker wrapper")?)
+    } else {
+        None
+    };
+
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
     shared_args.extend(context.cargo_extra_args.iter().map(String::as_str));
@@ -206,6 +269,16 @@ fn compile_target(
         // We can't get colored human and json messages from rustc as they are mutually exclusive,
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
+
+    if let Some(zig_linker) = zig_linker {
+        build_command.env("CC", &zig_linker);
+        let env_target = context
+            .target
+            .target_triple()
+            .to_uppercase()
+            .replace("-", "_");
+        build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_linker);
+    }
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
         let is_pypy = python_interpreter

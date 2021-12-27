@@ -15,7 +15,7 @@ pub mod other;
 // Y U NO accept windows path prefix, pip?
 // Anyways, here's shepmasters stack overflow solution
 // https://stackoverflow.com/a/50323079/3549270
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_family = "unix")]
 pub fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
     p.as_ref().display().to_string()
 }

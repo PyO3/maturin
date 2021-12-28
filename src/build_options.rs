@@ -293,7 +293,7 @@ impl BuildOptions {
                 // With zig we can compile to any glibc version that we want, so we pick the lowest
                 // one supported by the rust compiler
                 if self.zig && !target.is_musl_target() {
-                    Some(PlatformTag::manylinux2010())
+                    Some(target.get_default_manylinux_tag())
                 } else {
                     None
                 },

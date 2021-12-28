@@ -1,7 +1,7 @@
 use crate::build_context::BridgeModel;
 use crate::python_interpreter::InterpreterKind;
-use crate::PythonInterpreter;
-use crate::{BuildContext, PlatformTag};
+use crate::target::Arch;
+use crate::{BuildContext, PlatformTag, PythonInterpreter};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
@@ -112,25 +112,34 @@ fn compile_universal2(
 /// We create different files for different args because otherwise cargo might skip recompiling even
 /// if the linker target changed
 fn prepare_zig_linker(context: &BuildContext) -> Result<PathBuf> {
+    let target = &context.target;
+    let arch = if target.cross_compiling() {
+        if matches!(target.target_arch(), Arch::Armv7L) {
+            "armv7".to_string()
+        } else {
+            target.target_arch().to_string()
+        }
+    } else {
+        "native".to_string()
+    };
     let (zig_linker, cc_args) = match context.platform_tag {
         // Not sure branch even has any use case, but it doesn't hurt to support it
-        None | Some(PlatformTag::Linux) => (
-            "./zigcc-gnu.sh".to_string(),
-            "native-native-gnu".to_string(),
-        ),
+        None | Some(PlatformTag::Linux) => {
+            ("./zigcc-gnu.sh".to_string(), format!("{}-linux-gnu", arch))
+        }
         Some(PlatformTag::Musllinux { x, y }) => {
             println!("⚠️  Warning: zig with musl is unstable");
             (
                 format!("./zigcc-musl-{}-{}.sh", x, y),
-                format!("-target native-native-musl.{}.{}", x, y),
+                format!("{}-linux-musl", arch),
             )
         }
         Some(PlatformTag::Manylinux { x, y }) => (
             format!("./zigcc-gnu-{}-{}.sh", x, y),
             // https://github.com/ziglang/zig/issues/10050#issuecomment-956204098
             format!(
-                "${{@/-lgcc_s/-lunwind}} -target native-native-gnu.{}.{}",
-                x, y
+                "${{@/-lgcc_s/-lunwind}} -target {}-linux-gnu.{}.{}",
+                arch, x, y
             ),
         ),
     };
@@ -271,14 +280,13 @@ fn compile_target(
         .stderr(Stdio::inherit());
 
     if let Some(zig_linker) = zig_linker {
-        build_command.env("CC", &zig_linker);
         let env_target = context
             .target
             .target_triple()
             .to_uppercase()
             .replace("-", "_");
+        build_command.env(format!("{}_CC", env_target), &zig_linker);
         build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_linker);
-        build_command.env("TARGET_CC", &zig_linker);
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {

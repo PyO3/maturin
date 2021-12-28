@@ -2,6 +2,7 @@ import json
 import platform
 import sys
 import sysconfig
+import struct
 
 if platform.python_implementation() == "PyPy":
     # Workaround for PyPy 3.6 on windows:
@@ -28,6 +29,8 @@ metadata = {
     "platform": sysconfig.get_platform(),
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),
+    # This one is for generating a config file for pyo3
+    "calcsize_pointer": struct.calcsize("P"),
 }
 
 print(json.dumps(metadata))

@@ -1,7 +1,7 @@
 use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
-use crate::python_interpreter::{InterpreterKind, MINIMUM_PYTHON_MINOR};
+use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Metadata21;
@@ -619,6 +619,30 @@ fn find_single_python_interpreter(
     Ok(interpreter)
 }
 
+fn find_host_interpreter(
+    bridge: &BridgeModel,
+    interpreter: &[PathBuf],
+    target: &Target,
+    min_python_minor: Option<usize>,
+) -> Result<Vec<PythonInterpreter>> {
+    let interpreters = if !interpreter.is_empty() {
+        PythonInterpreter::check_executables(interpreter, target, bridge)
+            .context("The given list of python interpreters is invalid")?
+    } else {
+        PythonInterpreter::find_all(target, bridge, min_python_minor)
+            .context("Finding python interpreters failed")?
+    };
+
+    if interpreters.is_empty() {
+        if let Some(minor) = min_python_minor {
+            bail!("Couldn't find any python interpreters with version >= 3.{}. Please specify at least one with -i", minor);
+        } else {
+            bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+        }
+    }
+    Ok(interpreters)
+}
+
 /// Finds the appropriate amount for python versions for each [BridgeModel].
 ///
 /// This means all for bindings, one for cffi and zero for bin.
@@ -631,26 +655,13 @@ pub fn find_interpreter(
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
         BridgeModel::Bindings(binding_name, _) => {
-            let mut interpreter = if !interpreter.is_empty() {
-                PythonInterpreter::check_executables(interpreter, target, bridge)
-                    .context("The given list of python interpreters is invalid")?
-            } else {
-                PythonInterpreter::find_all(target, bridge, min_python_minor)
-                    .context("Finding python interpreters failed")?
-            };
-
-            if interpreter.is_empty() {
-                if let Some(minor) = min_python_minor {
-                    bail!("Couldn't find any python interpreters with version >= 3.{}. Please specify at least one with -i", minor);
-                } else {
-                    bail!("Couldn't find any python interpreters. Please specify at least one with -i");
-                }
-            }
-
+            let mut interpreters = Vec::new();
             if binding_name.starts_with("pyo3") && target.is_unix() && target.cross_compiling() {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
+                    let host_interpreters =
+                        find_host_interpreter(bridge, interpreter, target, min_python_minor)?;
                     println!("⚠️ Cross-compiling is poorly supported");
-                    let host_python = &interpreter[0];
+                    let host_python = &host_interpreters[0];
                     println!(
                         "🐍 Using host {} for cross-compiling preparation",
                         host_python
@@ -699,31 +710,81 @@ pub fn find_interpreter(
                             }
                         })
                         .context("unsupported Python interpreter")?;
-                    interpreter = vec![PythonInterpreter {
-                        major,
-                        minor,
-                        abiflags,
+                    interpreters.push(PythonInterpreter {
+                        config: InterpreterConfig {
+                            major,
+                            minor,
+                            interpreter_kind,
+                            abiflags,
+                            ext_suffix: ext_suffix.to_string(),
+                            abi_tag,
+                            calcsize_pointer: None,
+                        },
                         target: target.clone(),
                         executable: PathBuf::new(),
-                        ext_suffix: ext_suffix.to_string(),
-                        interpreter_kind,
-                        abi_tag,
                         platform: None,
                         runnable: false,
-                    }];
+                    });
+                } else {
+                    if interpreter.is_empty() {
+                        bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+                    }
+                    for interp in interpreter {
+                        let python = interp
+                            .file_name()
+                            .context("Invalid python interpreter")?
+                            .to_string_lossy();
+                        let (python_impl, python_ver) =
+                            if let Some(ver) = python.strip_prefix("pypy") {
+                                (InterpreterKind::PyPy, ver)
+                            } else if let Some(ver) = python.strip_prefix("python") {
+                                (InterpreterKind::CPython, ver)
+                            } else {
+                                bail!("Unsupported Python interpreter: {}", python);
+                            };
+                        let (ver_major, ver_minor) = python_ver
+                            .split_once('.')
+                            .context("Invalid python interpreter version")?;
+                        let ver_major = ver_major.parse::<usize>().with_context(|| {
+                            format!(
+                                "Invalid python interpreter major version '{}', expect a digit",
+                                ver_major
+                            )
+                        })?;
+                        let ver_minor = ver_minor.parse::<usize>().with_context(|| {
+                            format!(
+                                "Invalid python interpreter minor version '{}', expect a digit",
+                                ver_minor
+                            )
+                        })?;
+                        let sysconfig = InterpreterConfig::lookup(
+                            target.target_os(),
+                            target.target_arch(),
+                            python_impl,
+                            (ver_major, ver_minor),
+                        )
+                        .context("Failed to find a python interpreter")?;
+                        interpreters.push(PythonInterpreter::from_config(
+                            sysconfig.clone(),
+                            target.clone(),
+                        ));
+                    }
                 }
+            } else {
+                interpreters =
+                    find_host_interpreter(bridge, interpreter, target, min_python_minor)?;
             }
 
             println!(
                 "🐍 Found {}",
-                interpreter
+                interpreters
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")
             );
 
-            Ok(interpreter)
+            Ok(interpreters)
         }
         BridgeModel::Cffi => {
             let interpreter = find_single_python_interpreter(bridge, interpreter, target, "cffi")?;
@@ -748,14 +809,17 @@ pub fn find_interpreter(
                     // when cross compiling, so we fake a python interpreter matching it
                     println!("⚠️  Cross-compiling is poorly supported");
                     Ok(vec![PythonInterpreter {
-                        major: *major as usize,
-                        minor: *minor as usize,
-                        abiflags: "".to_string(),
+                        config: InterpreterConfig {
+                            major: *major as usize,
+                            minor: *minor as usize,
+                            interpreter_kind: InterpreterKind::CPython,
+                            abiflags: "".to_string(),
+                            ext_suffix: ".pyd".to_string(),
+                            abi_tag: None,
+                            calcsize_pointer: None,
+                        },
                         target: target.clone(),
                         executable: PathBuf::new(),
-                        ext_suffix: ".pyd".to_string(),
-                        interpreter_kind: InterpreterKind::CPython,
-                        abi_tag: None,
                         platform: None,
                         runnable: false,
                     }])
@@ -766,14 +830,17 @@ pub fn find_interpreter(
                     println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
                     // fake a python interpreter
                     Ok(vec![PythonInterpreter {
-                        major: *major as usize,
-                        minor: *minor as usize,
-                        abiflags: "".to_string(),
+                        config: InterpreterConfig {
+                            major: *major as usize,
+                            minor: *minor as usize,
+                            interpreter_kind: InterpreterKind::CPython,
+                            abiflags: "".to_string(),
+                            ext_suffix: ".pyd".to_string(),
+                            abi_tag: None,
+                            calcsize_pointer: None,
+                        },
                         target: target.clone(),
                         executable: PathBuf::new(),
-                        ext_suffix: ".pyd".to_string(),
-                        interpreter_kind: InterpreterKind::CPython,
-                        abi_tag: None,
                         platform: None,
                         runnable: false,
                     }])

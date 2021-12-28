@@ -1,3 +1,4 @@
+pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
 use crate::{BridgeModel, Target};
 use anyhow::{bail, format_err, Context, Result};
@@ -6,9 +7,12 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
 use std::io;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
+
+mod config;
 
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
@@ -228,7 +232,8 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     Ok(interpreter)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum InterpreterKind {
     CPython,
     PyPy,
@@ -261,16 +266,9 @@ struct IntepreterMetadataMessage {
 /// The location and version of an interpreter
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PythonInterpreter {
+    /// Python's sysconfig
     /// Python's major version
-    pub major: usize,
-    /// Python's minor version
-    pub minor: usize,
-    /// For linux and mac, this contains the value of the abiflags, e.g. "m"
-    /// for python3.7m or "dm" for python3.6dm. Since python3.8, the value is
-    /// empty. On windows, the value was always "".
-    ///
-    /// See PEP 261 and PEP 393 for details
-    pub abiflags: String,
+    pub config: InterpreterConfig,
     /// Currently just the value of [Target::os()], i.e. "windows", "linux",
     /// "macos" or "freebsd"
     pub target: Target,
@@ -278,14 +276,6 @@ pub struct PythonInterpreter {
     ///
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
     pub executable: PathBuf,
-    /// Suffix to use for extension modules as given by sysconfig.
-    pub ext_suffix: String,
-    /// cpython or pypy
-    pub interpreter_kind: InterpreterKind,
-    /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
-    ///
-    /// Note that this always `None` on windows
-    pub abi_tag: Option<String>,
     /// Comes from `sysconfig.get_platform()`
     ///
     /// Note that this can be `None` when cross compiling
@@ -295,6 +285,14 @@ pub struct PythonInterpreter {
     /// When cross compile the target interpreter isn't runnable,
     /// and it's `executable` is empty
     pub runnable: bool,
+}
+
+impl Deref for PythonInterpreter {
+    type Target = InterpreterConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &self.config
+    }
 }
 
 /// Returns the abiflags that are assembled through the message, with some
@@ -515,19 +513,33 @@ impl PythonInterpreter {
         };
 
         Ok(Some(PythonInterpreter {
-            major: message.major,
-            minor: message.minor,
-            abiflags,
+            config: InterpreterConfig {
+                major: message.major,
+                minor: message.minor,
+                interpreter_kind: interpreter,
+                abiflags,
+                ext_suffix: message
+                    .ext_suffix
+                    .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
+                abi_tag: message.abi_tag,
+                calcsize_pointer: None,
+            },
             target: target.clone(),
             executable: executable.as_ref().to_path_buf(),
-            ext_suffix: message
-                .ext_suffix
-                .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
-            interpreter_kind: interpreter,
-            abi_tag: message.abi_tag,
             platform,
             runnable: true,
         }))
+    }
+
+    /// Construct a `PythonInterpreter` from a sysconfig and target
+    pub fn from_config(config: InterpreterConfig, target: Target) -> Self {
+        PythonInterpreter {
+            config,
+            target,
+            executable: PathBuf::new(),
+            platform: None,
+            runnable: false,
+        }
     }
 
     /// Tries to find all installed python versions using the heuristic for the
@@ -645,17 +657,20 @@ impl fmt::Display for PythonInterpreter {
             write!(
                 f,
                 "{} {}.{}{} at {}",
-                self.interpreter_kind,
-                self.major,
-                self.minor,
-                self.abiflags,
+                self.config.interpreter_kind,
+                self.config.major,
+                self.config.minor,
+                self.config.abiflags,
                 self.executable.display()
             )
         } else {
             write!(
                 f,
                 "cross compiling target {} {}.{}{}",
-                self.interpreter_kind, self.major, self.minor, self.abiflags,
+                self.config.interpreter_kind,
+                self.config.major,
+                self.config.minor,
+                self.config.abiflags,
             )
         }
     }

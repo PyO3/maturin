@@ -3,6 +3,7 @@ use crate::python_interpreter::InterpreterKind;
 use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use platform_info::*;
+use serde::Deserialize;
 use std::env;
 use std::fmt;
 use std::path::Path;
@@ -11,8 +12,9 @@ use std::str;
 use target_lexicon::{Environment, Triple};
 
 /// All supported operating system
-#[derive(Debug, Clone, Eq, PartialEq)]
-enum Os {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Os {
     Linux,
     Windows,
     Macos,
@@ -41,12 +43,16 @@ impl fmt::Display for Os {
 }
 
 /// All supported CPU architectures
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Arch {
     Aarch64,
     Armv7L,
+    #[serde(alias = "ppc64le")]
     Powerpc64Le,
+    #[serde(alias = "ppc64")]
     Powerpc64,
+    #[serde(alias = "i686")]
     X86,
     X86_64,
     S390X,
@@ -346,6 +352,11 @@ impl Target {
             | Os::Illumos
             | Os::Haiku => true,
         }
+    }
+
+    /// Returns target operating system
+    pub fn target_os(&self) -> Os {
+        self.os
     }
 
     /// Returns target architecture

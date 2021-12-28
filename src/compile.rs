@@ -110,6 +110,7 @@ fn compile_target(
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
     let target = &context.target;
+
     let mut shared_args: Vec<_> = context
         .cargo_extra_args
         .iter()
@@ -238,15 +239,35 @@ fn compile_target(
         }
     }
 
-    if let Some(python_interpreter) = python_interpreter {
+    // Setup `PYO3_CONFIG_FILE` if we are cross compiling for pyo3 bindings
+    if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling
-        if python_interpreter.runnable {
+        if interpreter.runnable {
             if bindings_crate.is_bindings("pyo3") || bindings_crate.is_bindings("pyo3-ffi") {
-                build_command.env("PYO3_PYTHON", &python_interpreter.executable);
+                build_command.env("PYO3_PYTHON", &interpreter.executable);
             }
 
             // rust-cpython, and legacy pyo3 versions
-            build_command.env("PYTHON_SYS_EXECUTABLE", &python_interpreter.executable);
+            build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
+        } else if (bindings_crate.is_bindings("pyo3") || bindings_crate.is_bindings("pyo3-ffi"))
+            && env::var_os("PYO3_CONFIG_FILE").is_none()
+        {
+            let pyo3_config = interpreter.pyo3_config_file();
+            let maturin_target_dir = context.target_dir.join("maturin");
+            let config_file = maturin_target_dir.join(format!(
+                "pyo3-config-{}-{}.{}.txt",
+                target.target_triple(),
+                interpreter.major,
+                interpreter.minor
+            ));
+            fs::create_dir_all(&maturin_target_dir)?;
+            fs::write(&config_file, pyo3_config).with_context(|| {
+                format!(
+                    "Failed to create pyo3 config file at '{}'",
+                    config_file.display()
+                )
+            })?;
+            build_command.env("PYO3_CONFIG_FILE", config_file);
         }
     }
 

@@ -1,0 +1,318 @@
+{
+  "x86_64": [
+    {
+      "major": 3,
+      "minor": 6,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-36m-x86_64-linux-gnu.so",
+      "abi_tag": "36m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-37m-x86_64-linux-gnu.so",
+      "abi_tag": "37m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38-x86_64-linux-gnu.so",
+      "abi_tag": "38",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39-x86_64-linux-gnu.so",
+      "abi_tag": "39",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-x86_64-linux-gnu.so",
+      "abi_tag": "310",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy37-pp73-x86_64-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy38-pp73-x86_64-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy39-pp73-x86_64-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 8
+    }
+  ],
+  "i686": [
+    {
+      "major": 3,
+      "minor": 6,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-36m-i386-linux-gnu.so",
+      "abi_tag": "36m",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-37m-i386-linux-gnu.so",
+      "abi_tag": "37m",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38-i386-linux-gnu.so",
+      "abi_tag": "38",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39-i386-linux-gnu.so",
+      "abi_tag": "39",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-i386-linux-gnu.so",
+      "abi_tag": "310",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy37-pp73-x86-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy38-pp73-x86-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 4
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy39-pp73-x86-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 4
+    }
+  ],
+  "aarch64": [
+    {
+      "major": 3,
+      "minor": 6,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-36m-aarch64-linux-gnu.so",
+      "abi_tag": "36m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-37m-aarch64-linux-gnu.so",
+      "abi_tag": "37m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38-aarch64-linux-gnu.so",
+      "abi_tag": "38",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39-aarch64-linux-gnu.so",
+      "abi_tag": "39",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-aarch64-linux-gnu.so",
+      "abi_tag": "310",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy37-pp73-aarch64-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy38-pp73-aarch64-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy39-pp73-aarch64-linux-gnu.so",
+      "abi_tag": "pp73",
+      "calcsize_pointer": 8
+    }
+  ],
+  "ppc64le": [
+    {
+      "major": 3,
+      "minor": 6,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-36m-powerpc64le-linux-gnu.so",
+      "abi_tag": "36m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-37m-powerpc64le-linux-gnu.so",
+      "abi_tag": "37m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38-powerpc64le-linux-gnu.so",
+      "abi_tag": "38",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39-powerpc64le-linux-gnu.so",
+      "abi_tag": "39",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-powerpc64le-linux-gnu.so",
+      "abi_tag": "310",
+      "calcsize_pointer": 8
+    }
+  ],
+  "s390x": [
+    {
+      "major": 3,
+      "minor": 6,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-36m-s390x-linux-gnu.so",
+      "abi_tag": "36m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-37m-s390x-linux-gnu.so",
+      "abi_tag": "37m",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38-s390x-linux-gnu.so",
+      "abi_tag": "38",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39-s390x-linux-gnu.so",
+      "abi_tag": "39",
+      "calcsize_pointer": 8
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-s390x-linux-gnu.so",
+      "abi_tag": "310",
+      "calcsize_pointer": 8
+    }
+  ]
+}

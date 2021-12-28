@@ -106,6 +106,13 @@ jobs:
           pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-pure/target/wheels pyo3-pure
           pypy3 -m pip install pytest
           pypy3 -m pytest test-crates/pyo3-pure/test_pyo3_pure.py
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.0"
+      - name: test cross compiling with zig
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
 
   test-auditwheel:
     name: Test Auditwheel

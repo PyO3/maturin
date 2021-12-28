@@ -278,6 +278,7 @@ fn compile_target(
             .to_uppercase()
             .replace("-", "_");
         build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_linker);
+        build_command.env("TARGET_CC", &zig_linker);
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {

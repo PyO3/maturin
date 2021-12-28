@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.10.0"
       - name: Install cffi and virtualenv
-        run: pip install cffi virtualenv
+        run: pip install cffi virtualenv ziglang~=0.9.0
       - uses: actions-rs/toolchain@v1
         id: rustup
         with:

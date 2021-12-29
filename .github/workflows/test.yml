@@ -110,6 +110,7 @@ jobs:
         with:
           python-version: "3.10.0"
       - name: test cross compiling with zig
+        if: matrix.os != 'windows-latest'
         run: |
           rustup target add aarch64-unknown-linux-gnu
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig

@@ -183,7 +183,7 @@ fn create_linker_script(path: &Path) -> Result<std::fs::File> {
 
 #[cfg(not(target_family = "unix"))]
 fn create_linker_script(path: &Path) -> Result<File> {
-    File::create(path)
+    Ok(File::create(path)?)
 }
 
 fn compile_target(

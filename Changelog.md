@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add support for repairing cross compiled linux wheels in [#754](https://github.com/PyO3/maturin/pull/754)
 * Add support for `manylinux_2_28` and `manylinux_2_31` in [#755](https://github.com/PyO3/maturin/pull/755)
+* Remove existing so file first in `maturin develop` command to avoid triggering SIGSEV in running process in [#760](https://github.com/PyO3/maturin/pull/760)
 
 ## [0.12.5] - 2021-12-20
 

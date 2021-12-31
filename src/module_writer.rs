@@ -628,6 +628,9 @@ pub fn write_bindings_module(
 
             if editable {
                 let target = rust_module.join(&so_filename);
+                // Remove existing so file to avoid triggering SIGSEV in running process
+                // See https://github.com/PyO3/maturin/issues/758
+                let _ = fs::remove_file(&target);
                 fs::copy(&artifact, &target).context(format!(
                     "Failed to copy {} to {}",
                     artifact.display(),

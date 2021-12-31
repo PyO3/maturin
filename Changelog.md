@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.6] - 2021-12-31
+
 * Add support for repairing cross compiled linux wheels in [#754](https://github.com/PyO3/maturin/pull/754)
 * Add support for `manylinux_2_28` and `manylinux_2_31` in [#755](https://github.com/PyO3/maturin/pull/755)
 * Remove existing so file first in `maturin develop` command to avoid triggering SIGSEV in running process in [#760](https://github.com/PyO3/maturin/pull/760)
@@ -515,7 +517,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.5...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.6...HEAD
+[0.12.6]: https://github.com/pyo3/maturin/compare/v0.12.5...v0.12.6
 [0.12.5]: https://github.com/pyo3/maturin/compare/v0.12.4...v0.12.5
 [0.12.4]: https://github.com/pyo3/maturin/compare/v0.12.3...v0.12.4
 [0.12.3]: https://github.com/pyo3/maturin/compare/v0.12.2...v0.12.3

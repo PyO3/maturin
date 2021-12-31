@@ -19,6 +19,7 @@ pub fn test_musl() -> Result<bool> {
     use std::fs;
     use std::io::ErrorKind;
     use std::io::Read;
+    use std::path::PathBuf;
     use std::process::Command;
 
     let get_target_list = Command::new("rustup")

@@ -35,6 +35,7 @@ pub fn develop(
         manifest_path: manifest_file.to_path_buf(),
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
+        zig: false,
         target: None,
         cargo_extra_args,
         rustc_extra_args,
@@ -113,7 +114,7 @@ pub fn develop(
 // Y U NO accept windows path prefix, pip?
 // Anyways, here's shepmasters stack overflow solution
 // https://stackoverflow.com/a/50323079/3549270
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_family = "unix")]
 fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
     p.as_ref().display().to_string()
 }

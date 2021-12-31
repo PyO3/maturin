@@ -158,8 +158,10 @@ pub struct BuildContext {
     pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
-    /// Whether to skip checking the linked libraries for manylinux/musllinux compliance
+    /// Skip checking the linked libraries for manylinux/musllinux compliance
     pub skip_auditwheel: bool,
+    /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
+    pub zig: bool,
     /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
     pub platform_tag: Option<PlatformTag>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`

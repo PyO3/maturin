@@ -59,7 +59,7 @@ impl Display for Policy {
             f.write_str(&self.name)
         } else {
             f.write_fmt(format_args!(
-                "{}(aka {})",
+                "{} (aka {})",
                 &self.name,
                 self.aliases.join(",")
             ))

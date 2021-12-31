@@ -64,6 +64,13 @@ pub struct BuildOptions {
     /// Don't check for manylinux compliance
     #[structopt(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
+    /// For manylinux targets, use zig to ensure compliance for the chosen manylinux version
+    ///
+    /// Default to manylinux2010/manylinux_2_12 if you do not specify an `--compatibility`
+    ///
+    /// Make sure you installed zig with `pip install maturin[zig]`
+    #[structopt(long)]
+    pub zig: bool,
     /// The --target option for cargo
     #[structopt(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
     pub target: Option<String>,
@@ -96,6 +103,7 @@ impl Default for BuildOptions {
             manifest_path: PathBuf::from("Cargo.toml"),
             out: None,
             skip_auditwheel: false,
+            zig: false,
             target: None,
             cargo_extra_args: Vec::new(),
             rustc_extra_args: Vec::new(),
@@ -271,14 +279,25 @@ impl BuildOptions {
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
-        let platform_tag = self.platform_tag.or_else(|| {
-            pyproject.and_then(|x| {
-                if x.compatibility().is_some() {
-                    args_from_pyproject.push("compatibility");
-                }
-                x.compatibility()
+        let platform_tag = self
+            .platform_tag
+            .or_else(|| {
+                pyproject.and_then(|x| {
+                    if x.compatibility().is_some() {
+                        args_from_pyproject.push("compatibility");
+                    }
+                    x.compatibility()
+                })
             })
-        });
+            .or(
+                // With zig we can compile to any glibc version that we want, so we pick the lowest
+                // one supported by the rust compiler
+                if self.zig && !target.is_musl_target() {
+                    Some(target.get_minimum_manylinux_tag())
+                } else {
+                    None
+                },
+            );
         if platform_tag == Some(PlatformTag::manylinux1()) {
             eprintln!("⚠️  Warning: manylinux1 is unsupported by the Rust compiler.");
         }
@@ -302,6 +321,7 @@ impl BuildOptions {
             release,
             strip,
             skip_auditwheel,
+            zig: self.zig,
             platform_tag,
             cargo_extra_args,
             rustc_extra_args,

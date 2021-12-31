@@ -12,6 +12,7 @@ pub fn test_integration(
     package: impl AsRef<Path>,
     bindings: Option<String>,
     unique_name: &str,
+    zig: bool,
 ) -> Result<()> {
     maybe_mock_cargo();
 
@@ -32,8 +33,6 @@ pub fn test_integration(
         &cargo_extra_args,
         "--out",
         &shed,
-        "--compatibility",
-        "linux",
     ];
 
     if let Some(ref bindings) = bindings {
@@ -41,8 +40,14 @@ pub fn test_integration(
         cli.push(bindings);
     }
 
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    if zig {
+        cli.push("--zig")
+    } else {
+        cli.push("--compatibility");
+        cli.push("linux");
+    }
 
+    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
@@ -70,6 +75,11 @@ pub fn test_integration(
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
+        if zig && build_context.target.is_linux() && !build_context.target.is_musl_target() {
+            assert!(filename
+                .to_string_lossy()
+                .ends_with("manylinux_2_12_x86_64.manylinux2010_x86_64.whl"))
+        }
         let venv_name = if supported_version == "py3" {
             format!("{}-cffi", test_name)
         } else {

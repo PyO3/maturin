@@ -29,6 +29,7 @@ fn run() -> Result<()> {
     let env_key = env_args.replace(" ", "-").replace("/", "-");
     let cargo_key = cargo_args
         .replace("--message-format json", "")
+        .replace("--target-dir test-crates/targets/", "")
         .replace("--quiet", "")
         .replace(&cwd, "")
         .replace(" ", "-")

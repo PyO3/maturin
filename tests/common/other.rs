@@ -3,7 +3,7 @@ use flate2::read::GzDecoder;
 use maturin::BuildOptions;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use structopt::StructOpt;
 use tar::Archive;
 

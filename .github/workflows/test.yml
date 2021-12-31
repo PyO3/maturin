@@ -77,7 +77,7 @@ jobs:
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:
-          path: test-crates/*/target
+          path: test-crates/targets
           key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
 
       - name: cargo test

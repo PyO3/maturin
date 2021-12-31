@@ -12,7 +12,6 @@ pub fn test_integration(
     package: impl AsRef<Path>,
     bindings: Option<String>,
     unique_name: &str,
-    zig: bool,
 ) -> Result<()> {
     maybe_mock_cargo();
 

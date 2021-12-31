@@ -9,13 +9,23 @@ use std::str;
 use structopt::StructOpt;
 
 /// test PEP 660 editable installs
-pub fn test_editable(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_editable(
+    package: impl AsRef<Path>,
+    bindings: Option<String>,
+    unique_name: &str,
+) -> Result<()> {
     maybe_mock_cargo();
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
     let (venv_dir, python) = create_virtualenv(&package, "editable")?;
     let interpreter = python.to_str().expect("invalid interpreter path");
+    let cargo_extra_args = format!(
+        "--cargo-extra-args=--quiet --target-dir test-crates/targets/{}",
+        unique_name
+    );
+    let wheel_dir = format!("test-crates/wheels/{}", unique_name);
+
     // The first argument is ignored by clap
     let mut cli = vec![
         "build",
@@ -25,7 +35,9 @@ pub fn test_editable(package: impl AsRef<Path>, bindings: Option<String>) -> Res
         &package_string,
         "--compatibility",
         "linux",
-        "--cargo-extra-args='--quiet'",
+        &cargo_extra_args,
+        "--out",
+        &wheel_dir,
     ];
 
     if let Some(ref bindings) = bindings {
@@ -34,7 +46,6 @@ pub fn test_editable(package: impl AsRef<Path>, bindings: Option<String>) -> Res
     }
 
     let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
-
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), true)?;
     let wheels = build_context.build_wheels()?;
 

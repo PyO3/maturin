@@ -6,12 +6,20 @@ mod common;
 
 #[test]
 fn develop_pyo3_pure() {
-    handle_result(develop::test_develop("test-crates/pyo3-pure", None));
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-pure",
+        None,
+        "develop_pyo3_pure",
+    ));
 }
 
 #[test]
 fn develop_pyo3_mixed() {
-    handle_result(develop::test_develop("test-crates/pyo3-mixed", None));
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-mixed",
+        None,
+        "develop_pyo3_mixed",
+    ));
 }
 
 #[test]
@@ -19,6 +27,7 @@ fn develop_pyo3_mixed_submodule() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed-submodule",
         None,
+        "develop_pyo3_mixed_submodule",
     ));
 }
 
@@ -27,32 +36,53 @@ fn develop_pyo3_mixed_py_subdir() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed-py-subdir",
         None,
+        "develop_pyo3_mixed_py_subdir",
     ));
 }
 
 #[test]
 fn develop_cffi_pure() {
-    handle_result(develop::test_develop("test-crates/cffi-pure", None));
+    handle_result(develop::test_develop(
+        "test-crates/cffi-pure",
+        None,
+        "develop_cffi_pure",
+    ));
 }
 
 #[test]
 fn develop_cffi_mixed() {
-    handle_result(develop::test_develop("test-crates/cffi-mixed", None));
+    handle_result(develop::test_develop(
+        "test-crates/cffi-mixed",
+        None,
+        "develop_cffi_mixed",
+    ));
 }
 
 #[test]
 fn develop_hello_world() {
-    handle_result(develop::test_develop("test-crates/hello-world", None));
+    handle_result(develop::test_develop(
+        "test-crates/hello-world",
+        None,
+        "develop_hello_world",
+    ));
 }
 
 #[test]
 fn editable_pyo3_pure() {
-    handle_result(editable::test_editable("test-crates/pyo3-pure", None));
+    handle_result(editable::test_editable(
+        "test-crates/pyo3-pure",
+        None,
+        "editable_pyo3_pure",
+    ));
 }
 
 #[test]
 fn editable_pyo3_mixed() {
-    handle_result(editable::test_editable("test-crates/pyo3-mixed", None));
+    handle_result(editable::test_editable(
+        "test-crates/pyo3-mixed",
+        None,
+        "editable_pyo3_mixed",
+    ));
 }
 
 #[test]
@@ -60,12 +90,17 @@ fn editable_pyo3_mixed_py_subdir() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-mixed-py-subdir",
         None,
+        "editable_pyo3_mixed_py_subdir",
     ));
 }
 
 #[test]
 fn integration_pyo3_pure() {
-    handle_result(integration::test_integration("test-crates/pyo3-pure", None));
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-pure",
+        None,
+        "integration_pyo3_pure",
+    ));
 }
 
 #[test]
@@ -73,6 +108,7 @@ fn integration_pyo3_mixed() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed",
         None,
+        "integration_pyo3_mixed",
     ));
 }
 
@@ -81,6 +117,7 @@ fn integration_pyo3_mixed_submodule() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed-submodule",
         None,
+        "integration_pyo3_mixed_submodule",
     ));
 }
 
@@ -89,6 +126,7 @@ fn integration_pyo3_mixed_py_subdir() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed-py-subdir",
         None,
+        "integration_pyo3_mixed_py_subdir",
     ));
 }
 
@@ -104,7 +142,11 @@ fn integration_pyo3_pure_conda() {
 
 #[test]
 fn integration_cffi_pure() {
-    handle_result(integration::test_integration("test-crates/cffi-pure", None));
+    handle_result(integration::test_integration(
+        "test-crates/cffi-pure",
+        None,
+        "integration_cffi_pure",
+    ));
 }
 
 #[test]
@@ -112,6 +154,7 @@ fn integration_cffi_mixed() {
     handle_result(integration::test_integration(
         "test-crates/cffi-mixed",
         None,
+        "integration_cffi_mixed",
     ));
 }
 
@@ -120,6 +163,7 @@ fn integration_hello_world() {
     handle_result(integration::test_integration(
         "test-crates/hello-world",
         None,
+        "integration_hello_world",
     ));
 }
 
@@ -173,6 +217,7 @@ fn lib_with_path_dep_sdist() {
             "sdist_with_path_dep-0.1.0/src/lib.rs",
             "sdist_with_path_dep-0.1.0/PKG-INFO",
         ],
+        "lib_with_path_dep_sdist",
     ))
 }
 
@@ -190,5 +235,6 @@ fn workspace_with_path_dep_sdist() {
             "workspace_with_path_dep-0.1.0/src/lib.rs",
             "workspace_with_path_dep-0.1.0/PKG-INFO",
         ],
+        "workspace_with_path_dep_sdist",
     ))
 }

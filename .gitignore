@@ -11,3 +11,6 @@ dist/
 build
 dist
 tags
+test-crates/wheels/
+test-crates/targets/
+test-crates/venvs/

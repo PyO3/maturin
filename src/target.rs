@@ -300,8 +300,8 @@ impl Target {
         }
     }
 
-    /// Returns the default Manylinux tag for this architecture
-    pub fn get_default_manylinux_tag(&self) -> PlatformTag {
+    /// Returns the oldest possible Manylinux tag for this architecture
+    pub fn get_minimum_manylinux_tag(&self) -> PlatformTag {
         match self.arch {
             Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::S390X => {
                 PlatformTag::manylinux2014()

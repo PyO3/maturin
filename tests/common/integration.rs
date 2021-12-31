@@ -8,7 +8,12 @@ use structopt::StructOpt;
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
-pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_integration(
+    package: impl AsRef<Path>,
+    bindings: Option<String>,
+    unique_name: &str,
+    zig: bool,
+) -> Result<()> {
     maybe_mock_cargo();
 
     let target = Target::from_target_triple(None)?;
@@ -16,11 +21,18 @@ pub fn test_integration(package: impl AsRef<Path>, bindings: Option<String>) -> 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
     // The first argument is ignored by clap
+    let shed = format!("test-crates/wheels/{}", unique_name);
+    let cargo_extra_args = format!(
+        "--cargo-extra-args=--quiet --target-dir test-crates/targets/{}",
+        unique_name
+    );
     let mut cli = vec![
         "build",
         "--manifest-path",
         &package_string,
-        "--cargo-extra-args='--quiet'",
+        &cargo_extra_args,
+        "--out",
+        &shed,
         "--compatibility",
         "linux",
     ];
@@ -174,7 +186,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         "build",
         "--manifest-path",
         &package_string,
-        "--cargo-extra-args='--quiet'",
+        "--cargo-extra-args=--quiet",
     ];
 
     if let Some(ref bindings) = bindings {

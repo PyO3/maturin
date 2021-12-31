@@ -7,16 +7,20 @@ use std::str;
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "maturin develop" to install it and checks it is working
-pub fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_develop(
+    package: impl AsRef<Path>,
+    bindings: Option<String>,
+    unique_name: &str,
+) -> Result<()> {
     maybe_mock_cargo();
 
     let (venv_dir, python) = create_virtualenv(&package, "develop")?;
 
     // Ensure the test doesn't wrongly pass
-    check_installed(&package.as_ref(), &python).unwrap_err();
+    check_installed(package.as_ref(), &python).unwrap_err();
 
     let output = Command::new(&python)
-        .args(&["-m", "pip", "install", "-U", "pip", "cffi"])
+        .args(&["-m", "pip", "install", "cffi"])
         .output()?;
     if !output.status.success() {
         panic!(
@@ -31,7 +35,11 @@ pub fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
     develop(
         bindings,
         &manifest_file,
-        vec!["--quiet".to_string()],
+        vec![
+            "--quiet".to_string(),
+            "--target-dir".to_string(),
+            format!("test-crates/targets/{}", unique_name),
+        ],
         vec![],
         &venv_dir,
         false,
@@ -39,6 +47,6 @@ pub fn test_develop(package: impl AsRef<Path>, bindings: Option<String>) -> Resu
         vec![],
     )?;
 
-    check_installed(&package.as_ref(), &python)?;
+    check_installed(package.as_ref(), &python)?;
     Ok(())
 }

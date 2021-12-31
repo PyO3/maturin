@@ -3,7 +3,7 @@ use flate2::read::GzDecoder;
 use maturin::BuildOptions;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use tar::Archive;
 
@@ -13,7 +13,7 @@ use tar::Archive;
 /// The bool in the Ok() response says whether the test was actually run
 #[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
-    use anyhow::{bail, format_err};
+    use anyhow::bail;
     use fs_err::File;
     use goblin::elf::Elf;
     use std::fs;
@@ -57,14 +57,14 @@ pub fn test_musl() -> Result<bool> {
         "x86_64-unknown-linux-musl",
         "--compatibility",
         "linux",
+        "--cargo-extra-args=--quiet --target-dir test-crates/targets/test_musl",
+        "--out",
+        "test-crates/wheels/test_musl",
     ])?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
-    let built_lib = build_context
-        .manifest_path
-        .parent()
-        .ok_or(format_err!("Missing parent directory"))?
-        .join("target/x86_64-unknown-linux-musl/debug/hello-world");
+    let built_lib =
+        PathBuf::from("test-crates/targets/test_musl/x86_64-unknown-linux-musl/debug/hello-world");
     if built_lib.is_file() {
         fs::remove_file(&built_lib)?;
     }
@@ -94,6 +94,9 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "test-crates/workspace/py/Cargo.toml",
         "--compatibility",
         "linux",
+        "--cargo-extra-args=--quiet --target-dir test-crates/targets/test_workspace_cargo_lock",
+        "--out",
+        "test-crates/wheels/test_workspace_cargo_lock",
     ])?;
 
     let build_context = options.into_build_context(false, false, false)?;
@@ -106,13 +109,22 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 pub fn test_source_distribution(
     package: impl AsRef<Path>,
     expected_files: Vec<&str>,
+    unique_name: &str,
 ) -> Result<()> {
-    let manifest_dir = package.as_ref();
-    let manifest_path = manifest_dir.join("Cargo.toml");
-    let sdist_directory = tempfile::tempdir()?;
+    let manifest_path = package.as_ref().join("Cargo.toml");
+    let sdist_directory = Path::new("test-crates")
+        .join("wheels")
+        .join(unique_name)
+        .to_path_buf();
+
     let build_options = BuildOptions {
         manifest_path,
-        out: Some(sdist_directory.into_path()),
+        out: Some(sdist_directory),
+        cargo_extra_args: vec![
+            "--quiet".to_string(),
+            "--target-dir".to_string(),
+            "test-crates/targets/test_workspace_cargo_lock".to_string(),
+        ],
         ..Default::default()
     };
 

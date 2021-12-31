@@ -9,10 +9,10 @@ pub fn abi3_without_version() -> Result<()> {
         "build",
         "--manifest-path",
         "test-crates/pyo3-abi3-without-version/Cargo.toml",
-        "--cargo-extra-args='--quiet'",
+        "--cargo-extra-args=--quiet --target-dir test-targets/wheels/abi3_without_version",
     ];
 
-    let options = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
     let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
     if let Err(err) = result {
         assert_eq!(err.to_string(),
@@ -34,11 +34,13 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "build",
         "--manifest-path",
         "test-crates/pyo3-no-extension-module/Cargo.toml",
-        "--cargo-extra-args='--quiet'",
+        "--cargo-extra-args=--quiet --target-dir test-crates/targets/pyo3_no_extension_module",
         "-i=python",
+        "--out",
+        "test-crates/targets/pyo3_no_extension_module",
     ];
 
-    let options = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
     let result = options
         .into_build_context(false, cfg!(feature = "faster-tests"), false)?
         .build_wheels();
@@ -67,8 +69,9 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
         "build",
         "--manifest-path",
         "test-crates/lib_with_path_dep/Cargo.toml",
-        "--cargo-extra-args='--locked'",
-        "-i=python",
+        "--cargo-extra-args=--locked",
+        "-itargetspython",
+        "--cargo-extra-args=--target-dir test-crates/targets/locked_doesnt_build_without_cargo_lock",
     ];
     let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
     let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
@@ -104,6 +107,9 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "-i=python",
         "--compatibility",
         "manylinux_2_99",
+        "--cargo-extra-args=--target-dir test-crates/targets/invalid_manylinux_does_not_panic",
+        "--out",
+        "test-crates/targets/invalid_manylinux_does_not_panic",
     ];
     let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
     let result = options

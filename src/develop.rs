@@ -6,6 +6,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use std::path::Path;
 use std::process::Command;
 use std::str;
+use tempfile::TempDir;
 
 /// Installs a crate by compiling it and copying the shared library to site-packages.
 /// Also adds the dist-info directory to make sure pip and other tools detect the library
@@ -23,15 +24,16 @@ pub fn develop(
     extras: Vec<String>,
 ) -> Result<()> {
     let target = Target::from_target_triple(None)?;
-
     let python = target.get_venv_python(&venv_dir);
+    // Store wheel in a unique location so we don't get name clashes with parallel runs
+    let wheel_dir = TempDir::new().context("Failed to create temporary directory")?;
 
     let build_options = BuildOptions {
         platform_tag: Some(PlatformTag::Linux),
         interpreter: Some(vec![python.clone()]),
         bindings,
         manifest_path: manifest_file.to_path_buf(),
-        out: None,
+        out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
         target: None,
         cargo_extra_args,

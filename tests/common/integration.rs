@@ -1,10 +1,10 @@
 use crate::common::{adjust_canonicalization, check_installed, maybe_mock_cargo};
 use anyhow::{bail, Context, Result};
+use clap::Parser;
 use maturin::{BuildOptions, PythonInterpreter, Target};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
-use structopt::StructOpt;
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
@@ -47,7 +47,7 @@ pub fn test_integration(
         cli.push("linux");
     }
 
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
@@ -203,7 +203,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         cli.push(bindings);
     }
 
-    let options = BuildOptions::from_iter_safe(cli)?;
+    let options = BuildOptions::try_parse_from(cli)?;
 
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;

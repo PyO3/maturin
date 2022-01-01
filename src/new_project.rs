@@ -4,7 +4,6 @@ use dialoguer::{theme::ColorfulTheme, Select};
 use fs_err as fs;
 use minijinja::{context, Environment};
 use std::path::Path;
-use structopt::StructOpt;
 
 struct ProjectGenerator<'a> {
     env: Environment<'a>,
@@ -89,19 +88,17 @@ impl<'a> ProjectGenerator<'a> {
     }
 }
 
-// workaround for https://github.com/TeXitoi/structopt/issues/333#issuecomment-712265332
-#[cfg_attr(not(doc), allow(missing_docs))]
-#[cfg_attr(doc, doc = "Options common to `maturin new` and `maturin init`.")]
-#[derive(Debug, StructOpt)]
+/// Options common to `maturin new` and `maturin init`.
+#[derive(Debug, clap::Parser)]
 pub struct GenerateProjectOptions {
     /// Set the resulting package name, defaults to the directory name
-    #[structopt(long)]
+    #[clap(long)]
     name: Option<String>,
     /// Use mixed Rust/Python project layout
-    #[structopt(long)]
+    #[clap(long)]
     mixed: bool,
     /// Which kind of bindings to use
-    #[structopt(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
+    #[clap(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
     bindings: Option<String>,
 }
 
@@ -166,7 +163,7 @@ fn generate_project(
         let selection = Select::with_theme(&ColorfulTheme::default())
             .with_prompt(format!(
                 "🤷 {}",
-                style("What kind of bindings to use?").bold()
+                style("Which kind of bindings to use?").bold()
             ))
             .items(&bindings_items)
             .default(0)

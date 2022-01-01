@@ -1,7 +1,7 @@
 use anyhow::format_err;
 use anyhow::{bail, Result};
+use clap::Parser;
 use maturin::BuildOptions;
-use structopt::StructOpt;
 
 pub fn abi3_without_version() -> Result<()> {
     // The first argument is ignored by clap
@@ -12,7 +12,7 @@ pub fn abi3_without_version() -> Result<()> {
         "--cargo-extra-args=--quiet --target-dir test-targets/wheels/abi3_without_version",
     ];
 
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let options = BuildOptions::try_parse_from(cli)?;
     let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
     if let Err(err) = result {
         assert_eq!(err.to_string(),
@@ -40,7 +40,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "test-crates/targets/pyo3_no_extension_module",
     ];
 
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context(false, cfg!(feature = "faster-tests"), false)?
         .build_wheels();
@@ -73,7 +73,7 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
         "-itargetspython",
         "--cargo-extra-args=--target-dir test-crates/targets/locked_doesnt_build_without_cargo_lock",
     ];
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let options = BuildOptions::try_parse_from(cli)?;
     let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
     if let Err(err) = result {
         let err_string = err
@@ -111,7 +111,7 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "--out",
         "test-crates/targets/invalid_manylinux_does_not_panic",
     ];
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context(false, cfg!(feature = "faster-tests"), false)?
         .build_wheels();

@@ -14,29 +14,28 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
-use structopt::StructOpt;
 use thiserror::Error;
 
 /// An account with a registry, possibly incomplete
-#[derive(Debug, StructOpt)]
+#[derive(Debug, clap::Parser)]
 pub struct PublishOpt {
-    #[structopt(
-        short = "r",
+    #[clap(
+        short = 'r',
         long = "repository-url",
         default_value = "https://upload.pypi.org/legacy/"
     )]
     /// The url of registry where the wheels are uploaded to
     registry: String,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     /// Username for pypi or your custom registry
     username: Option<String>,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     /// Password for pypi or your custom registry. Note that you can also pass the password
     /// through MATURIN_PASSWORD
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
-    #[structopt(long = "skip-existing")]
+    #[clap(long = "skip-existing")]
     skip_existing: bool,
 }
 

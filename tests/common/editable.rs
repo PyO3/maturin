@@ -2,11 +2,11 @@ use crate::common::{
     adjust_canonicalization, check_installed, create_virtualenv, maybe_mock_cargo,
 };
 use anyhow::{bail, Context, Result};
+use clap::Parser;
 use maturin::BuildOptions;
 use std::path::Path;
 use std::process::Command;
 use std::str;
-use structopt::StructOpt;
 
 /// test PEP 660 editable installs
 pub fn test_editable(
@@ -45,7 +45,8 @@ pub fn test_editable(
         cli.push(bindings);
     }
 
-    let options: BuildOptions = BuildOptions::from_iter_safe(cli)?;
+    let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
+
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), true)?;
     let wheels = build_context.build_wheels()?;
 

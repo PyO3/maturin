@@ -288,15 +288,18 @@ impl BuildOptions {
                     x.compatibility()
                 })
             })
-            .or(
-                // With zig we can compile to any glibc version that we want, so we pick the lowest
-                // one supported by the rust compiler
-                if self.zig && !target.is_musl_target() {
-                    Some(target.get_minimum_manylinux_tag())
+            .or(if self.zig {
+                if target.is_musl_target() {
+                    // Zig bundles musl 1.2
+                    Some(PlatformTag::Musllinux { x: 1, y: 2 })
                 } else {
-                    None
-                },
-            );
+                    // With zig we can compile to any glibc version that we want, so we pick the lowest
+                    // one supported by the rust compiler
+                    Some(target.get_minimum_manylinux_tag())
+                }
+            } else {
+                None
+            });
         if platform_tag == Some(PlatformTag::manylinux1()) {
             eprintln!("⚠️  Warning: manylinux1 is unsupported by the Rust compiler.");
         }

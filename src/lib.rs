@@ -37,6 +37,7 @@ pub use crate::new_project::{init_project, new_project, GenerateProjectOptions};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::Target;
+pub use crate::zig::Zig;
 pub use auditwheel::PlatformTag;
 #[cfg(feature = "upload")]
 pub use {
@@ -62,3 +63,4 @@ mod source_distribution;
 mod target;
 #[cfg(feature = "upload")]
 mod upload;
+mod zig;

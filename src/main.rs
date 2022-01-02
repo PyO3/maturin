@@ -8,7 +8,7 @@ use clap::{ArgEnum, IntoApp, Parser};
 use clap_complete::Generator;
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
-    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
+    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target, Zig,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
@@ -163,6 +163,9 @@ enum Opt {
         #[clap(name = "SHELL", parse(try_from_str))]
         shell: Shell,
     },
+    /// Zig linker wrapper
+    #[clap(subcommand)]
+    Zig(Zig),
 }
 
 /// Backend for the PEP 517 integration. Not for human consumption
@@ -448,6 +451,11 @@ fn run() -> Result<()> {
                     )
                 }
             }
+        }
+        Opt::Zig(subcommand) => {
+            subcommand
+                .execute()
+                .context("Failed to create zig wrapper script")?;
         }
     }
 

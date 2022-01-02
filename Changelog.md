@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for using [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html) as linker for easier cross compiling and manylinux compliance in [#756](https://github.com/PyO3/maturin/pull/756)
+
 ## [0.12.6] - 2021-12-31
 
 * Add support for repairing cross compiled linux wheels in [#754](https://github.com/PyO3/maturin/pull/754)

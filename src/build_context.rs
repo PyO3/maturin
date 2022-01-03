@@ -275,7 +275,7 @@ impl BuildContext {
                 }
             })?;
         let external_libs = if should_repair && !self.editable {
-            let sysroot = get_sysroot_path(&self.target)?;
+            let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
             find_external_libs(&artifact, &policy, sysroot).with_context(|| {
                 if let Some(platform_tag) = platform_tag {
                     format!("Error repairing wheel for {} compliance", platform_tag)
@@ -707,9 +707,12 @@ fn relpath(to: &Path, from: &Path) -> PathBuf {
 /// Get sysroot path from target C compiler
 ///
 /// Currently only gcc is supported, clang doesn't have a `--print-sysroot` option
-/// TODO: allow specify sysroot from environment variable?
 fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
     use crate::target::get_host_target;
+
+    if let Some(sysroot) = std::env::var_os("TARGET_SYSROOT") {
+        return Ok(PathBuf::from(sysroot));
+    }
 
     let host_triple = get_host_target()?;
     let target_triple = target.target_triple();
@@ -725,6 +728,10 @@ fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
         let compiler = build
             .try_get_compiler()
             .with_context(|| format!("Failed to get compiler for {}", target_triple))?;
+        // Only GNU like compilers support `--print-sysroot`
+        if !compiler.is_like_gnu() {
+            return Ok(PathBuf::from("/"));
+        }
         let path = compiler.path();
         let out = Command::new(path)
             .arg("--print-sysroot")

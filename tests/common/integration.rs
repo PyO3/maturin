@@ -16,6 +16,9 @@ pub fn test_integration(
 ) -> Result<()> {
     maybe_mock_cargo();
 
+    // Pass CARGO_BIN_EXE_maturin for testing purpose
+    std::env::set_var("CARGO_BIN_EXE_maturin", env!("CARGO_BIN_EXE_maturin"));
+
     let target = Target::from_target_triple(None)?;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();

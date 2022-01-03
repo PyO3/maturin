@@ -67,13 +67,9 @@ jobs:
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
       - name: Cache cargo build
-        uses: actions/cache@v2
+        uses: Swatinem/rust-cache@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: maturin-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('Cargo.lock') }}
+          key: maturin-${{ runner.os }}
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:
@@ -129,24 +125,23 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       # actions-rs/toolchain@v1 has some hiccups with the custom installation locations
-      - run: curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-      - run: echo "$(pwd)/.cargo/bin" >> $GITHUB_PATH
+      - name: Install Rust
+        id: rustup
+        run: |
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$(pwd)/.cargo/bin" >> $GITHUB_PATH
+          echo "::set-output name=rustc_hash::$(rustc -V | awk '{print $3}' | cut -c 2-)"
 
       # Caching
       - name: Cache cargo build
-        uses: actions/cache@v2
+        uses: Swatinem/rust-cache@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: manylinux-cargo-${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('Cargo.lock') }}
+          key: maturin-${{ runner.os }}
       - name: Cache test crates cargo build
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: manylinux-test-crates-${{ matrix.manylinux }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
-
+          key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       # Do a bit of if-switching since the docker url doesn't support substitutions
       - name: Compliant Build
         if: matrix.manylinux == '2010'

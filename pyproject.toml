@@ -18,6 +18,9 @@ dependencies = ["toml~=0.10.2"]
 zig = [
     "ziglang~=0.9.0",
 ]
+patchelf = [
+    "patchelf",
+]
 
 [project.urls]
 "Source Code" = "https://github.com/PyO3/maturin"

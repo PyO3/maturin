@@ -32,7 +32,6 @@ keyring = { version = "1.0.0", optional = true }
 platform-info = "0.2.0"
 pretty_env_logger = { version = "0.4.0", optional = true }
 regex = "1.4.5"
-reqwest = { version = "0.11.2", optional = true, default-features = false, features = ["blocking", "multipart"] }
 rpassword = { version = "5.0.1", optional = true }
 serde = { version = "1.0.131", features = ["derive"] }
 serde_json = "1.0.70"
@@ -62,18 +61,17 @@ clap = { version = "3.0.0", features = ["derive", "env", "wrap_help"] }
 clap_complete = "3.0.0"
 clap_complete_fig = "3.0.0"
 semver = "1.0.4"
+ureq = { version = "2.3.1", optional = true }
+multipart = { version = "0.18.0", features = ["client"],default-features = false, optional = true }
 
 [dev-dependencies]
 indoc = "1.0.3"
 
 [features]
-default = ["log", "upload", "rustls", "human-panic"]
-upload = ["reqwest", "rpassword", "configparser", "dirs"]
+default = ["log", "upload", "human-panic"]
+upload = ["ureq", "multipart", "rpassword", "configparser", "dirs"]
 password-storage = ["upload", "keyring"]
 log = ["pretty_env_logger"]
-# We use rustls for manylinux compliance and because unlike both dynamic and
-# static openssl variants it can be built and used inside a cent os 5 container
-rustls = ["reqwest/rustls-tls"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
 

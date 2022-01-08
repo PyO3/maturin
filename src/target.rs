@@ -547,31 +547,31 @@ mod test {
     fn test_macosx_deployment_target() {
         assert_eq!(
             macosx_deployment_target(None, false).unwrap(),
-            (((10, 7), (11, 0)))
+            ((10, 7), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(None, true).unwrap(),
-            (((10, 9), (11, 0)))
+            ((10, 9), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("10.6"), false).unwrap(),
-            (((10, 7), (11, 0)))
+            ((10, 7), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("10.6"), true).unwrap(),
-            (((10, 9), (11, 0)))
+            ((10, 9), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("10.9"), false).unwrap(),
-            (((10, 9), (11, 0)))
+            ((10, 9), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("11.0.0"), false).unwrap(),
-            (((11, 0), (11, 0)))
+            ((11, 0), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("11.1"), false).unwrap(),
-            (((11, 1), (11, 1)))
+            ((11, 1), (11, 1))
         );
     }
 }

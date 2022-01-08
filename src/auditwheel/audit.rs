@@ -1,15 +1,16 @@
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
-use crate::auditwheel::PlatformTag;
+use crate::auditwheel::{find_external_libs, PlatformTag};
 use crate::target::Target;
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use fs_err::File;
 use goblin::elf::{sym::STT_FUNC, Elf};
+use lddtree::Library;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Error raised during auditing an elf file for manylinux/musllinux compatibility
@@ -353,4 +354,128 @@ pub fn auditwheel_rs(
         Ok(Policy::default())
     }?;
     Ok((policy, should_repair))
+}
+
+/// Get sysroot path from target C compiler
+///
+/// Currently only gcc is supported, clang doesn't have a `--print-sysroot` option
+pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
+    use crate::target::get_host_target;
+    use std::process::{Command, Stdio};
+
+    if let Some(sysroot) = std::env::var_os("TARGET_SYSROOT") {
+        return Ok(PathBuf::from(sysroot));
+    }
+
+    let host_triple = get_host_target()?;
+    let target_triple = target.target_triple();
+    if host_triple != target_triple {
+        let mut build = cc::Build::new();
+        build
+            // Suppress cargo metadata for example env vars printing
+            .cargo_metadata(false)
+            // opt_level, host and target are required
+            .opt_level(0)
+            .host(&host_triple)
+            .target(target_triple);
+        let compiler = build
+            .try_get_compiler()
+            .with_context(|| format!("Failed to get compiler for {}", target_triple))?;
+        // Only GNU like compilers support `--print-sysroot`
+        if !compiler.is_like_gnu() {
+            return Ok(PathBuf::from("/"));
+        }
+        let path = compiler.path();
+        let out = Command::new(path)
+            .arg("--print-sysroot")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .with_context(|| format!("Failed to run `{} --print-sysroot`", path.display()))?;
+        if out.status.success() {
+            let sysroot = String::from_utf8(out.stdout)
+                .context("Failed to read the sysroot path")?
+                .trim()
+                .to_owned();
+            return Ok(PathBuf::from(sysroot));
+        } else {
+            bail!(
+                "Failed to get the sysroot path: {}",
+                String::from_utf8(out.stderr)?
+            );
+        }
+    }
+    Ok(PathBuf::from("/"))
+}
+
+/// For the given compilation result, return the manylinux platform and the external libs
+/// we need to add to repair it
+pub fn get_policy_and_libs(
+    artifact: &Path,
+    platform_tag: Option<PlatformTag>,
+    target: &Target,
+) -> Result<(Policy, Vec<Library>)> {
+    let (policy, should_repair) =
+        auditwheel_rs(artifact, target, platform_tag).with_context(|| {
+            if let Some(platform_tag) = platform_tag {
+                format!("Error ensuring {} compliance", platform_tag)
+            } else {
+                "Error checking for manylinux/musllinux compliance".to_string()
+            }
+        })?;
+    let external_libs = if should_repair {
+        let sysroot = get_sysroot_path(target).unwrap_or_else(|_| PathBuf::from("/"));
+        find_external_libs(&artifact, &policy, sysroot).with_context(|| {
+            if let Some(platform_tag) = platform_tag {
+                format!("Error repairing wheel for {} compliance", platform_tag)
+            } else {
+                "Error repairing wheel for manylinux/musllinux compliance".to_string()
+            }
+        })?
+    } else {
+        Vec::new()
+    };
+    Ok((policy, external_libs))
+}
+
+pub fn relpath(to: &Path, from: &Path) -> PathBuf {
+    let mut suffix_pos = 0;
+    for (f, t) in from.components().zip(to.components()) {
+        if f == t {
+            suffix_pos += 1;
+        } else {
+            break;
+        }
+    }
+    let mut result = PathBuf::new();
+    from.components()
+        .skip(suffix_pos)
+        .map(|_| result.push(".."))
+        .last();
+    to.components()
+        .skip(suffix_pos)
+        .map(|x| result.push(x.as_os_str()))
+        .last();
+    result
+}
+
+#[cfg(test)]
+mod test {
+    use crate::auditwheel::audit::relpath;
+    use std::path::Path;
+
+    #[test]
+    fn test_relpath() {
+        let cases = [
+            ("", "", ""),
+            ("/", "/usr", ".."),
+            ("/", "/usr/lib", "../.."),
+        ];
+        for (from, to, expected) in cases {
+            let from = Path::new(from);
+            let to = Path::new(to);
+            let result = relpath(from, to);
+            assert_eq!(result, Path::new(expected));
+        }
+    }
 }

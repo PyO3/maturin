@@ -1,6 +1,7 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
+use crate::build_context::hash_file;
 use anyhow::{bail, Context, Result};
 use bytesize::ByteSize;
 use configparser::ini::Ini;
@@ -8,7 +9,6 @@ use fs_err as fs;
 use fs_err::File;
 use multipart::client::lazy::Multipart;
 use regex::Regex;
-use sha2::{Digest, Sha256};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -224,10 +224,7 @@ fn canonicalize_name(name: &str) -> String {
 
 /// Uploads a single wheel to the registry
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
-    let mut wheel = File::open(&wheel_path)?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut wheel, &mut hasher)?;
-    let hash_hex = format!("{:x}", hasher.finalize());
+    let hash_hex = hash_file(&wheel_path)?;
 
     let dist = python_pkginfo::Distribution::new(wheel_path)
         .map_err(|err| UploadError::PkgInfoError(wheel_path.to_owned(), err))?;

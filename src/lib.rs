@@ -23,7 +23,6 @@
 
 #![deny(missing_docs)]
 
-pub use crate::auditwheel::{auditwheel_rs, AuditWheelError};
 pub use crate::build_context::{BridgeModel, BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::BuildOptions;
 pub use crate::cargo_toml::CargoToml;
@@ -37,13 +36,10 @@ pub use crate::new_project::{init_project, new_project, GenerateProjectOptions};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::Target;
+#[cfg(feature = "upload")]
+pub use crate::upload::{upload, upload_ui, PublishOpt, Registry, UploadError};
 pub use crate::zig::Zig;
 pub use auditwheel::PlatformTag;
-#[cfg(feature = "upload")]
-pub use {
-    crate::registry::Registry,
-    crate::upload::{upload, upload_ui, PublishOpt, UploadError},
-};
 
 mod auditwheel;
 mod build_context;
@@ -57,8 +53,6 @@ mod module_writer;
 mod new_project;
 mod pyproject_toml;
 mod python_interpreter;
-#[cfg(feature = "upload")]
-mod registry;
 mod source_distribution;
 mod target;
 #[cfg(feature = "upload")]

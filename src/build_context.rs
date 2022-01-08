@@ -1,6 +1,5 @@
-use crate::auditwheel::{
-    auditwheel_rs, find_external_libs, hash_file, patchelf, PlatformTag, Policy,
-};
+use crate::auditwheel::{get_policy_and_libs, patchelf, relpath};
+use crate::auditwheel::{PlatformTag, Policy};
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
     write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
@@ -12,10 +11,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
 use lddtree::Library;
+use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -258,7 +258,7 @@ impl BuildContext {
         artifact: &Path,
         platform_tag: Option<PlatformTag>,
     ) -> Result<(Policy, Vec<Library>)> {
-        if self.skip_auditwheel {
+        if self.skip_auditwheel || self.editable {
             return Ok((Policy::default(), Vec::new()));
         }
 
@@ -266,27 +266,7 @@ impl BuildContext {
             .map(|x| &x.target)
             .unwrap_or(&self.target);
 
-        let (policy, should_repair) =
-            auditwheel_rs(artifact, target, platform_tag).with_context(|| {
-                if let Some(platform_tag) = platform_tag {
-                    format!("Error ensuring {} compliance", platform_tag)
-                } else {
-                    "Error checking for manylinux/musllinux compliance".to_string()
-                }
-            })?;
-        let external_libs = if should_repair && !self.editable {
-            let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
-            find_external_libs(&artifact, &policy, sysroot).with_context(|| {
-                if let Some(platform_tag) = platform_tag {
-                    format!("Error repairing wheel for {} compliance", platform_tag)
-                } else {
-                    "Error repairing wheel for manylinux/musllinux compliance".to_string()
-                }
-            })?
-        } else {
-            Vec::new()
-        };
-        Ok((policy, external_libs))
+        get_policy_and_libs(artifact, platform_tag, target)
     }
 
     fn add_external_libs(
@@ -332,12 +312,11 @@ impl BuildContext {
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
                 patchelf::set_rpath(&dest_path, &libs_dir)?;
             }
+            patchelf::replace_needed(artifact, &lib.name, &new_soname)?;
             soname_map.insert(
                 lib.name.clone(),
                 (new_soname.clone(), dest_path.clone(), lib.needed.clone()),
             );
-
-            patchelf::replace_needed(artifact, &lib.name, &new_soname)?;
         }
 
         // we grafted in a bunch of libraries and modified their sonames, but
@@ -683,95 +662,11 @@ impl BuildContext {
     }
 }
 
-fn relpath(to: &Path, from: &Path) -> PathBuf {
-    let mut suffix_pos = 0;
-    for (f, t) in from.components().zip(to.components()) {
-        if f == t {
-            suffix_pos += 1;
-        } else {
-            break;
-        }
-    }
-    let mut result = PathBuf::new();
-    from.components()
-        .skip(suffix_pos)
-        .map(|_| result.push(".."))
-        .last();
-    to.components()
-        .skip(suffix_pos)
-        .map(|x| result.push(x.as_os_str()))
-        .last();
-    result
-}
-
-/// Get sysroot path from target C compiler
-///
-/// Currently only gcc is supported, clang doesn't have a `--print-sysroot` option
-fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
-    use crate::target::get_host_target;
-
-    if let Some(sysroot) = std::env::var_os("TARGET_SYSROOT") {
-        return Ok(PathBuf::from(sysroot));
-    }
-
-    let host_triple = get_host_target()?;
-    let target_triple = target.target_triple();
-    if host_triple != target_triple {
-        let mut build = cc::Build::new();
-        build
-            // Suppress cargo metadata for example env vars printing
-            .cargo_metadata(false)
-            // opt_level, host and target are required
-            .opt_level(0)
-            .host(&host_triple)
-            .target(target_triple);
-        let compiler = build
-            .try_get_compiler()
-            .with_context(|| format!("Failed to get compiler for {}", target_triple))?;
-        // Only GNU like compilers support `--print-sysroot`
-        if !compiler.is_like_gnu() {
-            return Ok(PathBuf::from("/"));
-        }
-        let path = compiler.path();
-        let out = Command::new(path)
-            .arg("--print-sysroot")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .output()
-            .with_context(|| format!("Failed to run `{} --print-sysroot`", path.display()))?;
-        if out.status.success() {
-            let sysroot = String::from_utf8(out.stdout)
-                .context("Failed to read the sysroot path")?
-                .trim()
-                .to_owned();
-            return Ok(PathBuf::from(sysroot));
-        } else {
-            bail!(
-                "Failed to get the sysroot path: {}",
-                String::from_utf8(out.stderr)?
-            );
-        }
-    }
-    Ok(PathBuf::from("/"))
-}
-
-#[cfg(test)]
-mod test {
-    use super::relpath;
-    use std::path::Path;
-
-    #[test]
-    fn test_relpath() {
-        let cases = [
-            ("", "", ""),
-            ("/", "/usr", ".."),
-            ("/", "/usr/lib", "../.."),
-        ];
-        for (from, to, expected) in cases {
-            let from = Path::new(from);
-            let to = Path::new(to);
-            let result = relpath(from, to);
-            assert_eq!(result, Path::new(expected));
-        }
-    }
+/// Calculate the sha256 of a file
+pub fn hash_file(path: impl AsRef<Path>) -> Result<String, io::Error> {
+    let mut file = fs::File::open(path.as_ref())?;
+    let mut hasher = Sha256::new();
+    io::copy(&mut file, &mut hasher)?;
+    let hex = format!("{:x}", hasher.finalize());
+    Ok(hex)
 }

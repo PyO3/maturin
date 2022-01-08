@@ -156,7 +156,7 @@ mod test {
         "#
         );
 
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(cargo_toml).unwrap();
 
         let mut scripts = HashMap::new();
         scripts.insert("ph".to_string(), "maturin:print_hello".to_string());
@@ -195,7 +195,7 @@ mod test {
         "#
         );
 
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(cargo_toml).unwrap();
 
         let classifiers = vec!["Programming Language :: Python".to_string()];
 
@@ -226,7 +226,7 @@ mod test {
         "#
         );
 
-        let cargo_toml: Result<CargoToml, _> = toml::from_str(&cargo_toml);
+        let cargo_toml: Result<CargoToml, _> = toml::from_str(cargo_toml);
         assert!(cargo_toml.is_ok());
     }
 }

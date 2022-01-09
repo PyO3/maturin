@@ -63,6 +63,10 @@ pub enum UploadError {
     /// Read package metadata error
     #[error("Could not read the metadata from the package at {0}")]
     PkgInfoError(PathBuf, #[source] python_pkginfo::Error),
+    /// TLS error
+    #[cfg(feature = "native-tls")]
+    #[error("TLS Error")]
+    TlsError(#[source] native_tls_crate::Error),
 }
 
 impl From<io::Error> for UploadError {
@@ -74,6 +78,13 @@ impl From<io::Error> for UploadError {
 impl From<ureq::Error> for UploadError {
     fn from(error: ureq::Error) -> Self {
         UploadError::UreqError(error)
+    }
+}
+
+#[cfg(feature = "native-tls")]
+impl From<native_tls_crate::Error> for UploadError {
+    fn from(error: native_tls_crate::Error) -> Self {
+        UploadError::TlsError(error)
     }
 }
 
@@ -300,7 +311,20 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     let multipart_data = form.prepare().map_err(|e| e.error)?;
 
     let encoded = base64::encode(&format!("{}:{}", registry.username, registry.password));
-    let response = ureq::post(registry.url.as_str())
+
+    #[cfg(not(feature = "native-tls"))]
+    let agent = ureq::agent();
+
+    #[cfg(feature = "native-tls")]
+    let agent = {
+        use std::sync::Arc;
+        ureq::builder()
+            .tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?))
+            .build()
+    };
+
+    let response = agent
+        .post(registry.url.as_str())
         .set(
             "Content-Type",
             &format!(

@@ -2,6 +2,7 @@ use crate::common::{adjust_canonicalization, check_installed, maybe_mock_cargo};
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use maturin::{BuildOptions, PythonInterpreter, Target, Zig};
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -43,7 +44,7 @@ pub fn test_integration(
         cli.push(bindings);
     }
 
-    if zig && Zig::find_zig().is_ok() {
+    if zig && (env::var("GITHUB_ACTIONS").is_ok() || Zig::find_zig().is_ok()) {
         cli.push("--zig")
     } else {
         cli.push("--compatibility");

@@ -78,7 +78,7 @@ impl Zig {
     /// Search for `python -m ziglang` first and for `zig` second.
     /// That way we use the zig from `maturin[ziglang]` first,
     /// but users or distributions can also insert their own zig
-    fn find_zig() -> Result<(String, Vec<String>)> {
+    pub fn find_zig() -> Result<(String, Vec<String>)> {
         Self::find_zig_python()
             .or_else(|_| Self::find_zig_bin())
             .context("Failed to find zig")

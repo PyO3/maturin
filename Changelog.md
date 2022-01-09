@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Add support for using [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html) as linker for easier cross compiling and manylinux compliance in [#756](https://github.com/PyO3/maturin/pull/756)
+* Switch from reqwest to ureq to reduce dependencies in [#767](https://github.com/PyO3/maturin/pull/767)
 
 ## [0.12.6] - 2021-12-31
 

@@ -74,16 +74,6 @@ impl PartialOrd for Policy {
 }
 
 impl Policy {
-    /// Get highest priority policy than self
-    pub fn higher_priority_policies(&self) -> impl Iterator<Item = &Policy> {
-        let policies = if self.name.starts_with("musllinux") {
-            &MUSLLINUX_POLICIES
-        } else {
-            &MANYLINUX_POLICIES
-        };
-        policies.iter().filter(move |p| p.priority > self.priority)
-    }
-
     /// Get platform tag from this policy
     pub fn platform_tag(&self) -> PlatformTag {
         self.name.parse().expect("unknown platform tag")

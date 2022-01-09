@@ -30,7 +30,7 @@ pub fn test_editable(
     let mut cli = vec![
         "build",
         "--interpreter",
-        &interpreter,
+        interpreter,
         "--manifest-path",
         &package_string,
         "--compatibility",
@@ -84,7 +84,7 @@ pub fn test_editable(
             );
         }
 
-        check_installed(&package.as_ref(), &python)?;
+        check_installed(package.as_ref(), &python)?;
     }
 
     Ok(())

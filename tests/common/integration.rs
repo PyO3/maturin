@@ -148,7 +148,7 @@ pub fn test_integration(
             );
         }
 
-        check_installed(&package.as_ref(), &python)?;
+        check_installed(package.as_ref(), &python)?;
     }
 
     Ok(())

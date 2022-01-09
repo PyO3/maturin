@@ -1,16 +1,14 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use crate::Registry;
+use crate::build_context::hash_file;
 use anyhow::{bail, Context, Result};
 use bytesize::ByteSize;
 use configparser::ini::Ini;
 use fs_err as fs;
 use fs_err::File;
+use multipart::client::lazy::Multipart;
 use regex::Regex;
-use reqwest::Url;
-use reqwest::{self, blocking::multipart::Form, blocking::Client, StatusCode};
-use sha2::{Digest, Sha256};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -47,9 +45,9 @@ pub struct PublishOpt {
 #[derive(Error, Debug)]
 #[error("Uploading to the registry failed")]
 pub enum UploadError {
-    /// Any reqwest error
+    /// Any ureq error
     #[error("Http error")]
-    RewqestError(#[source] reqwest::Error),
+    UreqError(#[source] ureq::Error),
     /// The registry returned a "403 Forbidden"
     #[error("Username or password are incorrect")]
     AuthenticationError,
@@ -73,9 +71,32 @@ impl From<io::Error> for UploadError {
     }
 }
 
-impl From<reqwest::Error> for UploadError {
-    fn from(error: reqwest::Error) -> Self {
-        UploadError::RewqestError(error)
+impl From<ureq::Error> for UploadError {
+    fn from(error: ureq::Error) -> Self {
+        UploadError::UreqError(error)
+    }
+}
+
+/// A pip registry such as pypi or testpypi with associated credentials, used
+/// for uploading wheels
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Registry {
+    /// The username
+    pub username: String,
+    /// The password
+    pub password: String,
+    /// The url endpoint for legacy uploading
+    pub url: String,
+}
+
+impl Registry {
+    /// Creates a new registry
+    pub fn new(username: String, password: String, url: String) -> Registry {
+        Registry {
+            username,
+            password,
+            url,
+        }
     }
 }
 
@@ -187,7 +208,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
             (None, opt.registry.clone())
         };
     let (username, password) = resolve_pypi_cred(opt, &pypirc, register_name);
-    let registry = Registry::new(username, password, Url::parse(&registry_url)?);
+    let registry = Registry::new(username, password, registry_url);
 
     Ok(registry)
 }
@@ -203,10 +224,7 @@ fn canonicalize_name(name: &str) -> String {
 
 /// Uploads a single wheel to the registry
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
-    let mut wheel = File::open(&wheel_path)?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut wheel, &mut hasher)?;
-    let hash_hex = format!("{:x}", hasher.finalize());
+    let hash_hex = hash_file(&wheel_path)?;
 
     let dist = python_pkginfo::Distribution::new(wheel_path)
         .map_err(|err| UploadError::PkgInfoError(wheel_path.to_owned(), err))?;
@@ -267,57 +285,72 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     add_vec("requires_external", &metadata.requires_external);
     add_vec("project_urls", &metadata.project_urls);
 
-    let mut form = Form::new();
+    let wheel = File::open(&wheel_path)?;
+    let wheel_name = wheel_path
+        .file_name()
+        .expect("Wheel path has a file name")
+        .to_string_lossy();
+
+    let mut form = Multipart::new();
     for (key, value) in api_metadata {
-        form = form.text(key, value);
+        form.add_text(key, value);
     }
 
-    form = form.file("content", &wheel_path)?;
+    form.add_stream("content", &wheel, Some(wheel_name), None);
+    let multipart_data = form.prepare().map_err(|e| e.error)?;
 
-    let client = Client::new();
-    let response = client
-        .post(registry.url.clone())
-        .header(
-            reqwest::header::USER_AGENT,
-            format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+    let encoded = base64::encode(&format!("{}:{}", registry.username, registry.password));
+    let response = ureq::post(registry.url.as_str())
+        .set(
+            "Content-Type",
+            &format!(
+                "multipart/form-data; boundary={}",
+                multipart_data.boundary()
+            ),
         )
-        .multipart(form)
-        .basic_auth(registry.username.clone(), Some(registry.password.clone()))
-        .send()?;
+        .set(
+            "User-Agent",
+            &format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+        )
+        .set("Authorization", &format!("Basic {}", encoded))
+        .send(multipart_data);
 
-    let status = response.status();
-    if status.is_success() {
-        return Ok(());
-    }
-    let err_text = response.text().unwrap_or_else(|e| {
-        format!(
-            "The registry should return some text, even in case of an error, but didn't ({})",
-            e
-        )
-    });
-    // Detect FileExistsError the way twine does
-    // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
-    if status == StatusCode::FORBIDDEN {
-        if err_text.contains("overwrite artifact") {
-            // Artifactory (https://jfrog.com/artifactory/)
-            Err(UploadError::FileExistsError(err_text))
-        } else {
-            Err(UploadError::AuthenticationError)
-        }
-    } else {
-        let status_string = status.to_string();
-        if status == StatusCode::CONFLICT // pypiserver (https://pypi.org/project/pypiserver)
+    match response {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(status, response)) => {
+            let err_text = response.into_string().unwrap_or_else(|e| {
+                format!(
+                    "The registry should return some text, \
+                    even in case of an error, but didn't ({})",
+                    e
+                )
+            });
+            // Detect FileExistsError the way twine does
+            // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
+            if status == 403 {
+                if err_text.contains("overwrite artifact") {
+                    // Artifactory (https://jfrog.com/artifactory/)
+                    Err(UploadError::FileExistsError(err_text))
+                } else {
+                    Err(UploadError::AuthenticationError)
+                }
+            } else {
+                let status_string = status.to_string();
+                if status == 409 // conflict, pypiserver (https://pypi.org/project/pypiserver)
             // PyPI / TestPyPI
-            || (status == StatusCode::BAD_REQUEST && err_text.contains("already exists"))
+            || (status == 400 && err_text.contains("already exists"))
             // Nexus Repository OSS (https://www.sonatype.com/nexus-repository-oss)
-            || (status == StatusCode::BAD_REQUEST && err_text.contains("updating asset"))
+            || (status == 400 && err_text.contains("updating asset"))
             // # Gitlab Enterprise Edition (https://about.gitlab.com)
-            || (status == StatusCode::BAD_REQUEST && err_text.contains("already been taken"))
-        {
-            Err(UploadError::FileExistsError(err_text))
-        } else {
-            Err(UploadError::StatusCodeError(status_string, err_text))
+            || (status == 400 && err_text.contains("already been taken"))
+                {
+                    Err(UploadError::FileExistsError(err_text))
+                } else {
+                    Err(UploadError::StatusCodeError(status_string, err_text))
+                }
+            }
         }
+        Err(err) => Err(UploadError::UreqError(err)),
     }
 }
 

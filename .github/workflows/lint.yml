@@ -37,7 +37,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --features password-storage -- -D warnings
+          args: --tests --all-features -- -D warnings
 
   black:
     runs-on: ubuntu-latest

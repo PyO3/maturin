@@ -113,10 +113,7 @@ pub fn test_source_distribution(
     unique_name: &str,
 ) -> Result<()> {
     let manifest_path = package.as_ref().join("Cargo.toml");
-    let sdist_directory = Path::new("test-crates")
-        .join("wheels")
-        .join(unique_name)
-        .to_path_buf();
+    let sdist_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
     let build_options = BuildOptions {
         manifest_path,

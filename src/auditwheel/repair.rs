@@ -1,10 +1,7 @@
 use super::audit::AuditWheelError;
 use crate::auditwheel::Policy;
 use anyhow::Result;
-use fs_err as fs;
 use lddtree::DependencyAnalyzer;
-use sha2::{Digest, Sha256};
-use std::io;
 use std::path::{Path, PathBuf};
 
 pub fn find_external_libs(
@@ -29,13 +26,4 @@ pub fn find_external_libs(
         ext_libs.push(lib);
     }
     Ok(ext_libs)
-}
-
-/// Calculate the sha256 of a file
-pub fn hash_file(path: impl AsRef<Path>) -> Result<String, AuditWheelError> {
-    let mut file = fs::File::open(path.as_ref()).map_err(AuditWheelError::IoError)?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher).map_err(AuditWheelError::IoError)?;
-    let hex = format!("{:x}", hasher.finalize());
-    Ok(hex)
 }

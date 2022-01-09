@@ -63,16 +63,19 @@ semver = "1.0.4"
 configparser = { version = "3.0.0", optional = true }
 multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
 rpassword = { version = "5.0.1", optional = true }
-ureq = { version = "2.3.1", optional = true }
+ureq = { version = "2.3.1", features = ["gzip"], default-features = false, optional = true }
+native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
 
 [dev-dependencies]
 indoc = "1.0.3"
 
 [features]
-default = ["log", "upload", "human-panic"]
+default = ["log", "upload", "rustls", "human-panic"]
 upload = ["ureq", "multipart", "rpassword", "configparser"]
 password-storage = ["upload", "keyring"]
 log = ["pretty_env_logger"]
+rustls = ["ureq/tls"]
+native-tls = ["ureq/native-tls", "native-tls-crate"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
 

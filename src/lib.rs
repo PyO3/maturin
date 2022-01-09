@@ -5,11 +5,16 @@
 //!
 //! # Cargo features
 //!
-//! Default features: log, upload, human-panic
+//! Default features: log, upload, rustls, human-panic
 //!
 //! - log: Configures pretty-env-logger, even though maturin doesn't use logging itself.
 //!
 //! - upload: Uses ureq to add the upload command.
+//!
+//! - rustls: Makes ureq use the rustls stack so that we can build maturin in a CentOS 6
+//! docker container and which maturin itself manylinux compliant.
+//!
+//! - native-tls: Makes ureq use the platform native tls stack
 //!
 //! - human-panic: Adds https://github.com/rust-clique/human-panic
 //!

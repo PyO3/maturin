@@ -16,7 +16,7 @@ pub fn replace_needed<S: AsRef<OsStr>>(
         .arg(file.as_ref());
     let output = cmd
         .output()
-        .context("Failed to execute 'patchelf', did you install it?")?;
+        .context("Failed to execute 'patchelf', did you install it? Hint: Try `pip install maturin[patchelf]` (or just `pip install patchelf`)")?;
     if !output.status.success() {
         bail!(
             "patchelf --replace-needed failed: {}",

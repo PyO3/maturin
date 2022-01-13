@@ -611,12 +611,10 @@ impl BuildContext {
 
         match self.project_layout {
             ProjectLayout::Mixed {
-                ref python_module,
-                ref extension_name,
-                ..
+                ref python_module, ..
             } => {
                 if !self.editable {
-                    write_python_part(&mut writer, python_module, extension_name)
+                    write_python_part(&mut writer, python_module)
                         .context("Failed to add the python module to the package")?;
                 }
             }

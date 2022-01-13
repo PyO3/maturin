@@ -622,7 +622,7 @@ pub fn write_bindings_module(
             ..
         } => {
             if !editable {
-                write_python_part(writer, python_module, &module_name)
+                write_python_part(writer, python_module)
                     .context("Failed to add the python module to the package")?;
             }
 
@@ -695,7 +695,7 @@ pub fn write_cffi_module(
             ref extension_name,
         } => {
             if !editable {
-                write_python_part(writer, python_module, &module_name)
+                write_python_part(writer, python_module)
                     .context("Failed to add the python module to the package")?;
             }
 
@@ -767,24 +767,15 @@ pub fn write_bin(
 }
 
 /// Adds the python part of a mixed project to the writer,
-/// excluding older versions of the native library or generated cffi declarations
 pub fn write_python_part(
     writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
-    module_name: impl AsRef<Path>,
 ) -> Result<()> {
     use ignore::WalkBuilder;
 
     for absolute in WalkBuilder::new(&python_module).hidden(false).build() {
         let absolute = absolute?.into_path();
-
         let relative = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;
-
-        // Ignore the cffi folder from develop, if any
-        if relative.starts_with(module_name.as_ref().join(&module_name)) {
-            continue;
-        }
-
         if absolute.is_dir() {
             writer.add_directory(relative)?;
         } else {

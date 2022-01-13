@@ -52,8 +52,12 @@ The Rust compiler since version 1.47 [requires at least glibc 2.11](https://gith
 For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
 The [messense/maturin-action](https://github.com/messense/maturin-action) github action already takes care of this if you set e.g. `manylinux: 2014`.
 
-maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper.
-If your system's glibc is too new or you link other shared libraries, it will assign the `linux` tag.
+maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper platform tag.
+
+* If your system's glibc is too new, it will assign the `linux` tag.
+* If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf), 
+  it can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
+
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 
 For full manylinux compliance you need to compile in a CentOS docker container. The [konstin2/maturin](https://hub.docker.com/r/konstin2/maturin) image is based on the manylinux2010 image,

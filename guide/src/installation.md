@@ -12,6 +12,13 @@ maturin is published as Python binary wheel to PyPI, you can install it using pi
 pip install maturin
 ```
 
+There are some extra dependencies for certain scenarios:
+
+* `zig`: use zig as linker for easier cross compiling and manylinux compliance.
+* `patchelf`: repair wheels that links other shared libraries.
+
+For example, to install patchelf dependencies: `pip install maturin[patchelf]`.
+
 ### Homebrew
 
 On macOS [maturin is in Homebrew](https://formulae.brew.sh/formula/maturin#default) and you can install maturin from Homebrew:

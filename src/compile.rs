@@ -118,8 +118,8 @@ fn compile_target(
 
     shared_args.extend(context.cargo_extra_args.iter().map(String::as_str));
 
-    if context.release {
-        shared_args.push("--release");
+    if let Some(profile) = &context.profile {
+        shared_args.extend(&["--profile", profile]);
     }
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args

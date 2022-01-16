@@ -19,9 +19,9 @@ pub fn develop(
     cargo_extra_args: Vec<String>,
     rustc_extra_args: Vec<String>,
     venv_dir: &Path,
-    release: bool,
     strip: bool,
     extras: Vec<String>,
+    profile: Option<String>,
 ) -> Result<()> {
     let target = Target::from_target_triple(None)?;
     let python = target.get_venv_python(&venv_dir);
@@ -40,9 +40,10 @@ pub fn develop(
         cargo_extra_args,
         rustc_extra_args,
         universal2: false,
+        profile,
     };
 
-    let build_context = build_options.into_build_context(release, strip, true)?;
+    let build_context = build_options.into_build_context(None, strip, true)?;
 
     let interpreter = PythonInterpreter::check_executable(&python, &target, &build_context.bridge)?
         .ok_or_else(|| {

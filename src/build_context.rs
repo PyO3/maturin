@@ -154,8 +154,8 @@ pub struct BuildContext {
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     pub out: PathBuf,
-    /// Pass --release to cargo
-    pub release: bool,
+    /// The `--profile` to pass to cargo.
+    pub profile: Option<String>,
     /// Strip the library for minimum file size
     pub strip: bool,
     /// Skip checking the linked libraries for manylinux/musllinux compliance

@@ -102,6 +102,9 @@ enum Opt {
             multiple_occurrences = false
         )]
         extras: Vec<String>,
+        /// The `--profile` to pass to `cargo`.
+        #[clap(long)]
+        profile: Option<String>,
     },
     /// Build only a source distribution (sdist) without compiling.
     ///
@@ -259,7 +262,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 build_options.interpreter.as_ref(),
                 Some(version) if version.len() == 1
             ));
-            let context = build_options.into_build_context(true, strip, false)?;
+            let context = build_options.into_build_context(Some("release"), strip, false)?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge {
@@ -289,7 +292,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
             editable,
         } => {
-            let build_context = build_options.into_build_context(true, strip, editable)?;
+            let build_context = build_options.into_build_context(Some("release"), strip, editable)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
@@ -303,7 +306,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 out: Some(sdist_directory),
                 ..Default::default()
             };
-            let build_context = build_options.into_build_context(false, false, false)?;
+            let build_context = build_options.into_build_context(None, false, false)?;
             let (path, _) = build_context
                 .build_source_distribution()?
                 .context("Failed to build source distribution")?;
@@ -322,12 +325,17 @@ fn run() -> Result<()> {
 
     match opt {
         Opt::Build {
-            build,
+            mut build,
             release,
             strip,
             no_sdist,
         } => {
-            let build_context = build.into_build_context(release, strip, false)?;
+            build.profile = match (release, build.profile) {
+                (true, Some(_)) => bail!("cannot set both `--release` and `--profile`"),
+                (true, None) => Some("release".to_owned()),
+                (false, profile) => profile
+            };
+            let build_context = build.into_build_context(None, strip, false)?;
             if !no_sdist {
                 build_context.build_source_distribution()?;
             }
@@ -335,16 +343,21 @@ fn run() -> Result<()> {
         }
         #[cfg(feature = "upload")]
         Opt::Publish {
-            build,
+            mut build,
             publish,
             debug,
             no_strip,
             no_sdist,
         } => {
-            let build_context = build.into_build_context(!debug, !no_strip, false)?;
+            build.profile = match (debug, build.profile) {
+                (true, Some(_)) => bail!("cannot set both `--debug` and `--profile`"),
+                (true, None) => Some("debug".to_owned()),
+                (false, profile) => profile,
+            };
+            let build_context = build.into_build_context(Some("release"), !no_strip, false)?;
 
-            if !build_context.release {
-                eprintln!("⚠️  Warning: You're publishing debug wheels");
+            if build_context.profile.as_deref() != Some("release") {
+                eprintln!("⚠️  Warning: You're not publishing release wheels");
             }
 
             let mut wheels = build_context.build_wheels()?;
@@ -375,6 +388,7 @@ fn run() -> Result<()> {
             release,
             strip,
             extras,
+            profile,
         } => {
             let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
                 (Some(dir), None) => PathBuf::from(dir),
@@ -391,6 +405,11 @@ fn run() -> Result<()> {
                     )
                 }
             };
+            let profile = match (release, profile) {
+                (true, Some(_)) => bail!("cannot set both `--release` and `--profile`"),
+                (true, None) => Some("release".to_owned()),
+                (false, profile) => profile
+            };
 
             develop(
                 bindings,
@@ -398,9 +417,9 @@ fn run() -> Result<()> {
                 cargo_extra_args,
                 rustc_extra_args,
                 &venv_dir,
-                release,
                 strip,
                 extras,
+                profile,
             )?;
         }
         Opt::SDist { manifest_path, out } => {
@@ -409,7 +428,7 @@ fn run() -> Result<()> {
                 out,
                 ..Default::default()
             };
-            let build_context = build_options.into_build_context(false, false, false)?;
+            let build_context = build_options.into_build_context(None, false, false)?;
             build_context
                 .build_source_distribution()?
                 .context("Failed to build source distribution")?;

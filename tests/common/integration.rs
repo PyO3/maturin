@@ -52,7 +52,7 @@ pub fn test_integration(
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options.into_build_context(None, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
     let test_name = package

@@ -42,9 +42,9 @@ pub fn test_develop(
         ],
         vec![],
         &venv_dir,
-        false,
         cfg!(feature = "faster-tests"),
         vec![],
+        None,
     )?;
 
     check_installed(package.as_ref(), &python)?;

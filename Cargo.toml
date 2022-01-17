@@ -55,7 +55,7 @@ console = "0.15.0"
 minijinja = "0.10.0"
 lddtree = "0.2.5"
 cc = "1.0.72"
-clap = { version = "3.0.0", features = ["derive", "env", "wrap_help"] }
+clap = { version = "3.0.8", features = ["derive", "env", "wrap_help"] }
 clap_complete = "3.0.0"
 clap_complete_fig = "3.0.0"
 semver = "1.0.4"

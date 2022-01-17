@@ -47,7 +47,7 @@ pub fn test_editable(
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
 
-    let build_context = options.into_build_context(None, cfg!(feature = "faster-tests"), true)?;
+    let build_context = options.into_build_context(cfg!(feature = "faster-tests"), true)?;
     let wheels = build_context.build_wheels()?;
 
     for (filename, _supported_version) in wheels.iter() {

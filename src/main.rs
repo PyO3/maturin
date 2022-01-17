@@ -104,7 +104,7 @@ enum Opt {
         extras: Vec<String>,
         /// The `--profile` to pass to cargo. Can also be set by the `MATURIN_PROFILE` environment
         /// variable.
-        #[clap(long)]
+        #[clap(long, env = "MATURIN_PROFILE")]
         profile: Option<String>,
     },
     /// Build only a source distribution (sdist) without compiling.
@@ -255,7 +255,7 @@ impl FromStr for Shell {
 fn pep517(subcommand: Pep517Command) -> Result<()> {
     match subcommand {
         Pep517Command::WriteDistInfo {
-            build_options,
+            mut build_options,
             metadata_directory,
             strip,
         } => {
@@ -263,7 +263,10 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 build_options.interpreter.as_ref(),
                 Some(version) if version.len() == 1
             ));
-            let context = build_options.into_build_context(Some("release"), strip, false)?;
+            if build_options.profile.is_none() {
+                build_options.profile = Some("release".to_owned());
+            }
+            let context = build_options.into_build_context(strip, false)?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge {
@@ -289,12 +292,14 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             println!("{}", context.metadata21.get_dist_info_dir().display());
         }
         Pep517Command::BuildWheel {
-            build_options,
+            mut build_options,
             strip,
             editable,
         } => {
-            let build_context =
-                build_options.into_build_context(Some("release"), strip, editable)?;
+            if build_options.profile.is_none() {
+                build_options.profile = Some("release".to_owned());
+            }
+            let build_context = build_options.into_build_context(strip, editable)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
@@ -308,7 +313,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 out: Some(sdist_directory),
                 ..Default::default()
             };
-            let build_context = build_options.into_build_context(None, false, false)?;
+            let build_context = build_options.into_build_context(false, false)?;
             let (path, _) = build_context
                 .build_source_distribution()?
                 .context("Failed to build source distribution")?;
@@ -336,7 +341,7 @@ fn run() -> Result<()> {
                 assert!(build.profile.is_none()); // enforced by structopt conflicts_with
                 build.profile = Some("release".to_owned());
             }
-            let build_context = build.into_build_context(None, strip, false)?;
+            let build_context = build.into_build_context(strip, false)?;
             if !no_sdist {
                 build_context.build_source_distribution()?;
             }
@@ -352,9 +357,11 @@ fn run() -> Result<()> {
         } => {
             if debug {
                 assert!(build.profile.is_none()); // enforced by structopt conflicts_with
-                build.profile = Some("debug".to_owned());
+                build.profile = Some("dev".to_owned()); // cargo calls the debug profile dev
+            } else if build.profile.is_none() {
+                build.profile = Some("release".to_owned());
             }
-            let build_context = build.into_build_context(Some("release"), !no_strip, false)?;
+            let build_context = build.into_build_context(!no_strip, false)?;
 
             if build_context.profile.as_deref() != Some("release") {
                 eprintln!("⚠️  Warning: You're not publishing release wheels");
@@ -427,7 +434,7 @@ fn run() -> Result<()> {
                 out,
                 ..Default::default()
             };
-            let build_context = build_options.into_build_context(None, false, false)?;
+            let build_context = build_options.into_build_context(false, false)?;
             build_context
                 .build_source_distribution()?
                 .context("Failed to build source distribution")?;

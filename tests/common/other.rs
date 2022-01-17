@@ -63,7 +63,7 @@ pub fn test_musl() -> Result<bool> {
         "test-crates/wheels/test_musl",
     ])?;
 
-    let build_context = options.into_build_context(None, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options.into_build_context(cfg!(feature = "faster-tests"), false)?;
     let built_lib =
         PathBuf::from("test-crates/targets/test_musl/x86_64-unknown-linux-musl/debug/hello-world");
     if built_lib.is_file() {
@@ -100,7 +100,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "test-crates/wheels/test_workspace_cargo_lock",
     ])?;
 
-    let build_context = options.into_build_context(None, false, false)?;
+    let build_context = options.into_build_context(false, false)?;
     let source_distribution = build_context.build_source_distribution()?;
     assert!(source_distribution.is_some());
 
@@ -126,7 +126,7 @@ pub fn test_source_distribution(
         ..Default::default()
     };
 
-    let build_context = build_options.into_build_context(None, false, false)?;
+    let build_context = build_options.into_build_context(false, false)?;
     let (path, _) = build_context
         .build_source_distribution()?
         .context("Failed to build source distribution")?;

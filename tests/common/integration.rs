@@ -52,7 +52,7 @@ pub fn test_integration(
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let build_context = options.into_build_context(None, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options.into_build_context(cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
     let test_name = package
@@ -171,7 +171,6 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 
 #[cfg(target_os = "windows")]
 pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
-    use std::env;
     use std::process::Stdio;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();

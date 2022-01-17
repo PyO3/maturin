@@ -93,7 +93,7 @@ pub struct BuildOptions {
     pub universal2: bool,
     /// The `--profile` to pass to cargo. Can also be set by the `MATURIN_PROFILE` environment
     /// variable.
-    #[clap(long)]
+    #[clap(long, env = "MATURIN_PROFILE")]
     pub profile: Option<String>,
 }
 
@@ -118,12 +118,7 @@ impl Default for BuildOptions {
 
 impl BuildOptions {
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
-    pub fn into_build_context(
-        self,
-        default_profile: Option<&str>,
-        strip: bool,
-        editable: bool,
-    ) -> Result<BuildContext> {
+    pub fn into_build_context(self, strip: bool, editable: bool) -> Result<BuildContext> {
         let manifest_file = &self.manifest_path;
         if !manifest_file.exists() {
             let current_dir =
@@ -316,19 +311,6 @@ impl BuildOptions {
             );
         }
 
-        let profile = if self.profile.is_some() {
-            self.profile
-        } else if let Some(env_var) = std::env::var_os("MATURIN_PROFILE") {
-            Some(
-                env_var
-                    .to_str()
-                    .context("expected MATURIN_PROFILE to be utf-8")?
-                    .to_owned(),
-            )
-        } else {
-            default_profile.map(ToOwned::to_owned)
-        };
-
         Ok(BuildContext {
             target,
             bridge,
@@ -348,7 +330,7 @@ impl BuildOptions {
             cargo_metadata,
             universal2,
             editable,
-            profile,
+            profile: self.profile,
         })
     }
 }
@@ -847,7 +829,7 @@ mod test {
         let mut options = BuildOptions::default();
         options.cargo_extra_args.push("--features log".to_string());
         options.bindings = Some("bin".to_string());
-        let context = options.into_build_context(None, false, false).unwrap();
+        let context = options.into_build_context(false, false).unwrap();
         assert_eq!(context.cargo_extra_args, vec!["--features", "log"])
     }
 

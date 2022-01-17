@@ -43,7 +43,7 @@ pub fn develop(
         profile,
     };
 
-    let build_context = build_options.into_build_context(None, strip, true)?;
+    let build_context = build_options.into_build_context(strip, true)?;
 
     let interpreter = PythonInterpreter::check_executable(&python, &target, &build_context.bridge)?
         .ok_or_else(|| {

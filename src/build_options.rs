@@ -91,7 +91,8 @@ pub struct BuildOptions {
     /// Only applies to macOS targets, do nothing otherwise.
     #[clap(long)]
     pub universal2: bool,
-    /// The `--profile` to pass to `cargo`.
+    /// The `--profile` to pass to cargo. Can also be set by the `MATURIN_PROFILE` environment
+    /// variable.
     #[clap(long)]
     pub profile: Option<String>,
 }

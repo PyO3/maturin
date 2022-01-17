@@ -154,7 +154,8 @@ pub struct BuildContext {
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     pub out: PathBuf,
-    /// The `--profile` to pass to cargo.
+    /// The `--profile` to pass to cargo. Can also be set by the `MATURIN_PROFILE` environment
+    /// variable.
     pub profile: Option<String>,
     /// Strip the library for minimum file size
     pub strip: bool,

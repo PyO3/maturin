@@ -318,7 +318,12 @@ impl BuildOptions {
         let profile = if self.profile.is_some() {
             self.profile
         } else if let Some(env_var) = std::env::var_os("MATURIN_PROFILE") {
-            Some(env_var.to_str().context("expected MATURIN_PROFILE to be utf-8")?.to_owned())
+            Some(
+                env_var
+                    .to_str()
+                    .context("expected MATURIN_PROFILE to be utf-8")?
+                    .to_owned(),
+            )
         } else {
             default_profile.map(ToOwned::to_owned)
         };

@@ -29,7 +29,7 @@ enum Opt {
         #[clap(flatten)]
         build: BuildOptions,
         /// Pass --release to cargo
-        #[clap(long)]
+        #[clap(long, conflicts_with = "profile")]
         release: bool,
         /// Strip the library for minimum file size
         #[clap(long)]
@@ -45,7 +45,7 @@ enum Opt {
         #[clap(flatten)]
         build: BuildOptions,
         /// Do not pass --release to cargo
-        #[clap(long)]
+        #[clap(long, conflicts_with = "profile")]
         debug: bool,
         /// Do not strip the library for minimum file size
         #[clap(long = "no-strip")]
@@ -76,7 +76,7 @@ enum Opt {
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
         /// Pass --release to cargo
-        #[clap(long)]
+        #[clap(long, conflicts_with = "profile")]
         release: bool,
         /// Strip the library for minimum file size
         #[clap(long)]
@@ -292,7 +292,8 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
             editable,
         } => {
-            let build_context = build_options.into_build_context(Some("release"), strip, editable)?;
+            let build_context =
+                build_options.into_build_context(Some("release"), strip, editable)?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
@@ -330,11 +331,10 @@ fn run() -> Result<()> {
             strip,
             no_sdist,
         } => {
-            build.profile = match (release, build.profile) {
-                (true, Some(_)) => bail!("cannot set both `--release` and `--profile`"),
-                (true, None) => Some("release".to_owned()),
-                (false, profile) => profile
-            };
+            if release {
+                assert!(build.profile.is_none()); // enforced by structopt conflicts_with
+                build.profile = Some("release".to_owned());
+            }
             let build_context = build.into_build_context(None, strip, false)?;
             if !no_sdist {
                 build_context.build_source_distribution()?;
@@ -349,11 +349,10 @@ fn run() -> Result<()> {
             no_strip,
             no_sdist,
         } => {
-            build.profile = match (debug, build.profile) {
-                (true, Some(_)) => bail!("cannot set both `--debug` and `--profile`"),
-                (true, None) => Some("debug".to_owned()),
-                (false, profile) => profile,
-            };
+            if debug {
+                assert!(build.profile.is_none()); // enforced by structopt conflicts_with
+                build.profile = Some("debug".to_owned());
+            }
             let build_context = build.into_build_context(Some("release"), !no_strip, false)?;
 
             if build_context.profile.as_deref() != Some("release") {
@@ -388,7 +387,7 @@ fn run() -> Result<()> {
             release,
             strip,
             extras,
-            profile,
+            mut profile,
         } => {
             let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
                 (Some(dir), None) => PathBuf::from(dir),
@@ -405,10 +404,9 @@ fn run() -> Result<()> {
                     )
                 }
             };
-            let profile = match (release, profile) {
-                (true, Some(_)) => bail!("cannot set both `--release` and `--profile`"),
-                (true, None) => Some("release".to_owned()),
-                (false, profile) => profile
+            if release {
+                assert!(profile.is_none()); // enforced by structopt conflicts_with
+                profile = Some("release".to_owned());
             };
 
             develop(

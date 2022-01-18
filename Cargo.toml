@@ -57,7 +57,7 @@ lddtree = "0.2.5"
 cc = "1.0.72"
 clap = { version = "3.0.0", features = ["derive", "env", "wrap_help"] }
 clap_complete = "3.0.0"
-clap_complete_fig = "3.0.0"
+clap_complete_fig = "3.0.2"
 semver = "1.0.4"
 # upload
 configparser = { version = "3.0.0", optional = true }

@@ -335,9 +335,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete_fig"
-version = "3.0.1"
+version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32591d8d9bbb3894c7b0b245251cf6977e279ca896730e69e4e24a2a6ea12645"
+checksum = "29cc003d824770d10072f4aa4a958e66d33d74a9cb7339595ac2a445d80d50a0"
 dependencies = [
  "clap",
  "clap_complete",

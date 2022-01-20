@@ -116,7 +116,7 @@ pub fn test_source_distribution(
     let sdist_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
     let build_options = BuildOptions {
-        manifest_path,
+        manifest_path: Some(manifest_path),
         out: Some(sdist_directory),
         cargo_extra_args: vec![
             "--quiet".to_string(),

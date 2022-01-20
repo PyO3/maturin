@@ -108,7 +108,7 @@ community seems to be consolidating declarative configuration in this file.
 
 ## Program the guessing game in Rust
 
-When you create a `lib` projectg with `cargo new` it creates a file
+When you create a `lib` project with `cargo new` it creates a file
 `src/lib.rs` with some default code. Edit that file and replace the default
 code with the code below. As mentioned, we will implement a slightly
 modified version of [the guessing game from The Rust

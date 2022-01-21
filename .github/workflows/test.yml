@@ -124,14 +124,6 @@ jobs:
       CARGO_HOME: .cargo
     steps:
       - uses: actions/checkout@v2
-      # actions-rs/toolchain@v1 has some hiccups with the custom installation locations
-      - name: Install Rust
-        id: rustup
-        run: |
-          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-          echo "$(pwd)/.cargo/bin" >> $GITHUB_PATH
-          echo "::set-output name=rustc_hash::$(rustc -V | awk '{print $3}' | cut -c 2-)"
-
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1
@@ -141,7 +133,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: auditwheel-test-crates-${{ runner.os }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       # Do a bit of if-switching since the docker url doesn't support substitutions
       - name: Compliant Build
         if: matrix.manylinux == '2010'

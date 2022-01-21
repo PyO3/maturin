@@ -113,10 +113,20 @@ impl BuildOptions {
             return Ok(path.clone());
         }
         // check `manifest-path` option in pyproject.toml
-        let current_dir = env::current_dir().context("Failed to detect current directory ಠ_ಠ")?;
+        let current_dir = env::current_dir()
+            .context("Failed to detect current directory ಠ_ಠ")?
+            .canonicalize()?;
         let pyproject = PyProjectToml::new(&current_dir).context("pyproject.toml is invalid")?;
         if let Some(path) = pyproject.manifest_path() {
             println!("🔗 Found cargo manifest path in pyproject.toml");
+            // pyproject.toml must be placed at top directory
+            let manifest_dir = path
+                .parent()
+                .context("missing parent directory")?
+                .canonicalize()?;
+            if !manifest_dir.starts_with(&current_dir) {
+                bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
+            }
             return Ok(path.to_path_buf());
         }
         // check Cargo.toml in current directory

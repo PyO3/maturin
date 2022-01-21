@@ -65,7 +65,7 @@ pyo3 will set the used python interpreter in the environment variable `PYTHON_SY
 
 Cffi wheels are compatible with all python versions including pypy. If `cffi` isn't installed and python is running inside a virtualenv, maturin will install it, otherwise you have to install it yourself (`pip install cffi`).
 
-maturin uses cbindgen to generate a header file, which can be customized by configuring cbindgen through a `cbindgen.toml` file inside your project root. Aternatively you can use a build script that writes a header file to `$PROJECT_ROOT/target/header.h`.
+maturin uses cbindgen to generate a header file, which can be customized by configuring cbindgen through a `cbindgen.toml` file inside your project root. Alternatively you can use a build script that writes a header file to `$PROJECT_ROOT/target/header.h`.
 
 Based on the header file maturin generates a module which exports an `ffi` and a `lib` object.
 

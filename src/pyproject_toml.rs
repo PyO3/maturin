@@ -3,7 +3,7 @@ use anyhow::{format_err, Context, Result};
 use pyproject_toml::PyProjectToml as ProjectToml;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The `[tool]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -16,6 +16,7 @@ pub struct Tool {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
+    manifest_path: Option<PathBuf>,
     sdist_include: Option<Vec<String>>,
     bindings: Option<String>,
     cargo_extra_args: Option<String>,
@@ -117,6 +118,16 @@ impl PyProjectToml {
             .and_then(|tool| tool.maturin.as_ref())
             .map(|maturin| maturin.strip)
             .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
+    pub fn manifest_path(&self) -> Option<&Path> {
+        self.tool
+            .as_ref()?
+            .maturin
+            .as_ref()?
+            .manifest_path
+            .as_deref()
     }
 
     /// Having a pyproject.toml without a version constraint is a bad idea

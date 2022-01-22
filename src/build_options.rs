@@ -47,15 +47,9 @@ pub struct BuildOptions {
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
     #[clap(short, long)]
     pub bindings: Option<String>,
-    #[clap(
-        short = 'm',
-        long = "manifest-path",
-        parse(from_os_str),
-        default_value = "Cargo.toml",
-        name = "PATH"
-    )]
+    #[clap(short = 'm', long = "manifest-path", parse(from_os_str), name = "PATH")]
     /// The path to the Cargo.toml
-    pub manifest_path: PathBuf,
+    pub manifest_path: Option<PathBuf>,
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     #[clap(short, long, parse(from_os_str))]
@@ -99,7 +93,7 @@ impl Default for BuildOptions {
             platform_tag: None,
             interpreter: Some(vec![]),
             bindings: None,
-            manifest_path: PathBuf::from("Cargo.toml"),
+            manifest_path: None,
             out: None,
             skip_auditwheel: false,
             zig: false,
@@ -112,6 +106,41 @@ impl Default for BuildOptions {
 }
 
 impl BuildOptions {
+    /// Get cargo manifest file path
+    fn manifest_path(&self) -> Result<PathBuf> {
+        // use command line argument if specified
+        if let Some(path) = &self.manifest_path {
+            return Ok(path.clone());
+        }
+        // check `manifest-path` option in pyproject.toml
+        let current_dir = env::current_dir()
+            .context("Failed to detect current directory ಠ_ಠ")?
+            .canonicalize()?;
+        let pyproject = PyProjectToml::new(&current_dir).context("pyproject.toml is invalid")?;
+        if let Some(path) = pyproject.manifest_path() {
+            println!("🔗 Found cargo manifest path in pyproject.toml");
+            // pyproject.toml must be placed at top directory
+            let manifest_dir = path
+                .parent()
+                .context("missing parent directory")?
+                .canonicalize()?;
+            if !manifest_dir.starts_with(&current_dir) {
+                bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
+            }
+            return Ok(path.to_path_buf());
+        }
+        // check Cargo.toml in current directory
+        let path = PathBuf::from("Cargo.toml");
+        if path.exists() {
+            Ok(path)
+        } else {
+            Err(format_err!(
+                "Can't find {} (in {})",
+                path.display(),
+                current_dir.display()
+            ))
+        }
+    }
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     pub fn into_build_context(
         self,
@@ -119,21 +148,10 @@ impl BuildOptions {
         strip: bool,
         editable: bool,
     ) -> Result<BuildContext> {
-        let manifest_file = &self.manifest_path;
-        if !manifest_file.exists() {
-            let current_dir =
-                env::current_dir().context("Failed to detect current directory ಠ_ಠ")?;
-            bail!(
-                "Can't find {} (in {})",
-                self.manifest_path.display(),
-                current_dir.display()
-            );
-        }
-
+        let manifest_file = self.manifest_path()?;
         if !manifest_file.is_file() {
             bail!(
-                "{} (resolved to {}) is not the path to a Cargo.toml",
-                self.manifest_path.display(),
+                "{} is not the path to a Cargo.toml",
                 manifest_file.display()
             );
         }
@@ -195,7 +213,7 @@ impl BuildOptions {
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args)?;
 
         let result = MetadataCommand::new()
-            .manifest_path(&self.manifest_path)
+            .manifest_path(&manifest_file)
             .other_options(cargo_metadata_extra_args)
             .exec();
 
@@ -318,7 +336,7 @@ impl BuildOptions {
             metadata21,
             crate_name: crate_name.to_string(),
             module_name,
-            manifest_path: self.manifest_path,
+            manifest_path: manifest_file,
             out: wheel_dir,
             release,
             strip,

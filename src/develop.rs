@@ -32,7 +32,7 @@ pub fn develop(
         platform_tag: Some(PlatformTag::Linux),
         interpreter: Some(vec![python.clone()]),
         bindings,
-        manifest_path: manifest_file.to_path_buf(),
+        manifest_path: Some(manifest_file.to_path_buf()),
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
         zig: false,

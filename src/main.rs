@@ -299,7 +299,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             manifest_path,
         } => {
             let build_options = BuildOptions {
-                manifest_path,
+                manifest_path: Some(manifest_path),
                 out: Some(sdist_directory),
                 ..Default::default()
             };
@@ -405,7 +405,7 @@ fn run() -> Result<()> {
         }
         Opt::SDist { manifest_path, out } => {
             let build_options = BuildOptions {
-                manifest_path,
+                manifest_path: Some(manifest_path),
                 out,
                 ..Default::default()
             };

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Switch from reqwest to ureq to reduce dependencies in [#767](https://github.com/PyO3/maturin/pull/767)
 * Fix missing Python submodule in wheel in [#772](https://github.com/PyO3/maturin/pull/772)
 * Add support for specifying cargo manifest path in pyproject.toml in [#781](https://github.com/PyO3/maturin/pull/781)
+* Add support for passing arguments to pep517 command via `MATURIN_PEP517_ARGS` env var in [#786](https://github.com/PyO3/maturin/pull/786)
 
 ## [0.12.6] - 2021-12-31
 

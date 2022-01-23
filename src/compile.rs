@@ -119,7 +119,13 @@ fn compile_target(
     shared_args.extend(context.cargo_extra_args.iter().map(String::as_str));
 
     if context.release {
-        shared_args.push("--release");
+        let has_cargo_profile = shared_args
+            .iter()
+            .any(|arg| *arg == "--profile" || arg.starts_with("--profile="));
+        // --release and --profile are conflicting options
+        if !has_cargo_profile {
+            shared_args.push("--release");
+        }
     }
     let mut rustc_args: Vec<&str> = context
         .rustc_extra_args

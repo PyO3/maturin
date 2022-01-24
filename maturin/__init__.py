@@ -10,6 +10,7 @@ maturin's emojis.
 """
 
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,11 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
+def get_maturin_pep517_args():
+    args = shlex.split(os.getenv("MATURIN_PEP517_ARGS", ""))
+    return args
+
+
 # noinspection PyUnusedLocal
 def _build_wheel(
     wheel_directory, config_settings=None, metadata_directory=None, editable=False
@@ -34,6 +40,9 @@ def _build_wheel(
     command = ["maturin", "pep517", "build-wheel", "-i", sys.executable]
     if editable:
         command.append("--editable")
+    pep517_args = get_maturin_pep517_args()
+    if pep517_args:
+        command.extend(pep517_args)
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
@@ -131,6 +140,9 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
         "--interpreter",
         sys.executable,
     ]
+    pep517_args = get_maturin_pep517_args()
+    if pep517_args:
+        command.extend(pep517_args)
 
     print("Running `{}`".format(" ".join(command)))
     try:

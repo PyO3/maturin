@@ -56,7 +56,7 @@ minijinja = "0.13.0"
 lddtree = "0.2.5"
 cc = "1.0.72"
 clap = { version = "3.0.13", features = ["derive", "env", "wrap_help"] }
-clap_complete = "3.0.4"
+clap_complete = "3.0.5"
 clap_complete_fig = "3.0.2"
 semver = "1.0.4"
 # upload

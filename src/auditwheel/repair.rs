@@ -10,7 +10,9 @@ pub fn find_external_libs(
     sysroot: PathBuf,
 ) -> Result<Vec<lddtree::Library>, AuditWheelError> {
     let dep_analyzer = DependencyAnalyzer::new(sysroot);
-    let deps = dep_analyzer.analyze(artifact).unwrap();
+    let deps = dep_analyzer
+        .analyze(artifact)
+        .map_err(AuditWheelError::DependencyAnalysisError)?;
     let mut ext_libs = Vec::new();
     for (name, lib) in deps.libraries {
         // Skip dynamic linker/loader and white-listed libs

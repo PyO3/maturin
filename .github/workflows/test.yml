@@ -117,13 +117,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        manylinux: [ '2014', '2_24' ]
-    env:
-      # Install rust in the workspace so it gets mounted into the docker container
-      RUSTUP_HOME: .rustup
-      CARGO_HOME: .cargo
+        manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
+    container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        id: rustup
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1
@@ -133,30 +136,12 @@ jobs:
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: auditwheel-test-crates-${{ runner.os }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
-      # Do a bit of if-switching since the docker url doesn't support substitutions
+          key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Compliant Build
-        if: matrix.manylinux == '2_24'
-        uses: docker://quay.io/pypa/manylinux_2_24_x86_64
-        with:
-          entrypoint: /bin/bash
-          args: -c "PATH=/github/workspace/.cargo/bin:$PATH tests/manylinux_compliant.sh ${{ matrix.manylinux }}"
-      - name: Compliant Build
-        if: matrix.manylinux == '2014'
-        uses: docker://quay.io/pypa/manylinux2014_x86_64
-        with:
-          entrypoint: /bin/bash
-          args: -c "PATH=/github/workspace/.cargo/bin:$PATH tests/manylinux_compliant.sh ${{ matrix.manylinux }}"
-
+        run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
-        if: matrix.manylinux == '2014'
-        uses: docker://quay.io/pypa/manylinux2014_x86_64
-        with:
-          entrypoint: /bin/bash
-          args: -c "PATH=/github/workspace/.cargo/bin:$PATH tests/manylinux_incompliant.sh ${{ matrix.manylinux }}"
-
-      # Fix permissions from docker for caching
-      - run: sudo chown $(id -u):$(id -g) -R target test-crates/*/target
+        if: matrix.manylinux == 'manylinux_2_24'
+        run: tests/manylinux_incompliant.sh ${{ matrix.manylinux }}
 
   test-docker:
     name: Test Docker

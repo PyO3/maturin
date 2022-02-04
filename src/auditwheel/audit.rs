@@ -51,6 +51,9 @@ pub enum AuditWheelError {
     /// This platform tag isn't defined by auditwheel yet
     #[error("{0} compatibility policy is not defined by auditwheel yet, pass `--skip-auditwheel` to proceed anyway")]
     UndefinedPolicy(String),
+    /// Failed to analyze external shared library dependencies of the wheel
+    #[error("Failed to analyze external shared library dependencies of the wheel")]
+    DependencyAnalysisError(#[source] lddtree::Error),
 }
 
 #[derive(Clone, Debug)]

@@ -41,10 +41,6 @@ jobs:
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin
-      # We use this target in the musl unit test
-      - name: Install x86_64-unknown-linux-musl Rust target
-        if: matrix.os == 'ubuntu-latest'
-        run: rustup target add x86_64-unknown-linux-musl
       - name: Install musl tools
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y musl-tools
@@ -81,12 +77,6 @@ jobs:
         with:
           command: test
           args: --features password-storage
-      - name: cargo test with musl
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --features password-storage --target x86_64-unknown-linux-musl
       - uses: actions/setup-python@v2
         with:
           python-version: "pypy-3.7"
@@ -111,6 +101,30 @@ jobs:
           rustup target add aarch64-unknown-linux-musl
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
+
+  test-alpine:
+    name: Test Alpine Linux
+    runs-on: ubuntu-latest
+    container: alpine:edge
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install build requirements
+        run: |
+          apk add cargo python3-dev libffi-dev py3-pip
+          pip3 install cffi virtualenv
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v1
+        with:
+          key: maturin-${{ runner.os }}-alpine
+      - name: Cache test crates cargo build
+        uses: actions/cache@v2
+        with:
+          path: test-crates/targets
+          key: test-crates-${{ runner.os }}-alpine-${{ hashFiles('test-crates/*/Cargo.lock') }}
+      - name: cargo test
+        run: |
+          # unset GITHUB_ACTIONS env var to disable zig related tests
+          env -u GITHUB_ACTIONS cargo test
 
   test-auditwheel:
     name: Test Auditwheel

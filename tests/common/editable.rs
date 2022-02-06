@@ -56,6 +56,7 @@ pub fn test_editable(
             "-m",
             "pip",
             "--disable-pip-version-check",
+            "--no-cache-dir",
             "install",
             "--force-reinstall",
             &adjust_canonicalization(filename),

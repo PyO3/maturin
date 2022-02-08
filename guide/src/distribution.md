@@ -46,7 +46,7 @@ There's a `maturin sdist` command for only building a source distribution as wor
 
 For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux.
 The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0571/#the-manylinux2010-policy).
-If you want to publish widely usable wheels for linux pypi, **you need to use a manylinux docker image**.
+If you want to publish widely usable wheels for linux pypi, **you need to use a manylinux docker image** or [build with zig](#use-zig).
 
 The Rust compiler since version 1.47 [requires at least glibc 2.11](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1470-2020-10-08), so you need to use at least manylinux2010.
 For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
@@ -145,5 +145,19 @@ OPTIONS:
 Maturin has decent cross compilation support for `pyo3` and `bin` bindings,
 other kind of bindings may work but aren't tested regularly.
 
+#### Use Docker
+
 For manylinux support the [manylinux-cross](https://github.com/messense/manylinux-cross) docker images can be used.
 And [maturin-action](https://github.com/messense/maturin-action) makes it easy to do cross compilation on GitHub Actions.
+
+#### Use Zig
+
+Since v0.12.7 maturin added support for linking with [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html),
+compile for  Linux works and is regularly tested on CI, other platforms may also work but aren't tested regularly.
+
+You can install zig following the [official documentation](https://ziglang.org/download), or install it from PyPI via `pip install ziglang`.
+Then pass `--zig` to maturin `build` or `publish` commands to use it, for example
+
+```bash
+maturin build --release --target aarch64-unknown-linux-gnu --zig
+```

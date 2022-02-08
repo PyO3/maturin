@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.7] - 2022-02-08
+
 * Add support for using [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html) as linker for easier cross compiling and manylinux compliance in [#756](https://github.com/PyO3/maturin/pull/756)
 * Switch from reqwest to ureq to reduce dependencies in [#767](https://github.com/PyO3/maturin/pull/767)
 * Fix missing Python submodule in wheel in [#772](https://github.com/PyO3/maturin/pull/772)
@@ -524,7 +526,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.6...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.7...HEAD
+[0.12.7]: https://github.com/pyo3/maturin/compare/v0.12.6...v0.12.7
 [0.12.6]: https://github.com/pyo3/maturin/compare/v0.12.5...v0.12.6
 [0.12.5]: https://github.com/pyo3/maturin/compare/v0.12.4...v0.12.5
 [0.12.4]: https://github.com/pyo3/maturin/compare/v0.12.3...v0.12.4

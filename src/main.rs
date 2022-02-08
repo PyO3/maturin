@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 #[derive(Debug, Parser)]
-#[clap(name = env!("CARGO_PKG_NAME"))]
+#[clap(name = env!("CARGO_PKG_NAME"), version)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages

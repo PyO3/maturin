@@ -74,17 +74,62 @@ or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decod
 
 ```
 USAGE:
-    maturin build [FLAGS] [OPTIONS]
+    maturin build [OPTIONS]
 
-FLAGS:
+OPTIONS:
+    -b, --bindings <BINDINGS>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+
+        --cargo-extra-args <CARGO_EXTRA_ARGS>
+            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --
+            [...]`
+
+            Use as `--cargo-extra-args="--my-arg"`
+
+            Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo
+            rustc`. maturin tries to pass only the shared subset of options to cargo metadata, but
+            this is may be a bit flaky.
+
+        --compatibility <compatibility>
+            Control the platform tag on linux.
+
+            Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
+            `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
+
+            Note that `manylinux1` is unsupported by the rust compiler. Wheels with the native
+            `linux` tag will be rejected by pypi, unless they are separately validated by
+            `auditwheel`.
+
+            The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing
+            matched
+
+            This option is ignored on all non-linux platforms
+
     -h, --help
-            Prints help information
+            Print help information
+
+    -i, --interpreter <INTERPRETER>
+            The python versions to build wheels for, given as the names of the interpreters. Uses
+            autodiscovery if not explicitly set
+
+    -m, --manifest-path <PATH>
+            The path to the Cargo.toml
 
         --no-sdist
             Don't build a source distribution
 
+    -o, --out <OUT>
+            The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+            project's target directory
+
         --release
             Pass --release to cargo
+
+        --rustc-extra-args <RUSTC_EXTRA_ARGS>
+            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1]
+            [arg2]`
+
+            Use as `--rustc-extra-args="--my-arg"`
 
         --skip-auditwheel
             Don't check for manylinux compliance
@@ -92,52 +137,21 @@ FLAGS:
         --strip
             Strip the library for minimum file size
 
-        --universal2
-            Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets, do nothing
-            otherwise
-    -V, --version
-            Prints version information
-
-
-OPTIONS:
-    -m, --manifest-path <PATH>
-            The path to the Cargo.toml [default: Cargo.toml]
-
         --target <TRIPLE>
-            The --target option for cargo [env: CARGO_BUILD_TARGET=]
+            The --target option for cargo
 
-    -b, --bindings <bindings>
-            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+            [env: CARGO_BUILD_TARGET=]
 
-        --cargo-extra-args <cargo-extra-args>...
-            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
+        --universal2
+            Control whether to build universal2 wheel for macOS or not. Only applies to macOS
+            targets, do nothing otherwise
 
-            Use as `--cargo-extra-args="--my-arg"`
+        --zig
+            For manylinux targets, use zig to ensure compliance for the chosen manylinux version
 
-            Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`. maturin tries to
-            pass only the shared subset of options to cargo metadata, but this is may be a bit flaky.
-        --compatibility <compatibility>
-            Control the platform tag on linux.
+            Default to manylinux2010/manylinux_2_12 if you do not specify an `--compatibility`
 
-            Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example
-            `musllinux_1_2`) and `linux` for the native linux tag.
-
-            Note that `manylinux1` is unsupported by the rust compiler. Wheels with the native `linux` tag will be
-            rejected by pypi, unless they are separately validated by `auditwheel`.
-
-            The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
-
-            This option is ignored on all non-linux platforms
-    -i, --interpreter <interpreter>...
-            The python versions to build wheels for, given as the names of the interpreters. Uses autodiscovery if not
-            explicitly set
-    -o, --out <out>
-            The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target
-            directory
-        --rustc-extra-args <rustc-extra-args>...
-            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
-
-            Use as `--rustc-extra-args="--my-arg"`
+            Make sure you installed zig with `pip install maturin[zig]`
 ```
 
 ### Cross Compiling

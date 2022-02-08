@@ -8,6 +8,7 @@ FILES = [
     "Readme.md",
     "guide/src/develop.md",
     "guide/src/tutorial.md",
+    "guide/src/distribution.md",
 ]
 
 

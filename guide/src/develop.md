@@ -7,41 +7,40 @@ build a package in debug mode by default and install it to virtualenv.
 
 ```
 USAGE:
-    maturin develop [FLAGS] [OPTIONS]
+    maturin develop [OPTIONS]
 
-FLAGS:
+OPTIONS:
+    -b, --bindings <BINDINGS>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+
+        --cargo-extra-args <CARGO_EXTRA_ARGS>
+            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+
+            Use as `--cargo-extra-args="--my-arg"`
+
+    -E, --extras <EXTRAS>
+            Install extra requires aka. optional dependencies
+
+            Use as `--extras=extra1,extra2`
+
     -h, --help
-            Prints help information
+            Print help information
+
+    -m, --manifest-path <MANIFEST_PATH>
+            The path to the Cargo.toml
+
+            [default: Cargo.toml]
 
         --release
             Pass --release to cargo
 
-        --strip
-            Strip the library for minimum file size
-
-    -V, --version
-            Prints version information
-
-
-OPTIONS:
-    -b, --binding-crate <binding-crate>
-            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-
-        --cargo-extra-args <cargo-extra-args>...
-            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
-
-            Use as `--cargo-extra-args="--my-arg"`
-    -E, --extras <extras>
-            Install extra requires aka. optional dependencies
-
-            Use as `--extras=extra1,extra2`
-    -m, --manifest-path <manifest-path>
-            The path to the Cargo.toml [default: Cargo.toml]
-
-        --rustc-extra-args <rustc-extra-args>...
+        --rustc-extra-args <RUSTC_EXTRA_ARGS>
             Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
 
             Use as `--rustc-extra-args="--my-arg"`
+
+        --strip
+            Strip the library for minimum file size
 ```
 
 ## PEP 660 Editable Installs

@@ -568,7 +568,7 @@ pub fn find_interpreter(
                 }
             }
 
-            if binding_name == "pyo3" && target.is_unix() && target.cross_compiling() {
+            if binding_name.starts_with("pyo3") && target.is_unix() && target.cross_compiling() {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     println!("⚠️ Cross-compiling is poorly supported");
                     let host_python = &interpreter[0];
@@ -658,7 +658,8 @@ pub fn find_interpreter(
                 PythonInterpreter::check_executables(interpreter, target, bridge)
                     .unwrap_or_default()
             } else {
-                PythonInterpreter::find_all(target, bridge, min_python_minor).unwrap_or_default()
+                PythonInterpreter::find_all(target, bridge, Some(*minor as usize))
+                    .unwrap_or_default()
             };
             // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
             // Unfortunately, on windows we need one to figure out base_prefix for a linker

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Don't require `pyproject.toml` when cargo manifest is not specified in [#806](https://github.com/PyO3/maturin/pull/806)
+
 ## [0.12.8] - 2022-02-08
 
 * Add missing `--version` flag from clap 3.0 upgrade

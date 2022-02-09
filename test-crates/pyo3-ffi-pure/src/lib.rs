@@ -46,8 +46,8 @@ pub unsafe extern "C" fn sum(
     _kwds: *mut PyObject,
 ) -> *mut PyObject {
     // this is a minimal test of compilation, not good example code
-    let val_a = PyTuple_GET_ITEM(args, 0);
-    let val_b = PyTuple_GET_ITEM(args, 1);
+    let val_a = PyTuple_GetItem(args, 0);
+    let val_b = PyTuple_GetItem(args, 1);
     let res: i64 = PyLong_AsLongLong(val_a) + PyLong_AsLongLong(val_b);
     PyLong_FromLongLong(res)
 }

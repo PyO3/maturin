@@ -68,6 +68,15 @@ fn develop_hello_world() {
 }
 
 #[test]
+fn develop_pyo3_ffi_pure() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-ffi-pure",
+        None,
+        "develop_pyo3_ffi_pure",
+    ));
+}
+
+#[test]
 fn editable_pyo3_pure() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-pure",
@@ -91,6 +100,15 @@ fn editable_pyo3_mixed_py_subdir() {
         "test-crates/pyo3-mixed-py-subdir",
         None,
         "editable_pyo3_mixed_py_subdir",
+    ));
+}
+
+#[test]
+fn editable_pyo3_ffi_pure() {
+    handle_result(editable::test_editable(
+        "test-crates/pyo3-ffi-pure",
+        None,
+        "editable_pyo3_ffi_pure",
     ));
 }
 
@@ -170,6 +188,16 @@ fn integration_hello_world() {
         "test-crates/hello-world",
         None,
         "integration_hello_world",
+        false,
+    ));
+}
+
+#[test]
+fn integration_pyo3_ffi_pure() {
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-ffi-pure",
+        None,
+        "integration_pyo3_ffi_pure",
         false,
     ));
 }

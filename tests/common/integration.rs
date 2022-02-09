@@ -1,9 +1,11 @@
-use crate::common::{adjust_canonicalization, check_installed, maybe_mock_cargo};
+use crate::common::{
+    adjust_canonicalization, check_installed, create_virtualenv, maybe_mock_cargo,
+};
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use maturin::{BuildOptions, PythonInterpreter, Target, Zig};
+use maturin::{BuildOptions, PythonInterpreter, Zig};
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::str;
 
@@ -19,8 +21,6 @@ pub fn test_integration(
 
     // Pass CARGO_BIN_EXE_maturin for testing purpose
     std::env::set_var("CARGO_BIN_EXE_maturin", env!("CARGO_BIN_EXE_maturin"));
-
-    let target = Target::from_target_triple(None)?;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
@@ -55,13 +55,6 @@ pub fn test_integration(
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;
 
-    let test_name = package
-        .as_ref()
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
     // For abi3 on unix, we didn't use a python interpreter, but we need one here
     let interpreter = if build_context.interpreter.is_empty() {
         let error_message = "python3 should be a python interpreter";
@@ -84,38 +77,16 @@ pub fn test_integration(
                 .to_string_lossy()
                 .ends_with("manylinux_2_12_x86_64.manylinux2010_x86_64.whl"))
         }
-        let venv_name = if supported_version == "py3" {
-            format!("{}-cffi", test_name)
+        let venv_suffix = if supported_version == "py3" {
+            "py3".to_string()
         } else {
-            format!(
-                "{}-{}.{}",
-                test_name, python_interpreter.major, python_interpreter.minor,
-            )
+            format!("{}.{}", python_interpreter.major, python_interpreter.minor,)
         };
-        let venv_dir = PathBuf::from("test-crates")
-            .canonicalize()?
-            .join("venvs")
-            .join(venv_name);
-
-        if !venv_dir.is_dir() {
-            let output = Command::new("virtualenv")
-                .arg("-p")
-                .arg(python_interpreter.executable.clone())
-                .arg(&adjust_canonicalization(&venv_dir))
-                .output()?;
-
-            if !output.status.success() {
-                bail!(
-                    "Failed to create a virtualenv at {}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
-                    venv_dir.display(),
-                    output.status,
-                    str::from_utf8(&output.stdout)?,
-                    str::from_utf8(&output.stderr)?,
-                );
-            }
-        }
-
-        let python = target.get_venv_python(&venv_dir);
+        let (venv_dir, python) = create_virtualenv(
+            &package,
+            &venv_suffix,
+            Some(python_interpreter.executable.clone()),
+        )?;
 
         let command = [
             "-m",
@@ -131,10 +102,11 @@ pub fn test_integration(
             .output()
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
+            let full_command = format!("{} {}", python.display(), command.join(" "));
             bail!(
                 "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
                 venv_dir.display(),
-                &command,
+                full_command,
                 output.status,
                 str::from_utf8(&output.stdout)?.trim(),
                 str::from_utf8(&output.stderr)?.trim(),
@@ -172,6 +144,7 @@ fn create_conda_env(name: &str, major: usize, minor: usize) {
 
 #[cfg(target_os = "windows")]
 pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+    use std::path::PathBuf;
     use std::process::Stdio;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();

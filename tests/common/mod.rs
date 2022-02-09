@@ -100,6 +100,7 @@ pub fn handle_result<T>(result: Result<T>) -> T {
 pub fn create_virtualenv(
     package: impl AsRef<Path>,
     venv_suffix: &str,
+    python_interp: Option<PathBuf>,
 ) -> Result<(PathBuf, PathBuf)> {
     let test_name = package
         .as_ref()
@@ -119,7 +120,11 @@ pub fn create_virtualenv(
         fs::remove_dir_all(&venv_dir)?;
     }
 
-    let output = Command::new("virtualenv")
+    let mut cmd = Command::new("virtualenv");
+    if let Some(interp) = python_interp {
+        cmd.arg("-p").arg(interp);
+    }
+    let output = cmd
         .arg(adjust_canonicalization(&venv_dir))
         .stderr(Stdio::inherit())
         .output()

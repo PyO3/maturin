@@ -542,7 +542,14 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
         min_python_minor: Option<usize>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = min_python_minor.unwrap_or(MINIMUM_PYTHON_MINOR);
+        let min_python_minor = min_python_minor.unwrap_or_else(|| {
+            if bridge.is_bindings("pyo3-ffi") {
+                // pyo3-ffi requires at least Python 3.7
+                7
+            } else {
+                MINIMUM_PYTHON_MINOR
+            }
+        });
         let executables = if target.is_windows() {
             find_all_windows(target, min_python_minor)?
         } else {
@@ -550,7 +557,10 @@ impl PythonInterpreter {
                 .map(|minor| format!("python3.{}", minor))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
-            if matches!(bridge, BridgeModel::Cffi) || bridge.is_bindings("pyo3") {
+            if matches!(bridge, BridgeModel::Cffi)
+                || bridge.is_bindings("pyo3")
+                || bridge.is_bindings("pyo3-ffi")
+            {
                 executables.extend(
                     (min_python_minor..MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{}", minor)),
                 );

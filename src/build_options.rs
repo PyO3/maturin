@@ -17,6 +17,12 @@ use std::env;
 use std::io;
 use std::path::PathBuf;
 
+// This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
+// These should be treated almost identically but must be correctly identified
+// as one or the other in logs. pyo3-ffi is ordered first because it is newer
+// and more restrictive.
+const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
+
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
@@ -385,44 +391,44 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
         .resolve
         .as_ref()
         .context("Expected cargo to return metadata with resolve")?;
-    let pyo3_packages = resolve
-        .nodes
-        .iter()
-        .filter(|package| cargo_metadata[&package.id].name == "pyo3")
-        .collect::<Vec<_>>();
-    match pyo3_packages.as_slice() {
-        [pyo3_crate] => {
-            // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
-            // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-            let abi3_selected = pyo3_crate.features.iter().any(|x| x == "abi3");
+    for &lib in PYO3_BINDING_CRATES.iter() {
+        let pyo3_packages = resolve
+            .nodes
+            .iter()
+            .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
+            .collect::<Vec<_>>();
+        match pyo3_packages.as_slice() {
+            [pyo3_crate] => {
+                // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
+                // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
+                let abi3_selected = pyo3_crate.features.iter().any(|x| x == "abi3");
 
-            let min_abi3_version = pyo3_crate
-                .features
-                .iter()
-                .filter(|x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
-                .map(|x| {
-                    Ok((
-                        (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
-                        x[8..].parse::<u8>()?,
-                    ))
-                })
-                .collect::<Result<Vec<(u8, u8)>>>()
-                .context("Bogus pyo3 cargo features")?
-                .into_iter()
-                .min();
-            if abi3_selected && min_abi3_version.is_none() {
-                bail!(
-                    "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
-                    maturin needs a minimum version feature to build abi3 wheels."
-                )
+                let min_abi3_version = pyo3_crate
+                    .features
+                    .iter()
+                    .filter(|x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
+                    .map(|x| {
+                        Ok((
+                            (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
+                            x[8..].parse::<u8>()?,
+                        ))
+                    })
+                    .collect::<Result<Vec<(u8, u8)>>>()
+                    .context(format!("Bogus {} cargo features", lib))?
+                    .into_iter()
+                    .min();
+                if abi3_selected && min_abi3_version.is_none() {
+                    bail!(
+                        "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
+                        maturin needs a minimum version feature to build abi3 wheels."
+                    )
+                }
+                return Ok(min_abi3_version);
             }
-            Ok(min_abi3_version)
+            _ => continue,
         }
-        _ => bail!(format!(
-            "Expected exactly one pyo3 dependency, found {}",
-            pyo3_packages.len()
-        )),
     }
+    Ok(None)
 }
 
 /// Tries to determine the [BridgeModel] for the target crate
@@ -454,6 +460,8 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             BridgeModel::Bindings(bindings.to_string())
         }
+    } else if deps.get("pyo3-ffi").is_some() {
+        BridgeModel::Bindings("pyo3-ffi".to_string())
     } else if deps.get("pyo3").is_some() {
         BridgeModel::Bindings("pyo3".to_string())
     } else if deps.contains_key("cpython") {
@@ -478,28 +486,30 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         }
     };
 
-    if BridgeModel::Bindings("pyo3".to_string()) == bridge {
-        let pyo3_node = deps["pyo3"];
-        if !pyo3_node.features.contains(&"extension-module".to_string()) {
-            let version = cargo_metadata[&pyo3_node.id].version.to_string();
-            println!(
-                "⚠️  Warning: You're building a library without activating pyo3's \
-                 `extension-module` feature. \
-                 See https://pyo3.rs/v{}/building_and_distribution.html#linking",
-                version
-            );
-        }
+    for &lib in PYO3_BINDING_CRATES.iter() {
+        if BridgeModel::Bindings(lib.to_string()) == bridge {
+            let pyo3_node = deps[lib];
+            if !pyo3_node.features.contains(&"extension-module".to_string()) {
+                let version = cargo_metadata[&pyo3_node.id].version.to_string();
+                println!(
+                    "⚠️  Warning: You're building a library without activating {}'s \
+                     `extension-module` feature. \
+                     See https://pyo3.rs/v{}/building_and_distribution.html#linking",
+                    lib, version
+                );
+            }
 
-        return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
-            println!(
-                "🔗 Found pyo3 bindings with abi3 support for Python ≥ {}.{}",
-                major, minor
-            );
-            Ok(BridgeModel::BindingsAbi3(major, minor))
-        } else {
-            println!("🔗 Found pyo3 bindings");
-            Ok(bridge)
-        };
+            return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
+                println!(
+                    "🔗 Found {} bindings with abi3 support for Python ≥ {}.{}",
+                    lib, major, minor
+                );
+                Ok(BridgeModel::BindingsAbi3(major, minor))
+            } else {
+                println!("🔗 Found {} bindings", lib);
+                Ok(bridge)
+            };
+        }
     }
 
     Ok(bridge)
@@ -558,7 +568,7 @@ pub fn find_interpreter(
                 }
             }
 
-            if binding_name == "pyo3" && target.is_unix() && target.cross_compiling() {
+            if binding_name.starts_with("pyo3") && target.is_unix() && target.cross_compiling() {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     println!("⚠️ Cross-compiling is poorly supported");
                     let host_python = &interpreter[0];
@@ -648,7 +658,8 @@ pub fn find_interpreter(
                 PythonInterpreter::check_executables(interpreter, target, bridge)
                     .unwrap_or_default()
             } else {
-                PythonInterpreter::find_all(target, bridge, min_python_minor).unwrap_or_default()
+                PythonInterpreter::find_all(target, bridge, Some(*minor as usize))
+                    .unwrap_or_default()
             };
             // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
             // Unfortunately, on windows we need one to figure out base_prefix for a linker

@@ -550,7 +550,10 @@ impl PythonInterpreter {
                 .map(|minor| format!("python3.{}", minor))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
-            if matches!(bridge, BridgeModel::Cffi) || bridge.is_bindings("pyo3") {
+            if matches!(bridge, BridgeModel::Cffi)
+                || bridge.is_bindings("pyo3")
+                || bridge.is_bindings("pyo3-ffi")
+            {
                 executables.extend(
                     (min_python_minor..MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{}", minor)),
                 );

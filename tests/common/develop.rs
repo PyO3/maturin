@@ -14,7 +14,7 @@ pub fn test_develop(
 ) -> Result<()> {
     maybe_mock_cargo();
 
-    let (venv_dir, python) = create_virtualenv(&package, "develop")?;
+    let (venv_dir, python) = create_virtualenv(&package, "develop", None)?;
 
     // Ensure the test doesn't wrongly pass
     check_installed(package.as_ref(), &python).unwrap_err();

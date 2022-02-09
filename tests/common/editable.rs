@@ -18,7 +18,7 @@ pub fn test_editable(
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
-    let (venv_dir, python) = create_virtualenv(&package, "editable")?;
+    let (venv_dir, python) = create_virtualenv(&package, "editable", None)?;
     let interpreter = python.to_str().expect("invalid interpreter path");
     let cargo_extra_args = format!(
         "--cargo-extra-args=--quiet --target-dir test-crates/targets/{}",

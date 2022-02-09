@@ -535,7 +535,7 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
  * Initial Release
 
 [Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.9...HEAD
-[0.12.8]: https://github.com/pyo3/maturin/compare/v0.12.8...v0.12.9
+[0.12.9]: https://github.com/pyo3/maturin/compare/v0.12.8...v0.12.9
 [0.12.8]: https://github.com/pyo3/maturin/compare/v0.12.7...v0.12.8
 [0.12.7]: https://github.com/pyo3/maturin/compare/v0.12.6...v0.12.7
 [0.12.6]: https://github.com/pyo3/maturin/compare/v0.12.5...v0.12.6

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.8] - 2022-02-09
+
 * Don't require `pyproject.toml` when cargo manifest is not specified in [#806](https://github.com/PyO3/maturin/pull/806)
 
 ## [0.12.8] - 2022-02-08
@@ -532,7 +534,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.8...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.9...HEAD
+[0.12.8]: https://github.com/pyo3/maturin/compare/v0.12.8...v0.12.9
 [0.12.8]: https://github.com/pyo3/maturin/compare/v0.12.7...v0.12.8
 [0.12.7]: https://github.com/pyo3/maturin/compare/v0.12.6...v0.12.7
 [0.12.6]: https://github.com/pyo3/maturin/compare/v0.12.5...v0.12.6

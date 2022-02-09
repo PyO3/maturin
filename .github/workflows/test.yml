@@ -131,7 +131,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
+        # manylinux2014 fails with `/lib64/libc.so.6: version `GLIBC_2.18'` not found recently
+        # could be a upstream Rust issue, disable it for now
+        #
+        # manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
+        manylinux: [ 'manylinux_2_24' ]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v2

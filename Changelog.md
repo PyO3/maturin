@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for `pyo3-ffi` by ijl in [#804](https://github.com/PyO3/maturin/pull/804)
+
 ## [0.12.9] - 2022-02-09
 
 * Don't require `pyproject.toml` when cargo manifest is not specified in [#806](https://github.com/PyO3/maturin/pull/806)

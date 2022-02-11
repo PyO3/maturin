@@ -325,7 +325,12 @@ impl BuildOptions {
                     Some(target.get_minimum_manylinux_tag())
                 }
             } else {
-                None
+                // Defaults to musllinux_1_2 for musl target if it's not bin bindings
+                if target.is_musl_target() && !matches!(bridge, BridgeModel::Bin) {
+                    Some(PlatformTag::Musllinux { x: 1, y: 2 })
+                } else {
+                    None
+                }
             });
         if platform_tag == Some(PlatformTag::manylinux1()) {
             eprintln!("⚠️  Warning: manylinux1 is unsupported by the Rust compiler.");

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Add support for `pyo3-ffi` by ijl in [#804](https://github.com/PyO3/maturin/pull/804)
+* Defaults to `musllinux_1_2` for musl target if it's not bin bindings in [#808](https://github.com/PyO3/maturin/pull/808)
 
 ## [0.12.9] - 2022-02-09
 

@@ -50,7 +50,7 @@ pyproject-toml = "0.3.0"
 python-pkginfo = "0.5.1"
 textwrap = "0.14.2"
 ignore = "0.4.18"
-dialoguer = "0.10.0"
+dialoguer = { version = "0.10.0", default-features = false }
 console = "0.15.0"
 minijinja = "0.13.0"
 lddtree = "0.2.6"

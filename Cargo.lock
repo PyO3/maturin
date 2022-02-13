@@ -473,8 +473,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349d6b4fabcd9e97e1df1ae15395ac7e49fb144946a0d453959dc2696273b9da"
 dependencies = [
  "console",
- "tempfile",
- "zeroize",
 ]
 
 [[package]]
@@ -2300,12 +2298,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package]]
-name = "zeroize"
-version = "1.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c88870063c39ee00ec285a2f8d6a966e5b6fb2becc4e8dac77ed0d370ed6006"
 
 [[package]]
 name = "zip"

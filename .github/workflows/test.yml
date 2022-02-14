@@ -135,8 +135,8 @@ jobs:
         # could be a upstream Rust issue, disable it for now
         #
         # manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
-        manylinux: [ 'manylinux_2_24' ]
-    container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
+        manylinux: [ 'manylinux_2_28' ]
+    container: quay.io/pypa/manylinux_2_28_poc_x86_64:poc
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -158,7 +158,6 @@ jobs:
       - name: Compliant Build
         run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
-        if: matrix.manylinux == 'manylinux_2_24'
         run: tests/manylinux_incompliant.sh ${{ matrix.manylinux }}
 
   test-docker:

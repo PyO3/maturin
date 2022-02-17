@@ -11,7 +11,7 @@ build-backend = "maturin"
 ```
 
 If a `pyproject.toml` with a `[build-system]` entry is present, maturin will build a source distribution of your package, unless `--no-sdist` is specified.
-The source distribution will contain the same files as `cargo package`. To only build a source distribution, pass `--interpreter` without any values.
+The source distribution will contain the same files as `cargo package`. To only build a source distribution, use the `maturin sdist` command.
 
 You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and maturin.
 
@@ -38,9 +38,6 @@ To include arbitrary files in the sdist for use during compilation specify `sdis
 [tool.maturin]
 sdist-include = ["path/**/*"]
 ```
-
-There's a `maturin sdist` command for only building a source distribution as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041).
-
 
 ## Build Wheels
 

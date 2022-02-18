@@ -4,7 +4,7 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
-use clap::{ArgEnum, IntoApp, Parser};
+use clap::{ArgEnum, IntoApp, Parser, Subcommand};
 use clap_complete::Generator;
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
@@ -97,7 +97,7 @@ enum Opt {
         #[clap(
             short = 'E',
             long,
-            use_delimiter = true,
+            use_value_delimiter = true,
             multiple_values = false,
             multiple_occurrences = false
         )]
@@ -158,7 +158,7 @@ enum Opt {
     #[clap(subcommand)]
     Pep517(Pep517Command),
     /// Generate shell completions
-    #[clap(name = "completions", setting = clap::AppSettings::Hidden)]
+    #[clap(name = "completions", hide = true)]
     Completions {
         #[clap(name = "SHELL", parse(try_from_str))]
         shell: Shell,
@@ -171,8 +171,8 @@ enum Opt {
 /// Backend for the PEP 517 integration. Not for human consumption
 ///
 /// The commands are meant to be called from the python PEP 517
-#[derive(Debug, Parser)]
-#[clap(name = "pep517", setting = clap::AppSettings::Hidden)]
+#[derive(Debug, Subcommand)]
+#[clap(name = "pep517", hide = true)]
 enum Pep517Command {
     /// The implementation of prepare_metadata_for_build_wheel
     #[clap(name = "write-dist-info")]
@@ -427,12 +427,12 @@ fn run() -> Result<()> {
             upload_ui(&files, &publish)?
         }
         Opt::Completions { shell } => {
-            let mut app = Opt::into_app();
+            let mut cmd = Opt::command();
             match shell {
                 Shell::Fig => {
-                    app.set_bin_name(env!("CARGO_BIN_NAME"));
+                    cmd.set_bin_name(env!("CARGO_BIN_NAME"));
                     let fig = clap_complete_fig::Fig;
-                    fig.generate(&app, &mut io::stdout());
+                    fig.generate(&cmd, &mut io::stdout());
                 }
                 _ => {
                     let shell = match shell {
@@ -445,7 +445,7 @@ fn run() -> Result<()> {
                     };
                     clap_complete::generate(
                         shell,
-                        &mut app,
+                        &mut cmd,
                         env!("CARGO_BIN_NAME"),
                         &mut io::stdout(),
                     )

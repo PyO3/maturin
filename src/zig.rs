@@ -4,6 +4,7 @@
 use crate::target::Arch;
 use crate::{BuildContext, PlatformTag};
 use anyhow::{bail, Context, Result};
+use clap::Subcommand;
 use fs_err as fs;
 use std::env;
 #[cfg(target_family = "unix")]
@@ -16,18 +17,18 @@ use std::process::{self, Command};
 use std::str;
 
 /// Zig linker wrapper
-#[derive(Debug, clap::Parser)]
-#[clap(name = "zig", setting = clap::AppSettings::Hidden)]
+#[derive(Debug, Subcommand)]
+#[clap(name = "zig", hide = true)]
 pub enum Zig {
     /// `zig cc` wrapper
-    #[clap(name = "cc", setting = clap::AppSettings::TrailingVarArg)]
+    #[clap(name = "cc", trailing_var_arg = true)]
     Cc {
         /// `zig cc` arguments
         #[clap(takes_value = true, multiple_values = true)]
         args: Vec<String>,
     },
     /// `zig c++` wrapper
-    #[clap(name = "c++", setting = clap::AppSettings::TrailingVarArg)]
+    #[clap(name = "c++", trailing_var_arg = true)]
     Cxx {
         /// `zig c++` arguments
         #[clap(takes_value = true, multiple_values = true)]

@@ -24,7 +24,7 @@ use std::path::PathBuf;
 const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
 
 /// High level API for building wheels from a crate which is also used for the CLI
-#[derive(Debug, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
     /// Control the platform tag on linux.
@@ -46,23 +46,29 @@ pub struct BuildOptions {
         parse(try_from_str)
     )]
     pub platform_tag: Option<PlatformTag>,
-    #[clap(short, long)]
+
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
-    pub interpreter: Option<Vec<PathBuf>>,
+    #[clap(short, long)]
+    pub interpreter: Vec<PathBuf>,
+
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
     #[clap(short, long)]
     pub bindings: Option<String>,
-    #[clap(short = 'm', long = "manifest-path", parse(from_os_str), name = "PATH")]
+
     /// The path to the Cargo.toml
+    #[clap(short = 'm', long = "manifest-path", parse(from_os_str), name = "PATH")]
     pub manifest_path: Option<PathBuf>,
+
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     #[clap(short, long, parse(from_os_str))]
     pub out: Option<PathBuf>,
+
     /// Don't check for manylinux compliance
     #[clap(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
+
     /// For manylinux targets, use zig to ensure compliance for the chosen manylinux version
     ///
     /// Default to manylinux2010/manylinux_2_12 if you do not specify an `--compatibility`
@@ -70,9 +76,11 @@ pub struct BuildOptions {
     /// Make sure you installed zig with `pip install maturin[zig]`
     #[clap(long)]
     pub zig: bool,
+
     /// The --target option for cargo
     #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
     pub target: Option<String>,
+
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
     ///
     /// Use as `--cargo-extra-args="--my-arg"`
@@ -82,33 +90,17 @@ pub struct BuildOptions {
     /// be a bit flaky.
     #[clap(long = "cargo-extra-args")]
     pub cargo_extra_args: Vec<String>,
+
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
     ///
     /// Use as `--rustc-extra-args="--my-arg"`
     #[clap(long = "rustc-extra-args")]
     pub rustc_extra_args: Vec<String>,
+
     /// Control whether to build universal2 wheel for macOS or not.
     /// Only applies to macOS targets, do nothing otherwise.
     #[clap(long)]
     pub universal2: bool,
-}
-
-impl Default for BuildOptions {
-    fn default() -> Self {
-        BuildOptions {
-            platform_tag: None,
-            interpreter: Some(vec![]),
-            bindings: None,
-            manifest_path: None,
-            out: None,
-            skip_auditwheel: false,
-            zig: false,
-            target: None,
-            cargo_extra_args: Vec::new(),
-            rustc_extra_args: Vec::new(),
-            universal2: false,
-        }
-    }
 }
 
 impl BuildOptions {
@@ -265,13 +257,12 @@ impl BuildOptions {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
-        let interpreter = match self.interpreter {
-            // Only build a source distribution
-            Some(ref interpreter) if interpreter.is_empty() => vec![],
-            // User given list of interpreters
-            Some(interpreter) => find_interpreter(&bridge, &interpreter, &target, None)?,
+        let interpreter = if self.interpreter.is_empty() {
             // Auto-detect interpreters
-            None => find_interpreter(&bridge, &[], &target, get_min_python_minor(&metadata21))?,
+            find_interpreter(&bridge, &[], &target, get_min_python_minor(&metadata21))?
+        } else {
+            // User given list of interpreters
+            find_interpreter(&bridge, &self.interpreter, &target, None)?
         };
 
         let mut rustc_extra_args = self.rustc_extra_args.clone();

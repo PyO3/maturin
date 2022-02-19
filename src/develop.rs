@@ -30,7 +30,7 @@ pub fn develop(
 
     let build_options = BuildOptions {
         platform_tag: Some(PlatformTag::Linux),
-        interpreter: Some(vec![python.clone()]),
+        interpreter: vec![python.clone()],
         bindings,
         manifest_path: Some(manifest_file.to_path_buf()),
         out: Some(wheel_dir.path().to_path_buf()),

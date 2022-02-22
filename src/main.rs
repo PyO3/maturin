@@ -4,11 +4,12 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
+use cargo_zigbuild::Zig;
 use clap::{ArgEnum, IntoApp, Parser, Subcommand};
 use clap_complete::Generator;
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
-    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target, Zig,
+    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};

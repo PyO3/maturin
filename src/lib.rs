@@ -40,7 +40,6 @@ pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::Target;
 #[cfg(feature = "upload")]
 pub use crate::upload::{upload, upload_ui, PublishOpt, Registry, UploadError};
-pub use crate::zig::Zig;
 pub use auditwheel::PlatformTag;
 
 mod auditwheel;
@@ -59,4 +58,3 @@ mod source_distribution;
 mod target;
 #[cfg(feature = "upload")]
 mod upload;
-mod zig;

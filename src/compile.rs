@@ -105,14 +105,24 @@ fn compile_target(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
-    let (zig_cc, zig_cxx) =
-        if context.zig && context.target.user_specified && !context.target.is_msvc() {
-            let (cc, cxx) =
-                prepare_zig_linker(context).context("Failed to create zig linker wrapper")?;
-            (Some(cc), Some(cxx))
-        } else {
-            (None, None)
-        };
+    let target = &context.target;
+    let target_triple = target.target_triple();
+    let zig_triple = if target.is_linux() {
+        match context.platform_tag {
+            Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", target_triple, x, y),
+            _ => target_triple.to_string(),
+        }
+    } else {
+        target_triple.to_string()
+    };
+    let (zig_cc, zig_cxx) = if context.zig && !target.is_msvc() && target.host_triple != zig_triple
+    {
+        let (cc, cxx) =
+            prepare_zig_linker(context).context("Failed to create zig linker wrapper")?;
+        (Some(cc), Some(cxx))
+    } else {
+        (None, None)
+    };
 
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
@@ -164,7 +174,7 @@ fn compile_target(
     let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
-    if context.target.is_macos() {
+    if target.is_macos() {
         if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) = bindings_crate {
             let mac_args = &[
                 "-C",
@@ -191,7 +201,7 @@ fn compile_target(
         // however, we get an exit code 0xc0000005 if we try the same with
         // `/FORCE:UNDEFINED`, so we still look up the python interpreter
         // and pass the location of the lib with the definitions.
-        if context.target.is_windows() {
+        if target.is_windows() {
             let python_interpreter = python_interpreter
                 .expect("Must have a python interpreter for building abi3 on windows");
             pythonxy_lib_folder = format!("native={}", python_interpreter.libs_dir.display());
@@ -223,11 +233,7 @@ fn compile_target(
 
     // Also set TARGET_CC and TARGET_CXX for cc-rs and cmake-rs
     if let Some(zig_cc) = zig_cc {
-        let env_target = context
-            .target
-            .target_triple()
-            .to_uppercase()
-            .replace('-', "_");
+        let env_target = target_triple.to_uppercase().replace('-', "_");
         build_command.env("TARGET_CC", &zig_cc);
         build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_cc);
     }

@@ -102,6 +102,8 @@ pub struct Target {
     env: Environment,
     triple: String,
     cross_compiling: bool,
+    /// Host machine target triple
+    pub(crate) host_triple: String,
     /// Is user specified `--target`
     pub(crate) user_specified: bool,
 }
@@ -112,17 +114,17 @@ impl Target {
     ///
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
+        let host_triple = get_host_target()?;
         let (platform, triple) = if let Some(ref target_triple) = target_triple {
             let platform: Triple = target_triple
                 .parse()
                 .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
             (platform, target_triple.to_string())
         } else {
-            let target_triple = get_host_target()?;
-            let platform: Triple = target_triple
+            let platform: Triple = host_triple
                 .parse()
-                .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
-            (platform, target_triple)
+                .map_err(|_| format_err!("Unknown target triple {}", host_triple))?;
+            (platform, host_triple.clone())
         };
 
         let os = match platform.operating_system {
@@ -159,6 +161,7 @@ impl Target {
             arch,
             env: platform.environment,
             triple,
+            host_triple,
             user_specified: target_triple.is_some(),
             cross_compiling: false,
         };

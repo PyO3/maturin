@@ -1064,7 +1064,7 @@ dependencies = [
  "python-pkginfo",
  "regex",
  "rpassword",
- "semver",
+ "rustc_version",
  "serde",
  "serde_json",
  "sha2 0.10.2",

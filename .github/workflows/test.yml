@@ -99,8 +99,10 @@ jobs:
         run: |
           rustup target add aarch64-unknown-linux-gnu
           rustup target add aarch64-unknown-linux-musl
+          rustup target add aarch64-apple-darwin
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
+          cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
 
   test-alpine:
     name: Test Alpine Linux

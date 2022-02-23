@@ -151,6 +151,8 @@ pub struct BuildContext {
     pub module_name: String,
     /// The path to the Cargo.toml. Required for the cargo invocations
     pub manifest_path: PathBuf,
+    /// Directory for all generated artifacts
+    pub target_dir: PathBuf,
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     pub out: PathBuf,

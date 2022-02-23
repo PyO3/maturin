@@ -102,6 +102,8 @@ pub struct Target {
     env: Environment,
     triple: String,
     cross_compiling: bool,
+    /// Is user specified `--target`
+    pub(crate) user_specified: bool,
 }
 
 impl Target {
@@ -157,6 +159,7 @@ impl Target {
             arch,
             env: platform.environment,
             triple,
+            user_specified: target_triple.is_some(),
             cross_compiling: false,
         };
         target.cross_compiling = is_cross_compiling(&target)?;
@@ -365,6 +368,11 @@ impl Target {
     /// Returns true if the current platform is windows
     pub fn is_windows(&self) -> bool {
         self.os == Os::Windows
+    }
+
+    /// Returns true if the current environment is msvc
+    pub fn is_msvc(&self) -> bool {
+        self.env == Environment::Msvc
     }
 
     /// Returns true if the current platform is illumos

@@ -105,13 +105,14 @@ fn compile_target(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
-    let (zig_cc, zig_cxx) = if context.zig && context.target.is_linux() {
-        let (cc, cxx) =
-            prepare_zig_linker(context).context("Failed to create zig linker wrapper")?;
-        (Some(cc), Some(cxx))
-    } else {
-        (None, None)
-    };
+    let (zig_cc, zig_cxx) =
+        if context.zig && context.target.user_specified && !context.target.is_msvc() {
+            let (cc, cxx) =
+                prepare_zig_linker(context).context("Failed to create zig linker wrapper")?;
+            (Some(cc), Some(cxx))
+        } else {
+            (None, None)
+        };
 
     let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
 
@@ -324,6 +325,8 @@ fn compile_target(
 }
 
 fn prepare_zig_linker(context: &BuildContext) -> Result<(PathBuf, PathBuf)> {
+    use cargo_zigbuild::macos::LIBICONV_TBD;
+
     let target = &context.target;
     let triple = target.target_triple();
     let triple = if target.is_linux() {
@@ -339,6 +342,18 @@ fn prepare_zig_linker(context: &BuildContext) -> Result<(PathBuf, PathBuf)> {
         triple.to_string()
     };
     let (cc, cxx) = cargo_zigbuild::zig::prepare_zig_linker(&triple)?;
+
+    if target.is_macos() {
+        let target_dir = if target.user_specified {
+            context.target_dir.join(triple)
+        } else {
+            context.target_dir.clone()
+        };
+        let profile = if context.release { "release" } else { "debug" };
+        let deps_dir = target_dir.join(profile).join("deps");
+        fs::create_dir_all(&deps_dir)?;
+        fs::write(deps_dir.join("libiconv.tbd"), LIBICONV_TBD)?;
+    }
     Ok((cc, cxx))
 }
 

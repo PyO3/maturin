@@ -1,7 +1,6 @@
 use crate::build_context::BridgeModel;
 use crate::python_interpreter::InterpreterKind;
-use crate::zig::prepare_zig_linker;
-use crate::{BuildContext, PythonInterpreter};
+use crate::{BuildContext, PlatformTag, PythonInterpreter};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
@@ -322,6 +321,25 @@ fn compile_target(
     }
 
     Ok(artifacts)
+}
+
+fn prepare_zig_linker(context: &BuildContext) -> Result<(PathBuf, PathBuf)> {
+    let target = &context.target;
+    let triple = target.target_triple();
+    let triple = if target.is_linux() {
+        match context.platform_tag {
+            None | Some(PlatformTag::Linux) => triple.to_string(),
+            Some(PlatformTag::Musllinux { .. }) => {
+                println!("⚠️  Warning: zig with musl is unstable");
+                triple.to_string()
+            }
+            Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", triple, x, y),
+        }
+    } else {
+        triple.to_string()
+    };
+    let (cc, cxx) = cargo_zigbuild::zig::prepare_zig_linker(&triple)?;
+    Ok((cc, cxx))
 }
 
 /// Checks that the native library contains a function called `PyInit_<module name>` and warns

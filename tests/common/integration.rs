@@ -2,8 +2,9 @@ use crate::common::{
     adjust_canonicalization, check_installed, create_virtualenv, maybe_mock_cargo,
 };
 use anyhow::{bail, Context, Result};
+use cargo_zigbuild::Zig;
 use clap::Parser;
-use maturin::{BuildOptions, PythonInterpreter, Zig};
+use maturin::{BuildOptions, PythonInterpreter};
 use std::env;
 use std::path::Path;
 use std::process::Command;
@@ -20,7 +21,10 @@ pub fn test_integration(
     maybe_mock_cargo();
 
     // Pass CARGO_BIN_EXE_maturin for testing purpose
-    std::env::set_var("CARGO_BIN_EXE_maturin", env!("CARGO_BIN_EXE_maturin"));
+    std::env::set_var(
+        "CARGO_BIN_EXE_cargo-zigbuild",
+        env!("CARGO_BIN_EXE_maturin"),
+    );
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 

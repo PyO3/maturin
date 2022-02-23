@@ -59,9 +59,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.54"
+version = "1.0.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a99269dff3bc004caa411f38845c20303f1e393ca2bd6581576fa3a7f59577d"
+checksum = "159bb86af3a200e19a068f4224eae4c8bb2d0fa054c7e5d1cacd5cef95e684cd"
 
 [[package]]
 name = "async-io"
@@ -233,6 +233,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-zigbuild"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "713fc3be70832f404d4538b8100306cc579bdb47ae8269c38245af67a553bc9c"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dirs",
+ "fs-err",
+ "rustc_version",
+ "semver",
+ "target-lexicon",
+]
+
+[[package]]
 name = "cargo_metadata"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -308,9 +323,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5f1fea81f183005ced9e59cdb01737ef2423956dac5a6d731b06b2ecfaa3467"
+checksum = "6d76c22c9b9b215eeb8d016ad3a90417bd13cb24cf8142756e6472445876cab7"
 dependencies = [
  "atty",
  "bitflags",
@@ -639,9 +654,9 @@ dependencies = [
 
 [[package]]
 name = "fs-err"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ebd3504ad6116843b8375ad70df74e7bfe83cac77a1f3fe73200c844d43bfe0"
+checksum = "5bd79fa345a495d3ae89fb7165fec01c0e72f41821d642dda363a1e97975652e"
 
 [[package]]
 name = "futures"
@@ -759,9 +774,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
+checksum = "d39cd93900197114fa1fcb7ae84ca742095eed9442088988ae74fa744e930e77"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -981,9 +996,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.118"
+version = "0.2.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06e509672465a0504304aa87f9f176f2b2b716ed8fb105ebe5c02dc6dce96a94"
+checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
 
 [[package]]
 name = "log"
@@ -1018,6 +1033,7 @@ dependencies = [
  "anyhow",
  "base64",
  "bytesize",
+ "cargo-zigbuild",
  "cargo_metadata",
  "cbindgen",
  "cc",
@@ -1596,10 +1612,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef03e0a2b150c7a90d01faf6254c9c48a41e95fb2a8c2ac1c6f0d2b9aefc342"
 
 [[package]]
-name = "rustls"
-version = "0.20.3"
+name = "rustc_version"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b323592e3164322f5b193dc4302e4e36cd8d37158a712d664efae1a5c2791700"
+checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
+dependencies = [
+ "semver",
+]
+
+[[package]]
+name = "rustls"
+version = "0.20.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fbfeb8d0ddb84706bc597a5574ab8912817c52a397f819e5b614e2265206921"
 dependencies = [
  "log",
  "ring",
@@ -1713,9 +1738,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0486718e92ec9a68fbed73bb5ef687d71103b142595b406835649bebd33f72c7"
+checksum = "a4a3381e03edd24287172047536f20cabde766e2cd3e65e6b00fb3af51c4f38d"
 dependencies = [
  "serde",
 ]

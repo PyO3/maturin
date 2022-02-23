@@ -1,13 +1,12 @@
 use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::{PlatformTag, PythonInterpreter};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{anyhow, bail, format_err, Context, Result};
 use platform_info::*;
 use std::env;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::str;
 use target_lexicon::{Environment, Triple};
 
@@ -481,36 +480,20 @@ impl Target {
 }
 
 pub(crate) fn get_host_target() -> Result<String> {
-    let output = Command::new("rustc").arg("-vV").output();
-    let output = match output {
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            bail!(
-                "rustc, the rust compiler, is not installed or not in PATH. \
-                This package requires Rust and Cargo to compile extensions. \
-                Install it through the system's package manager or via https://rustup.rs/.",
-            );
-        }
-        Err(err) => {
-            return Err(err).context("Failed to run rustc to get the host target");
-        }
-        Ok(output) => output,
-    };
-
-    let output = str::from_utf8(&output.stdout).context("`rustc -vV` didn't return utf8 output")?;
-
-    let field = "host: ";
-    let host = output
-        .lines()
-        .find(|l| l.starts_with(field))
-        .map(|l| &l[field.len()..])
-        .ok_or_else(|| {
-            format_err!(
-                "`rustc -vV` didn't have a line for `{}`, got:\n{}",
-                field.trim(),
-                output
-            )
-        })?
-        .to_string();
+    let host = rustc_version::version_meta()
+        .map(|meta| meta.host)
+        .map_err(|err| match err {
+            rustc_version::Error::CouldNotExecuteCommand(e)
+                if e.kind() == std::io::ErrorKind::NotFound =>
+            {
+                anyhow!(
+                    "rustc, the rust compiler, is not installed or not in PATH. \
+                     This package requires Rust and Cargo to compile extensions. \
+                     Install it through the system's package manager or via https://rustup.rs/.",
+                )
+            }
+            err => anyhow!(err).context("Failed to run rustc to get the host target"),
+        })?;
     Ok(host)
 }
 

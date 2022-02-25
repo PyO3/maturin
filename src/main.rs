@@ -165,7 +165,7 @@ enum Opt {
         shell: Shell,
     },
     /// Zig linker wrapper
-    #[clap(subcommand)]
+    #[clap(subcommand, hide = true)]
     Zig(Zig),
 }
 

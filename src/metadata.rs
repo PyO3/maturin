@@ -522,7 +522,7 @@ mod test {
         let mut readme_md = tempfile::NamedTempFile::new().unwrap();
 
         let readme_path = if cfg!(windows) {
-            readme_md.path().to_str().unwrap().replace("\\", "/")
+            readme_md.path().to_str().unwrap().replace('\\', "/")
         } else {
             readme_md.path().to_str().unwrap().to_string()
         };

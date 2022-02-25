@@ -413,7 +413,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 bail!("Username and/or password are wrong");
             }
             Err(err) => {
-                let filename = i.file_name().unwrap_or_else(|| i.as_os_str());
+                let filename = i.file_name().unwrap_or(i.as_os_str());
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
                         println!(

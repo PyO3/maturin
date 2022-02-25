@@ -226,7 +226,7 @@ fn compile_target(
             .target
             .target_triple()
             .to_uppercase()
-            .replace("-", "_");
+            .replace('-', "_");
         build_command.env("TARGET_CC", &zig_cc);
         build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_cc);
     }

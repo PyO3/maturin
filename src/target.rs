@@ -180,7 +180,7 @@ impl Target {
             | (Os::OpenBsd, Arch::X86_64)
             | (Os::OpenBsd, Arch::Aarch64) => {
                 let info = PlatformInfo::new()?;
-                let release = info.release().replace(".", "_").replace("-", "_");
+                let release = info.release().replace('.', "_").replace('-', "_");
                 let arch = match self.arch {
                     Arch::X86_64 => "amd64",
                     Arch::X86 => "i386",
@@ -203,7 +203,7 @@ impl Target {
             // Haiku
             | (Os::Haiku, Arch::X86_64) => {
                 let info = PlatformInfo::new()?;
-                let release = info.release().replace(".", "_").replace("-", "_");
+                let release = info.release().replace('.', "_").replace('-', "_");
                 format!(
                     "{}_{}_{}",
                     self.os.to_string().to_ascii_lowercase(),
@@ -213,7 +213,7 @@ impl Target {
             }
             (Os::Illumos, Arch::X86_64) => {
                 let info = PlatformInfo::new()?;
-                let mut release = info.release().replace(".", "_").replace("-", "_");
+                let mut release = info.release().replace('.', "_").replace('-', "_");
                 let mut arch = info.machine().replace(' ', "_").replace('/', "_");
 
                 let mut os = self.os.to_string().to_ascii_lowercase();

@@ -214,7 +214,7 @@ impl ModuleWriter for WheelWriter {
         permissions: u32,
     ) -> Result<()> {
         // The zip standard mandates using unix style paths
-        let target = target.as_ref().to_str().unwrap().replace("\\", "/");
+        let target = target.as_ref().to_str().unwrap().replace('\\', "/");
 
         // Unlike users which can use the develop subcommand, the tests have to go through
         // packing a zip which pip than has to unpack. This makes this 2-3 times faster
@@ -298,7 +298,7 @@ impl WheelWriter {
             zip::CompressionMethod::Deflated
         };
         let options = zip::write::FileOptions::default().compression_method(compression_method);
-        let record_filename = self.record_file.to_str().unwrap().replace("\\", "/");
+        let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
         self.zip.start_file(&record_filename, options)?;
         for (filename, hash, len) in self.record {
             self.zip

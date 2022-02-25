@@ -491,10 +491,9 @@ impl PythonInterpreter {
             return Ok(None);
         }
 
-        let interpreter;
-        match message.interpreter.as_str() {
-            "cpython" => interpreter = InterpreterKind::CPython,
-            "pypy" => interpreter = InterpreterKind::PyPy,
+        let interpreter = match message.interpreter.as_str() {
+            "cpython" => InterpreterKind::CPython,
+            "pypy" => InterpreterKind::PyPy,
             other => {
                 bail!("Unsupported interpreter {}", other);
             }

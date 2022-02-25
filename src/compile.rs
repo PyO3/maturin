@@ -105,7 +105,18 @@ fn compile_target(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
-    let (zig_cc, zig_cxx) = if context.zig && context.target.is_linux() {
+    let target = &context.target;
+    let target_triple = target.target_triple();
+    let zig_triple = if target.is_linux() {
+        match context.platform_tag {
+            Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", target_triple, x, y),
+            _ => target_triple.to_string(),
+        }
+    } else {
+        target_triple.to_string()
+    };
+    let (zig_cc, zig_cxx) = if context.zig && !target.is_msvc() && target.host_triple != zig_triple
+    {
         let (cc, cxx) =
             prepare_zig_linker(context).context("Failed to create zig linker wrapper")?;
         (Some(cc), Some(cxx))
@@ -163,7 +174,7 @@ fn compile_target(
     let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
-    if context.target.is_macos() {
+    if target.is_macos() {
         if let BridgeModel::Bindings(_) | BridgeModel::BindingsAbi3(_, _) = bindings_crate {
             let mac_args = &[
                 "-C",
@@ -190,7 +201,7 @@ fn compile_target(
         // however, we get an exit code 0xc0000005 if we try the same with
         // `/FORCE:UNDEFINED`, so we still look up the python interpreter
         // and pass the location of the lib with the definitions.
-        if context.target.is_windows() {
+        if target.is_windows() {
             let python_interpreter = python_interpreter
                 .expect("Must have a python interpreter for building abi3 on windows");
             pythonxy_lib_folder = format!("native={}", python_interpreter.libs_dir.display());
@@ -222,11 +233,7 @@ fn compile_target(
 
     // Also set TARGET_CC and TARGET_CXX for cc-rs and cmake-rs
     if let Some(zig_cc) = zig_cc {
-        let env_target = context
-            .target
-            .target_triple()
-            .to_uppercase()
-            .replace('-', "_");
+        let env_target = target_triple.to_uppercase().replace('-', "_");
         build_command.env("TARGET_CC", &zig_cc);
         build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_cc);
     }
@@ -324,6 +331,8 @@ fn compile_target(
 }
 
 fn prepare_zig_linker(context: &BuildContext) -> Result<(PathBuf, PathBuf)> {
+    use cargo_zigbuild::macos::LIBICONV_TBD;
+
     let target = &context.target;
     let triple = target.target_triple();
     let triple = if target.is_linux() {
@@ -339,6 +348,18 @@ fn prepare_zig_linker(context: &BuildContext) -> Result<(PathBuf, PathBuf)> {
         triple.to_string()
     };
     let (cc, cxx) = cargo_zigbuild::zig::prepare_zig_linker(&triple)?;
+
+    if target.is_macos() {
+        let target_dir = if target.user_specified {
+            context.target_dir.join(triple)
+        } else {
+            context.target_dir.clone()
+        };
+        let profile = if context.release { "release" } else { "debug" };
+        let deps_dir = target_dir.join(profile).join("deps");
+        fs::create_dir_all(&deps_dir)?;
+        fs::write(deps_dir.join("libiconv.tbd"), LIBICONV_TBD)?;
+    }
     Ok((cc, cxx))
 }
 

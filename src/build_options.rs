@@ -334,6 +334,13 @@ impl BuildOptions {
             );
         }
 
+        let target_dir = cargo_extra_args
+            .iter()
+            .position(|x| x == "--target-dir")
+            .and_then(|i| cargo_extra_args.get(i + 1))
+            .map(PathBuf::from)
+            .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
+
         Ok(BuildContext {
             target,
             bridge,
@@ -342,6 +349,7 @@ impl BuildOptions {
             crate_name: crate_name.to_string(),
             module_name,
             manifest_path: manifest_file,
+            target_dir,
             out: wheel_dir,
             release,
             strip,

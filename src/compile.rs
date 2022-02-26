@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::str;
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
@@ -106,27 +106,11 @@ fn compile_target(
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
     let target = &context.target;
-    let target_triple = target.target_triple();
-    let zig_triple = if target.is_linux() {
-        match context.platform_tag {
-            Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", target_triple, x, y),
-            _ => target_triple.to_string(),
-        }
-    } else {
-        target_triple.to_string()
-    };
-    let (zig_cc, zig_cxx) = if context.zig && !target.is_msvc() && target.host_triple != zig_triple
-    {
-        let (cc, cxx) =
-            prepare_zig_linker(context).context("Failed to create zig linker wrapper")?;
-        (Some(cc), Some(cxx))
-    } else {
-        (None, None)
-    };
-
-    let mut shared_args = vec!["--manifest-path", context.manifest_path.to_str().unwrap()];
-
-    shared_args.extend(context.cargo_extra_args.iter().map(String::as_str));
+    let mut shared_args: Vec<_> = context
+        .cargo_extra_args
+        .iter()
+        .map(String::as_str)
+        .collect();
 
     if context.release {
         let has_cargo_profile = shared_args
@@ -209,7 +193,7 @@ fn compile_target(
         }
     }
 
-    let cargo_args = vec!["rustc", "--message-format", "json"];
+    let cargo_args = vec!["--message-format", "json"];
 
     let build_args: Vec<_> = cargo_args
         .iter()
@@ -217,12 +201,30 @@ fn compile_target(
         .chain(&["--"])
         .chain(&rustc_args)
         .collect();
-    let command_str = build_args
-        .iter()
-        .fold("cargo".to_string(), |acc, x| acc + " " + x);
 
-    let mut let_binding = Command::new("cargo");
-    let build_command = let_binding
+    let mut build = cargo_zigbuild::Build {
+        manifest_path: Some(context.manifest_path.clone()),
+        ..Default::default()
+    };
+    let target_triple = target.target_triple();
+    if !context.zig {
+        build.disable_zig_linker = true;
+        if target.user_specified {
+            build.target = Some(target_triple.to_string());
+        }
+    } else {
+        let zig_triple = if target.is_linux() {
+            match context.platform_tag {
+                Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", target_triple, x, y),
+                _ => target_triple.to_string(),
+            }
+        } else {
+            target_triple.to_string()
+        };
+        build.target = Some(zig_triple);
+    }
+    let mut build_command = build.build_command("rustc")?;
+    build_command
         .env("RUSTFLAGS", rust_flags)
         .args(&build_args)
         // We need to capture the json messages
@@ -230,16 +232,6 @@ fn compile_target(
         // We can't get colored human and json messages from rustc as they are mutually exclusive,
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
-
-    // Also set TARGET_CC and TARGET_CXX for cc-rs and cmake-rs
-    if let Some(zig_cc) = zig_cc {
-        let env_target = target_triple.to_uppercase().replace('-', "_");
-        build_command.env("TARGET_CC", &zig_cc);
-        build_command.env(format!("CARGO_TARGET_{}_LINKER", env_target), &zig_cc);
-    }
-    if let Some(zig_cxx) = zig_cxx {
-        build_command.env("TARGET_CXX", &zig_cxx);
-    }
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
         let is_pypy = python_interpreter
@@ -320,47 +312,20 @@ fn compile_target(
         .expect("Failed to wait on cargo child process");
 
     if !status.success() {
+        let command_str = build_args
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(" ");
         bail!(
-            r#"Cargo build finished with "{}": `{}`"#,
+            r#"Cargo build finished with "{}": `cargo rustc --manifest-path {} {}`"#,
             status,
+            context.manifest_path.display(),
             command_str
         )
     }
 
     Ok(artifacts)
-}
-
-fn prepare_zig_linker(context: &BuildContext) -> Result<(PathBuf, PathBuf)> {
-    use cargo_zigbuild::macos::LIBICONV_TBD;
-
-    let target = &context.target;
-    let triple = target.target_triple();
-    let triple = if target.is_linux() {
-        match context.platform_tag {
-            None | Some(PlatformTag::Linux) => triple.to_string(),
-            Some(PlatformTag::Musllinux { .. }) => {
-                println!("⚠️  Warning: zig with musl is unstable");
-                triple.to_string()
-            }
-            Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", triple, x, y),
-        }
-    } else {
-        triple.to_string()
-    };
-    let (cc, cxx) = cargo_zigbuild::zig::prepare_zig_linker(&triple)?;
-
-    if target.is_macos() {
-        let target_dir = if target.user_specified {
-            context.target_dir.join(triple)
-        } else {
-            context.target_dir.clone()
-        };
-        let profile = if context.release { "release" } else { "debug" };
-        let deps_dir = target_dir.join(profile).join("deps");
-        fs::create_dir_all(&deps_dir)?;
-        fs::write(deps_dir.join("libiconv.tbd"), LIBICONV_TBD)?;
-    }
-    Ok((cc, cxx))
 }
 
 /// Checks that the native library contains a function called `PyInit_<module name>` and warns

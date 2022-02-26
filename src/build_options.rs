@@ -207,9 +207,6 @@ impl BuildOptions {
             }
         }
         cargo_extra_args = split_extra_args(&cargo_extra_args)?;
-        if let Some(ref target) = self.target {
-            cargo_extra_args.extend(vec!["--target".to_string(), target.clone()]);
-        }
 
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args)?;
 

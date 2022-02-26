@@ -234,14 +234,15 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e147af71d647d7d7705be89ae6786085d8de813888b07ae0537c89da4a2ec217"
+checksum = "5271b86ef9cd9d3898587ff97064c324e205c5ef29afc9e206580b09794fb206"
 dependencies = [
  "anyhow",
  "clap",
  "dirs",
  "fs-err",
+ "path-slash",
  "rustc_version",
  "semver",
  "serde",
@@ -1329,6 +1330,12 @@ name = "parking"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "427c3892f9e783d91cc128285287e70a59e206ca452770ece88a76f7a3eddd72"
+
+[[package]]
+name = "path-slash"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cacbb3c4ff353b534a67fb8d7524d00229da4cb1dc8c79f4db96e375ab5b619"
 
 [[package]]
 name = "percent-encoding"

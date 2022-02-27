@@ -10,7 +10,10 @@ import sys
 import subprocess
 from typing import Optional
 
-import toml
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 
 class Importer(abc.MetaPathFinder):
@@ -64,8 +67,8 @@ class Loader(abc.Loader):
 
 def _is_cargo_project(cargo_toml: pathlib.Path, module_name: str) -> bool:
     with contextlib.suppress(FileNotFoundError):
-        with open(cargo_toml) as f:
-            cargo = toml.load(f)
+        with open(cargo_toml, "rb") as f:
+            cargo = tomllib.load(f)
             package_name = cargo.get("package", {}).get("name")
             if (
                 package_name == module_name

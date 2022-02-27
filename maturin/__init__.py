@@ -17,12 +17,15 @@ import sys
 from subprocess import SubprocessError
 from typing import Dict
 
-import toml
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 
 def get_config() -> Dict[str, str]:
-    with open("pyproject.toml", encoding="utf-8") as fp:
-        pyproject_toml = toml.load(fp)
+    with open("pyproject.toml", "rb") as fp:
+        pyproject_toml = tomllib.load(fp)
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 

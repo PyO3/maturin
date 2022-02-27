@@ -1,6 +1,6 @@
 # Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
-requires = ["setuptools~=53.0.0", "wheel~=0.36.2", "toml~=0.10.2"]
+requires = ["setuptools~=53.0.0", "wheel~=0.36.2", "tomli>=1.1.0 ; python_version<'3.11'"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = ["toml~=0.10.2"]
+dependencies = ["tomli>=1.1.0 ; python_version<'3.11'"]
 
 [project.optional-dependencies]
 zig = [

@@ -16,7 +16,10 @@ import shutil
 import subprocess
 import sys
 
-import toml
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from setuptools import setup
 from setuptools.command.install import install
 
@@ -109,8 +112,8 @@ class PostInstallCommand(install):
 with open("Readme.md", encoding="utf-8", errors="ignore") as fp:
     long_description = fp.read()
 
-with open("Cargo.toml") as fp:
-    version = toml.load(fp)["package"]["version"]
+with open("Cargo.toml", "rb") as fp:
+    version = tomllib.load(fp)["package"]["version"]
 
 setup(
     name="maturin",
@@ -131,6 +134,6 @@ setup(
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
-    install_requires=["toml~=0.10.0"],
+    install_requires=["tomli>=1.1.0 ; python_version<'3.11'"],
     zip_safe=False,
 )

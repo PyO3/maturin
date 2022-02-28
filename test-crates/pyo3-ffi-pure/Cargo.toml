@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2018"
 
 [dependencies]
-pyo3-ffi = { git = "https://github.com/PyO3/pyo3.git", branch = "main", features = ["abi3-py37", "extension-module"] }
+pyo3-ffi = { version = "0.16.0", features = ["abi3-py37", "extension-module"] }
 
 [lib]
 name = "pyo3_ffi_pure"

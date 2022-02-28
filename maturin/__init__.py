@@ -40,7 +40,15 @@ def _build_wheel(
 ):
     # PEP 517 specifies that only `sys.executable` points to the correct
     # python interpreter
-    command = ["maturin", "pep517", "build-wheel", "-i", sys.executable]
+    command = [
+        "maturin",
+        "pep517",
+        "build-wheel",
+        "-i",
+        sys.executable,
+        "--compatibility",
+        "off",
+    ]
     if editable:
         command.append("--editable")
     pep517_args = get_maturin_pep517_args()

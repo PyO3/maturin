@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Remove support for building only sdist via `maturin build -i` in [#813](https://github.com/PyO3/maturin/pull/813), use `maturin sdist` instead.
 * Add macOS target support for `--zig` in [#817](https://github.com/PyO3/maturin/pull/817)
 * Migrate Python dependency `toml` to `tomllib` / `tomli` by Contextualist in [#821](https://github.com/PyO3/maturin/pull/821)
+* Disable auditwheel for PEP 517 build wheel process in [#823](https://github.com/PyO3/maturin/pull/823)
 
 ## [0.12.9] - 2022-02-09
 

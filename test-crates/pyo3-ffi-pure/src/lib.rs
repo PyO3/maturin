@@ -20,10 +20,10 @@ pub unsafe extern "C" fn PyInit_pyo3_ffi_pure() -> *mut PyObject {
 
     let wrapped_sum = PyMethodDef {
         ml_name: "sum\0".as_ptr() as *const c_char,
-        ml_meth: Some(std::mem::transmute::<PyCFunctionWithKeywords, PyCFunction>(
-            sum,
-        )),
-        ml_flags: METH_VARARGS,
+        ml_meth: PyMethodDefPointer {
+            PyCFunctionWithKeywords: sum,
+        },
+        ml_flags: METH_VARARGS | METH_KEYWORDS,
         ml_doc: std::ptr::null_mut(),
     };
     PyModule_AddObject(

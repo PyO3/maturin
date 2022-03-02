@@ -339,7 +339,7 @@ dependencies = [
  "strsim",
  "termcolor",
  "terminal_size",
- "textwrap",
+ "textwrap 0.14.2",
 ]
 
 [[package]]
@@ -1075,7 +1075,7 @@ dependencies = [
  "tar",
  "target-lexicon",
  "tempfile",
- "textwrap",
+ "textwrap 0.15.0",
  "thiserror",
  "toml",
  "ureq",
@@ -1939,8 +1939,16 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0066c8d12af8b5acd21e00547c3797fde4e8677254a7ee429176ccebbe93dd80"
 dependencies = [
- "smawk",
  "terminal_size",
+]
+
+[[package]]
+name = "textwrap"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1141d4d61095b28419e22cb0bbf02755f5e54e0526f97f1e3d1d160e60885fb"
+dependencies = [
+ "smawk",
  "unicode-linebreak",
  "unicode-width",
 ]

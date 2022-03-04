@@ -234,11 +234,12 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d48ae9f51cda3668a89ee563c51e74b02d82cfbbfd7b2784d02b8e0449bdfce"
+checksum = "c1b2b95b4f7c6790d5e8f9de1e4b544d188ce1c5d9b6d4851f190f7e76b41d31"
 dependencies = [
  "anyhow",
+ "cargo_metadata",
  "clap",
  "dirs",
  "fs-err",
@@ -1264,9 +1265,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
 
 [[package]]
 name = "opaque-debug"

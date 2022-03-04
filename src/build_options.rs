@@ -1,7 +1,7 @@
 use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
-use crate::python_interpreter::InterpreterKind;
+use crate::python_interpreter::{InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::BuildContext;
 use crate::CargoToml;
 use crate::Metadata21;
@@ -22,6 +22,24 @@ use std::path::PathBuf;
 // as one or the other in logs. pyo3-ffi is ordered first because it is newer
 // and more restrictive.
 const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
+
+fn pyo3_minimum_python_minor_version(major_version: u64, minor_version: u64) -> Option<usize> {
+    if (major_version, minor_version) >= (0, 16) {
+        Some(7)
+    } else if (major_version, minor_version) >= (0, 12) {
+        Some(6)
+    } else {
+        None
+    }
+}
+
+fn pyo3_ffi_minimum_python_minor_version(major_version: u64, minor_version: u64) -> Option<usize> {
+    if (major_version, minor_version) >= (0, 16) {
+        pyo3_minimum_python_minor_version(major_version, minor_version)
+    } else {
+        None
+    }
+}
 
 /// High level API for building wheels from a crate which is also used for the CLI
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
@@ -444,6 +462,18 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         .iter()
         .map(|node| (cargo_metadata[&node.id].name.as_ref(), node))
         .collect();
+    let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
+        .packages
+        .iter()
+        .filter_map(|pkg| {
+            let name = &pkg.name;
+            if name == "pyo3" || name == "pyo3-ffi" || name == "cpython" {
+                Some((name.as_ref(), pkg))
+            } else {
+                None
+            }
+        })
+        .collect();
 
     let bridge = if let Some(bindings) = bridge {
         if bindings == "cffi" {
@@ -459,15 +489,21 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 );
             }
 
-            BridgeModel::Bindings(bindings.to_string())
+            BridgeModel::Bindings(bindings.to_string(), MINIMUM_PYTHON_MINOR)
         }
     } else if deps.get("pyo3-ffi").is_some() {
-        BridgeModel::Bindings("pyo3-ffi".to_string())
+        let ver = &packages["pyo3-ffi"].version;
+        let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
+            .unwrap_or(MINIMUM_PYTHON_MINOR);
+        BridgeModel::Bindings("pyo3-ffi".to_string(), minor)
     } else if deps.get("pyo3").is_some() {
-        BridgeModel::Bindings("pyo3".to_string())
+        let ver = &packages["pyo3"].version;
+        let minor =
+            pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
+        BridgeModel::Bindings("pyo3".to_string(), minor)
     } else if deps.contains_key("cpython") {
         println!("🔗 Found rust-cpython bindings");
-        BridgeModel::Bindings("rust_cpython".to_string())
+        BridgeModel::Bindings("rust_cpython".to_string(), MINIMUM_PYTHON_MINOR)
     } else {
         let package = &cargo_metadata[resolve.root.as_ref().unwrap()];
         let targets: Vec<_> = package
@@ -487,7 +523,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     };
 
     for &lib in PYO3_BINDING_CRATES.iter() {
-        if BridgeModel::Bindings(lib.to_string()) == bridge {
+        if bridge.is_bindings(lib) {
             let pyo3_node = deps[lib];
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
                 let version = cargo_metadata[&pyo3_node.id].version.to_string();
@@ -551,7 +587,7 @@ pub fn find_interpreter(
     min_python_minor: Option<usize>,
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
-        BridgeModel::Bindings(binding_name) => {
+        BridgeModel::Bindings(binding_name, _) => {
             let mut interpreter = if !interpreter.is_empty() {
                 PythonInterpreter::check_executables(interpreter, target, bridge)
                     .context("The given list of python interpreters is invalid")?
@@ -773,11 +809,11 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_mixed, None),
-            Ok(BridgeModel::Bindings(_))
+            Ok(BridgeModel::Bindings(..))
         ));
         assert!(matches!(
             find_bridge(&pyo3_mixed, Some("pyo3")),
-            Ok(BridgeModel::Bindings(_))
+            Ok(BridgeModel::Bindings(..))
         ));
 
         assert!(find_bridge(&pyo3_mixed, Some("rust-cpython")).is_err());
@@ -818,7 +854,7 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_pure, None).unwrap(),
-            BridgeModel::Bindings(_)
+            BridgeModel::Bindings(..)
         ));
     }
 

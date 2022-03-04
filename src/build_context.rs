@@ -25,8 +25,8 @@ pub enum BridgeModel {
     /// A rust binary to be shipped a python package
     Bin,
     /// A native module with pyo3 or rust-cpython bindings. The String is the name of the bindings
-    /// providing crate, e.g. pyo3.
-    Bindings(String),
+    /// providing crate, e.g. pyo3, the number is the minimum minor python version
+    Bindings(String, usize),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
     /// for all cpython versions (pypy still needs multiple versions).
     /// The numbers are the minimum major and minor version
@@ -37,7 +37,7 @@ impl BridgeModel {
     /// Returns the name of the bindings crate
     pub fn unwrap_bindings(&self) -> &str {
         match self {
-            BridgeModel::Bindings(value) => value,
+            BridgeModel::Bindings(value, _) => value,
             _ => panic!("Expected Bindings"),
         }
     }
@@ -45,7 +45,7 @@ impl BridgeModel {
     /// Test whether this is using a specific bindings crate
     pub fn is_bindings(&self, name: &str) -> bool {
         match self {
-            BridgeModel::Bindings(value) => value == name,
+            BridgeModel::Bindings(value, _) => value == name,
             _ => false,
         }
     }
@@ -196,7 +196,7 @@ impl BuildContext {
         let wheels = match &self.bridge {
             BridgeModel::Cffi => self.build_cffi_wheel()?,
             BridgeModel::Bin => self.build_bin_wheel()?,
-            BridgeModel::Bindings(_) => self.build_binding_wheels(&self.interpreter)?,
+            BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
             BridgeModel::BindingsAbi3(major, minor) => {
                 let cpythons: Vec<_> = self
                     .interpreter

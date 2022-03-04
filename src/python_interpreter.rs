@@ -13,7 +13,7 @@ use std::str;
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
-const MINIMUM_PYTHON_MINOR: usize = 6;
+pub const MINIMUM_PYTHON_MINOR: usize = 6;
 /// Be liberal here to include preview versions
 const MAXIMUM_PYTHON_MINOR: usize = 12;
 const MAXIMUM_PYPY_MINOR: usize = 8;
@@ -541,13 +541,9 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
         min_python_minor: Option<usize>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = min_python_minor.unwrap_or_else(|| {
-            if bridge.is_bindings("pyo3-ffi") {
-                // pyo3-ffi requires at least Python 3.7
-                7
-            } else {
-                MINIMUM_PYTHON_MINOR
-            }
+        let min_python_minor = min_python_minor.unwrap_or(match bridge {
+            BridgeModel::Bindings(_, minor) => *minor,
+            _ => MINIMUM_PYTHON_MINOR,
         });
         let executables = if target.is_windows() {
             find_all_windows(target, min_python_minor)?

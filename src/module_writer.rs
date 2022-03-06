@@ -441,8 +441,8 @@ where
 
 /// Checks if user has provided their own header at `target/header.h`, otherwise
 /// we run cbindgen to generate one.
-fn cffi_header(crate_dir: &Path, tempdir: &TempDir) -> Result<PathBuf> {
-    let maybe_header = crate_dir.join("target").join("header.h");
+fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result<PathBuf> {
+    let maybe_header = target_dir.join("header.h");
 
     if maybe_header.is_file() {
         println!("💼 Using the existing header at {}", maybe_header.display());
@@ -486,9 +486,13 @@ fn cffi_header(crate_dir: &Path, tempdir: &TempDir) -> Result<PathBuf> {
 /// how to load the shared library without the header and then writes those instructions to a
 /// file called `ffi.py`. This `ffi.py` will expose an object called `ffi`. This object is used
 /// in `__init__.py` to load the shared library into a module called `lib`.
-pub fn generate_cffi_declarations(crate_dir: &Path, python: &Path) -> Result<String> {
+pub fn generate_cffi_declarations(
+    crate_dir: &Path,
+    target_dir: &Path,
+    python: &Path,
+) -> Result<String> {
     let tempdir = tempdir()?;
-    let header = cffi_header(crate_dir, &tempdir)?;
+    let header = cffi_header(crate_dir, target_dir, &tempdir)?;
 
     let ffi_py = tempdir.as_ref().join("ffi.py");
 
@@ -679,12 +683,13 @@ pub fn write_cffi_module(
     writer: &mut impl ModuleWriter,
     project_layout: &ProjectLayout,
     crate_dir: &Path,
+    target_dir: &Path,
     module_name: &str,
     artifact: &Path,
     python: &Path,
     editable: bool,
 ) -> Result<()> {
-    let cffi_declarations = generate_cffi_declarations(crate_dir, python)?;
+    let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
     let module;
 

@@ -556,6 +556,7 @@ impl BuildContext {
             &mut writer,
             &self.project_layout,
             self.manifest_path.parent().unwrap(),
+            &self.target_dir,
             &self.module_name,
             artifact,
             &self.interpreter[0].executable,

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add macOS target support for `--zig` in [#817](https://github.com/PyO3/maturin/pull/817)
 * Migrate Python dependency `toml` to `tomllib` / `tomli` by Contextualist in [#821](https://github.com/PyO3/maturin/pull/821)
 * Disable auditwheel for PEP 517 build wheel process in [#823](https://github.com/PyO3/maturin/pull/823)
+* Lookup existing cffi `header.h` in workspace target directory in [#833](https://github.com/PyO3/maturin/pull/833)
 
 ## [0.12.9] - 2022-02-09
 

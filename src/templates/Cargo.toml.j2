@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 {%- if bindings == "pyo3" -%}
-pyo3 = { version = "0.15.1", features = ["extension-module"] }
+pyo3 = { version = "0.16.1", features = ["extension-module"] }
 {%- elif bindings == "rust-cpython" -%}
 cpython = { version = "0.7.0", features = ["extension-module"] }
 {%- endif -%}

@@ -502,6 +502,7 @@ fn fold_header(text: &str) -> String {
         if i > 0 {
             result.push_str("\r\n");
         }
+        let line = line.trim_end();
         if line.is_empty() {
             result.push('\t');
         } else {
@@ -794,6 +795,29 @@ mod test {
         let content = metadata.to_file_contents();
         let pkginfo: Result<python_pkginfo::Metadata, _> = content.parse();
         assert!(pkginfo.is_ok());
+
+        let license = metadata
+            .to_vec()
+            .into_iter()
+            .filter_map(|(key, val)| {
+                if key.starts_with("License") {
+                    Some(val)
+                } else {
+                    None
+                }
+            })
+            .next()
+            .unwrap();
+        let mut lines = license.split_inclusive('\n');
+        assert_eq!(
+            lines.next().unwrap(),
+            "Copyright (c) 2018-present konstin\r\n"
+        );
+        assert_eq!(lines.next().unwrap(), "\t\r\n");
+        assert_eq!(
+            lines.next().unwrap(),
+            "\tPermission is hereby granted, free of charge, to any\r\n"
+        );
     }
 
     #[test]

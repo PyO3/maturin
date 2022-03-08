@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.10.0"
       - name: Install cffi and virtualenv
-        run: pip install cffi virtualenv ziglang~=0.9.0
+        run: pip install cffi virtualenv ziglang~=0.9.0 twine
       - uses: actions-rs/toolchain@v1
         id: rustup
         with:
@@ -103,6 +103,8 @@ jobs:
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
+          # Check wheels with twine
+          twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
 
   test-alpine:
     name: Test Alpine Linux

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.10] - 2022-03-09
+
 * Add support for `pyo3-ffi` by ijl in [#804](https://github.com/PyO3/maturin/pull/804)
 * Defaults to `musllinux_1_2` for musl target if it's not bin bindings in [#808](https://github.com/PyO3/maturin/pull/808)
 * Remove support for building only sdist via `maturin build -i` in [#813](https://github.com/PyO3/maturin/pull/813), use `maturin sdist` instead.
@@ -543,7 +545,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.9...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.10...HEAD
+[0.12.10]: https://github.com/pyo3/maturin/compare/v0.12.9...v0.12.10
 [0.12.9]: https://github.com/pyo3/maturin/compare/v0.12.8...v0.12.9
 [0.12.8]: https://github.com/pyo3/maturin/compare/v0.12.7...v0.12.8
 [0.12.7]: https://github.com/pyo3/maturin/compare/v0.12.6...v0.12.7

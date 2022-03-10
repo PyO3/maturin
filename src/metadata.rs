@@ -44,6 +44,8 @@ pub struct Metadata21 {
     pub maintainer: Option<String>,
     pub maintainer_email: Option<String>,
     pub license: Option<String>,
+    // https://peps.python.org/pep-0639/#license-file-multiple-use
+    pub license_files: Vec<PathBuf>,
     pub classifiers: Vec<String>,
     pub requires_dist: Vec<String>,
     pub provides_dist: Vec<String>,
@@ -144,10 +146,7 @@ impl Metadata21 {
                 }
                 if let Some(license_path) = file {
                     let license_path = manifest_path.join(license_path);
-                    self.license = Some(fs::read_to_string(&license_path).context(format!(
-                            "Failed to read license file specified in pyproject.toml, which should be at {}",
-                            license_path.display()
-                        ))?);
+                    self.license_files.push(license_path);
                 }
                 if let Some(license_text) = text {
                     self.license = Some(license_text.clone());
@@ -351,6 +350,7 @@ impl Metadata21 {
             author: authors,
             author_email,
             license: cargo_toml.package.license.clone(),
+            license_files: Vec::new(),
 
             // Values provided through `[project.metadata.maturin]`
             classifiers,
@@ -403,6 +403,13 @@ impl Metadata21 {
         add_vec("Obsoletes-Dist", &self.obsoletes_dist);
         add_vec("Requires-External", &self.requires_external);
         add_vec("Provides-Extra", &self.provides_extra);
+
+        let license_files: Vec<String> = self
+            .license_files
+            .iter()
+            .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
+            .collect();
+        add_vec("License-File", &license_files);
 
         let mut add_option = |name, value: &Option<String>| {
             if let Some(some) = value.clone() {
@@ -791,33 +798,14 @@ mod test {
                 "boltons; (sys_platform == 'win32') and extra == 'test'"
             ]
         );
+        assert_eq!(metadata.license.as_ref().unwrap(), "MIT");
+
+        let license_file = &metadata.license_files[0];
+        assert_eq!(license_file.file_name().unwrap(), "LICENSE");
 
         let content = metadata.to_file_contents();
         let pkginfo: Result<python_pkginfo::Metadata, _> = content.parse();
         assert!(pkginfo.is_ok());
-
-        let license = metadata
-            .to_vec()
-            .into_iter()
-            .filter_map(|(key, val)| {
-                if key.starts_with("License") {
-                    Some(val)
-                } else {
-                    None
-                }
-            })
-            .next()
-            .unwrap();
-        let mut lines = license.split_inclusive('\n');
-        assert_eq!(
-            lines.next().unwrap(),
-            "Copyright (c) 2018-present konstin\r\n"
-        );
-        assert_eq!(lines.next().unwrap(), "\t\r\n");
-        assert_eq!(
-            lines.next().unwrap(),
-            "\tPermission is hereby granted, free of charge, to any\r\n"
-        );
     }
 
     #[test]

@@ -4,6 +4,7 @@ name = "pyo3-pure"
 version = "2.1.2"
 edition = "2018"
 description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
+license = "MIT"
 
 [dependencies]
 pyo3 = { version = "0.15.1", features = ["abi3-py36", "extension-module"] }

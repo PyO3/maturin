@@ -32,7 +32,7 @@ fn rewrite_cargo_toml(
         "Can't read Cargo.toml at {}",
         manifest_path.as_ref().display(),
     ))?;
-    let mut data = toml::from_str::<toml::value::Table>(&text).context(format!(
+    let mut data = text.parse::<toml_edit::Document>().context(format!(
         "Failed to parse Cargo.toml at {}",
         manifest_path.as_ref().display()
     ))?;
@@ -60,10 +60,10 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name).into()
+                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    format!("../{}", dep_name).into()
+                    toml_edit::value(format!("../{}", dep_name))
                 };
                 rewritten = true;
                 if !known_path_deps.contains_key(&dep_name) {
@@ -79,7 +79,7 @@ fn rewrite_cargo_toml(
         }
     }
     if rewritten {
-        Ok(toml::to_string(&data)?)
+        Ok(data.to_string())
     } else {
         Ok(text)
     }

@@ -62,7 +62,7 @@ impl PyProjectToml {
             "Couldn't find pyproject.toml at {}",
             path.display()
         ))?;
-        let pyproject: PyProjectToml = toml::from_str(&contents)
+        let pyproject: PyProjectToml = toml_edit::easy::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
         Ok(pyproject)
     }

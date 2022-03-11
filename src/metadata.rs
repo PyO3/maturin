@@ -532,7 +532,7 @@ mod test {
 
         let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
 
-        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
+        let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(&toml_with_path).unwrap();
 
         let metadata =
             Metadata21::from_cargo_toml(&cargo_toml_struct, &readme_md.path().parent().unwrap())
@@ -718,7 +718,7 @@ mod test {
         "#
         );
 
-        let cargo_toml_struct: CargoToml = toml::from_str(cargo_toml).unwrap();
+        let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(cargo_toml).unwrap();
         let metadata =
             Metadata21::from_cargo_toml(&cargo_toml_struct, "/not/exist/manifest/path").unwrap();
         let actual = metadata.to_file_contents();
@@ -763,7 +763,7 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_toml() {
         let cargo_toml_str = fs_err::read_to_string("test-crates/pyo3-pure/Cargo.toml").unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
         let metadata = Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure").unwrap();
         assert_eq!(
             metadata.summary,
@@ -824,7 +824,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
         let cargo_toml_str =
             fs_err::read_to_string("test-crates/pyo3-mixed-py-subdir/Cargo.toml").unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
         let metadata =
             Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-mixed-py-subdir").unwrap();
         // defined in Cargo.toml
@@ -839,7 +839,7 @@ mod test {
     #[test]
     fn test_implicit_readme() {
         let cargo_toml_str = fs_err::read_to_string("test-crates/pyo3-mixed/Cargo.toml").unwrap();
-        let cargo_toml = toml::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
         let metadata = Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-mixed").unwrap();
         assert!(metadata.description.unwrap().starts_with("# pyo3-mixed"));
         assert_eq!(

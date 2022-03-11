@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Package license files in `.dist-info/license_files` following PEP 639 in [#837](https://github.com/PyO3/maturin/pull/837)
+* Stop testing Python 3.6 on CI since it's already EOL in [#840](https://github.com/PyO3/maturin/pull/840)
+
 ## [0.12.10] - 2022-03-09
 
 * Add support for `pyo3-ffi` by ijl in [#804](https://github.com/PyO3/maturin/pull/804)

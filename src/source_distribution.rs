@@ -96,9 +96,15 @@ fn add_crate_to_source_distribution(
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
 ) -> Result<()> {
+    let crate_dir = manifest_path.as_ref().parent().with_context(|| {
+        format!(
+            "Can't get parent directory of {}",
+            manifest_path.as_ref().display()
+        )
+    })?;
     let output = Command::new("cargo")
-        .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
-        .arg(manifest_path.as_ref())
+        .args(&["package", "--list", "--allow-dirty"])
+        .current_dir(crate_dir)
         .output()
         .context("Failed to run cargo")?;
     if !output.status.success() {

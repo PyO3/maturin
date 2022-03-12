@@ -491,16 +491,16 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             BridgeModel::Bindings(bindings.to_string(), MINIMUM_PYTHON_MINOR)
         }
-    } else if deps.get("pyo3-ffi").is_some() {
-        let ver = &packages["pyo3-ffi"].version;
-        let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
-            .unwrap_or(MINIMUM_PYTHON_MINOR);
-        BridgeModel::Bindings("pyo3-ffi".to_string(), minor)
     } else if deps.get("pyo3").is_some() {
         let ver = &packages["pyo3"].version;
         let minor =
             pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
         BridgeModel::Bindings("pyo3".to_string(), minor)
+    } else if deps.get("pyo3-ffi").is_some() {
+        let ver = &packages["pyo3-ffi"].version;
+        let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
+            .unwrap_or(MINIMUM_PYTHON_MINOR);
+        BridgeModel::Bindings("pyo3-ffi".to_string(), minor)
     } else if deps.contains_key("cpython") {
         println!("🔗 Found rust-cpython bindings");
         BridgeModel::Bindings("rust_cpython".to_string(), MINIMUM_PYTHON_MINOR)

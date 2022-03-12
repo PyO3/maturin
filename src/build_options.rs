@@ -828,11 +828,11 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_pure, None),
-            Ok(BridgeModel::BindingsAbi3(3, 6))
+            Ok(BridgeModel::BindingsAbi3(3, 7))
         ));
         assert!(matches!(
             find_bridge(&pyo3_pure, Some("pyo3")),
-            Ok(BridgeModel::BindingsAbi3(3, 6))
+            Ok(BridgeModel::BindingsAbi3(3, 7))
         ));
         assert!(find_bridge(&pyo3_pure, Some("rust-cpython")).is_err());
     }

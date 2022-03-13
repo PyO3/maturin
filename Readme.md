@@ -232,11 +232,11 @@ maturin contains a reimplementation of auditwheel automatically checks the gener
 If your system's glibc is too new or you link other shared libraries, it will assign the `linux` tag.
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 
-For full manylinux compliance you need to compile in a CentOS docker container. The [konstin2/maturin](https://hub.docker.com/r/konstin2/maturin) image is based on the manylinux2010 image,
+For full manylinux compliance you need to compile in a CentOS docker container. The [pyo3/maturin](https://ghcr.io/pyo3/maturin) image is based on the manylinux2010 image,
 and passes arguments to the `maturin` binary. You can use it like this:
 
 ```
-docker run --rm -v $(pwd):/io konstin2/maturin build --release  # or other maturin arguments
+docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --release  # or other maturin arguments
 ```
 
 Note that this image is very basic and only contains python, maturin and stable rust. If you need additional tools, you can run commands inside the manylinux container.

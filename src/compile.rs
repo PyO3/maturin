@@ -1,5 +1,4 @@
 use crate::build_context::BridgeModel;
-use crate::python_interpreter::InterpreterKind;
 use crate::{BuildContext, PlatformTag, PythonInterpreter};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
@@ -178,7 +177,6 @@ fn compile_target(
 
     let pythonxy_lib_folder;
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
-        // NB: We set PYO3_NO_PYTHON further below.
         // On linux, we can build a shared library without the python
         // providing these symbols being present, on mac we can do it with
         // the `-undefined dynamic_lookup` we use above anyway. On windows
@@ -232,17 +230,6 @@ fn compile_target(
         // We can't get colored human and json messages from rustc as they are mutually exclusive,
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
-
-    if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
-        let is_pypy = python_interpreter
-            .map(|p| p.interpreter_kind == InterpreterKind::PyPy)
-            .unwrap_or(false);
-        if !is_pypy {
-            // This will make pyo3's build script only set some predefined linker
-            // arguments without trying to read any python configuration
-            build_command.env("PYO3_NO_PYTHON", "1");
-        }
-    }
 
     if let Some(python_interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling

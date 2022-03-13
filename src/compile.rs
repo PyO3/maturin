@@ -175,22 +175,6 @@ fn compile_target(
         rustc_args.extend(&["-C", "link-arg=-s"]);
     }
 
-    let pythonxy_lib_folder;
-    if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
-        // On linux, we can build a shared library without the python
-        // providing these symbols being present, on mac we can do it with
-        // the `-undefined dynamic_lookup` we use above anyway. On windows
-        // however, we get an exit code 0xc0000005 if we try the same with
-        // `/FORCE:UNDEFINED`, so we still look up the python interpreter
-        // and pass the location of the lib with the definitions.
-        if target.is_windows() {
-            let python_interpreter = python_interpreter
-                .expect("Must have a python interpreter for building abi3 on windows");
-            pythonxy_lib_folder = format!("native={}", python_interpreter.libs_dir.display());
-            rustc_args.extend(&["-L", &pythonxy_lib_folder]);
-        }
-    }
-
     let cargo_args = vec!["--message-format", "json"];
 
     let build_args: Vec<_> = cargo_args

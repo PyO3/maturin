@@ -237,7 +237,7 @@ fn compile_target(
         let is_pypy = python_interpreter
             .map(|p| p.interpreter_kind == InterpreterKind::PyPy)
             .unwrap_or(false);
-        if !is_pypy {
+        if !is_pypy && !target.is_windows() {
             // This will make pyo3's build script only set some predefined linker
             // arguments without trying to read any python configuration
             build_command.env("PYO3_NO_PYTHON", "1");

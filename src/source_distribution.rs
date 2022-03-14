@@ -140,7 +140,7 @@ fn add_crate_to_source_distribution(
         .args(&["package", "--list", "--allow-dirty"])
         .current_dir(crate_dir)
         .output()
-        .context("Failed to run cargo")?;
+        .context("Failed to run `cargo package --list --allow-dirty`")?;
     if !output.status.success() {
         bail!(
             "Failed to query file list from cargo: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",

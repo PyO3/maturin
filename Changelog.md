@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Package license files in `.dist-info/license_files` following PEP 639 in [#837](https://github.com/PyO3/maturin/pull/837)
 * Stop testing Python 3.6 on CI since it's already EOL in [#840](https://github.com/PyO3/maturin/pull/840)
-* Fix `maturin sdist --manifest-path <PATH>` for workspace project in [#843](https://github.com/PyO3/maturin/pull/843)
+* Update workspace members for sdist local dependencies in [#844](https://github.com/PyO3/maturin/pull/844)
 * Migrate docker image to github container registry in [#845](https://github.com/PyO3/maturin/pull/845)
 
 ## [0.12.10] - 2022-03-09

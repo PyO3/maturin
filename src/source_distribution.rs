@@ -78,6 +78,40 @@ fn rewrite_cargo_toml(
             }
         }
     }
+    if root_crate {
+        // Update workspace members
+        if let Some(workspace) = data.get_mut("workspace").and_then(|x| x.as_table_mut()) {
+            if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array_mut()) {
+                let mut new_members = toml_edit::Array::new();
+                for member in members.iter() {
+                    if let toml_edit::Value::String(ref s) = member {
+                        let name = s.value();
+                        if known_path_deps.contains_key(name) {
+                            new_members.push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                        }
+                    }
+                }
+                if !new_members.is_empty() {
+                    workspace["members"] = toml_edit::value(new_members);
+                    rewritten = true;
+                }
+            }
+        }
+    } else {
+        // Update package.workspace
+        // https://rust-lang.github.io/rfcs/1525-cargo-workspace.html#implicit-relations
+        // https://doc.rust-lang.org/cargo/reference/manifest.html#the-workspace-field
+        if let Some(package) = data.get_mut("package").and_then(|x| x.as_table_mut()) {
+            if let Some(workspace) = package.get("workspace").and_then(|x| x.as_str()) {
+                // This is enough to fix https://github.com/PyO3/maturin/issues/838
+                // Other cases can be fixed on demand
+                if workspace == ".." || workspace == "../" {
+                    package.remove("workspace");
+                    rewritten = true;
+                }
+            }
+        }
+    }
     if rewritten {
         Ok(data.to_string())
     } else {
@@ -96,17 +130,11 @@ fn add_crate_to_source_distribution(
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
 ) -> Result<()> {
-    let crate_dir = manifest_path.as_ref().parent().with_context(|| {
-        format!(
-            "Can't get parent directory of {}",
-            manifest_path.as_ref().display()
-        )
-    })?;
     let output = Command::new("cargo")
-        .args(&["package", "--list", "--allow-dirty"])
-        .current_dir(crate_dir)
+        .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
+        .arg(manifest_path.as_ref())
         .output()
-        .context("Failed to run cargo")?;
+        .context("Failed to run `cargo package --list --allow-dirty`")?;
     if !output.status.success() {
         bail!(
             "Failed to query file list from cargo: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",

@@ -260,7 +260,9 @@ fn compile_target(
         build_command.env("PYO3_CROSS_LIB_DIR", lib_dir);
     }
 
-    let mut cargo_build = build_command.spawn().context("Failed to run cargo")?;
+    let mut cargo_build = build_command
+        .spawn()
+        .context("Failed to run `cargo rustc`")?;
 
     let mut artifacts = HashMap::new();
 

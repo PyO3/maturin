@@ -30,7 +30,7 @@ enum Opt {
         #[clap(flatten)]
         build: BuildOptions,
         /// Pass --release to cargo
-        #[clap(long)]
+        #[clap(short = 'r', long)]
         release: bool,
         /// Strip the library for minimum file size
         #[clap(long)]
@@ -77,7 +77,7 @@ enum Opt {
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
         /// Pass --release to cargo
-        #[clap(long)]
+        #[clap(short = 'r', long)]
         release: bool,
         /// Strip the library for minimum file size
         #[clap(long)]

@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.11] - 2022-03-15
+
 * Package license files in `.dist-info/license_files` following PEP 639 in [#837](https://github.com/PyO3/maturin/pull/837)
 * Stop testing Python 3.6 on CI since it's already EOL in [#840](https://github.com/PyO3/maturin/pull/840)
 * Update workspace members for sdist local dependencies in [#844](https://github.com/PyO3/maturin/pull/844)
 * Migrate docker image to github container registry in [#845](https://github.com/PyO3/maturin/pull/845)
+* Remove `PYO3_NO_PYTHON` hack for Windows in [#848](https://github.com/PyO3/maturin/pull/848)
+* Remove Windows abi3 python lib link hack in [#851](https://github.com/PyO3/maturin/pull/851)
 * Add `-r` option as a short alias for `--release` in [#854](https://github.com/PyO3/maturin/pull/854)
 
 ## [0.12.10] - 2022-03-09
@@ -551,7 +555,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.10...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.11...HEAD
+[0.12.11]: https://github.com/pyo3/maturin/compare/v0.12.10...v0.12.11
 [0.12.10]: https://github.com/pyo3/maturin/compare/v0.12.9...v0.12.10
 [0.12.9]: https://github.com/pyo3/maturin/compare/v0.12.8...v0.12.9
 [0.12.8]: https://github.com/pyo3/maturin/compare/v0.12.7...v0.12.8

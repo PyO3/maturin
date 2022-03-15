@@ -85,9 +85,11 @@ fn rewrite_cargo_toml(
                 let mut new_members = toml_edit::Array::new();
                 for member in members.iter() {
                     if let toml_edit::Value::String(ref s) = member {
-                        let name = s.value();
-                        if known_path_deps.contains_key(name) {
-                            new_members.push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                        let path = Path::new(s.value());
+                        if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
+                            if known_path_deps.contains_key(name) {
+                                new_members.push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                            }
                         }
                     }
                 }

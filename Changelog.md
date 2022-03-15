@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Stop testing Python 3.6 on CI since it's already EOL in [#840](https://github.com/PyO3/maturin/pull/840)
 * Update workspace members for sdist local dependencies in [#844](https://github.com/PyO3/maturin/pull/844)
 * Migrate docker image to github container registry in [#845](https://github.com/PyO3/maturin/pull/845)
+* Add `-r` option as a short alias for `--release` in [#854](https://github.com/PyO3/maturin/pull/854)
 
 ## [0.12.10] - 2022-03-09
 

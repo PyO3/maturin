@@ -14,6 +14,13 @@ freebsd_task:
   env:
     matrix:
       - TOOLCHAIN: stable
+  registry_cache:
+    folder: $HOME/.cargo/registry
+    fingerprint_script: cat Cargo.lock
+  target_cache:
+    folder: target
+    fingerprint_script:
+      - cat Cargo.lock
   install_script:
     - pkg install -y curl bash python
   setup_script:

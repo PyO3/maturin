@@ -8,5 +8,5 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.16.1", features = ["extension-module"] }
+pyo3 = { version = "0.16.2", features = ["extension-module"] }
 generic_lib = { path = "../generic_lib" }

@@ -1,4 +1,4 @@
-FROM quay.io/pypa/manylinux2010_x86_64 as builder
+FROM quay.io/pypa/manylinux2014_x86_64 as builder
 
 ENV PATH /root/.cargo/bin:$PATH
 
@@ -24,7 +24,7 @@ RUN cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --fe
     && mv /maturin/target/release/maturin /usr/bin/maturin \
     && rm -rf /maturin
 
-FROM quay.io/pypa/manylinux2010_x86_64
+FROM quay.io/pypa/manylinux2014_x86_64
 
 ENV PATH /root/.cargo/bin:$PATH
 # Add all supported python versions

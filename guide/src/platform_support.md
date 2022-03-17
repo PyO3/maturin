@@ -13,9 +13,9 @@ GitHub action and these three platforms.
 
 The following targets are built into wheels and downloadable binaries:
 
- * windows: 32-bit and 64-bit x86
- * linux 32-bit and 64-bit x86 as well as armv7 and aarch64 (musl)
- * macOS: 64-bit and aarch64
+ * Windows: 32-bit and 64-bit x86 as well as arm64
+ * Linux: x86, x86_64, armv7, aarch64 and ppc64le (musl), as well as s390x (gnu)
+ * macOS: x86_64 and aarch64
 
 ## Other Operating Systems
 
@@ -37,3 +37,11 @@ CPython 3.7 to 3.10 are supported and tested on CI, though the entire 3.x series
 This will be changed as new python versions are released and others have their end of life.
 
 PyPy 3.6 and later also works.
+
+## Manylinux/Musllinux
+
+`manylinux2014` and  its newer versions as well as `musllinux_1_1` and its newer versions
+are supported.
+
+Since Rust and the manylinux project drop support for old manylinux/musllinux versions sometimes, 
+after maturin 1.0 manylinux version bumps will be minor versions rather than major versions.

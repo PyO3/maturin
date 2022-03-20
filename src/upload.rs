@@ -132,7 +132,7 @@ fn get_password(_username: &str) -> String {
         };
     }
 
-    rpassword::prompt_password_stdout("Please enter your password: ").unwrap_or_else(|_| {
+    rpassword::prompt_password("Please enter your password: ").unwrap_or_else(|_| {
         // So we need this fallback for pycharm on windows
         let mut password = String::new();
         io::stdin()

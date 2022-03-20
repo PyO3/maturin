@@ -14,6 +14,7 @@ jobs:
   test:
     name: Test
     strategy:
+      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
@@ -135,6 +136,7 @@ jobs:
     name: Test Auditwheel
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
         # manylinux2014 fails with `/lib64/libc.so.6: version `GLIBC_2.18'` not found recently
         # could be a upstream Rust issue, disable it for now
@@ -214,6 +216,7 @@ jobs:
     name: Test Cross Compile
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
         platform:
           # CPython

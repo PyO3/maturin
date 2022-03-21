@@ -57,7 +57,8 @@ impl<'a> ProjectGenerator<'a> {
         self.write_project_file(&gh_action_path, "CI.yml")?;
 
         if self.mixed {
-            let py_path = project_path.join(&self.crate_name);
+            let python_dir = project_path.join("python");
+            let py_path = python_dir.join(&self.crate_name);
             fs::create_dir_all(&py_path)?;
             self.write_project_file(&py_path, "__init__.py")?;
         }
@@ -73,6 +74,7 @@ impl<'a> ProjectGenerator<'a> {
             name => self.project_name,
             crate_name => self.crate_name,
             bindings => self.bindings,
+            mixed => self.mixed,
             version_major => version_major,
             version_minor => version_minor
         ))?;

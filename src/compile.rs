@@ -193,7 +193,7 @@ fn compile_target(
     if !context.zig {
         build.disable_zig_linker = true;
         if target.user_specified {
-            build.target = Some(target_triple.to_string());
+            build.target = vec![target_triple.to_string()];
         }
     } else {
         let zig_triple = if target.is_linux() {
@@ -204,7 +204,7 @@ fn compile_target(
         } else {
             target_triple.to_string()
         };
-        build.target = Some(zig_triple);
+        build.target = vec![zig_triple];
     }
     let mut build_command = build.build_command("rustc")?;
     build_command

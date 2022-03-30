@@ -1,5 +1,5 @@
 [build]
   base = "guide"
   publish = "book/"
-  command = "curl -L https://github.com/rust-lang/mdBook/releases/download/v0.4.14/mdbook-v0.4.14-x86_64-unknown-linux-gnu.tar.gz | tar xvz && ./mdbook build"
+  command = "curl -L https://github.com/rust-lang/mdBook/releases/download/v0.4.16/mdbook-v0.4.16-x86_64-unknown-linux-gnu.tar.gz | tar xvz && ./mdbook build"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF . ../Readme.md ../Changelog.md ../netlify.toml"

@@ -857,10 +857,11 @@ mod test {
 
     #[test]
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
-        let manifest_path = "test-crates/license-test";
-        let cargo_toml_str = fs_err::read_to_string("test-crates/license-test/Cargo.toml").unwrap();
+        let manifest_path = PathBuf::from("test-crates").join("license-test");
+        let cargo_toml_str =
+            fs_err::read_to_string(manifest_path.clone().join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let metadata = Metadata21::from_cargo_toml(&cargo_toml, manifest_path).unwrap();
+        let metadata = Metadata21::from_cargo_toml(&cargo_toml, manifest_path.clone()).unwrap();
 
         // verify Cargo.toml value came through
         assert_eq!(metadata.license.as_ref().unwrap(), "MIT");
@@ -877,21 +878,21 @@ mod test {
         // Verify pyproject.toml license = {file = ...} worked
         assert_eq!(
             license_files_strings[0],
-            format!("{}/LICENCE.txt", manifest_path)
+            manifest_path.join("LICENCE.txt").to_str().unwrap()
         );
 
         // Verify the default licenses were included
         assert_eq!(
             license_files_strings[1],
-            format!("{}/LICENSE", manifest_path)
+            manifest_path.join("LICENSE").to_str().unwrap()
         );
         assert_eq!(
             license_files_strings[2],
-            format!("{}/NOTICE.md", manifest_path)
+            manifest_path.join("NOTICE.md").to_str().unwrap()
         );
         assert_eq!(
             license_files_strings[3],
-            format!("{}/AUTHORS.txt", manifest_path)
+            manifest_path.join("AUTHORS.txt").to_str().unwrap()
         );
     }
 }

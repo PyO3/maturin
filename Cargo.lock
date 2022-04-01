@@ -1511,15 +1511,16 @@ dependencies = [
 
 [[package]]
 name = "python-pkginfo"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a8d0ae14c6a9a6b9ca65516bad430f5c9588f9b424784275febba8cd6711dc4"
+checksum = "f51c51da2adc8c5cc4321a274b87b8073e58e6215d17c362dacedc1f8e9503f2"
 dependencies = [
  "flate2",
  "fs-err",
  "mailparse",
  "rfc2047-decoder",
  "tar",
+ "thiserror",
  "zip",
 ]
 

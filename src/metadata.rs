@@ -153,6 +153,25 @@ impl Metadata21 {
                 }
             }
 
+            // Until PEP 639 is approved with metadata 2.3, we can assume a
+            // dynamic license-files (also awaiting full 2.2 metadata support)
+            // We're already emitting the License-Files metadata without issue.
+            // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
+            let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
+            for pattern in license_include_targets.iter() {
+                for license_path in glob::glob(&manifest_path.join(pattern).to_string_lossy())
+                    .expect("No license files found for pattern")
+                    .filter_map(Result::ok)
+                {
+                    // if the pyproject.toml specified the license file,
+                    // then we won't list it as automatically included
+                    if !self.license_files.contains(&license_path) {
+                        println!("📦 Including license file \"{}\"", license_path.display());
+                        self.license_files.push(license_path);
+                    }
+                }
+            }
+
             if let Some(authors) = &project.authors {
                 let mut names = Vec::with_capacity(authors.len());
                 let mut emails = Vec::with_capacity(authors.len());
@@ -834,5 +853,34 @@ mod test {
             metadata.description_content_type.unwrap(),
             "text/markdown; charset=UTF-8; variant=GFM"
         );
+    }
+
+    #[test]
+    fn test_merge_metadata_from_pyproject_dynamic_license_test() {
+        let manifest_path = "test-crates/license-test";
+        let cargo_toml_str = fs_err::read_to_string("test-crates/license-test/Cargo.toml").unwrap();
+        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let metadata =
+            Metadata21::from_cargo_toml(&cargo_toml, manifest_path).unwrap();
+
+        // verify Cargo.toml value came through
+        assert_eq!(metadata.license.as_ref().unwrap(), "MIT");
+
+        let license_files_strings: Vec<_> = metadata
+            .license_files
+            .iter()
+            .map(|v| v.to_str().unwrap())
+            .collect();
+
+        // verify we have the total number of expected licenses
+        assert_eq!(4, license_files_strings.len());
+
+        // Verify pyproject.toml license = {file = ...} worked
+        assert_eq!(license_files_strings[0], format!("{}/LICENCE.txt", manifest_path));
+
+        // Verify the default licenses were included
+        assert_eq!(license_files_strings[1], format!("{}/LICENSE", manifest_path));
+        assert_eq!(license_files_strings[2], format!("{}/NOTICE.md", manifest_path));
+        assert_eq!(license_files_strings[3], format!("{}/AUTHORS.txt", manifest_path));
     }
 }

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Automatically include license files in `.dist-info/license_files` following PEP 639 in [#862](https://github.com/PyO3/maturin/pull/862)
+
 ## [0.12.11] - 2022-03-15
 
 * Package license files in `.dist-info/license_files` following PEP 639 in [#837](https://github.com/PyO3/maturin/pull/837)

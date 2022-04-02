@@ -185,10 +185,7 @@ fn compile_target(
         .chain(&rustc_args)
         .collect();
 
-    let mut build = cargo_zigbuild::Build {
-        manifest_path: Some(context.manifest_path.clone()),
-        ..Default::default()
-    };
+    let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
     let target_triple = target.target_triple();
     if !context.zig {
         build.disable_zig_linker = true;

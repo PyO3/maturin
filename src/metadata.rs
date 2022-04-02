@@ -159,8 +159,7 @@ impl Metadata21 {
             // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
             let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
             for pattern in license_include_targets.iter() {
-                for license_path in glob::glob(&manifest_path.join(pattern).to_string_lossy())
-                    .expect("No license files found for pattern")
+                for license_path in glob::glob(&manifest_path.join(pattern).to_string_lossy())?
                     .filter_map(Result::ok)
                 {
                     // if the pyproject.toml specified the license file,

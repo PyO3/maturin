@@ -158,9 +158,12 @@ impl Metadata21 {
             // We're already emitting the License-Files metadata without issue.
             // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
             let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
+            let escaped_manifest_string = glob::Pattern::escape(manifest_path.to_str().unwrap());
+            let escaped_manifest_path = Path::new(&escaped_manifest_string);
             for pattern in license_include_targets.iter() {
-                for license_path in glob::glob(&manifest_path.join(pattern).to_string_lossy())?
-                    .filter_map(Result::ok)
+                for license_path in
+                    glob::glob(&escaped_manifest_path.join(pattern).to_string_lossy())?
+                        .filter_map(Result::ok)
                 {
                     // if the pyproject.toml specified the license file,
                     // then we won't list it as automatically included

@@ -2376,13 +2376,14 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6fa4aa90e99fb8d701bda16fb040d8ed2f9c7176fb44de750e880a74b580315"
+checksum = "db2a3b9c90b21734aaf4449cee7735305f559f28894123b57e0f700be8459418"
 dependencies = [
  "byteorder",
  "bzip2",
  "crc32fast",
+ "crossbeam-utils",
  "flate2",
  "time",
 ]

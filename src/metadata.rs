@@ -865,33 +865,15 @@ mod test {
         // verify Cargo.toml value came through
         assert_eq!(metadata.license.as_ref().unwrap(), "MIT");
 
-        let license_files_strings: Vec<_> = metadata
-            .license_files
-            .iter()
-            .map(|v| v.to_str().unwrap())
-            .collect();
-
         // verify we have the total number of expected licenses
-        assert_eq!(4, license_files_strings.len());
+        assert_eq!(4, metadata.license_files.len());
 
         // Verify pyproject.toml license = {file = ...} worked
-        assert_eq!(
-            license_files_strings[0],
-            manifest_path.join("LICENCE.txt").to_str().unwrap()
-        );
+        assert_eq!(metadata.license_files[0], manifest_path.join("LICENCE.txt"));
 
         // Verify the default licenses were included
-        assert_eq!(
-            license_files_strings[1],
-            manifest_path.join("LICENSE").to_str().unwrap()
-        );
-        assert_eq!(
-            license_files_strings[2],
-            manifest_path.join("NOTICE.md").to_str().unwrap()
-        );
-        assert_eq!(
-            license_files_strings[3],
-            manifest_path.join("AUTHORS.txt").to_str().unwrap()
-        );
+        assert_eq!(metadata.license_files[1], manifest_path.join("LICENSE"));
+        assert_eq!(metadata.license_files[2], manifest_path.join("NOTICE.md"));
+        assert_eq!(metadata.license_files[3], manifest_path.join("AUTHORS.txt"));
     }
 }

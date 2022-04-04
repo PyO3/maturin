@@ -99,3 +99,28 @@ To use SPDX license expressions, you can specify it in `Cargo.toml` instead:
 name = "my-project"
 license = "MIT OR Apache-2.0"
 ```
+
+## Add `maturin build` options
+
+Some of the `maturin build` command line options can also be specified
+in the `tool.maturin` section of `pyproject.toml`.
+
+```toml
+[tool.maturin]
+# Cargo manifest path
+manifest-path = "Cargo.toml"
+# Include arbitrary files in the sdist
+sdist-include = []
+# Bindings type
+bindings = "pyo3"
+# Control the platform tag on linux
+compatibility = "manylinux2014"
+# Don't check for manylinux compliance
+skip-auditwheel = false
+# Strip the library for minimum file size
+strip = true
+# Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
+cargo-extra-args = ""
+# Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
+rustc-extra-args = ""
+```

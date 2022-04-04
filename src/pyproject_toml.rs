@@ -85,6 +85,7 @@ impl PyProjectToml {
             .as_ref()?
             .cargo_extra_args
             .as_deref()
+            .filter(|s| !s.trim().is_empty())
     }
 
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
@@ -100,6 +101,7 @@ impl PyProjectToml {
             .as_ref()?
             .rustc_extra_args
             .as_deref()
+            .filter(|s| !s.trim().is_empty())
     }
 
     /// Returns the value of `[tool.maturin.skip-auditwheel]` in pyproject.toml
@@ -198,10 +200,15 @@ mod tests {
             build-backend = "maturin"
 
             [tool.maturin]
-            manylinux = "2010""#,
+            manylinux = "2010"
+            cargo-extra-args = ""
+            rustc-extra-args = "  "
+            "#,
         )
         .unwrap();
         let without_constraint = PyProjectToml::new(without_constraint_dir).unwrap();
         assert!(!without_constraint.warn_missing_maturin_version());
+        assert!(without_constraint.cargo_extra_args().is_none());
+        assert!(without_constraint.rustc_extra_args().is_none());
     }
 }

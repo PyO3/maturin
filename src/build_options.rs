@@ -67,7 +67,7 @@ pub struct BuildOptions {
 
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
-    #[clap(short, long)]
+    #[clap(short, long, multiple_values = true, multiple_occurrences = true)]
     pub interpreter: Vec<PathBuf>,
 
     /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin

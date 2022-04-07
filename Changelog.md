@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.12] - 2022-04-07
+
+* Migrate docker image to GitHub container registry in [#845](https://github.com/PyO3/maturin/pull/845)
+* Change mixed rust/python template project layout for new projects in [#855](https://github.com/PyO3/maturin/pull/855)
 * Automatically include license files in `.dist-info/license_files` following PEP 639 in [#862](https://github.com/PyO3/maturin/pull/862)
 * Bring back multiple values support for `--interpreter` option in [#873](https://github.com/PyO3/maturin/pull/873)
 * Update the default edition to 2021 for new projects by sa- in [#874](https://github.com/PyO3/maturin/pull/874)
+* Drop `python3.6` from `ghcr.io/pyo3/maturin` docker image.
 
 ## [0.12.11] - 2022-03-15
 
@@ -559,7 +564,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.11...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.12...HEAD
+[0.12.12]: https://github.com/pyo3/maturin/compare/v0.12.11...v0.12.12
 [0.12.11]: https://github.com/pyo3/maturin/compare/v0.12.10...v0.12.11
 [0.12.10]: https://github.com/pyo3/maturin/compare/v0.12.9...v0.12.10
 [0.12.9]: https://github.com/pyo3/maturin/compare/v0.12.8...v0.12.9

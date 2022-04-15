@@ -11,6 +11,10 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
 
+/// The first version of pyo3 that supports building Windows abi3 wheel
+/// without `PYO3_NO_PYTHON` environment variable
+const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
+
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
@@ -218,9 +222,13 @@ fn compile_target(
             .map(|p| p.interpreter_kind == InterpreterKind::PyPy)
             .unwrap_or(false);
         if !is_pypy && !target.is_windows() {
-            // This will make pyo3's build script only set some predefined linker
-            // arguments without trying to read any python configuration
-            build_command.env("PYO3_NO_PYTHON", "1");
+            let pyo3_ver = pyo3_version(&context.cargo_metadata)
+                .context("Failed to get pyo3 version from cargo metadata")?;
+            if pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
+                // This will make old pyo3's build script only set some predefined linker
+                // arguments without trying to read any python configuration
+                build_command.env("PYO3_NO_PYTHON", "1");
+            }
         }
     }
 
@@ -385,4 +393,23 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn pyo3_version(cargo_metadata: &cargo_metadata::Metadata) -> Option<(u64, u64, u64)> {
+    let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
+        .packages
+        .iter()
+        .filter_map(|pkg| {
+            let name = &pkg.name;
+            if name == "pyo3" || name == "pyo3-ffi" {
+                Some((name.as_ref(), pkg))
+            } else {
+                None
+            }
+        })
+        .collect();
+    packages
+        .get("pyo3")
+        .or_else(|| packages.get("pyo3-ffi"))
+        .map(|pkg| (pkg.version.major, pkg.version.minor, pkg.version.patch))
 }

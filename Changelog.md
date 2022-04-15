@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Stop setting `PYO3_NO_PYTHON` environment variable for pyo3 0.16.4 and later in [#875](https://github.com/PyO3/maturin/pull/875)
+
 ## [0.12.12] - 2022-04-07
 
 * Migrate docker image to GitHub container registry in [#845](https://github.com/PyO3/maturin/pull/845)

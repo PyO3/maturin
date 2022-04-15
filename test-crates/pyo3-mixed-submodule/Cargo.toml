@@ -10,7 +10,7 @@ edition = "2018"
 name = "pyo3_mixed_submodule.rust_module.rust"
 
 [dependencies]
-pyo3 = { version = "0.16.3", features = ["extension-module"] }
+pyo3 = { version = "0.16.4", features = ["extension-module"] }
 
 [lib]
 name = "pyo3_mixed_submodule"

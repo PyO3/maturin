@@ -9,5 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Don't use the macros feature, which makes compilation much faster
-pyo3 = { version = "0.16.3", default-features = false, features = ["extension-module"] }
+pyo3 = { version = "0.16.4", default-features = false, features = ["extension-module"] }
 some_path_dep = { path = "../some_path_dep" }

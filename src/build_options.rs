@@ -406,15 +406,14 @@ fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
 
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
 fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected cargo to return metadata with resolve")?;
+    let package = cargo_metadata
+        .root_package()
+        .context("Expected cargo to return metadata with root_package")?;
     for &lib in PYO3_BINDING_CRATES.iter() {
-        let pyo3_packages = resolve
-            .nodes
+        let pyo3_packages = package
+            .dependencies
             .iter()
-            .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
+            .filter(|dep| dep.name == lib)
             .collect::<Vec<_>>();
         match pyo3_packages.as_slice() {
             [pyo3_crate] => {
@@ -505,7 +504,9 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         println!("🔗 Found rust-cpython bindings");
         BridgeModel::Bindings("rust_cpython".to_string(), MINIMUM_PYTHON_MINOR)
     } else {
-        let package = &cargo_metadata[resolve.root.as_ref().unwrap()];
+        let package = cargo_metadata
+            .root_package()
+            .context("Expected cargo to return metadata with root_package")?;
         let targets: Vec<_> = package
             .targets
             .iter()

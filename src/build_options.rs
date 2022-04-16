@@ -470,7 +470,7 @@ fn is_generating_abi3_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
         .resolve
         .as_ref()
         .context("Expected cargo to return metadata with resolve")?;
-    for &lib in PYO3_BINDING_CRATES.iter() {
+    for &lib in PYO3_BINDING_CRATES.iter().rev() {
         let pyo3_packages = resolve
             .nodes
             .iter()

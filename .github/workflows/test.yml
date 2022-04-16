@@ -107,6 +107,12 @@ jobs:
           cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
           # Check wheels with twine
           twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
+      - name: test cross compiling windows abi3 wheel
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y mingw-w64
+          rustup target add x86_64-pc-windows-gnu
+          cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
 
   test-alpine:
     name: Test Alpine Linux

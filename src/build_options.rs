@@ -272,12 +272,25 @@ impl BuildOptions {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
+        let generate_abi3_import_lib = is_generating_abi3_import_lib(&cargo_metadata)?;
         let interpreter = if self.interpreter.is_empty() {
             // Auto-detect interpreters
-            find_interpreter(&bridge, &[], &target, get_min_python_minor(&metadata21))?
+            find_interpreter(
+                &bridge,
+                &[],
+                &target,
+                get_min_python_minor(&metadata21),
+                generate_abi3_import_lib,
+            )?
         } else {
             // User given list of interpreters
-            find_interpreter(&bridge, &self.interpreter, &target, None)?
+            find_interpreter(
+                &bridge,
+                &self.interpreter,
+                &target,
+                None,
+                generate_abi3_import_lib,
+            )?
         };
 
         let mut rustc_extra_args = self.rustc_extra_args.clone();
@@ -450,6 +463,33 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
     Ok(None)
 }
 
+/// pyo3 0.16.4+ supports building abi3 wheels without a working Python interpreter for Windows
+/// when `generate-abi3-import-lib` feature is enabled
+fn is_generating_abi3_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
+    let resolve = cargo_metadata
+        .resolve
+        .as_ref()
+        .context("Expected cargo to return metadata with resolve")?;
+    for &lib in PYO3_BINDING_CRATES.iter().rev() {
+        let pyo3_packages = resolve
+            .nodes
+            .iter()
+            .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
+            .collect::<Vec<_>>();
+        match pyo3_packages.as_slice() {
+            [pyo3_crate] => {
+                let generate_import_lib = pyo3_crate
+                    .features
+                    .iter()
+                    .any(|x| x == "generate-abi3-import-lib");
+                return Ok(generate_import_lib);
+            }
+            _ => continue,
+        }
+    }
+    Ok(false)
+}
+
 /// Tries to determine the [BridgeModel] for the target crate
 pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
     let resolve = cargo_metadata
@@ -505,7 +545,9 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         println!("🔗 Found rust-cpython bindings");
         BridgeModel::Bindings("rust_cpython".to_string(), MINIMUM_PYTHON_MINOR)
     } else {
-        let package = &cargo_metadata[resolve.root.as_ref().unwrap()];
+        let package = cargo_metadata
+            .root_package()
+            .context("Expected cargo to return metadata with root_package")?;
         let targets: Vec<_> = package
             .targets
             .iter()
@@ -585,6 +627,7 @@ pub fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
     min_python_minor: Option<usize>,
+    generate_abi3_import_lib: bool,
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
         BridgeModel::Bindings(binding_name, _) => {
@@ -718,15 +761,17 @@ pub fn find_interpreter(
                         platform: None,
                         runnable: false,
                     }])
-                } else {
-                    let interp = interpreter
-                        .get(0)
-                        .context("Failed to find a python interpreter")?;
+                } else if let Some(interp) = interpreter.get(0) {
                     println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interp);
                     Ok(interpreter)
+                } else if generate_abi3_import_lib {
+                    println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
+                    Ok(Vec::new())
+                } else {
+                    bail!("Failed to find a python interpreter");
                 }
             } else {
-                println!("🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)");
+                println!("🐍 Not using a specific python interpreter");
                 Ok(interpreter)
             }
         }

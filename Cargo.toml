@@ -25,7 +25,7 @@ bytesize = "1.0.1"
 glob = "0.3.0"
 cargo_metadata = "0.14.0"
 cargo-zigbuild = "0.8.3"
-cbindgen = { version = "0.21.0", default-features = false }
+cbindgen = { version = "0.22.0", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.5.1"
 human-panic = { version = "1.0.3", optional = true }

@@ -249,9 +249,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f936f57aeb3d779e714edf47217aef514f4fc283550c1f2600d334c5ebe49eb5"
+checksum = "ba1735482294621dd295daa2353e7fd324fd9fd12bae601aba9577ccf93b7aa5"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -343,9 +343,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.11"
+version = "3.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "423af4bd829996d7de0b8bf0279f5b91a20306937be514e972a95c3d3ab13f33"
+checksum = "7c167e37342afc5f33fd87bbc870cedd020d2a6dffa05d45ccd9241fbdd146db"
 dependencies = [
  "atty",
  "bitflags",

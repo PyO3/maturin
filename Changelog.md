@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix PyPy pep517 build when abi3 feature is enabled in [#883](https://github.com/PyO3/maturin/pull/883)
+
 ## [0.12.13] - 2022-04-25
 
 * Stop setting `PYO3_NO_PYTHON` environment variable for pyo3 0.16.4 and later in [#875](https://github.com/PyO3/maturin/pull/875)

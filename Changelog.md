@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.13] - 2022-04-25
+
 * Stop setting `PYO3_NO_PYTHON` environment variable for pyo3 0.16.4 and later in [#875](https://github.com/PyO3/maturin/pull/875)
-* Build Windows abi3 wheels with `pyo3` 0.16.4 and later versions no longer require a Python interpreter in [#879](https://github.com/PyO3/maturin/pull/879)
+* Build Windows abi3 wheels for `pyo3` 0.16.4 and later versions with `generate-abi3-import-lib` feature enabled no longer require a Python interpreter in [#879](https://github.com/PyO3/maturin/pull/879)
 
 ## [0.12.12] - 2022-04-07
 
@@ -567,7 +569,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.12...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.13...HEAD
+[0.12.13]: https://github.com/pyo3/maturin/compare/v0.12.12...v0.12.13
 [0.12.12]: https://github.com/pyo3/maturin/compare/v0.12.11...v0.12.12
 [0.12.11]: https://github.com/pyo3/maturin/compare/v0.12.10...v0.12.11
 [0.12.10]: https://github.com/pyo3/maturin/compare/v0.12.9...v0.12.10

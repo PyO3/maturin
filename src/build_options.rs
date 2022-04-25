@@ -766,7 +766,20 @@ pub fn find_interpreter(
                     Ok(interpreter)
                 } else if generate_abi3_import_lib {
                     println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
-                    Ok(Vec::new())
+                    // fake a python interpreter
+                    Ok(vec![PythonInterpreter {
+                        major: *major as usize,
+                        minor: *minor as usize,
+                        abiflags: "".to_string(),
+                        target: target.clone(),
+                        executable: PathBuf::new(),
+                        ext_suffix: ".pyd".to_string(),
+                        interpreter_kind: InterpreterKind::CPython,
+                        abi_tag: None,
+                        libs_dir: PathBuf::new(),
+                        platform: None,
+                        runnable: false,
+                    }])
                 } else {
                     bail!("Failed to find a python interpreter");
                 }

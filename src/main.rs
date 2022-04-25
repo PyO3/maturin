@@ -329,7 +329,8 @@ fn run() -> Result<()> {
             if !no_sdist {
                 build_context.build_source_distribution()?;
             }
-            build_context.build_wheels()?;
+            let wheels = build_context.build_wheels()?;
+            assert!(!wheels.is_empty());
         }
         #[cfg(feature = "upload")]
         Opt::Publish {

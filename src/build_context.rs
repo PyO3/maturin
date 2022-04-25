@@ -211,7 +211,9 @@ impl BuildContext {
                     .cloned()
                     .collect();
                 let mut built_wheels = Vec::new();
-                built_wheels.extend(self.build_binding_wheel_abi3(&cpythons, *major, *minor)?);
+                if !cpythons.is_empty() {
+                    built_wheels.extend(self.build_binding_wheel_abi3(&cpythons, *major, *minor)?);
+                }
                 if !pypys.is_empty() {
                     println!(
                         "⚠️ Warning: PyPy does not yet support abi3 so the build artifacts will be version-specific. \

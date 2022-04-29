@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Re-export `__all__` for pure Rust projects in [#886](https://github.com/PyO3/maturin/pull/886)
+
 ## [0.12.14] - 2022-04-25
 
 * Fix PyPy pep517 build when abi3 feature is enabled in [#883](https://github.com/PyO3/maturin/pull/883)

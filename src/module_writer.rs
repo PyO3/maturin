@@ -656,11 +656,11 @@ pub fn write_bindings_module(
             writer.add_bytes(
                 &module.join("__init__.py"),
                 format!(
-                    "from .{module_name} import *\n\
-                    \n\
-                    __doc__ = {module_name}.__doc__\n\
-                    if hasattr({module_name}, \"__all__\"):\n\
-                    \t__all__ = {module_name}.__all__\n",
+                    r#"from .{module_name} import *
+
+__doc__ = {module_name}.__doc__
+if hasattr({module_name}, "__all__"):
+    __all__ = {module_name}.__all__"#,
                     module_name = module_name
                 )
                 .as_bytes(),

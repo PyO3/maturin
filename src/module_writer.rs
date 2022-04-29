@@ -656,7 +656,7 @@ pub fn write_bindings_module(
             writer.add_bytes(
                 &module.join("__init__.py"),
                 format!(
-                    "from .{module_name} import *\n\n__doc__ = {module_name}.__doc__\n",
+                    "from .{module_name} import *\n\n__doc__ = {module_name}.__doc__\n__all__ = {module_name}.__all__\n",
                     module_name = module_name
                 )
                 .as_bytes(),

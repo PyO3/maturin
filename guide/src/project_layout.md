@@ -23,7 +23,8 @@ wheel. For convenience, this file includes the following:
 from .my_project import *
 
 __doc__ = my_project.__doc__
-__all__ = my_project.__all__
+if hasattr(my_project, "__all__"):
+    __all__ = my_project.__all__
 ```
 
 such that the module functions may be called directly with:

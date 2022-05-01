@@ -249,9 +249,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba1735482294621dd295daa2353e7fd324fd9fd12bae601aba9577ccf93b7aa5"
+checksum = "1c685f8470f1583b2a03ae6fbd8f853165b73911020cf80d3c92676aa931d6e4"
 dependencies = [
  "anyhow",
  "cargo-options",

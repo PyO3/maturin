@@ -131,7 +131,7 @@ fn compile_target(
         .map(String::as_str)
         .collect();
 
-    let mut rust_flags = env::var_os("RUSTFLAGS").unwrap_or_default();
+    let mut rust_flags = env::var_os("RUSTFLAGS");
 
     // We need to pass --bins / --lib to set the rustc extra args later
     // TODO: What do we do when there are multiple bin targets?
@@ -143,7 +143,9 @@ fn compile_target(
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
             if context.target.is_musl_target() {
-                rust_flags.push(" -C target-feature=-crt-static");
+                rust_flags
+                    .get_or_insert_with(Default::default)
+                    .push(" -C target-feature=-crt-static");
             }
         }
     }
@@ -207,15 +209,19 @@ fn compile_target(
         };
         build.target = vec![zig_triple];
     }
+
     let mut build_command = build.build_command("rustc")?;
     build_command
-        .env("RUSTFLAGS", rust_flags)
         .args(&build_args)
         // We need to capture the json messages
         .stdout(Stdio::piped())
         // We can't get colored human and json messages from rustc as they are mutually exclusive,
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
+
+    if let Some(flags) = rust_flags {
+        build_command.env("RUSTFLAGS", flags);
+    }
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
         let is_pypy = python_interpreter

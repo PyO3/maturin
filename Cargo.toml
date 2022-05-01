@@ -39,7 +39,7 @@ sha2 = "0.10.0"
 shlex = "1.0.0"
 tar = "0.4.33"
 tempfile = "3.2.0"
-toml_edit = { version = "0.14.2", features = ["easy"] }
+toml_edit = { version = "0.14.3", features = ["easy"] }
 zip = { version = "0.6.1", default-features = false, features = ["bzip2", "deflate", "time"] }
 thiserror = "1.0.24"
 dirs = "4.0.0"

@@ -148,7 +148,7 @@ fn integration_pyo3_mixed_py_subdir() {
         "test-crates/pyo3-mixed-py-subdir",
         None,
         "integration_pyo3_mixed_py_subdir",
-        true,
+        cfg!(unix),
     ));
 }
 

@@ -454,7 +454,7 @@ fn run() -> Result<()> {
         Opt::Zig(subcommand) => {
             subcommand
                 .execute()
-                .context("Failed to create zig wrapper script")?;
+                .context("Failed to run zig linker wrapper")?;
         }
     }
 

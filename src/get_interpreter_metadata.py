@@ -28,8 +28,6 @@ metadata = {
     "platform": sysconfig.get_platform(),
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),
-    # We need this one for windows abi3 builds
-    "base_prefix": sys.base_prefix,
 }
 
 print(json.dumps(metadata))

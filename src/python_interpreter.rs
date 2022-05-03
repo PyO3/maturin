@@ -256,7 +256,6 @@ struct IntepreterMetadataMessage {
     // comes from `platform.system()`
     system: String,
     abi_tag: Option<String>,
-    base_prefix: String,
 }
 
 /// The location and version of an interpreter
@@ -287,8 +286,6 @@ pub struct PythonInterpreter {
     ///
     /// Note that this always `None` on windows
     pub abi_tag: Option<String>,
-    /// We need this value for windows abi3 linking
-    pub libs_dir: PathBuf,
     /// Comes from `sysconfig.get_platform()`
     ///
     /// Note that this can be `None` when cross compiling
@@ -528,7 +525,6 @@ impl PythonInterpreter {
                 .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
             interpreter_kind: interpreter,
             abi_tag: message.abi_tag,
-            libs_dir: PathBuf::from(message.base_prefix).join("libs"),
             platform,
             runnable: true,
         }))

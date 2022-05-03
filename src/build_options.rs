@@ -708,7 +708,6 @@ pub fn find_interpreter(
                         ext_suffix: ext_suffix.to_string(),
                         interpreter_kind,
                         abi_tag,
-                        libs_dir: PathBuf::from(cross_lib_dir),
                         platform: None,
                         runnable: false,
                     }];
@@ -744,7 +743,7 @@ pub fn find_interpreter(
             // Unfortunately, on windows we need one to figure out base_prefix for a linker
             // argument.
             if target.is_windows() {
-                if let Some(manual_base_prefix) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
+                if env::var_os("PYO3_CROSS_LIB_DIR").is_some() {
                     // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
                     // when cross compiling, so we fake a python interpreter matching it
                     println!("⚠️  Cross-compiling is poorly supported");
@@ -757,7 +756,6 @@ pub fn find_interpreter(
                         ext_suffix: ".pyd".to_string(),
                         interpreter_kind: InterpreterKind::CPython,
                         abi_tag: None,
-                        libs_dir: PathBuf::from(manual_base_prefix),
                         platform: None,
                         runnable: false,
                     }])
@@ -776,7 +774,6 @@ pub fn find_interpreter(
                         ext_suffix: ".pyd".to_string(),
                         interpreter_kind: InterpreterKind::CPython,
                         abi_tag: None,
-                        libs_dir: PathBuf::new(),
                         platform: None,
                         runnable: false,
                     }])

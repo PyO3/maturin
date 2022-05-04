@@ -256,7 +256,6 @@ impl BuildContext {
 
     fn auditwheel(
         &self,
-        python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
         platform_tag: Option<PlatformTag>,
     ) -> Result<(Policy, Vec<Library>)> {
@@ -264,11 +263,7 @@ impl BuildContext {
             return Ok((Policy::default(), Vec::new()));
         }
 
-        let target = python_interpreter
-            .map(|x| &x.target)
-            .unwrap_or(&self.target);
-
-        get_policy_and_libs(artifact, platform_tag, target)
+        get_policy_and_libs(artifact, platform_tag, &self.target)
     }
 
     fn add_external_libs(
@@ -411,8 +406,7 @@ impl BuildContext {
             python_interpreter,
             Some(self.project_layout.extension_name()),
         )?;
-        let (policy, external_libs) =
-            self.auditwheel(python_interpreter, &artifact, self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
         let (wheel_path, tag) = self.write_binding_wheel_abi3(
             &artifact,
             policy.platform_tag(),
@@ -439,7 +433,7 @@ impl BuildContext {
         platform_tag: PlatformTag,
         ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
-        let tag = python_interpreter.get_tag(platform_tag, self.universal2)?;
+        let tag = python_interpreter.get_tag(&self.target, platform_tag, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
         self.add_external_libs(&mut writer, artifact, ext_libs)?;
@@ -481,8 +475,7 @@ impl BuildContext {
                 Some(python_interpreter),
                 Some(self.project_layout.extension_name()),
             )?;
-            let (policy, external_libs) =
-                self.auditwheel(Some(python_interpreter), &artifact, self.platform_tag)?;
+            let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
             let (wheel_path, tag) = self.write_binding_wheel(
                 python_interpreter,
                 &artifact,
@@ -573,7 +566,7 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) = self.auditwheel(None, &artifact, self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
         let (wheel_path, tag) =
             self.write_cffi_wheel(&artifact, policy.platform_tag(), &external_libs)?;
 
@@ -652,7 +645,7 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let (policy, external_libs) = self.auditwheel(None, &artifact, self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
 
         let (wheel_path, tag) =
             self.write_bin_wheel(&artifact, policy.platform_tag(), &external_libs)?;

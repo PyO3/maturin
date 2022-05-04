@@ -9,8 +9,11 @@ static WELLKNOWN_SYSCONFIG: Lazy<HashMap<Os, HashMap<Arch, Vec<InterpreterConfig
     Lazy::new(|| {
         let mut sysconfig = HashMap::new();
         let sysconfig_linux = serde_json::from_slice(include_bytes!("sysconfig-linux.json"))
-            .expect("invalid sysconfig.json");
+            .expect("invalid sysconfig-linux.json");
         sysconfig.insert(Os::Linux, sysconfig_linux);
+        let sysconfig_macos = serde_json::from_slice(include_bytes!("sysconfig-macos.json"))
+            .expect("invalid sysconfig-macos.json");
+        sysconfig.insert(Os::Macos, sysconfig_macos);
         sysconfig
     });
 

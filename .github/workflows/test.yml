@@ -115,6 +115,9 @@ jobs:
 
           # non-abi3
           cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
+          # Check wheels with twine
+          twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
       - name: test cross compiling windows abi3 wheel
         if: matrix.os == 'ubuntu-latest'
         run: |

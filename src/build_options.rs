@@ -720,7 +720,6 @@ pub fn find_interpreter(
                             abi_tag,
                             calcsize_pointer: None,
                         },
-                        target: target.clone(),
                         executable: PathBuf::new(),
                         platform: None,
                         runnable: false,
@@ -764,10 +763,7 @@ pub fn find_interpreter(
                             (ver_major, ver_minor),
                         )
                         .context("Failed to find a python interpreter")?;
-                        interpreters.push(PythonInterpreter::from_config(
-                            sysconfig.clone(),
-                            target.clone(),
-                        ));
+                        interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
                     }
                 }
             } else {
@@ -818,7 +814,6 @@ pub fn find_interpreter(
                             abi_tag: None,
                             calcsize_pointer: None,
                         },
-                        target: target.clone(),
                         executable: PathBuf::new(),
                         platform: None,
                         runnable: false,
@@ -839,7 +834,6 @@ pub fn find_interpreter(
                             abi_tag: None,
                             calcsize_pointer: None,
                         },
-                        target: target.clone(),
                         executable: PathBuf::new(),
                         platform: None,
                         runnable: false,

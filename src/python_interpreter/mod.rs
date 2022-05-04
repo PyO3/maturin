@@ -269,9 +269,6 @@ pub struct PythonInterpreter {
     /// Python's sysconfig
     /// Python's major version
     pub config: InterpreterConfig,
-    /// Currently just the value of [Target::os()], i.e. "windows", "linux",
-    /// "macos" or "freebsd"
-    pub target: Target,
     /// Path to the python interpreter, e.g. /usr/bin/python3.6
     ///
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
@@ -355,24 +352,29 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, platform_tag: PlatformTag, universal2: bool) -> Result<String> {
+    pub fn get_tag(
+        &self,
+        target: &Target,
+        platform_tag: PlatformTag,
+        universal2: bool,
+    ) -> Result<String> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
-        let use_sysconfig_platform = self.target.is_windows()
-            || (self.target.is_linux() && !platform_tag.is_portable())
-            || self.target.is_illumos();
+        let use_sysconfig_platform = target.is_windows()
+            || (target.is_linux() && !platform_tag.is_portable())
+            || target.is_illumos();
         let platform = if use_sysconfig_platform {
             if let Some(platform) = self.platform.clone() {
                 platform
             } else {
-                self.target.get_platform_tag(platform_tag, universal2)?
+                target.get_platform_tag(platform_tag, universal2)?
             }
         } else {
-            self.target.get_platform_tag(platform_tag, universal2)?
+            target.get_platform_tag(platform_tag, universal2)?
         };
         let tag = match self.interpreter_kind {
             InterpreterKind::CPython => {
-                if self.target.is_unix() {
+                if target.is_unix() {
                     format!(
                         "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
                         major = self.major,
@@ -524,7 +526,6 @@ impl PythonInterpreter {
                 abi_tag: message.abi_tag,
                 calcsize_pointer: None,
             },
-            target: target.clone(),
             executable: executable.as_ref().to_path_buf(),
             platform,
             runnable: true,
@@ -532,10 +533,9 @@ impl PythonInterpreter {
     }
 
     /// Construct a `PythonInterpreter` from a sysconfig and target
-    pub fn from_config(config: InterpreterConfig, target: Target) -> Self {
+    pub fn from_config(config: InterpreterConfig) -> Self {
         PythonInterpreter {
             config,
-            target,
             executable: PathBuf::new(),
             platform: None,
             runnable: false,

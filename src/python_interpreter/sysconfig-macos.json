@@ -7,7 +7,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-36m-darwin.so",
       "abi_tag": "36m",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -16,7 +16,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-37m-darwin.so",
       "abi_tag": "37m",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -25,7 +25,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-38-darwin.so",
       "abi_tag": "38",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -34,7 +34,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-39-darwin.so",
       "abi_tag": "39",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -43,7 +43,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-310-darwin.so",
       "abi_tag": "310",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -52,7 +52,7 @@
       "interpreter": "pypy",
       "ext_suffix": ".pypy37-pp73-darwin.so",
       "abi_tag": "pp73",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -61,7 +61,7 @@
       "interpreter": "pypy",
       "ext_suffix": ".pypy38-pp73-darwin.so",
       "abi_tag": "pp73",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -70,7 +70,7 @@
       "interpreter": "pypy",
       "ext_suffix": ".pypy39-pp73-darwin.so",
       "abi_tag": "pp73",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     }
   ],
   "aarch64": [
@@ -81,7 +81,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-36m-darwin.so",
       "abi_tag": "36m",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -90,7 +90,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-37m-darwin.so",
       "abi_tag": "37m",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -99,7 +99,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-38-darwin.so",
       "abi_tag": "38",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -108,7 +108,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-39-darwin.so",
       "abi_tag": "39",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     },
     {
       "major": 3,
@@ -117,7 +117,7 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-310-darwin.so",
       "abi_tag": "310",
-      "calcsize_pointer": 8
+      "pointer_width": 64
     }
   ]
 }

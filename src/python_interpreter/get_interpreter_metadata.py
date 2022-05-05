@@ -30,7 +30,7 @@ metadata = {
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),
     # This one is for generating a config file for pyo3
-    "calcsize_pointer": struct.calcsize("P"),
+    "pointer_width": struct.calcsize("P") * 8,
 }
 
 print(json.dumps(metadata))

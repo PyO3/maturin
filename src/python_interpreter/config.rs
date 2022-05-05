@@ -40,7 +40,7 @@ pub struct InterpreterConfig {
     /// Note that this always `None` on windows
     pub abi_tag: Option<String>,
     /// Pointer width
-    pub calcsize_pointer: Option<usize>,
+    pub pointer_width: Option<usize>,
 }
 
 impl InterpreterConfig {
@@ -75,8 +75,8 @@ suppress_build_script_link_lines=false"#,
             major = self.major,
             minor = self.minor,
         );
-        if let Some(pointer_width) = self.calcsize_pointer {
-            content.push_str(&format!("\npointer_width={}", pointer_width * 8));
+        if let Some(pointer_width) = self.pointer_width {
+            content.push_str(&format!("\npointer_width={}", pointer_width));
         }
         content
     }

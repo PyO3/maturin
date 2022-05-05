@@ -524,7 +524,7 @@ impl PythonInterpreter {
                     .ext_suffix
                     .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
                 abi_tag: message.abi_tag,
-                calcsize_pointer: None,
+                pointer_width: None,
             },
             executable: executable.as_ref().to_path_buf(),
             platform,

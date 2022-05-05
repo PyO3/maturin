@@ -726,7 +726,7 @@ pub fn find_interpreter(
                     });
                 } else if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
                     let interpreter_config =
-                        InterpreterConfig::from_pyo3_config(config_file.as_ref())
+                        InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
                             .context("Invalid PYO3_CONFIG_FILE")?;
                     interpreters.push(PythonInterpreter::from_config(interpreter_config));
                 } else {

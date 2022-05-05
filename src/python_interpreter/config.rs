@@ -1,5 +1,6 @@
 use super::InterpreterKind;
 use crate::target::{Arch, Os};
+use crate::Target;
 use anyhow::{format_err, Context, Result};
 use fs_err as fs;
 use once_cell::sync::Lazy;
@@ -67,7 +68,7 @@ impl InterpreterConfig {
     }
 
     /// Construct a new InterpreterConfig from a pyo3 config file
-    pub fn from_pyo3_config(config_file: &Path) -> Result<Self> {
+    pub fn from_pyo3_config(config_file: &Path, target: &Target) -> Result<Self> {
         let config_file = fs::File::open(config_file)?;
         let reader = BufReader::new(config_file);
         let lines = reader.lines();
@@ -125,16 +126,52 @@ impl InterpreterConfig {
         })?;
         let implementation = implementation.unwrap_or_else(|| "cpython".to_string());
         let interpreter_kind = implementation.parse().map_err(|e| format_err!("{}", e))?;
-        let ext_suffix = ext_suffix.context("missing value for ext_suffix")?;
         let abi_tag = match interpreter_kind {
             InterpreterKind::CPython => {
                 if (major, minor) >= (3, 8) {
-                    abi_tag.or_else(|| Some(format!("{}{}", major, minor)))
+                    abi_tag.unwrap_or_else(|| format!("{}{}", major, minor))
                 } else {
-                    abi_tag.or_else(|| Some(format!("{}{}m", major, minor)))
+                    abi_tag.unwrap_or_else(|| format!("{}{}m", major, minor))
                 }
             }
-            InterpreterKind::PyPy => abi_tag.or_else(|| Some("pp73".to_string())),
+            InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| "pp73".to_string()),
+        };
+        let file_ext = if target.is_windows() { "pyd" } else { "so" };
+        let ext_suffix = if target.is_linux() || target.is_macos() {
+            // See https://github.com/pypa/auditwheel/issues/349
+            let target_env = if (major, minor) >= (3, 11) {
+                target.target_env().to_string()
+            } else {
+                "gnu".to_string()
+            };
+            match interpreter_kind {
+                InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
+                    // Eg: .cpython-38-x86_64-linux-gnu.so
+                    format!(
+                        ".cpython-{}-{}-{}-{}.{}",
+                        abi_tag,
+                        target.get_python_arch(),
+                        target.get_python_os(),
+                        target_env,
+                        file_ext,
+                    )
+                }),
+                InterpreterKind::PyPy => ext_suffix.unwrap_or_else(|| {
+                    // Eg: .pypy38-pp73-x86_64-linux-gnu.so
+                    format!(
+                        ".pypy{}{}-{}-{}-{}-{}.{}",
+                        major,
+                        minor,
+                        abi_tag,
+                        target.get_python_arch(),
+                        target.get_python_os(),
+                        target_env,
+                        file_ext,
+                    )
+                }),
+            }
+        } else {
+            ext_suffix.context("missing value for ext_suffix")?
         };
         Ok(Self {
             major,
@@ -142,7 +179,7 @@ impl InterpreterConfig {
             interpreter_kind,
             abiflags: abiflags.unwrap_or_default(),
             ext_suffix,
-            abi_tag,
+            abi_tag: Some(abi_tag),
             pointer_width,
         })
     }

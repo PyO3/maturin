@@ -296,6 +296,19 @@ impl Target {
         Ok(tag)
     }
 
+    /// Returns the name python uses in `sys.platform` for this architecture.
+    pub fn get_python_arch(&self) -> &str {
+        match self.arch {
+            Arch::Aarch64 => "aarch64",
+            Arch::Armv7L => "armv7l",
+            Arch::Powerpc64Le => "powerpc64le",
+            Arch::Powerpc64 => "powerpc64",
+            Arch::X86 => "i386",
+            Arch::X86_64 => "x86_64",
+            Arch::S390X => "s390x",
+        }
+    }
+
     /// Returns the name python uses in `sys.platform` for this os
     pub fn get_python_os(&self) -> &str {
         match self.os {
@@ -362,6 +375,11 @@ impl Target {
     /// Returns target architecture
     pub fn target_arch(&self) -> Arch {
         self.arch
+    }
+
+    /// Returns target environment
+    pub fn target_env(&self) -> Environment {
+        self.env
     }
 
     /// Returns true if the current platform is linux

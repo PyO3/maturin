@@ -126,6 +126,16 @@ impl InterpreterConfig {
         let implementation = implementation.unwrap_or_else(|| "cpython".to_string());
         let interpreter_kind = implementation.parse().map_err(|e| format_err!("{}", e))?;
         let ext_suffix = ext_suffix.context("missing value for ext_suffix")?;
+        let abi_tag = match interpreter_kind {
+            InterpreterKind::CPython => {
+                if (major, minor) >= (3, 8) {
+                    abi_tag.or_else(|| Some(format!("{}{}", major, minor)))
+                } else {
+                    abi_tag.or_else(|| Some(format!("{}{}m", major, minor)))
+                }
+            }
+            InterpreterKind::PyPy => abi_tag.or_else(|| Some("pp73".to_string())),
+        };
         Ok(Self {
             major,
             minor,

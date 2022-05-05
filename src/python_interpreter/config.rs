@@ -1,8 +1,12 @@
 use super::InterpreterKind;
 use crate::target::{Arch, Os};
+use anyhow::{format_err, Context, Result};
+use fs_err as fs;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 /// Wellknown Python interpreter sysconfig values
 static WELLKNOWN_SYSCONFIG: Lazy<HashMap<Os, HashMap<Arch, Vec<InterpreterConfig>>>> =
@@ -60,6 +64,77 @@ impl InterpreterConfig {
             }
         }
         None
+    }
+
+    /// Construct a new InterpreterConfig from a pyo3 config file
+    pub fn from_pyo3_config(config_file: &Path) -> Result<Self> {
+        let config_file = fs::File::open(config_file)?;
+        let reader = BufReader::new(config_file);
+        let lines = reader.lines();
+
+        macro_rules! parse_value {
+            ($variable:ident, $value:ident) => {
+                $variable = Some($value.trim().parse().context(format!(
+                    concat!(
+                        "failed to parse ",
+                        stringify!($variable),
+                        " from config value '{}'"
+                    ),
+                    $value
+                ))?)
+            };
+        }
+
+        let mut implementation = None;
+        let mut version = None;
+        let mut abiflags = None;
+        let mut ext_suffix = None;
+        let mut abi_tag = None;
+        let mut pointer_width = None;
+
+        for (i, line) in lines.enumerate() {
+            let line = line.context("failed to read line from config")?;
+            let (key, value) = line
+                .split_once('=')
+                .with_context(|| format!("expected key=value pair on line {}", i + 1))?;
+            match key {
+                "implementation" => parse_value!(implementation, value),
+                "version" => parse_value!(version, value),
+                "abiflags" => parse_value!(abiflags, value),
+                "ext_suffix" => parse_value!(ext_suffix, value),
+                "abi_tag" => parse_value!(abi_tag, value),
+                "pointer_width" => parse_value!(pointer_width, value),
+                _ => continue,
+            }
+        }
+        let version: String = version.context("missing value for version")?;
+        let (ver_major, ver_minor) = version
+            .split_once('.')
+            .context("Invalid python interpreter version")?;
+        let major = ver_major.parse::<usize>().with_context(|| {
+            format!(
+                "Invalid python interpreter major version '{}', expect a digit",
+                ver_major
+            )
+        })?;
+        let minor = ver_minor.parse::<usize>().with_context(|| {
+            format!(
+                "Invalid python interpreter minor version '{}', expect a digit",
+                ver_minor
+            )
+        })?;
+        let implementation = implementation.unwrap_or_else(|| "cpython".to_string());
+        let interpreter_kind = implementation.parse().map_err(|e| format_err!("{}", e))?;
+        let ext_suffix = ext_suffix.context("missing value for ext_suffix")?;
+        Ok(Self {
+            major,
+            minor,
+            interpreter_kind,
+            abiflags: abiflags.unwrap_or_default(),
+            ext_suffix,
+            abi_tag,
+            pointer_width,
+        })
     }
 
     /// Generate pyo3 config file content

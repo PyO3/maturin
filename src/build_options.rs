@@ -724,6 +724,11 @@ pub fn find_interpreter(
                         platform: None,
                         runnable: false,
                     });
+                } else if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
+                    let interpreter_config =
+                        InterpreterConfig::from_pyo3_config(config_file.as_ref())
+                            .context("Invalid PYO3_CONFIG_FILE")?;
+                    interpreters.push(PythonInterpreter::from_config(interpreter_config));
                 } else {
                     if interpreter.is_empty() {
                         bail!("Couldn't find any python interpreters. Please specify at least one with -i");

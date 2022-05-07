@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.14] - 2022-05-07
+## [0.12.15] - 2022-05-07
 
 * Re-export `__all__` for pure Rust projects in [#886](https://github.com/PyO3/maturin/pull/886)
 * Stop setting `RUSTFLAGS` environment variable to an empty string in [#887](https://github.com/PyO3/maturin/pull/887)

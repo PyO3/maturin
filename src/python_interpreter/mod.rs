@@ -10,7 +10,7 @@ use std::io;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::str;
+use std::str::{self, FromStr};
 
 mod config;
 
@@ -244,6 +244,18 @@ impl fmt::Display for InterpreterKind {
         match *self {
             InterpreterKind::CPython => write!(f, "CPython"),
             InterpreterKind::PyPy => write!(f, "PyPy"),
+        }
+    }
+}
+
+impl FromStr for InterpreterKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "cpython" => Ok(InterpreterKind::CPython),
+            "pypy" => Ok(InterpreterKind::PyPy),
+            unknown => Err(format!("Unknown interpreter kind '{}'", unknown)),
         }
     }
 }

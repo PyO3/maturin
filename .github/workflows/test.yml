@@ -124,6 +124,12 @@ jobs:
           sudo apt-get install -y mingw-w64
           rustup target add x86_64-pc-windows-gnu
           cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+      - name: test compiling with PYO3_CONFIG_FILE
+        shell: bash
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
+          cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
 
   test-alpine:
     name: Test Alpine Linux

@@ -656,7 +656,18 @@ pub fn find_interpreter(
     match bridge {
         BridgeModel::Bindings(binding_name, _) => {
             let mut interpreters = Vec::new();
-            if binding_name.starts_with("pyo3") && target.is_unix() && target.cross_compiling() {
+            if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
+                if !binding_name.starts_with("pyo3") {
+                    bail!("Only pyo3 bindings can be configured with PYO3_CONFIG_FILE");
+                }
+                let interpreter_config =
+                    InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
+                        .context("Invalid PYO3_CONFIG_FILE")?;
+                interpreters.push(PythonInterpreter::from_config(interpreter_config));
+            } else if binding_name.starts_with("pyo3")
+                && target.is_unix()
+                && target.cross_compiling()
+            {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     let host_interpreters =
                         find_host_interpreter(bridge, interpreter, target, min_python_minor)?;

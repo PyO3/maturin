@@ -671,7 +671,6 @@ pub fn find_interpreter(
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     let host_interpreters =
                         find_host_interpreter(bridge, interpreter, target, min_python_minor)?;
-                    println!("⚠️ Cross-compiling is poorly supported");
                     let host_python = &host_interpreters[0];
                     println!(
                         "🐍 Using host {} for cross-compiling preparation",

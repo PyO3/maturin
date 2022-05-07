@@ -1,0 +1,40 @@
+{
+  "x86_64": [
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".so",
+      "abi_tag": "37",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".so",
+      "abi_tag": "38",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".so",
+      "abi_tag": "39",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".so",
+      "abi_tag": "310",
+      "pointer_width": 64
+    }
+  ]
+}

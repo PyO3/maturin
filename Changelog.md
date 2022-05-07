@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Add Linux armv7l python sysconfig in [#901](https://github.com/PyO3/maturin/pull/901)
+* Add NetBSD python sysconfig in [#903](https://github.com/PyO3/maturin/pull/903)
 
 ## [0.12.15] - 2022-05-07
 

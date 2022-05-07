@@ -8,12 +8,22 @@ use std::collections::HashMap;
 static WELLKNOWN_SYSCONFIG: Lazy<HashMap<Os, HashMap<Arch, Vec<InterpreterConfig>>>> =
     Lazy::new(|| {
         let mut sysconfig = HashMap::new();
+        // Linux
         let sysconfig_linux = serde_json::from_slice(include_bytes!("sysconfig-linux.json"))
             .expect("invalid sysconfig-linux.json");
         sysconfig.insert(Os::Linux, sysconfig_linux);
+        // macOS
         let sysconfig_macos = serde_json::from_slice(include_bytes!("sysconfig-macos.json"))
             .expect("invalid sysconfig-macos.json");
         sysconfig.insert(Os::Macos, sysconfig_macos);
+        // FreeBSD
+        let sysconfig_freebsd = serde_json::from_slice(include_bytes!("sysconfig-freebsd.json"))
+            .expect("invalid sysconfig-freebsd.json");
+        sysconfig.insert(Os::FreeBsd, sysconfig_freebsd);
+        // OpenBSD
+        let sysconfig_openbsd = serde_json::from_slice(include_bytes!("sysconfig-openbsd.json"))
+            .expect("invalid sysconfig-openbsd.json");
+        sysconfig.insert(Os::OpenBsd, sysconfig_openbsd);
         sysconfig
     });
 

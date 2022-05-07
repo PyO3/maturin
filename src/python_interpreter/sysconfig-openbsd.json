@@ -1,0 +1,22 @@
+{
+  "x86_64": [
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38.so",
+      "abi_tag": "38",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39.so",
+      "abi_tag": "39",
+      "pointer_width": 64
+    }
+  ]
+}

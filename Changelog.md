@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.14] - 2022-05-07
+
 * Re-export `__all__` for pure Rust projects in [#886](https://github.com/PyO3/maturin/pull/886)
 * Stop setting `RUSTFLAGS` environment variable to an empty string in [#887](https://github.com/PyO3/maturin/pull/887)
 * Add hardcoded well-known sysconfigs for effortless cross compiling in [#896](https://github.com/PyO3/maturin/pull/896)
@@ -578,7 +580,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.14...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.15...HEAD
+[0.12.15]: https://github.com/pyo3/maturin/compare/v0.12.14...v0.12.15
 [0.12.14]: https://github.com/pyo3/maturin/compare/v0.12.13...v0.12.14
 [0.12.13]: https://github.com/pyo3/maturin/compare/v0.12.12...v0.12.13
 [0.12.12]: https://github.com/pyo3/maturin/compare/v0.12.11...v0.12.12

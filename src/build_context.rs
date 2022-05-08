@@ -309,11 +309,18 @@ impl BuildContext {
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
                 patchelf::set_rpath(&dest_path, &libs_dir)?;
             }
-            patchelf::replace_needed(artifact, &lib.name, &new_soname)?;
             soname_map.insert(
                 lib.name.clone(),
                 (new_soname.clone(), dest_path.clone(), lib.needed.clone()),
             );
+        }
+
+        let replacements = soname_map
+            .iter()
+            .map(|(k, v)| (k, v.0.clone()))
+            .collect::<Vec<_>>();
+        if !replacements.is_empty() {
+            patchelf::replace_needed(artifact, &replacements[..])?;
         }
 
         // we grafted in a bunch of libraries and modified their sonames, but
@@ -321,10 +328,14 @@ impl BuildContext {
         // we need to update those records so each now knows about the new
         // name of the other.
         for (new_soname, path, needed) in soname_map.values() {
+            let mut replacements = Vec::new();
             for n in needed {
                 if soname_map.contains_key(n) {
-                    patchelf::replace_needed(path, n, &soname_map[n].0)?;
+                    replacements.push((n, soname_map[n].0.clone()));
                 }
+            }
+            if !replacements.is_empty() {
+                patchelf::replace_needed(path, &replacements[..])?;
             }
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }

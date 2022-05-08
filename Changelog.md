@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add Linux armv7l python sysconfig in [#901](https://github.com/PyO3/maturin/pull/901)
 * Add NetBSD python sysconfig in [#903](https://github.com/PyO3/maturin/pull/903)
 * Update 'replace_needed' to reduce total calls to 'patchelf' in [#905](https://github.com/PyO3/maturin/pull/905)
+* Allow use python interpreters from bundled sysconfig when not cross compiling in [#907](https://github.com/PyO3/maturin/pull/907)
 
 ## [0.12.15] - 2022-05-07
 

@@ -4,16 +4,15 @@ use std::path::Path;
 use std::process::Command;
 
 /// Replace a declared dependency on a dynamic library with another one (`DT_NEEDED`)
-pub fn replace_needed<S: AsRef<OsStr>>(
+pub fn replace_needed<O: AsRef<OsStr>, N: AsRef<OsStr>>(
     file: impl AsRef<Path>,
-    old_lib: &str,
-    new_lib: &S,
+    old_new_pairs: &[(O, N)],
 ) -> Result<()> {
     let mut cmd = Command::new("patchelf");
-    cmd.arg("--replace-needed")
-        .arg(old_lib)
-        .arg(new_lib)
-        .arg(file.as_ref());
+    for (old, new) in old_new_pairs {
+        cmd.arg("--replace-needed").arg(old).arg(new);
+    }
+    cmd.arg(file.as_ref());
     let output = cmd
         .output()
         .context("Failed to execute 'patchelf', did you install it? Hint: Try `pip install maturin[patchelf]` (or just `pip install patchelf`)")?;

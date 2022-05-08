@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
 // These should be treated almost identically but must be correctly identified
@@ -209,10 +209,14 @@ impl BuildOptions {
             .filter(|name| name.contains('.'))
             .unwrap_or(&module_name);
 
+        let data = pyproject
+            .and_then(|x| x.data())
+            .or_else(|| extra_metadata.data.as_ref().map(Path::new));
         let project_layout = ProjectLayout::determine(
             manifest_dir,
             extension_name,
             extra_metadata.python_source.as_deref(),
+            data,
         )?;
 
         let mut args_from_pyproject = Vec::new();

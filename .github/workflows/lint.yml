@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - uses: psf/black@22.1.0
+      - uses: psf/black@22.3.0
 
   spellcheck:
     runs-on: ubuntu-latest

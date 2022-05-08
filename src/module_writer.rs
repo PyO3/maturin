@@ -9,6 +9,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use fs_err as fs;
 use fs_err::File;
+use ignore::WalkBuilder;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -22,6 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 use tempfile::{tempdir, TempDir};
+use tracing::debug;
 use zip::{self, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
@@ -44,7 +46,7 @@ pub trait ModuleWriter {
         permissions: u32,
     ) -> Result<()>;
 
-    /// Copies the source file the the target path relative to the module base path
+    /// Copies the source file to the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
         let read_failed_context = format!("Failed to read {}", source.as_ref().display());
         let mut file = File::open(source.as_ref()).context(read_failed_context.clone())?;
@@ -273,19 +275,14 @@ impl WheelWriter {
         project_layout: &ProjectLayout,
         metadata21: &Metadata21,
     ) -> Result<()> {
-        match project_layout {
-            ProjectLayout::Mixed {
-                ref python_module, ..
-            } => {
-                let absolute_path = python_module.canonicalize()?;
-                if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
-                    let name = metadata21.get_distribution_escaped();
-                    self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;
-                } else {
-                    println!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
-                }
+        if let Some(python_module) = &project_layout.python_module {
+            let absolute_path = python_module.canonicalize()?;
+            if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
+                let name = metadata21.get_distribution_escaped();
+                self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;
+            } else {
+                println!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
             }
-            ProjectLayout::PureRust { .. } => {}
         }
         Ok(())
     }
@@ -586,7 +583,7 @@ fn handle_cffi_call_result(
         );
     } else {
         // Don't swallow warnings
-        std::io::stderr().write_all(&output.stderr)?;
+        io::stderr().write_all(&output.stderr)?;
 
         let ffi_py_content = fs::read_to_string(&ffi_py)?;
         tempdir.close()?;
@@ -605,7 +602,7 @@ pub fn write_bindings_module(
     target: &Target,
     editable: bool,
 ) -> Result<()> {
-    let ext_name = project_layout.extension_name();
+    let ext_name = &project_layout.extension_name;
     let so_filename = match python_interpreter {
         Some(python_interpreter) => python_interpreter.get_library_name(ext_name),
         // abi3
@@ -619,63 +616,58 @@ pub fn write_bindings_module(
         }
     };
 
-    match project_layout {
-        ProjectLayout::Mixed {
-            ref python_module,
-            ref rust_module,
-            ..
-        } => {
-            if !editable {
-                write_python_part(writer, python_module)
-                    .context("Failed to add the python module to the package")?;
-            }
-
-            if editable {
-                let target = rust_module.join(&so_filename);
-                // Remove existing so file to avoid triggering SIGSEV in running process
-                // See https://github.com/PyO3/maturin/issues/758
-                let _ = fs::remove_file(&target);
-                fs::copy(&artifact, &target).context(format!(
-                    "Failed to copy {} to {}",
-                    artifact.display(),
-                    target.display()
-                ))?;
-            }
-
-            if !editable {
-                let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
-                writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
-            }
+    if let Some(python_module) = &project_layout.python_module {
+        if !editable {
+            write_python_part(writer, python_module)
+                .context("Failed to add the python module to the package")?;
         }
-        ProjectLayout::PureRust {
-            ref rust_module, ..
-        } => {
-            let module = PathBuf::from(module_name);
-            writer.add_directory(&module)?;
-            // Reexport the shared library as if it were the top level module
-            writer.add_bytes(
-                &module.join("__init__.py"),
-                format!(
-                    r#"from .{module_name} import *
+
+        if editable {
+            let target = project_layout.rust_module.join(&so_filename);
+            // Remove existing so file to avoid triggering SIGSEV in running process
+            // See https://github.com/PyO3/maturin/issues/758
+            let _ = fs::remove_file(&target);
+            fs::copy(&artifact, &target).context(format!(
+                "Failed to copy {} to {}",
+                artifact.display(),
+                target.display()
+            ))?;
+        }
+
+        if !editable {
+            let relative = project_layout
+                .rust_module
+                .strip_prefix(python_module.parent().unwrap())?;
+            writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
+        }
+    } else {
+        let module = PathBuf::from(module_name);
+        writer.add_directory(&module)?;
+        // Reexport the shared library as if it were the top level module
+        writer.add_bytes(
+            &module.join("__init__.py"),
+            format!(
+                r#"from .{module_name} import *
 
 __doc__ = {module_name}.__doc__
 if hasattr({module_name}, "__all__"):
     __all__ = {module_name}.__all__"#,
-                    module_name = module_name
-                )
-                .as_bytes(),
+                module_name = module_name
+            )
+            .as_bytes(),
+        )?;
+        let type_stub = project_layout
+            .rust_module
+            .join(format!("{}.pyi", module_name));
+        if type_stub.exists() {
+            writer.add_bytes(
+                &module.join("__init__.pyi"),
+                &fs_err::read(type_stub).context("Failed to read type stub file")?,
             )?;
-            let type_stub = rust_module.join(format!("{}.pyi", module_name));
-            if type_stub.exists() {
-                writer.add_bytes(
-                    &module.join("__init__.pyi"),
-                    &fs_err::read(type_stub).context("Failed to read type stub file")?,
-                )?;
-                writer.add_bytes(&module.join("py.typed"), b"")?;
-                println!("📖 Found type stub file at {}.pyi", module_name);
-            }
-            writer.add_file_with_permissions(&module.join(so_filename), &artifact, 0o755)?;
+            writer.add_bytes(&module.join("py.typed"), b"")?;
+            println!("📖 Found type stub file at {}.pyi", module_name);
         }
+        writer.add_file_with_permissions(&module.join(so_filename), &artifact, 0o755)?;
     }
 
     Ok(())
@@ -697,55 +689,49 @@ pub fn write_cffi_module(
 
     let module;
 
-    match project_layout {
-        ProjectLayout::Mixed {
-            ref python_module,
-            ref rust_module,
-            ref extension_name,
-        } => {
-            if !editable {
-                write_python_part(writer, python_module)
-                    .context("Failed to add the python module to the package")?;
-            }
-
-            if editable {
-                let base_path = python_module.join(&module_name);
-                fs::create_dir_all(&base_path)?;
-                let target = base_path.join("native.so");
-                fs::copy(&artifact, &target).context(format!(
-                    "Failed to copy {} to {}",
-                    artifact.display(),
-                    target.display()
-                ))?;
-                File::create(base_path.join("__init__.py"))?
-                    .write_all(cffi_init_file().as_bytes())?;
-                File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
-            }
-
-            let relative = rust_module.strip_prefix(python_module.parent().unwrap())?;
-            module = relative.join(extension_name);
-            if !editable {
-                writer.add_directory(&module)?;
-            }
+    if let Some(python_module) = &project_layout.python_module {
+        if !editable {
+            write_python_part(writer, python_module)
+                .context("Failed to add the python module to the package")?;
         }
-        ProjectLayout::PureRust {
-            ref rust_module, ..
-        } => {
-            module = PathBuf::from(module_name);
+
+        if editable {
+            let base_path = python_module.join(&module_name);
+            fs::create_dir_all(&base_path)?;
+            let target = base_path.join("native.so");
+            fs::copy(&artifact, &target).context(format!(
+                "Failed to copy {} to {}",
+                artifact.display(),
+                target.display()
+            ))?;
+            File::create(base_path.join("__init__.py"))?.write_all(cffi_init_file().as_bytes())?;
+            File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
+        }
+
+        let relative = project_layout
+            .rust_module
+            .strip_prefix(python_module.parent().unwrap())?;
+        module = relative.join(&project_layout.extension_name);
+        if !editable {
             writer.add_directory(&module)?;
-            let type_stub = rust_module.join(format!("{}.pyi", module_name));
-            if type_stub.exists() {
-                writer.add_bytes(
-                    &module.join("__init__.pyi"),
-                    &fs_err::read(type_stub).context("Failed to read type stub file")?,
-                )?;
-                writer.add_bytes(&module.join("py.typed"), b"")?;
-                println!("📖 Found type stub file at {}.pyi", module_name);
-            }
+        }
+    } else {
+        module = PathBuf::from(module_name);
+        writer.add_directory(&module)?;
+        let type_stub = project_layout
+            .rust_module
+            .join(format!("{}.pyi", module_name));
+        if type_stub.exists() {
+            writer.add_bytes(
+                &module.join("__init__.pyi"),
+                &fs_err::read(type_stub).context("Failed to read type stub file")?,
+            )?;
+            writer.add_bytes(&module.join("py.typed"), b"")?;
+            println!("📖 Found type stub file at {}.pyi", module_name);
         }
     };
 
-    if !editable || matches!(project_layout, ProjectLayout::PureRust { .. }) {
+    if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
         writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
         writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;
@@ -780,8 +766,6 @@ pub fn write_python_part(
     writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
 ) -> Result<()> {
-    use ignore::WalkBuilder;
-
     for absolute in WalkBuilder::new(&python_module).hidden(false).build() {
         let absolute = absolute?.into_path();
         let relative = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;
@@ -848,5 +832,57 @@ pub fn write_dist_info(
         }
     }
 
+    Ok(())
+}
+
+/// If any, copies the data files from the data directory, resolving symlinks to their source.
+/// We resolve symlinks since we require this rather rigid structure while people might need
+/// to save or generate the data in other places
+///
+/// See https://peps.python.org/pep-0427/#file-contents
+pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<()> {
+    let possible_data_dir_names = ["data", "scripts", "headers", "purelib", "platlib"];
+    if let Some(data) = data {
+        for subdir in fs::read_dir(data).context("Failed to read data dir")? {
+            let subdir = subdir?;
+            let dir_name = subdir
+                .file_name()
+                .to_str()
+                .context("Invalid data dir name")?
+                .to_string();
+            if !subdir.path().is_dir() || !possible_data_dir_names.contains(&dir_name.as_str()) {
+                bail!(
+                    "Invalid data dir entry {}. Possible are directories named {}",
+                    subdir.path().display(),
+                    possible_data_dir_names.join(", ")
+                );
+            }
+            debug!("Adding data from {}", subdir.path().display());
+            (|| {
+                for file in WalkBuilder::new(subdir.path())
+                    .standard_filters(false)
+                    .build()
+                {
+                    let file = file?;
+                    let relative = file.path().strip_prefix(data.parent().unwrap())?;
+
+                    if file.path_is_symlink() {
+                        // Copy the actual file contents, not the link, so that you can create a
+                        // data directory by joining different data sources
+                        let source = fs::read_link(file.path())?;
+                        writer.add_file(relative, source.parent().unwrap())?;
+                    } else if file.path().is_file() {
+                        writer.add_file(relative, file.path())?;
+                    } else if file.path().is_dir() {
+                        writer.add_directory(relative)?;
+                    } else {
+                        bail!("Can't handle data dir entry {}", file.path().display());
+                    }
+                }
+                Ok(())
+            })()
+            .with_context(|| format!("Failed to include data from {}", data.display()))?
+        }
+    }
     Ok(())
 }

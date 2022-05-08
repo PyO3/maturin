@@ -27,6 +27,8 @@ pub struct ToolMaturin {
     skip_auditwheel: bool,
     #[serde(default)]
     strip: bool,
+    /// Path to the wheel directory, defaults to `<module_name>.data`
+    data: Option<PathBuf>,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -120,6 +122,14 @@ impl PyProjectToml {
             .and_then(|tool| tool.maturin.as_ref())
             .map(|maturin| maturin.strip)
             .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.data]` in pyproject.toml
+    pub fn data(&self) -> Option<&Path> {
+        self.tool
+            .as_ref()
+            .and_then(|tool| tool.maturin.as_ref())
+            .and_then(|maturin| maturin.data.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml

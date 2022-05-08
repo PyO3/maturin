@@ -1,5 +1,5 @@
 class DummyClass:
     @staticmethod
-    def get_42(self) -> int: ...
+    def get_42() -> int: ...
 
 fourtytwo: int

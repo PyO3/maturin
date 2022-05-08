@@ -53,7 +53,7 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     let message = str::from_utf8(&output.stdout).unwrap().trim();
 
     if message != "SUCCESS" {
-        panic!("{}", message);
+        panic!("Not SUCCESS: {}", message);
     }
 
     Ok(())

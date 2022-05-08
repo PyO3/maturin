@@ -256,7 +256,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             metadata_directory,
             strip,
         } => {
-            assert!(build_options.interpreter.len() == 1);
+            assert_eq!(build_options.interpreter.len(), 1);
             let context = build_options.into_build_context(true, strip, false)?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too

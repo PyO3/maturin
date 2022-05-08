@@ -1,4 +1,4 @@
-use crate::module_writer::ModuleWriter;
+use crate::module_writer::{add_data, ModuleWriter};
 use crate::{Metadata21, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, PackageId};
@@ -272,6 +272,7 @@ pub fn source_distribution(
     cargo_metadata: &Metadata,
     sdist_include: Option<&Vec<String>>,
     include_cargo_lock: bool,
+    data: Option<&Path>,
 ) -> Result<PathBuf> {
     let known_path_deps = find_path_deps(cargo_metadata)?;
 
@@ -332,6 +333,7 @@ pub fn source_distribution(
         metadata21.to_file_contents().as_bytes(),
     )?;
 
+    add_data(&mut writer, data)?;
     let source_distribution_path = writer.finish()?;
 
     println!(

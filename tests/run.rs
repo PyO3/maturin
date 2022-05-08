@@ -201,6 +201,15 @@ fn integration_pyo3_ffi_pure() {
         false,
     ));
 }
+#[test]
+fn integration_with_data() {
+    handle_result(integration::test_integration(
+        "test-crates/with-data",
+        None,
+        "integration_with_data",
+        false,
+    ));
+}
 
 #[test]
 fn abi3_without_version() {

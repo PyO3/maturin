@@ -619,7 +619,8 @@ fn find_single_python_interpreter(
     Ok(interpreter)
 }
 
-fn find_host_interpreter(
+/// Find python interpreters in the host machine
+fn find_interpreter_in_host(
     bridge: &BridgeModel,
     interpreter: &[PathBuf],
     target: &Target,
@@ -639,6 +640,51 @@ fn find_host_interpreter(
         } else {
             bail!("Couldn't find any python interpreters. Please specify at least one with -i");
         }
+    }
+    Ok(interpreters)
+}
+
+/// Find python interpreters in the bundled sysconfig
+fn find_interpreter_in_sysconfig(
+    interpreter: &[PathBuf],
+    target: &Target,
+) -> Result<Vec<PythonInterpreter>> {
+    let mut interpreters = Vec::new();
+    for interp in interpreter {
+        let python = interp
+            .file_name()
+            .context("Invalid python interpreter")?
+            .to_string_lossy();
+        let (python_impl, python_ver) = if let Some(ver) = python.strip_prefix("pypy") {
+            (InterpreterKind::PyPy, ver)
+        } else if let Some(ver) = python.strip_prefix("python") {
+            (InterpreterKind::CPython, ver)
+        } else {
+            bail!("Unsupported Python interpreter: {}", python);
+        };
+        let (ver_major, ver_minor) = python_ver
+            .split_once('.')
+            .context("Invalid python interpreter version")?;
+        let ver_major = ver_major.parse::<usize>().with_context(|| {
+            format!(
+                "Invalid python interpreter major version '{}', expect a digit",
+                ver_major
+            )
+        })?;
+        let ver_minor = ver_minor.parse::<usize>().with_context(|| {
+            format!(
+                "Invalid python interpreter minor version '{}', expect a digit",
+                ver_minor
+            )
+        })?;
+        let sysconfig = InterpreterConfig::lookup(
+            target.target_os(),
+            target.target_arch(),
+            python_impl,
+            (ver_major, ver_minor),
+        )
+        .context("Failed to find a python interpreter")?;
+        interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
     }
     Ok(interpreters)
 }
@@ -670,7 +716,7 @@ pub fn find_interpreter(
             {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     let host_interpreters =
-                        find_host_interpreter(bridge, interpreter, target, min_python_minor)?;
+                        find_interpreter_in_host(bridge, interpreter, target, min_python_minor)?;
                     let host_python = &host_interpreters[0];
                     println!(
                         "🐍 Using host {} for cross-compiling preparation",
@@ -738,47 +784,23 @@ pub fn find_interpreter(
                     if interpreter.is_empty() {
                         bail!("Couldn't find any python interpreters. Please specify at least one with -i");
                     }
-                    for interp in interpreter {
-                        let python = interp
-                            .file_name()
-                            .context("Invalid python interpreter")?
-                            .to_string_lossy();
-                        let (python_impl, python_ver) =
-                            if let Some(ver) = python.strip_prefix("pypy") {
-                                (InterpreterKind::PyPy, ver)
-                            } else if let Some(ver) = python.strip_prefix("python") {
-                                (InterpreterKind::CPython, ver)
-                            } else {
-                                bail!("Unsupported Python interpreter: {}", python);
-                            };
-                        let (ver_major, ver_minor) = python_ver
-                            .split_once('.')
-                            .context("Invalid python interpreter version")?;
-                        let ver_major = ver_major.parse::<usize>().with_context(|| {
-                            format!(
-                                "Invalid python interpreter major version '{}', expect a digit",
-                                ver_major
-                            )
-                        })?;
-                        let ver_minor = ver_minor.parse::<usize>().with_context(|| {
-                            format!(
-                                "Invalid python interpreter minor version '{}', expect a digit",
-                                ver_minor
-                            )
-                        })?;
-                        let sysconfig = InterpreterConfig::lookup(
-                            target.target_os(),
-                            target.target_arch(),
-                            python_impl,
-                            (ver_major, ver_minor),
-                        )
-                        .context("Failed to find a python interpreter")?;
-                        interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
-                    }
+                    interpreters = find_interpreter_in_sysconfig(interpreter, target)?;
                 }
             } else {
-                interpreters =
-                    find_host_interpreter(bridge, interpreter, target, min_python_minor)?;
+                match find_interpreter_in_host(bridge, interpreter, target, min_python_minor) {
+                    Ok(host_interps) => interpreters = host_interps,
+                    Err(err) => {
+                        if !interpreter.is_empty()
+                            && binding_name.starts_with("pyo3")
+                            && target.is_unix()
+                        {
+                            interpreters = find_interpreter_in_sysconfig(interpreter, target)
+                                .map_err(|_| err)?;
+                        } else {
+                            return Err(err);
+                        }
+                    }
+                }
             }
 
             println!(

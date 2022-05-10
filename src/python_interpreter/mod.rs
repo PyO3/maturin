@@ -678,7 +678,7 @@ impl fmt::Display for PythonInterpreter {
         } else {
             write!(
                 f,
-                "cross compiling target {} {}.{}{}",
+                "{} {}.{}{}",
                 self.config.interpreter_kind,
                 self.config.major,
                 self.config.minor,

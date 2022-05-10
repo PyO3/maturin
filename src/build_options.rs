@@ -701,6 +701,7 @@ pub fn find_interpreter(
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
         BridgeModel::Bindings(binding_name, _) => {
+            let mut native_interpreters = false;
             let mut interpreters = Vec::new();
             if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
                 if !binding_name.starts_with("pyo3") {
@@ -788,7 +789,10 @@ pub fn find_interpreter(
                 }
             } else {
                 match find_interpreter_in_host(bridge, interpreter, target, min_python_minor) {
-                    Ok(host_interps) => interpreters = host_interps,
+                    Ok(host_interps) => {
+                        interpreters = host_interps;
+                        native_interpreters = true;
+                    }
                     Err(err) => {
                         if !interpreter.is_empty()
                             && binding_name.starts_with("pyo3")
@@ -803,14 +807,16 @@ pub fn find_interpreter(
                 }
             }
 
-            println!(
-                "🐍 Found {}",
-                interpreters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            );
+            let interpreters_str = interpreters
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>()
+                .join(", ");
+            if native_interpreters {
+                println!("🐍 Found {}", interpreters_str);
+            } else {
+                println!("🐍 Found cross compiling target {}", interpreters_str);
+            }
 
             Ok(interpreters)
         }

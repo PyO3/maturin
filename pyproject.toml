@@ -13,6 +13,13 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = ["tomli>=1.1.0 ; python_version<'3.11'"]
+dynamic = [
+    "authors",
+    "description",
+    "license",
+    "readme",
+    "version"
+]
 
 [project.optional-dependencies]
 zig = [

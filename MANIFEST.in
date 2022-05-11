@@ -1,0 +1,7 @@
+include Cargo.toml Cargo.lock
+include Readme.md
+include license-apache license-mit
+recursive-include src *.rs
+recursive-include src/auditwheel *.json
+recursive-include src/python_interpreter *.py *.json
+recursive-include src/templates *.j2

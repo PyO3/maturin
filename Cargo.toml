@@ -66,6 +66,7 @@ multipart = { version = "0.18.0", features = ["client"], default-features = fals
 rpassword = { version = "6.0.1", optional = true }
 ureq = { version = "2.3.1", features = ["gzip"], default-features = false, optional = true }
 native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
+tracing = "0.1.34"
 
 [dev-dependencies]
 indoc = "1.0.3"

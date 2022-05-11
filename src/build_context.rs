@@ -2,7 +2,7 @@ use crate::auditwheel::{get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
-    write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
+    add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
 };
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
@@ -51,25 +51,19 @@ impl BridgeModel {
     }
 }
 
-/// Whether this project is pure rust or rust mixed with python
+/// Whether this project is pure rust or rust mixed with python and whether it has wheel data
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ProjectLayout {
-    /// A rust crate compiled into a shared library with only some glue python for cffi
-    PureRust {
-        /// Contains the canonicialized (i.e. absolute) path to the rust part of the project
-        rust_module: PathBuf,
-        /// rust extension name
-        extension_name: String,
-    },
-    /// A python package that is extended by a native rust module.
-    Mixed {
-        /// Contains the canonicialized (i.e. absolute) path to the python part of the project
-        python_module: PathBuf,
-        /// Contains the canonicialized (i.e. absolute) path to the rust part of the project
-        rust_module: PathBuf,
-        /// rust extension name
-        extension_name: String,
-    },
+pub struct ProjectLayout {
+    /// Contains the canonicalized (i.e. absolute) path to the python part of the project
+    /// If none, we have a rust crate compiled into a shared library with only some glue python for cffi
+    /// If some, we have a python package that is extended by a native rust module.
+    pub python_module: Option<PathBuf>,
+    /// Contains the canonicalized (i.e. absolute) path to the rust part of the project
+    pub rust_module: PathBuf,
+    /// rust extension name
+    pub extension_name: String,
+    /// The location of the wheel data, if any
+    pub data: Option<PathBuf>,
 }
 
 impl ProjectLayout {
@@ -78,6 +72,7 @@ impl ProjectLayout {
         project_root: impl AsRef<Path>,
         module_name: &str,
         py_src: Option<impl AsRef<Path>>,
+        data: Option<impl AsRef<Path>>,
     ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
         let parts: Vec<&str> = module_name.split('.').collect();
@@ -100,6 +95,23 @@ impl ProjectLayout {
                 module_name.to_string(),
             )
         };
+
+        let data = if let Some(data) = data {
+            let data = if data.as_ref().is_absolute() {
+                data.as_ref().to_path_buf()
+            } else {
+                project_root.join(data)
+            };
+            if !data.is_dir() {
+                bail!("No such data directory {}", data.display());
+            }
+            Some(data)
+        } else if project_root.join(format!("{}.data", module_name)).is_dir() {
+            Some(project_root.join(format!("{}.data", module_name)))
+        } else {
+            None
+        };
+
         if python_module.is_dir() {
             if !python_module.join("__init__.py").is_file() {
                 bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
@@ -107,27 +119,19 @@ impl ProjectLayout {
 
             println!("🍹 Building a mixed python/rust project");
 
-            Ok(ProjectLayout::Mixed {
-                python_module,
+            Ok(ProjectLayout {
+                python_module: Some(python_module),
                 rust_module,
                 extension_name,
+                data,
             })
         } else {
-            Ok(ProjectLayout::PureRust {
+            Ok(ProjectLayout {
+                python_module: None,
                 rust_module: project_root.to_path_buf(),
                 extension_name,
+                data,
             })
-        }
-    }
-
-    pub fn extension_name(&self) -> &str {
-        match *self {
-            ProjectLayout::PureRust {
-                ref extension_name, ..
-            } => extension_name,
-            ProjectLayout::Mixed {
-                ref extension_name, ..
-            } => extension_name,
         }
     }
 }
@@ -246,6 +250,7 @@ impl BuildContext {
                     &self.cargo_metadata,
                     pyproject.sdist_include(),
                     include_cargo_lock,
+                    self.project_layout.data.as_deref(),
                 )
                 .context("Failed to build source distribution")?;
                 Ok(Some((sdist_path, "source".to_string())))
@@ -396,7 +401,7 @@ impl BuildContext {
         .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
-
+        add_data(&mut writer, self.project_layout.data.as_deref())?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, format!("cp{}{}", major, min_minor)))
     }
@@ -415,7 +420,7 @@ impl BuildContext {
         let python_interpreter = interpreters.get(0);
         let artifact = self.compile_cdylib(
             python_interpreter,
-            Some(self.project_layout.extension_name()),
+            Some(&self.project_layout.extension_name),
         )?;
         let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
         let (wheel_path, tag) = self.write_binding_wheel_abi3(
@@ -461,7 +466,7 @@ impl BuildContext {
         .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
-
+        add_data(&mut writer, self.project_layout.data.as_deref())?;
         let wheel_path = writer.finish()?;
         Ok((
             wheel_path,
@@ -484,7 +489,7 @@ impl BuildContext {
         for python_interpreter in interpreters {
             let artifact = self.compile_cdylib(
                 Some(python_interpreter),
-                Some(self.project_layout.extension_name()),
+                Some(&self.project_layout.extension_name),
             )?;
             let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
             let (wheel_path, tag) = self.write_binding_wheel(
@@ -568,7 +573,7 @@ impl BuildContext {
         )?;
 
         self.add_pth(&mut writer)?;
-
+        add_data(&mut writer, self.project_layout.data.as_deref())?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }
@@ -616,16 +621,11 @@ impl BuildContext {
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
 
-        match self.project_layout {
-            ProjectLayout::Mixed {
-                ref python_module, ..
-            } => {
-                if !self.editable {
-                    write_python_part(&mut writer, python_module)
-                        .context("Failed to add the python module to the package")?;
-                }
+        if let Some(python_module) = &self.project_layout.python_module {
+            if !self.editable {
+                write_python_part(&mut writer, python_module)
+                    .context("Failed to add the python module to the package")?;
             }
-            ProjectLayout::PureRust { .. } => {}
         }
 
         // I wouldn't know of any case where this would be the wrong (and neither do
@@ -638,7 +638,7 @@ impl BuildContext {
         write_bin(&mut writer, artifact, &self.metadata21, bin_name)?;
 
         self.add_pth(&mut writer)?;
-
+        add_data(&mut writer, self.project_layout.data.as_deref())?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }

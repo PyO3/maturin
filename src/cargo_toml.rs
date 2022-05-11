@@ -123,7 +123,10 @@ pub struct RemainingCoreMetadata {
     pub project_url: Option<HashMap<String, String>>,
     pub provides_extra: Option<Vec<String>>,
     pub description_content_type: Option<String>,
+    /// The directory with python module, contains `<module_name>/__init__.py`
     pub python_source: Option<String>,
+    /// The directory containing the wheel data
+    pub data: Option<String>,
 }
 
 #[cfg(test)]

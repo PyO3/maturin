@@ -25,11 +25,12 @@ pub struct PublishOpt {
     /// The url of registry where the wheels are uploaded to
     registry: String,
     #[clap(short, long)]
-    /// Username for pypi or your custom registry
+    /// Username for pypi or your custom registry. Set MATURIN_PYPI_TOKEN variable
+    /// to use token-based authentication instead
     username: Option<String>,
     #[clap(short, long)]
     /// Password for pypi or your custom registry. Note that you can also pass the password
-    /// through MATURIN_PASSWORD
+    /// through MATURIN_PASSWORD variable
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
@@ -170,6 +171,14 @@ fn load_pypi_cred_from_config(config: &Ini, registry_name: &str) -> Option<(Stri
     None
 }
 
+/// Gets the PyPI credentials from (in precedence order):
+///
+/// 1. `MATURIN_PYPI_TOKEN` environment variable
+/// 2. `.pypirc` config file
+/// 3. maturin command arguments
+/// 4. `MATURIN_PASSWORD` environment variable
+/// 5. the password keyring
+/// 6. interactive prompt
 fn resolve_pypi_cred(
     opt: &PublishOpt,
     config: &Ini,

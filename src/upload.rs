@@ -20,9 +20,11 @@ pub struct PublishOpt {
     #[clap(
         short = 'r',
         long = "repository-url",
+        env = "MATURIN_REPOSITORY_URL",
         default_value = "https://upload.pypi.org/legacy/"
     )]
-    /// The url of registry where the wheels are uploaded to
+    /// The URL of the registry where the wheels are uploaded to. Note than you can also pass
+    /// the URL through MATURIN_REPOSITORY_URL variable
     registry: String,
     #[clap(short, long)]
     /// Username for pypi or your custom registry. Set MATURIN_PYPI_TOKEN variable

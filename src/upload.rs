@@ -17,22 +17,24 @@ use thiserror::Error;
 /// An account with a registry, possibly incomplete
 #[derive(Debug, clap::Parser)]
 pub struct PublishOpt {
+    /// The URL of the registry where the wheels are uploaded to. Note than you can also pass
+    /// the URL through MATURIN_REPOSITORY_URL variable
     #[clap(
         short = 'r',
         long = "repository-url",
         env = "MATURIN_REPOSITORY_URL",
         default_value = "https://upload.pypi.org/legacy/"
     )]
-    /// The URL of the registry where the wheels are uploaded to. Note than you can also pass
-    /// the URL through MATURIN_REPOSITORY_URL variable
     registry: String,
-    #[clap(short, long)]
-    /// Username for pypi or your custom registry. Set MATURIN_PYPI_TOKEN variable
-    /// to use token-based authentication instead
+    /// Username for pypi or your custom registry. Note that you can also pass the username
+    /// through MATURIN_USERNAME variable
+    ///
+    /// Set MATURIN_PYPI_TOKEN variable to use token-based authentication instead
+    #[clap(short, long, env = "MATURIN_USERNAME")]
     username: Option<String>,
-    #[clap(short, long)]
     /// Password for pypi or your custom registry. Note that you can also pass the password
     /// through MATURIN_PASSWORD variable
+    #[clap(short, long)]
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
@@ -114,18 +116,9 @@ impl Registry {
     }
 }
 
-/// Returns the password and a bool that states whether to ask for re-entering the password
-/// after a failed authentication
-///
-/// Precedence:
-/// 1. MATURIN_PASSWORD
-/// 2. keyring
-/// 3. stdin
+/// Attempts to fetch the password from the keyring (if enabled)
+/// and falls back to the interactive password prompt.
 fn get_password(_username: &str) -> String {
-    if let Ok(password) = env::var("MATURIN_PASSWORD") {
-        return password;
-    };
-
     #[cfg(feature = "keyring")]
     {
         let service = env!("CARGO_PKG_NAME");
@@ -178,7 +171,7 @@ fn load_pypi_cred_from_config(config: &Ini, registry_name: &str) -> Option<(Stri
 /// 1. `MATURIN_PYPI_TOKEN` environment variable
 /// 2. `.pypirc` config file
 /// 3. maturin command arguments
-/// 4. `MATURIN_PASSWORD` environment variable
+/// 4. `MATURIN_USERNAME` and `MATURIN_PASSWORD` environment variables
 /// 5. the password keyring
 /// 6. interactive prompt
 fn resolve_pypi_cred(
@@ -200,10 +193,11 @@ fn resolve_pypi_cred(
 
     // fallback to username and password
     let username = opt.username.clone().unwrap_or_else(get_username);
-    let password = match opt.password {
-        Some(ref password) => password.clone(),
-        None => get_password(&username),
-    };
+    let password = opt
+        .password
+        .clone()
+        .or_else(|| env::var("MATURIN_PASSWORD").ok())
+        .unwrap_or_else(|| get_password(&username));
 
     (username, password)
 }

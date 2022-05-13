@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Allow use python interpreters from bundled sysconfig when not cross compiling in [#907](https://github.com/PyO3/maturin/pull/907)
 * Use setuptools-rust for bootstrapping in [#909](https://github.com/PyO3/maturin/pull/909)
 * Allow setting the publish repository URL via `MATURIN_REPOSITORY_URL` in [#913](https://github.com/PyO3/maturin/pull/913)
+* Allow setting the publish user name via `MATURIN_USERNAME` in [#915](https://github.com/PyO3/maturin/pull/915)
 
 ## [0.12.15] - 2022-05-07
 

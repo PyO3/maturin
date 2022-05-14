@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Allow stubs-only mixed project layout in [#914](https://github.com/PyO3/maturin/pull/914)
 * Allow setting the publish user name via `MATURIN_USERNAME` in [#915](https://github.com/PyO3/maturin/pull/915)
 * Add Windows python sysconfig in [#917](https://github.com/PyO3/maturin/pull/917)
+* Add support for `generate-import-lib` feature of pyo3 in [#918](https://github.com/PyO3/maturin/pull/918)
 
 ## [0.12.15] - 2022-05-07
 

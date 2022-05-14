@@ -276,7 +276,7 @@ impl BuildOptions {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
-        let generate_abi3_import_lib = is_generating_abi3_import_lib(&cargo_metadata)?;
+        let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
         let interpreter = if self.interpreter.is_empty() {
             // Auto-detect interpreters
             find_interpreter(
@@ -284,7 +284,7 @@ impl BuildOptions {
                 &[],
                 &target,
                 get_min_python_minor(&metadata21),
-                generate_abi3_import_lib,
+                generate_import_lib,
             )?
         } else {
             // User given list of interpreters
@@ -293,7 +293,7 @@ impl BuildOptions {
                 &self.interpreter,
                 &target,
                 None,
-                generate_abi3_import_lib,
+                generate_import_lib,
             )?
         };
 
@@ -468,8 +468,8 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
 }
 
 /// pyo3 0.16.4+ supports building abi3 wheels without a working Python interpreter for Windows
-/// when `generate-abi3-import-lib` feature is enabled
-fn is_generating_abi3_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
+/// when `generate-import-lib` feature is enabled
+fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
     let resolve = cargo_metadata
         .resolve
         .as_ref()
@@ -485,7 +485,7 @@ fn is_generating_abi3_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
                 let generate_import_lib = pyo3_crate
                     .features
                     .iter()
-                    .any(|x| x == "generate-abi3-import-lib");
+                    .any(|x| x == "generate-import-lib" || x == "generate-abi3-import-lib");
                 return Ok(generate_import_lib);
             }
             _ => continue,
@@ -701,7 +701,7 @@ pub fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
     min_python_minor: Option<usize>,
-    generate_abi3_import_lib: bool,
+    generate_import_lib: bool,
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
         BridgeModel::Bindings(binding_name, _) => {
@@ -715,10 +715,7 @@ pub fn find_interpreter(
                     InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
                         .context("Invalid PYO3_CONFIG_FILE")?;
                 interpreters.push(PythonInterpreter::from_config(interpreter_config));
-            } else if binding_name.starts_with("pyo3")
-                && target.is_unix()
-                && target.cross_compiling()
-            {
+            } else if binding_name.starts_with("pyo3") && target.cross_compiling() {
                 if let Some(cross_lib_dir) = std::env::var_os("PYO3_CROSS_LIB_DIR") {
                     let host_interpreters =
                         find_interpreter_in_host(bridge, interpreter, target, min_python_minor)?;
@@ -863,7 +860,7 @@ pub fn find_interpreter(
                 } else if let Some(interp) = interpreter.get(0) {
                     println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interp);
                     Ok(interpreter)
-                } else if generate_abi3_import_lib {
+                } else if generate_import_lib {
                     println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
                     // fake a python interpreter
                     Ok(vec![PythonInterpreter {

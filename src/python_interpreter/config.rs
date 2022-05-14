@@ -21,6 +21,10 @@ static WELLKNOWN_SYSCONFIG: Lazy<HashMap<Os, HashMap<Arch, Vec<InterpreterConfig
         let sysconfig_macos = serde_json::from_slice(include_bytes!("sysconfig-macos.json"))
             .expect("invalid sysconfig-macos.json");
         sysconfig.insert(Os::Macos, sysconfig_macos);
+        // Windows
+        let sysconfig_windows = serde_json::from_slice(include_bytes!("sysconfig-windows.json"))
+            .expect("invalid sysconfig-windows.json");
+        sysconfig.insert(Os::Windows, sysconfig_windows);
         // FreeBSD
         let sysconfig_freebsd = serde_json::from_slice(include_bytes!("sysconfig-freebsd.json"))
             .expect("invalid sysconfig-freebsd.json");

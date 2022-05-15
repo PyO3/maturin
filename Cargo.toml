@@ -25,7 +25,7 @@ bytesize = "1.0.1"
 glob = "0.3.0"
 cargo_metadata = "0.14.0"
 cargo-zigbuild = "0.8.7"
-cargo-xwin = "0.8.4"
+cargo-xwin = { version = "0.8.4", optional = true }
 cbindgen = { version = "0.23.0", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.5.1"
@@ -77,7 +77,7 @@ default = ["log", "upload", "rustls", "human-panic"]
 upload = ["ureq", "multipart", "rpassword", "configparser"]
 password-storage = ["upload", "keyring"]
 log = ["pretty_env_logger"]
-rustls = ["ureq/tls"]
+rustls = ["ureq/tls", "cargo-xwin"]
 native-tls = ["ureq/native-tls", "native-tls-crate"]
 # Internal feature to speed up the tests significantly
 faster-tests = []

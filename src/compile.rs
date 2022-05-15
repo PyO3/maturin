@@ -200,15 +200,6 @@ fn compile_target(
         let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
 
         build.target = vec![target_triple.to_string()];
-        // Pass zig command to downstream, eg. python3-dll-a
-        if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
-            let zig_cmd = if zig_args.is_empty() {
-                zig_cmd
-            } else {
-                format!("{} {}", zig_cmd, zig_args.join(" "))
-            };
-            env::set_var("ZIG_COMMAND", zig_cmd);
-        }
         build.build_command("rustc")?
     } else {
         let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
@@ -232,6 +223,18 @@ fn compile_target(
         }
         build.build_command("rustc")?
     };
+
+    if context.zig {
+        // Pass zig command to downstream, eg. python3-dll-a
+        if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
+            let zig_cmd = if zig_args.is_empty() {
+                zig_cmd
+            } else {
+                format!("{} {}", zig_cmd, zig_args.join(" "))
+            };
+            build_command.env("ZIG_COMMAND", zig_cmd);
+        }
+    }
 
     build_command
         .args(&build_args)

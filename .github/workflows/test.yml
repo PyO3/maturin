@@ -121,9 +121,11 @@ jobs:
       - name: test cross compiling windows abi3 wheel
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get install -y mingw-w64
+          sudo apt-get install -y mingw-w64 llvm
           rustup target add x86_64-pc-windows-gnu
+          rustup target add x86_64-pc-windows-msvc
           cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+          cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
       - name: test compiling with PYO3_CONFIG_FILE
         shell: bash
         run: |

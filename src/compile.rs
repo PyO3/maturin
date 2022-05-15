@@ -192,26 +192,43 @@ fn compile_target(
         .chain(&rustc_args)
         .collect();
 
-    let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
     let target_triple = target.target_triple();
-    if !context.zig {
-        build.disable_zig_linker = true;
-        if target.user_specified {
-            build.target = vec![target_triple.to_string()];
+    let mut build_command = if target.is_msvc() && target.cross_compiling() {
+        let mut build = cargo_xwin::Build::new(Some(context.manifest_path.clone()));
+        build.target = vec![target_triple.to_string()];
+        // Pass zig command to downstream, eg. python3-dll-a
+        if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
+            let zig_cmd = if zig_args.is_empty() {
+                zig_cmd
+            } else {
+                format!("{} {}", zig_cmd, zig_args.join(" "))
+            };
+            env::set_var("ZIG_COMMAND", zig_cmd);
         }
+        build.build_command("rustc")?
     } else {
-        let zig_triple = if target.is_linux() {
-            match context.platform_tag {
-                Some(PlatformTag::Manylinux { x, y }) => format!("{}.{}.{}", target_triple, x, y),
-                _ => target_triple.to_string(),
+        let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
+        if !context.zig {
+            build.disable_zig_linker = true;
+            if target.user_specified {
+                build.target = vec![target_triple.to_string()];
             }
         } else {
-            target_triple.to_string()
-        };
-        build.target = vec![zig_triple];
-    }
+            let zig_triple = if target.is_linux() {
+                match context.platform_tag {
+                    Some(PlatformTag::Manylinux { x, y }) => {
+                        format!("{}.{}.{}", target_triple, x, y)
+                    }
+                    _ => target_triple.to_string(),
+                }
+            } else {
+                target_triple.to_string()
+            };
+            build.target = vec![zig_triple];
+        }
+        build.build_command("rustc")?
+    };
 
-    let mut build_command = build.build_command("rustc")?;
     build_command
         .args(&build_args)
         // We need to capture the json messages

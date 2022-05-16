@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.16] - 2022-05-16
+
 * Add Linux armv7l python sysconfig in [#901](https://github.com/PyO3/maturin/pull/901)
 * Add NetBSD python sysconfig in [#903](https://github.com/PyO3/maturin/pull/903)
 * Update 'replace_needed' to reduce total calls to 'patchelf' in [#905](https://github.com/PyO3/maturin/pull/905)
@@ -593,7 +595,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.15...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.16...HEAD
+[0.12.16]: https://github.com/pyo3/maturin/compare/v0.12.15...v0.12.16
 [0.12.15]: https://github.com/pyo3/maturin/compare/v0.12.14...v0.12.15
 [0.12.14]: https://github.com/pyo3/maturin/compare/v0.12.13...v0.12.14
 [0.12.13]: https://github.com/pyo3/maturin/compare/v0.12.12...v0.12.13

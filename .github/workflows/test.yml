@@ -118,14 +118,19 @@ jobs:
           cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
           # Check wheels with twine
           twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
-      - name: test cross compiling windows abi3 wheel
+      - name: test cross compiling windows wheel
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get install -y mingw-w64 llvm
           rustup target add x86_64-pc-windows-gnu
           rustup target add x86_64-pc-windows-msvc
+
+          # abi3
           cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
           cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+
+          # no-abi3
+          cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
       - name: test compiling with PYO3_CONFIG_FILE
         shell: bash
         run: |

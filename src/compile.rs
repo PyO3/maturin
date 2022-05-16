@@ -194,10 +194,7 @@ fn compile_target(
 
     let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
-        #[cfg(feature = "cargo-xwin")]
         let mut build = cargo_xwin::Build::new(Some(context.manifest_path.clone()));
-        #[cfg(not(feature = "cargo-xwin"))]
-        let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
 
         build.target = vec![target_triple.to_string()];
         build.build_command("rustc")?

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Allow setting the publish user name via `MATURIN_USERNAME` in [#915](https://github.com/PyO3/maturin/pull/915)
 * Add Windows python sysconfig in [#917](https://github.com/PyO3/maturin/pull/917)
 * Add support for `generate-import-lib` feature of pyo3 in [#918](https://github.com/PyO3/maturin/pull/918)
+* Integrate [`cargo-xwin`](https://github.com/messense/cargo-xwin) for cross compiling to Windows MSVC targets in [#919](https://github.com/PyO3/maturin/pull/919)
 
 ## [0.12.15] - 2022-05-07
 

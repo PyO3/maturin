@@ -299,3 +299,4 @@ jobs:
             *.zip
             *.deb
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          generate_release_notes: true

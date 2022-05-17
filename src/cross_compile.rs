@@ -23,6 +23,11 @@ pub fn is_cross_compiling(target: &Target) -> Result<bool> {
         return Ok(false);
     }
 
+    if target_triple.starts_with("i686-pc-windows") && host.starts_with("x86_64-pc-windows") {
+        // Not cross-compiling to compile for 32-bit Python from windows 64-bit
+        return Ok(false);
+    }
+
     if let Some(target_without_env) = target_triple
         .rfind('-')
         .map(|index| &target_triple[0..index])

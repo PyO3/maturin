@@ -201,6 +201,7 @@ fn integration_pyo3_ffi_pure() {
         false,
     ));
 }
+
 #[test]
 fn integration_with_data() {
     handle_result(integration::test_integration(

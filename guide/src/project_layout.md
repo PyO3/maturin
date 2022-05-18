@@ -151,10 +151,11 @@ You can add wheel data by creating a `<module_name>.data` folder or setting its 
 
 The data folder may have the following subfolder:
 
- * `data`: The contents of this folder will simply be unpacked into the virtualenv
+ * `data`: The contents of this folder will simply be unpacked into the virtualenv. Use with care and also consider alternatives before using.
  * `scripts`: Treated similar to entry points, files in there are installed as standalone executable
  * `headers`: For `.h` C header files
  * `purelib`: This also exists, but seems to be barely used
  * `platlib`: This also exists, but seems to be barely used
+ * `extra-src`: Custom maturin extension. Similar to data, but files will be unpacked into the site-packages directory in the virtualenv. Use with care and also consider alternatives before using.
 
 If you add a symlink in the data directory, we'll include the actual file so you more flexibility 

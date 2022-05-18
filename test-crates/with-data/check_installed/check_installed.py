@@ -30,4 +30,9 @@ header_file = (
 )
 assert header_file.is_file(), header_file
 
+# noinspection PyUnresolvedReferences
+from sneaky_extra_module import silent_paws
+
+assert silent_paws() == "🐈"
+
 print("SUCCESS")

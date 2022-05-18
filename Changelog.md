@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Don't consider compile to i686 on x86_64 Windows cross compiling in [#923](https://github.com/PyO3/maturin/pull/923)
+* Add custom `extra-src` extension to data
 
 ## [0.12.16] - 2022-05-16
 

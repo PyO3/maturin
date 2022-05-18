@@ -841,7 +841,14 @@ pub fn write_dist_info(
 ///
 /// See https://peps.python.org/pep-0427/#file-contents
 pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<()> {
-    let possible_data_dir_names = ["data", "scripts", "headers", "purelib", "platlib"];
+    let possible_data_dir_names = [
+        "data",
+        "scripts",
+        "headers",
+        "purelib",
+        "platlib",
+        "extra-src",
+    ];
     if let Some(data) = data {
         for subdir in fs::read_dir(data).context("Failed to read data dir")? {
             let subdir = subdir?;
@@ -864,7 +871,11 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
                     .build()
                 {
                     let file = file?;
-                    let relative = file.path().strip_prefix(data.parent().unwrap())?;
+                    let relative = if dir_name.as_str() == "extra-src" {
+                        file.path().strip_prefix(subdir.path())?
+                    } else {
+                        file.path().strip_prefix(data.parent().unwrap())?
+                    };
 
                     if file.path_is_symlink() {
                         // Copy the actual file contents, not the link, so that you can create a

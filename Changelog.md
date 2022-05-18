@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.17] - 2022-05-18
+
 * Don't consider compile to i686 on x86_64 Windows cross compiling in [#923](https://github.com/PyO3/maturin/pull/923)
 * Accept `-i x.y` and `-i python-x.y` in `maturin build` command in [#925](https://github.com/PyO3/maturin/pull/925)
 
@@ -598,7 +600,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.16...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.17...HEAD
+[0.12.17]: https://github.com/pyo3/maturin/compare/v0.12.16...v0.12.17
 [0.12.16]: https://github.com/pyo3/maturin/compare/v0.12.15...v0.12.16
 [0.12.15]: https://github.com/pyo3/maturin/compare/v0.12.14...v0.12.15
 [0.12.14]: https://github.com/pyo3/maturin/compare/v0.12.13...v0.12.14

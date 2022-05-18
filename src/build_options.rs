@@ -660,9 +660,20 @@ fn find_interpreter_in_sysconfig(
             .context("Invalid python interpreter")?
             .to_string_lossy();
         let (python_impl, python_ver) = if let Some(ver) = python.strip_prefix("pypy") {
-            (InterpreterKind::PyPy, ver)
+            (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
         } else if let Some(ver) = python.strip_prefix("python") {
-            (InterpreterKind::CPython, ver)
+            (
+                InterpreterKind::CPython,
+                ver.strip_prefix('-').unwrap_or(ver),
+            )
+        } else if python
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+        {
+            // Eg: -i 3.9 without interpreter kind, assume it's CPython
+            (InterpreterKind::CPython, &*python)
         } else {
             bail!("Unsupported Python interpreter: {}", python);
         };

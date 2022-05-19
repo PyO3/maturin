@@ -367,22 +367,22 @@ impl PythonInterpreter {
     pub fn get_tag(
         &self,
         target: &Target,
-        platform_tag: PlatformTag,
+        platform_tags: &[PlatformTag],
         universal2: bool,
     ) -> Result<String> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
         let use_sysconfig_platform = target.is_windows()
-            || (target.is_linux() && !platform_tag.is_portable())
+            || (target.is_linux() && platform_tags.iter().any(|tag| !tag.is_portable()))
             || target.is_illumos();
         let platform = if use_sysconfig_platform {
             if let Some(platform) = self.platform.clone() {
                 platform
             } else {
-                target.get_platform_tag(platform_tag, universal2)?
+                target.get_platform_tag(platform_tags, universal2)?
             }
         } else {
-            target.get_platform_tag(platform_tag, universal2)?
+            target.get_platform_tag(platform_tags, universal2)?
         };
         let tag = match self.interpreter_kind {
             InterpreterKind::CPython => {

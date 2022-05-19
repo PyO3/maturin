@@ -4,7 +4,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Decides how to handle manylinux and musllinux compliance
-#[derive(Serialize, Debug, Clone, Eq, PartialEq, Copy)]
+#[derive(Serialize, Debug, Clone, Eq, PartialEq, Copy, Ord, PartialOrd)]
 pub enum PlatformTag {
     /// Use the manylinux_x_y tag
     Manylinux {
@@ -60,6 +60,16 @@ impl PlatformTag {
     /// Only manylinux and musllinux are portable
     pub fn is_portable(&self) -> bool {
         !matches!(self, PlatformTag::Linux)
+    }
+
+    /// Is this a manylinux platform tag
+    pub fn is_manylinux(&self) -> bool {
+        matches!(self, PlatformTag::Manylinux { .. })
+    }
+
+    /// Is this a musllinux platform tag
+    pub fn is_musllinux(&self) -> bool {
+        matches!(self, PlatformTag::Musllinux { .. })
     }
 }
 

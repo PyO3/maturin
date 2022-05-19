@@ -61,9 +61,11 @@ pub struct BuildOptions {
         name = "compatibility",
         long = "compatibility",
         alias = "manylinux",
-        parse(try_from_str)
+        parse(try_from_str),
+        multiple_values = true,
+        multiple_occurrences = true
     )]
-    pub platform_tag: Option<PlatformTag>,
+    pub platform_tag: Vec<PlatformTag>,
 
     /// The python versions to build wheels for, given as the names of the
     /// interpreters. Uses autodiscovery if not explicitly set.
@@ -328,35 +330,89 @@ impl BuildOptions {
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
-        let platform_tag = self
-            .platform_tag
-            .or_else(|| {
-                pyproject.and_then(|x| {
+        let platform_tags = if self.platform_tag.is_empty() {
+            let compatibility = pyproject
+                .and_then(|x| {
                     if x.compatibility().is_some() {
                         args_from_pyproject.push("compatibility");
                     }
                     x.compatibility()
                 })
-            })
-            .or(if self.zig {
-                if target.is_musl_target() {
-                    // Zig bundles musl 1.2
-                    Some(PlatformTag::Musllinux { x: 1, y: 2 })
+                .or(if self.zig {
+                    if target.is_musl_target() {
+                        // Zig bundles musl 1.2
+                        Some(PlatformTag::Musllinux { x: 1, y: 2 })
+                    } else {
+                        // With zig we can compile to any glibc version that we want, so we pick the lowest
+                        // one supported by the rust compiler
+                        Some(target.get_minimum_manylinux_tag())
+                    }
                 } else {
-                    // With zig we can compile to any glibc version that we want, so we pick the lowest
-                    // one supported by the rust compiler
-                    Some(target.get_minimum_manylinux_tag())
-                }
+                    // Defaults to musllinux_1_2 for musl target if it's not bin bindings
+                    if target.is_musl_target() && !matches!(bridge, BridgeModel::Bin) {
+                        Some(PlatformTag::Musllinux { x: 1, y: 2 })
+                    } else {
+                        None
+                    }
+                });
+            if let Some(platform_tag) = compatibility {
+                vec![platform_tag]
             } else {
-                // Defaults to musllinux_1_2 for musl target if it's not bin bindings
-                if target.is_musl_target() && !matches!(bridge, BridgeModel::Bin) {
-                    Some(PlatformTag::Musllinux { x: 1, y: 2 })
-                } else {
-                    None
-                }
-            });
-        if platform_tag == Some(PlatformTag::manylinux1()) {
+                Vec::new()
+            }
+        } else {
+            self.platform_tag
+        };
+        if platform_tags
+            .iter()
+            .any(|tag| tag == &PlatformTag::manylinux1())
+        {
             eprintln!("⚠️  Warning: manylinux1 is unsupported by the Rust compiler.");
+        }
+
+        match bridge {
+            BridgeModel::Bin => {
+                // Only support two different kind of platform tags when compiling to musl target
+                if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
+                    bail!(
+                        "Cannot mix musllinux and manylinux platform tags when compiling to {}",
+                        target.target_triple()
+                    );
+                }
+
+                #[allow(clippy::comparison_chain)]
+                if platform_tags.len() > 2 {
+                    bail!(
+                        "Expected only one or two platform tags but found {}",
+                        platform_tags.len()
+                    );
+                } else if platform_tags.len() == 2 {
+                    // The two platform tags can't be the same kind
+                    let tag_types = platform_tags
+                        .iter()
+                        .map(|tag| tag.is_musllinux())
+                        .collect::<HashSet<_>>();
+                    if tag_types.len() == 1 {
+                        bail!(
+                            "Expected only one platform tag but found {}",
+                            platform_tags.len()
+                        );
+                    }
+                }
+            }
+            _ => {
+                if platform_tags.len() > 1 {
+                    bail!(
+                        "Expected only one platform tag but found {}",
+                        platform_tags.len()
+                    );
+                }
+            }
+        }
+
+        // linux tag can not be mixed with manylinux and musllinux tags
+        if platform_tags.len() > 1 && platform_tags.iter().any(|tag| !tag.is_portable()) {
+            bail!("Cannot mix linux and manylinux/musllinux platform tags",);
         }
 
         if !args_from_pyproject.is_empty() {
@@ -387,7 +443,7 @@ impl BuildOptions {
             strip,
             skip_auditwheel,
             zig: self.zig,
-            platform_tag,
+            platform_tag: platform_tags,
             cargo_extra_args,
             rustc_extra_args,
             interpreter,

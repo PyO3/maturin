@@ -29,7 +29,7 @@ pub fn develop(
     let wheel_dir = TempDir::new().context("Failed to create temporary directory")?;
 
     let build_options = BuildOptions {
-        platform_tag: Some(PlatformTag::Linux),
+        platform_tag: vec![PlatformTag::Linux],
         interpreter: vec![python.clone()],
         bindings,
         manifest_path: Some(manifest_file.to_path_buf()),

@@ -14,6 +14,7 @@ use lddtree::Library;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -47,6 +48,17 @@ impl BridgeModel {
         match self {
             BridgeModel::Bindings(value, _) => value == name,
             _ => false,
+        }
+    }
+}
+
+impl Display for BridgeModel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BridgeModel::Cffi => write!(f, "cffi"),
+            BridgeModel::Bin => write!(f, "bin"),
+            BridgeModel::Bindings(name, _) => write!(f, "{}", name),
+            BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
         }
     }
 }
@@ -171,7 +183,7 @@ pub struct BuildContext {
     /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
     pub zig: bool,
     /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
-    pub platform_tag: Option<PlatformTag>,
+    pub platform_tag: Vec<PlatformTag>,
     /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
     pub cargo_extra_args: Vec<String>,
     /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
@@ -264,13 +276,31 @@ impl BuildContext {
     fn auditwheel(
         &self,
         artifact: &Path,
-        platform_tag: Option<PlatformTag>,
+        platform_tag: &[PlatformTag],
     ) -> Result<(Policy, Vec<Library>)> {
         if self.skip_auditwheel || self.editable {
             return Ok((Policy::default(), Vec::new()));
         }
 
-        get_policy_and_libs(artifact, platform_tag, &self.target)
+        let mut musllinux: Vec<_> = platform_tag
+            .iter()
+            .filter(|tag| tag.is_musllinux())
+            .copied()
+            .collect();
+        musllinux.sort();
+        let mut others: Vec<_> = platform_tag
+            .iter()
+            .filter(|tag| !tag.is_musllinux())
+            .copied()
+            .collect();
+        others.sort();
+
+        if matches!(self.bridge, BridgeModel::Bin) && !musllinux.is_empty() {
+            return get_policy_and_libs(artifact, Some(musllinux[0]), &self.target);
+        }
+
+        let tag = others.get(0).or_else(|| musllinux.get(0)).copied();
+        get_policy_and_libs(artifact, tag, &self.target)
     }
 
     fn add_external_libs(
@@ -378,14 +408,14 @@ impl BuildContext {
     fn write_binding_wheel_abi3(
         &self,
         artifact: &Path,
-        platform_tag: PlatformTag,
+        platform_tags: &[PlatformTag],
         ext_libs: &[Library],
         major: u8,
         min_minor: u8,
     ) -> Result<BuiltWheelMetadata> {
         let platform = self
             .target
-            .get_platform_tag(platform_tag, self.universal2)?;
+            .get_platform_tag(platform_tags, self.universal2)?;
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
@@ -424,10 +454,15 @@ impl BuildContext {
             python_interpreter,
             Some(&self.project_layout.extension_name),
         )?;
-        let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+        let platform_tags = if self.platform_tag.is_empty() {
+            vec![policy.platform_tag()]
+        } else {
+            self.platform_tag.clone()
+        };
         let (wheel_path, tag) = self.write_binding_wheel_abi3(
             &artifact,
-            policy.platform_tag(),
+            &platform_tags,
             &external_libs,
             major,
             min_minor,
@@ -448,10 +483,10 @@ impl BuildContext {
         &self,
         python_interpreter: &PythonInterpreter,
         artifact: &Path,
-        platform_tag: PlatformTag,
+        platform_tags: &[PlatformTag],
         ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
-        let tag = python_interpreter.get_tag(&self.target, platform_tag, self.universal2)?;
+        let tag = python_interpreter.get_tag(&self.target, platform_tags, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
         self.add_external_libs(&mut writer, artifact, ext_libs)?;
@@ -493,11 +528,16 @@ impl BuildContext {
                 Some(python_interpreter),
                 Some(&self.project_layout.extension_name),
             )?;
-            let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
+            let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+            let platform_tags = if self.platform_tag.is_empty() {
+                vec![policy.platform_tag()]
+            } else {
+                self.platform_tag.clone()
+            };
             let (wheel_path, tag) = self.write_binding_wheel(
                 python_interpreter,
                 &artifact,
-                policy.platform_tag(),
+                &platform_tags,
                 &external_libs,
             )?;
             println!(
@@ -553,12 +593,12 @@ impl BuildContext {
     fn write_cffi_wheel(
         &self,
         artifact: &Path,
-        platform_tag: PlatformTag,
+        platform_tags: &[PlatformTag],
         ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self
             .target
-            .get_universal_tags(platform_tag, self.universal2)?;
+            .get_universal_tags(platform_tags, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
         self.add_external_libs(&mut writer, artifact, ext_libs)?;
@@ -584,9 +624,13 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
-        let (wheel_path, tag) =
-            self.write_cffi_wheel(&artifact, policy.platform_tag(), &external_libs)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+        let platform_tags = if self.platform_tag.is_empty() {
+            vec![policy.platform_tag()]
+        } else {
+            self.platform_tag.clone()
+        };
+        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &platform_tags, &external_libs)?;
 
         // Warn if cffi isn't specified in the requirements
         if !self
@@ -610,12 +654,12 @@ impl BuildContext {
     fn write_bin_wheel(
         &self,
         artifact: &Path,
-        platform_tag: PlatformTag,
+        platform_tags: &[PlatformTag],
         ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self
             .target
-            .get_universal_tags(platform_tag, self.universal2)?;
+            .get_universal_tags(platform_tags, self.universal2)?;
 
         if !self.metadata21.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
@@ -658,10 +702,14 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let (policy, external_libs) = self.auditwheel(&artifact, self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+        let platform_tags = if self.platform_tag.is_empty() {
+            vec![policy.platform_tag()]
+        } else {
+            self.platform_tag.clone()
+        };
 
-        let (wheel_path, tag) =
-            self.write_bin_wheel(&artifact, policy.platform_tag(), &external_libs)?;
+        let (wheel_path, tag) = self.write_bin_wheel(&artifact, &platform_tags, &external_libs)?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 

@@ -86,10 +86,7 @@ jobs:
       - name: Build wheel (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          # manylinux
-          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage"
-          # musllinux
-          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage" --no-sdist --compatibility musllinux_1_1
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage" --no-sdist --compatibility manylinux2010 musllinux_1_1
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
@@ -184,7 +181,7 @@ jobs:
           # musllinux
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
-            --compatibility musllinux_1_1 \
+            --compatibility  musllinux_1_1 \
             --cargo-extra-args="--features password-storage"
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin

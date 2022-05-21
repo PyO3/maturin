@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add support for building bin bindings wheels with multiple platform tags in [#928](https://github.com/PyO3/maturin/pull/928)
 * Skip auditwheel for non-compliant linux environment automatically in [#931](https://github.com/PyO3/maturin/pull/931)
+* Fix abi3 wheel build issue when no Python interpreters found on host in [#933](https://github.com/PyO3/maturin/pull/933)
 
 ## [0.12.17] - 2022-05-18
 

@@ -949,7 +949,26 @@ pub fn find_interpreter(
                 }
             } else {
                 println!("🐍 Not using a specific python interpreter");
-                Ok(interpreter)
+                if interpreter.is_empty() {
+                    // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
+                    // The python interpreter config doesn't matter, as it's not used for anything
+                    Ok(vec![PythonInterpreter {
+                        config: InterpreterConfig {
+                            major: *major as usize,
+                            minor: *minor as usize,
+                            interpreter_kind: InterpreterKind::CPython,
+                            abiflags: "".to_string(),
+                            ext_suffix: "".to_string(),
+                            abi_tag: None,
+                            pointer_width: None,
+                        },
+                        executable: PathBuf::new(),
+                        platform: None,
+                        runnable: false,
+                    }])
+                } else {
+                    Ok(interpreter)
+                }
             }
         }
     }

@@ -277,9 +277,23 @@ impl BuildContext {
         &self,
         artifact: &Path,
         platform_tag: &[PlatformTag],
+        python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<(Policy, Vec<Library>)> {
         if self.skip_auditwheel || self.editable {
             return Ok((Policy::default(), Vec::new()));
+        }
+
+        if let Some(python_interpreter) = python_interpreter {
+            if platform_tag.is_empty()
+                && self.target.is_linux()
+                && !python_interpreter.support_portable_wheels()
+            {
+                println!(
+                    "🐍 Skipping auditwheel because {} does not support manylinux/musllinux wheels",
+                    python_interpreter
+                );
+                return Ok((Policy::default(), Vec::new()));
+            }
         }
 
         let mut musllinux: Vec<_> = platform_tag
@@ -454,7 +468,8 @@ impl BuildContext {
             python_interpreter,
             Some(&self.project_layout.extension_name),
         )?;
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+        let (policy, external_libs) =
+            self.auditwheel(&artifact, &self.platform_tag, python_interpreter)?;
         let platform_tags = if self.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {
@@ -528,7 +543,8 @@ impl BuildContext {
                 Some(python_interpreter),
                 Some(&self.project_layout.extension_name),
             )?;
-            let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+            let (policy, external_libs) =
+                self.auditwheel(&artifact, &self.platform_tag, Some(python_interpreter))?;
             let platform_tags = if self.platform_tag.is_empty() {
                 vec![policy.platform_tag()]
             } else {
@@ -624,7 +640,7 @@ impl BuildContext {
     pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
         let platform_tags = if self.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {
@@ -702,7 +718,7 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
         let platform_tags = if self.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {

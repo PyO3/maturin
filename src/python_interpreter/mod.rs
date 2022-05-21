@@ -661,6 +661,36 @@ impl PythonInterpreter {
             Ok(ok) => Ok(String::from_utf8(ok.stdout)?),
         }
     }
+
+    /// Whether this Python interpreter support portable manylinux/musllinux wheels
+    ///
+    /// Returns `true` if we can not decide
+    pub fn support_portable_wheels(&self) -> bool {
+        if !self.runnable {
+            return true;
+        }
+        let out = Command::new(&self.executable)
+            .args(&[
+                "-m",
+                "pip",
+                "debug",
+                "--verbose",
+                "--disable-pip-version-check",
+            ])
+            .output();
+
+        match out {
+            Err(_) => true,
+            Ok(ok) if !ok.status.success() => true,
+            Ok(ok) => {
+                if let Ok(stdout) = String::from_utf8(ok.stdout) {
+                    stdout.contains("manylinux") || stdout.contains("musllinux")
+                } else {
+                    true
+                }
+            }
+        }
+    }
 }
 
 impl fmt::Display for PythonInterpreter {

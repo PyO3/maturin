@@ -206,8 +206,8 @@ fn compile_target(
                 build.target = vec![target_triple.to_string()];
             }
         } else {
-            let zig_triple = if target.is_linux() {
-                match context.platform_tag {
+            let zig_triple = if target.is_linux() && !target.is_musl_target() {
+                match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
                     Some(PlatformTag::Manylinux { x, y }) => {
                         format!("{}.{}.{}", target_triple, x, y)
                     }

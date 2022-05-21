@@ -176,7 +176,11 @@ impl Target {
     }
 
     /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(&self, platform_tag: PlatformTag, universal2: bool) -> Result<String> {
+    pub fn get_platform_tag(
+        &self,
+        platform_tags: &[PlatformTag],
+        universal2: bool,
+    ) -> Result<String> {
         let tag = match (&self.os, &self.arch) {
             // FreeBSD
             (Os::FreeBsd, Arch::X86_64)
@@ -254,9 +258,14 @@ impl Target {
                         .map(|info| info.machine().into_owned())
                         .unwrap_or_else(|_| self.arch.to_string())
                 };
-                let mut tags = vec![format!("{}_{}", platform_tag, arch)];
-                for alias in platform_tag.aliases() {
-                    tags.push(format!("{}_{}", alias, arch));
+                let mut platform_tags = platform_tags.to_vec();
+                platform_tags.sort();
+                let mut tags = vec![];
+                for platform_tag in platform_tags {
+                    tags.push(format!("{}_{}", platform_tag, arch));
+                    for alias in platform_tag.aliases() {
+                        tags.push(format!("{}_{}", alias, arch));
+                    }
                 }
                 tags.join(".")
             }
@@ -434,10 +443,14 @@ impl Target {
     }
 
     /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(&self, platform_tag: PlatformTag, universal2: bool) -> Result<Vec<String>> {
+    pub fn get_py3_tags(
+        &self,
+        platform_tags: &[PlatformTag],
+        universal2: bool,
+    ) -> Result<Vec<String>> {
         let tags = vec![format!(
             "py3-none-{}",
-            self.get_platform_tag(platform_tag, universal2)?
+            self.get_platform_tag(platform_tags, universal2)?
         )];
         Ok(tags)
     }
@@ -507,14 +520,14 @@ impl Target {
     /// Returns the tags for the platform without python version
     pub fn get_universal_tags(
         &self,
-        platform_tag: PlatformTag,
+        platform_tags: &[PlatformTag],
         universal2: bool,
     ) -> Result<(String, Vec<String>)> {
         let tag = format!(
             "py3-none-{platform}",
-            platform = self.get_platform_tag(platform_tag, universal2)?
+            platform = self.get_platform_tag(platform_tags, universal2)?
         );
-        let tags = self.get_py3_tags(platform_tag, universal2)?;
+        let tags = self.get_py3_tags(platform_tags, universal2)?;
         Ok((tag, tags))
     }
 }

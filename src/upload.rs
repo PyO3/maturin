@@ -317,15 +317,31 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 
     let encoded = base64::encode(&format!("{}:{}", registry.username, registry.password));
 
+    let http_proxy = env::var("HTTPS_PROXY")
+        .or_else(|_| env::var("https_proxy"))
+        .or_else(|_| env::var("HTTP_PROXY"))
+        .or_else(|_| env::var("http_proxy"));
+
     #[cfg(not(feature = "native-tls"))]
-    let agent = ureq::agent();
+    let agent = {
+        let mut builder = ureq::builder();
+        if let Ok(proxy) = http_proxy {
+            let proxy = ureq::Proxy::new(proxy)?;
+            builder = builder.proxy(proxy);
+        };
+        builder.build()
+    };
 
     #[cfg(feature = "native-tls")]
     let agent = {
         use std::sync::Arc;
-        ureq::builder()
-            .tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?))
-            .build()
+        let mut builder =
+            ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
+        if let Ok(proxy) = http_proxy {
+            let proxy = ureq::Proxy::new(proxy)?;
+            builder = builder.proxy(proxy);
+        };
+        builder.build()
     };
 
     let response = agent

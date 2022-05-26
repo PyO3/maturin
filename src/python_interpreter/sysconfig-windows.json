@@ -92,5 +92,16 @@
       "abi_tag": null,
       "pointer_width": 32
     }
+  ],
+  "aarch64": [
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cp311-win_arm64.pyd",
+      "abi_tag": null,
+      "pointer_width": 64
+    }
   ]
 }

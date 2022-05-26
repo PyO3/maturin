@@ -47,6 +47,15 @@
     },
     {
       "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-darwin.so",
+      "abi_tag": "311",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
       "minor": 7,
       "abiflags": "",
       "interpreter": "pypy",
@@ -117,6 +126,15 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-310-darwin.so",
       "abi_tag": "310",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-darwin.so",
+      "abi_tag": "311",
       "pointer_width": 64
     }
   ]

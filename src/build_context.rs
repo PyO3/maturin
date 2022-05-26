@@ -24,7 +24,9 @@ pub enum BridgeModel {
     /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
     Cffi,
     /// A rust binary to be shipped a python package
-    Bin,
+    /// The String is the name of the bindings
+    /// providing crate, e.g. pyo3, the number is the minimum minor python version
+    Bin(Option<(String, usize)>),
     /// A native module with pyo3 or rust-cpython bindings. The String is the name of the bindings
     /// providing crate, e.g. pyo3, the number is the minimum minor python version
     Bindings(String, usize),
@@ -46,9 +48,15 @@ impl BridgeModel {
     /// Test whether this is using a specific bindings crate
     pub fn is_bindings(&self, name: &str) -> bool {
         match self {
+            BridgeModel::Bin(Some((value, _))) => value == name,
             BridgeModel::Bindings(value, _) => value == name,
             _ => false,
         }
+    }
+
+    /// Test whether this is bin bindings
+    pub fn is_bin(&self) -> bool {
+        matches!(self, BridgeModel::Bin(_))
     }
 }
 
@@ -56,7 +64,8 @@ impl Display for BridgeModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BridgeModel::Cffi => write!(f, "cffi"),
-            BridgeModel::Bin => write!(f, "bin"),
+            BridgeModel::Bin(Some((name, _))) => write!(f, "{} bin", name),
+            BridgeModel::Bin(None) => write!(f, "bin"),
             BridgeModel::Bindings(name, _) => write!(f, "{}", name),
             BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
         }
@@ -213,7 +222,8 @@ impl BuildContext {
 
         let wheels = match &self.bridge {
             BridgeModel::Cffi => self.build_cffi_wheel()?,
-            BridgeModel::Bin => self.build_bin_wheel()?,
+            BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
+            BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
             BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
             BridgeModel::BindingsAbi3(major, minor) => {
                 let cpythons: Vec<_> = self
@@ -309,7 +319,7 @@ impl BuildContext {
             .collect();
         others.sort();
 
-        if matches!(self.bridge, BridgeModel::Bin) && !musllinux.is_empty() {
+        if self.bridge.is_bin() && !musllinux.is_empty() {
             return get_policy_and_libs(artifact, Some(musllinux[0]), &self.target);
         }
 
@@ -669,13 +679,22 @@ impl BuildContext {
 
     fn write_bin_wheel(
         &self,
+        python_interpreter: Option<&PythonInterpreter>,
         artifact: &Path,
         platform_tags: &[PlatformTag],
         ext_libs: &[Library],
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self
-            .target
-            .get_universal_tags(platform_tags, self.universal2)?;
+        let (tag, tags) = match (&self.bridge, python_interpreter) {
+            (BridgeModel::Bin(None), _) => self
+                .target
+                .get_universal_tags(platform_tags, self.universal2)?,
+            (BridgeModel::Bin(Some(..)), Some(python_interpreter)) => {
+                let tag =
+                    python_interpreter.get_tag(&self.target, platform_tags, self.universal2)?;
+                (tag.clone(), vec![tag])
+            }
+            _ => unreachable!(),
+        };
 
         if !self.metadata21.scripts.is_empty() {
             bail!("Defining entrypoints and working with a binary doesn't mix well");
@@ -708,9 +727,12 @@ impl BuildContext {
     /// Builds a wheel that contains a binary
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_bin_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub fn build_bin_wheel(
+        &self,
+        python_interpreter: Option<&PythonInterpreter>,
+    ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifacts = compile(self, None, &self.bridge)
+        let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts
@@ -725,10 +747,29 @@ impl BuildContext {
             self.platform_tag.clone()
         };
 
-        let (wheel_path, tag) = self.write_bin_wheel(&artifact, &platform_tags, &external_libs)?;
+        let (wheel_path, tag) = self.write_bin_wheel(
+            python_interpreter,
+            &artifact,
+            &platform_tags,
+            &external_libs,
+        )?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
+        Ok(wheels)
+    }
+
+    /// Builds a wheel that contains a binary
+    ///
+    /// Runs [auditwheel_rs()] if not deactivated
+    pub fn build_bin_wheels(
+        &self,
+        interpreters: &[PythonInterpreter],
+    ) -> Result<Vec<BuiltWheelMetadata>> {
+        let mut wheels = Vec::new();
+        for python_interpreter in interpreters {
+            wheels.extend(self.build_bin_wheel(Some(python_interpreter))?);
+        }
         Ok(wheels)
     }
 }

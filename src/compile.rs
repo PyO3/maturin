@@ -36,9 +36,10 @@ fn compile_universal2(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
 ) -> Result<HashMap<String, PathBuf>> {
-    let build_type = match bindings_crate {
-        BridgeModel::Bin => "bin",
-        _ => "cdylib",
+    let build_type = if bindings_crate.is_bin() {
+        "bin"
+    } else {
+        "cdylib"
     };
     let mut aarch64_context = context.clone();
     aarch64_context.cargo_extra_args.extend(vec![
@@ -137,7 +138,7 @@ fn compile_target(
     // We need to pass --bins / --lib to set the rustc extra args later
     // TODO: What do we do when there are multiple bin targets?
     match bindings_crate {
-        BridgeModel::Bin => shared_args.push("--bins"),
+        BridgeModel::Bin(..) => shared_args.push("--bins"),
         BridgeModel::Cffi | BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) => {
             shared_args.push("--lib");
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250

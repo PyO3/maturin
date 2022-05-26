@@ -113,6 +113,16 @@ fn editable_pyo3_ffi_pure() {
 }
 
 #[test]
+fn integration_pyo3_bin() {
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-bin",
+        None,
+        "integration_pyo3_bin",
+        false,
+    ));
+}
+
+#[test]
 fn integration_pyo3_pure() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-pure",

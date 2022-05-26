@@ -47,6 +47,15 @@
     },
     {
       "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-x86_64-linux-gnu.so",
+      "abi_tag": "311",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
       "minor": 7,
       "abiflags": "",
       "interpreter": "pypy",
@@ -117,6 +126,15 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-310-i386-linux-gnu.so",
       "abi_tag": "310",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-i386-linux-gnu.so",
+      "abi_tag": "311",
       "pointer_width": 32
     },
     {
@@ -195,6 +213,15 @@
     },
     {
       "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-aarch64-linux-gnu.so",
+      "abi_tag": "311",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
       "minor": 7,
       "abiflags": "",
       "interpreter": "pypy",
@@ -266,6 +293,15 @@
       "ext_suffix": ".cpython-310-powerpc64le-linux-gnu.so",
       "abi_tag": "310",
       "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-powerpc64le-linux-gnu.so",
+      "abi_tag": "311",
+      "pointer_width": 64
     }
   ],
   "s390x": [
@@ -313,6 +349,15 @@
       "ext_suffix": ".cpython-310-s390x-linux-gnu.so",
       "abi_tag": "310",
       "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-s390x-linux-gnu.so",
+      "abi_tag": "311",
+      "pointer_width": 64
     }
   ],
   "armv7l": [
@@ -359,6 +404,15 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-310-arm-linux-gnueabihf.so",
       "abi_tag": "310",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-arm-linux-gnueabihf.so",
+      "abi_tag": "311",
       "pointer_width": 32
     },
     {

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add Python 3.11 sysconfigs for Linux, macOS and Windows in [#934](https://github.com/PyO3/maturin/pull/934)
 * Add Python 3.11 sysconfig for arm64 Windows in [#936](https://github.com/PyO3/maturin/pull/936)
 * Add network proxy support to upload command in [#939](https://github.com/PyO3/maturin/pull/939)
+* Fix python interpreter detection on arm64 Windows in [#940](https://github.com/PyO3/maturin/pull/940)
 
 ## [0.12.17] - 2022-05-18
 

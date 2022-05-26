@@ -98,27 +98,29 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     // which is used to find the installed interpreters
     let execution = Command::new("py").arg("-0").output();
     if let Ok(output) = execution {
-        let expr = Regex::new(r" -(\d).(\d+)-(\d+)(?: .*)?").unwrap();
+        // x86_64: ' -3.10-64 *'
+        // arm64:  ' -V:3.11-arm64 * Python 3.11 (ARM64)
+        let expr = Regex::new(r" -(V:)?(\d).(\d+)-(arm)?(\d+)(?: .*)?").unwrap();
         let lines = str::from_utf8(&output.stdout).unwrap().lines();
         for line in lines {
             if let Some(capture) = expr.captures(line) {
                 let context = "Expected a digit";
 
                 let major = capture
-                    .get(1)
+                    .get(2)
                     .unwrap()
                     .as_str()
                     .parse::<usize>()
                     .context(context)?;
                 let minor = capture
-                    .get(2)
+                    .get(3)
                     .unwrap()
                     .as_str()
                     .parse::<usize>()
                     .context(context)?;
                 if !versions_found.contains(&(major, minor)) {
                     let pointer_width = capture
-                        .get(3)
+                        .get(5)
                         .unwrap()
                         .as_str()
                         .parse::<usize>()

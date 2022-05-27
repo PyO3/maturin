@@ -20,6 +20,7 @@ else:
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
 
 metadata = {
+    "executable": sys.executable or None,
     "major": sys.version_info.major,
     "minor": sys.version_info.minor,
     "abiflags": sysconfig.get_config_var("ABIFLAGS"),

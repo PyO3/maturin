@@ -226,6 +226,15 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
             }
         }
     }
+
+    // Fallback to pythonX.Y for Microsoft Store versions
+    for minor in min_python_minor..MAXIMUM_PYTHON_MINOR {
+        if !versions_found.contains(&(3, minor)) {
+            interpreter.push(format!("python3.{}", minor));
+            versions_found.insert((3, minor));
+        }
+    }
+
     if interpreter.is_empty() {
         bail!(
             "Could not find any interpreters, are you sure you have python installed on your PATH?"
@@ -501,8 +510,11 @@ impl PythonInterpreter {
                             let output = Command::new("py")
                                 .arg(format!("-{}", ver))
                                 .args(&["-c", GET_INTERPRETER_METADATA])
-                                .output()?;
-                            output
+                                .output();
+                            match output {
+                                Ok(output) if output.status.success() => output,
+                                _ => return Ok(None),
+                            }
                         } else {
                             return Ok(None);
                         }

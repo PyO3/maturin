@@ -265,6 +265,7 @@ impl FromStr for InterpreterKind {
 /// The output format of [GET_INTERPRETER_METADATA]
 #[derive(Deserialize)]
 struct IntepreterMetadataMessage {
+    executable: Option<String>,
     major: usize,
     minor: usize,
     abiflags: Option<String>,
@@ -488,6 +489,25 @@ impl PythonInterpreter {
             }
             Err(err) => {
                 if err.kind() == io::ErrorKind::NotFound {
+                    #[cfg(windows)]
+                    {
+                        if let Some(python) = executable.as_ref().to_str() {
+                            let ver = if python.starts_with("python") {
+                                python.strip_prefix("python").unwrap_or(python)
+                            } else {
+                                python
+                            };
+                            // Try py -x.y on Windows
+                            let output = Command::new("py")
+                                .arg(format!("-{}", ver))
+                                .args(&["-c", GET_INTERPRETER_METADATA])
+                                .output()?;
+                            output
+                        } else {
+                            return Ok(None);
+                        }
+                    }
+                    #[cfg(not(windows))]
                     return Ok(None);
                 } else {
                     return Err(err).context(err_msg);
@@ -540,7 +560,10 @@ impl PythonInterpreter {
                 abi_tag: message.abi_tag,
                 pointer_width: None,
             },
-            executable: executable.as_ref().to_path_buf(),
+            executable: message
+                .executable
+                .map(PathBuf::from)
+                .unwrap_or_else(|| executable.as_ref().to_path_buf()),
             platform,
             runnable: true,
         }))

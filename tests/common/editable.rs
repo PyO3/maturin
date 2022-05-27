@@ -1,6 +1,4 @@
-use crate::common::{
-    adjust_canonicalization, check_installed, create_virtualenv, maybe_mock_cargo,
-};
+use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo};
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use maturin::BuildOptions;
@@ -59,10 +57,10 @@ pub fn test_editable(
             "--no-cache-dir",
             "install",
             "--force-reinstall",
-            &adjust_canonicalization(filename),
         ];
         let output = Command::new(&python)
             .args(&command)
+            .arg(dunce::simplified(filename))
             .output()
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {

@@ -79,10 +79,10 @@ pub fn develop(
             "--disable-pip-version-check",
             "install",
             "--force-reinstall",
-            &adjust_canonicalization(filename),
         ];
         let output = Command::new(&python)
             .args(&command)
+            .arg(dunce::simplified(filename))
             .output()
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
@@ -109,23 +109,4 @@ pub fn develop(
     }
 
     Ok(())
-}
-
-// Y U NO accept windows path prefix, pip?
-// Anyways, here's shepmasters stack overflow solution
-// https://stackoverflow.com/a/50323079/3549270
-#[cfg(target_family = "unix")]
-fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
-    p.as_ref().display().to_string()
-}
-
-#[cfg(target_os = "windows")]
-fn adjust_canonicalization(p: impl AsRef<Path>) -> String {
-    const VERBATIM_PREFIX: &str = r#"\\?\"#;
-    let p = p.as_ref().display().to_string();
-    if p.starts_with(VERBATIM_PREFIX) {
-        p[VERBATIM_PREFIX.len()..].to_string()
-    } else {
-        p
-    }
 }

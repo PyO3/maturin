@@ -1,6 +1,4 @@
-use crate::common::{
-    adjust_canonicalization, check_installed, create_virtualenv, maybe_mock_cargo,
-};
+use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo};
 use anyhow::{bail, Context, Result};
 use cargo_zigbuild::Zig;
 use clap::Parser;
@@ -99,10 +97,10 @@ pub fn test_integration(
             "--no-cache-dir",
             "install",
             "--force-reinstall",
-            &adjust_canonicalization(filename),
         ];
         let output = Command::new(&python)
             .args(&command)
+            .arg(dunce::simplified(filename))
             .output()
             .context(format!("pip install failed with {:?}", python))?;
         if !output.status.success() {
@@ -210,8 +208,8 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
                 "--disable-pip-version-check",
                 "install",
                 "--force-reinstall",
-                &adjust_canonicalization(wheel_file),
             ])
+            .arg(dunce::simplified(&wheel_file))
             .stderr(Stdio::inherit())
             .output()?;
         if !output.status.success() {

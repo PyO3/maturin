@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add network proxy support to upload command in [#939](https://github.com/PyO3/maturin/pull/939)
 * Fix python interpreter detection on arm64 Windows in [#940](https://github.com/PyO3/maturin/pull/940)
 * Fallback to `py -X.Y` when `pythonX.Y` cannot be found on Windows in [#943](https://github.com/PyO3/maturin/pull/943)
+* Auto-detect Python Installs from Microsoft Store in [#944](https://github.com/PyO3/maturin/pull/944)
 
 ## [0.12.17] - 2022-05-18
 

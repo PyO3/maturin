@@ -264,7 +264,7 @@ impl BuildOptions {
             }),
         )?;
 
-        if bridge != BridgeModel::Bin && module_name.contains('-') {
+        if !bridge.is_bin() && module_name.contains('-') {
             bail!(
                 "The module name must not contains a minus \
                  (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
@@ -349,7 +349,7 @@ impl BuildOptions {
                     }
                 } else {
                     // Defaults to musllinux_1_2 for musl target if it's not bin bindings
-                    if target.is_musl_target() && !matches!(bridge, BridgeModel::Bin) {
+                    if target.is_musl_target() && !bridge.is_bin() {
                         Some(PlatformTag::Musllinux { x: 1, y: 2 })
                     } else {
                         None
@@ -371,8 +371,8 @@ impl BuildOptions {
         }
 
         match bridge {
-            BridgeModel::Bin => {
-                // Only support two different kind of platform tags when compiling to musl target
+            BridgeModel::Bin(None) => {
+                // Only support two different kind of platform tags when compiling to musl target without any binding crates
                 if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
                     bail!(
                         "Cannot mix musllinux and manylinux platform tags when compiling to {}",
@@ -550,6 +550,28 @@ fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
     Ok(false)
 }
 
+/// Tries to determine the bindings type from dependency
+fn find_bindings(
+    deps: &HashMap<&str, &Node>,
+    packages: &HashMap<&str, &cargo_metadata::Package>,
+) -> Option<(String, usize)> {
+    if deps.get("pyo3").is_some() {
+        let ver = &packages["pyo3"].version;
+        let minor =
+            pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
+        Some(("pyo3".to_string(), minor))
+    } else if deps.get("pyo3-ffi").is_some() {
+        let ver = &packages["pyo3-ffi"].version;
+        let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
+            .unwrap_or(MINIMUM_PYTHON_MINOR);
+        Some(("pyo3-ffi".to_string(), minor))
+    } else if deps.contains_key("cpython") {
+        Some(("rust-cpython".to_string(), MINIMUM_PYTHON_MINOR))
+    } else {
+        None
+    }
+}
+
 /// Tries to determine the [BridgeModel] for the target crate
 pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
     let resolve = cargo_metadata
@@ -574,13 +596,21 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             }
         })
         .collect();
+    let root_package = cargo_metadata
+        .root_package()
+        .context("Expected cargo to return metadata with root_package")?;
+    let targets: Vec<_> = root_package
+        .targets
+        .iter()
+        .flat_map(|target| target.crate_types.iter())
+        .map(String::as_str)
+        .collect();
 
     let bridge = if let Some(bindings) = bridge {
         if bindings == "cffi" {
             BridgeModel::Cffi
         } else if bindings == "bin" {
-            println!("🔗 Found bin bindings");
-            BridgeModel::Bin
+            BridgeModel::Bin(find_bindings(&deps, &packages))
         } else {
             if !deps.contains_key(bindings) {
                 bail!(
@@ -591,41 +621,26 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             BridgeModel::Bindings(bindings.to_string(), MINIMUM_PYTHON_MINOR)
         }
-    } else if deps.get("pyo3").is_some() {
-        let ver = &packages["pyo3"].version;
-        let minor =
-            pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
-        BridgeModel::Bindings("pyo3".to_string(), minor)
-    } else if deps.get("pyo3-ffi").is_some() {
-        let ver = &packages["pyo3-ffi"].version;
-        let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
-            .unwrap_or(MINIMUM_PYTHON_MINOR);
-        BridgeModel::Bindings("pyo3-ffi".to_string(), minor)
-    } else if deps.contains_key("cpython") {
-        println!("🔗 Found rust-cpython bindings");
-        BridgeModel::Bindings("rust_cpython".to_string(), MINIMUM_PYTHON_MINOR)
-    } else {
-        let package = cargo_metadata
-            .root_package()
-            .context("Expected cargo to return metadata with root_package")?;
-        let targets: Vec<_> = package
-            .targets
-            .iter()
-            .flat_map(|target| target.crate_types.iter())
-            .map(String::as_str)
-            .collect();
-
-        if targets.contains(&"cdylib") {
-            BridgeModel::Cffi
-        } else if targets.contains(&"bin") {
-            BridgeModel::Bin
+    } else if let Some((bindings, minor)) = find_bindings(&deps, &packages) {
+        if !targets.contains(&"cdylib") && targets.contains(&"bin") {
+            BridgeModel::Bin(Some((bindings, minor)))
         } else {
-            bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")
+            BridgeModel::Bindings(bindings, minor)
         }
+    } else if targets.contains(&"cdylib") {
+        BridgeModel::Cffi
+    } else if targets.contains(&"bin") {
+        BridgeModel::Bin(find_bindings(&deps, &packages))
+    } else {
+        bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")
     };
 
+    if !(bridge.is_bindings("pyo3") || bridge.is_bindings("pyo3-ffi")) {
+        println!("🔗 Found {} bindings", bridge);
+    }
+
     for &lib in PYO3_BINDING_CRATES.iter() {
-        if bridge.is_bindings(lib) {
+        if !bridge.is_bin() && bridge.is_bindings(lib) {
             let pyo3_node = deps[lib];
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
                 let version = cargo_metadata[&pyo3_node.id].version.to_string();
@@ -771,7 +786,7 @@ pub fn find_interpreter(
     generate_import_lib: bool,
 ) -> Result<Vec<PythonInterpreter>> {
     match bridge {
-        BridgeModel::Bindings(binding_name, _) => {
+        BridgeModel::Bindings(binding_name, _) | BridgeModel::Bin(Some((binding_name, _))) => {
             let mut native_interpreters = false;
             let mut interpreters = Vec::new();
             if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
@@ -893,7 +908,7 @@ pub fn find_interpreter(
             println!("🐍 Using {} to generate the cffi bindings", interpreter);
             Ok(vec![interpreter])
         }
-        BridgeModel::Bin => Ok(vec![]),
+        BridgeModel::Bin(None) => Ok(vec![]),
         BridgeModel::BindingsAbi3(major, minor) => {
             let interpreter = if !interpreter.is_empty() {
                 PythonInterpreter::check_executables(interpreter, target, bridge)
@@ -1125,12 +1140,28 @@ mod test {
 
         assert_eq!(
             find_bridge(&hello_world, Some("bin")).unwrap(),
-            BridgeModel::Bin
+            BridgeModel::Bin(None)
         );
-        assert_eq!(find_bridge(&hello_world, None).unwrap(), BridgeModel::Bin);
+        assert_eq!(
+            find_bridge(&hello_world, None).unwrap(),
+            BridgeModel::Bin(None)
+        );
 
         assert!(find_bridge(&hello_world, Some("rust-cpython")).is_err());
         assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
+
+        let pyo3_bin = MetadataCommand::new()
+            .manifest_path(&Path::new("test-crates/pyo3-bin").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        assert!(matches!(
+            find_bridge(&pyo3_bin, Some("bin")).unwrap(),
+            BridgeModel::Bin(Some((..)))
+        ));
+        assert!(matches!(
+            find_bridge(&pyo3_bin, None).unwrap(),
+            BridgeModel::Bin(Some(..))
+        ));
     }
 
     #[test]

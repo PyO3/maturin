@@ -26,8 +26,6 @@ const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
 fn pyo3_minimum_python_minor_version(major_version: u64, minor_version: u64) -> Option<usize> {
     if (major_version, minor_version) >= (0, 16) {
         Some(7)
-    } else if (major_version, minor_version) >= (0, 12) {
-        Some(6)
     } else {
         None
     }

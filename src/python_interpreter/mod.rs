@@ -17,7 +17,7 @@ mod config;
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
-pub const MINIMUM_PYTHON_MINOR: usize = 6;
+pub const MINIMUM_PYTHON_MINOR: usize = 7;
 /// Be liberal here to include preview versions
 const MAXIMUM_PYTHON_MINOR: usize = 12;
 const MAXIMUM_PYPY_MINOR: usize = 8;

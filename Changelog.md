@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* **Breaking Change**: Drop support for python 3.6, which is end of life
+
 ## [0.12.18] - 2022-05-29
 
 * Add support for building bin bindings wheels with multiple platform tags in [#928](https://github.com/PyO3/maturin/pull/928)

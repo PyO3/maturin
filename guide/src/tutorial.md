@@ -76,7 +76,7 @@ ferris@rustbox [~/src/rust/guessing-game] % python3 -m venv .venv
 ferris@rustbox [~/src/rust/guessing-game] % source .venv/bin/activate
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % pip install -U pip maturin
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % pip freeze
-maturin==0.12.10
+maturin==0.13.0
 tomli==2.0.1
 ```
 
@@ -99,7 +99,7 @@ build-backend (Python supports a number of build-backends since [PEP
 
 ```toml
 [build-system]
-requires = ["maturin>=0.12,<0.13"]
+requires = ["maturin>=0.13,<0.14"]
 build-backend = "maturin"
 ```
 

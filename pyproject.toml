@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "maturin"
-requires-python = ">=3.6"
+requires-python = ">=3.7"
 classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Programming Language :: Rust",
@@ -39,7 +39,7 @@ Changelog = "https://maturin.rs/changelog.html"
 bindings = "bin"
 
 [tool.black]
-target_version = ['py36']
+target_version = ['py37']
 extend-exclude = '''
 # Ignore cargo-generate templates
 ^/src/templates

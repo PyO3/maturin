@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.18] - 2022-05-29
+
 * Add support for building bin bindings wheels with multiple platform tags in [#928](https://github.com/PyO3/maturin/pull/928)
 * Skip auditwheel for non-compliant linux environment automatically in [#931](https://github.com/PyO3/maturin/pull/931)
 * Fix abi3 wheel build issue when no Python interpreters found on host in [#933](https://github.com/PyO3/maturin/pull/933)
@@ -611,7 +613,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.17...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.18...HEAD
+[0.12.18]: https://github.com/pyo3/maturin/compare/v0.12.17...v0.12.18
 [0.12.17]: https://github.com/pyo3/maturin/compare/v0.12.16...v0.12.17
 [0.12.16]: https://github.com/pyo3/maturin/compare/v0.12.15...v0.12.16
 [0.12.15]: https://github.com/pyo3/maturin/compare/v0.12.14...v0.12.15

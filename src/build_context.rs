@@ -592,6 +592,9 @@ impl BuildContext {
     ) -> Result<PathBuf> {
         let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
+        let artifacts = artifacts
+            .get(0)
+            .context("Failed to build a native library through cargo")?;
 
         let artifact = artifacts.get("cdylib").cloned().ok_or_else(|| {
             anyhow!(
@@ -680,9 +683,9 @@ impl BuildContext {
     fn write_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
-        artifact: &Path,
+        artifacts: &[PathBuf],
         platform_tags: &[PlatformTag],
-        ext_libs: &[Library],
+        ext_libs: &[Vec<Library>],
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = match (&self.bridge, python_interpreter) {
             (BridgeModel::Bin(None), _) => self
@@ -709,14 +712,16 @@ impl BuildContext {
             }
         }
 
-        // I wouldn't know of any case where this would be the wrong (and neither do
-        // I know a better alternative)
-        let bin_name = artifact
-            .file_name()
-            .expect("Couldn't get the filename from the binary produced by cargo");
-        self.add_external_libs(&mut writer, artifact, ext_libs)?;
+        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+            // I wouldn't know of any case where this would be the wrong (and neither do
+            // I know a better alternative)
+            let bin_name = artifact
+                .file_name()
+                .expect("Couldn't get the filename from the binary produced by cargo");
+            self.add_external_libs(&mut writer, artifact, artifact_ext_libs)?;
 
-        write_bin(&mut writer, artifact, &self.metadata21, bin_name)?;
+            write_bin(&mut writer, artifact, &self.metadata21, bin_name)?;
+        }
 
         self.add_pth(&mut writer)?;
         add_data(&mut writer, self.project_layout.data.as_deref())?;
@@ -735,12 +740,21 @@ impl BuildContext {
         let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
 
-        let artifact = artifacts
-            .get("bin")
-            .cloned()
-            .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
+        let mut policies = Vec::with_capacity(artifacts.len());
+        let mut ext_libs = Vec::new();
+        let mut artifact_paths = Vec::with_capacity(artifacts.len());
+        for artifact in artifacts {
+            let artifact = artifact
+                .get("bin")
+                .cloned()
+                .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
+            let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
+            policies.push(policy);
+            ext_libs.push(external_libs);
+            artifact_paths.push(artifact);
+        }
+        let policy = policies.iter().min_by_key(|p| p.priority).unwrap();
         let platform_tags = if self.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {
@@ -749,9 +763,9 @@ impl BuildContext {
 
         let (wheel_path, tag) = self.write_bin_wheel(
             python_interpreter,
-            &artifact,
+            &artifact_paths,
             &platform_tags,
-            &external_libs,
+            &ext_libs,
         )?;
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));

@@ -22,11 +22,20 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
-) -> Result<HashMap<String, PathBuf>> {
+) -> Result<Vec<HashMap<String, PathBuf>>> {
+    let root_pkg = context.cargo_metadata.root_package().unwrap();
+    let targets: Vec<_> = root_pkg
+        .targets
+        .iter()
+        .filter(|target| match bindings_crate {
+            BridgeModel::Bin(_) => target.crate_types.contains(&"bin".to_string()),
+            _ => target.crate_types.contains(&"cdylib".to_string()),
+        })
+        .collect();
     if context.target.is_macos() && context.universal2 {
-        compile_universal2(context, python_interpreter, bindings_crate)
+        compile_universal2(context, python_interpreter, bindings_crate, &targets)
     } else {
-        compile_target(context, python_interpreter, bindings_crate)
+        compile_targets(context, python_interpreter, bindings_crate, &targets)
     }
 }
 
@@ -35,7 +44,8 @@ fn compile_universal2(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
-) -> Result<HashMap<String, PathBuf>> {
+    targets: &[&cargo_metadata::Target],
+) -> Result<Vec<HashMap<String, PathBuf>>> {
     let build_type = if bindings_crate.is_bin() {
         "bin"
     } else {
@@ -47,11 +57,26 @@ fn compile_universal2(
         "aarch64-apple-darwin".to_string(),
     ]);
 
-    let aarch64_artifact = compile_target(&aarch64_context, python_interpreter, bindings_crate)
-        .context("Failed to build a aarch64 library through cargo")?
-        .get(build_type)
-        .cloned()
-        .ok_or_else(|| {
+    let aarch64_artifacts = compile_targets(
+        &aarch64_context,
+        python_interpreter,
+        bindings_crate,
+        targets,
+    )
+    .context("Failed to build a aarch64 library through cargo")?;
+    let mut x86_64_context = context.clone();
+    x86_64_context.cargo_extra_args.extend(vec![
+        "--target".to_string(),
+        "x86_64-apple-darwin".to_string(),
+    ]);
+
+    let x86_64_artifacts =
+        compile_targets(&x86_64_context, python_interpreter, bindings_crate, targets)
+            .context("Failed to build a x86_64 library through cargo")?;
+
+    let mut universal_artifacts = Vec::with_capacity(targets.len());
+    for (aarch64_artifact, x86_64_artifact) in aarch64_artifacts.iter().zip(x86_64_artifacts) {
+        let aarch64_artifact = aarch64_artifact.get(build_type).cloned().ok_or_else(|| {
             if build_type == "cdylib" {
                 anyhow!(
                     "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
@@ -61,17 +86,7 @@ fn compile_universal2(
                 anyhow!("Cargo didn't build an aarch64 bin.")
             }
         })?;
-    let mut x86_64_context = context.clone();
-    x86_64_context.cargo_extra_args.extend(vec![
-        "--target".to_string(),
-        "x86_64-apple-darwin".to_string(),
-    ]);
-
-    let x86_64_artifact = compile_target(&x86_64_context, python_interpreter, bindings_crate)
-        .context("Failed to build a x86_64 library through cargo")?
-        .get(build_type)
-        .cloned()
-        .ok_or_else(|| {
+        let x86_64_artifact = x86_64_artifact.get(build_type).cloned().ok_or_else(|| {
             if build_type == "cdylib" {
                 anyhow!(
                     "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
@@ -81,34 +96,54 @@ fn compile_universal2(
                 anyhow!("Cargo didn't build a x86_64 bin.")
             }
         })?;
+        // Create an universal dylib
+        let output_path = aarch64_artifact
+            .display()
+            .to_string()
+            .replace("aarch64-apple-darwin/", "");
+        let mut writer = FatWriter::new();
+        let aarch64_file = fs::read(aarch64_artifact)?;
+        let x86_64_file = fs::read(x86_64_artifact)?;
+        writer
+            .add(aarch64_file)
+            .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
+        writer
+            .add(x86_64_file)
+            .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
+        writer
+            .write_to_file(&output_path)
+            .map_err(|e| anyhow!("Failed to create universal cdylib: {:?}", e))?;
 
-    // Create an universal dylib
-    let output_path = aarch64_artifact
-        .display()
-        .to_string()
-        .replace("aarch64-apple-darwin/", "");
-    let mut writer = FatWriter::new();
-    let aarch64_file = fs::read(aarch64_artifact)?;
-    let x86_64_file = fs::read(x86_64_artifact)?;
-    writer
-        .add(aarch64_file)
-        .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
-    writer
-        .add(x86_64_file)
-        .map_err(|e| anyhow!("Failed to add x86_64 cdylib: {:?}", e))?;
-    writer
-        .write_to_file(&output_path)
-        .map_err(|e| anyhow!("Failed to create universal cdylib: {:?}", e))?;
+        let mut result = HashMap::new();
+        result.insert(build_type.to_string(), PathBuf::from(output_path));
+        universal_artifacts.push(result);
+    }
+    Ok(universal_artifacts)
+}
 
-    let mut result = HashMap::new();
-    result.insert(build_type.to_string(), PathBuf::from(output_path));
-    Ok(result)
+fn compile_targets(
+    context: &BuildContext,
+    python_interpreter: Option<&PythonInterpreter>,
+    bindings_crate: &BridgeModel,
+    targets: &[&cargo_metadata::Target],
+) -> Result<Vec<HashMap<String, PathBuf>>> {
+    let mut artifacts = Vec::with_capacity(targets.len());
+    for target in targets {
+        artifacts.push(compile_target(
+            context,
+            python_interpreter,
+            bindings_crate,
+            target,
+        )?);
+    }
+    Ok(artifacts)
 }
 
 fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
+    binding_target: &cargo_metadata::Target,
 ) -> Result<HashMap<String, PathBuf>> {
     let target = &context.target;
 
@@ -135,10 +170,12 @@ fn compile_target(
 
     let mut rust_flags = env::var_os("RUSTFLAGS");
 
-    // We need to pass --bins / --lib to set the rustc extra args later
-    // TODO: What do we do when there are multiple bin targets?
+    // We need to pass --bin / --lib to set the rustc extra args later
     match bindings_crate {
-        BridgeModel::Bin(..) => shared_args.push("--bins"),
+        BridgeModel::Bin(..) => {
+            shared_args.push("--bin");
+            shared_args.push(binding_target.name.as_str());
+        }
         BridgeModel::Cffi | BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) => {
             shared_args.push("--lib");
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250

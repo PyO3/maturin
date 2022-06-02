@@ -144,7 +144,11 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                         .unwrap();
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
                     if !output.status.success() || path.trim().is_empty() {
-                        bail!("Couldn't determine the path to python for `py {}`", version);
+                        eprintln!(
+                            "⚠️  Warning: couldn't determine the path to python for `py {}`",
+                            version
+                        );
+                        continue;
                     }
                     interpreter.push(path.to_string());
                     versions_found.insert((major, minor));

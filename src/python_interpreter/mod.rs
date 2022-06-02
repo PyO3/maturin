@@ -230,7 +230,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     // Fallback to pythonX.Y for Microsoft Store versions
     for minor in min_python_minor..MAXIMUM_PYTHON_MINOR {
         if !versions_found.contains(&(3, minor)) {
-            interpreter.push(format!("python3.{}", minor));
+            interpreter.push(format!("python3.{}.exe", minor));
             versions_found.insert((3, minor));
         }
     }

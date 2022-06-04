@@ -182,51 +182,18 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
             } else {
                 Path::new(&path).join("python")
             };
-            let python_info = Command::new(&executable)
-                .arg("-c")
-                .arg("import sys; print(sys.version)")
-                .output();
-
-            let python_info = match python_info {
-                Ok(python_info) => python_info,
-                Err(err) => {
-                    if err.kind() == io::ErrorKind::NotFound {
-                        // This conda env doesn't have python installed
-                        continue;
-                    } else {
-                        bail!(
-                            "Error getting Python version info from conda env at {}",
-                            path
-                        );
-                    }
+            if let Some(python_info) = windows_python_info(&executable)? {
+                if windows_interpreter_no_build(
+                    python_info.major,
+                    python_info.minor,
+                    target.pointer_width(),
+                    python_info.pointer_width.unwrap(),
+                    min_python_minor,
+                ) {
+                    continue;
                 }
-            };
-
-            let version_info = str::from_utf8(&python_info.stdout).unwrap();
-            let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
-            if let Some(capture) = expr.captures(version_info) {
-                let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
-                let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
-                if !versions_found.contains(&(major, minor)) {
-                    let pointer_width = if version_info.contains("64 bit (AMD64)") {
-                        64_usize
-                    } else {
-                        32_usize
-                    };
-
-                    if windows_interpreter_no_build(
-                        major,
-                        minor,
-                        target.pointer_width(),
-                        pointer_width,
-                        min_python_minor,
-                    ) {
-                        continue;
-                    }
-
-                    interpreter.push(String::from(executable.to_str().unwrap()));
-                    versions_found.insert((major, minor));
-                }
+                interpreter.push(String::from(executable.to_str().unwrap()));
+                versions_found.insert((python_info.major, python_info.minor));
             }
         }
     }
@@ -234,8 +201,20 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     // Fallback to pythonX.Y for Microsoft Store versions
     for minor in min_python_minor..MAXIMUM_PYTHON_MINOR {
         if !versions_found.contains(&(3, minor)) {
-            interpreter.push(format!("python3.{}.exe", minor));
-            versions_found.insert((3, minor));
+            let executable = format!("python3.{}.exe", minor);
+            if let Some(python_info) = windows_python_info(Path::new(&executable))? {
+                if windows_interpreter_no_build(
+                    python_info.major,
+                    python_info.minor,
+                    target.pointer_width(),
+                    python_info.pointer_width.unwrap(),
+                    min_python_minor,
+                ) {
+                    continue;
+                }
+                interpreter.push(executable);
+                versions_found.insert((3, minor));
+            }
         }
     }
 
@@ -245,6 +224,51 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
         );
     };
     Ok(interpreter)
+}
+
+fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
+    let python_info = Command::new(&executable)
+        .arg("-c")
+        .arg("import sys; print(sys.version)")
+        .output();
+
+    let python_info = match python_info {
+        Ok(python_info) => python_info,
+        Err(err) => {
+            if err.kind() == io::ErrorKind::NotFound {
+                // python executable not found
+                return Ok(None);
+            } else {
+                bail!(
+                    "Error getting Python version info from {}",
+                    executable.display()
+                );
+            }
+        }
+    };
+
+    let version_info = str::from_utf8(&python_info.stdout).unwrap();
+    let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
+    if let Some(capture) = expr.captures(version_info) {
+        let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
+        let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
+        let pointer_width = if version_info.contains("64 bit (AMD64)") {
+            64
+        } else {
+            32
+        };
+        Ok(Some(InterpreterConfig {
+            major,
+            minor,
+            interpreter_kind: InterpreterKind::CPython,
+            abiflags: String::new(),
+            ext_suffix: String::new(),
+            abi_tag: None,
+            pointer_width: Some(pointer_width),
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
@@ -512,7 +536,7 @@ impl PythonInterpreter {
                             };
                             // Try py -x.y on Windows
                             let output = Command::new("py")
-                                .arg(format!("-{}", ver))
+                                .arg(format!("-{}-{}", ver, target.pointer_width()))
                                 .args(&["-c", GET_INTERPRETER_METADATA])
                                 .output();
                             match output {

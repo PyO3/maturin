@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix Windows Store install detection in [#949](https://github.com/PyO3/maturin/pull/949)
+* Filter Python interpreters by target pointer width on Windows in [#950](https://github.com/PyO3/maturin/pull/950)
+
 ## [0.12.18] - 2022-05-29
 
 * Add support for building bin bindings wheels with multiple platform tags in [#928](https://github.com/PyO3/maturin/pull/928)

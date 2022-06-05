@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * **Breaking Change**: Drop support for python 3.6, which is end of life
+
+## [0.12.19] - 2022-06-05
+
 * Fix Windows Store install detection in [#949](https://github.com/PyO3/maturin/pull/949)
 * Filter Python interpreters by target pointer width on Windows in [#950](https://github.com/PyO3/maturin/pull/950)
 
@@ -617,7 +620,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.18...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.19...HEAD
+[0.12.19]: https://github.com/pyo3/maturin/compare/v0.12.18...v0.12.19
 [0.12.18]: https://github.com/pyo3/maturin/compare/v0.12.17...v0.12.18
 [0.12.17]: https://github.com/pyo3/maturin/compare/v0.12.16...v0.12.17
 [0.12.16]: https://github.com/pyo3/maturin/compare/v0.12.15...v0.12.16

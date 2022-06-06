@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Breaking Change**: Drop support for python 3.6, which is end of life
 * Fix incompatibility with cibuildwheel for 32-bit Windows in [#951](https://github.com/PyO3/maturin/pull/951)
+* Don't require `pip` error messages to be utf-8 encoding in [#953](https://github.com/PyO3/maturin/pull/953)
 
 ## [0.12.19] - 2022-06-05
 

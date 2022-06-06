@@ -626,10 +626,28 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
         min_python_minor: Option<usize>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = min_python_minor.unwrap_or(match bridge {
-            BridgeModel::Bindings(_, minor) => *minor,
-            _ => MINIMUM_PYTHON_MINOR,
-        });
+        let min_python_minor = match min_python_minor {
+            Some(requires_python_minor) => match bridge {
+                BridgeModel::Bindings(bridge_name, minor)
+                | BridgeModel::Bin(Some((bridge_name, minor))) => {
+                    // requires-python minor version might be lower than bridge crate required minor version
+                    if requires_python_minor >= *minor {
+                        requires_python_minor
+                    } else {
+                        eprintln!(
+                            "⚠️  Warning: 'requires-python' (3.{}) is lower than the requirement of {} crate (3.{}).",
+                            requires_python_minor, bridge_name, *minor
+                        );
+                        *minor
+                    }
+                }
+                _ => requires_python_minor,
+            },
+            None => match bridge {
+                BridgeModel::Bindings(_, minor) | BridgeModel::Bin(Some((_, minor))) => *minor,
+                _ => MINIMUM_PYTHON_MINOR,
+            },
+        };
         let executables = if target.is_windows() {
             find_all_windows(target, min_python_minor)?
         } else {

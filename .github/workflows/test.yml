@@ -85,13 +85,13 @@ jobs:
           python-version: "pypy-3.7"
       - name: test build pypy wheel
         run: |
-          cargo run -- build --no-sdist -i pypy3 -m test-crates/pyo3-mixed-submodule/Cargo.toml
+          cargo run -- build -i pypy3 -m test-crates/pyo3-mixed-submodule/Cargo.toml
           pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-mixed-submodule/target/wheels pyo3-mixed-submodule
           pypy3 -m pip install pytest
           pypy3 -m pytest test-crates/pyo3-mixed-submodule/tests/
       - name: test build pypy wheel with abi3
         run: |
-          cargo run -- build --no-sdist -i pypy3 -m test-crates/pyo3-pure/Cargo.toml --cargo-extra-args="-vv"
+          cargo run -- build -i pypy3 -m test-crates/pyo3-pure/Cargo.toml --cargo-extra-args="-vv"
           pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-pure/target/wheels pyo3-pure
           pypy3 -m pip install pytest
           pypy3 -m pytest test-crates/pyo3-pure/test_pyo3_pure.py
@@ -107,15 +107,15 @@ jobs:
           rustup target add aarch64-apple-darwin
 
           # abi3
-          cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
-          cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
-          cargo run -- build --no-sdist -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
+          cargo run -- build -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          cargo run -- build -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
+          cargo run -- build -i python -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
           # Check wheels with twine
           twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
 
           # non-abi3
-          cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
-          cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
+          cargo run -- build -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          cargo run -- build -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
           # Check wheels with twine
           twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
       - name: test cross compiling windows wheel
@@ -127,17 +127,17 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
           # abi3
-          cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          cargo run -- build --no-sdist -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
 
           # no-abi3
-          cargo run -- build --no-sdist -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
+          cargo run -- build -i python3.9 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
       - name: test compiling with PYO3_CONFIG_FILE
         shell: bash
         run: |
           rustup target add x86_64-unknown-linux-gnu
           export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
-          cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
+          cargo run -- build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
 
   test-alpine:
     name: Test Alpine Linux
@@ -281,10 +281,10 @@ jobs:
           rustup target add ${{ matrix.platform.target }}
 
           # Use bundled sysconfig
-          cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --no-sdist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
 
           # Use PYO3_CROSS_LIB_DIR
           export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          cargo run --target x86_64-unknown-linux-gnu -- build -i python3.9 --release --out dist --no-sdist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          cargo run --target x86_64-unknown-linux-gnu -- build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
           ' > build-wheel.sh
           docker run --rm -v "$PWD":/io -w /io messense/manylinux2014-cross:${{ matrix.platform.arch }} bash build-wheel.sh

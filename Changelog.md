@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-* **Breaking Change**: Drop support for python 3.6, which is end of life
+* **Breaking Change**: Drop support for python 3.6, which is end of life in [#945](https://github.com/PyO3/maturin/pull/945)
+* **Breaking Change**: Don't build source distribution by default in `maturin build` command in [#955](https://github.com/PyO3/maturin/pull/955), `--no-sdist` option is replaced by `--sdist`
 * Add support for building with multiple binary targets in [#948](https://github.com/PyO3/maturin/pull/948)
 * Fix incompatibility with cibuildwheel for 32-bit Windows in [#951](https://github.com/PyO3/maturin/pull/951)
 * Don't require `pip` error messages to be utf-8 encoding in [#953](https://github.com/PyO3/maturin/pull/953)

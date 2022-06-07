@@ -5,6 +5,10 @@ def main():
     output = check_output(["hello-world"]).decode("utf-8").strip()
     if not output == "Hello, world!":
         raise Exception(output)
+
+    output = check_output(["foo"]).decode("utf-8").strip()
+    if not output == "Hello, world!":
+        raise Exception(output)
     print("SUCCESS")
 
 

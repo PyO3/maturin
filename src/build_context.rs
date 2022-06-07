@@ -343,7 +343,7 @@ impl BuildContext {
 
         let temp_dir = tempfile::tempdir()?;
         let mut soname_map = HashMap::new();
-        let mut libs_copied = Vec::new();
+        let mut libs_copied = HashSet::new();
         for lib in ext_libs.iter().flatten() {
             let lib_path = lib.realpath.clone().with_context(|| {
                 format!(
@@ -364,7 +364,7 @@ impl BuildContext {
             // for example soname and rpath
             let dest_path = temp_dir.path().join(&new_soname);
             fs::copy(&lib_path, &dest_path)?;
-            libs_copied.push(lib_path);
+            libs_copied.insert(lib_path);
 
             patchelf::set_soname(&dest_path, &new_soname)?;
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {

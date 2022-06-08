@@ -4,7 +4,6 @@ use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
 };
-use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::{compile, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
@@ -229,13 +228,13 @@ impl BuildContext {
                 let cpythons: Vec<_> = self
                     .interpreter
                     .iter()
-                    .filter(|interp| interp.interpreter_kind == InterpreterKind::CPython)
+                    .filter(|interp| interp.interpreter_kind.is_cpython())
                     .cloned()
                     .collect();
                 let pypys: Vec<_> = self
                     .interpreter
                     .iter()
-                    .filter(|interp| interp.interpreter_kind == InterpreterKind::PyPy)
+                    .filter(|interp| interp.interpreter_kind.is_pypy())
                     .cloned()
                     .collect();
                 let mut built_wheels = Vec::new();

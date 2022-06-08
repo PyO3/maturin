@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Breaking Change**: Drop support for python 3.6, which is end of life in [#945](https://github.com/PyO3/maturin/pull/945)
 * **Breaking Change**: Don't build source distribution by default in `maturin build` command in [#955](https://github.com/PyO3/maturin/pull/955), `--no-sdist` option is replaced by `--sdist`
+* **Breaking Change**: maturin no longer search for python interpreters by default and only build for current interpreter in `PATH` in [#964](https://github.com/PyO3/maturin/pull/964)
 * Add support for building with multiple binary targets in [#948](https://github.com/PyO3/maturin/pull/948)
 * Fix incompatibility with cibuildwheel for 32-bit Windows in [#951](https://github.com/PyO3/maturin/pull/951)
 * Don't require `pip` error messages to be utf-8 encoding in [#953](https://github.com/PyO3/maturin/pull/953)
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Set `PYO3_PYTHON` env var for PyPy when abi3 is enabled in [#960](https://github.com/PyO3/maturin/pull/960)
 * Add sysconfigs for x64 Windows PyPy in [#962](https://github.com/PyO3/maturin/pull/962)
 * Add support for cross compiling PyPy wheels when abi3 feature is enabled in [#963](https://github.com/PyO3/maturin/pull/963)
+* Add `--find-interpreter` option to `build` and `publish` commands to search for python interpreters in [#964](https://github.com/PyO3/maturin/pull/964)
 
 ## [0.12.19] - 2022-06-05
 

@@ -278,6 +278,18 @@ pub enum InterpreterKind {
     PyPy,
 }
 
+impl InterpreterKind {
+    /// Is this a CPython interpreter?
+    pub fn is_cpython(&self) -> bool {
+        matches!(self, InterpreterKind::CPython)
+    }
+
+    /// Is this a PyPy interpreter?
+    pub fn is_pypy(&self) -> bool {
+        matches!(self, InterpreterKind::PyPy)
+    }
+}
+
 impl fmt::Display for InterpreterKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -620,10 +632,22 @@ impl PythonInterpreter {
     }
 
     /// Find all available python interpreters for a given target
-    pub fn find_by_target(target: &Target) -> Vec<PythonInterpreter> {
+    pub fn find_by_target(
+        target: &Target,
+        min_python_minor: Option<usize>,
+    ) -> Vec<PythonInterpreter> {
         InterpreterConfig::lookup_target(target)
             .into_iter()
-            .map(Self::from_config)
+            .filter_map(|config| match min_python_minor {
+                Some(min_python_minor) => {
+                    if config.minor < min_python_minor {
+                        None
+                    } else {
+                        Some(Self::from_config(config))
+                    }
+                }
+                None => Some(Self::from_config(config)),
+            })
             .collect()
     }
 

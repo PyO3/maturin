@@ -85,6 +85,16 @@ impl InterpreterConfig {
         None
     }
 
+    /// Lookup wellknown sysconfigs for a given target
+    pub fn lookup_target(target: &Target) -> Vec<Self> {
+        if let Some(os_sysconfigs) = WELLKNOWN_SYSCONFIG.get(&target.target_os()) {
+            if let Some(sysconfigs) = os_sysconfigs.get(&target.target_arch()).cloned() {
+                return sysconfigs;
+            }
+        }
+        Vec::new()
+    }
+
     /// Construct a new InterpreterConfig from a pyo3 config file
     pub fn from_pyo3_config(config_file: &Path, target: &Target) -> Result<Self> {
         let config_file = fs::File::open(config_file)?;

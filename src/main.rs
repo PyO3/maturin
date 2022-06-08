@@ -59,7 +59,10 @@ enum Opt {
     },
     #[clap(name = "list-python")]
     /// Searches and lists the available python installations
-    ListPython,
+    ListPython {
+        #[clap(long)]
+        target: Option<String>,
+    },
     #[clap(name = "develop")]
     /// Installs the crate as module in the current virtualenv
     ///
@@ -361,10 +364,15 @@ fn run() -> Result<()> {
 
             upload_ui(&items, &publish)?
         }
-        Opt::ListPython => {
-            let target = Target::from_target_triple(None)?;
-            // We don't know the targeted bindings yet, so we use the most lenient
-            let found = PythonInterpreter::find_all(&target, &BridgeModel::Cffi, None)?;
+        Opt::ListPython { target } => {
+            let found = if target.is_some() {
+                let target = Target::from_target_triple(target)?;
+                PythonInterpreter::find_by_target(&target)
+            } else {
+                let target = Target::from_target_triple(None)?;
+                // We don't know the targeted bindings yet, so we use the most lenient
+                PythonInterpreter::find_all(&target, &BridgeModel::Cffi, None)?
+            };
             println!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
                 println!(" - {}", interpreter);

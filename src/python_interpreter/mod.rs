@@ -619,6 +619,14 @@ impl PythonInterpreter {
         }
     }
 
+    /// Find all available python interpreters for a given target
+    pub fn find_by_target(target: &Target) -> Vec<PythonInterpreter> {
+        InterpreterConfig::lookup_target(target)
+            .into_iter()
+            .map(Self::from_config)
+            .collect()
+    }
+
     /// Tries to find all installed python versions using the heuristic for the
     /// given platform
     pub fn find_all(

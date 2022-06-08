@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix incompatibility with cibuildwheel for 32-bit Windows in [#951](https://github.com/PyO3/maturin/pull/951)
 * Don't require `pip` error messages to be utf-8 encoding in [#953](https://github.com/PyO3/maturin/pull/953)
 * Compare minimum python version requirement between `requires-python` and bindings crate in [#954](https://github.com/PyO3/maturin/pull/954)
+* Add a `--target` option to `maturin list-python` command in [#957](https://github.com/PyO3/maturin/pull/957)
 
 ## [0.12.19] - 2022-06-05
 

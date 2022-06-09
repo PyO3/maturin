@@ -28,8 +28,8 @@ pub fn compile(
         .targets
         .iter()
         .filter(|target| match bindings_crate {
-            BridgeModel::Bin(_) => target.crate_types.contains(&"bin".to_string()),
-            _ => target.crate_types.contains(&"cdylib".to_string()),
+            BridgeModel::Bin(_) => target.kind.contains(&"bin".to_string()),
+            _ => target.kind.contains(&"cdylib".to_string()),
         })
         .collect();
     if context.target.is_macos() && context.universal2 {

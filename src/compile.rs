@@ -15,6 +15,10 @@ use std::str;
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
+const C_LIBRARIES_BUILD_ENVIRONMENT: [&str; 7] = [
+    "CARCH", "CHOST", "CC", "CXX", "CFLAGS", "CXXFLAGS", "LDFLAGS",
+];
+
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
@@ -168,7 +172,7 @@ fn compile_target(
         .map(String::as_str)
         .collect();
 
-    let mut rust_flags = env::var_os("RUSTFLAGS");
+    let mut rust_flags = env::var("RUSTFLAGS").unwrap_or(String::new());
 
     // We need to pass --bin / --lib to set the rustc extra args later
     match bindings_crate {
@@ -182,9 +186,7 @@ fn compile_target(
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
             if context.target.is_musl_target() {
-                rust_flags
-                    .get_or_insert_with(Default::default)
-                    .push(" -C target-feature=-crt-static");
+                rust_flags.push_str(" -C target-feature=-crt-static");
             }
         }
     }
@@ -279,8 +281,9 @@ fn compile_target(
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
 
-    if let Some(flags) = rust_flags {
-        build_command.env("RUSTFLAGS", flags);
+    if !rust_flags.is_empty() {
+        println!("➕ Passing RUSTFLAGS={}", &rust_flags);
+        build_command.env("RUSTFLAGS", rust_flags);
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
@@ -339,6 +342,14 @@ fn compile_target(
 
     if let Some(lib_dir) = env::var_os("MATURIN_PYTHON_SYSCONFIGDATA_DIR") {
         build_command.env("PYO3_CROSS_LIB_DIR", lib_dir);
+    }
+
+    // pass context for cross-compiles with C/C++ libraries
+    for key in C_LIBRARIES_BUILD_ENVIRONMENT {
+        if let Ok(val) = env::var(key) {
+            println!("➕ Passing {}={}", &key, &val);
+            build_command.env(key, val);
+        }
     }
 
     let mut cargo_build = build_command

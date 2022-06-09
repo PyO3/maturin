@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add a `--target` option to `maturin list-python` command in [#957](https://github.com/PyO3/maturin/pull/957)
 * Add support for using bundled python sysconfigs for PyPy when abi3 feature is enabled in [#958](https://github.com/PyO3/maturin/pull/958)
 * Set `PYO3_PYTHON` env var for PyPy when abi3 is enabled in [#960](https://github.com/PyO3/maturin/pull/960)
+* Pass C/C++ build-related environmental variables such as `CC` and `CFLAGS` through to `cargo`.
 
 ## [0.12.19] - 2022-06-05
 

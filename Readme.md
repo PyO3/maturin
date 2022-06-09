@@ -244,6 +244,42 @@ See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/comple
 
 maturin itself is manylinux compliant when compiled for the musl target.
 
+## Depending on C/C++ libraries
+
+maturin supports the compilation of C/C++ dependencies through Cargo. To build the library, use
+the `cc` crate. To configure its build, maturin passes common environmental variables
+such as `CC`, `CXX`, `CFLAGS`, `CXXFLAGS`, `LDFLAGS`, `CARCH`, and `CHOST`.
+
+
+```rust
+// build.rs
+
+fn main() {
+    pyo3_build_config::use_pyo3_cfgs();
+
+    cc::Build::new()
+        .file("include/library.c")
+        .include("include")
+        .compile("library");
+}
+```
+
+For example, to build a C library with `clang` and include it into the pyo3 project's shared object:
+
+```bash
+% export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld"
+% export CC="clang" CFLAGS="-O2 -flto=thin" LDFLAGS="-O2 -flto=thin -fuse-ld=lld"
+% maturin build --release
+📦 Including license file "LICENSE-APACHE"
+🔗 Found pyo3 bindings
+🐍 Found CPython 3.10 at ...
+➕ Passing RUSTFLAGS=-C linker=clang -C link-arg=-fuse-ld=lld
+➕ Passing CC=clang
+➕ Passing CFLAGS=-O2 -flto=thin
+➕ Passing LDFLAGS=-O2 -flto=thin -fuse-ld=lld
+   Compiling ...
+```
+
 ## Code
 
 The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.

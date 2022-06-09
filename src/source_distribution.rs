@@ -179,7 +179,7 @@ fn add_crate_to_source_distribution(
     {
         bail!(
             "pyproject.toml was not included by `cargo package`. \
-                 Please make sure pyproject.toml is not excluded or build with `--no-sdist`"
+                 Please make sure pyproject.toml is not excluded or build without `--sdist`"
         )
     }
 

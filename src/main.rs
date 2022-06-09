@@ -35,9 +35,9 @@ enum Opt {
         /// Strip the library for minimum file size
         #[clap(long)]
         strip: bool,
-        /// Don't build a source distribution
-        #[clap(long = "no-sdist")]
-        no_sdist: bool,
+        /// Build a source distribution
+        #[clap(long)]
+        sdist: bool,
     },
     #[cfg(feature = "upload")]
     #[clap(name = "publish")]
@@ -330,10 +330,10 @@ fn run() -> Result<()> {
             build,
             release,
             strip,
-            no_sdist,
+            sdist,
         } => {
             let build_context = build.into_build_context(release, strip, false)?;
-            if !no_sdist {
+            if sdist {
                 build_context.build_source_distribution()?;
             }
             let wheels = build_context.build_wheels()?;

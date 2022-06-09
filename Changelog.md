@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Don't require `pip` error messages to be utf-8 encoding in [#953](https://github.com/PyO3/maturin/pull/953)
 * Compare minimum python version requirement between `requires-python` and bindings crate in [#954](https://github.com/PyO3/maturin/pull/954)
 * Add a `--target` option to `maturin list-python` command in [#957](https://github.com/PyO3/maturin/pull/957)
+* Add support for using bundled python sysconfigs for PyPy when abi3 feature is enabled in [#958](https://github.com/PyO3/maturin/pull/958)
 
 ## [0.12.19] - 2022-06-05
 

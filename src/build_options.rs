@@ -908,11 +908,19 @@ pub fn find_interpreter(
         }
         BridgeModel::Bin(None) => Ok(vec![]),
         BridgeModel::BindingsAbi3(major, minor) => {
-            let interpreter = if !interpreter.is_empty() {
-                PythonInterpreter::check_executables(interpreter, target, bridge)
-                    .unwrap_or_default()
+            let interpreters = if !interpreter.is_empty() {
+                match find_interpreter_in_host(bridge, interpreter, target, Some(*minor as usize)) {
+                    Ok(host_interps) => host_interps,
+                    Err(err) => {
+                        if !interpreter.is_empty() {
+                            find_interpreter_in_sysconfig(interpreter, target).map_err(|_| err)?
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                }
             } else {
-                PythonInterpreter::find_all(target, bridge, Some(*minor as usize))
+                find_interpreter_in_host(bridge, interpreter, target, Some(*minor as usize))
                     .unwrap_or_default()
             };
             // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
@@ -937,9 +945,9 @@ pub fn find_interpreter(
                         platform: None,
                         runnable: false,
                     }])
-                } else if let Some(interp) = interpreter.get(0) {
+                } else if let Some(interp) = interpreters.get(0) {
                     println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interp);
-                    Ok(interpreter)
+                    Ok(interpreters)
                 } else if generate_import_lib {
                     println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
                     // fake a python interpreter
@@ -980,7 +988,7 @@ pub fn find_interpreter(
                         runnable: false,
                     }])
                 } else {
-                    Ok(interpreter)
+                    Ok(interpreters)
                 }
             }
         }

@@ -308,7 +308,10 @@ fn compile_target(
 
             // rust-cpython, and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
-        } else if (bindings_crate.is_bindings("pyo3") || bindings_crate.is_bindings("pyo3-ffi"))
+        } else if (bindings_crate.is_bindings("pyo3")
+            || bindings_crate.is_bindings("pyo3-ffi")
+            || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
+                && matches!(interpreter.interpreter_kind, InterpreterKind::PyPy)))
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {
             let pyo3_config = interpreter.pyo3_config_file();

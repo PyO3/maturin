@@ -987,6 +987,25 @@ pub fn find_interpreter(
                         platform: None,
                         runnable: false,
                     }])
+                } else if target.cross_compiling() {
+                    let mut interps = Vec::with_capacity(interpreters.len());
+                    let mut pypys = Vec::new();
+                    for interp in interpreters {
+                        if matches!(interp.interpreter_kind, InterpreterKind::PyPy) {
+                            pypys.push(PathBuf::from(format!(
+                                "pypy{}.{}",
+                                interp.major, interp.minor
+                            )));
+                        } else {
+                            interps.push(interp);
+                        }
+                    }
+                    // cross compiling to PyPy with abi3 feature enabled,
+                    // we cannot use host pypy so switch to bundled sysconfig instead
+                    if !pypys.is_empty() {
+                        interps.extend(find_interpreter_in_sysconfig(&pypys, target)?)
+                    }
+                    Ok(interps)
                 } else {
                     Ok(interpreters)
                 }

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Don't require `pip` error messages to be utf-8 encoding in [#953](https://github.com/PyO3/maturin/pull/953)
 * Compare minimum python version requirement between `requires-python` and bindings crate in [#954](https://github.com/PyO3/maturin/pull/954)
 * Set `PYO3_PYTHON` env var for PyPy when abi3 is enabled in [#960](https://github.com/PyO3/maturin/pull/960)
+* Add sysconfigs for x64 Windows PyPy in [#962](https://github.com/PyO3/maturin/pull/962)
 
 ## [0.12.19] - 2022-06-05
 

@@ -1,5 +1,4 @@
 use crate::build_context::BridgeModel;
-use crate::python_interpreter::InterpreterKind;
 use crate::{BuildContext, PlatformTag, PythonInterpreter};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
@@ -285,7 +284,7 @@ fn compile_target(
 
     if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
         let is_pypy = python_interpreter
-            .map(|p| p.interpreter_kind == InterpreterKind::PyPy)
+            .map(|p| p.interpreter_kind.is_pypy())
             .unwrap_or(false);
         if !is_pypy && !target.is_windows() {
             let pyo3_ver = pyo3_version(&context.cargo_metadata)
@@ -305,7 +304,7 @@ fn compile_target(
             if bindings_crate.is_bindings("pyo3")
                 || bindings_crate.is_bindings("pyo3-ffi")
                 || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
-                    && matches!(interpreter.interpreter_kind, InterpreterKind::PyPy))
+                    && interpreter.interpreter_kind.is_pypy())
             {
                 build_command.env("PYO3_PYTHON", &interpreter.executable);
             }
@@ -315,7 +314,7 @@ fn compile_target(
         } else if (bindings_crate.is_bindings("pyo3")
             || bindings_crate.is_bindings("pyo3-ffi")
             || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
-                && matches!(interpreter.interpreter_kind, InterpreterKind::PyPy)))
+                && interpreter.interpreter_kind.is_pypy()))
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {
             let pyo3_config = interpreter.pyo3_config_file();

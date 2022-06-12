@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add sysconfigs for x64 Windows PyPy in [#962](https://github.com/PyO3/maturin/pull/962)
 * Add support for cross compiling PyPy wheels when abi3 feature is enabled in [#963](https://github.com/PyO3/maturin/pull/963)
 * Add `--find-interpreter` option to `build` and `publish` commands to search for python interpreters in [#964](https://github.com/PyO3/maturin/pull/964)
+* Add support for Linux armv6l in [#966](https://github.com/PyO3/maturin/pull/966)
 
 ## [0.12.19] - 2022-06-05
 

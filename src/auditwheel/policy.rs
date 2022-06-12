@@ -97,6 +97,7 @@ impl Policy {
         if self.name.starts_with("musllinux") && self.lib_whitelist.remove("libc.so") {
             let new_soname = match target_arch {
                 Arch::Aarch64 => "libc.musl-aarch64.so.1",
+                Arch::Armv6L => "libc.musl-armhf.so.1",
                 Arch::Armv7L => "libc.musl-armv7.so.1",
                 Arch::Powerpc64Le => "libc.musl-ppc64le.so.1",
                 Arch::Powerpc64 => "", // musllinux doesn't support ppc64

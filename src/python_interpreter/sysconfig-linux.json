@@ -424,5 +424,70 @@
       "abi_tag": "pp73",
       "pointer_width": 32
     }
+  ],
+  "armv6l": [
+    {
+      "major": 3,
+      "minor": 6,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-36m-arm-linux-gnueabihf.so",
+      "abi_tag": "36m",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "m",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-37m-arm-linux-gnueabihf.so",
+      "abi_tag": "37m",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-38-arm-linux-gnueabihf.so",
+      "abi_tag": "38",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-39-arm-linux-gnueabihf.so",
+      "abi_tag": "39",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-arm-linux-gnueabihf.so",
+      "abi_tag": "310",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-arm-linux-gnueabihf.so",
+      "abi_tag": "311",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy38-pp73-arm-linux-gnueabihf.so",
+      "abi_tag": "pp73",
+      "pointer_width": 32
+    }
   ]
 }

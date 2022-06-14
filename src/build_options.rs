@@ -170,10 +170,10 @@ impl BuildOptions {
         &self,
         bridge: &BridgeModel,
         interpreter: &[PathBuf],
+        target: &Target,
         min_python_minor: Option<usize>,
         generate_import_lib: bool,
     ) -> Result<Vec<PythonInterpreter>> {
-        let target = &Target::from_target_triple(self.target.clone())?;
         match bridge {
             BridgeModel::Bindings(binding_name, _) | BridgeModel::Bin(Some((binding_name, _))) => {
                 let mut native_interpreters = false;
@@ -533,41 +533,7 @@ impl BuildOptions {
             );
         }
 
-        let target = Target::from_target_triple(self.target.clone())?;
-
-        let wheel_dir = match self.out {
-            Some(ref dir) => dir.clone(),
-            None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
-        };
-
-        let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
-        let interpreter = if self.find_interpreter {
-            // Auto-detect interpreters
-            self.find_interpreters(
-                &bridge,
-                &[],
-                get_min_python_minor(&metadata21),
-                generate_import_lib,
-            )?
-        } else {
-            // User given list of interpreters
-            let interpreter = if self.interpreter.is_empty() && !target.cross_compiling() {
-                vec![PathBuf::from("python3")]
-            } else {
-                self.interpreter.clone()
-            };
-            self.find_interpreters(&bridge, &interpreter, None, generate_import_lib)?
-        };
-
-        let mut rustc_extra_args = self.rustc_extra_args.clone();
-        if rustc_extra_args.is_empty() {
-            // if not supplied on command line, try pyproject.toml
-            if let Some(args) = pyproject.and_then(|x| x.rustc_extra_args()) {
-                rustc_extra_args.push(args.to_string());
-                args_from_pyproject.push("rustc-extra-args");
-            }
-        }
-        rustc_extra_args = split_extra_args(&rustc_extra_args)?;
+        let mut target_triple = self.target.clone();
 
         let mut universal2 = self.universal2;
         // Also try to determine universal2 from ARCHFLAGS environment variable
@@ -583,10 +549,55 @@ impl BuildOptions {
                     }
                 })
                 .collect();
-            if arches.contains("x86_64") && arches.contains("arm64") {
-                universal2 = true;
+            match (arches.contains("x86_64"), arches.contains("arm64")) {
+                (true, true) => universal2 = true,
+                (true, false) if target_triple.is_none() => {
+                    target_triple = Some("x86_64-apple-darwin".to_string())
+                }
+                (false, true) if target_triple.is_none() => {
+                    target_triple = Some("aarch64-apple-darwin".to_string())
+                }
+                _ => {}
             }
         };
+
+        let target = Target::from_target_triple(target_triple)?;
+
+        let wheel_dir = match self.out {
+            Some(ref dir) => dir.clone(),
+            None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
+        };
+
+        let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
+        let interpreter = if self.find_interpreter {
+            // Auto-detect interpreters
+            self.find_interpreters(
+                &bridge,
+                &[],
+                &target,
+                get_min_python_minor(&metadata21),
+                generate_import_lib,
+            )?
+        } else {
+            // User given list of interpreters
+            let interpreter = if self.interpreter.is_empty() && !target.cross_compiling() {
+                vec![PathBuf::from("python3")]
+            } else {
+                self.interpreter.clone()
+            };
+            self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?
+        };
+
+        let mut rustc_extra_args = self.rustc_extra_args.clone();
+        if rustc_extra_args.is_empty() {
+            // if not supplied on command line, try pyproject.toml
+            if let Some(args) = pyproject.and_then(|x| x.rustc_extra_args()) {
+                rustc_extra_args.push(args.to_string());
+                args_from_pyproject.push("rustc-extra-args");
+            }
+        }
+        rustc_extra_args = split_extra_args(&rustc_extra_args)?;
+
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for cross compiling PyPy wheels when abi3 feature is enabled in [#963](https://github.com/PyO3/maturin/pull/963)
 * Add `--find-interpreter` option to `build` and `publish` commands to search for python interpreters in [#964](https://github.com/PyO3/maturin/pull/964)
 * Add support for Linux armv6l in [#966](https://github.com/PyO3/maturin/pull/966)
+* Infer target triple from `ARCHFLAGS` for macOS to be compatible with `cibuildwheel` in [#967](https://github.com/PyO3/maturin/pull/967)
 
 ## [0.12.19] - 2022-06-05
 

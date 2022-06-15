@@ -324,6 +324,7 @@ jobs:
               - 'MANIFEST.in'
               - '.github/workflows/test.yml'
       - uses: actions-rs/toolchain@v1
+        if: steps.changes.outputs.changed == 'true'
         with:
           profile: minimal
           toolchain: stable

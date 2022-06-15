@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Set `PYO3_PYTHON` env var for PyPy when abi3 is enabled in [#960](https://github.com/PyO3/maturin/pull/960)
 * Add sysconfigs for x64 Windows PyPy in [#962](https://github.com/PyO3/maturin/pull/962)
 * Add support for Linux armv6l in [#966](https://github.com/PyO3/maturin/pull/966)
+* Fix auditwheel bundled shared libs directory name in [#969](https://github.com/PyO3/maturin/pull/969)
 
 ## [0.12.19] - 2022-06-05
 

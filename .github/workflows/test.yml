@@ -339,7 +339,19 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         with:
           python-version: "3.10"
-      - run: pip install -v .
+      - name: Build and install
+        shell: bash
+        run: |
+          set -ex
+          pip install build
+          python3 -m build --wheel -o dist
+          pip install dist/maturin*.whl
         if: steps.changes.outputs.changed == 'true'
       - run: maturin --version
         if: steps.changes.outputs.changed == 'true'
+      - name: Upload wheel artifacts
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: dist

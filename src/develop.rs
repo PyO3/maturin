@@ -5,7 +5,6 @@ use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
 use std::path::Path;
 use std::process::Command;
-use std::str;
 use tempfile::TempDir;
 
 /// Installs a crate by compiling it and copying the shared library to site-packages.
@@ -91,15 +90,15 @@ pub fn develop(
                 venv_dir.display(),
                 &command,
                 output.status,
-                str::from_utf8(&output.stdout)?.trim(),
-                str::from_utf8(&output.stderr)?.trim(),
+                String::from_utf8_lossy(&output.stdout).trim(),
+                String::from_utf8_lossy(&output.stderr).trim(),
             );
         }
         if !output.stderr.is_empty() {
             eprintln!(
                 "⚠️  Warning: pip raised a warning running {:?}:\n{}",
                 &command,
-                str::from_utf8(&output.stderr)?.trim(),
+                String::from_utf8_lossy(&output.stderr).trim(),
             );
         }
         println!(

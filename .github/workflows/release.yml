@@ -13,7 +13,7 @@ jobs:
       name: crates.io
       url: ${{ steps.set_url.outputs.env_url }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -62,7 +62,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -169,10 +169,10 @@ jobs:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build wheel
         run: |
-          sudo python3 -m pip install --pre maturin
+          sudo python3 -m pip install maturin
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} musllinux_1_1 \
@@ -208,7 +208,7 @@ jobs:
     container:
       image: docker://${{ matrix.platform.image }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # powerpc64le-unknown-linux-musl doesn't have official std library release
       - uses: actions-rs/toolchain@v1
         if: matrix.platform.target == 's390x-unknown-linux-gnu'
@@ -219,7 +219,7 @@ jobs:
           target: ${{ matrix.platform.target }}
       - name: Build wheel
         run: |
-          sudo python3 -m pip install --pre maturin
+          sudo python3 -m pip install maturin
           maturin build --release -b bin -o dist --no-sdist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} ${{ matrix.platform.musllinux }} \
@@ -250,7 +250,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: wheels
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: 3.9
       - name: Publish

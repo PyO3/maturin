@@ -102,7 +102,7 @@ impl ProjectLayout {
             Cow::Owned(project_root.join(py_src))
         });
         let (python_module, rust_module, extension_name) = if parts.len() > 1 {
-            let mut rust_module = project_root.to_path_buf();
+            let mut rust_module = python_root.to_path_buf();
             rust_module.extend(&parts[0..parts.len() - 1]);
             (
                 python_root.join(parts[0]),
@@ -338,7 +338,14 @@ impl BuildContext {
         }
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
-        let libs_dir = PathBuf::from(format!("{}.libs", self.module_name));
+        let mut libs_dir = self
+            .project_layout
+            .python_module
+            .as_ref()
+            .and_then(|py| py.file_name().map(|s| s.to_os_string()))
+            .unwrap_or_else(|| self.module_name.clone().into());
+        libs_dir.push(".libs");
+        let libs_dir = PathBuf::from(libs_dir);
         writer.add_directory(&libs_dir)?;
 
         let temp_dir = tempfile::tempdir()?;

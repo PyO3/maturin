@@ -265,7 +265,11 @@ fn compile_target(
     if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling
         if interpreter.runnable {
-            if bindings_crate.is_bindings("pyo3") || bindings_crate.is_bindings("pyo3-ffi") {
+            if bindings_crate.is_bindings("pyo3")
+                || bindings_crate.is_bindings("pyo3-ffi")
+                || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
+                    && matches!(interpreter.interpreter_kind, InterpreterKind::PyPy))
+            {
                 build_command.env("PYO3_PYTHON", &interpreter.executable);
             }
 

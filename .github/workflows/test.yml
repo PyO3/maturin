@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release-0.12
   pull_request:
   workflow_dispatch:
 
@@ -20,17 +21,17 @@ jobs:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.7"
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.8"
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.9"
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.10.0"
       - name: Install cffi and virtualenv
@@ -51,6 +52,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
+          set -ex
           sudo xcode-select -s /Applications/Xcode.app
           bindir="$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/bin"
           echo "CC=${bindir}/clang" >> "${GITHUB_ENV}"
@@ -80,28 +82,34 @@ jobs:
         with:
           command: test
           args: --features password-storage
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: "pypy-3.7"
       - name: test build pypy wheel
+        shell: bash
         run: |
+          set -ex
           cargo run -- build --no-sdist -i pypy3 -m test-crates/pyo3-mixed-submodule/Cargo.toml
           pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-mixed-submodule/target/wheels pyo3-mixed-submodule
           pypy3 -m pip install pytest
           pypy3 -m pytest test-crates/pyo3-mixed-submodule/tests/
       - name: test build pypy wheel with abi3
+        shell: bash
         run: |
+          set -ex
           cargo run -- build --no-sdist -i pypy3 -m test-crates/pyo3-pure/Cargo.toml --cargo-extra-args="-vv"
           pypy3 -m pip install --force-reinstall --no-index --find-links test-crates/pyo3-pure/target/wheels pyo3-pure
           pypy3 -m pip install pytest
           pypy3 -m pytest test-crates/pyo3-pure/test_pyo3_pure.py
 
           cargo run -- pep517 build-wheel -i pypy3 -m test-crates/pyo3-pure/Cargo.toml --cargo-extra-args="-vv"
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.10.0"
       - name: test cross compiling with zig
+        shell: bash
         run: |
+          set -ex
           rustup target add aarch64-unknown-linux-gnu
           rustup target add aarch64-unknown-linux-musl
           rustup target add aarch64-apple-darwin
@@ -121,6 +129,7 @@ jobs:
       - name: test cross compiling windows wheel
         if: matrix.os == 'ubuntu-latest'
         run: |
+          set -ex
           sudo apt-get install -y mingw-w64
           rustup component add llvm-tools-preview
           rustup target add x86_64-pc-windows-gnu
@@ -135,6 +144,7 @@ jobs:
       - name: test compiling with PYO3_CONFIG_FILE
         shell: bash
         run: |
+          set -ex
           rustup target add x86_64-unknown-linux-gnu
           export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
           cargo run -- build --no-sdist -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
@@ -144,9 +154,10 @@ jobs:
     runs-on: ubuntu-latest
     container: alpine:edge
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install build requirements
         run: |
+          set -ex
           apk add cargo python3-dev libffi-dev py3-pip
           pip3 install cffi virtualenv
       - name: Cache cargo build
@@ -176,7 +187,7 @@ jobs:
         manylinux: [ 'manylinux_2_24' ]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         id: rustup
         with:
@@ -204,8 +215,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.8"
       - uses: docker/setup-buildx-action@v1
@@ -273,10 +284,11 @@ jobs:
             abi: pp38-pypy38_pp73
             python: pypy3.8
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build Wheels
         run: |
-          echo 'curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+          echo 'set -ex
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
           source ~/.cargo/env
           rustup target add ${{ matrix.platform.target }}
 

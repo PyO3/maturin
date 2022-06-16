@@ -47,6 +47,7 @@ impl fmt::Display for Os {
 #[serde(rename_all = "lowercase")]
 pub enum Arch {
     Aarch64,
+    Armv6L,
     Armv7L,
     #[serde(alias = "ppc64le")]
     Powerpc64Le,
@@ -62,6 +63,7 @@ impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Arch::Aarch64 => write!(f, "aarch64"),
+            Arch::Armv6L => write!(f, "armv6l"),
             Arch::Armv7L => write!(f, "armv7l"),
             Arch::Powerpc64Le => write!(f, "ppc64le"),
             Arch::Powerpc64 => write!(f, "ppc64"),
@@ -77,6 +79,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
     match os {
         Os::Linux => vec![
             Arch::Aarch64,
+            Arch::Armv6L,
             Arch::Armv7L,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
@@ -120,6 +123,8 @@ impl Target {
     ///
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
+        use target_lexicon::ArmArchitecture;
+
         let host_triple = get_host_target()?;
         let (platform, triple) = if let Some(ref target_triple) = target_triple {
             let platform: Triple = target_triple
@@ -150,7 +155,10 @@ impl Target {
         let arch = match platform.architecture {
             target_lexicon::Architecture::X86_64 => Arch::X86_64,
             target_lexicon::Architecture::X86_32(_) => Arch::X86,
-            target_lexicon::Architecture::Arm(_) => Arch::Armv7L,
+            target_lexicon::Architecture::Arm(arm_arch) => match arm_arch {
+                ArmArchitecture::Arm | ArmArchitecture::Armv6 => Arch::Armv6L,
+                _ => Arch::Armv7L,
+            },
             target_lexicon::Architecture::Aarch64(_) => Arch::Aarch64,
             target_lexicon::Architecture::Powerpc64 => Arch::Powerpc64,
             target_lexicon::Architecture::Powerpc64le => Arch::Powerpc64Le,
@@ -309,6 +317,7 @@ impl Target {
     pub fn get_python_arch(&self) -> &str {
         match self.arch {
             Arch::Aarch64 => "aarch64",
+            Arch::Armv6L => "armv6l",
             Arch::Armv7L => "armv7l",
             Arch::Powerpc64Le => "powerpc64le",
             Arch::Powerpc64 => "powerpc64",
@@ -340,19 +349,15 @@ impl Target {
                 PlatformTag::manylinux2014()
             }
             Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
+            Arch::Armv6L => PlatformTag::Linux,
         }
     }
 
     /// Returns whether the platform is 64 bit or 32 bit
     pub fn pointer_width(&self) -> usize {
         match self.arch {
-            Arch::Aarch64 => 64,
-            Arch::Armv7L => 32,
-            Arch::Powerpc64 => 64,
-            Arch::Powerpc64Le => 64,
-            Arch::X86 => 32,
-            Arch::X86_64 => 64,
-            Arch::S390X => 64,
+            Arch::Aarch64 | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::X86_64 | Arch::S390X => 64,
+            Arch::Armv6L | Arch::Armv7L | Arch::X86 => 32,
         }
     }
 

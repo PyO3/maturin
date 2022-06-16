@@ -10,10 +10,12 @@ maturin's emojis.
 """
 
 import os
+import platform
 import shlex
 import shutil
 import subprocess
 import sys
+import struct
 from subprocess import SubprocessError
 from typing import Dict
 
@@ -34,6 +36,15 @@ def get_maturin_pep517_args():
     return args
 
 
+def _additional_pep517_args():
+    # Support building for 32-bit Python on x64 Windows
+    if platform.system().lower() == "windows" and platform.machine().lower() == "amd64":
+        pointer_width = struct.calcsize("P") * 8
+        if pointer_width == 32:
+            return ["--target", "i686-pc-windows-msvc"]
+    return []
+
+
 # noinspection PyUnusedLocal
 def _build_wheel(
     wheel_directory, config_settings=None, metadata_directory=None, editable=False
@@ -49,8 +60,10 @@ def _build_wheel(
         "--compatibility",
         "off",
     ]
+    command.extend(_additional_pep517_args())
     if editable:
         command.append("--editable")
+
     pep517_args = get_maturin_pep517_args()
     if pep517_args:
         command.extend(pep517_args)
@@ -151,6 +164,7 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
         "--interpreter",
         sys.executable,
     ]
+    command.extend(_additional_pep517_args())
     pep517_args = get_maturin_pep517_args()
     if pep517_args:
         command.extend(pep517_args)

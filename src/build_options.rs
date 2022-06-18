@@ -1,6 +1,7 @@
 use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
+use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::BuildContext;
 use crate::CargoToml;
@@ -42,7 +43,7 @@ fn pyo3_ffi_minimum_python_minor_version(major_version: u64, minor_version: u64)
 
 /// Cargo options for the build process
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct CargoOptions {
     /// Do not print cargo log messages
     #[clap(short = 'q', long)]
@@ -537,6 +538,8 @@ impl BuildOptions {
             None
         };
         let pyproject = pyproject.as_ref();
+        let tool_maturin = pyproject.and_then(|p| p.maturin());
+
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
         let extra_metadata = cargo_toml.remaining_core_metadata();
@@ -569,17 +572,13 @@ impl BuildOptions {
             data,
         )?;
 
-        let mut args_from_pyproject = Vec::new();
-        /*
-        let mut cargo_extra_args = self.cargo_extra_args.clone();
-        if cargo_extra_args.is_empty() {
-            // if not supplied on command line, try pyproject.toml
-            if let Some(args) = pyproject.and_then(|x| x.cargo_extra_args()) {
-                cargo_extra_args.push(args.to_string());
-                args_from_pyproject.push("cargo-extra-args");
-            }
-        }
-        */
+        let mut cargo_options = self.cargo.clone();
+
+        let mut args_from_pyproject = if let Some(tool_maturin) = tool_maturin {
+            cargo_options.merge_with_pyproject_toml(tool_maturin.clone())
+        } else {
+            Vec::new()
+        };
 
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&self.cargo)?;
 
@@ -675,17 +674,13 @@ impl BuildOptions {
             self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?
         };
 
-        /*
-        let mut rustc_extra_args = self.rustc_extra_args.clone();
-        if rustc_extra_args.is_empty() {
+        if cargo_options.args.is_empty() {
             // if not supplied on command line, try pyproject.toml
-            if let Some(args) = pyproject.and_then(|x| x.rustc_extra_args()) {
-                rustc_extra_args.push(args.to_string());
-                args_from_pyproject.push("rustc-extra-args");
+            if let Some(args) = tool_maturin.and_then(|x| x.rustc_args.as_ref()) {
+                cargo_options.args.extend(args.iter().cloned());
+                args_from_pyproject.push("rustc-args");
             }
         }
-        rustc_extra_args = split_extra_args(&rustc_extra_args)?;
-        */
 
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
@@ -807,7 +802,7 @@ impl BuildOptions {
             cargo_metadata,
             universal2,
             editable,
-            cargo_options: self.cargo,
+            cargo_options,
         })
     }
 }
@@ -1205,6 +1200,68 @@ impl From<CargoOptions> for cargo_options::Rustc {
             args: cargo.args,
             ..Default::default()
         }
+    }
+}
+
+impl CargoOptions {
+    fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
+        let mut args_from_pyproject = Vec::new();
+
+        if self.profile.is_none() && tool_maturin.profile.is_some() {
+            self.profile = tool_maturin.profile.clone();
+            args_from_pyproject.push("profile");
+        }
+
+        if let Some(features) = tool_maturin.features {
+            if self.features.is_empty() {
+                self.features = features;
+                args_from_pyproject.push("features");
+            }
+        }
+
+        if let Some(all_features) = tool_maturin.all_features {
+            if !self.all_features {
+                self.all_features = all_features;
+                args_from_pyproject.push("all-features");
+            }
+        }
+
+        if let Some(no_default_features) = tool_maturin.no_default_features {
+            if !self.no_default_features {
+                self.no_default_features = no_default_features;
+                args_from_pyproject.push("no-default-features");
+            }
+        }
+
+        if let Some(frozen) = tool_maturin.frozen {
+            if !self.frozen {
+                self.frozen = frozen;
+                args_from_pyproject.push("frozen");
+            }
+        }
+
+        if let Some(locked) = tool_maturin.locked {
+            if !self.locked {
+                self.locked = locked;
+                args_from_pyproject.push("locked");
+            }
+        }
+
+        if let Some(config) = tool_maturin.config {
+            if self.config.is_empty() {
+                self.config = config;
+                args_from_pyproject.push("config");
+            }
+        }
+
+        if let Some(unstable_flags) = tool_maturin.unstable_flags {
+            if self.unstable_flags.is_empty() {
+                self.unstable_flags = unstable_flags;
+                args_from_pyproject.push("unstable-flags");
+            }
+        }
+
+        args_from_pyproject
     }
 }
 

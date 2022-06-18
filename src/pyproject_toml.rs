@@ -16,19 +16,37 @@ pub struct Tool {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
-    manifest_path: Option<PathBuf>,
+    // maturin specific options
     sdist_include: Option<Vec<String>>,
     bindings: Option<String>,
-    cargo_extra_args: Option<String>,
     #[serde(alias = "manylinux")]
     compatibility: Option<PlatformTag>,
-    rustc_extra_args: Option<String>,
     #[serde(default)]
     skip_auditwheel: bool,
     #[serde(default)]
     strip: bool,
     /// Path to the wheel directory, defaults to `<module_name>.data`
     data: Option<PathBuf>,
+    // Some customizable cargo options
+    /// Build artifacts with the specified Cargo profile
+    pub profile: Option<String>,
+    /// Space or comma separated list of features to activate
+    pub features: Option<Vec<String>>,
+    /// Activate all available features
+    pub all_features: Option<bool>,
+    /// Do not activate the `default` feature
+    pub no_default_features: Option<bool>,
+    /// Path to Cargo.toml
+    pub manifest_path: Option<PathBuf>,
+    /// Require Cargo.lock and cache are up to date
+    pub frozen: Option<bool>,
+    /// Require Cargo.lock is up to date
+    pub locked: Option<bool>,
+    /// Override a configuration value (unstable)
+    pub config: Option<Vec<String>>,
+    /// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+    pub unstable_flags: Option<Vec<String>>,
+    pub rustc_args: Option<Vec<String>>,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -69,77 +87,49 @@ impl PyProjectToml {
         Ok(pyproject)
     }
 
+    /// Returns the values of `[tool.maturin]` in pyproject.toml
+    #[inline]
+    pub fn maturin(&self) -> Option<&ToolMaturin> {
+        self.tool.as_ref()?.maturin.as_ref()
+    }
+
     /// Returns the value of `[tool.maturin.sdist-include]` in pyproject.toml
     pub fn sdist_include(&self) -> Option<&Vec<String>> {
-        self.tool.as_ref()?.maturin.as_ref()?.sdist_include.as_ref()
+        self.maturin()?.sdist_include.as_ref()
     }
 
     /// Returns the value of `[tool.maturin.bindings]` in pyproject.toml
     pub fn bindings(&self) -> Option<&str> {
-        self.tool.as_ref()?.maturin.as_ref()?.bindings.as_deref()
-    }
-
-    /// Returns the value of `[tool.maturin.cargo-extra-args]` in pyproject.toml
-    pub fn cargo_extra_args(&self) -> Option<&str> {
-        self.tool
-            .as_ref()?
-            .maturin
-            .as_ref()?
-            .cargo_extra_args
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
+        self.maturin()?.bindings.as_deref()
     }
 
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
     pub fn compatibility(&self) -> Option<PlatformTag> {
-        self.tool.as_ref()?.maturin.as_ref()?.compatibility
-    }
-
-    /// Returns the value of `[tool.maturin.rustc-extra-args]` in pyproject.toml
-    pub fn rustc_extra_args(&self) -> Option<&str> {
-        self.tool
-            .as_ref()?
-            .maturin
-            .as_ref()?
-            .rustc_extra_args
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
+        self.maturin()?.compatibility
     }
 
     /// Returns the value of `[tool.maturin.skip-auditwheel]` in pyproject.toml
     pub fn skip_auditwheel(&self) -> bool {
-        self.tool
-            .as_ref()
-            .and_then(|tool| tool.maturin.as_ref())
+        self.maturin()
             .map(|maturin| maturin.skip_auditwheel)
             .unwrap_or_default()
     }
 
     /// Returns the value of `[tool.maturin.strip]` in pyproject.toml
     pub fn strip(&self) -> bool {
-        self.tool
-            .as_ref()
-            .and_then(|tool| tool.maturin.as_ref())
+        self.maturin()
             .map(|maturin| maturin.strip)
             .unwrap_or_default()
     }
 
     /// Returns the value of `[tool.maturin.data]` in pyproject.toml
     pub fn data(&self) -> Option<&Path> {
-        self.tool
-            .as_ref()
-            .and_then(|tool| tool.maturin.as_ref())
-            .and_then(|maturin| maturin.data.as_deref())
+        self.maturin().and_then(|maturin| maturin.data.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
-        self.tool
-            .as_ref()?
-            .maturin
-            .as_ref()?
-            .manifest_path
-            .as_deref()
+        self.maturin()?.manifest_path.as_deref()
     }
 
     /// Having a pyproject.toml without a version constraint is a bad idea
@@ -195,7 +185,48 @@ impl PyProjectToml {
 mod tests {
     use crate::PyProjectToml;
     use fs_err as fs;
+    use std::path::Path;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_parse_tool_maturin() {
+        let tmp_dir = TempDir::new().unwrap();
+
+        fs::write(
+            tmp_dir.path().join("pyproject.toml"),
+            r#"[build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            manylinux = "2010"
+            manifest-path = "Cargo.toml"
+            profile = "dev"
+            features = ["foo", "bar"]
+            no-default-features = true
+            locked = true
+            rustc-args = ["-Z", "unstable-options"]
+            "#,
+        )
+        .unwrap();
+        let pyproject = PyProjectToml::new(tmp_dir).unwrap();
+        assert_eq!(pyproject.manifest_path(), Some(Path::new("Cargo.toml")));
+
+        let maturin = pyproject.maturin().unwrap();
+        assert_eq!(maturin.profile.as_deref(), Some("dev"));
+        assert_eq!(
+            maturin.features,
+            Some(vec!["foo".to_string(), "bar".to_string()])
+        );
+        assert!(maturin.all_features.is_none());
+        assert_eq!(maturin.no_default_features, Some(true));
+        assert_eq!(maturin.locked, Some(true));
+        assert!(maturin.frozen.is_none());
+        assert_eq!(
+            maturin.rustc_args,
+            Some(vec!["-Z".to_string(), "unstable-options".to_string()])
+        );
+    }
 
     #[test]
     fn test_warn_missing_maturin_version() {
@@ -211,14 +242,10 @@ mod tests {
 
             [tool.maturin]
             manylinux = "2010"
-            cargo-extra-args = ""
-            rustc-extra-args = "  "
             "#,
         )
         .unwrap();
         let without_constraint = PyProjectToml::new(without_constraint_dir).unwrap();
         assert!(!without_constraint.warn_missing_maturin_version());
-        assert!(without_constraint.cargo_extra_args().is_none());
-        assert!(without_constraint.rustc_extra_args().is_none());
     }
 }

@@ -15,9 +15,7 @@ use tempfile::TempDir;
 #[allow(clippy::too_many_arguments)]
 pub fn develop(
     bindings: Option<String>,
-    manifest_file: &Path,
-    cargo_extra_args: Vec<String>,
-    rustc_extra_args: Vec<String>,
+    cargo_options: CargoOptions,
     venv_dir: &Path,
     release: bool,
     strip: bool,
@@ -37,11 +35,7 @@ pub fn develop(
         skip_auditwheel: false,
         zig: false,
         universal2: false,
-        cargo: CargoOptions {
-            target: None,
-            manifest_path: Some(manifest_file.to_path_buf()),
-            ..Default::default()
-        },
+        cargo: cargo_options,
     };
 
     let build_context = build_options.into_build_context(release, strip, true)?;

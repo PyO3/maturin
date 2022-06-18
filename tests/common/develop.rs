@@ -1,7 +1,7 @@
 use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo};
 use anyhow::Result;
-use maturin::develop;
-use std::path::Path;
+use maturin::{develop, CargoOptions};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
@@ -34,13 +34,15 @@ pub fn test_develop(
     let manifest_file = package.as_ref().join("Cargo.toml");
     develop(
         bindings,
-        &manifest_file,
-        vec![
-            "--quiet".to_string(),
-            "--target-dir".to_string(),
-            format!("test-crates/targets/{}", unique_name),
-        ],
-        vec![],
+        CargoOptions {
+            manifest_path: Some(manifest_file),
+            quiet: true,
+            target_dir: Some(PathBuf::from(format!(
+                "test-crates/targets/{}",
+                unique_name
+            ))),
+            ..Default::default()
+        },
         &venv_dir,
         false,
         cfg!(feature = "faster-tests"),

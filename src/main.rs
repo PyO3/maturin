@@ -19,7 +19,11 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 #[derive(Debug, Parser)]
-#[clap(name = env!("CARGO_PKG_NAME"), version)]
+#[clap(
+    version,
+    name = env!("CARGO_PKG_NAME"),
+    global_setting(clap::AppSettings::DeriveDisplayOrder)
+)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
@@ -71,30 +75,12 @@ enum Opt {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
         #[clap(short = 'b', long = "bindings", alias = "binding-crate")]
         bindings: Option<String>,
-        #[clap(
-            short = 'm',
-            long = "manifest-path",
-            parse(from_os_str),
-            default_value = "Cargo.toml"
-        )]
-        /// The path to the Cargo.toml
-        manifest_path: PathBuf,
         /// Pass --release to cargo
         #[clap(short = 'r', long)]
         release: bool,
         /// Strip the library for minimum file size
         #[clap(long)]
         strip: bool,
-        /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
-        ///
-        /// Use as `--cargo-extra-args="--my-arg"`
-        #[clap(long = "cargo-extra-args")]
-        cargo_extra_args: Vec<String>,
-        /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
-        ///
-        /// Use as `--rustc-extra-args="--my-arg"`
-        #[clap(long = "rustc-extra-args")]
-        rustc_extra_args: Vec<String>,
         /// Install extra requires aka. optional dependencies
         ///
         /// Use as `--extras=extra1,extra2`
@@ -106,6 +92,8 @@ enum Opt {
             multiple_occurrences = false
         )]
         extras: Vec<String>,
+        #[clap(flatten)]
+        cargo_options: CargoOptions,
     },
     /// Build only a source distribution (sdist) without compiling.
     ///
@@ -383,12 +371,10 @@ fn run() -> Result<()> {
         }
         Opt::Develop {
             bindings,
-            manifest_path,
-            cargo_extra_args,
-            rustc_extra_args,
             release,
             strip,
             extras,
+            cargo_options,
         } => {
             let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
                 (Some(dir), None) => PathBuf::from(dir),
@@ -406,16 +392,7 @@ fn run() -> Result<()> {
                 }
             };
 
-            develop(
-                bindings,
-                &manifest_path,
-                cargo_extra_args,
-                rustc_extra_args,
-                &venv_dir,
-                release,
-                strip,
-                extras,
-            )?;
+            develop(bindings, cargo_options, &venv_dir, release, strip, extras)?;
         }
         Opt::SDist { manifest_path, out } => {
             let build_options = BuildOptions {

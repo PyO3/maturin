@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use flate2::read::GzDecoder;
-use maturin::BuildOptions;
+use maturin::{BuildOptions, CargoOptions};
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tar::Archive;
 
 /// Tries to compile a sample crate (pyo3-pure) for musl,
@@ -116,13 +116,15 @@ pub fn test_source_distribution(
     let sdist_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
     let build_options = BuildOptions {
-        manifest_path: Some(manifest_path),
         out: Some(sdist_directory),
-        cargo_extra_args: vec![
-            "--quiet".to_string(),
-            "--target-dir".to_string(),
-            "test-crates/targets/test_workspace_cargo_lock".to_string(),
-        ],
+        cargo: CargoOptions {
+            manifest_path: Some(manifest_path),
+            quiet: true,
+            target_dir: Some(PathBuf::from(
+                "test-crates/targets/test_workspace_cargo_lock",
+            )),
+            ..Default::default()
+        },
         ..Default::default()
     };
 

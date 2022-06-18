@@ -1264,6 +1264,7 @@ dependencies = [
  "anyhow",
  "base64",
  "bytesize",
+ "cargo-options",
  "cargo-xwin",
  "cargo-zigbuild",
  "cargo_metadata",

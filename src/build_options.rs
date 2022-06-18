@@ -1174,6 +1174,40 @@ fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Result<Vec<Strin
     Ok(cargo_metadata_extra_args)
 }
 
+impl From<CargoOptions> for cargo_options::Rustc {
+    fn from(cargo: CargoOptions) -> Self {
+        cargo_options::Rustc {
+            common: cargo_options::CommonOptions {
+                quiet: cargo.quiet,
+                jobs: cargo.jobs,
+                profile: cargo.profile,
+                features: cargo.features,
+                all_features: cargo.all_features,
+                no_default_features: cargo.no_default_features,
+                target: match cargo.target {
+                    Some(target) => vec![target],
+                    None => Vec::new(),
+                },
+                target_dir: cargo.target_dir,
+                manifest_path: cargo.manifest_path,
+                ignore_rust_version: cargo.ignore_rust_version,
+                verbose: cargo.verbose,
+                color: cargo.color,
+                frozen: cargo.frozen,
+                locked: cargo.locked,
+                offline: cargo.offline,
+                config: cargo.config,
+                unstable_flags: cargo.unstable_flags,
+                timings: cargo.timings,
+                ..Default::default()
+            },
+            future_incompat_report: cargo.future_incompat_report,
+            args: cargo.args,
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::path::Path;

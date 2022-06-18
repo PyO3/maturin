@@ -140,24 +140,23 @@ fn compile_target(
 ) -> Result<HashMap<String, PathBuf>> {
     let target = &context.target;
 
-    let mut shared_args = Vec::new();
-    let mut rustc_args: Vec<&str> = context
-        .cargo_options
-        .args
-        .iter()
-        .map(String::as_str)
-        .collect();
+    let mut cargo_rustc: cargo_options::Rustc = context.cargo_options.clone().into();
+    cargo_rustc.message_format = vec!["json".to_string()];
+
+    // --release and --profile are conflicting options
+    if context.release && cargo_rustc.profile.is_none() {
+        cargo_rustc.release = true;
+    }
 
     let mut rust_flags = env::var_os("RUSTFLAGS");
 
-    // We need to pass --bin / --lib to set the rustc extra args later
+    // We need to pass --bin / --lib
     match bindings_crate {
         BridgeModel::Bin(..) => {
-            shared_args.push("--bin");
-            shared_args.push(binding_target.name.as_str());
+            cargo_rustc.bin.push(binding_target.name.clone());
         }
         BridgeModel::Cffi | BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) => {
-            shared_args.push("--lib");
+            cargo_rustc.lib = true;
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
@@ -177,47 +176,41 @@ fn compile_target(
             format!("{base}.abi3.so", base = module_name)
         }
     };
-    // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
-    // non-existent library.
-    // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
-    let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
         if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bindings_crate {
-            let mac_args = &[
-                "-C",
-                "link-arg=-undefined",
-                "-C",
-                "link-arg=dynamic_lookup",
-                "-C",
-                &macos_dylib_install_name,
+            // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
+            // non-existent library.
+            // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
+            let macos_dylib_install_name =
+                format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
+            let mac_args = [
+                "-C".to_string(),
+                "link-arg=-undefined".to_string(),
+                "-C".to_string(),
+                "link-arg=dynamic_lookup".to_string(),
+                "-C".to_string(),
+                macos_dylib_install_name,
             ];
-            rustc_args.extend(mac_args);
+            cargo_rustc.args.extend(mac_args);
         }
     }
 
     if context.strip {
-        rustc_args.extend(&["-C", "link-arg=-s"]);
+        cargo_rustc
+            .args
+            .extend(["-C".to_string(), "link-arg=-s".to_string()]);
     }
-
-    let cargo_args = vec!["--message-format", "json"];
-
-    let build_args: Vec<_> = cargo_args
-        .iter()
-        .chain(&shared_args)
-        .chain(&["--"])
-        .chain(&rustc_args)
-        .collect();
 
     let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
-        let mut build = cargo_xwin::Rustc::new(Some(context.manifest_path.clone()));
+        let mut build = cargo_xwin::Rustc::from(cargo_rustc);
 
         build.target = vec![target_triple.to_string()];
         build.build_command()?
     } else {
-        let mut build = cargo_zigbuild::Rustc::new(Some(context.manifest_path.clone()));
+        let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
         if !context.zig {
             build.disable_zig_linker = true;
             if target.user_specified {
@@ -252,7 +245,6 @@ fn compile_target(
     }
 
     build_command
-        .args(&build_args)
         // We need to capture the json messages
         .stdout(Stdio::piped())
         // We can't get colored human and json messages from rustc as they are mutually exclusive,
@@ -375,16 +367,10 @@ fn compile_target(
         .expect("Failed to wait on cargo child process");
 
     if !status.success() {
-        let command_str = build_args
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<String>>()
-            .join(" ");
         bail!(
-            r#"Cargo build finished with "{}": `cargo rustc --manifest-path {} {}`"#,
+            r#"Cargo build finished with "{}": `{:?}`"#,
             status,
-            context.manifest_path.display(),
-            command_str
+            build_command,
         )
     }
 

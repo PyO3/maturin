@@ -1,5 +1,5 @@
 use crate::build_context::BridgeModel;
-use crate::{BuildContext, PlatformTag, PythonInterpreter};
+use crate::{BuildContext, PlatformTag, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
@@ -51,10 +51,7 @@ fn compile_universal2(
         "cdylib"
     };
     let mut aarch64_context = context.clone();
-    aarch64_context.cargo_extra_args.extend(vec![
-        "--target".to_string(),
-        "aarch64-apple-darwin".to_string(),
-    ]);
+    aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
 
     let aarch64_artifacts = compile_targets(
         &aarch64_context,
@@ -64,10 +61,7 @@ fn compile_universal2(
     )
     .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
-    x86_64_context.cargo_extra_args.extend(vec![
-        "--target".to_string(),
-        "x86_64-apple-darwin".to_string(),
-    ]);
+    x86_64_context.target = Target::from_target_triple(Some("x86_64-apple-darwin".to_string()))?;
 
     let x86_64_artifacts =
         compile_targets(&x86_64_context, python_interpreter, bindings_crate, targets)
@@ -146,23 +140,10 @@ fn compile_target(
 ) -> Result<HashMap<String, PathBuf>> {
     let target = &context.target;
 
-    let mut shared_args: Vec<_> = context
-        .cargo_extra_args
-        .iter()
-        .map(String::as_str)
-        .collect();
-
-    if context.release {
-        let has_cargo_profile = shared_args
-            .iter()
-            .any(|arg| *arg == "--profile" || arg.starts_with("--profile="));
-        // --release and --profile are conflicting options
-        if !has_cargo_profile {
-            shared_args.push("--release");
-        }
-    }
+    let mut shared_args = Vec::new();
     let mut rustc_args: Vec<&str> = context
-        .rustc_extra_args
+        .cargo_options
+        .args
         .iter()
         .map(String::as_str)
         .collect();

@@ -1,5 +1,6 @@
 use crate::auditwheel::{get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
+use crate::build_options::CargoOptions;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
@@ -182,7 +183,7 @@ pub struct BuildContext {
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     pub out: PathBuf,
-    /// Pass --release to cargo
+    /// Build artifacts in release mode, with optimizations
     pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
@@ -192,10 +193,6 @@ pub struct BuildContext {
     pub zig: bool,
     /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
     pub platform_tag: Vec<PlatformTag>,
-    /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
-    pub cargo_extra_args: Vec<String>,
-    /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
-    pub rustc_extra_args: Vec<String>,
     /// The available python interpreter
     pub interpreter: Vec<PythonInterpreter>,
     /// Cargo.toml as resolved by [cargo_metadata]
@@ -204,6 +201,8 @@ pub struct BuildContext {
     pub universal2: bool,
     /// Build editable wheels
     pub editable: bool,
+    /// Cargo build options
+    pub cargo_options: CargoOptions,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -260,10 +259,7 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the source distribution")?;
 
-        let include_cargo_lock = self
-            .cargo_extra_args
-            .iter()
-            .any(|arg| arg == "--locked" || arg == "--frozen");
+        let include_cargo_lock = self.cargo_options.locked || self.cargo_options.frozen;
         match PyProjectToml::new(self.manifest_path.parent().unwrap()) {
             Ok(pyproject) => {
                 let sdist_path = source_distribution(

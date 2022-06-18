@@ -8,7 +8,7 @@ use cargo_zigbuild::Zig;
 use clap::{ArgEnum, IntoApp, Parser, Subcommand};
 use clap_complete::Generator;
 use maturin::{
-    develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions,
+    develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions, CargoOptions,
     GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
@@ -27,9 +27,7 @@ enum Opt {
     #[clap(name = "build")]
     /// Build the crate into python packages
     Build {
-        #[clap(flatten)]
-        build: BuildOptions,
-        /// Pass --release to cargo
+        /// Build artifacts in release mode, with optimizations
         #[clap(short = 'r', long)]
         release: bool,
         /// Strip the library for minimum file size
@@ -38,13 +36,13 @@ enum Opt {
         /// Build a source distribution
         #[clap(long)]
         sdist: bool,
+        #[clap(flatten)]
+        build: BuildOptions,
     },
     #[cfg(feature = "upload")]
     #[clap(name = "publish")]
     /// Build and publish the crate as python packages to pypi
     Publish {
-        #[clap(flatten)]
-        build: BuildOptions,
         /// Do not pass --release to cargo
         #[clap(long)]
         debug: bool,
@@ -56,6 +54,8 @@ enum Opt {
         no_sdist: bool,
         #[clap(flatten)]
         publish: PublishOpt,
+        #[clap(flatten)]
+        build: BuildOptions,
     },
     #[clap(name = "list-python")]
     /// Searches and lists the available python installations
@@ -304,8 +304,11 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             manifest_path,
         } => {
             let build_options = BuildOptions {
-                manifest_path: Some(manifest_path),
                 out: Some(sdist_directory),
+                cargo: CargoOptions {
+                    manifest_path: Some(manifest_path),
+                    ..Default::default()
+                },
                 ..Default::default()
             };
             let build_context = build_options.into_build_context(false, false, false)?;
@@ -416,8 +419,11 @@ fn run() -> Result<()> {
         }
         Opt::SDist { manifest_path, out } => {
             let build_options = BuildOptions {
-                manifest_path: Some(manifest_path),
                 out,
+                cargo: CargoOptions {
+                    manifest_path: Some(manifest_path),
+                    ..Default::default()
+                },
                 ..Default::default()
             };
             let build_context = build_options.into_build_context(false, false, false)?;

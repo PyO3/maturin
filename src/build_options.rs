@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
@@ -37,6 +38,97 @@ fn pyo3_ffi_minimum_python_minor_version(major_version: u64, minor_version: u64)
     } else {
         None
     }
+}
+
+/// Cargo options for the build process
+#[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
+#[serde(default)]
+pub struct CargoOptions {
+    /// Do not print cargo log messages
+    #[clap(short = 'q', long)]
+    pub quiet: bool,
+
+    /// Number of parallel jobs, defaults to # of CPUs
+    #[clap(short = 'j', long, value_name = "N")]
+    pub jobs: Option<usize>,
+
+    /// Build artifacts with the specified Cargo profile
+    #[clap(long, value_name = "PROFILE-NAME")]
+    pub profile: Option<String>,
+
+    /// Space or comma separated list of features to activate
+    #[clap(long, multiple_values = true)]
+    pub features: Vec<String>,
+
+    /// Activate all available features
+    #[clap(long)]
+    pub all_features: bool,
+
+    /// Do not activate the `default` feature
+    #[clap(long)]
+    pub no_default_features: bool,
+
+    /// Build for the target triple
+    #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
+    pub target: Option<String>,
+
+    /// Directory for all generated artifacts
+    #[clap(long, value_name = "DIRECTORY", parse(from_os_str))]
+    pub target_dir: Option<PathBuf>,
+
+    /// Path to Cargo.toml
+    #[clap(short = 'm', long, value_name = "PATH", parse(from_os_str))]
+    pub manifest_path: Option<PathBuf>,
+
+    /// Ignore `rust-version` specification in packages
+    #[clap(long)]
+    pub ignore_rust_version: bool,
+
+    /// Use verbose output (-vv very verbose/build.rs output)
+    #[clap(short = 'v', long, parse(from_occurrences), max_occurrences = 2)]
+    pub verbose: usize,
+
+    /// Coloring: auto, always, never
+    #[clap(long, value_name = "WHEN")]
+    pub color: Option<String>,
+
+    /// Require Cargo.lock and cache are up to date
+    #[clap(long)]
+    pub frozen: bool,
+
+    /// Require Cargo.lock is up to date
+    #[clap(long)]
+    pub locked: bool,
+
+    /// Run without accessing the network
+    #[clap(long)]
+    pub offline: bool,
+
+    /// Override a configuration value (unstable)
+    #[clap(long, value_name = "KEY=VALUE", multiple_values = true)]
+    pub config: Vec<String>,
+
+    /// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+    #[clap(short = 'Z', value_name = "FLAG", multiple_values = true)]
+    pub unstable_flags: Vec<String>,
+
+    /// Timing output formats (unstable) (comma separated): html, json
+    #[clap(
+        long,
+        value_name = "FMTS",
+        min_values = 0,
+        value_delimiter = ',',
+        require_equals = true
+    )]
+    pub timings: Option<Vec<String>>,
+
+    /// Outputs a future incompatibility report at the end of the build (unstable)
+    #[clap(long)]
+    pub future_incompat_report: bool,
+
+    /// Rustc flags
+    #[clap(takes_value = true, multiple_values = true)]
+    pub args: Vec<String>,
 }
 
 /// High level API for building wheels from a crate which is also used for the CLI
@@ -78,10 +170,6 @@ pub struct BuildOptions {
     #[clap(short, long)]
     pub bindings: Option<String>,
 
-    /// The path to the Cargo.toml
-    #[clap(short = 'm', long = "manifest-path", parse(from_os_str), name = "PATH")]
-    pub manifest_path: Option<PathBuf>,
-
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     #[clap(short, long, parse(from_os_str))]
@@ -99,30 +187,28 @@ pub struct BuildOptions {
     #[clap(long)]
     pub zig: bool,
 
-    /// The --target option for cargo
-    #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
-    pub target: Option<String>,
-
-    /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
-    ///
-    /// Use as `--cargo-extra-args="--my-arg"`
-    ///
-    /// Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`.
-    /// maturin tries to pass only the shared subset of options to cargo metadata, but this is may
-    /// be a bit flaky.
-    #[clap(long = "cargo-extra-args")]
-    pub cargo_extra_args: Vec<String>,
-
-    /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
-    ///
-    /// Use as `--rustc-extra-args="--my-arg"`
-    #[clap(long = "rustc-extra-args")]
-    pub rustc_extra_args: Vec<String>,
-
     /// Control whether to build universal2 wheel for macOS or not.
     /// Only applies to macOS targets, do nothing otherwise.
     #[clap(long)]
     pub universal2: bool,
+
+    /// Cargo build options
+    #[clap(flatten)]
+    pub cargo: CargoOptions,
+}
+
+impl Deref for BuildOptions {
+    type Target = CargoOptions;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cargo
+    }
+}
+
+impl DerefMut for BuildOptions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cargo
+    }
 }
 
 impl BuildOptions {
@@ -484,6 +570,7 @@ impl BuildOptions {
         )?;
 
         let mut args_from_pyproject = Vec::new();
+        /*
         let mut cargo_extra_args = self.cargo_extra_args.clone();
         if cargo_extra_args.is_empty() {
             // if not supplied on command line, try pyproject.toml
@@ -495,10 +582,11 @@ impl BuildOptions {
         cargo_extra_args = split_extra_args(&cargo_extra_args)?;
 
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args)?;
+        */
 
         let result = MetadataCommand::new()
             .manifest_path(&manifest_file)
-            .other_options(cargo_metadata_extra_args)
+            // .other_options(cargo_metadata_extra_args)
             .exec();
 
         let cargo_metadata = match result {
@@ -588,6 +676,7 @@ impl BuildOptions {
             self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?
         };
 
+        /*
         let mut rustc_extra_args = self.rustc_extra_args.clone();
         if rustc_extra_args.is_empty() {
             // if not supplied on command line, try pyproject.toml
@@ -597,6 +686,7 @@ impl BuildOptions {
             }
         }
         rustc_extra_args = split_extra_args(&rustc_extra_args)?;
+        */
 
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
@@ -693,11 +783,10 @@ impl BuildOptions {
             );
         }
 
-        let target_dir = cargo_extra_args
-            .iter()
-            .position(|x| x == "--target-dir")
-            .and_then(|i| cargo_extra_args.get(i + 1))
-            .map(PathBuf::from)
+        let target_dir = self
+            .cargo
+            .target_dir
+            .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
 
         Ok(BuildContext {
@@ -715,12 +804,11 @@ impl BuildOptions {
             skip_auditwheel,
             zig: self.zig,
             platform_tag: platform_tags,
-            cargo_extra_args,
-            rustc_extra_args,
             interpreter,
             cargo_metadata,
             universal2,
             editable,
+            cargo_options: self.cargo,
         })
     }
 }
@@ -1223,15 +1311,6 @@ mod test {
             find_bridge(&pyo3_bin, None).unwrap(),
             BridgeModel::Bin(Some(..))
         ));
-    }
-
-    #[test]
-    fn test_argument_splitting() {
-        let mut options = BuildOptions::default();
-        options.cargo_extra_args.push("--features log".to_string());
-        options.bindings = Some("bin".to_string());
-        let context = options.into_build_context(false, false, false).unwrap();
-        assert_eq!(context.cargo_extra_args, vec!["--features", "log"])
     }
 
     #[test]

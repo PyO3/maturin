@@ -212,12 +212,12 @@ fn compile_target(
 
     let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
-        let mut build = cargo_xwin::Build::new(Some(context.manifest_path.clone()));
+        let mut build = cargo_xwin::Rustc::new(Some(context.manifest_path.clone()));
 
         build.target = vec![target_triple.to_string()];
-        build.build_command("rustc")?
+        build.build_command()?
     } else {
-        let mut build = cargo_zigbuild::Build::new(Some(context.manifest_path.clone()));
+        let mut build = cargo_zigbuild::Rustc::new(Some(context.manifest_path.clone()));
         if !context.zig {
             build.disable_zig_linker = true;
             if target.user_specified {
@@ -236,7 +236,7 @@ fn compile_target(
             };
             build.target = vec![zig_triple];
         }
-        build.build_command("rustc")?
+        build.build_command()?
     };
 
     if context.zig {

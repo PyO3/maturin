@@ -57,7 +57,9 @@ pub fn test_musl() -> Result<bool> {
         "x86_64-unknown-linux-musl",
         "--compatibility",
         "linux",
-        "--cargo-extra-args=--quiet --target-dir test-crates/targets/test_musl",
+        "--quiet",
+        "--target-dir",
+        "test-crates/targets/test_musl",
         "--out",
         "test-crates/wheels/test_musl",
     ])?;
@@ -94,7 +96,9 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "test-crates/workspace/py/Cargo.toml",
         "--compatibility",
         "linux",
-        "--cargo-extra-args=--quiet --target-dir test-crates/targets/test_workspace_cargo_lock",
+        "--quiet",
+        "--target-dir",
+        "test-crates/targets/test_workspace_cargo_lock",
         "--out",
         "test-crates/wheels/test_workspace_cargo_lock",
     ])?;

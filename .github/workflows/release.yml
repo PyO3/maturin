@@ -86,16 +86,16 @@ jobs:
       - name: Build wheel (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage" --compatibility manylinux2010 musllinux_1_1
+          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--no-default-features" --cargo-extra-args="--features log,upload,human-panic"
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features log,upload,human-panic
 
       - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --cargo-extra-args="--features password-storage"
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage
 
       - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
@@ -106,7 +106,7 @@ jobs:
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --universal2 --cargo-extra-args="--features password-storage"
+          cargo run -- build --release -b bin -o dist --universal2 --features password-storage
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'

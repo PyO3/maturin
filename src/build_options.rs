@@ -579,14 +579,13 @@ impl BuildOptions {
                 args_from_pyproject.push("cargo-extra-args");
             }
         }
-        cargo_extra_args = split_extra_args(&cargo_extra_args)?;
-
-        let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args)?;
         */
+
+        let cargo_metadata_extra_args = extract_cargo_metadata_args(&self.cargo)?;
 
         let result = MetadataCommand::new()
             .manifest_path(&manifest_file)
-            // .other_options(cargo_metadata_extra_args)
+            .other_options(cargo_metadata_extra_args)
             .exec();
 
         let cargo_metadata = match result {
@@ -1138,23 +1137,6 @@ fn find_interpreter_in_sysconfig(
     Ok(interpreters)
 }
 
-/// Helper function that calls shlex on all extra args given
-fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
-    let mut splitted_args = vec![];
-    for arg in given_args {
-        match shlex::split(arg) {
-            Some(split) => splitted_args.extend(split),
-            None => {
-                bail!(
-                    "Couldn't split argument from `--cargo-extra-args`: '{}'",
-                    arg
-                );
-            }
-        }
-    }
-    Ok(splitted_args)
-}
-
 /// We need to pass the global flags to cargo metadata
 /// (https://github.com/PyO3/maturin/issues/211 and https://github.com/PyO3/maturin/issues/472),
 /// but we can't pass all the extra args, as e.g. `--target` isn't supported, so this tries to
@@ -1164,37 +1146,30 @@ fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
 /// in the same string as its name or in the next one. For this naive parsing logic, we
 /// assume that the value is in the next argument if the argument string equals the name,
 /// otherwise it's in the same argument and the next argument is unrelated.
-fn extract_cargo_metadata_args(cargo_extra_args: &[String]) -> Result<Vec<String>> {
-    // flags name and whether it has a value
-    let known_prefixes = vec![
-        ("--frozen", false),
-        ("--locked", false),
-        ("--offline", false),
-        ("-Z", true),
-        ("--features", true),
-        ("--all-features", false),
-        ("--no-default-features", false),
-    ];
+fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Result<Vec<String>> {
     let mut cargo_metadata_extra_args = vec![];
-    let mut args_iter = cargo_extra_args.iter();
-    // We do manual iteration so we can take and skip the value of an option that is in the next
-    // argument
-    while let Some(arg) = args_iter.next() {
-        // Does it match any of the cargo metadata arguments?
-        if let Some((prefix, has_arg)) = known_prefixes
-            .iter()
-            .find(|(prefix, _)| arg.starts_with(prefix))
-        {
-            cargo_metadata_extra_args.push(arg.to_string());
-            // Do we also need to take the next argument?
-            if arg == prefix && *has_arg {
-                let value = args_iter.next().context(format!(
-                    "Can't parse cargo-extra-args: {} is expected to have an argument",
-                    prefix
-                ))?;
-                cargo_metadata_extra_args.push(value.to_owned());
-            }
-        }
+    if cargo_options.frozen {
+        cargo_metadata_extra_args.push("--frozen".to_string());
+    }
+    if cargo_options.locked {
+        cargo_metadata_extra_args.push("--locked".to_string());
+    }
+    if cargo_options.offline {
+        cargo_metadata_extra_args.push("--offline".to_string());
+    }
+    for feature in &cargo_options.features {
+        cargo_metadata_extra_args.push("--features".to_string());
+        cargo_metadata_extra_args.push(feature.clone());
+    }
+    if cargo_options.all_features {
+        cargo_metadata_extra_args.push("--all-features".to_string());
+    }
+    if cargo_options.no_default_features {
+        cargo_metadata_extra_args.push("--no-default-features".to_string());
+    }
+    for opt in &cargo_options.unstable_flags {
+        cargo_metadata_extra_args.push("-Z".to_string());
+        cargo_metadata_extra_args.push(opt.clone());
     }
     Ok(cargo_metadata_extra_args)
 }
@@ -1315,37 +1290,43 @@ mod test {
 
     #[test]
     fn test_old_extra_feature_args() {
-        let cargo_extra_args = "--no-default-features --features a --target x86_64-unknown-linux-musl --features=c --lib";
-        let cargo_extra_args = split_extra_args(&[cargo_extra_args.to_string()]).unwrap();
+        let cargo_extra_args = CargoOptions {
+            no_default_features: true,
+            features: vec!["a".to_string(), "c".to_string()],
+            target: Some("x86_64-unknown-linux-musl".to_string()),
+            ..Default::default()
+        };
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args).unwrap();
         assert_eq!(
             cargo_metadata_extra_args,
-            vec!["--no-default-features", "--features", "a", "--features=c"]
+            vec![
+                "--features",
+                "a",
+                "--features",
+                "c",
+                "--no-default-features",
+            ]
         );
     }
 
     #[test]
     fn test_extract_cargo_metadata_args() {
-        let args: Vec<_> = vec![
-            "--locked",
-            "--features=my-feature",
-            "--unbeknownst",
-            "--features",
-            "other-feature",
-            "--target",
-            "x86_64-unknown-linux-musl",
-            "-Zunstable-options",
-        ]
-        .iter()
-        .map(ToString::to_string)
-        .collect();
+        let args = CargoOptions {
+            locked: true,
+            features: vec!["my-feature".to_string(), "other-feature".to_string()],
+            target: Some("x86_64-unknown-linux-musl".to_string()),
+            unstable_flags: vec!["unstable-options".to_string()],
+            ..Default::default()
+        };
 
         let expected = vec![
             "--locked",
-            "--features=my-feature",
+            "--features",
+            "my-feature",
             "--features",
             "other-feature",
-            "-Zunstable-options",
+            "-Z",
+            "unstable-options",
         ];
 
         assert_eq!(extract_cargo_metadata_args(&args).unwrap(), expected);

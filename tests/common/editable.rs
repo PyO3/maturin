@@ -18,22 +18,21 @@ pub fn test_editable(
 
     let (venv_dir, python) = create_virtualenv(&package, "editable", None)?;
     let interpreter = python.to_str().expect("invalid interpreter path");
-    let cargo_extra_args = format!(
-        "--cargo-extra-args=--quiet --target-dir test-crates/targets/{}",
-        unique_name
-    );
+    let target_dir = format!("test-crates/targets/{}", unique_name);
     let wheel_dir = format!("test-crates/wheels/{}", unique_name);
 
     // The first argument is ignored by clap
     let mut cli = vec![
         "build",
+        "--quiet",
         "--interpreter",
         interpreter,
         "--manifest-path",
         &package_string,
         "--compatibility",
         "linux",
-        &cargo_extra_args,
+        "--target-dir",
+        &target_dir,
         "--out",
         &wheel_dir,
     ];

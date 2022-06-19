@@ -28,15 +28,14 @@ pub fn test_integration(
 
     // The first argument is ignored by clap
     let shed = format!("test-crates/wheels/{}", unique_name);
-    let cargo_extra_args = format!(
-        "--cargo-extra-args=--quiet --target-dir test-crates/targets/{}",
-        unique_name
-    );
+    let target_dir = format!("test-crates/targets/{}", unique_name);
     let mut cli = vec![
         "build",
+        "--quiet",
         "--manifest-path",
         &package_string,
-        &cargo_extra_args,
+        "--target-dir",
+        &target_dir,
         "--out",
         &shed,
     ];
@@ -170,12 +169,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     create_conda_env("A-pyo3-build-env-310", 3, 10);
 
     // The first argument is ignored by clap
-    let mut cli = vec![
-        "build",
-        "--manifest-path",
-        &package_string,
-        "--cargo-extra-args=--quiet",
-    ];
+    let mut cli = vec!["build", "--manifest-path", &package_string, "--quiet"];
 
     if let Some(ref bindings) = bindings {
         cli.push("--bindings");

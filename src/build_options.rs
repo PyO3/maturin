@@ -1,6 +1,7 @@
 use crate::auditwheel::PlatformTag;
 use crate::build_context::{BridgeModel, ProjectLayout};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
+use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::BuildContext;
 use crate::CargoToml;
@@ -15,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
@@ -37,6 +39,97 @@ fn pyo3_ffi_minimum_python_minor_version(major_version: u64, minor_version: u64)
     } else {
         None
     }
+}
+
+/// Cargo options for the build process
+#[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct CargoOptions {
+    /// Do not print cargo log messages
+    #[clap(short = 'q', long)]
+    pub quiet: bool,
+
+    /// Number of parallel jobs, defaults to # of CPUs
+    #[clap(short = 'j', long, value_name = "N")]
+    pub jobs: Option<usize>,
+
+    /// Build artifacts with the specified Cargo profile
+    #[clap(long, value_name = "PROFILE-NAME")]
+    pub profile: Option<String>,
+
+    /// Space or comma separated list of features to activate
+    #[clap(long, multiple_values = true)]
+    pub features: Vec<String>,
+
+    /// Activate all available features
+    #[clap(long)]
+    pub all_features: bool,
+
+    /// Do not activate the `default` feature
+    #[clap(long)]
+    pub no_default_features: bool,
+
+    /// Build for the target triple
+    #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
+    pub target: Option<String>,
+
+    /// Directory for all generated artifacts
+    #[clap(long, value_name = "DIRECTORY", parse(from_os_str))]
+    pub target_dir: Option<PathBuf>,
+
+    /// Path to Cargo.toml
+    #[clap(short = 'm', long, value_name = "PATH", parse(from_os_str))]
+    pub manifest_path: Option<PathBuf>,
+
+    /// Ignore `rust-version` specification in packages
+    #[clap(long)]
+    pub ignore_rust_version: bool,
+
+    /// Use verbose output (-vv very verbose/build.rs output)
+    #[clap(short = 'v', long, parse(from_occurrences), max_occurrences = 2)]
+    pub verbose: usize,
+
+    /// Coloring: auto, always, never
+    #[clap(long, value_name = "WHEN")]
+    pub color: Option<String>,
+
+    /// Require Cargo.lock and cache are up to date
+    #[clap(long)]
+    pub frozen: bool,
+
+    /// Require Cargo.lock is up to date
+    #[clap(long)]
+    pub locked: bool,
+
+    /// Run without accessing the network
+    #[clap(long)]
+    pub offline: bool,
+
+    /// Override a configuration value (unstable)
+    #[clap(long, value_name = "KEY=VALUE", multiple_values = true)]
+    pub config: Vec<String>,
+
+    /// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+    #[clap(short = 'Z', value_name = "FLAG", multiple_values = true)]
+    pub unstable_flags: Vec<String>,
+
+    /// Timing output formats (unstable) (comma separated): html, json
+    #[clap(
+        long,
+        value_name = "FMTS",
+        min_values = 0,
+        value_delimiter = ',',
+        require_equals = true
+    )]
+    pub timings: Option<Vec<String>>,
+
+    /// Outputs a future incompatibility report at the end of the build (unstable)
+    #[clap(long)]
+    pub future_incompat_report: bool,
+
+    /// Rustc flags
+    #[clap(takes_value = true, multiple_values = true)]
+    pub args: Vec<String>,
 }
 
 /// High level API for building wheels from a crate which is also used for the CLI
@@ -78,10 +171,6 @@ pub struct BuildOptions {
     #[clap(short, long)]
     pub bindings: Option<String>,
 
-    /// The path to the Cargo.toml
-    #[clap(short = 'm', long = "manifest-path", parse(from_os_str), name = "PATH")]
-    pub manifest_path: Option<PathBuf>,
-
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     #[clap(short, long, parse(from_os_str))]
@@ -99,30 +188,28 @@ pub struct BuildOptions {
     #[clap(long)]
     pub zig: bool,
 
-    /// The --target option for cargo
-    #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
-    pub target: Option<String>,
-
-    /// Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
-    ///
-    /// Use as `--cargo-extra-args="--my-arg"`
-    ///
-    /// Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo rustc`.
-    /// maturin tries to pass only the shared subset of options to cargo metadata, but this is may
-    /// be a bit flaky.
-    #[clap(long = "cargo-extra-args")]
-    pub cargo_extra_args: Vec<String>,
-
-    /// Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
-    ///
-    /// Use as `--rustc-extra-args="--my-arg"`
-    #[clap(long = "rustc-extra-args")]
-    pub rustc_extra_args: Vec<String>,
-
     /// Control whether to build universal2 wheel for macOS or not.
     /// Only applies to macOS targets, do nothing otherwise.
     #[clap(long)]
     pub universal2: bool,
+
+    /// Cargo build options
+    #[clap(flatten)]
+    pub cargo: CargoOptions,
+}
+
+impl Deref for BuildOptions {
+    type Target = CargoOptions;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cargo
+    }
+}
+
+impl DerefMut for BuildOptions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cargo
+    }
 }
 
 impl BuildOptions {
@@ -451,6 +538,8 @@ impl BuildOptions {
             None
         };
         let pyproject = pyproject.as_ref();
+        let tool_maturin = pyproject.and_then(|p| p.maturin());
+
         let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
         let extra_metadata = cargo_toml.remaining_core_metadata();
@@ -483,18 +572,15 @@ impl BuildOptions {
             data,
         )?;
 
-        let mut args_from_pyproject = Vec::new();
-        let mut cargo_extra_args = self.cargo_extra_args.clone();
-        if cargo_extra_args.is_empty() {
-            // if not supplied on command line, try pyproject.toml
-            if let Some(args) = pyproject.and_then(|x| x.cargo_extra_args()) {
-                cargo_extra_args.push(args.to_string());
-                args_from_pyproject.push("cargo-extra-args");
-            }
-        }
-        cargo_extra_args = split_extra_args(&cargo_extra_args)?;
+        let mut cargo_options = self.cargo.clone();
 
-        let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args)?;
+        let mut args_from_pyproject = if let Some(tool_maturin) = tool_maturin {
+            cargo_options.merge_with_pyproject_toml(tool_maturin.clone())
+        } else {
+            Vec::new()
+        };
+
+        let cargo_metadata_extra_args = extract_cargo_metadata_args(&self.cargo)?;
 
         let result = MetadataCommand::new()
             .manifest_path(&manifest_file)
@@ -588,15 +674,13 @@ impl BuildOptions {
             self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?
         };
 
-        let mut rustc_extra_args = self.rustc_extra_args.clone();
-        if rustc_extra_args.is_empty() {
+        if cargo_options.args.is_empty() {
             // if not supplied on command line, try pyproject.toml
-            if let Some(args) = pyproject.and_then(|x| x.rustc_extra_args()) {
-                rustc_extra_args.push(args.to_string());
-                args_from_pyproject.push("rustc-extra-args");
+            if let Some(args) = tool_maturin.and_then(|x| x.rustc_args.as_ref()) {
+                cargo_options.args.extend(args.iter().cloned());
+                args_from_pyproject.push("rustc-args");
             }
         }
-        rustc_extra_args = split_extra_args(&rustc_extra_args)?;
 
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
@@ -693,11 +777,10 @@ impl BuildOptions {
             );
         }
 
-        let target_dir = cargo_extra_args
-            .iter()
-            .position(|x| x == "--target-dir")
-            .and_then(|i| cargo_extra_args.get(i + 1))
-            .map(PathBuf::from)
+        let target_dir = self
+            .cargo
+            .target_dir
+            .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
 
         Ok(BuildContext {
@@ -715,12 +798,11 @@ impl BuildOptions {
             skip_auditwheel,
             zig: self.zig,
             platform_tag: platform_tags,
-            cargo_extra_args,
-            rustc_extra_args,
             interpreter,
             cargo_metadata,
             universal2,
             editable,
+            cargo_options,
         })
     }
 }
@@ -1050,23 +1132,6 @@ fn find_interpreter_in_sysconfig(
     Ok(interpreters)
 }
 
-/// Helper function that calls shlex on all extra args given
-fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
-    let mut splitted_args = vec![];
-    for arg in given_args {
-        match shlex::split(arg) {
-            Some(split) => splitted_args.extend(split),
-            None => {
-                bail!(
-                    "Couldn't split argument from `--cargo-extra-args`: '{}'",
-                    arg
-                );
-            }
-        }
-    }
-    Ok(splitted_args)
-}
-
 /// We need to pass the global flags to cargo metadata
 /// (https://github.com/PyO3/maturin/issues/211 and https://github.com/PyO3/maturin/issues/472),
 /// but we can't pass all the extra args, as e.g. `--target` isn't supported, so this tries to
@@ -1076,39 +1141,128 @@ fn split_extra_args(given_args: &[String]) -> Result<Vec<String>> {
 /// in the same string as its name or in the next one. For this naive parsing logic, we
 /// assume that the value is in the next argument if the argument string equals the name,
 /// otherwise it's in the same argument and the next argument is unrelated.
-fn extract_cargo_metadata_args(cargo_extra_args: &[String]) -> Result<Vec<String>> {
-    // flags name and whether it has a value
-    let known_prefixes = vec![
-        ("--frozen", false),
-        ("--locked", false),
-        ("--offline", false),
-        ("-Z", true),
-        ("--features", true),
-        ("--all-features", false),
-        ("--no-default-features", false),
-    ];
+fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Result<Vec<String>> {
     let mut cargo_metadata_extra_args = vec![];
-    let mut args_iter = cargo_extra_args.iter();
-    // We do manual iteration so we can take and skip the value of an option that is in the next
-    // argument
-    while let Some(arg) = args_iter.next() {
-        // Does it match any of the cargo metadata arguments?
-        if let Some((prefix, has_arg)) = known_prefixes
-            .iter()
-            .find(|(prefix, _)| arg.starts_with(prefix))
-        {
-            cargo_metadata_extra_args.push(arg.to_string());
-            // Do we also need to take the next argument?
-            if arg == prefix && *has_arg {
-                let value = args_iter.next().context(format!(
-                    "Can't parse cargo-extra-args: {} is expected to have an argument",
-                    prefix
-                ))?;
-                cargo_metadata_extra_args.push(value.to_owned());
-            }
-        }
+    if cargo_options.frozen {
+        cargo_metadata_extra_args.push("--frozen".to_string());
+    }
+    if cargo_options.locked {
+        cargo_metadata_extra_args.push("--locked".to_string());
+    }
+    if cargo_options.offline {
+        cargo_metadata_extra_args.push("--offline".to_string());
+    }
+    for feature in &cargo_options.features {
+        cargo_metadata_extra_args.push("--features".to_string());
+        cargo_metadata_extra_args.push(feature.clone());
+    }
+    if cargo_options.all_features {
+        cargo_metadata_extra_args.push("--all-features".to_string());
+    }
+    if cargo_options.no_default_features {
+        cargo_metadata_extra_args.push("--no-default-features".to_string());
+    }
+    for opt in &cargo_options.unstable_flags {
+        cargo_metadata_extra_args.push("-Z".to_string());
+        cargo_metadata_extra_args.push(opt.clone());
     }
     Ok(cargo_metadata_extra_args)
+}
+
+impl From<CargoOptions> for cargo_options::Rustc {
+    fn from(cargo: CargoOptions) -> Self {
+        cargo_options::Rustc {
+            common: cargo_options::CommonOptions {
+                quiet: cargo.quiet,
+                jobs: cargo.jobs,
+                profile: cargo.profile,
+                features: cargo.features,
+                all_features: cargo.all_features,
+                no_default_features: cargo.no_default_features,
+                target: match cargo.target {
+                    Some(target) => vec![target],
+                    None => Vec::new(),
+                },
+                target_dir: cargo.target_dir,
+                manifest_path: cargo.manifest_path,
+                ignore_rust_version: cargo.ignore_rust_version,
+                verbose: cargo.verbose,
+                color: cargo.color,
+                frozen: cargo.frozen,
+                locked: cargo.locked,
+                offline: cargo.offline,
+                config: cargo.config,
+                unstable_flags: cargo.unstable_flags,
+                timings: cargo.timings,
+                ..Default::default()
+            },
+            future_incompat_report: cargo.future_incompat_report,
+            args: cargo.args,
+            ..Default::default()
+        }
+    }
+}
+
+impl CargoOptions {
+    fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
+        let mut args_from_pyproject = Vec::new();
+
+        if self.profile.is_none() && tool_maturin.profile.is_some() {
+            self.profile = tool_maturin.profile.clone();
+            args_from_pyproject.push("profile");
+        }
+
+        if let Some(features) = tool_maturin.features {
+            if self.features.is_empty() {
+                self.features = features;
+                args_from_pyproject.push("features");
+            }
+        }
+
+        if let Some(all_features) = tool_maturin.all_features {
+            if !self.all_features {
+                self.all_features = all_features;
+                args_from_pyproject.push("all-features");
+            }
+        }
+
+        if let Some(no_default_features) = tool_maturin.no_default_features {
+            if !self.no_default_features {
+                self.no_default_features = no_default_features;
+                args_from_pyproject.push("no-default-features");
+            }
+        }
+
+        if let Some(frozen) = tool_maturin.frozen {
+            if !self.frozen {
+                self.frozen = frozen;
+                args_from_pyproject.push("frozen");
+            }
+        }
+
+        if let Some(locked) = tool_maturin.locked {
+            if !self.locked {
+                self.locked = locked;
+                args_from_pyproject.push("locked");
+            }
+        }
+
+        if let Some(config) = tool_maturin.config {
+            if self.config.is_empty() {
+                self.config = config;
+                args_from_pyproject.push("config");
+            }
+        }
+
+        if let Some(unstable_flags) = tool_maturin.unstable_flags {
+            if self.unstable_flags.is_empty() {
+                self.unstable_flags = unstable_flags;
+                args_from_pyproject.push("unstable-flags");
+            }
+        }
+
+        args_from_pyproject
+    }
 }
 
 #[cfg(test)]
@@ -1226,47 +1380,44 @@ mod test {
     }
 
     #[test]
-    fn test_argument_splitting() {
-        let mut options = BuildOptions::default();
-        options.cargo_extra_args.push("--features log".to_string());
-        options.bindings = Some("bin".to_string());
-        let context = options.into_build_context(false, false, false).unwrap();
-        assert_eq!(context.cargo_extra_args, vec!["--features", "log"])
-    }
-
-    #[test]
     fn test_old_extra_feature_args() {
-        let cargo_extra_args = "--no-default-features --features a --target x86_64-unknown-linux-musl --features=c --lib";
-        let cargo_extra_args = split_extra_args(&[cargo_extra_args.to_string()]).unwrap();
+        let cargo_extra_args = CargoOptions {
+            no_default_features: true,
+            features: vec!["a".to_string(), "c".to_string()],
+            target: Some("x86_64-unknown-linux-musl".to_string()),
+            ..Default::default()
+        };
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args).unwrap();
         assert_eq!(
             cargo_metadata_extra_args,
-            vec!["--no-default-features", "--features", "a", "--features=c"]
+            vec![
+                "--features",
+                "a",
+                "--features",
+                "c",
+                "--no-default-features",
+            ]
         );
     }
 
     #[test]
     fn test_extract_cargo_metadata_args() {
-        let args: Vec<_> = vec![
-            "--locked",
-            "--features=my-feature",
-            "--unbeknownst",
-            "--features",
-            "other-feature",
-            "--target",
-            "x86_64-unknown-linux-musl",
-            "-Zunstable-options",
-        ]
-        .iter()
-        .map(ToString::to_string)
-        .collect();
+        let args = CargoOptions {
+            locked: true,
+            features: vec!["my-feature".to_string(), "other-feature".to_string()],
+            target: Some("x86_64-unknown-linux-musl".to_string()),
+            unstable_flags: vec!["unstable-options".to_string()],
+            ..Default::default()
+        };
 
         let expected = vec![
             "--locked",
-            "--features=my-feature",
+            "--features",
+            "my-feature",
             "--features",
             "other-feature",
-            "-Zunstable-options",
+            "-Z",
+            "unstable-options",
         ];
 
         assert_eq!(extract_cargo_metadata_args(&args).unwrap(), expected);

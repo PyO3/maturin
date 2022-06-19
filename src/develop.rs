@@ -1,3 +1,4 @@
+use crate::build_options::CargoOptions;
 use crate::BuildOptions;
 use crate::PlatformTag;
 use crate::PythonInterpreter;
@@ -14,9 +15,7 @@ use tempfile::TempDir;
 #[allow(clippy::too_many_arguments)]
 pub fn develop(
     bindings: Option<String>,
-    manifest_file: &Path,
-    cargo_extra_args: Vec<String>,
-    rustc_extra_args: Vec<String>,
+    cargo_options: CargoOptions,
     venv_dir: &Path,
     release: bool,
     strip: bool,
@@ -32,14 +31,11 @@ pub fn develop(
         interpreter: vec![python.clone()],
         find_interpreter: false,
         bindings,
-        manifest_path: Some(manifest_file.to_path_buf()),
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
         zig: false,
-        target: None,
-        cargo_extra_args,
-        rustc_extra_args,
         universal2: false,
+        cargo: cargo_options,
     };
 
     let build_context = build_options.into_build_context(release, strip, true)?;

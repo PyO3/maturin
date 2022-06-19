@@ -243,9 +243,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68dacdf12b405b432ddcb94aa5edef0766daf8cb781f484e56b518305afd45ba"
+checksum = "23ce158e74c4b485a51101125ce308f69a62c13310f4c6e9a082acd862f38995"
 dependencies = [
  "clap",
 ]
@@ -261,9 +261,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.8.7"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb40f2f01bc8ff52fbb570b4b7f8ec823ba21ce1a64352492868eab29f39b9fc"
+checksum = "ef75f26606f9e2fa5e3ebf73e5a4518dfe97e9f034bae9d1147c04ccaba656b3"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -278,9 +278,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.9.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed951e06c76e4580db0fec84aad5a0266f876f82c3190e323b4c09875edf5750"
+checksum = "3f82d567aa085050598e94d2326132630715fc97506544eef56eea3c1ff7b28f"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -526,9 +526,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aaa7bd5fb665c6864b5f963dd9097905c54125909c7aa94c9e18507cdbe6c53"
+checksum = "4c02a4d71819009c192cf4872265391563fd6a84c81ff2c0f2a7026ca4c1d85c"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-utils",
@@ -547,26 +547,26 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.8"
+version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1145cf131a2c6ba0615079ab6a638f7e1973ac9c2634fcbeaaad6114246efe8c"
+checksum = "07db9d94cbd326813772c968ccd25999e5f8ae22f4f8d1b11effa37ef6ce281d"
 dependencies = [
  "autocfg",
  "cfg-if 1.0.0",
  "crossbeam-utils",
- "lazy_static",
  "memoffset",
+ "once_cell",
  "scopeguard",
 ]
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.8"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bf124c720b7686e3c2663cf54062ab0f68a88af2fb6a030e87e30bf721fcb38"
+checksum = "8ff1f980957787286a554052d03c7aee98d99cc32e09f6d45f0a814133c87978"
 dependencies = [
  "cfg-if 1.0.0",
- "lazy_static",
+ "once_cell",
 ]
 
 [[package]]
@@ -1019,9 +1019,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.11.2"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+checksum = "db0d4cf898abf0081f964436dc980e96670a0f36863e4b83aaacdb65c9d7ccc3"
 
 [[package]]
 name = "heck"
@@ -1113,9 +1113,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.8.2"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
+checksum = "6c6392766afd7964e2531940894cffe4bd8d7d17dbc3c1c4857040fd4b33bdb3"
 dependencies = [
  "autocfg",
  "hashbrown",
@@ -1264,6 +1264,7 @@ dependencies = [
  "anyhow",
  "base64",
  "bytesize",
+ "cargo-options",
  "cargo-xwin",
  "cargo-zigbuild",
  "cargo_metadata",

@@ -24,6 +24,7 @@ pub enum Os {
     Dragonfly,
     Illumos,
     Haiku,
+    Emscripten,
 }
 
 impl fmt::Display for Os {
@@ -38,6 +39,7 @@ impl fmt::Display for Os {
             Os::Dragonfly => write!(f, "DragonFly"),
             Os::Illumos => write!(f, "Illumos"),
             Os::Haiku => write!(f, "Haiku"),
+            Os::Emscripten => write!(f, "Emscripten"),
         }
     }
 }
@@ -57,6 +59,7 @@ pub enum Arch {
     X86,
     X86_64,
     S390X,
+    Wasm32,
 }
 
 impl fmt::Display for Arch {
@@ -70,6 +73,7 @@ impl fmt::Display for Arch {
             Arch::X86 => write!(f, "i686"),
             Arch::X86_64 => write!(f, "x86_64"),
             Arch::S390X => write!(f, "s390x"),
+            Arch::Wasm32 => write!(f, "wasm32"),
         }
     }
 }
@@ -100,6 +104,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
         Os::Haiku => vec![Arch::X86_64],
+        Os::Emscripten => vec![Arch::Wasm32],
     }
 }
 
@@ -123,7 +128,7 @@ impl Target {
     ///
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
-        use target_lexicon::ArmArchitecture;
+        use target_lexicon::{Architecture, ArmArchitecture, OperatingSystem};
 
         let host_triple = get_host_target()?;
         let (platform, triple) = if let Some(ref target_triple) = target_triple {
@@ -139,30 +144,31 @@ impl Target {
         };
 
         let os = match platform.operating_system {
-            target_lexicon::OperatingSystem::Linux => Os::Linux,
-            target_lexicon::OperatingSystem::Windows => Os::Windows,
-            target_lexicon::OperatingSystem::MacOSX { .. }
-            | target_lexicon::OperatingSystem::Darwin => Os::Macos,
-            target_lexicon::OperatingSystem::Netbsd => Os::NetBsd,
-            target_lexicon::OperatingSystem::Freebsd => Os::FreeBsd,
-            target_lexicon::OperatingSystem::Openbsd => Os::OpenBsd,
-            target_lexicon::OperatingSystem::Dragonfly => Os::Dragonfly,
-            target_lexicon::OperatingSystem::Illumos => Os::Illumos,
-            target_lexicon::OperatingSystem::Haiku => Os::Haiku,
+            OperatingSystem::Linux => Os::Linux,
+            OperatingSystem::Windows => Os::Windows,
+            OperatingSystem::MacOSX { .. } | OperatingSystem::Darwin => Os::Macos,
+            OperatingSystem::Netbsd => Os::NetBsd,
+            OperatingSystem::Freebsd => Os::FreeBsd,
+            OperatingSystem::Openbsd => Os::OpenBsd,
+            OperatingSystem::Dragonfly => Os::Dragonfly,
+            OperatingSystem::Illumos => Os::Illumos,
+            OperatingSystem::Haiku => Os::Haiku,
+            OperatingSystem::Emscripten => Os::Emscripten,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
         let arch = match platform.architecture {
-            target_lexicon::Architecture::X86_64 => Arch::X86_64,
-            target_lexicon::Architecture::X86_32(_) => Arch::X86,
-            target_lexicon::Architecture::Arm(arm_arch) => match arm_arch {
+            Architecture::X86_64 => Arch::X86_64,
+            Architecture::X86_32(_) => Arch::X86,
+            Architecture::Arm(arm_arch) => match arm_arch {
                 ArmArchitecture::Arm | ArmArchitecture::Armv6 => Arch::Armv6L,
                 _ => Arch::Armv7L,
             },
-            target_lexicon::Architecture::Aarch64(_) => Arch::Aarch64,
-            target_lexicon::Architecture::Powerpc64 => Arch::Powerpc64,
-            target_lexicon::Architecture::Powerpc64le => Arch::Powerpc64Le,
-            target_lexicon::Architecture::S390x => Arch::S390X,
+            Architecture::Aarch64(_) => Arch::Aarch64,
+            Architecture::Powerpc64 => Arch::Powerpc64,
+            Architecture::Powerpc64le => Arch::Powerpc64Le,
+            Architecture::S390x => Arch::S390X,
+            Architecture::Wasm32 => Arch::Wasm32,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -235,6 +241,7 @@ impl Target {
                     "x86_64"
                 )
             }
+            // Illumos
             (Os::Illumos, Arch::X86_64) => {
                 let info = PlatformInfo::new()?;
                 let mut release = info.release().replace('.', "_").replace('-', "_");
@@ -258,6 +265,7 @@ impl Target {
                     arch
                 )
             }
+            // Linux
             (Os::Linux, _) => {
                 let arch = if self.cross_compiling {
                     self.arch.to_string()
@@ -277,6 +285,7 @@ impl Target {
                 }
                 tags.join(".")
             }
+            // macOS
             (Os::Macos, Arch::X86_64) => {
                 let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
                 if universal2 {
@@ -305,9 +314,15 @@ impl Target {
                     format!("macosx_{}_{}_arm64", arm64_major, arm64_minor)
                 }
             }
+            // Windows
             (Os::Windows, Arch::X86) => "win32".to_string(),
             (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
             (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
+            // Emscripten
+            (Os::Emscripten, Arch::Wasm32) => {
+                let version = emcc_version()?;
+                format!("emscripten_{}_wasm32", version.replace('.', "_"))
+            }
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         };
         Ok(tag)
@@ -324,6 +339,7 @@ impl Target {
             Arch::X86 => "i386",
             Arch::X86_64 => "x86_64",
             Arch::S390X => "s390x",
+            Arch::Wasm32 => "wasm32",
         }
     }
 
@@ -339,6 +355,7 @@ impl Target {
             Os::Dragonfly => "dragonfly",
             Os::Illumos => "sunos",
             Os::Haiku => "haiku",
+            Os::Emscripten => "emscripten",
         }
     }
 
@@ -349,7 +366,7 @@ impl Target {
                 PlatformTag::manylinux2014()
             }
             Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
-            Arch::Armv6L => PlatformTag::Linux,
+            Arch::Armv6L | Arch::Wasm32 => PlatformTag::Linux,
         }
     }
 
@@ -357,7 +374,7 @@ impl Target {
     pub fn pointer_width(&self) -> usize {
         match self.arch {
             Arch::Aarch64 | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::X86_64 | Arch::S390X => 64,
-            Arch::Armv6L | Arch::Armv7L | Arch::X86 => 32,
+            Arch::Armv6L | Arch::Armv7L | Arch::X86 | Arch::Wasm32 => 32,
         }
     }
 
@@ -377,7 +394,8 @@ impl Target {
             | Os::OpenBsd
             | Os::Dragonfly
             | Os::Illumos
-            | Os::Haiku => true,
+            | Os::Haiku
+            | Os::Emscripten => true,
         }
     }
 
@@ -429,6 +447,11 @@ impl Target {
     /// Returns true if the current platform is haiku
     pub fn is_haiku(&self) -> bool {
         self.os == Os::Haiku
+    }
+
+    /// Returns true if the current platform is Emscripten
+    pub fn is_emscripten(&self) -> bool {
+        self.os == Os::Emscripten
     }
 
     /// Returns true if the current platform's target env is Musl
@@ -578,6 +601,22 @@ fn macosx_deployment_target(
         }
     }
     Ok((x86_64_ver, arm64_ver))
+}
+
+fn emcc_version() -> Result<String> {
+    use regex::bytes::Regex;
+    use std::process::Command;
+
+    let emcc = Command::new("emcc")
+        .arg("--version")
+        .output()
+        .context("Failed to run emcc to get the version")?;
+    let pattern = Regex::new(r"^emcc .+? (\d+\.\d+\.\d+).*").unwrap();
+    let caps = pattern
+        .captures(&emcc.stdout)
+        .context("Failed to parse emcc version")?;
+    let version = caps.get(1).context("Failed to parse emcc version")?;
+    Ok(String::from_utf8(version.as_bytes().to_vec())?)
 }
 
 #[cfg(test)]

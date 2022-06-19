@@ -148,6 +148,39 @@ jobs:
           export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
           cargo run -- build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
 
+  test-emscripten:
+    name: Test Emscripten
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rust-src
+          target: wasm32-unknown-emscripten
+          override: true
+      - uses: mymindstorm/setup-emsdk@v11
+        with:
+          version: 3.1.13
+          actions-cache-folder: emsdk-cache
+      - uses: actions/setup-python@v2
+        id: setup-python
+        with:
+          python-version: "3.10"
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: pip install nox
+      - uses: actions/cache@v3
+        with:
+          path: |
+            tests/pyodide
+          key: ${{ hashFiles('tests/*.js') }} - ${{ hashFiles('noxfile.py') }} - ${{ steps.setup-python.outputs.python-path }}
+      - uses: Swatinem/rust-cache@v1
+      - name: Run tests
+        run: nox -s test-emscripten
+
   test-alpine:
     name: Test Alpine Linux
     runs-on: ubuntu-latest

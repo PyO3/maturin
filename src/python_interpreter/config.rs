@@ -37,6 +37,11 @@ static WELLKNOWN_SYSCONFIG: Lazy<HashMap<Os, HashMap<Arch, Vec<InterpreterConfig
         let sysconfig_netbsd = serde_json::from_slice(include_bytes!("sysconfig-netbsd.json"))
             .expect("invalid sysconfig-netbsd.json");
         sysconfig.insert(Os::NetBsd, sysconfig_netbsd);
+        // Emscripten
+        let sysconfig_emscripten =
+            serde_json::from_slice(include_bytes!("sysconfig-emscripten.json"))
+                .expect("invalid sysconfig-emscripten.json");
+        sysconfig.insert(Os::Emscripten, sysconfig_emscripten);
         sysconfig
     });
 

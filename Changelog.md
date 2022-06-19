@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking Change**: Drop support for python 3.6, which is end of life in [#945](https://github.com/PyO3/maturin/pull/945)
 * **Breaking Change**: Don't build source distribution by default in `maturin build` command in [#955](https://github.com/PyO3/maturin/pull/955), `--no-sdist` option is replaced by `--sdist`
 * **Breaking Change**: maturin no longer search for python interpreters by default and only build for current interpreter in `PATH` in [#964](https://github.com/PyO3/maturin/pull/964)
-* **Breaking Change**: Removed `--cargo-extra-args` and `--rustc-extra-args` options in [#972](https://github.com/PyO3/maturin/pull/972)
+* **Breaking Change**: Removed `--cargo-extra-args` and `--rustc-extra-args` options in [#972](https://github.com/PyO3/maturin/pull/972). You can now pass all common `cargo build` arguments directly to `maturin build`
 * Add support for building with multiple binary targets in [#948](https://github.com/PyO3/maturin/pull/948)
 * Add a `--target` option to `maturin list-python` command in [#957](https://github.com/PyO3/maturin/pull/957)
 * Add support for using bundled python sysconfigs for PyPy when abi3 feature is enabled in [#958](https://github.com/PyO3/maturin/pull/958)

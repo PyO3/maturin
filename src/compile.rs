@@ -372,11 +372,17 @@ fn compile_target(
                 let crate_name = match package_in_metadata {
                     Some(package) => &package.name,
                     None => {
-                        // This is a spurious error I don't really understand
-                        println!(
-                            "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
-                            artifact.package_id
-                        );
+                        let package_id = &artifact.package_id;
+                        // Ignore the package if it's coming from Rust sysroot when compiling with `-Zbuild-std`
+                        if !package_id.repr.contains("rustup")
+                            && !package_id.repr.contains("rustlib")
+                        {
+                            // This is a spurious error I don't really understand
+                            println!(
+                                "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
+                                package_id
+                            );
+                        }
                         continue;
                     }
                 };

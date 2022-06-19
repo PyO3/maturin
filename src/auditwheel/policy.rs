@@ -104,6 +104,7 @@ impl Policy {
                 Arch::X86 => "libc.musl-x86.so.1",
                 Arch::X86_64 => "libc.musl-x86_64.so.1",
                 Arch::S390X => "libc.musl-s390x.so.1",
+                _ => "",
             };
             if !new_soname.is_empty() {
                 self.lib_whitelist.insert(new_soname.to_string());

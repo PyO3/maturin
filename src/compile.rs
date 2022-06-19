@@ -5,7 +5,9 @@ use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use std::collections::HashMap;
 use std::env;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
@@ -13,6 +15,8 @@ use std::str;
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
+
+const EMCC_WRAPPER: &str = include_str!("emcc_wrapper.py");
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
@@ -195,6 +199,18 @@ fn compile_target(
             ];
             cargo_rustc.args.extend(mac_args);
         }
+    } else if target.is_emscripten() {
+        cargo_rustc.unstable_flags.push("build-std".to_string());
+        rust_flags
+            .get_or_insert_with(Default::default)
+            .push(" -C relocation-model=pic");
+        let emscripten_args = [
+            "-C".to_string(),
+            "link-arg=-sSIDE_MODULE=2".to_string(),
+            "-C".to_string(),
+            "link-arg=-sWASM_BIGINT".to_string(),
+        ];
+        cargo_rustc.args.extend(emscripten_args);
     }
 
     if context.strip {
@@ -242,6 +258,28 @@ fn compile_target(
             };
             build_command.env("ZIG_COMMAND", zig_cmd);
         }
+    }
+
+    if target.is_emscripten() {
+        // Workaround https://github.com/emscripten-core/emscripten/issues/17191
+        let cache_dir = dirs::cache_dir()
+            .unwrap_or_else(|| env::current_dir().expect("Failed to get current dir"))
+            .join(env!("CARGO_PKG_NAME"));
+        fs::create_dir_all(&cache_dir)?;
+        let emcc_wrapper = cache_dir.join("emcc_wrapper.py");
+        let mut emcc_wrapper_file = fs::File::create(&emcc_wrapper)?;
+        emcc_wrapper_file.write_all(EMCC_WRAPPER.as_bytes())?;
+        #[cfg(unix)]
+        {
+            let metadata = emcc_wrapper_file.metadata()?;
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o755);
+            emcc_wrapper_file.set_permissions(permissions)?;
+        }
+        build_command.env(
+            "CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_LINKER",
+            emcc_wrapper,
+        );
     }
 
     build_command
@@ -334,11 +372,17 @@ fn compile_target(
                 let crate_name = match package_in_metadata {
                     Some(package) => &package.name,
                     None => {
-                        // This is a spurious error I don't really understand
-                        println!(
-                            "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
-                            artifact.package_id
-                        );
+                        let package_id = &artifact.package_id;
+                        // Ignore the package if it's coming from Rust sysroot when compiling with `-Zbuild-std`
+                        if !package_id.repr.contains("rustup")
+                            && !package_id.repr.contains("rustlib")
+                        {
+                            // This is a spurious error I don't really understand
+                            println!(
+                                "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
+                                package_id
+                            );
+                        }
                         continue;
                     }
                 };

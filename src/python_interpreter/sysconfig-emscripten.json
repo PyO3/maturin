@@ -1,0 +1,22 @@
+{
+  "wasm32": [
+    {
+      "major": 3,
+      "minor": 10,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-310-wasm32-emscripten.so",
+      "abi_tag": "310",
+      "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-311-wasm32-emscripten.so",
+      "abi_tag": "311",
+      "pointer_width": 32
+    }
+  ]
+}

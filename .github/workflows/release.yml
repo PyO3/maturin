@@ -172,11 +172,11 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build wheel
         run: |
-          sudo python3 -m pip install maturin
-          maturin build --release -b bin -o dist --no-sdist \
+          sudo python3 -m pip install --pre maturin
+          maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} musllinux_1_1 \
-            --cargo-extra-args="--features password-storage"
+            --features password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
@@ -219,12 +219,12 @@ jobs:
           target: ${{ matrix.platform.target }}
       - name: Build wheel
         run: |
-          sudo python3 -m pip install maturin
-          maturin build --release -b bin -o dist --no-sdist \
+          sudo python3 -m pip install --pre maturin
+          maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} ${{ matrix.platform.musllinux }} \
-            --cargo-extra-args="--no-default-features" \
-            --cargo-extra-args="--features log,upload,human-panic,password-storage"
+            --no-default-features \
+            --features log,upload,human-panic,password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts

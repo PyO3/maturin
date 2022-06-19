@@ -107,8 +107,6 @@ in the `tool.maturin` section of `pyproject.toml`.
 
 ```toml
 [tool.maturin]
-# Cargo manifest path
-manifest-path = "Cargo.toml"
 # Include arbitrary files in the sdist
 sdist-include = []
 # Bindings type
@@ -119,8 +117,24 @@ compatibility = "manylinux2014"
 skip-auditwheel = false
 # Strip the library for minimum file size
 strip = true
-# Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] -- [...]`
-cargo-extra-args = ""
+# Build artifacts with the specified Cargo profile
+profile = "release"
+# List of features to activate
+features = ["foo", "bar"]
+# Activate all available features
+all-features = false
+# Do not activate the `default` feature
+no-default-features = false
+# Cargo manifest path
+manifest-path = "Cargo.toml"
+# Require Cargo.lock and cache are up to date
+frozen = false
+# Require Cargo.lock is up to date
+locked = false
+# Override a configuration value (unstable)
+config = []
+# Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+unstable-flags = []
 # Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
-rustc-extra-args = ""
+rustc-args = []
 ```

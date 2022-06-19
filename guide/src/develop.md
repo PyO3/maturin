@@ -7,40 +7,88 @@ build a package in debug mode by default and install it to virtualenv.
 
 ```
 USAGE:
-    maturin develop [OPTIONS]
+    maturin develop [OPTIONS] [--] [ARGS]...
+
+ARGS:
+    <ARGS>...
+            Rustc flags
 
 OPTIONS:
     -b, --bindings <BINDINGS>
             Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
-        --cargo-extra-args <CARGO_EXTRA_ARGS>
-            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --`
+    -r, --release
+            Pass --release to cargo
 
-            Use as `--cargo-extra-args="--my-arg"`
+        --strip
+            Strip the library for minimum file size
 
     -E, --extras <EXTRAS>
             Install extra requires aka. optional dependencies
 
             Use as `--extras=extra1,extra2`
 
+    -q, --quiet
+            Do not print cargo log messages
+
+    -j, --jobs <N>
+            Number of parallel jobs, defaults to # of CPUs
+
+        --profile <PROFILE-NAME>
+            Build artifacts with the specified Cargo profile
+
+    -F, --features <FEATURES>
+            Space or comma separated list of features to activate
+
+        --all-features
+            Activate all available features
+
+        --no-default-features
+            Do not activate the `default` feature
+
+        --target <TRIPLE>
+            Build for the target triple
+
+            [env: CARGO_BUILD_TARGET=]
+
+        --target-dir <DIRECTORY>
+            Directory for all generated artifacts
+
+    -m, --manifest-path <PATH>
+            Path to Cargo.toml
+
+        --ignore-rust-version
+            Ignore `rust-version` specification in packages
+
+    -v, --verbose
+            Use verbose output (-vv very verbose/build.rs output)
+
+        --color <WHEN>
+            Coloring: auto, always, never
+
+        --frozen
+            Require Cargo.lock and cache are up to date
+
+        --locked
+            Require Cargo.lock is up to date
+
+        --offline
+            Run without accessing the network
+
+        --config <KEY=VALUE>
+            Override a configuration value (unstable)
+
+    -Z <FLAG>
+            Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+        --timings[=<FMTS>...]
+            Timing output formats (unstable) (comma separated): html, json
+
+        --future-incompat-report
+            Outputs a future incompatibility report at the end of the build (unstable)
+
     -h, --help
             Print help information
-
-    -m, --manifest-path <MANIFEST_PATH>
-            The path to the Cargo.toml
-
-            [default: Cargo.toml]
-
-        --release
-            Pass --release to cargo
-
-        --rustc-extra-args <RUSTC_EXTRA_ARGS>
-            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [arg1] [arg2]`
-
-            Use as `--rustc-extra-args="--my-arg"`
-
-        --strip
-            Strip the library for minimum file size
 ```
 
 ## PEP 660 Editable Installs

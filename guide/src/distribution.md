@@ -71,23 +71,23 @@ or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decod
 
 ```
 USAGE:
-    maturin build [OPTIONS]
+    maturin build [OPTIONS] [--] [ARGS]...
+
+ARGS:
+    <ARGS>...
+            Rustc flags
 
 OPTIONS:
-    -b, --bindings <BINDINGS>
-            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+    -r, --release
+            Build artifacts in release mode, with optimizations
 
-        --cargo-extra-args <CARGO_EXTRA_ARGS>
-            Extra arguments that will be passed to cargo as `cargo rustc [...] [arg1] [arg2] --
-            [...]`
+        --strip
+            Strip the library for minimum file size
 
-            Use as `--cargo-extra-args="--my-arg"`
+        --sdist
+            Build a source distribution
 
-            Note that maturin invokes cargo twice: Once as `cargo metadata` and then as `cargo
-            rustc`. maturin tries to pass only the shared subset of options to cargo metadata, but
-            this is may be a bit flaky.
-
-        --compatibility <compatibility>
+        --compatibility <compatibility>...
             Control the platform tag on linux.
 
             Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
@@ -102,46 +102,22 @@ OPTIONS:
 
             This option is ignored on all non-linux platforms
 
-    -h, --help
-            Print help information
-
-    -i, --interpreter <INTERPRETER>
+    -i, --interpreter <INTERPRETER>...
             The python versions to build wheels for, given as the names of the interpreters. Uses
             autodiscovery if not explicitly set
 
-    -m, --manifest-path <PATH>
-            The path to the Cargo.toml
+    -f, --find-interpreter
+            Find interpreters from the host machine
 
-        --sdist
-            Build a source distribution
+    -b, --bindings <BINDINGS>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
     -o, --out <OUT>
             The directory to store the built wheels in. Defaults to a new "wheels" directory in the
             project's target directory
 
-        --release
-            Pass --release to cargo
-
-        --rustc-extra-args <RUSTC_EXTRA_ARGS>
-            Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1]
-            [arg2]`
-
-            Use as `--rustc-extra-args="--my-arg"`
-
         --skip-auditwheel
             Don't check for manylinux compliance
-
-        --strip
-            Strip the library for minimum file size
-
-        --target <TRIPLE>
-            The --target option for cargo
-
-            [env: CARGO_BUILD_TARGET=]
-
-        --universal2
-            Control whether to build universal2 wheel for macOS or not. Only applies to macOS
-            targets, do nothing otherwise
 
         --zig
             For manylinux targets, use zig to ensure compliance for the chosen manylinux version
@@ -149,6 +125,72 @@ OPTIONS:
             Default to manylinux2010/manylinux_2_12 if you do not specify an `--compatibility`
 
             Make sure you installed zig with `pip install maturin[zig]`
+
+        --universal2
+            Control whether to build universal2 wheel for macOS or not. Only applies to macOS
+            targets, do nothing otherwise
+
+    -q, --quiet
+            Do not print cargo log messages
+
+    -j, --jobs <N>
+            Number of parallel jobs, defaults to # of CPUs
+
+        --profile <PROFILE-NAME>
+            Build artifacts with the specified Cargo profile
+
+    -F, --features <FEATURES>
+            Space or comma separated list of features to activate
+
+        --all-features
+            Activate all available features
+
+        --no-default-features
+            Do not activate the `default` feature
+
+        --target <TRIPLE>
+            Build for the target triple
+
+            [env: CARGO_BUILD_TARGET=]
+
+        --target-dir <DIRECTORY>
+            Directory for all generated artifacts
+
+    -m, --manifest-path <PATH>
+            Path to Cargo.toml
+
+        --ignore-rust-version
+            Ignore `rust-version` specification in packages
+
+    -v, --verbose
+            Use verbose output (-vv very verbose/build.rs output)
+
+        --color <WHEN>
+            Coloring: auto, always, never
+
+        --frozen
+            Require Cargo.lock and cache are up to date
+
+        --locked
+            Require Cargo.lock is up to date
+
+        --offline
+            Run without accessing the network
+
+        --config <KEY=VALUE>
+            Override a configuration value (unstable)
+
+    -Z <FLAG>
+            Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+        --timings[=<FMTS>...]
+            Timing output formats (unstable) (comma separated): html, json
+
+        --future-incompat-report
+            Outputs a future incompatibility report at the end of the build (unstable)
+
+    -h, --help
+            Print help information
 ```
 
 ### Cross Compiling

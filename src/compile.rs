@@ -374,9 +374,10 @@ fn compile_target(
                     None => {
                         let package_id = &artifact.package_id;
                         // Ignore the package if it's coming from Rust sysroot when compiling with `-Zbuild-std`
-                        if !package_id.repr.contains("rustup")
+                        let should_warn = !package_id.repr.contains("rustup")
                             && !package_id.repr.contains("rustlib")
-                        {
+                            && !artifact.features.contains(&"rustc-dep-of-std".to_string());
+                        if should_warn {
                             // This is a spurious error I don't really understand
                             println!(
                                 "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",

@@ -30,6 +30,7 @@ def test_emscripten(session: nox.Session):
         download_pyodide(session, pyodide_dir)
 
     test_crates = [
+        "test-crates/pyo3-pure",
         "test-crates/pyo3-mixed",
     ]
     for crate in test_crates:

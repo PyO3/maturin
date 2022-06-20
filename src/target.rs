@@ -209,8 +209,7 @@ impl Target {
             | (Os::OpenBsd, Arch::X86)
             | (Os::OpenBsd, Arch::X86_64)
             | (Os::OpenBsd, Arch::Aarch64) => {
-                let info = PlatformInfo::new()?;
-                let release = info.release().replace('.', "_").replace('-', "_");
+                let release = self.get_platform_release()?;
                 let arch = match self.arch {
                     Arch::X86_64 => "amd64",
                     Arch::X86 => "i386",
@@ -232,8 +231,7 @@ impl Target {
             (Os::Dragonfly, Arch::X86_64)
             // Haiku
             | (Os::Haiku, Arch::X86_64) => {
-                let info = PlatformInfo::new()?;
-                let release = info.release().replace('.', "_").replace('-', "_");
+                let release = self.get_platform_release()?;
                 format!(
                     "{}_{}_{}",
                     self.os.to_string().to_ascii_lowercase(),
@@ -320,12 +318,31 @@ impl Target {
             (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
             // Emscripten
             (Os::Emscripten, Arch::Wasm32) => {
-                let version = emcc_version()?;
-                format!("emscripten_{}_wasm32", version.replace('.', "_"))
+                let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
+                let release = match os_version {
+                    Ok(os_ver) => os_ver,
+                    Err(_) => emcc_version()?,
+                };
+                let release = release.replace('.', "_").replace('-', "_");
+                format!("emscripten_{}_wasm32", release)
             }
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         };
         Ok(tag)
+    }
+
+    fn get_platform_release(&self) -> Result<String> {
+        let os = self.os.to_string();
+        let os_version = env::var(format!("MATURIN_{}_VERSION", os.to_ascii_uppercase()));
+        let release = match os_version {
+            Ok(os_ver) => os_ver,
+            Err(_) => {
+                let info = PlatformInfo::new()?;
+                info.release().to_string()
+            }
+        };
+        let release = release.replace('.', "_").replace('-', "_");
+        Ok(release)
     }
 
     /// Returns the name python uses in `sys.platform` for this architecture.

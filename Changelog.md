@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Infer target triple from `ARCHFLAGS` for macOS to be compatible with `cibuildwheel` in [#967](https://github.com/PyO3/maturin/pull/967)
 * Expose commonly used Cargo CLI options in `maturin build` command in [#972](https://github.com/PyO3/maturin/pull/972)
 * Add support for `wasm32-unknown-emscripten` target in [#974](https://github.com/PyO3/maturin/pull/974)
+* Allow overriding platform release version using env var in [#975](https://github.com/PyO3/maturin/pull/975)
 
 ## [0.12.20] - 2022-06-15
 

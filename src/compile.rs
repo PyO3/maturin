@@ -5,7 +5,7 @@ use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use std::collections::HashMap;
 use std::env;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, Read};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};

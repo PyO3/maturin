@@ -216,9 +216,9 @@ dependencies = [
 
 [[package]]
 name = "cab"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4721d7a367cc36bc2e2c39371912072edaec9061b8a1b8139d2f9eadde29649"
+checksum = "ae6b4de23c7d39c0631fd3cc952d87951c86c75a13812d7247cb7a896e7b3551"
 dependencies = [
  "byteorder",
  "flate2",
@@ -243,9 +243,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ce158e74c4b485a51101125ce308f69a62c13310f4c6e9a082acd862f38995"
+checksum = "dcca24408b680f815bce1aaf7014aea4800aa1bb3a9bafe020f41a0520267dbc"
 dependencies = [
  "clap",
 ]
@@ -261,9 +261,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef75f26606f9e2fa5e3ebf73e5a4518dfe97e9f034bae9d1147c04ccaba656b3"
+checksum = "b935055d8e5f5adcaf32f86bf1561092fd5eaff0361293617f600fe3a135d1b7"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -278,9 +278,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f82d567aa085050598e94d2326132630715fc97506544eef56eea3c1ff7b28f"
+checksum = "2a3bccaed3328671e80c82e9726c3ada7c034858bfbaf034a8a62ed45ed976c6"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -335,9 +335,9 @@ checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
 
 [[package]]
 name = "cfb"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25f6cc832d96f9961bfe67da666f1fb96387305d385db5222cbb7bce21121016"
+checksum = "466bc70ba95e7ad3322ce4c69a2bc22635a0f9535c1ffb7174bc28c286764517"
 dependencies = [
  "byteorder",
  "fnv",
@@ -1770,9 +1770,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.39"
+version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54b25569025b7fc9651de43004ae593a75ad88543b17178aa5e1b9c4f15f56f"
+checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
 dependencies = [
  "unicode-ident",
 ]
@@ -1810,9 +1810,9 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quote"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f53dc8cf16a769a6f677e09e7ff2cd4be1ea0f48754aac39520536962011de0d"
+checksum = "3bcdf212e9776fbcb2d23ab029360416bb1706b1aea2d1a5ba002727cbcab804"
 dependencies = [
  "proc-macro2",
 ]
@@ -2364,9 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.9"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2702e08a7a860f005826c6815dcac101b19b5eb330c27fe4a5928fec1d20ddd"
+checksum = "82501a4c1c0330d640a6e176a3d6a204f5ec5237aca029029d21864a902e27b0"
 dependencies = [
  "itoa",
  "libc",
@@ -2826,9 +2826,9 @@ dependencies = [
 
 [[package]]
 name = "xwin"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69faac30f4548eef3c0bd1dc7a91fd245be7233909a6022904ddc1de0c99c6b7"
+checksum = "3f66ef70cc262a6da73cb13fae0c767add6bd0b85fa46053b263732fecfb9b9f"
 dependencies = [
  "anyhow",
  "bytes",

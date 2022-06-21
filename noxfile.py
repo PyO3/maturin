@@ -10,7 +10,7 @@ def download_pyodide(session: nox.Session, pyodide_dir: Path) -> None:
     PYODIDE_DEV = "https://pyodide-cdn2.iodide.io/dev/full/"
     pyodide_files = [
         "pyodide.js",
-        "packages.json",
+        "repodata.json",
         "pyodide.asm.js",
         "pyodide.asm.data",
         "pyodide.asm.wasm",

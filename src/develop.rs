@@ -1,4 +1,5 @@
 use crate::build_options::CargoOptions;
+use crate::target::Arch;
 use crate::BuildOptions;
 use crate::PlatformTag;
 use crate::PythonInterpreter;
@@ -22,7 +23,28 @@ pub fn develop(
     extras: Vec<String>,
 ) -> Result<()> {
     let target = Target::from_target_triple(None)?;
+    let mut target_triple = None;
     let python = target.get_venv_python(&venv_dir);
+
+    // check python platform and architecture
+    match Command::new(&python)
+        .arg("-c")
+        .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let platform = String::from_utf8_lossy(&output.stdout);
+            if platform.contains("macos") {
+                if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
+                    target_triple = Some("x86_64-apple-darwin".to_string());
+                } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
+                    target_triple = Some("aarch64-apple-darwin".to_string());
+                }
+            }
+        }
+        _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
+    }
+
     // Store wheel in a unique location so we don't get name clashes with parallel runs
     let wheel_dir = TempDir::new().context("Failed to create temporary directory")?;
 
@@ -35,7 +57,10 @@ pub fn develop(
         skip_auditwheel: false,
         zig: false,
         universal2: false,
-        cargo: cargo_options,
+        cargo: CargoOptions {
+            target: target_triple,
+            ..cargo_options
+        },
     };
 
     let build_context = build_options.into_build_context(release, strip, true)?;

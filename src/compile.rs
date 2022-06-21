@@ -5,9 +5,7 @@ use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use std::collections::HashMap;
 use std::env;
-use std::io::{BufReader, Read, Write};
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
@@ -15,8 +13,6 @@ use std::str;
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
-
-const EMCC_WRAPPER: &str = include_str!("emcc_wrapper.py");
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
@@ -201,9 +197,9 @@ fn compile_target(
         }
     } else if target.is_emscripten() {
         cargo_rustc.unstable_flags.push("build-std".to_string());
-        rust_flags
-            .get_or_insert_with(Default::default)
-            .push(" -C relocation-model=pic");
+        let flags = rust_flags.get_or_insert_with(Default::default);
+        flags.push(" -C relocation-model=pic");
+        flags.push(" -Z link-native-libraries=no");
         let emscripten_args = [
             "-C".to_string(),
             "link-arg=-sSIDE_MODULE=2".to_string(),
@@ -266,20 +262,6 @@ fn compile_target(
             .unwrap_or_else(|| env::current_dir().expect("Failed to get current dir"))
             .join(env!("CARGO_PKG_NAME"));
         fs::create_dir_all(&cache_dir)?;
-        let emcc_wrapper = cache_dir.join("emcc_wrapper.py");
-        let mut emcc_wrapper_file = fs::File::create(&emcc_wrapper)?;
-        emcc_wrapper_file.write_all(EMCC_WRAPPER.as_bytes())?;
-        #[cfg(unix)]
-        {
-            let metadata = emcc_wrapper_file.metadata()?;
-            let mut permissions = metadata.permissions();
-            permissions.set_mode(0o755);
-            emcc_wrapper_file.set_permissions(permissions)?;
-        }
-        build_command.env(
-            "CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_LINKER",
-            emcc_wrapper,
-        );
     }
 
     build_command

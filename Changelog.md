@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Expose commonly used Cargo CLI options in `maturin build` command in [#972](https://github.com/PyO3/maturin/pull/972)
 * Add support for `wasm32-unknown-emscripten` target in [#974](https://github.com/PyO3/maturin/pull/974)
 * Allow overriding platform release version using env var in [#975](https://github.com/PyO3/maturin/pull/975)
+* Fix `maturin develop` for arm64 Python on M1 Mac when default toolchain is x86_64 in [#980](https://github.com/PyO3/maturin/pull/980)
 
 ## [0.12.20] - 2022-06-15
 

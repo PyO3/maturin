@@ -256,14 +256,6 @@ fn compile_target(
         }
     }
 
-    if target.is_emscripten() {
-        // Workaround https://github.com/emscripten-core/emscripten/issues/17191
-        let cache_dir = dirs::cache_dir()
-            .unwrap_or_else(|| env::current_dir().expect("Failed to get current dir"))
-            .join(env!("CARGO_PKG_NAME"));
-        fs::create_dir_all(&cache_dir)?;
-    }
-
     build_command
         // We need to capture the json messages
         .stdout(Stdio::piped())

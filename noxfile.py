@@ -14,7 +14,7 @@ def test_emscripten(session: nox.Session):
     ]
     for crate in test_crates:
         crate = Path(crate).resolve()
-        os.environ["RUSTFLAGS"] = "-sWASM_BIGINT"
+        os.environ["RUSTFLAGS"] = "-C link-arg=-sWASM_BIGINT -Z print-link-args"
         ver = sys.version_info
         session.run(
             "cargo",

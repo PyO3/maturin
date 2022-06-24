@@ -162,7 +162,7 @@ jobs:
           cd tests
           npm i pyodide@0.21.0-alpha.2
           cp node_modules/pyodide/repodata.json .
-          EMSCRIPTEN_VERSION=node -p "require('./repodata.json').info.platform"
+          EMSCRIPTEN_VERSION=$(node -p "require('./repodata.json').info.platform")
           PYTHON_VERSION=3.10.2
           rm repodata.json
 

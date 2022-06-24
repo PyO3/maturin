@@ -160,11 +160,11 @@ jobs:
           PYODIDE_VERSION=0.21.0-alpha.2
 
           cd tests
-          npm i pyodide@0.21.0-alpha.2
-          cp node_modules/pyodide/repodata.json .
+          npm i pyodide@0.21.0-alpha.2 prettier
+          cd node_modules/pyodide/
+          node ../prettier/bin-prettier.js -w pyodide.asm.js
           EMSCRIPTEN_VERSION=$(node -p "require('./repodata.json').info.platform.split('_').slice(1).join('.')")
           PYTHON_VERSION=3.10.2
-          rm repodata.json
 
           echo "PYODIDE_VERSION=$PYODIDE_VERSION" >> $GITHUB_ENV
           echo "EMSCRIPTEN_VERSION=$EMSCRIPTEN_VERSION" >> $GITHUB_ENV

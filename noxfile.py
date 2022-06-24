@@ -7,8 +7,6 @@ import nox
 @nox.session(name="test-emscripten")
 def test_emscripten(session: nox.Session):
     emscripten_dir = Path("./tests").resolve()
-    with session.chdir(emscripten_dir):
-        session.run("npm", "i", "pyodide@" + os.environ["PYODIDE_VERSION"], external=True)
 
     test_crates = [
         "test-crates/pyo3-pure",

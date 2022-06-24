@@ -153,6 +153,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: |
+          PYODIDE_VERSION=0.21.0-alpha.2
+
+          cd tests
+          npm i pyodide@0.21.0-alpha.2
+          cp node_modules/pyodide/repodata.json .
+          EMSCRIPTEN_VERSION=node -p "require('./repodata.json').info.platform"
+          PYTHON_VERSION=3.10.2
+          rm repodata.json
+
+          echo "PYODIDE_VERSION=$PYODIDE_VERSION" >> $GITHUB_ENV
+          echo "EMSCRIPTEN_VERSION=$EMSCRIPTEN_VERSION" >> $GITHUB_ENV
+          echo "PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -162,15 +178,12 @@ jobs:
           override: true
       - uses: mymindstorm/setup-emsdk@v11
         with:
-          version: 3.1.13
+          version: ${{env.EMSCRIPTEN_VERSION}}
           actions-cache-folder: emsdk-cache
       - uses: actions/setup-python@v2
         id: setup-python
         with:
-          python-version: "3.10"
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
+          python-version: ${{env.PYTHON_VERSION}}
       - run: pip install nox
       - uses: actions/cache@v3
         with:

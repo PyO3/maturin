@@ -169,6 +169,7 @@ jobs:
           echo "PYODIDE_VERSION=$PYODIDE_VERSION" >> $GITHUB_ENV
           echo "EMSCRIPTEN_VERSION=$EMSCRIPTEN_VERSION" >> $GITHUB_ENV
           echo "PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+          echo "ORIG_PATH=$PATH" >> $GITHUB_ENV
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -192,7 +193,9 @@ jobs:
           key: ${{ hashFiles('tests/*.js') }} - ${{ hashFiles('noxfile.py') }} - ${{ steps.setup-python.outputs.python-path }}
       - uses: Swatinem/rust-cache@v1
       - name: Run tests
-        run: nox -s test-emscripten
+        run: |
+          export PATH=$ORIG_PATH:$PATH
+          nox -s test-emscripten
 
   test-alpine:
     name: Test Alpine Linux

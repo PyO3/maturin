@@ -24,7 +24,7 @@ async function main() {
     const NODEFS = FS.filesystems.NODEFS;
     FS.mkdir("/test_dir");
     FS.mount(NODEFS, { root: testDir }, "/test_dir");
-    await pyodide.loadPackage(["packaging", "file:///home/hood/Documents/programming/pyodide/dist/micropip-0.1-py3-none-any.whl", "pytest", "tomli"]);
+    await pyodide.loadPackage(["micropip", "pytest", "tomli"]);
     const micropip = pyodide.pyimport("micropip");
     await micropip.install(wheelURL);
     const pytest = pyodide.pyimport("pytest");

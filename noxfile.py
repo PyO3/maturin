@@ -1,8 +1,8 @@
-import sys
 from pathlib import Path
-import os
 
 import nox
+import sys
+
 
 @nox.session(name="test-emscripten")
 def test_emscripten(session: nox.Session):

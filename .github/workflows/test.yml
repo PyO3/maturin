@@ -151,25 +151,19 @@ jobs:
   test-emscripten:
     name: Test Emscripten
     runs-on: ubuntu-latest
+    env:
+      PYODIDE_VERSION: '0.21.0-alpha.2'
+      PYTHON_VERSION: '3.10.2'
+      NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/setup-python@v2
+        id: setup-python
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
-      - run: |
-          PYODIDE_VERSION=0.21.0-alpha.2
-
-          cd tests
-          npm i pyodide@0.21.0-alpha.2 prettier
-          cd node_modules/pyodide/
-          node ../prettier/bin-prettier.js -w pyodide.asm.js
-          EMSCRIPTEN_VERSION=$(node -p "require('./repodata.json').info.platform.split('_').slice(1).join('.')")
-          PYTHON_VERSION=3.10.2
-
-          echo "PYODIDE_VERSION=$PYODIDE_VERSION" >> $GITHUB_ENV
-          echo "EMSCRIPTEN_VERSION=$EMSCRIPTEN_VERSION" >> $GITHUB_ENV
-          echo "PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-          echo "ORIG_PATH=$PATH" >> $GITHUB_ENV
+          node-version: ${{ env.NODE_VERSION }}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -177,25 +171,19 @@ jobs:
           components: rust-src
           target: wasm32-unknown-emscripten
           override: true
+      - uses: Swatinem/rust-cache@v1
+      - run: pip install nox
+      - name: Setup Pyodide
+        run: nox -s setup-pyodide
       - uses: mymindstorm/setup-emsdk@v11
         with:
-          version: ${{env.EMSCRIPTEN_VERSION}}
+          version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache
-      - uses: actions/setup-python@v2
-        id: setup-python
+      - uses: actions/setup-node@v3
         with:
-          python-version: ${{env.PYTHON_VERSION}}
-      - run: pip install nox
-      - uses: actions/cache@v3
-        with:
-          path: |
-            tests/pyodide
-          key: ${{ hashFiles('tests/*.js') }} - ${{ hashFiles('noxfile.py') }} - ${{ steps.setup-python.outputs.python-path }}
-      - uses: Swatinem/rust-cache@v1
+          node-version: ${{ env.NODE_VERSION }}
       - name: Run tests
-        run: |
-          export PATH=$ORIG_PATH:$PATH
-          nox -s test-emscripten
+        run: nox -s test-emscripten
 
   test-alpine:
     name: Test Alpine Linux

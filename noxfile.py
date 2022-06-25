@@ -1,6 +1,6 @@
 import os
+import json
 import sys
-import subprocess
 from pathlib import Path
 
 import nox
@@ -39,15 +39,11 @@ def setup_pyodide(session: nox.Session):
                 "pyodide.asm.js",
                 external=True,
             )
-            emscripten_version = (
-                subprocess.check_output(
-                    '''node -p "require('./repodata.json').info.platform.split('_').slice(1).join('.')"''',
-                    shell=True,
+            with open("repodata.json") as f:
+                emscripten_version = (
+                    json.load(f)["info"]["platform"].split("_", 1)[1].replace("_", ".")
                 )
-                .decode()
-                .strip()
-            )
-            append_to_github_env("EMSCRIPTEN_VERSION", emscripten_version)
+                append_to_github_env("EMSCRIPTEN_VERSION", emscripten_version)
 
 
 @nox.session(name="test-emscripten")

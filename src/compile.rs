@@ -196,7 +196,6 @@ fn compile_target(
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
-        cargo_rustc.unstable_flags.push("build-std".to_string());
         let flags = rust_flags.get_or_insert_with(Default::default);
         flags.push(" -C relocation-model=pic");
         flags.push(" -Z link-native-libraries=no");

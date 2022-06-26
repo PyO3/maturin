@@ -50,7 +50,8 @@ pub struct PublishOpt {
 }
 
 impl PublishOpt {
-    const PYPI_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy/";
+    const DEFAULT_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy/";
+    const TEST_REPOSITORY_URL: &'static str = "https://test.pypi.org/legacy/";
 }
 
 /// Error type for different types of errors that can happen when uploading a
@@ -217,17 +218,23 @@ fn resolve_pypi_cred(
 fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
     // load creds from pypirc if found
     let pypirc = load_pypirc();
-    let (registry_name, registry_url) = if let Some(repository_url) = opt.repository_url.as_ref() {
-        let name = if repository_url == PublishOpt::PYPI_REPOSITORY_URL {
-            Some("pypi")
-        } else {
-            None
+    let (registry_name, registry_url) = if let Some(repository_url) = opt.repository_url.as_deref()
+    {
+        let name = match repository_url {
+            PublishOpt::DEFAULT_REPOSITORY_URL => Some("pypi"),
+            PublishOpt::TEST_REPOSITORY_URL => Some("testpypi"),
+            _ => None,
         };
         (name, repository_url.to_string())
     } else if let Some(url) = pypirc.get(&opt.repository, "repository") {
         (Some(opt.repository.as_str()), url)
     } else if opt.repository == "pypi" {
-        (Some("pypi"), PublishOpt::PYPI_REPOSITORY_URL.to_string())
+        (Some("pypi"), PublishOpt::DEFAULT_REPOSITORY_URL.to_string())
+    } else if opt.repository == "testpypi" {
+        (
+            Some("testpypi"),
+            PublishOpt::TEST_REPOSITORY_URL.to_string(),
+        )
     } else {
         bail!(
             "Failed to get registry {} in .pypirc. \

@@ -1083,10 +1083,7 @@ fn find_interpreter_in_sysconfig(
     }
     let mut interpreters = Vec::new();
     for interp in interpreter {
-        let python = interp
-            .file_name()
-            .context("Invalid python interpreter")?
-            .to_string_lossy();
+        let python = interp.display().to_string();
         let (python_impl, python_ver) = if let Some(ver) = python.strip_prefix("pypy") {
             (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
         } else if let Some(ver) = python.strip_prefix("python") {

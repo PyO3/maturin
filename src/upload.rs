@@ -17,29 +17,40 @@ use thiserror::Error;
 /// An account with a registry, possibly incomplete
 #[derive(Debug, clap::Parser)]
 pub struct PublishOpt {
-    /// The URL of the registry where the wheels are uploaded to. Note than you can also pass
-    /// the URL through MATURIN_REPOSITORY_URL variable
+    /// The repository (package index) to upload the package to. Should be a section in the config file.
+    ///
+    /// Can also be set via MATURIN_REPOSITORY environment variable.
+    #[clap(short = 'r', long, env = "MATURIN_REPOSITORY", default_value = "pypi")]
+    repository: String,
+    /// The URL of the registry where the wheels are uploaded to. This overrides --repository.
+    ///
+    /// Can also be set via MATURIN_REPOSITORY_URL environment variable.
     #[clap(
-        short = 'r',
         long = "repository-url",
         env = "MATURIN_REPOSITORY_URL",
-        default_value = "https://upload.pypi.org/legacy/"
+        overrides_with = "repository"
     )]
-    registry: String,
-    /// Username for pypi or your custom registry. Note that you can also pass the username
-    /// through MATURIN_USERNAME variable
+    repository_url: Option<String>,
+    /// Username for pypi or your custom registry.
+    ///
+    /// Can also be set via MATURIN_USERNAME environment variable.
     ///
     /// Set MATURIN_PYPI_TOKEN variable to use token-based authentication instead
     #[clap(short, long, env = "MATURIN_USERNAME")]
     username: Option<String>,
-    /// Password for pypi or your custom registry. Note that you can also pass the password
-    /// through MATURIN_PASSWORD variable
+    /// Password for pypi or your custom registry.
+    ///
+    /// Can also be set via MATURIN_PASSWORD environment variable.
     #[clap(short, long)]
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
     #[clap(long = "skip-existing")]
     skip_existing: bool,
+}
+
+impl PublishOpt {
+    const PYPI_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy/";
 }
 
 /// Error type for different types of errors that can happen when uploading a
@@ -206,24 +217,26 @@ fn resolve_pypi_cred(
 fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
     // load creds from pypirc if found
     let pypirc = load_pypirc();
-    let (register_name, registry_url) =
-        if !opt.registry.starts_with("http://") && !opt.registry.starts_with("https://") {
-            if let Some(url) = pypirc.get(&opt.registry, "repository") {
-                (Some(opt.registry.as_str()), url)
-            } else {
-                bail!(
-                    "Failed to get registry {} in .pypirc. \
-                    Note: Your index didn't start with http:// or https://, \
-                    which is required for non-pypirc indices.",
-                    opt.registry
-                );
-            }
-        } else if opt.registry == "https://upload.pypi.org/legacy/" {
-            (Some("pypi"), opt.registry.clone())
+    let (registry_name, registry_url) = if let Some(repository_url) = opt.repository_url.as_ref() {
+        let name = if repository_url == PublishOpt::PYPI_REPOSITORY_URL {
+            Some("pypi")
         } else {
-            (None, opt.registry.clone())
+            None
         };
-    let (username, password) = resolve_pypi_cred(opt, &pypirc, register_name);
+        (name, repository_url.to_string())
+    } else if let Some(url) = pypirc.get(&opt.repository, "repository") {
+        (Some(opt.repository.as_str()), url)
+    } else if opt.repository == "pypi" {
+        (Some("pypi"), PublishOpt::PYPI_REPOSITORY_URL.to_string())
+    } else {
+        bail!(
+            "Failed to get registry {} in .pypirc. \
+                Note: Your index didn't start with http:// or https://, \
+                which is required for non-pypirc indices.",
+            opt.repository
+        );
+    };
+    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name);
     let registry = Registry::new(username, password, registry_url);
 
     Ok(registry)

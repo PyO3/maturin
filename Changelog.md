@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking Change**: Don't build source distribution by default in `maturin build` command in [#955](https://github.com/PyO3/maturin/pull/955), `--no-sdist` option is replaced by `--sdist`
 * **Breaking Change**: maturin no longer search for python interpreters by default and only build for current interpreter in `PATH` in [#964](https://github.com/PyO3/maturin/pull/964)
 * **Breaking Change**: Removed `--cargo-extra-args` and `--rustc-extra-args` options in [#972](https://github.com/PyO3/maturin/pull/972). You can now pass all common `cargo build` arguments directly to `maturin build`
+* **Breaking Change**: `--repository-url` option in `upload` command no longer accepts plain repository name, full url required and `-r` short option moved to `--repository` in [#987](https://github.com/PyO3/maturin/pull/987)
 * Add support for building with multiple binary targets in [#948](https://github.com/PyO3/maturin/pull/948)
 * Add a `--target` option to `maturin list-python` command in [#957](https://github.com/PyO3/maturin/pull/957)
 * Add support for using bundled python sysconfigs for PyPy when abi3 feature is enabled in [#958](https://github.com/PyO3/maturin/pull/958)
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for `wasm32-unknown-emscripten` target in [#974](https://github.com/PyO3/maturin/pull/974)
 * Allow overriding platform release version using env var in [#975](https://github.com/PyO3/maturin/pull/975)
 * Fix `maturin develop` for arm64 Python on M1 Mac when default toolchain is x86_64 in [#980](https://github.com/PyO3/maturin/pull/980)
+* Add `--repository` option to `maturin upload` command in [#987](https://github.com/PyO3/maturin/pull/987)
 
 ## [0.12.20] - 2022-06-15
 

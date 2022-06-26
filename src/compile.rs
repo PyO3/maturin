@@ -197,7 +197,6 @@ fn compile_target(
         }
     } else if target.is_emscripten() {
         let flags = rust_flags.get_or_insert_with(Default::default);
-        flags.push(" -C relocation-model=pic");
         flags.push(" -Z link-native-libraries=no");
         let emscripten_args = [
             "-C".to_string(),

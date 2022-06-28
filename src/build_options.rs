@@ -58,7 +58,7 @@ pub struct CargoOptions {
     pub profile: Option<String>,
 
     /// Space or comma separated list of features to activate
-    #[clap(long, multiple_occurrences = true)]
+    #[clap(short = 'F', long, multiple_occurrences = true)]
     pub features: Vec<String>,
 
     /// Activate all available features

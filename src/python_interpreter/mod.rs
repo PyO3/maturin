@@ -20,7 +20,7 @@ const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
 /// Be liberal here to include preview versions
 const MAXIMUM_PYTHON_MINOR: usize = 12;
-const MAXIMUM_PYPY_MINOR: usize = 8;
+const MAXIMUM_PYPY_MINOR: usize = 10;
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -199,7 +199,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     }
 
     // Fallback to pythonX.Y for Microsoft Store versions
-    for minor in min_python_minor..MAXIMUM_PYTHON_MINOR {
+    for minor in min_python_minor..=MAXIMUM_PYTHON_MINOR {
         if !versions_found.contains(&(3, minor)) {
             let executable = format!("python3.{}.exe", minor);
             if let Some(python_info) = windows_python_info(Path::new(&executable))? {
@@ -683,7 +683,7 @@ impl PythonInterpreter {
         let executables = if target.is_windows() {
             find_all_windows(target, min_python_minor)?
         } else {
-            let mut executables: Vec<String> = (min_python_minor..MAXIMUM_PYTHON_MINOR)
+            let mut executables: Vec<String> = (min_python_minor..=MAXIMUM_PYTHON_MINOR)
                 .map(|minor| format!("python3.{}", minor))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
@@ -692,7 +692,7 @@ impl PythonInterpreter {
                 || bridge.is_bindings("pyo3-ffi")
             {
                 executables.extend(
-                    (min_python_minor..MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{}", minor)),
+                    (min_python_minor..=MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{}", minor)),
                 );
             }
             executables

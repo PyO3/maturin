@@ -67,7 +67,7 @@ enum Opt {
         #[clap(long)]
         target: Option<String>,
     },
-    #[clap(name = "develop")]
+    #[clap(name = "develop", alias = "dev")]
     /// Installs the crate as module in the current virtualenv
     ///
     /// Note that this command doesn't create entrypoints

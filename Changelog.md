@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add `--repository` option to `maturin upload` command in [#987](https://github.com/PyO3/maturin/pull/987)
 * Only lookup bundled Python sysconfig when interpreters aren't specified as file path in [#988](https://github.com/PyO3/maturin/pull/988)
 * Find CPython upper to 3.12 and PyPy upper to 3.10 in [#993](https://github.com/PyO3/maturin/pull/993)
+* Add short alias `maturin b` for `maturin build` and `maturin dev` for `maturin develop` subcommands in [#994](https://github.com/PyO3/maturin/pull/994)
 
 ## [0.12.20] - 2022-06-15
 

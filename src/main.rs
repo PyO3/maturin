@@ -28,7 +28,7 @@ use std::str::FromStr;
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
 enum Opt {
-    #[clap(name = "build")]
+    #[clap(name = "build", alias = "b")]
     /// Build the crate into python packages
     Build {
         /// Build artifacts in release mode, with optimizations

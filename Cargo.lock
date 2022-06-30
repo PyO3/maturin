@@ -224,9 +224,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcca24408b680f815bce1aaf7014aea4800aa1bb3a9bafe020f41a0520267dbc"
+checksum = "05cc50d93e6b63fe87ee694f62a2f85151bed46af13c67fde8544a2bd0034b67"
 dependencies = [
  "clap",
 ]
@@ -242,9 +242,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.9.2"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b935055d8e5f5adcaf32f86bf1561092fd5eaff0361293617f600fe3a135d1b7"
+checksum = "59b1f4d60f32a6a330e7975999f7ba0eea89bb57712df64a840eb3747d61167b"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -259,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.10.3"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71c85a614068d0cea55c2ef899dd1b81d123799419dffcdf54b6a115db7b6c3c"
+checksum = "cb1a8bb8bc3e7377ee47f400bd4533fea02846b45576e98ae4976d9e009e2930"
 dependencies = [
  "anyhow",
  "cargo-options",

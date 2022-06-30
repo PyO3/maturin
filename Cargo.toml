@@ -24,9 +24,9 @@ base64 = "0.13.0"
 bytesize = "1.0.1"
 glob = "0.3.0"
 cargo_metadata = "0.15.0"
-cargo-options = "0.2.1"
-cargo-zigbuild = "0.10.3"
-cargo-xwin = { version = "0.9.2", default-features = false }
+cargo-options = "0.3.0"
+cargo-zigbuild = "0.11.0"
+cargo-xwin = { version = "0.10.0", default-features = false }
 cbindgen = { version = "0.24.2", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.5.1"

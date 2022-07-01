@@ -13,6 +13,7 @@ use ignore::WalkBuilder;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::fmt::Write as _;
 #[cfg(target_family = "unix")]
 use std::fs::OpenOptions;
 use std::io;
@@ -383,7 +384,7 @@ impl SDistWriter {
     }
 }
 
-fn wheel_file(tags: &[String]) -> String {
+fn wheel_file(tags: &[String]) -> Result<String> {
     let mut wheel_file = format!(
         "Wheel-Version: 1.0
 Generator: {name} ({version})
@@ -394,10 +395,10 @@ Root-Is-Purelib: false
     );
 
     for tag in tags {
-        wheel_file += &format!("Tag: {}\n", tag);
+        writeln!(wheel_file, "Tag: {}", tag)?;
     }
 
-    wheel_file
+    Ok(wheel_file)
 }
 
 /// https://packaging.python.org/specifications/entry-points/
@@ -799,10 +800,10 @@ pub fn write_dist_info(
 
     writer.add_bytes(
         &dist_info_dir.join("METADATA"),
-        metadata21.to_file_contents().as_bytes(),
+        metadata21.to_file_contents()?.as_bytes(),
     )?;
 
-    writer.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags).as_bytes())?;
+    writer.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags)?.as_bytes())?;
 
     let mut entry_points = String::new();
     if !metadata21.scripts.is_empty() {

@@ -330,7 +330,7 @@ pub fn source_distribution(
 
     writer.add_bytes(
         root_dir.join("PKG-INFO"),
-        metadata21.to_file_contents().as_bytes(),
+        metadata21.to_file_contents()?.as_bytes(),
     )?;
 
     add_data(&mut writer, data)?;

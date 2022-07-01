@@ -4,6 +4,7 @@ use fs_err as fs;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str;
 
@@ -470,7 +471,7 @@ impl Metadata21 {
     }
 
     /// Writes the format for the metadata file inside wheels
-    pub fn to_file_contents(&self) -> String {
+    pub fn to_file_contents(&self) -> Result<String> {
         let mut fields = self.to_vec();
         let mut out = "".to_string();
         let body = match fields.last() {
@@ -484,14 +485,14 @@ impl Metadata21 {
         };
 
         for (key, value) in fields {
-            out += &format!("{}: {}\n", key, value);
+            writeln!(out, "{}: {}", key, value)?;
         }
 
         if let Some(body) = body {
-            out += &format!("\n{}\n", body);
+            writeln!(out, "\n{}", body)?;
         }
 
-        out
+        Ok(out)
     }
 
     /// Returns the distribution name according to PEP 427, Section "Escaping
@@ -566,7 +567,7 @@ mod test {
             Metadata21::from_cargo_toml(&cargo_toml_struct, &readme_md.path().parent().unwrap())
                 .unwrap();
 
-        let actual = metadata.to_file_contents();
+        let actual = metadata.to_file_contents().unwrap();
 
         assert_eq!(
             actual.trim(),
@@ -749,7 +750,7 @@ mod test {
         let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(cargo_toml).unwrap();
         let metadata =
             Metadata21::from_cargo_toml(&cargo_toml_struct, "/not/exist/manifest/path").unwrap();
-        let actual = metadata.to_file_contents();
+        let actual = metadata.to_file_contents().unwrap();
 
         assert_eq!(
             actual.trim(),
@@ -824,7 +825,7 @@ mod test {
         let license_file = &metadata.license_files[0];
         assert_eq!(license_file.file_name().unwrap(), "LICENSE");
 
-        let content = metadata.to_file_contents();
+        let content = metadata.to_file_contents().unwrap();
         let pkginfo: Result<python_pkginfo::Metadata, _> = content.parse();
         assert!(pkginfo.is_ok());
     }

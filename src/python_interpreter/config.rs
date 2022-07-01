@@ -6,6 +6,7 @@ use fs_err as fs;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
@@ -231,7 +232,7 @@ suppress_build_script_link_lines=false"#,
             minor = self.minor,
         );
         if let Some(pointer_width) = self.pointer_width {
-            content.push_str(&format!("\npointer_width={}", pointer_width));
+            write!(content, "\npointer_width={}", pointer_width).unwrap();
         }
         content
     }

@@ -172,7 +172,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build wheel
         run: |
-          sudo python3 -m pip install --pre maturin
+          sudo python3 -m pip install -U --pre maturin
           maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} musllinux_1_1 \
@@ -219,7 +219,7 @@ jobs:
           target: ${{ matrix.platform.target }}
       - name: Build wheel
         run: |
-          sudo python3 -m pip install --pre maturin
+          sudo python3 -m pip install -U --pre maturin
           maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --manylinux ${{ matrix.platform.manylinux }} ${{ matrix.platform.musllinux }} \

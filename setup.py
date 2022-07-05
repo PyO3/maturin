@@ -19,7 +19,7 @@ except ModuleNotFoundError:
 from setuptools import setup
 from setuptools.command.install import install
 
-from setuptools_rust import Binding, RustExtension
+from setuptools_rust import RustBin
 
 # Force the wheel to be platform specific
 # https://stackoverflow.com/a/45150383/3549270
@@ -68,15 +68,7 @@ setup(
     python_requires=">=3.5",
     cmdclass={"bdist_wheel": bdist_wheel},
     packages=["maturin"],
-    rust_extensions=[
-        RustExtension(
-            {"maturin": "maturin.maturin"},
-            "Cargo.toml",
-            binding=Binding.Exec,
-            script=True,
-            args=cargo_args,
-        )
-    ],
+    rust_extensions=[RustBin("maturin", args=cargo_args)],
     classifiers=[
         "Topic :: Software Development :: Build Tools",
         "Programming Language :: Rust",

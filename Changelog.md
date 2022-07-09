@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2022-07-09
+
 * **Breaking Change**: Drop support for python 3.6, which is end of life in [#945](https://github.com/PyO3/maturin/pull/945)
 * **Breaking Change**: Don't build source distribution by default in `maturin build` command in [#955](https://github.com/PyO3/maturin/pull/955), `--no-sdist` option is replaced by `--sdist`
 * **Breaking Change**: maturin no longer search for python interpreters by default and only build for current interpreter in `PATH` in [#964](https://github.com/PyO3/maturin/pull/964)
@@ -648,7 +650,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.12.20...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/pyo3/maturin/compare/v0.12.20...v0.13.0
 [0.12.20]: https://github.com/pyo3/maturin/compare/v0.12.19...v0.12.20
 [0.12.19]: https://github.com/pyo3/maturin/compare/v0.12.18...v0.12.19
 [0.12.18]: https://github.com/pyo3/maturin/compare/v0.12.17...v0.12.18

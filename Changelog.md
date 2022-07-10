@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add 64-bit RISC-V support by felixonmars in [#1001](https://github.com/PyO3/maturin/pull/1001)
+
 ## [0.13.0] - 2022-07-09
 
 * **Breaking Change**: Drop support for python 3.6, which is end of life in [#945](https://github.com/PyO3/maturin/pull/945)

@@ -60,6 +60,7 @@ pub enum Arch {
     X86_64,
     S390X,
     Wasm32,
+    Riscv64,
 }
 
 impl fmt::Display for Arch {
@@ -74,6 +75,7 @@ impl fmt::Display for Arch {
             Arch::X86_64 => write!(f, "x86_64"),
             Arch::S390X => write!(f, "s390x"),
             Arch::Wasm32 => write!(f, "wasm32"),
+            Arch::Riscv64 => write!(f, "riscv64"),
         }
     }
 }
@@ -90,6 +92,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::S390X,
             Arch::X86,
             Arch::X86_64,
+            Arch::Riscv64,
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
@@ -169,6 +172,7 @@ impl Target {
             Architecture::Powerpc64le => Arch::Powerpc64Le,
             Architecture::S390x => Arch::S390X,
             Architecture::Wasm32 => Arch::Wasm32,
+            Architecture::Riscv64(_) => Arch::Riscv64,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -357,6 +361,7 @@ impl Target {
             Arch::X86_64 => "x86_64",
             Arch::S390X => "s390x",
             Arch::Wasm32 => "wasm32",
+            Arch::Riscv64 => "riscv64",
         }
     }
 
@@ -383,14 +388,14 @@ impl Target {
                 PlatformTag::manylinux2014()
             }
             Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
-            Arch::Armv6L | Arch::Wasm32 => PlatformTag::Linux,
+            Arch::Armv6L | Arch::Wasm32 | Arch::Riscv64 => PlatformTag::Linux,
         }
     }
 
     /// Returns whether the platform is 64 bit or 32 bit
     pub fn pointer_width(&self) -> usize {
         match self.arch {
-            Arch::Aarch64 | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::X86_64 | Arch::S390X => 64,
+            Arch::Aarch64 | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::X86_64 | Arch::S390X | Arch::Riscv64 => 64,
             Arch::Armv6L | Arch::Armv7L | Arch::X86 | Arch::Wasm32 => 32,
         }
     }

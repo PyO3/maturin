@@ -395,7 +395,12 @@ impl Target {
     /// Returns whether the platform is 64 bit or 32 bit
     pub fn pointer_width(&self) -> usize {
         match self.arch {
-            Arch::Aarch64 | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::X86_64 | Arch::S390X | Arch::Riscv64 => 64,
+            Arch::Aarch64
+            | Arch::Powerpc64
+            | Arch::Powerpc64Le
+            | Arch::X86_64
+            | Arch::S390X
+            | Arch::Riscv64 => 64,
             Arch::Armv6L | Arch::Armv7L | Arch::X86 | Arch::Wasm32 => 32,
         }
     }

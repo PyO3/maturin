@@ -6,7 +6,7 @@ from pathlib import Path
 import nox
 
 
-PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.21.0-alpha.2")
+PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.21.0-alpha.3")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
 
@@ -19,7 +19,7 @@ def append_to_github_env(name: str, value: str):
         f.write(f"{name}={value}\n")
 
 
-@nox.session(name="setup-pyodide")
+@nox.session(name="setup-pyodide", python=False)
 def setup_pyodide(session: nox.Session):
     tests_dir = Path("./tests").resolve()
     with session.chdir(tests_dir):
@@ -46,7 +46,7 @@ def setup_pyodide(session: nox.Session):
                 append_to_github_env("EMSCRIPTEN_VERSION", emscripten_version)
 
 
-@nox.session(name="test-emscripten")
+@nox.session(name="test-emscripten", python=False)
 def test_emscripten(session: nox.Session):
     tests_dir = Path("./tests").resolve()
 
@@ -57,10 +57,9 @@ def test_emscripten(session: nox.Session):
     for crate in test_crates:
         crate = Path(crate).resolve()
         ver = sys.version_info
+        session.run("cargo", "build", external=True)
         session.run(
-            "cargo",
-            "+nightly",
-            "run",
+            tests_dir.parent / "target" / "debug" / "maturin",
             "build",
             "-m",
             str(crate / "Cargo.toml"),
@@ -68,6 +67,7 @@ def test_emscripten(session: nox.Session):
             "wasm32-unknown-emscripten",
             "-i",
             f"python{ver.major}.{ver.minor}",
+            env={"RUSTUP_TOOLCHAIN": "nightly"},
             external=True,
         )
 

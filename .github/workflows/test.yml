@@ -41,6 +41,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin
@@ -77,10 +79,7 @@ jobs:
           key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
 
       - name: cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --features password-storage
+        run: cargo nextest run --features password-storage
       - uses: actions/setup-python@v4
         with:
           python-version: "pypy-3.7"

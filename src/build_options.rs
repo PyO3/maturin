@@ -1,14 +1,10 @@
 use crate::auditwheel::PlatformTag;
-use crate::build_context::{BridgeModel, ProjectLayout};
+use crate::build_context::BridgeModel;
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
+use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
-use crate::BuildContext;
-use crate::CargoToml;
-use crate::Metadata21;
-use crate::PyProjectToml;
-use crate::PythonInterpreter;
-use crate::Target;
+use crate::{BuildContext, Metadata21, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand, Node};
 use regex::Regex;
@@ -17,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io;
 use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
 // These should be treated almost identically but must be correctly identified
@@ -213,45 +209,6 @@ impl DerefMut for BuildOptions {
 }
 
 impl BuildOptions {
-    /// Get cargo manifest file path
-    fn manifest_path(&self) -> Result<PathBuf> {
-        // use command line argument if specified
-        if let Some(path) = &self.manifest_path {
-            return Ok(path.clone());
-        }
-        // check `manifest-path` option in pyproject.toml
-        let current_dir = env::current_dir()
-            .context("Failed to detect current directory ಠ_ಠ")?
-            .canonicalize()?;
-        if current_dir.join("pyproject.toml").is_file() {
-            let pyproject =
-                PyProjectToml::new(&current_dir).context("pyproject.toml is invalid")?;
-            if let Some(path) = pyproject.manifest_path() {
-                println!("🔗 Found cargo manifest path in pyproject.toml");
-                // pyproject.toml must be placed at top directory
-                let manifest_dir = path
-                    .parent()
-                    .context("missing parent directory")?
-                    .canonicalize()?;
-                if !manifest_dir.starts_with(&current_dir) {
-                    bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
-                }
-                return Ok(path.to_path_buf());
-            }
-        }
-        // check Cargo.toml in current directory
-        let path = PathBuf::from("Cargo.toml");
-        if path.exists() {
-            Ok(path)
-        } else {
-            Err(format_err!(
-                "Can't find {} (in {})",
-                path.display(),
-                current_dir.display()
-            ))
-        }
-    }
-
     /// Finds the appropriate amount for python versions for each [BridgeModel].
     fn find_interpreters(
         &self,
@@ -518,59 +475,16 @@ impl BuildOptions {
         strip: bool,
         editable: bool,
     ) -> Result<BuildContext> {
-        let manifest_file = self.manifest_path()?;
-        if !manifest_file.is_file() {
-            bail!(
-                "{} is not the path to a Cargo.toml",
-                manifest_file.display()
-            );
-        }
-
-        let cargo_toml = CargoToml::from_path(&manifest_file)?;
-        let manifest_dir = manifest_file.parent().unwrap();
-        let pyproject: Option<PyProjectToml> = if manifest_dir.join("pyproject.toml").is_file() {
-            let pyproject =
-                PyProjectToml::new(manifest_dir).context("pyproject.toml is invalid")?;
-            pyproject.warn_missing_maturin_version();
-            pyproject.warn_missing_build_backend();
-            Some(pyproject)
-        } else {
-            None
-        };
-        let pyproject = pyproject.as_ref();
+        let ProjectResolver {
+            project_layout,
+            cargo_toml_path,
+            cargo_toml,
+            pyproject_toml,
+            module_name,
+            metadata21,
+        } = ProjectResolver::resolve(self.manifest_path.clone())?;
+        let pyproject = pyproject_toml.as_ref();
         let tool_maturin = pyproject.and_then(|p| p.maturin());
-
-        let metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-            .context("Failed to parse Cargo.toml into python metadata")?;
-        let extra_metadata = cargo_toml.remaining_core_metadata();
-
-        let crate_name = &cargo_toml.package.name;
-
-        // If the package name contains minuses, you must declare a module with
-        // underscores as lib name
-        let module_name = cargo_toml
-            .lib
-            .as_ref()
-            .and_then(|lib| lib.name.as_ref())
-            .unwrap_or(crate_name)
-            .to_owned();
-
-        // Only use extension name from extra metadata if it contains dot
-        let extension_name = extra_metadata
-            .name
-            .as_ref()
-            .filter(|name| name.contains('.'))
-            .unwrap_or(&module_name);
-
-        let data = pyproject
-            .and_then(|x| x.data())
-            .or_else(|| extra_metadata.data.as_ref().map(Path::new));
-        let project_layout = ProjectLayout::determine(
-            manifest_dir,
-            extension_name,
-            extra_metadata.python_source.as_deref(),
-            data,
-        )?;
 
         let mut cargo_options = self.cargo.clone();
 
@@ -583,7 +497,7 @@ impl BuildOptions {
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_options)?;
 
         let result = MetadataCommand::new()
-            .manifest_path(&manifest_file)
+            .manifest_path(&cargo_toml_path)
             .other_options(cargo_metadata_extra_args)
             .exec();
 
@@ -782,15 +696,17 @@ impl BuildOptions {
             .target_dir
             .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
+        let crate_name = cargo_toml.package.name;
 
         Ok(BuildContext {
             target,
             bridge,
             project_layout,
+            pyproject_toml,
             metadata21,
-            crate_name: crate_name.to_string(),
+            crate_name,
             module_name,
-            manifest_path: manifest_file,
+            manifest_path: cargo_toml_path,
             target_dir,
             out: wheel_dir,
             release,
@@ -1204,6 +1120,11 @@ impl CargoOptions {
     fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
         let mut args_from_pyproject = Vec::new();
 
+        if self.manifest_path.is_none() && tool_maturin.manifest_path.is_some() {
+            self.manifest_path = tool_maturin.manifest_path.clone();
+            args_from_pyproject.push("manifest-path");
+        }
+
         if self.profile.is_none() && tool_maturin.profile.is_some() {
             self.profile = tool_maturin.profile.clone();
             args_from_pyproject.push("profile");
@@ -1422,6 +1343,8 @@ mod test {
 
     #[test]
     fn test_get_min_python_minor() {
+        use crate::CargoToml;
+
         // Nothing specified
         let cargo_toml = CargoToml::from_path("test-crates/pyo3-pure/Cargo.toml").unwrap();
         let metadata21 =

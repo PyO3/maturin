@@ -85,13 +85,12 @@ impl Metadata21 {
     /// Merge metadata with pyproject.toml, where pyproject.toml takes precedence
     ///
     /// manifest_path must be the directory, not the file
-    fn merge_pyproject_toml(&mut self, manifest_path: impl AsRef<Path>) -> Result<()> {
+    pub fn merge_pyproject_toml(
+        &mut self,
+        manifest_path: impl AsRef<Path>,
+        pyproject_toml: &PyProjectToml,
+    ) -> Result<()> {
         let manifest_path = manifest_path.as_ref();
-        if !manifest_path.join("pyproject.toml").is_file() {
-            return Ok(());
-        }
-        let pyproject_toml =
-            PyProjectToml::new(manifest_path).context("pyproject.toml is invalid")?;
         if let Some(project) = &pyproject_toml.project {
             self.name = project.name.clone();
 
@@ -352,7 +351,7 @@ impl Metadata21 {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
 
-        let mut metadata = Metadata21 {
+        let metadata = Metadata21 {
             metadata_version: "2.1".to_owned(),
 
             // Mapped from cargo metadata
@@ -395,9 +394,6 @@ impl Metadata21 {
             gui_scripts: HashMap::new(),
             entry_points: HashMap::new(),
         };
-
-        let manifest_path = manifest_path.as_ref();
-        metadata.merge_pyproject_toml(manifest_path)?;
         Ok(metadata)
     }
 
@@ -804,9 +800,14 @@ mod test {
 
     #[test]
     fn test_merge_metadata_from_pyproject_toml() {
-        let cargo_toml_str = fs_err::read_to_string("test-crates/pyo3-pure/Cargo.toml").unwrap();
+        let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
+        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let metadata = Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure").unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir).unwrap();
+        let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
+            .unwrap();
         assert_eq!(
             metadata.summary,
             Some("Implements a dummy function in Rust".to_string())
@@ -845,11 +846,14 @@ mod test {
 
     #[test]
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
-        let cargo_toml_str =
-            fs_err::read_to_string("test-crates/pyo3-mixed-py-subdir/Cargo.toml").unwrap();
+        let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
+        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-mixed-py-subdir").unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir).unwrap();
+        let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
+            .unwrap();
         // defined in Cargo.toml
         assert_eq!(
             metadata.summary,
@@ -873,10 +877,14 @@ mod test {
 
     #[test]
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
-        let manifest_path = PathBuf::from("test-crates").join("license-test");
-        let cargo_toml_str = fs_err::read_to_string(&manifest_path.join("Cargo.toml")).unwrap();
+        let manifest_dir = PathBuf::from("test-crates").join("license-test");
+        let cargo_toml_str = fs_err::read_to_string(&manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_path).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir).unwrap();
+        let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
+            .unwrap();
 
         // verify Cargo.toml value came through
         assert_eq!(metadata.license.as_ref().unwrap(), "MIT");
@@ -885,11 +893,11 @@ mod test {
         assert_eq!(4, metadata.license_files.len());
 
         // Verify pyproject.toml license = {file = ...} worked
-        assert_eq!(metadata.license_files[0], manifest_path.join("LICENCE.txt"));
+        assert_eq!(metadata.license_files[0], manifest_dir.join("LICENCE.txt"));
 
         // Verify the default licenses were included
-        assert_eq!(metadata.license_files[1], manifest_path.join("LICENSE"));
-        assert_eq!(metadata.license_files[2], manifest_path.join("NOTICE.md"));
-        assert_eq!(metadata.license_files[3], manifest_path.join("AUTHORS.txt"));
+        assert_eq!(metadata.license_files[1], manifest_dir.join("LICENSE"));
+        assert_eq!(metadata.license_files[2], manifest_dir.join("NOTICE.md"));
+        assert_eq!(metadata.license_files[3], manifest_dir.join("AUTHORS.txt"));
     }
 }

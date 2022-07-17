@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add Linux 32-bit powerpc architecture support in [#1026](https://github.com/PyO3/maturin/pull/1026)
 * Add Linux sparc64 architecture support in [#1027](https://github.com/PyO3/maturin/pull/1027)
 * Add PEP 440 local version identifier support in [#1037](https://github.com/PyO3/maturin/pull/1037)
+* Fix inconsistent `Cargo.toml` and `pyproject.toml` path handling in [#1043](https://github.com/PyO3/maturin/pull/1043)
 
 ## [0.13.1] - 2022-07-26
 

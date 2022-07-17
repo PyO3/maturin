@@ -1,6 +1,6 @@
 //! The wheel format is (mostly) specified in PEP 427
 
-use crate::build_context::ProjectLayout;
+use crate::project_layout::ProjectLayout;
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::{BridgeModel, Metadata21};

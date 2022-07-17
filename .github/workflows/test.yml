@@ -385,6 +385,8 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
       - run: maturin --version
         if: steps.changes.outputs.changed == 'true'
+      - run: python3 -m maturin --version
+        if: steps.changes.outputs.changed == 'true'
       - name: Upload wheel artifacts
         if: steps.changes.outputs.changed == 'true'
         uses: actions/upload-artifact@v2

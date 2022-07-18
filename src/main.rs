@@ -62,13 +62,13 @@ enum Opt {
         build: BuildOptions,
     },
     #[clap(name = "list-python")]
-    /// Searches and lists the available python installations
+    /// Search and list the available python installations
     ListPython {
         #[clap(long)]
         target: Option<String>,
     },
     #[clap(name = "develop", alias = "dev")]
-    /// Installs the crate as module in the current virtualenv
+    /// Install the crate as module in the current virtualenv
     ///
     /// Note that this command doesn't create entrypoints
     Develop {
@@ -131,7 +131,7 @@ enum Opt {
         #[clap(flatten)]
         options: GenerateProjectOptions,
     },
-    /// Uploads python packages to pypi
+    /// Upload python packages to pypi
     ///
     /// It is mostly similar to `twine upload`, but can only upload python wheels
     /// and source distributions.

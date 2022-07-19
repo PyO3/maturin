@@ -35,9 +35,9 @@ pub fn develop(
         Ok(output) if output.status.success() => {
             let platform = String::from_utf8_lossy(&output.stdout);
             if platform.contains("macos") {
-                if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
+                if platform.contains("x86_64") && target.target_arch() == Arch::X86_64 {
                     target_triple = Some("x86_64-apple-darwin".to_string());
-                } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
+                } else if platform.contains("arm64") && target.target_arch() == Arch::Aarch64 {
                     target_triple = Some("aarch64-apple-darwin".to_string());
                 }
             }
@@ -48,7 +48,7 @@ pub fn develop(
     // Store wheel in a unique location so we don't get name clashes with parallel runs
     let wheel_dir = TempDir::new().context("Failed to create temporary directory")?;
 
-    let build_options = BuildOptions {
+    let mut build_options = BuildOptions {
         platform_tag: vec![PlatformTag::Linux],
         interpreter: vec![python.clone()],
         find_interpreter: false,
@@ -62,6 +62,11 @@ pub fn develop(
             ..cargo_options
         },
     };
+
+    // We should respect user input.
+    if cargo_options.target.is_some() {
+        build_options.cargo.target = cargo_options.target;
+    }
 
     let build_context = build_options.into_build_context(release, strip, true)?;
 

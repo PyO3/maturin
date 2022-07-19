@@ -22,27 +22,29 @@ pub fn develop(
     strip: bool,
     extras: Vec<String>,
 ) -> Result<()> {
-    let target = Target::from_target_triple(None)?;
-    let mut target_triple = None;
+    let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
+    let target = Target::from_target_triple(cargo_options.target)?;
     let python = target.get_venv_python(&venv_dir);
 
     // check python platform and architecture
-    match Command::new(&python)
-        .arg("-c")
-        .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
-        .output()
-    {
-        Ok(output) if output.status.success() => {
-            let platform = String::from_utf8_lossy(&output.stdout);
-            if platform.contains("macos") {
-                if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
-                    target_triple = Some("x86_64-apple-darwin".to_string());
-                } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
-                    target_triple = Some("aarch64-apple-darwin".to_string());
+    if !target.user_specified {
+        match Command::new(&python)
+            .arg("-c")
+            .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
+            .output()
+        {
+            Ok(output) if output.status.success() => {
+                let platform = String::from_utf8_lossy(&output.stdout);
+                if platform.contains("macos") {
+                    if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
+                        target_triple = Some("x86_64-apple-darwin".to_string());
+                    } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
+                        target_triple = Some("aarch64-apple-darwin".to_string());
+                    }
                 }
             }
+            _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
         }
-        _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
     }
 
     // Store wheel in a unique location so we don't get name clashes with parallel runs

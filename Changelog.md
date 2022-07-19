@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add 64-bit RISC-V support by felixonmars in [#1001](https://github.com/PyO3/maturin/pull/1001)
 * Add support for invoking with `python3 -m maturin` in [#1008](https://github.com/PyO3/maturin/pull/1008)
+* Fix detection of optional dependencies when declaring `features` in `pyproject.toml` in [#1014](https://github.com/PyO3/maturin/pull/1014)
 
 ## [0.13.0] - 2022-07-09
 

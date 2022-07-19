@@ -580,7 +580,7 @@ impl BuildOptions {
             Vec::new()
         };
 
-        let cargo_metadata_extra_args = extract_cargo_metadata_args(&self.cargo)?;
+        let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_options)?;
 
         let result = MetadataCommand::new()
             .manifest_path(&manifest_file)

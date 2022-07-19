@@ -151,7 +151,7 @@ jobs:
     name: Test Emscripten
     runs-on: ubuntu-latest
     env:
-      PYODIDE_VERSION: '0.21.0-alpha.2'
+      PYODIDE_VERSION: '0.21.0-alpha.3'
       PYTHON_VERSION: '3.10.2'
       NODE_VERSION: 18
     steps:

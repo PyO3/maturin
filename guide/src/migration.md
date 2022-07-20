@@ -11,8 +11,8 @@ maturin 0.13 has dropped support for Python 3.6, to support Python 3.6 you can u
 
 ### Source distributions are not built by default
 
-maturin 0.13 replaced `--no-sdist` with the new `--sdist` option, source distributions are now only built
-when `--sdist` is specified.
+maturin 0.13 replaced `--no-sdist` with the new `--sdist` option in `maturin build` command,
+source distributions are now only built when `--sdist` is specified.
 
 ### Only build wheels for current Python interpreter in `PATH` by default
 

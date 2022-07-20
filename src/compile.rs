@@ -14,6 +14,9 @@ use std::str;
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
+/// crate types excluding `bin`, `cdylib` and `proc-macro`
+const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
+
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
@@ -23,7 +26,7 @@ pub fn compile(
     bindings_crate: &BridgeModel,
 ) -> Result<Vec<HashMap<String, PathBuf>>> {
     let root_pkg = context.cargo_metadata.root_package().unwrap();
-    let targets: Vec<_> = root_pkg
+    let mut targets: Vec<_> = root_pkg
         .targets
         .iter()
         .filter(|target| match bindings_crate {
@@ -31,6 +34,19 @@ pub fn compile(
             _ => target.kind.contains(&"cdylib".to_string()),
         })
         .collect();
+    if targets.is_empty() && !bindings_crate.is_bin() {
+        // No `crate-type = ["cdylib"]` in `Cargo.toml`
+        // Let's try compile one of the target with `--crate-type cdylib`
+        let lib_target = root_pkg.targets.iter().find(|target| {
+            target
+                .kind
+                .iter()
+                .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
+        });
+        if let Some(target) = lib_target {
+            targets.push(target);
+        }
+    }
     if context.target.is_macos() && context.universal2 {
         compile_universal2(context, python_interpreter, bindings_crate, &targets)
     } else {
@@ -146,6 +162,25 @@ fn compile_target(
     // --release and --profile are conflicting options
     if context.release && cargo_rustc.profile.is_none() {
         cargo_rustc.release = true;
+    }
+
+    // Add `--crate-type cdylib` if available
+    if binding_target
+        .kind
+        .iter()
+        .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
+    {
+        if let Ok(channel) = rustc_version::version_meta().map(|x| x.channel) {
+            if matches!(
+                channel,
+                rustc_version::Channel::Nightly | rustc_version::Channel::Dev
+            ) {
+                cargo_rustc
+                    .unstable_flags
+                    .push("unstable-options".to_string());
+                cargo_rustc.crate_type = vec!["cdylib".to_string()];
+            }
+        }
     }
 
     let mut rust_flags = env::var_os("RUSTFLAGS");

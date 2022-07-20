@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for invoking with `python3 -m maturin` in [#1008](https://github.com/PyO3/maturin/pull/1008)
 * Fix detection of optional dependencies when declaring `features` in `pyproject.toml` in [#1014](https://github.com/PyO3/maturin/pull/1014)
 * Respect user specified Rust target in `maturin develop` in [#1016](https://github.com/PyO3/maturin/pull/1016)
+* Use `cargo rustc --crate-type cdylib` on Rust nightly/dev channel in [#1020](https://github.com/PyO3/maturin/pull/1020)
 
 ## [0.13.0] - 2022-07-09
 

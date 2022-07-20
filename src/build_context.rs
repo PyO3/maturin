@@ -605,16 +605,14 @@ impl BuildContext {
     ) -> Result<PathBuf> {
         let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
-        let artifacts = artifacts
-            .get(0)
-            .context("Failed to build a native library through cargo")?;
+        let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
+                 in the lib section of your Cargo.toml?";
+        let artifacts = artifacts.get(0).context(error_msg)?;
 
-        let artifact = artifacts.get("cdylib").cloned().ok_or_else(|| {
-            anyhow!(
-                "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?",
-            )
-        })?;
+        let artifact = artifacts
+            .get("cdylib")
+            .cloned()
+            .ok_or_else(|| anyhow!(error_msg,))?;
 
         if let Some(extension_name) = extension_name {
             warn_missing_py_init(&artifact, extension_name)

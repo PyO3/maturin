@@ -224,9 +224,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05cc50d93e6b63fe87ee694f62a2f85151bed46af13c67fde8544a2bd0034b67"
+checksum = "98cdaeae47871a543692dac2ad7cef3efdf1f9559a41e68a42507367e38c424f"
 dependencies = [
  "clap",
 ]
@@ -242,9 +242,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b1f4d60f32a6a330e7975999f7ba0eea89bb57712df64a840eb3747d61167b"
+checksum = "86ceaf7d17e6d09dce26620049a7d08d43b92efdd3f9eada80f08ad1f791a978"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -259,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fecad547272ad0a06e41c5cebcfec47ab03d02407852affb4a2db7bb1df54574"
+checksum = "d3d8bf4811d0b1aef4304e05351027c495b7fa126b4f7b3fd55f875f41bc954d"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -358,9 +358,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.12"
+version = "3.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab8b79fe3946ceb4a0b1c080b4018992b8d27e9ff363644c1c9b6387c854614d"
+checksum = "54635806b078b7925d6e36810b1755f2a4b5b4d57560432c1ecf60bcbe10602b"
 dependencies = [
  "atty",
  "bitflags",
@@ -437,9 +437,9 @@ dependencies = [
 
 [[package]]
 name = "concurrent-queue"
-version = "1.2.3"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83827793632c72fa4f73c2edb31e7a997527dd8ffe7077344621fc62c5478157"
+checksum = "30ed07550be01594c6026cff2a1d7fe9c8f683caa798e12b68694ac9e88286a3"
 dependencies = [
  "cache-padded",
 ]
@@ -1627,9 +1627,9 @@ dependencies = [
 
 [[package]]
 name = "path-slash"
-version = "0.1.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "498a099351efa4becc6a19c72aa9270598e8fd274ca47052e37455241c88b696"
+checksum = "c54014ba3c1880122928735226f78b6f5bf5bd1fed15e41e92cf7aa20278ce28"
 
 [[package]]
 name = "percent-encoding"
@@ -2091,18 +2091,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.139"
+version = "1.0.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0171ebb889e45aa68b44aee0859b3eede84c6f5f5c228e6f140c0b2a0a46cad6"
+checksum = "fc855a42c7967b7c369eb5860f7164ef1f6f81c20c7cc1141f2a604e18723b03"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.139"
+version = "1.0.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1d3230c1de7932af58ad8ffbe1d784bd55efd5a9d84ac24f69c72d83543dfb"
+checksum = "6f2122636b9fe3b81f1cb25099fcf2d3f542cdb1d45940d56c713158884a05da"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2437,9 +2437,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a713421342a5a666b7577783721d3117f1b69a393df803ee17bb73b1e122a59"
+checksum = "60db860322da191b40952ad9affe65ea23e7dd6a5c442c2c42865810c6ab8e6b"
 dependencies = [
  "matchers",
  "once_cell",

@@ -242,9 +242,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86ceaf7d17e6d09dce26620049a7d08d43b92efdd3f9eada80f08ad1f791a978"
+checksum = "0b4d44af0e3fdd773cbf70b6b826a28993839be0a36c2b7c00c47f2dadaca6c6"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -1854,9 +1854,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.13"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f25bc4c7e55e0b0b7a1d43fb893f4fa1361d0abe38b9ce4f323c2adfe6ef42"
+checksum = "534cfe58d6a18cc17120fbf4635d53d14691c1fe4d951064df9bd326178d7d5a"
 dependencies = [
  "bitflags",
 ]

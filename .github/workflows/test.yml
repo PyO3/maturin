@@ -193,7 +193,7 @@ jobs:
       - name: Install build requirements
         run: |
           set -ex
-          apk add cargo python3-dev libffi-dev py3-pip
+          apk add cargo python3-dev libffi-dev py3-pip curl bash
           pip3 install cffi virtualenv
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1
@@ -204,10 +204,12 @@ jobs:
         with:
           path: test-crates/targets
           key: test-crates-${{ runner.os }}-alpine-${{ hashFiles('test-crates/*/Cargo.lock') }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests
-          env -u GITHUB_ACTIONS cargo test
+          env -u GITHUB_ACTIONS cargo nextest run --features password-storage
 
   test-auditwheel:
     name: Test Auditwheel

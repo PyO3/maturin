@@ -193,7 +193,7 @@ jobs:
       - name: Install build requirements
         run: |
           set -ex
-          apk add cargo python3-dev libffi-dev py3-pip curl bash
+          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd
           pip3 install cffi virtualenv
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1

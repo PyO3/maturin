@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2022-07-26
+
 * Add 64-bit RISC-V support by felixonmars in [#1001](https://github.com/PyO3/maturin/pull/1001)
 * Add support for invoking with `python3 -m maturin` in [#1008](https://github.com/PyO3/maturin/pull/1008)
 * Fix detection of optional dependencies when declaring `features` in `pyproject.toml` in [#1014](https://github.com/PyO3/maturin/pull/1014)
@@ -656,7 +658,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/pyo3/maturin/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/pyo3/maturin/compare/v0.12.20...v0.13.0
 [0.12.20]: https://github.com/pyo3/maturin/compare/v0.12.19...v0.12.20
 [0.12.19]: https://github.com/pyo3/maturin/compare/v0.12.18...v0.12.19

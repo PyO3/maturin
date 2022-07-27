@@ -615,8 +615,9 @@ impl BuildContext {
             .ok_or_else(|| anyhow!(error_msg,))?;
 
         if let Some(extension_name) = extension_name {
-            warn_missing_py_init(&artifact, extension_name)
-                .context("Failed to parse the native library")?;
+            // globin has an issue parsing MIPS64 ELF, see https://github.com/m4b/goblin/issues/274
+            // But don't fail the build just because we can't emit a warning
+            let _ = warn_missing_py_init(&artifact, extension_name);
         }
 
         if self.editable || self.skip_auditwheel {

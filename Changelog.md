@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add Linux mips64el architecture support in [#1023](https://github.com/PyO3/maturin/pull/1023)
+
 ## [0.13.1] - 2022-07-26
 
 * Add 64-bit RISC-V support by felixonmars in [#1001](https://github.com/PyO3/maturin/pull/1001)

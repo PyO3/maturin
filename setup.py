@@ -46,9 +46,14 @@ with open("Cargo.toml", "rb") as fp:
     version = tomllib.load(fp)["package"]["version"]
 
 cargo_args = []
-if platform.machine() in ("ppc64le", "ppc64", "powerpc", "riscv64") or (
-    sys.platform == "win32" and platform.machine() == "ARM64"
-):
+if platform.machine() in (
+    "ppc64le",
+    "ppc64",
+    "powerpc",
+    "riscv64",
+    "mips",
+    "mips64",
+) or (sys.platform == "win32" and platform.machine() == "ARM64"):
     cargo_args.extend(["--no-default-features", "--features=upload,log,human-panic"])
 elif sys.platform.startswith("haiku"):
     # mio and ring doesn't build on haiku

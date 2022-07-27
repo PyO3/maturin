@@ -62,6 +62,7 @@ pub enum Arch {
     Wasm32,
     Riscv64,
     Mips64el,
+    Mipsel,
 }
 
 impl fmt::Display for Arch {
@@ -78,6 +79,7 @@ impl fmt::Display for Arch {
             Arch::Wasm32 => write!(f, "wasm32"),
             Arch::Riscv64 => write!(f, "riscv64"),
             Arch::Mips64el => write!(f, "mips64el"),
+            Arch::Mipsel => write!(f, "mipsel"),
         }
     }
 }
@@ -96,6 +98,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86_64,
             Arch::Riscv64,
             Arch::Mips64el,
+            Arch::Mipsel,
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
@@ -134,7 +137,9 @@ impl Target {
     ///
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
-        use target_lexicon::{Architecture, ArmArchitecture, Mips64Architecture, OperatingSystem};
+        use target_lexicon::{
+            Architecture, ArmArchitecture, Mips32Architecture, Mips64Architecture, OperatingSystem,
+        };
 
         let host_triple = get_host_target()?;
         let (platform, triple) = if let Some(ref target_triple) = target_triple {
@@ -177,6 +182,7 @@ impl Target {
             Architecture::Wasm32 => Arch::Wasm32,
             Architecture::Riscv64(_) => Arch::Riscv64,
             Architecture::Mips64(Mips64Architecture::Mips64el) => Arch::Mips64el,
+            Architecture::Mips32(Mips32Architecture::Mipsel) => Arch::Mipsel,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -366,7 +372,9 @@ impl Target {
             Arch::S390X => "s390x",
             Arch::Wasm32 => "wasm32",
             Arch::Riscv64 => "riscv64",
+            // It's kinda surprising that Python doesn't include the `el` suffix
             Arch::Mips64el => "mips64",
+            Arch::Mipsel => "mips",
         }
     }
 
@@ -393,7 +401,9 @@ impl Target {
                 PlatformTag::manylinux2014()
             }
             Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
-            Arch::Armv6L | Arch::Wasm32 | Arch::Riscv64 | Arch::Mips64el => PlatformTag::Linux,
+            Arch::Armv6L | Arch::Wasm32 | Arch::Riscv64 | Arch::Mips64el | Arch::Mipsel => {
+                PlatformTag::Linux
+            }
         }
     }
 
@@ -407,7 +417,7 @@ impl Target {
             | Arch::S390X
             | Arch::Riscv64
             | Arch::Mips64el => 64,
-            Arch::Armv6L | Arch::Armv7L | Arch::X86 | Arch::Wasm32 => 32,
+            Arch::Armv6L | Arch::Armv7L | Arch::X86 | Arch::Wasm32 | Arch::Mipsel => 32,
         }
     }
 

@@ -47,12 +47,14 @@ with open("Cargo.toml", "rb") as fp:
 
 cargo_args = []
 if platform.machine() in (
+    "mips",
+    "mips64",
+    "ppc",
     "ppc64le",
     "ppc64",
     "powerpc",
     "riscv64",
-    "mips",
-    "mips64",
+    "sparc64",
 ) or (sys.platform == "win32" and platform.machine() == "ARM64"):
     cargo_args.extend(["--no-default-features", "--features=upload,log,human-panic"])
 elif sys.platform.startswith("haiku"):

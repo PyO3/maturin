@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add Linux mips64el architecture support in [#1023](https://github.com/PyO3/maturin/pull/1023)
 * Add Linux mipsel architecture support in [#1024](https://github.com/PyO3/maturin/pull/1024)
+* Add Linux 32-bit powerpc architecture support in [#1026](https://github.com/PyO3/maturin/pull/1026)
 
 ## [0.13.1] - 2022-07-26
 

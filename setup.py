@@ -82,6 +82,6 @@ setup(
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
     install_requires=["tomli>=1.1.0 ; python_version<'3.11'"],
-    setup_requires=["setuptools-rust>=1.4.0", "wheel"],
+    setup_requires=["setuptools-rust>=1.4.0"],
     zip_safe=False,
 )

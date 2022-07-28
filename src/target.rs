@@ -65,6 +65,7 @@ pub enum Arch {
     Riscv64,
     Mips64el,
     Mipsel,
+    Sparc64,
 }
 
 impl fmt::Display for Arch {
@@ -83,6 +84,7 @@ impl fmt::Display for Arch {
             Arch::Riscv64 => write!(f, "riscv64"),
             Arch::Mips64el => write!(f, "mips64el"),
             Arch::Mipsel => write!(f, "mipsel"),
+            Arch::Sparc64 => write!(f, "sparc64"),
         }
     }
 }
@@ -103,6 +105,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Riscv64,
             Arch::Mips64el,
             Arch::Mipsel,
+            Arch::Sparc64,
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
@@ -188,6 +191,7 @@ impl Target {
             Architecture::Riscv64(_) => Arch::Riscv64,
             Architecture::Mips64(Mips64Architecture::Mips64el) => Arch::Mips64el,
             Architecture::Mips32(Mips32Architecture::Mipsel) => Arch::Mipsel,
+            Architecture::Sparc64 => Arch::Sparc64,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -381,6 +385,7 @@ impl Target {
             // It's kinda surprising that Python doesn't include the `el` suffix
             Arch::Mips64el => "mips64",
             Arch::Mipsel => "mips",
+            Arch::Sparc64 => "sparc64",
         }
     }
 
@@ -412,7 +417,8 @@ impl Target {
             | Arch::Riscv64
             | Arch::Mips64el
             | Arch::Mipsel
-            | Arch::Powerpc => PlatformTag::Linux,
+            | Arch::Powerpc
+            | Arch::Sparc64 => PlatformTag::Linux,
         }
     }
 
@@ -425,7 +431,8 @@ impl Target {
             | Arch::X86_64
             | Arch::S390X
             | Arch::Riscv64
-            | Arch::Mips64el => 64,
+            | Arch::Mips64el
+            | Arch::Sparc64 => 64,
             Arch::Armv6L
             | Arch::Armv7L
             | Arch::X86

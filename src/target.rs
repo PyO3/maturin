@@ -51,6 +51,8 @@ pub enum Arch {
     Aarch64,
     Armv6L,
     Armv7L,
+    #[serde(alias = "ppc")]
+    Powerpc,
     #[serde(alias = "ppc64le")]
     Powerpc64Le,
     #[serde(alias = "ppc64")]
@@ -71,6 +73,7 @@ impl fmt::Display for Arch {
             Arch::Aarch64 => write!(f, "aarch64"),
             Arch::Armv6L => write!(f, "armv6l"),
             Arch::Armv7L => write!(f, "armv7l"),
+            Arch::Powerpc => write!(f, "ppc"),
             Arch::Powerpc64Le => write!(f, "ppc64le"),
             Arch::Powerpc64 => write!(f, "ppc64"),
             Arch::X86 => write!(f, "i686"),
@@ -91,6 +94,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Aarch64,
             Arch::Armv6L,
             Arch::Armv7L,
+            Arch::Powerpc,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
             Arch::S390X,
@@ -176,6 +180,7 @@ impl Target {
                 _ => Arch::Armv7L,
             },
             Architecture::Aarch64(_) => Arch::Aarch64,
+            Architecture::Powerpc => Arch::Powerpc,
             Architecture::Powerpc64 => Arch::Powerpc64,
             Architecture::Powerpc64le => Arch::Powerpc64Le,
             Architecture::S390x => Arch::S390X,
@@ -365,6 +370,7 @@ impl Target {
             Arch::Aarch64 => "aarch64",
             Arch::Armv6L => "armv6l",
             Arch::Armv7L => "armv7l",
+            Arch::Powerpc => "ppc",
             Arch::Powerpc64Le => "powerpc64le",
             Arch::Powerpc64 => "powerpc64",
             Arch::X86 => "i386",
@@ -401,9 +407,12 @@ impl Target {
                 PlatformTag::manylinux2014()
             }
             Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
-            Arch::Armv6L | Arch::Wasm32 | Arch::Riscv64 | Arch::Mips64el | Arch::Mipsel => {
-                PlatformTag::Linux
-            }
+            Arch::Armv6L
+            | Arch::Wasm32
+            | Arch::Riscv64
+            | Arch::Mips64el
+            | Arch::Mipsel
+            | Arch::Powerpc => PlatformTag::Linux,
         }
     }
 
@@ -417,7 +426,12 @@ impl Target {
             | Arch::S390X
             | Arch::Riscv64
             | Arch::Mips64el => 64,
-            Arch::Armv6L | Arch::Armv7L | Arch::X86 | Arch::Wasm32 | Arch::Mipsel => 32,
+            Arch::Armv6L
+            | Arch::Armv7L
+            | Arch::X86
+            | Arch::Wasm32
+            | Arch::Mipsel
+            | Arch::Powerpc => 32,
         }
     }
 

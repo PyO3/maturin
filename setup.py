@@ -17,7 +17,6 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib
 from setuptools import setup
-from setuptools.command.install import install
 
 from setuptools_rust import RustBin
 
@@ -72,7 +71,7 @@ setup(
     long_description_content_type="text/markdown",
     version=version,
     license="MIT OR Apache-2.0",
-    python_requires=">=3.5",
+    python_requires=">=3.7",
     cmdclass={"bdist_wheel": bdist_wheel},
     packages=["maturin"],
     rust_extensions=[RustBin("maturin", args=cargo_args)],
@@ -83,6 +82,6 @@ setup(
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
     install_requires=["tomli>=1.1.0 ; python_version<'3.11'"],
-    setup_requires=["setuptools-rust"],
+    setup_requires=["setuptools-rust>=1.4.0", "wheel"],
     zip_safe=False,
 )

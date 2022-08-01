@@ -19,7 +19,7 @@ name = "maturin"
 name = "maturin"
 
 [dependencies]
-anyhow = "1.0.51"
+anyhow = "1.0.59"
 base64 = "0.13.0"
 glob = "0.3.0"
 cargo_metadata = "0.15.0"

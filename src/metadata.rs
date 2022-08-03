@@ -408,7 +408,7 @@ impl Metadata21 {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),
             ("Name", self.name.clone()),
-            ("Version", self.get_version_escaped()),
+            ("Version", self.get_pep440_version()),
         ];
 
         let mut add_vec = |name, values: &[String]| {
@@ -505,8 +505,21 @@ impl Metadata21 {
     /// Returns the version encoded according to PEP 427, Section "Escaping
     /// and Unicode"
     pub fn get_version_escaped(&self) -> String {
-        let re = Regex::new(r"[^\w\d.]+").unwrap();
-        re.replace_all(&self.version, "_").to_string()
+        self.get_pep440_version().replace('-', "_")
+    }
+
+    /// Returns the version encoded according to PEP 440
+    ///
+    /// See https://github.com/pypa/setuptools/blob/d90cf84e4890036adae403d25c8bb4ee97841bbf/pkg_resources/__init__.py#L1336-L1345
+    pub fn get_pep440_version(&self) -> String {
+        match pep440::Version::parse(&self.version) {
+            Some(ver) => ver.normalize(),
+            None => {
+                let ver = self.version.replace(' ', ".");
+                let re = Regex::new(r"[^A-Za-z0-9.]+").unwrap();
+                re.replace_all(&ver, "-").to_string()
+            }
+        }
     }
 
     /// Returns the name of the .dist-info directory as defined in the wheel specification

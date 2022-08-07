@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add Linux sparc64 architecture support in [#1027](https://github.com/PyO3/maturin/pull/1027)
 * Add PEP 440 local version identifier support in [#1037](https://github.com/PyO3/maturin/pull/1037)
 * Fix inconsistent `Cargo.toml` and `pyproject.toml` path handling in [#1043](https://github.com/PyO3/maturin/pull/1043)
+* Find python module next to `pyproject.toml` if `pyproject.toml` exists in [#1044](https://github.com/PyO3/maturin/pull/1044).
+  It's technically a **breaking change**, but previously it doesn't work properly
+  if the directory containing `pyproject.toml` isn't recognized as project root.
 
 ## [0.13.1] - 2022-07-26
 

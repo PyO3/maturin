@@ -52,7 +52,7 @@ impl ProjectResolver {
         let manifest_dir = manifest_file.parent().unwrap();
         let pyproject_toml: Option<PyProjectToml> = if pyproject_file.is_file() {
             let pyproject =
-                PyProjectToml::new(pyproject_file).context("pyproject.toml is invalid")?;
+                PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
             pyproject.warn_missing_maturin_version();
             pyproject.warn_missing_build_backend();
             Some(pyproject)
@@ -89,8 +89,13 @@ impl ProjectResolver {
         let data = pyproject
             .and_then(|x| x.data())
             .or_else(|| extra_metadata.data.as_ref().map(Path::new));
+        let project_root = if pyproject_file.is_file() {
+            pyproject_file.parent().unwrap_or(manifest_dir)
+        } else {
+            manifest_dir
+        };
         let project_layout = ProjectLayout::determine(
-            manifest_dir,
+            project_root,
             extension_name,
             extra_metadata.python_source.as_deref(),
             data,

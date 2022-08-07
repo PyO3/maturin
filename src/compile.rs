@@ -280,12 +280,14 @@ fn compile_target(
     if context.zig {
         // Pass zig command to downstream, eg. python3-dll-a
         if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
-            let zig_cmd = if zig_args.is_empty() {
-                zig_cmd
+            if zig_args.is_empty() {
+                build_command.env("ZIG_COMMAND", zig_cmd);
             } else {
-                format!("{} {}", zig_cmd, zig_args.join(" "))
+                build_command.env(
+                    "ZIG_COMMAND",
+                    format!("{} {}", zig_cmd.display(), zig_args.join(" ")),
+                );
             };
-            build_command.env("ZIG_COMMAND", zig_cmd);
         }
     }
 

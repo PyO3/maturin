@@ -76,8 +76,8 @@ impl PyProjectToml {
     ///
     /// Does no specific error handling because it's only used to check whether or not to build
     /// source distributions
-    pub fn new(project_root: impl AsRef<Path>) -> Result<PyProjectToml> {
-        let path = project_root.as_ref().join("pyproject.toml");
+    pub fn new(pyproject_file: impl AsRef<Path>) -> Result<PyProjectToml> {
+        let path = pyproject_file.as_ref();
         let contents = fs::read_to_string(&path).context(format!(
             "Couldn't find pyproject.toml at {}",
             path.display()
@@ -191,9 +191,10 @@ mod tests {
     #[test]
     fn test_parse_tool_maturin() {
         let tmp_dir = TempDir::new().unwrap();
+        let pyproject_file = tmp_dir.path().join("pyproject.toml");
 
         fs::write(
-            tmp_dir.path().join("pyproject.toml"),
+            &pyproject_file,
             r#"[build-system]
             requires = ["maturin"]
             build-backend = "maturin"
@@ -209,7 +210,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        let pyproject = PyProjectToml::new(tmp_dir).unwrap();
+        let pyproject = PyProjectToml::new(pyproject_file).unwrap();
         assert_eq!(pyproject.manifest_path(), Some(Path::new("Cargo.toml")));
 
         let maturin = pyproject.maturin().unwrap();
@@ -230,12 +231,13 @@ mod tests {
 
     #[test]
     fn test_warn_missing_maturin_version() {
-        let with_constraint = PyProjectToml::new("test-crates/pyo3-pure").unwrap();
+        let with_constraint = PyProjectToml::new("test-crates/pyo3-pure/pyproject.toml").unwrap();
         assert!(with_constraint.warn_missing_maturin_version());
         let without_constraint_dir = TempDir::new().unwrap();
+        let pyproject_file = without_constraint_dir.path().join("pyproject.toml");
 
         fs::write(
-            without_constraint_dir.path().join("pyproject.toml"),
+            &pyproject_file,
             r#"[build-system]
             requires = ["maturin"]
             build-backend = "maturin"
@@ -245,7 +247,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        let without_constraint = PyProjectToml::new(without_constraint_dir).unwrap();
+        let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
         assert!(!without_constraint.warn_missing_maturin_version());
     }
 }

@@ -5,6 +5,7 @@ use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
 };
+use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::{compile, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
@@ -12,7 +13,6 @@ use cargo_metadata::Metadata;
 use fs_err as fs;
 use lddtree::Library;
 use sha2::{Digest, Sha256};
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -72,93 +72,6 @@ impl Display for BridgeModel {
     }
 }
 
-/// Whether this project is pure rust or rust mixed with python and whether it has wheel data
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProjectLayout {
-    /// Contains the canonicalized (i.e. absolute) path to the python part of the project
-    /// If none, we have a rust crate compiled into a shared library with only some glue python for cffi
-    /// If some, we have a python package that is extended by a native rust module.
-    pub python_module: Option<PathBuf>,
-    /// Contains the canonicalized (i.e. absolute) path to the rust part of the project
-    pub rust_module: PathBuf,
-    /// rust extension name
-    pub extension_name: String,
-    /// The location of the wheel data, if any
-    pub data: Option<PathBuf>,
-}
-
-impl ProjectLayout {
-    /// Checks whether a python module exists besides Cargo.toml with the right name
-    pub fn determine(
-        project_root: impl AsRef<Path>,
-        module_name: &str,
-        py_src: Option<impl AsRef<Path>>,
-        data: Option<impl AsRef<Path>>,
-    ) -> Result<ProjectLayout> {
-        // A dot in the module name means the extension module goes into the module folder specified by the path
-        let parts: Vec<&str> = module_name.split('.').collect();
-        let project_root = project_root.as_ref();
-        let python_root = py_src.map_or(Cow::Borrowed(project_root), |py_src| {
-            Cow::Owned(project_root.join(py_src))
-        });
-        let (python_module, rust_module, extension_name) = if parts.len() > 1 {
-            let mut rust_module = python_root.to_path_buf();
-            rust_module.extend(&parts[0..parts.len() - 1]);
-            (
-                python_root.join(parts[0]),
-                rust_module,
-                parts[parts.len() - 1].to_string(),
-            )
-        } else {
-            (
-                python_root.join(module_name),
-                python_root.join(module_name),
-                module_name.to_string(),
-            )
-        };
-
-        let data = if let Some(data) = data {
-            let data = if data.as_ref().is_absolute() {
-                data.as_ref().to_path_buf()
-            } else {
-                project_root.join(data)
-            };
-            if !data.is_dir() {
-                bail!("No such data directory {}", data.display());
-            }
-            Some(data)
-        } else if project_root.join(format!("{}.data", module_name)).is_dir() {
-            Some(project_root.join(format!("{}.data", module_name)))
-        } else {
-            None
-        };
-
-        if python_module.is_dir() {
-            if !python_module.join("__init__.py").is_file()
-                && !python_module.join("__init__.pyi").is_file()
-            {
-                bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
-            }
-
-            println!("🍹 Building a mixed python/rust project");
-
-            Ok(ProjectLayout {
-                python_module: Some(python_module),
-                rust_module,
-                extension_name,
-                data,
-            })
-        } else {
-            Ok(ProjectLayout {
-                python_module: None,
-                rust_module: project_root.to_path_buf(),
-                extension_name,
-                data,
-            })
-        }
-    }
-}
-
 /// Contains all the metadata required to build the crate
 #[derive(Clone)]
 pub struct BuildContext {
@@ -168,6 +81,8 @@ pub struct BuildContext {
     pub bridge: BridgeModel,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
+    /// Parsed project.toml if any
+    pub pyproject_toml: Option<PyProjectToml>,
     /// Python Package Metadata 2.1
     pub metadata21: Metadata21,
     /// The name of the crate
@@ -260,8 +175,8 @@ impl BuildContext {
             .context("Failed to create the target directory for the source distribution")?;
 
         let include_cargo_lock = self.cargo_options.locked || self.cargo_options.frozen;
-        match PyProjectToml::new(self.manifest_path.parent().unwrap()) {
-            Ok(pyproject) => {
+        match self.pyproject_toml.as_ref() {
+            Some(pyproject) => {
                 let sdist_path = source_distribution(
                     &self.out,
                     &self.metadata21,
@@ -274,7 +189,7 @@ impl BuildContext {
                 .context("Failed to build source distribution")?;
                 Ok(Some((sdist_path, "source".to_string())))
             }
-            Err(_) => Ok(None),
+            None => Ok(None),
         }
     }
 

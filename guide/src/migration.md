@@ -9,6 +9,14 @@ For a detailed list of all changes, see the [CHANGELOG](changelog.md).
 
 maturin 0.13 has dropped support for Python 3.6, to support Python 3.6 you can use the old 0.12 versions.
 
+### Removed `--cargo-extra-args` and `--rustc-extra-args`
+
+maturin 0.13 added most of the `cargo rustc` options so you can just use them directly,
+for example `--cargo-extra-args="--no-default-features"` becomes `--no-default-features`.
+
+To pass extra arguments to rustc, add them after `--`, 
+for example use `maturin build -- -Clink-arg=-s` instead of `--rustc-extra-args="-Clink-arg=-s"`.
+
 ### Source distributions are not built by default
 
 maturin 0.13 replaced `--no-sdist` with the new `--sdist` option in `maturin build` command,

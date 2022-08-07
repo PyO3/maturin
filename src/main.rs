@@ -302,7 +302,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             let build_context = build_options.into_build_context(false, false, false)?;
             let (path, _) = build_context
                 .build_source_distribution()?
-                .context("Failed to build source distribution")?;
+                .context("Failed to build source distribution, pyproject.toml not found")?;
             println!("{}", path.file_name().unwrap().to_str().unwrap());
         }
     };
@@ -325,7 +325,9 @@ fn run() -> Result<()> {
         } => {
             let build_context = build.into_build_context(release, strip, false)?;
             if sdist {
-                build_context.build_source_distribution()?;
+                build_context
+                    .build_source_distribution()?
+                    .context("Failed to build source distribution, pyproject.toml not found")?;
             }
             let wheels = build_context.build_wheels()?;
             assert!(!wheels.is_empty());
@@ -406,7 +408,7 @@ fn run() -> Result<()> {
             let build_context = build_options.into_build_context(false, false, false)?;
             build_context
                 .build_source_distribution()?
-                .context("Failed to build source distribution")?;
+                .context("Failed to build source distribution, pyproject.toml not found")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
         Opt::InitProject { path, options } => init_project(path, options)?,

@@ -81,7 +81,7 @@ pub struct BuildContext {
     pub bridge: BridgeModel,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
-    /// Parsed project.toml if any
+    /// Parsed pyproject.toml if any
     pub pyproject_toml: Option<PyProjectToml>,
     /// Python Package Metadata 2.1
     pub metadata21: Metadata21,

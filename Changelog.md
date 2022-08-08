@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add `python-source` option to `[tool.maturin]` section of pyproject.toml in [#1046](https://github.com/PyO3/maturin/pull/1046)
 * Deprecate support for specifying python metadata in `Cargo.toml` in [#1048](https://github.com/PyO3/maturin/pull/1048).
   Please migrate to [PEP 621](https://peps.python.org/pep-0621/) instead.
+* Change `python-source` to be relative to the file specifies it in [#1049](https://github.com/PyO3/maturin/pull/1049)
 
 ## [0.13.1] - 2022-07-26
 

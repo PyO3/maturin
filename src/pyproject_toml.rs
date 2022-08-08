@@ -25,6 +25,8 @@ pub struct ToolMaturin {
     skip_auditwheel: bool,
     #[serde(default)]
     strip: bool,
+    /// The directory with python module, contains `<module_name>/__init__.py`
+    python_source: Option<PathBuf>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
     data: Option<PathBuf>,
     // Some customizable cargo options
@@ -120,6 +122,12 @@ impl PyProjectToml {
         self.maturin()
             .map(|maturin| maturin.strip)
             .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.python-source]` in pyproject.toml
+    pub fn python_source(&self) -> Option<&Path> {
+        self.maturin()
+            .and_then(|maturin| maturin.python_source.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.data]` in pyproject.toml

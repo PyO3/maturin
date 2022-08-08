@@ -86,6 +86,9 @@ impl ProjectResolver {
             .filter(|name| name.contains('.'))
             .unwrap_or(&module_name);
 
+        let py_src = pyproject
+            .and_then(|x| x.python_source())
+            .or_else(|| extra_metadata.python_source.as_ref().map(Path::new));
         let data = pyproject
             .and_then(|x| x.data())
             .or_else(|| extra_metadata.data.as_ref().map(Path::new));
@@ -94,12 +97,7 @@ impl ProjectResolver {
         } else {
             manifest_dir
         };
-        let project_layout = ProjectLayout::determine(
-            project_root,
-            extension_name,
-            extra_metadata.python_source.as_deref(),
-            data,
-        )?;
+        let project_layout = ProjectLayout::determine(project_root, extension_name, py_src, data)?;
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,

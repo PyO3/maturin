@@ -17,7 +17,3 @@ pyo3 = { version = "0.16.5", features = ["extension-module"] }
 {%- elif bindings == "rust-cpython" -%}
 cpython = { version = "0.7.0", features = ["extension-module"] }
 {%- endif -%}
-{% if mixed -%}
-[package.metadata.maturin]
-python-source = "python"
-{%- endif -%}

@@ -93,6 +93,57 @@ impl CargoToml {
             _ => Default::default(),
         }
     }
+
+    /// Warn about deprecated python metadata support
+    pub fn warn_deprecated_python_metadata(&self) -> bool {
+        let mut deprecated = Vec::new();
+        if let Some(CargoTomlMetadata {
+            maturin: Some(extra_metadata),
+        }) = &self.package.metadata
+        {
+            if extra_metadata.scripts.is_some() {
+                deprecated.push("scripts");
+            }
+            if extra_metadata.classifiers.is_some() {
+                deprecated.push("classifiers");
+            }
+            if extra_metadata.maintainer.is_some() {
+                deprecated.push("maintainer");
+            }
+            if extra_metadata.maintainer_email.is_some() {
+                deprecated.push("maintainer-email");
+            }
+            if extra_metadata.requires_dist.is_some() {
+                deprecated.push("requires-dist");
+            }
+            if extra_metadata.requires_python.is_some() {
+                deprecated.push("requires-python");
+            }
+            if extra_metadata.requires_external.is_some() {
+                deprecated.push("requires-external");
+            }
+            if extra_metadata.project_url.is_some() {
+                deprecated.push("project-url");
+            }
+            if extra_metadata.provides_extra.is_some() {
+                deprecated.push("provides-extra");
+            }
+            if extra_metadata.description_content_type.is_some() {
+                deprecated.push("description-content-type");
+            }
+        }
+        if !deprecated.is_empty() {
+            println!(
+                "⚠️  Warning: the following metadata fields in `package.metadata.maturin` section \
+                of Cargo.toml are deprecated and will be removed in future versions: {}, \
+                please set them in pyproject.toml as PEP 621 specifies.",
+                deprecated.join(", ")
+            );
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -203,6 +254,7 @@ mod test {
         let classifiers = vec!["Programming Language :: Python".to_string()];
 
         assert_eq!(cargo_toml.classifiers(), classifiers);
+        assert!(cargo_toml.warn_deprecated_python_metadata());
     }
 
     #[test]

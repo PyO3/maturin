@@ -99,9 +99,23 @@ impl ProjectResolver {
                 None => project_root.to_path_buf(),
             },
         };
-        let data = pyproject
-            .and_then(|x| x.data())
-            .or_else(|| extra_metadata.data.as_ref().map(Path::new));
+        let data = match pyproject.and_then(|x| x.data()) {
+            Some(data) => {
+                if data.is_absolute() {
+                    Some(data.to_path_buf())
+                } else {
+                    Some(project_root.join(data))
+                }
+            }
+            None => extra_metadata.data.as_ref().map(|data| {
+                let data = Path::new(data);
+                if data.is_absolute() {
+                    data.to_path_buf()
+                } else {
+                    manifest_dir.join(data)
+                }
+            }),
+        };
         let project_layout = ProjectLayout::determine(project_root, extension_name, py_root, data)?;
         Ok(Self {
             project_layout,
@@ -159,7 +173,7 @@ impl ProjectLayout {
         project_root: impl AsRef<Path>,
         module_name: &str,
         python_root: PathBuf,
-        data: Option<impl AsRef<Path>>,
+        data: Option<PathBuf>,
     ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
         let parts: Vec<&str> = module_name.split('.').collect();
@@ -181,11 +195,6 @@ impl ProjectLayout {
         };
 
         let data = if let Some(data) = data {
-            let data = if data.as_ref().is_absolute() {
-                data.as_ref().to_path_buf()
-            } else {
-                project_root.join(data)
-            };
             if !data.is_dir() {
                 bail!("No such data directory {}", data.display());
             }

@@ -1,6 +1,5 @@
 use crate::{CargoToml, Metadata21, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
-use std::borrow::Cow;
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -88,18 +87,22 @@ impl ProjectResolver {
             .filter(|name| name.contains('.'))
             .unwrap_or(&module_name);
 
-        let py_src = pyproject
-            .and_then(|x| x.python_source())
-            .or_else(|| extra_metadata.python_source.as_ref().map(Path::new));
-        let data = pyproject
-            .and_then(|x| x.data())
-            .or_else(|| extra_metadata.data.as_ref().map(Path::new));
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)
         } else {
             manifest_dir
         };
-        let project_layout = ProjectLayout::determine(project_root, extension_name, py_src, data)?;
+        let py_root = match pyproject.and_then(|x| x.python_source()) {
+            Some(py_src) => py_src.to_path_buf(),
+            None => match extra_metadata.python_source.as_ref() {
+                Some(py_src) => manifest_dir.join(py_src),
+                None => project_root.to_path_buf(),
+            },
+        };
+        let data = pyproject
+            .and_then(|x| x.data())
+            .or_else(|| extra_metadata.data.as_ref().map(Path::new));
+        let project_layout = ProjectLayout::determine(project_root, extension_name, py_root, data)?;
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,
@@ -152,20 +155,17 @@ impl ProjectResolver {
 
 impl ProjectLayout {
     /// Checks whether a python module exists besides Cargo.toml with the right name
-    pub fn determine(
+    fn determine(
         project_root: impl AsRef<Path>,
         module_name: &str,
-        py_src: Option<impl AsRef<Path>>,
+        python_root: PathBuf,
         data: Option<impl AsRef<Path>>,
     ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
         let parts: Vec<&str> = module_name.split('.').collect();
         let project_root = project_root.as_ref();
-        let python_root = py_src.map_or(Cow::Borrowed(project_root), |py_src| {
-            Cow::Owned(project_root.join(py_src))
-        });
         let (python_module, rust_module, extension_name) = if parts.len() > 1 {
-            let mut rust_module = python_root.to_path_buf();
+            let mut rust_module = python_root.clone();
             rust_module.extend(&parts[0..parts.len() - 1]);
             (
                 python_root.join(parts[0]),

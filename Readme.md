@@ -108,7 +108,17 @@ my-project
     └── lib.rs
 ```
 
-You can specify a different python source directory in `Cargo.toml` by setting `package.metadata.maturin.python-source`, for example
+You can specify a different python source directory in `pyproject.toml` by setting `tool.maturin.python-source`
+or in `Cargo.toml` by setting `package.metadata.maturin.python-source`, for example
+
+**pyproject.toml**
+
+```toml
+[tool.maturin]
+python-source = "python"
+```
+
+**Cargo.toml**
 
 ```toml
 [package.metadata.maturin]

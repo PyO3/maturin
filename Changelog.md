@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Please migrate to [PEP 621](https://peps.python.org/pep-0621/) instead.
 * Change `python-source` to be relative to the file specifies it in [#1049](https://github.com/PyO3/maturin/pull/1049)
 * Change `data` to be relative to the file specifies it in [#1051](https://github.com/PyO3/maturin/pull/1051)
+* Don't reinstall dependencies in `maturin develop` in [#1052](https://github.com/PyO3/maturin/pull/1052)
 
 ## [0.13.1] - 2022-07-26
 

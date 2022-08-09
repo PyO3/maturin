@@ -101,6 +101,7 @@ pub fn develop(
             "pip",
             "--disable-pip-version-check",
             "install",
+            "--no-deps",
             "--force-reinstall",
         ];
         let output = Command::new(&python)

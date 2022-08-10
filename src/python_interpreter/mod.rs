@@ -520,7 +520,7 @@ impl PythonInterpreter {
                 if output.status.success() {
                     output
                 } else {
-                    let stderr = str::from_utf8(&output.stderr).unwrap();
+                    let stderr = String::from_utf8_lossy(&output.stderr);
                     if stderr.starts_with(&format!(
                         "pyenv: {}: command not found",
                         executable.as_ref().display()

@@ -132,9 +132,10 @@ fn add_crate_to_source_distribution(
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
 ) -> Result<()> {
+    let manifest_path = manifest_path.as_ref();
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
-        .arg(manifest_path.as_ref())
+        .arg(manifest_path)
         .output()
         .context("Failed to run `cargo package --list --allow-dirty`")?;
     if !output.status.success() {
@@ -152,7 +153,7 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let manifest_dir = manifest_path.as_ref().parent().unwrap();
+    let manifest_dir = manifest_path.parent().unwrap();
 
     let target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
@@ -185,15 +186,14 @@ fn add_crate_to_source_distribution(
 
     let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, known_path_deps, root_crate)?;
 
-    writer.add_directory(&prefix)?;
+    let prefix = prefix.as_ref();
+    writer.add_directory(prefix)?;
     writer.add_bytes(
-        prefix
-            .as_ref()
-            .join(manifest_path.as_ref().file_name().unwrap()),
+        prefix.join(manifest_path.file_name().unwrap()),
         rewritten_cargo_toml.as_bytes(),
     )?;
     for (target, source) in target_source {
-        writer.add_file(prefix.as_ref().join(target), source)?;
+        writer.add_file(prefix.join(target), source)?;
     }
 
     Ok(())

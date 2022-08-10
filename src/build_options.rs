@@ -6,12 +6,11 @@ use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::{BuildContext, Metadata21, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
-use cargo_metadata::{Metadata, MetadataCommand, Node};
+use cargo_metadata::{Metadata, Node};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::io;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
@@ -482,44 +481,18 @@ impl BuildOptions {
             pyproject_toml,
             module_name,
             metadata21,
-        } = ProjectResolver::resolve(self.manifest_path.clone())?;
+            mut cargo_options,
+            cargo_metadata,
+            mut pyproject_toml_maturin_options,
+        } = ProjectResolver::resolve(self.manifest_path.clone(), self.cargo.clone())?;
         let pyproject = pyproject_toml.as_ref();
-        let tool_maturin = pyproject.and_then(|p| p.maturin());
-
-        let mut cargo_options = self.cargo.clone();
-
-        let mut args_from_pyproject = if let Some(tool_maturin) = tool_maturin {
-            cargo_options.merge_with_pyproject_toml(tool_maturin.clone())
-        } else {
-            Vec::new()
-        };
-
-        let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_options)?;
-
-        let result = MetadataCommand::new()
-            .manifest_path(&cargo_toml_path)
-            .other_options(cargo_metadata_extra_args)
-            .exec();
-
-        let cargo_metadata = match result {
-            Ok(cargo_metadata) => cargo_metadata,
-            Err(cargo_metadata::Error::Io(inner)) if inner.kind() == io::ErrorKind::NotFound => {
-                // NotFound is the specific error when cargo is not in PATH
-                return Err(inner)
-                    .context("Cargo metadata failed. Do you have cargo in your PATH?");
-            }
-            Err(err) => {
-                return Err(err)
-                    .context("Cargo metadata failed. Does your crate compile with `cargo build`?");
-            }
-        };
 
         let bridge = find_bridge(
             &cargo_metadata,
             self.bindings.as_deref().or_else(|| {
                 pyproject.and_then(|x| {
                     if x.bindings().is_some() {
-                        args_from_pyproject.push("bindings");
+                        pyproject_toml_maturin_options.push("bindings");
                     }
                     x.bindings()
                 })
@@ -590,9 +563,10 @@ impl BuildOptions {
 
         if cargo_options.args.is_empty() {
             // if not supplied on command line, try pyproject.toml
+            let tool_maturin = pyproject.and_then(|p| p.maturin());
             if let Some(args) = tool_maturin.and_then(|x| x.rustc_args.as_ref()) {
                 cargo_options.args.extend(args.iter().cloned());
-                args_from_pyproject.push("rustc-args");
+                pyproject_toml_maturin_options.push("rustc-args");
             }
         }
 
@@ -603,7 +577,7 @@ impl BuildOptions {
             let compatibility = pyproject
                 .and_then(|x| {
                     if x.compatibility().is_some() {
-                        args_from_pyproject.push("compatibility");
+                        pyproject_toml_maturin_options.push("compatibility");
                     }
                     x.compatibility()
                 })
@@ -684,10 +658,10 @@ impl BuildOptions {
             bail!("Cannot mix linux and manylinux/musllinux platform tags",);
         }
 
-        if !args_from_pyproject.is_empty() {
+        if !pyproject_toml_maturin_options.is_empty() {
             eprintln!(
                 "📡 Using build options {} from pyproject.toml",
-                args_from_pyproject.join(", ")
+                pyproject_toml_maturin_options.join(", ")
             );
         }
 
@@ -1054,7 +1028,7 @@ fn find_interpreter_in_sysconfig(
 /// in the same string as its name or in the next one. For this naive parsing logic, we
 /// assume that the value is in the next argument if the argument string equals the name,
 /// otherwise it's in the same argument and the next argument is unrelated.
-fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Result<Vec<String>> {
+pub(crate) fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Result<Vec<String>> {
     let mut cargo_metadata_extra_args = vec![];
     if cargo_options.frozen {
         cargo_metadata_extra_args.push("--frozen".to_string());
@@ -1117,7 +1091,8 @@ impl From<CargoOptions> for cargo_options::Rustc {
 }
 
 impl CargoOptions {
-    fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
+    /// Merge options from pyproject.toml
+    pub fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
         let mut args_from_pyproject = Vec::new();
 
         if self.manifest_path.is_none() && tool_maturin.manifest_path.is_some() {
@@ -1185,6 +1160,7 @@ impl CargoOptions {
 
 #[cfg(test)]
 mod test {
+    use cargo_metadata::MetadataCommand;
     use std::path::Path;
 
     use super::*;

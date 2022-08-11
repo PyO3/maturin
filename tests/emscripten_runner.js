@@ -4,7 +4,7 @@ const { loadPyodide } = require("pyodide");
 async function findWheel(distDir) {
   const dir = await opendir(distDir);
   for await (const dirent of dir) {
-    if (dirent.name.endsWith("whl")) {
+    if (dirent.name.includes("emscripten") && dirent.name.endsWith("whl")) {
       return dirent.name;
     }
   }

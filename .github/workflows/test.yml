@@ -19,6 +19,8 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
+    env:
+      RUST_BACKTRACE: '1'
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -187,6 +189,8 @@ jobs:
   test-alpine:
     name: Test Alpine Linux
     runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: '1'
     container: alpine:edge
     steps:
       - uses: actions/checkout@v3

@@ -1,6 +1,9 @@
+use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
 use crate::{CargoToml, Metadata21, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
+use cargo_metadata::{Metadata, MetadataCommand};
 use std::env;
+use std::io;
 use std::path::{Path, PathBuf};
 
 const PYPROJECT_TOML: &str = "pyproject.toml";
@@ -35,12 +38,22 @@ pub struct ProjectResolver {
     pub module_name: String,
     /// Python Package Metadata 2.1
     pub metadata21: Metadata21,
+    /// Cargo options
+    pub cargo_options: CargoOptions,
+    /// Cargo.toml as resolved by [cargo_metadata]
+    pub cargo_metadata: Metadata,
+    /// maturin options specified in pyproject.toml
+    pub pyproject_toml_maturin_options: Vec<&'static str>,
 }
 
 impl ProjectResolver {
     /// Resolve project layout
-    pub fn resolve(cargo_manifest_path: Option<PathBuf>) -> Result<Self> {
-        let (manifest_file, pyproject_file) = Self::resolve_manifest_paths(cargo_manifest_path)?;
+    pub fn resolve(
+        cargo_manifest_path: Option<PathBuf>,
+        mut cargo_options: CargoOptions,
+    ) -> Result<Self> {
+        let (manifest_file, pyproject_file) =
+            Self::resolve_manifest_paths(cargo_manifest_path, &cargo_options)?;
         if !manifest_file.is_file() {
             bail!(
                 "{} is not the path to a Cargo.toml",
@@ -61,6 +74,15 @@ impl ProjectResolver {
             None
         };
         let pyproject = pyproject_toml.as_ref();
+        let tool_maturin = pyproject.and_then(|p| p.maturin());
+
+        let pyproject_toml_maturin_options = if let Some(tool_maturin) = tool_maturin {
+            cargo_options.merge_with_pyproject_toml(tool_maturin.clone())
+        } else {
+            Vec::new()
+        };
+
+        let cargo_metadata = Self::resolve_cargo_metadata(&manifest_file, &cargo_options)?;
 
         let mut metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
@@ -124,13 +146,32 @@ impl ProjectResolver {
             pyproject_toml,
             module_name,
             metadata21,
+            cargo_options,
+            cargo_metadata,
+            pyproject_toml_maturin_options,
         })
     }
 
     /// Get cargo manifest file path and pyproject.toml path
-    fn resolve_manifest_paths(cargo_manifest_path: Option<PathBuf>) -> Result<(PathBuf, PathBuf)> {
+    fn resolve_manifest_paths(
+        cargo_manifest_path: Option<PathBuf>,
+        cargo_options: &CargoOptions,
+    ) -> Result<(PathBuf, PathBuf)> {
         // use command line argument if specified
         if let Some(path) = cargo_manifest_path {
+            let workspace_root = Self::resolve_cargo_metadata(&path, cargo_options)?.workspace_root;
+            for parent in path.canonicalize()?.ancestors().skip(1) {
+                if !parent.starts_with(&workspace_root) {
+                    break;
+                }
+                let pyproject_file = parent.join(PYPROJECT_TOML);
+                if pyproject_file.is_file() {
+                    // Don't return canonicalized manifest path
+                    // cargo doesn't handle them well.
+                    // See https://github.com/rust-lang/cargo/issues/9770
+                    return Ok((path.clone(), pyproject_file));
+                }
+            }
             return Ok((path.clone(), path.parent().unwrap().join(PYPROJECT_TOML)));
         }
         // check `manifest-path` option in pyproject.toml
@@ -164,6 +205,31 @@ impl ProjectResolver {
                 current_dir.display()
             ))
         }
+    }
+
+    fn resolve_cargo_metadata(
+        manifest_path: &Path,
+        cargo_options: &CargoOptions,
+    ) -> Result<Metadata> {
+        let cargo_metadata_extra_args = extract_cargo_metadata_args(cargo_options)?;
+        let result = MetadataCommand::new()
+            .manifest_path(manifest_path)
+            .other_options(cargo_metadata_extra_args)
+            .exec();
+
+        let cargo_metadata = match result {
+            Ok(cargo_metadata) => cargo_metadata,
+            Err(cargo_metadata::Error::Io(inner)) if inner.kind() == io::ErrorKind::NotFound => {
+                // NotFound is the specific error when cargo is not in PATH
+                return Err(inner)
+                    .context("Cargo metadata failed. Do you have cargo in your PATH?");
+            }
+            Err(err) => {
+                return Err(err)
+                    .context("Cargo metadata failed. Does your crate compile with `cargo build`?");
+            }
+        };
+        Ok(cargo_metadata)
     }
 }
 

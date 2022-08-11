@@ -28,7 +28,7 @@ pub static MUSLLINUX_POLICIES: Lazy<Vec<Policy>> = Lazy::new(|| {
 });
 
 /// Manylinux policy
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Policy {
     /// platform tag name
     pub name: String,

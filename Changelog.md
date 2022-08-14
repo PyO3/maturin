@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2022-08-14
+
 * Deprecate manylinux 2010 support in [#858](https://github.com/PyO3/maturin/pull/858).
   The [manylinux](https://github.com/pypa/manylinux) project already dropped its support
   and the rustc compiler will [drop glibc 2.12 support in 1.64.0](https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html).
@@ -678,7 +680,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/pyo3/maturin/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/pyo3/maturin/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/pyo3/maturin/compare/v0.12.20...v0.13.0
 [0.12.20]: https://github.com/pyo3/maturin/compare/v0.12.19...v0.12.20

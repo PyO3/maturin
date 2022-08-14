@@ -76,7 +76,7 @@ pub fn test_integration(
         if zig && build_context.target.is_linux() && !build_context.target.is_musl_target() {
             assert!(filename
                 .to_string_lossy()
-                .ends_with("manylinux_2_17_x86_64.manylinux2014_x86_64.whl"))
+                .ends_with("manylinux_2_12_x86_64.manylinux2010_x86_64.whl"))
         }
         let venv_suffix = if supported_version == "py3" {
             "py3".to_string()

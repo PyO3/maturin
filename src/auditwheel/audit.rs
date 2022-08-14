@@ -363,14 +363,13 @@ pub fn auditwheel_rs(
 ///
 /// Currently only gcc is supported, clang doesn't have a `--print-sysroot` option
 pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
-    use crate::target::get_host_target;
     use std::process::{Command, Stdio};
 
     if let Some(sysroot) = std::env::var_os("TARGET_SYSROOT") {
         return Ok(PathBuf::from(sysroot));
     }
 
-    let host_triple = get_host_target()?;
+    let host_triple = target.host_triple();
     let target_triple = target.target_triple();
     if host_triple != target_triple {
         let mut build = cc::Build::new();
@@ -379,7 +378,7 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
             .cargo_metadata(false)
             // opt_level, host and target are required
             .opt_level(0)
-            .host(&host_triple)
+            .host(host_triple)
             .target(target_triple);
         let compiler = build
             .try_get_compiler()

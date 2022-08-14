@@ -71,6 +71,15 @@ impl PlatformTag {
     pub fn is_musllinux(&self) -> bool {
         matches!(self, PlatformTag::Musllinux { .. })
     }
+
+    /// Is it supported by Rust compiler and manylinux project
+    pub fn is_supported(&self) -> bool {
+        match self {
+            PlatformTag::Manylinux { x, y } => (*x, *y) >= (2, 17),
+            PlatformTag::Musllinux { .. } => true,
+            PlatformTag::Linux => true,
+        }
+    }
 }
 
 impl fmt::Display for PlatformTag {

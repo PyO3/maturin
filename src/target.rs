@@ -3,6 +3,7 @@ use crate::python_interpreter::InterpreterKind;
 use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use platform_info::*;
+use rustc_version::VersionMeta;
 use serde::Deserialize;
 use std::env;
 use std::fmt;
@@ -132,8 +133,8 @@ pub struct Target {
     env: Environment,
     triple: String,
     cross_compiling: bool,
-    /// Host machine target triple
-    pub(crate) host_triple: String,
+    /// rustc version information
+    pub(crate) rustc_version: VersionMeta,
     /// Is user specified `--target`
     pub(crate) user_specified: bool,
 }
@@ -148,7 +149,8 @@ impl Target {
             Architecture, ArmArchitecture, Mips32Architecture, Mips64Architecture, OperatingSystem,
         };
 
-        let host_triple = get_host_target()?;
+        let rustc_version = rustc_version_meta()?;
+        let host_triple = &rustc_version.host;
         let (platform, triple) = if let Some(ref target_triple) = target_triple {
             let platform: Triple = target_triple
                 .parse()
@@ -204,7 +206,7 @@ impl Target {
             arch,
             env: platform.environment,
             triple,
-            host_triple,
+            rustc_version,
             user_specified: target_triple.is_some(),
             cross_compiling: false,
         };
@@ -411,7 +413,16 @@ impl Target {
             Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::S390X => {
                 PlatformTag::manylinux2014()
             }
-            Arch::X86 | Arch::X86_64 => PlatformTag::manylinux2010(),
+            Arch::X86 | Arch::X86_64 => {
+                let rust_1_64 = semver::Version::new(1, 64, 0);
+                // rustc 1.64.0 bumps glibc requirement to 2.17
+                // see https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html
+                if self.rustc_version.semver >= rust_1_64 {
+                    PlatformTag::manylinux2014()
+                } else {
+                    PlatformTag::manylinux2010()
+                }
+            }
             Arch::Armv6L
             | Arch::Wasm32
             | Arch::Riscv64
@@ -442,9 +453,14 @@ impl Target {
         }
     }
 
-    /// Returns target triple string
+    /// Returns target triple as string
     pub fn target_triple(&self) -> &str {
         &self.triple
+    }
+
+    /// Returns host triple as string
+    pub fn host_triple(&self) -> &str {
+        &self.rustc_version.host
     }
 
     /// Returns true if the current platform is not windows
@@ -624,22 +640,20 @@ impl Target {
     }
 }
 
-pub(crate) fn get_host_target() -> Result<String> {
-    let host = rustc_version::version_meta()
-        .map(|meta| meta.host)
-        .map_err(|err| match err {
-            rustc_version::Error::CouldNotExecuteCommand(e)
-                if e.kind() == std::io::ErrorKind::NotFound =>
-            {
-                anyhow!(
-                    "rustc, the rust compiler, is not installed or not in PATH. \
+fn rustc_version_meta() -> Result<VersionMeta> {
+    let meta = rustc_version::version_meta().map_err(|err| match err {
+        rustc_version::Error::CouldNotExecuteCommand(e)
+            if e.kind() == std::io::ErrorKind::NotFound =>
+        {
+            anyhow!(
+                "rustc, the rust compiler, is not installed or not in PATH. \
                      This package requires Rust and Cargo to compile extensions. \
                      Install it through the system's package manager or via https://rustup.rs/.",
-                )
-            }
-            err => anyhow!(err).context("Failed to run rustc to get the host target"),
-        })?;
-    Ok(host)
+            )
+        }
+        err => anyhow!(err).context("Failed to run rustc to get the host target"),
+    })?;
+    Ok(meta)
 }
 
 fn macosx_deployment_target(

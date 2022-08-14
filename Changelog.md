@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Deprecate manylinux 2010 support in [#858](https://github.com/PyO3/maturin/pull/858).
+  The [manylinux](https://github.com/pypa/manylinux) project already dropped its support
+  and the rustc compiler will [drop glibc 2.12 support in 1.64.0](https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html).
 * Add Linux mips64el architecture support in [#1023](https://github.com/PyO3/maturin/pull/1023)
 * Add Linux mipsel architecture support in [#1024](https://github.com/PyO3/maturin/pull/1024)
 * Add Linux 32-bit powerpc architecture support in [#1026](https://github.com/PyO3/maturin/pull/1026)

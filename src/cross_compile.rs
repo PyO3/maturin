@@ -1,4 +1,3 @@
-use crate::target::get_host_target;
 use crate::{PythonInterpreter, Target};
 use anyhow::{bail, Result};
 use fs_err::{self as fs, DirEntry};
@@ -8,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 pub fn is_cross_compiling(target: &Target) -> Result<bool> {
     let target_triple = target.target_triple();
-    let host = get_host_target()?;
+    let host = target.host_triple();
     if target_triple == host {
         // Not cross-compiling
         return Ok(false);

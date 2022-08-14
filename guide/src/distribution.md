@@ -42,10 +42,10 @@ sdist-include = ["path/**/*"]
 ## Build Wheels
 
 For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux.
-The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://www.python.org/dev/peps/pep-0571/#the-manylinux2010-policy).
+The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://peps.python.org/pep-0599/#the-manylinux2014-policy)).
 If you want to publish widely usable wheels for linux pypi, **you need to use a manylinux docker image** or [build with zig](#use-zig).
 
-The Rust compiler since version 1.47 [requires at least glibc 2.11](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1470-2020-10-08), so you need to use at least manylinux2010.
+The Rust compiler since version 1.64 [requires at least glibc 2.17](https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html), so you need to use at least manylinux2014.
 For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
 The [messense/maturin-action](https://github.com/messense/maturin-action) github action already takes care of this if you set e.g. `manylinux: 2014`.
 
@@ -93,9 +93,9 @@ OPTIONS:
             Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
             `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
 
-            Note that `manylinux1` is unsupported by the rust compiler. Wheels with the native
-            `linux` tag will be rejected by pypi, unless they are separately validated by
-            `auditwheel`.
+            Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. 
+            Wheels with the native `linux` tag will be rejected by pypi, unless they are separately 
+            validated by `auditwheel`.
 
             The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing
             matched
@@ -122,7 +122,7 @@ OPTIONS:
         --zig
             For manylinux targets, use zig to ensure compliance for the chosen manylinux version
 
-            Default to manylinux2010/manylinux_2_12 if you do not specify an `--compatibility`
+            Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
 
             Make sure you installed zig with `pip install maturin[zig]`
 

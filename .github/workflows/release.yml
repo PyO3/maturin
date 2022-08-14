@@ -86,7 +86,7 @@ jobs:
       - name: Build wheel (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2014 musllinux_1_1
+          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
@@ -161,7 +161,7 @@ jobs:
         platform: [
           { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl", manylinux: "2014" },
           { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf", manylinux: "2014"},
-          { target: "i686-unknown-linux-musl", image_tag: "i686-musl", manylinux: "2014"},
+          { target: "i686-unknown-linux-musl", image_tag: "i686-musl", manylinux: "2010"},
         ]
     container:
       image: docker://messense/rust-musl-cross:${{ matrix.platform.image_tag }}

@@ -232,13 +232,28 @@ fn compile_target(
         }
     } else if target.is_emscripten() {
         let flags = rust_flags.get_or_insert_with(Default::default);
-        flags.push(" -Z link-native-libraries=no");
-        let emscripten_args = [
-            "-C".to_string(),
-            "link-arg=-sSIDE_MODULE=2".to_string(),
-            "-C".to_string(),
-            "link-arg=-sWASM_BIGINT".to_string(),
-        ];
+        // Allow user to override these default flags
+        if !flags.to_string_lossy().contains("link-native-libraries") {
+            flags.push(" -Z link-native-libraries=no");
+        }
+        let mut emscripten_args = Vec::new();
+        // Allow user to override these default settings
+        if !cargo_rustc
+            .args
+            .iter()
+            .any(|arg| arg.contains("SIDE_MODULE"))
+        {
+            emscripten_args.push("-C".to_string());
+            emscripten_args.push("link-arg=-sSIDE_MODULE=2".to_string());
+        }
+        if !cargo_rustc
+            .args
+            .iter()
+            .any(|arg| arg.contains("WASM_BIGINT"))
+        {
+            emscripten_args.push("-C".to_string());
+            emscripten_args.push("link-arg=-sWASM_BIGINT".to_string());
+        }
         cargo_rustc.args.extend(emscripten_args);
     }
 

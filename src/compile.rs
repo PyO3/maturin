@@ -1,4 +1,5 @@
 use crate::build_context::BridgeModel;
+use crate::target::RUST_1_64_0;
 use crate::{BuildContext, PlatformTag, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
@@ -170,16 +171,10 @@ fn compile_target(
         .iter()
         .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
     {
-        if let Ok(channel) = rustc_version::version_meta().map(|x| x.channel) {
-            if matches!(
-                channel,
-                rustc_version::Channel::Nightly | rustc_version::Channel::Dev
-            ) {
-                cargo_rustc
-                    .unstable_flags
-                    .push("unstable-options".to_string());
-                cargo_rustc.crate_type = vec!["cdylib".to_string()];
-            }
+        // `--crate-type` is stable since Rust 1.64.0
+        // See https://github.com/rust-lang/cargo/pull/10838
+        if target.rustc_version.semver >= RUST_1_64_0 {
+            cargo_rustc.crate_type = vec!["cdylib".to_string()];
         }
     }
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Allow user to override default Emscripten settings in [#1059](https://github.com/PyO3/maturin/pull/1059)
+* Enable `--crate-type cdylib` on Rust 1.64.0 in [#1060](https://github.com/PyO3/maturin/pull/1060)
 
 ## [0.13.2] - 2022-08-14
 

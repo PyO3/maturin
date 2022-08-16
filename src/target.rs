@@ -12,6 +12,8 @@ use std::path::PathBuf;
 use std::str;
 use target_lexicon::{Environment, Triple};
 
+pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
+
 /// All supported operating system
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -414,10 +416,9 @@ impl Target {
                 PlatformTag::manylinux2014()
             }
             Arch::X86 | Arch::X86_64 => {
-                let rust_1_64 = semver::Version::new(1, 64, 0);
                 // rustc 1.64.0 bumps glibc requirement to 2.17
                 // see https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html
-                if self.rustc_version.semver >= rust_1_64 {
+                if self.rustc_version.semver >= RUST_1_64_0 {
                     PlatformTag::manylinux2014()
                 } else {
                     PlatformTag::manylinux2010()

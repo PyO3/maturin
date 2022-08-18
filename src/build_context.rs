@@ -665,6 +665,9 @@ impl BuildContext {
         let mut wheels = Vec::new();
         let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
+        if artifacts.is_empty() {
+            bail!("Cargo didn't build a binary")
+        }
 
         let mut policies = Vec::with_capacity(artifacts.len());
         let mut ext_libs = Vec::new();

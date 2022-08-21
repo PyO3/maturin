@@ -198,12 +198,14 @@ OPTIONS:
 Maturin has decent cross compilation support for `pyo3` and `bin` bindings,
 other kind of bindings may work but aren't tested regularly.
 
-#### Use Docker
+#### Cross-compile to Linux/macOS
+
+##### Use Docker
 
 For manylinux support the [manylinux-cross](https://github.com/messense/manylinux-cross) docker images can be used.
 And [maturin-action](https://github.com/messense/maturin-action) makes it easy to do cross compilation on GitHub Actions.
 
-#### Use Zig
+##### Use Zig
 
 Since v0.12.7 maturin added support for linking with [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html),
 compile for  Linux works and is regularly tested on CI, other platforms may also work but aren't tested regularly.
@@ -214,3 +216,26 @@ Then pass `--zig` to maturin `build` or `publish` commands to use it, for exampl
 ```bash
 maturin build --release --target aarch64-unknown-linux-gnu --zig
 ```
+
+#### Cross-compile to Windows
+
+Pyo3 0.16.5 added an experimental feature `generate-import-lib` enables the user to cross compile
+extension modules for Windows targets without setting the `PYO3_CROSS_LIB_DIR` environment variable 
+or providing any Windows Python library files. 
+
+```toml
+[dependencies]
+pyo3 = { version = "0.16.5", features = ["extension-module", "generate-import-lib"] }
+```
+
+It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to 
+generate import libraries for the Python DLL for MinGW-w64 and MSVC compile targets. 
+Note: MSVC targets require LLVM binutils or MSVC build tools to be available on the host system. 
+More specifically, `python3-dll-a` requires `llvm-dlltool` or `lib.exe` executable to be present in `PATH` when targeting `*-pc-windows-msvc`.
+
+maturin integrates [`cargo-xwin`](https://github.com/messense/cargo-xwin) to enable MSVC targets cross compilation support,
+it will download and unpack the Microsoft CRT headers and import libraries, and Windows SDK headers and import libraries
+needed for compiling and linking automatically.
+
+**By using this to cross compiling to Windows MSVC targets you are consented to accept the license at [https://go.microsoft.com/fwlink/?LinkId=2086102](https://go.microsoft.com/fwlink/?LinkId=2086102)**.
+(Building on Windows natively does not apply.)

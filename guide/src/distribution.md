@@ -93,8 +93,8 @@ OPTIONS:
             Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
             `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
 
-            Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. 
-            Wheels with the native `linux` tag will be rejected by pypi, unless they are separately 
+            Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels
+            with the native `linux` tag will be rejected by pypi, unless they are separately
             validated by `auditwheel`.
 
             The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing
@@ -103,8 +103,7 @@ OPTIONS:
             This option is ignored on all non-linux platforms
 
     -i, --interpreter <INTERPRETER>...
-            The python versions to build wheels for, given as the names of the interpreters. Uses
-            autodiscovery if not explicitly set
+            The python versions to build wheels for, given as the names of the interpreters
 
     -f, --find-interpreter
             Find interpreters from the host machine

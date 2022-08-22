@@ -155,7 +155,7 @@ pub struct BuildOptions {
     pub platform_tag: Vec<PlatformTag>,
 
     /// The python versions to build wheels for, given as the names of the
-    /// interpreters. Uses autodiscovery if not explicitly set.
+    /// interpreters.
     #[clap(short, long, multiple_values = true, multiple_occurrences = true)]
     pub interpreter: Vec<PathBuf>,
 

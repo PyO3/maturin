@@ -25,7 +25,7 @@ glob = "0.3.0"
 cargo_metadata = "0.15.0"
 cargo-options = "0.3.1"
 cargo-zigbuild = "0.12.0"
-cargo-xwin = { version = "0.10.2", default-features = false }
+cargo-xwin = { version = "0.10.3", default-features = false }
 cbindgen = { version = "0.24.2", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.5.4"

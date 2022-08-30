@@ -399,3 +399,21 @@ jobs:
         with:
           name: wheels
           path: dist
+
+  test-msrv:
+    name: Test MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: '1.59.0'
+          override: true
+      # Caching
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v1
+        with:
+          key: maturin-${{ runner.os }}-msrv
+      - name: cargo build
+        run: cargo build --all

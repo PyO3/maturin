@@ -292,3 +292,8 @@ fn workspace_with_path_dep_sdist() {
         "workspace_with_path_dep_sdist",
     ))
 }
+
+#[test]
+fn abi3_python_interpreter_args() {
+    handle_result(other::abi3_python_interpreter_args());
+}

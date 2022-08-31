@@ -403,18 +403,28 @@ impl BuildOptions {
                         bail!("Failed to find a python interpreter");
                     }
                 } else {
-                    let interpreters = find_interpreter_in_host(
+                    let found_interpreters = find_interpreter_in_host(
                         bridge,
                         interpreter,
                         target,
                         Some(*minor as usize),
                     )
-                    .unwrap_or_else(|_| {
-                        find_interpreter_in_sysconfig(interpreter, target, Some(*minor as usize))
-                            .unwrap_or_default()
-                    });
+                    .or_else(|err| {
+                        let interps = find_interpreter_in_sysconfig(
+                            interpreter,
+                            target,
+                            Some(*minor as usize),
+                        )
+                        .unwrap_or_default();
+                        if interps.is_empty() && !self.interpreter.is_empty() {
+                            // Print error when user supplied `--interpreter` option
+                            Err(err)
+                        } else {
+                            Ok(interps)
+                        }
+                    })?;
                     println!("🐍 Not using a specific python interpreter");
-                    if interpreter.is_empty() {
+                    if self.interpreter.is_empty() {
                         // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
                         // The python interpreter config doesn't matter, as it's not used for anything
                         Ok(vec![PythonInterpreter {
@@ -432,9 +442,9 @@ impl BuildOptions {
                             runnable: false,
                         }])
                     } else if target.cross_compiling() {
-                        let mut interps = Vec::with_capacity(interpreters.len());
+                        let mut interps = Vec::with_capacity(found_interpreters.len());
                         let mut pypys = Vec::new();
-                        for interp in interpreters {
+                        for interp in found_interpreters {
                             if interp.interpreter_kind.is_pypy() {
                                 pypys.push(PathBuf::from(format!(
                                     "pypy{}.{}",
@@ -458,10 +468,10 @@ impl BuildOptions {
                         }
                         Ok(interps)
                     } else {
-                        if interpreters.is_empty() {
+                        if found_interpreters.is_empty() {
                             bail!("Failed to find any python interpreter");
                         }
-                        Ok(interpreters)
+                        Ok(found_interpreters)
                     }
                 }
             }

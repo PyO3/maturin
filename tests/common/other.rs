@@ -150,3 +150,58 @@ pub fn test_source_distribution(
     );
     Ok(())
 }
+
+pub fn abi3_python_interpreter_args() -> Result<()> {
+    // Case 1: maturin build without `-i`, should work
+    let options = BuildOptions::try_parse_from(vec![
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-pure/Cargo.toml",
+        "--quiet",
+    ])?;
+    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+    assert!(result.is_ok());
+
+    // Case 2: maturin build -i python3.10, should work because python3.10 is in bundled sysconfigs
+    let options = BuildOptions::try_parse_from(vec![
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-pure/Cargo.toml",
+        "--quiet",
+        "-i",
+        "python3.10",
+    ])?;
+    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+    assert!(result.is_ok());
+
+    // Windows is a bit different so we exclude it from case 3 & 4
+
+    // Case 3: maturin build -i python2.7, errors because python2.7 is supported
+    #[cfg(not(windows))]
+    {
+        let options = BuildOptions::try_parse_from(vec![
+            "build",
+            "--manifest-path",
+            "test-crates/pyo3-pure/Cargo.toml",
+            "--quiet",
+            "-i",
+            "python2.7",
+        ])?;
+        let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+        assert!(result.is_err());
+
+        // Case 4: maturin build -i python-does-not-exists, errors because python executable is not found
+        let options = BuildOptions::try_parse_from(vec![
+            "build",
+            "--manifest-path",
+            "test-crates/pyo3-pure/Cargo.toml",
+            "--quiet",
+            "-i",
+            "python-does-not-exists",
+        ])?;
+        let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+        assert!(result.is_err());
+    }
+
+    Ok(())
+}

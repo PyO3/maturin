@@ -314,6 +314,19 @@ fn run() -> Result<()> {
     #[cfg(feature = "log")]
     pretty_env_logger::init();
 
+    // Allow symlink `maturin` to `ar` to invoke `zig ar`
+    // See https://github.com/messense/cargo-zigbuild/issues/52
+    let mut args = env::args();
+    let program_path = PathBuf::from(args.next().expect("no program path"));
+    let program_name = program_path.file_stem().expect("no program name");
+    if program_name.eq_ignore_ascii_case("ar") {
+        let zig = Zig::Ar {
+            args: args.collect(),
+        };
+        zig.execute()?;
+        return Ok(());
+    }
+
     let opt = Opt::parse();
 
     match opt {

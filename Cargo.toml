@@ -56,7 +56,7 @@ textwrap = "0.15.0"
 ignore = "0.4.18"
 dialoguer = { version = "0.10.2", default-features = false }
 console = "0.15.0"
-minijinja = "0.18.1"
+minijinja = "0.19.1"
 lddtree = "0.2.9"
 cc = "1.0.72"
 clap = { version = "3.2.19", features = ["derive", "env", "wrap_help"] }

@@ -9,11 +9,11 @@ edition = "2021"
 [lib]
 name = "{{ crate_name }}"
 crate-type = ["cdylib"]
-{%- endif -%}
+{%- endif %}
 
 [dependencies]
-{%- if bindings == "pyo3" -%}
+{% if bindings == "pyo3" -%}
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
-{%- elif bindings == "rust-cpython" -%}
+{% elif bindings == "rust-cpython" -%}
 cpython = { version = "0.7.0", features = ["extension-module"] }
-{%- endif -%}
+{% endif -%}

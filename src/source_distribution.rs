@@ -53,15 +53,6 @@ fn rewrite_cargo_toml(
                     )
                 }
                 if !known_path_deps.contains_key(&dep_name) {
-                    // Ignore optional indirect dependencies
-                    if !root_crate
-                        && table[&dep_name]
-                            .get("optional")
-                            .and_then(|x| x.as_bool())
-                            .unwrap_or_default()
-                    {
-                        continue;
-                    }
                     bail!(
                         "cargo metadata does not know about the path for {}.{} present in {}, \
                         which should never happen ಠ_ಠ",
@@ -140,11 +131,17 @@ fn add_crate_to_source_distribution(
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path)
         .output()
-        .context("Failed to run `cargo package --list --allow-dirty`")?;
+        .with_context(|| {
+            format!(
+                "Failed to run `cargo package --list --allow-dirty --manifest-path {}`",
+                manifest_path.display()
+            )
+        })?;
     if !output.status.success() {
         bail!(
-            "Failed to query file list from cargo: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+            "Failed to query file list from cargo: {}\n--- Manifest path: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
             output.status,
+            manifest_path.display(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
         );
@@ -213,20 +210,21 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
     while let Some(top) = stack.pop() {
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
-                path_deps.insert(dependency.name.clone(), PathBuf::from(path));
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
-                let dep_package = cargo_metadata
+                path_deps.insert(
+                    dependency.name.clone(),
+                    PathBuf::from(dep_manifest_path.clone()),
+                );
+                if let Some(dep_package) = cargo_metadata
                     .packages
                     .iter()
                     .find(|package| package.manifest_path == dep_manifest_path)
-                    .context(format!(
-                        "Expected metadata to contain a package for path dependency {:?}",
-                        path
-                    ))?;
-                // scan the dependencies of the path dependency
-                stack.push(dep_package)
+                {
+                    // scan the dependencies of the path dependency
+                    stack.push(dep_package)
+                }
             }
         }
     }

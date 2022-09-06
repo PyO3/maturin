@@ -41,8 +41,8 @@ from my_project import my_project
 ```
 
 > **Note**: there is currently no way to tell maturin to include extra data (e.g.
-`package_data` in setuptools) for a pure Rust project. Instead, consider using
-the layout described below for the mixed Rust/Python project.
+> `package_data` in setuptools) for a pure Rust project. Instead, consider using
+> the layout described below for the mixed Rust/Python project.
 
 ## Mixed Rust/Python project
 
@@ -116,8 +116,8 @@ my-rust-and-python-project
 
 To distribute typing information, you need to add:
 
-* an empty marker file called `py.typed` in the root of the Python package
-* inline types in Python files and/or `.pyi` "stub" files
+- an empty marker file called `py.typed` in the root of the Python package
+- inline types in Python files and/or `.pyi` "stub" files
 
 In a pure Rust project, add type stubs in a `<module_name>.pyi` file in the
 project root. Maturin will automatically include this file along with the
@@ -160,10 +160,10 @@ You can add wheel data by creating a `<module_name>.data` folder or setting its 
 
 The data folder may have the following subfolder:
 
- * `data`: The contents of this folder will simply be unpacked into the virtualenv
- * `scripts`: Treated similar to entry points, files in there are installed as standalone executable
- * `headers`: For `.h` C header files
- * `purelib`: This also exists, but seems to be barely used
- * `platlib`: This also exists, but seems to be barely used
+- `data`: The contents of this folder will simply be unpacked into the virtualenv
+- `scripts`: Treated similar to entry points, files in there are installed as standalone executable
+- `headers`: For `.h` C header files
+- `purelib`: This also exists, but seems to be barely used
+- `platlib`: This also exists, but seems to be barely used
 
-If you add a symlink in the data directory, we'll include the actual file so you more flexibility 
+If you add a symlink in the data directory, we'll include the actual file so you more flexibility

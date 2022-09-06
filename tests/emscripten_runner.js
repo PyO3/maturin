@@ -10,7 +10,7 @@ async function findWheel(distDir) {
   }
 }
 
-function make_tty_ops(stream){
+function make_tty_ops(stream) {
   return {
     // get_char has 3 particular return values:
     // a.) the next character represented as an integer
@@ -32,14 +32,14 @@ function make_tty_ops(stream){
     },
     put_char(tty, val) {
       try {
-        if(val !== null){
+        if (val !== null) {
           tty.output.push(val);
         }
         if (val === null || val === 10) {
           process.stdout.write(Buffer.from(tty.output));
           tty.output = [];
         }
-      } catch(e){
+      } catch (e) {
         console.warn(e);
       }
     },
@@ -49,29 +49,29 @@ function make_tty_ops(stream){
       }
       stream.write(Buffer.from(tty.output));
       tty.output = [];
-    }
+    },
   };
 }
 
-function setupStreams(FS, TTY){
+function setupStreams(FS, TTY) {
   let mytty = FS.makedev(FS.createDevice.major++, 0);
   let myttyerr = FS.makedev(FS.createDevice.major++, 0);
-  TTY.register(mytty, make_tty_ops(process.stdout))
-  TTY.register(myttyerr, make_tty_ops(process.stderr))
-  FS.mkdev('/dev/mytty', mytty);
-  FS.mkdev('/dev/myttyerr', myttyerr);
-  FS.unlink('/dev/stdin');
-  FS.unlink('/dev/stdout');
-  FS.unlink('/dev/stderr');
-  FS.symlink('/dev/mytty', '/dev/stdin');
-  FS.symlink('/dev/mytty', '/dev/stdout');
-  FS.symlink('/dev/myttyerr', '/dev/stderr');
+  TTY.register(mytty, make_tty_ops(process.stdout));
+  TTY.register(myttyerr, make_tty_ops(process.stderr));
+  FS.mkdev("/dev/mytty", mytty);
+  FS.mkdev("/dev/myttyerr", myttyerr);
+  FS.unlink("/dev/stdin");
+  FS.unlink("/dev/stdout");
+  FS.unlink("/dev/stderr");
+  FS.symlink("/dev/mytty", "/dev/stdin");
+  FS.symlink("/dev/mytty", "/dev/stdout");
+  FS.symlink("/dev/myttyerr", "/dev/stderr");
   FS.closeStream(0);
   FS.closeStream(1);
   FS.closeStream(2);
-  var stdin = FS.open('/dev/stdin', 0);
-  var stdout = FS.open('/dev/stdout', 1);
-  var stderr = FS.open('/dev/stderr', 1);
+  var stdin = FS.open("/dev/stdin", 0);
+  var stdout = FS.open("/dev/stdout", 1);
+  var stderr = FS.open("/dev/stderr", 1);
 }
 
 const pkgDir = process.argv[2];

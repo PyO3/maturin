@@ -14,8 +14,8 @@ pip install maturin
 
 There are some extra dependencies for certain scenarios:
 
-* `zig`: use zig as linker for easier cross compiling and manylinux compliance.
-* `patchelf`: repair wheels that links other shared libraries.
+- `zig`: use zig as linker for easier cross compiling and manylinux compliance.
+- `patchelf`: repair wheels that links other shared libraries.
 
 For example, to install patchelf dependencies: `pip install maturin[patchelf]`.
 

@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: [ 'v*' ]
+    tags: ["v*"]
 
 jobs:
   release-crates-io:
@@ -101,7 +101,7 @@ jobs:
         if: matrix.target == 'x86_64-apple-darwin'
         env:
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
-          MACOSX_DEPLOYMENT_TARGET: '10.9'
+          MACOSX_DEPLOYMENT_TARGET: "10.9"
         run: |
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
@@ -158,11 +158,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [
-          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl", manylinux: "2014" },
-          { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf", manylinux: "2014"},
-          { target: "i686-unknown-linux-musl", image_tag: "i686-musl", manylinux: "2010"},
-        ]
+        platform:
+          [
+            {
+              target: "aarch64-unknown-linux-musl",
+              image_tag: "aarch64-musl",
+              manylinux: "2014",
+            },
+            {
+              target: "armv7-unknown-linux-musleabihf",
+              image_tag: "armv7-musleabihf",
+              manylinux: "2014",
+            },
+            {
+              target: "i686-unknown-linux-musl",
+              image_tag: "i686-musl",
+              manylinux: "2010",
+            },
+          ]
     container:
       image: docker://messense/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
@@ -245,7 +258,7 @@ jobs:
       name: PyPI
       url: ${{ steps.set_url.outputs.env_url }}
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ release-build, release-musl, release-no-rustls ]
+    needs: [release-build, release-musl, release-no-rustls]
     steps:
       - uses: actions/download-artifact@v2
         with:
@@ -269,7 +282,7 @@ jobs:
     name: Publish to GitHub releases
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ release-build, release-musl, release-no-rustls ]
+    needs: [release-build, release-musl, release-no-rustls]
     steps:
       - uses: actions/download-artifact@v2
         with:

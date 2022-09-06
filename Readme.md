@@ -26,10 +26,10 @@ pip install maturin
 
 There are four main commands:
 
- * `maturin new` creates a new cargo project with maturin configured.
- * `maturin publish` builds the crate into python packages and publishes them to pypi.
- * `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
- * `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
+- `maturin new` creates a new cargo project with maturin configured.
+- `maturin publish` builds the crate into python packages and publishes them to pypi.
+- `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
+- `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 
 `pyo3` and `rust-cpython` bindings are automatically detected, for cffi or binaries you need to pass `-b cffi` or `-b bin`.
 maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust or milksnake configuration.
@@ -266,6 +266,7 @@ The `sysconfig` folder contains the output of `python -m sysconfig` for differen
 You need to install `cffi` and `virtualenv` (`pip install cffi virtualenv`) to run the tests.
 
 There are some optional hacks that can speed up the tests (over 80s to 17s on my machine).
+
 1. By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python version.
 2. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactivate it.
 3. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.

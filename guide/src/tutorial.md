@@ -6,8 +6,7 @@ run in Python using pyo3.
 
 ## Create a new Rust project
 
-First, create a new Rust library project using `cargo new --lib --edition 2018
-guessing-game`. This will create a directory with the following structure.
+First, create a new Rust library project using `cargo new --lib --edition 2018 guessing-game`. This will create a directory with the following structure.
 
 ```ignore
 guessing-game/
@@ -81,7 +80,7 @@ tomli==2.0.1
 ```
 
 maturin is configured in `pyproject.toml` as introduced by [PEP
-518](https://www.python.org/dev/peps/pep-0518/).  This file lives in the root
+518](https://www.python.org/dev/peps/pep-0518/). This file lives in the root
 of your project tree:
 
 ```ignore
@@ -168,6 +167,7 @@ fn guessing_game(_py: Python, m: &PyModule) -> PyResult<()> {
 
 Thanks to pyo3, there's very little difference between this and the example in
 The Rust Book. All we had to do was:
+
 1. Include the pyo3 prelude
 2. Add `#[pyfunction]` to our function
 3. Add the `#[pymodule]` block to expose the function as part of a Python module
@@ -177,7 +177,7 @@ pyo3. It can do a lot more!
 
 ## Build and install the module with `maturin develop`
 
-Note that *this is just a Rust project* at this point, and with few exceptions
+Note that _this is just a Rust project_ at this point, and with few exceptions
 you can build it as you'd expect using `cargo build`. maturin helps with this,
 however, adding some platform-specific build configuration and ultimately
 packaging the binary results as a wheel (a `.whl` file, which is an archive of
@@ -221,6 +221,7 @@ So let's use maturin to build and install in our current environment.
 
 Your `guessing_game` module should now be available in your current virtual
 environment. Go ahead and play a few games!
+
 ```shell
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % python
 Python 3.9.6 (default, Aug 25 2021, 16:04:27)
@@ -275,6 +276,7 @@ maturin can even publish wheels directly to [PyPI](https://pypi.org) with
 `maturin publish`!
 
 ## Summary
+
 Congratulations! You successfully created a Python module implemented entirely
 in Rust thanks to pyo3 and maturin.
 

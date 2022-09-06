@@ -1,7 +1,7 @@
 use crate::module_writer::{add_data, ModuleWriter};
 use crate::{Metadata21, SDistWriter};
 use anyhow::{bail, Context, Result};
-use cargo_metadata::{Metadata, PackageId};
+use cargo_metadata::Metadata;
 use fs_err as fs;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -9,12 +9,6 @@ use std::process::Command;
 use std::str;
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
-
-#[derive(Debug, Clone)]
-struct PathDependency {
-    id: PackageId,
-    path: PathBuf,
-}
 
 /// We need cargo to load the local dependencies from the location where we put them in the source
 /// distribution. Since there is no cargo-backed way to replace dependencies
@@ -25,7 +19,7 @@ struct PathDependency {
 /// This method is rather frail, but unfortunately I don't know a better solution.
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, PathDependency>,
+    known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<String> {
     let text = fs::read_to_string(&manifest_path).context(format!(
@@ -138,7 +132,7 @@ fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, PathDependency>,
+    known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
@@ -208,64 +202,35 @@ fn add_crate_to_source_distribution(
     Ok(())
 }
 
-/// Get path dependencies for a cargo package
-fn get_path_deps(
-    cargo_metadata: &Metadata,
-    resolve: &cargo_metadata::Resolve,
-    pkg_id: &cargo_metadata::PackageId,
-    visited: &HashMap<String, PathDependency>,
-) -> Result<HashMap<String, PathDependency>> {
-    // Parse ids in the format:
-    // on unix:    some_path_dep 0.1.0 (path+file:///home/konsti/maturin/test-crates/some_path_dep)
-    // on windows: some_path_dep 0.1.0 (path+file:///C:/konsti/maturin/test-crates/some_path_dep)
-    // This is not a good way to identify path dependencies, but I don't know a better one
-    let node = resolve
-        .nodes
-        .iter()
-        .find(|node| &node.id == pkg_id)
-        .context("Expected to get a node of dependency graph from cargo")?;
-    let path_deps = node
-        .deps
-        .iter()
-        .filter(|node| node.pkg.repr.contains("path+file://"))
-        .filter_map(|node| {
-            cargo_metadata.packages.iter().find_map(|pkg| {
-                if pkg.id.repr == node.pkg.repr && !visited.contains_key(&pkg.name) {
-                    let path_dep = PathDependency {
-                        id: pkg.id.clone(),
-                        path: PathBuf::from(&pkg.manifest_path),
-                    };
-                    Some((pkg.name.clone(), path_dep))
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
-    Ok(path_deps)
-}
-
 /// Finds all path dependencies of the crate
-fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected to get a dependency graph from cargo")?;
-    let root = resolve
-        .root
-        .clone()
-        .context("Expected to get a root package id of dependency graph from cargo")?;
-    let mut known_path_deps = HashMap::new();
-    let mut stack = vec![root];
-    while let Some(pkg_id) = stack.pop() {
-        let path_deps = get_path_deps(cargo_metadata, resolve, &pkg_id, &known_path_deps)?;
-        if path_deps.is_empty() {
-            continue;
+fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>> {
+    let root = cargo_metadata
+        .root_package()
+        .context("Expected the dependency graph to have a root package")?;
+    // scan the dependency graph for path dependencies
+    let mut path_deps = HashMap::new();
+    let mut stack: Vec<&cargo_metadata::Package> = vec![root];
+    while let Some(top) = stack.pop() {
+        for dependency in &top.dependencies {
+            if let Some(path) = &dependency.path {
+                path_deps.insert(dependency.name.clone(), PathBuf::from(path));
+                // we search for the respective package by `manifest_path`, there seems
+                // to be no way to query the dependency graph given `dependency`
+                let dep_manifest_path = path.join("Cargo.toml");
+                let dep_package = cargo_metadata
+                    .packages
+                    .iter()
+                    .find(|package| package.manifest_path == dep_manifest_path)
+                    .context(format!(
+                        "Expected metadata to contain a package for path dependency {:?}",
+                        path
+                    ))?;
+                // scan the dependencies of the path dependency
+                stack.push(dep_package)
+            }
         }
-        stack.extend(path_deps.values().map(|dep| dep.id.clone()));
-        known_path_deps.extend(path_deps);
     }
-    Ok(known_path_deps)
+    Ok(path_deps)
 }
 
 /// Creates a source distribution, packing the root crate and all local dependencies
@@ -296,7 +261,7 @@ pub fn source_distribution(
     for (name, path_dep) in known_path_deps.iter() {
         add_crate_to_source_distribution(
             &mut writer,
-            &path_dep.path,
+            &path_dep,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
             false,
@@ -304,7 +269,7 @@ pub fn source_distribution(
         .context(format!(
             "Failed to add local dependency {} at {} to the source distribution",
             name,
-            path_dep.path.display()
+            path_dep.display()
         ))?;
     }
 

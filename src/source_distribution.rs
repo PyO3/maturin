@@ -58,15 +58,16 @@ fn rewrite_cargo_toml(
                         dep_name
                     )
                 }
-                // This is the location of the targeted crate in the source distribution
-                table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
-                } else {
-                    // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    toml_edit::value(format!("../{}", dep_name))
-                };
-                rewritten = true;
                 if !known_path_deps.contains_key(&dep_name) {
+                    // Ignore optional indirect dependencies
+                    if !root_crate
+                        && table[&dep_name]
+                            .get("optional")
+                            .and_then(|x| x.as_bool())
+                            .unwrap_or_default()
+                    {
+                        continue;
+                    }
                     bail!(
                         "cargo metadata does not know about the path for {}.{} present in {}, \
                         which should never happen ಠ_ಠ",
@@ -75,6 +76,14 @@ fn rewrite_cargo_toml(
                         manifest_path.as_ref().display()
                     );
                 }
+                // This is the location of the targeted crate in the source distribution
+                table[&dep_name]["path"] = if root_crate {
+                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
+                } else {
+                    // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
+                    toml_edit::value(format!("../{}", dep_name))
+                };
+                rewritten = true;
             }
         }
     }

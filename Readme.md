@@ -271,3 +271,12 @@ Our [contributing notes](https://github.com/PyO3/maturin/blob/main/guide/src/con
 If you don't have time to contribute yourself but still wish to support the project's future success, some of our maintainers have GitHub sponsorship pages:
 
 - [messense](https://github.com/sponsors/messense)
+
+## License
+
+Licensed under either of:
+
+ * Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/PyO3/maturin/blob/main/license-apache) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](https://github.com/PyO3/maturin/blob/main/license-mit) or http://opensource.org/licenses/MIT)
+
+at your option.

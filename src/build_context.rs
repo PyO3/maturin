@@ -232,11 +232,11 @@ impl BuildContext {
         others.sort();
 
         if self.bridge.is_bin() && !musllinux.is_empty() {
-            return get_policy_and_libs(&artifact.path, Some(musllinux[0]), &self.target);
+            return get_policy_and_libs(artifact, Some(musllinux[0]), &self.target);
         }
 
         let tag = others.get(0).or_else(|| musllinux.get(0)).copied();
-        get_policy_and_libs(&artifact.path, tag, &self.target)
+        get_policy_and_libs(artifact, tag, &self.target)
     }
 
     fn add_external_libs(

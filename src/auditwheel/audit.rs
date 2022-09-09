@@ -1,6 +1,7 @@
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
 use crate::auditwheel::{find_external_libs, PlatformTag};
+use crate::compile::BuildArtifact;
 use crate::target::Target;
 use anyhow::{bail, Context, Result};
 use fs_err::File;
@@ -253,13 +254,14 @@ fn get_default_platform_policies() -> Vec<Policy> {
 ///
 /// Does nothing for `platform_tag` set to `Off`/`Linux` or non-linux platforms.
 pub fn auditwheel_rs(
-    path: &Path,
+    artifact: &BuildArtifact,
     target: &Target,
     platform_tag: Option<PlatformTag>,
 ) -> Result<(Policy, bool), AuditWheelError> {
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok((Policy::default(), false));
     }
+    let path = &artifact.path;
     let arch = target.target_arch().to_string();
     let mut file = File::open(path).map_err(AuditWheelError::IoError)?;
     let mut buffer = Vec::new();
@@ -413,7 +415,7 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
 /// For the given compilation result, return the manylinux platform and the external libs
 /// we need to add to repair it
 pub fn get_policy_and_libs(
-    artifact: &Path,
+    artifact: &BuildArtifact,
     platform_tag: Option<PlatformTag>,
     target: &Target,
 ) -> Result<(Policy, Vec<Library>)> {
@@ -427,9 +429,13 @@ pub fn get_policy_and_libs(
         })?;
     let external_libs = if should_repair {
         let sysroot = get_sysroot_path(target).unwrap_or_else(|_| PathBuf::from("/"));
-        // FIXME: gather ld_paths from `cargo rustc`
-        let ld_paths = Vec::new();
-        find_external_libs(&artifact, &policy, sysroot, ld_paths).with_context(|| {
+        find_external_libs(
+            &artifact.path,
+            &policy,
+            sysroot,
+            artifact.linked_paths.clone(),
+        )
+        .with_context(|| {
             if let Some(platform_tag) = platform_tag {
                 format!("Error repairing wheel for {} compliance", platform_tag)
             } else {

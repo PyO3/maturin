@@ -23,6 +23,9 @@ const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
 pub struct BuildArtifact {
     /// Path to the build artifact
     pub path: PathBuf,
+    /// Array of paths to include in the library search path, as indicated by
+    /// the `cargo:rustc-link-search` instruction.
+    pub linked_paths: Vec<PathBuf>,
 }
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
@@ -135,6 +138,7 @@ fn compile_universal2(
         let mut result = HashMap::new();
         let universal_artifact = BuildArtifact {
             path: PathBuf::from(output_path),
+            ..x86_64_artifact
         };
         result.insert(build_type.to_string(), universal_artifact);
         universal_artifacts.push(result);
@@ -387,6 +391,7 @@ fn compile_target(
         .context("Failed to run `cargo rustc`")?;
 
     let mut artifacts = HashMap::new();
+    let mut linked_paths = Vec::new();
 
     let stream = cargo_build
         .stdout
@@ -429,8 +434,20 @@ fn compile_target(
                     for (crate_type, filename) in tuples {
                         let artifact = BuildArtifact {
                             path: filename.into(),
+                            linked_paths: Vec::new(),
                         };
                         artifacts.insert(crate_type, artifact);
+                    }
+                }
+            }
+            // See https://doc.rust-lang.org/cargo/reference/external-tools.html#build-script-output
+            cargo_metadata::Message::BuildScriptExecuted(msg) => {
+                for path in msg.linked_paths.iter().map(|p| p.as_str()) {
+                    // `linked_paths` may include a "KIND=" prefix in the string where KIND is the library kind
+                    if let Some(index) = path.find('=') {
+                        linked_paths.push(PathBuf::from(&path[index + 1..]));
+                    } else {
+                        linked_paths.push(PathBuf::from(path));
                     }
                 }
             }
@@ -439,6 +456,11 @@ fn compile_target(
             }
             _ => (),
         }
+    }
+
+    // Add linked_paths to build artifacts
+    for artifact in artifacts.values_mut() {
+        artifact.linked_paths = linked_paths.clone();
     }
 
     let status = cargo_build

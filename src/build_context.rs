@@ -7,7 +7,9 @@ use crate::module_writer::{
 };
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
-use crate::{compile, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target};
+use crate::{
+    compile, BuildArtifact, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
+};
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -195,7 +197,7 @@ impl BuildContext {
 
     fn auditwheel(
         &self,
-        artifact: &Path,
+        artifact: &BuildArtifact,
         platform_tag: &[PlatformTag],
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<(Policy, Vec<Library>)> {
@@ -230,17 +232,17 @@ impl BuildContext {
         others.sort();
 
         if self.bridge.is_bin() && !musllinux.is_empty() {
-            return get_policy_and_libs(artifact, Some(musllinux[0]), &self.target);
+            return get_policy_and_libs(&artifact.path, Some(musllinux[0]), &self.target);
         }
 
         let tag = others.get(0).or_else(|| musllinux.get(0)).copied();
-        get_policy_and_libs(artifact, tag, &self.target)
+        get_policy_and_libs(&artifact.path, tag, &self.target)
     }
 
     fn add_external_libs(
         &self,
         writer: &mut WheelWriter,
-        artifacts: &[PathBuf],
+        artifacts: &[&BuildArtifact],
         ext_libs: &[Vec<Library>],
     ) -> Result<()> {
         if ext_libs.iter().all(|libs| libs.is_empty()) {
@@ -306,7 +308,7 @@ impl BuildContext {
                 })
                 .collect::<Vec<_>>();
             if !replacements.is_empty() {
-                patchelf::replace_needed(artifact, &replacements[..])?;
+                patchelf::replace_needed(&artifact.path, &replacements[..])?;
             }
         }
 
@@ -338,14 +340,14 @@ impl BuildContext {
         // Currently artifact .so file always resides at ${module_name}/${module_name}.so
         let artifact_dir = Path::new(&self.module_name);
         for artifact in artifacts {
-            let old_rpaths = patchelf::get_rpath(artifact)?;
+            let old_rpaths = patchelf::get_rpath(&artifact.path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
             let mut new_rpaths: Vec<&str> = old_rpaths.split(':').collect();
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap());
             let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(artifact, &new_rpath)?;
+            patchelf::set_rpath(&artifact.path, &new_rpath)?;
         }
         Ok(())
     }
@@ -359,7 +361,7 @@ impl BuildContext {
 
     fn write_binding_wheel_abi3(
         &self,
-        artifact: &Path,
+        artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
         major: u8,
@@ -371,13 +373,13 @@ impl BuildContext {
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
-        self.add_external_libs(&mut writer, &[artifact.to_path_buf()], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         write_bindings_module(
             &mut writer,
             &self.project_layout,
             &self.module_name,
-            artifact,
+            &artifact.path,
             None,
             &self.target,
             self.editable,
@@ -414,7 +416,7 @@ impl BuildContext {
             self.platform_tag.clone()
         };
         let (wheel_path, tag) = self.write_binding_wheel_abi3(
-            &artifact,
+            artifact,
             &platform_tags,
             external_libs,
             major,
@@ -435,20 +437,20 @@ impl BuildContext {
     fn write_binding_wheel(
         &self,
         python_interpreter: &PythonInterpreter,
-        artifact: &Path,
+        artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(&self.target, platform_tags, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
-        self.add_external_libs(&mut writer, &[artifact.to_path_buf()], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         write_bindings_module(
             &mut writer,
             &self.project_layout,
             &self.module_name,
-            artifact,
+            &artifact.path,
             Some(python_interpreter),
             &self.target,
             self.editable,
@@ -490,7 +492,7 @@ impl BuildContext {
             };
             let (wheel_path, tag) = self.write_binding_wheel(
                 python_interpreter,
-                &artifact,
+                artifact,
                 &platform_tags,
                 external_libs,
             )?;
@@ -517,14 +519,14 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
-    ) -> Result<PathBuf> {
+    ) -> Result<BuildArtifact> {
         let artifacts = compile(self, python_interpreter, &self.bridge)
             .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
         let artifacts = artifacts.get(0).context(error_msg)?;
 
-        let artifact = artifacts
+        let mut artifact = artifacts
             .get("cdylib")
             .cloned()
             .ok_or_else(|| anyhow!(error_msg,))?;
@@ -532,23 +534,25 @@ impl BuildContext {
         if let Some(extension_name) = extension_name {
             // globin has an issue parsing MIPS64 ELF, see https://github.com/m4b/goblin/issues/274
             // But don't fail the build just because we can't emit a warning
-            let _ = warn_missing_py_init(&artifact, extension_name);
+            let _ = warn_missing_py_init(&artifact.path, extension_name);
         }
 
         if self.editable || self.skip_auditwheel {
             return Ok(artifact);
         }
         // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns
-        let maturin_build = artifact.parent().unwrap().join("maturin");
+        let artifact_path = &artifact.path;
+        let maturin_build = artifact_path.parent().unwrap().join("maturin");
         fs::create_dir_all(&maturin_build)?;
-        let new_artifact = maturin_build.join(artifact.file_name().unwrap());
-        fs::copy(&artifact, &new_artifact)?;
-        Ok(new_artifact)
+        let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
+        fs::copy(artifact_path, &new_artifact_path)?;
+        artifact.path = new_artifact_path;
+        Ok(artifact)
     }
 
     fn write_cffi_wheel(
         &self,
-        artifact: &Path,
+        artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
     ) -> Result<BuiltWheelMetadata> {
@@ -557,7 +561,7 @@ impl BuildContext {
             .get_universal_tags(platform_tags, self.universal2)?;
 
         let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
-        self.add_external_libs(&mut writer, &[artifact.to_path_buf()], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         write_cffi_module(
             &mut writer,
@@ -565,7 +569,7 @@ impl BuildContext {
             self.manifest_path.parent().unwrap(),
             &self.target_dir,
             &self.module_name,
-            artifact,
+            &artifact.path,
             &self.interpreter[0].executable,
             self.editable,
         )?;
@@ -586,7 +590,7 @@ impl BuildContext {
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) = self.write_cffi_wheel(&artifact, &platform_tags, external_libs)?;
+        let (wheel_path, tag) = self.write_cffi_wheel(artifact, &platform_tags, external_libs)?;
 
         // Warn if cffi isn't specified in the requirements
         if !self
@@ -610,7 +614,7 @@ impl BuildContext {
     fn write_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
-        artifacts: &[PathBuf],
+        artifacts: &[BuildArtifact],
         platform_tags: &[PlatformTag],
         ext_libs: &[Vec<Library>],
     ) -> Result<BuiltWheelMetadata> {
@@ -639,15 +643,18 @@ impl BuildContext {
             }
         }
 
+        let mut artifacts_ref = Vec::with_capacity(artifacts.len());
         for artifact in artifacts {
+            artifacts_ref.push(artifact);
             // I wouldn't know of any case where this would be the wrong (and neither do
             // I know a better alternative)
             let bin_name = artifact
+                .path
                 .file_name()
                 .expect("Couldn't get the filename from the binary produced by cargo");
-            write_bin(&mut writer, artifact, &self.metadata21, bin_name)?;
+            write_bin(&mut writer, &artifact.path, &self.metadata21, bin_name)?;
         }
-        self.add_external_libs(&mut writer, artifacts, ext_libs)?;
+        self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;
 
         self.add_pth(&mut writer)?;
         add_data(&mut writer, self.project_layout.data.as_deref())?;

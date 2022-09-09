@@ -257,15 +257,17 @@ See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/comple
 
 maturin itself is manylinux compliant when compiled for the musl target.
 
-## Code
+## Contributing
 
-The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.
+Everyone is welcomed to contribute to maturin! There are many ways to support the project, such as:
 
-The `sysconfig` folder contains the output of `python -m sysconfig` for different python versions and platform, which is helpful during development.
+- help maturin users with issues on GitHub and Gitter
+- improve documentation
+- write features and bugfixes
+- publish blogs and examples of how to use maturin
 
-You need to install `cffi` and `virtualenv` (`pip install cffi virtualenv`) to run the tests.
+Our [contributing notes](https://github.com/PyO3/maturin/blob/main/guide/src/contributing.md) have more resources if you wish to volunteer time for maturin and are searching where to start.
 
-There are some optional hacks that can speed up the tests (over 80s to 17s on my machine).
-1. By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python version.
-2. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactivate it.
-3. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.
+If you don't have time to contribute yourself but still wish to support the project's future success, some of our maintainers have GitHub sponsorship pages:
+
+- [messense](https://github.com/sponsors/messense)

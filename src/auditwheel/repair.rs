@@ -8,8 +8,9 @@ pub fn find_external_libs(
     artifact: impl AsRef<Path>,
     policy: &Policy,
     sysroot: PathBuf,
+    ld_paths: Vec<PathBuf>,
 ) -> Result<Vec<lddtree::Library>, AuditWheelError> {
-    let dep_analyzer = DependencyAnalyzer::new(sysroot);
+    let dep_analyzer = DependencyAnalyzer::new(sysroot).library_paths(ld_paths);
     let deps = dep_analyzer
         .analyze(artifact)
         .map_err(AuditWheelError::DependencyAnalysisError)?;

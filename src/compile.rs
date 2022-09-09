@@ -18,6 +18,16 @@ const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
 
+/// A cargo build artifact
+#[derive(Debug, Clone)]
+pub struct BuildArtifact {
+    /// Path to the build artifact
+    pub path: PathBuf,
+    /// Array of paths to include in the library search path, as indicated by
+    /// the `cargo:rustc-link-search` instruction.
+    pub linked_paths: Vec<PathBuf>,
+}
+
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
@@ -25,7 +35,7 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
-) -> Result<Vec<HashMap<String, PathBuf>>> {
+) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let root_pkg = context.cargo_metadata.root_package().unwrap();
     let mut targets: Vec<_> = root_pkg
         .targets
@@ -61,7 +71,7 @@ fn compile_universal2(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
     targets: &[&cargo_metadata::Target],
-) -> Result<Vec<HashMap<String, PathBuf>>> {
+) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let build_type = if bindings_crate.is_bin() {
         "bin"
     } else {
@@ -108,12 +118,13 @@ fn compile_universal2(
         })?;
         // Create an universal dylib
         let output_path = aarch64_artifact
+            .path
             .display()
             .to_string()
             .replace("aarch64-apple-darwin/", "");
         let mut writer = FatWriter::new();
-        let aarch64_file = fs::read(aarch64_artifact)?;
-        let x86_64_file = fs::read(x86_64_artifact)?;
+        let aarch64_file = fs::read(&aarch64_artifact.path)?;
+        let x86_64_file = fs::read(&x86_64_artifact.path)?;
         writer
             .add(aarch64_file)
             .map_err(|e| anyhow!("Failed to add aarch64 cdylib: {:?}", e))?;
@@ -125,7 +136,11 @@ fn compile_universal2(
             .map_err(|e| anyhow!("Failed to create universal cdylib: {:?}", e))?;
 
         let mut result = HashMap::new();
-        result.insert(build_type.to_string(), PathBuf::from(output_path));
+        let universal_artifact = BuildArtifact {
+            path: PathBuf::from(output_path),
+            ..x86_64_artifact
+        };
+        result.insert(build_type.to_string(), universal_artifact);
         universal_artifacts.push(result);
     }
     Ok(universal_artifacts)
@@ -136,7 +151,7 @@ fn compile_targets(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
     targets: &[&cargo_metadata::Target],
-) -> Result<Vec<HashMap<String, PathBuf>>> {
+) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
     for target in targets {
         artifacts.push(compile_target(
@@ -154,7 +169,7 @@ fn compile_target(
     python_interpreter: Option<&PythonInterpreter>,
     bindings_crate: &BridgeModel,
     binding_target: &cargo_metadata::Target,
-) -> Result<HashMap<String, PathBuf>> {
+) -> Result<HashMap<String, BuildArtifact>> {
     let target = &context.target;
 
     let mut cargo_rustc: cargo_options::Rustc = context.cargo_options.clone().into();
@@ -376,6 +391,7 @@ fn compile_target(
         .context("Failed to run `cargo rustc`")?;
 
     let mut artifacts = HashMap::new();
+    let mut linked_paths = Vec::new();
 
     let stream = cargo_build
         .stdout
@@ -416,7 +432,22 @@ fn compile_target(
                         .into_iter()
                         .zip(artifact.filenames);
                     for (crate_type, filename) in tuples {
-                        artifacts.insert(crate_type, filename.into());
+                        let artifact = BuildArtifact {
+                            path: filename.into(),
+                            linked_paths: Vec::new(),
+                        };
+                        artifacts.insert(crate_type, artifact);
+                    }
+                }
+            }
+            // See https://doc.rust-lang.org/cargo/reference/external-tools.html#build-script-output
+            cargo_metadata::Message::BuildScriptExecuted(msg) => {
+                for path in msg.linked_paths.iter().map(|p| p.as_str()) {
+                    // `linked_paths` may include a "KIND=" prefix in the string where KIND is the library kind
+                    if let Some(index) = path.find('=') {
+                        linked_paths.push(PathBuf::from(&path[index + 1..]));
+                    } else {
+                        linked_paths.push(PathBuf::from(path));
                     }
                 }
             }
@@ -425,6 +456,11 @@ fn compile_target(
             }
             _ => (),
         }
+    }
+
+    // Add linked_paths to build artifacts
+    for artifact in artifacts.values_mut() {
+        artifact.linked_paths = linked_paths.clone();
     }
 
     let status = cargo_build

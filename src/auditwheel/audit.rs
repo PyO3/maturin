@@ -427,7 +427,9 @@ pub fn get_policy_and_libs(
         })?;
     let external_libs = if should_repair {
         let sysroot = get_sysroot_path(target).unwrap_or_else(|_| PathBuf::from("/"));
-        find_external_libs(&artifact, &policy, sysroot).with_context(|| {
+        // FIXME: gather ld_paths from `cargo rustc`
+        let ld_paths = Vec::new();
+        find_external_libs(&artifact, &policy, sysroot, ld_paths).with_context(|| {
             if let Some(platform_tag) = platform_tag {
                 format!("Error repairing wheel for {} compliance", platform_tag)
             } else {

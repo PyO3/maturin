@@ -71,3 +71,16 @@ Before you submit a pull request, check that it meets these guidelines:
 2. Add a [changelog](https://github.com/PyO3/maturin/blob/main/Changelog.md)
    entry.
 3. When command line interface changes, run `python3 test-crates/update_readme.py` to update related documentation.
+
+## Code
+
+The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.
+
+The `sysconfig` folder contains the output of `python -m sysconfig` for different python versions and platform, which is helpful during development.
+
+You need to install `cffi` and `virtualenv` (`pip install cffi virtualenv`) to run the tests.
+
+There are some optional hacks that can speed up the tests (over 80s to 17s on my machine).
+1. By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python version.
+2. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactivate it.
+3. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.

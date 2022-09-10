@@ -25,7 +25,7 @@ pub struct BuildArtifact {
     pub path: PathBuf,
     /// Array of paths to include in the library search path, as indicated by
     /// the `cargo:rustc-link-search` instruction.
-    pub linked_paths: Vec<PathBuf>,
+    pub linked_paths: Vec<String>,
 }
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
@@ -445,9 +445,9 @@ fn compile_target(
                 for path in msg.linked_paths.iter().map(|p| p.as_str()) {
                     // `linked_paths` may include a "KIND=" prefix in the string where KIND is the library kind
                     if let Some(index) = path.find('=') {
-                        linked_paths.push(PathBuf::from(&path[index + 1..]));
+                        linked_paths.push(path[index + 1..].to_string());
                     } else {
-                        linked_paths.push(PathBuf::from(path));
+                        linked_paths.push(path.to_string());
                     }
                 }
             }

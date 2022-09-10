@@ -41,7 +41,7 @@ pub fn set_soname<S: AsRef<OsStr>>(file: impl AsRef<Path>, soname: &S) -> Result
     Ok(())
 }
 
-/// /// Remove a `RPATH` from executables and libraries
+/// Remove a `RPATH` from executables and libraries
 pub fn remove_rpath(file: impl AsRef<Path>) -> Result<()> {
     let mut cmd = Command::new("patchelf");
     cmd.arg("--remove-rpath").arg(file.as_ref());

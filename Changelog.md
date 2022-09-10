@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add `zig ar` support in [#1073](https://github.com/PyO3/maturin/pull/1073)
 * Fix sdist build for optional path dependencies in [#1084](https://github.com/PyO3/maturin/pull/1084)
 * auditwheel: find dylibs in Cargo target directory in [#1092](https://github.com/PyO3/maturin/pull/1092)
+* Add library search paths in Cargo target directory to rpath in editable mode on Linux in [#1094](https://github.com/PyO3/maturin/pull/1094)
 
 ## [0.13.2] - 2022-08-14
 

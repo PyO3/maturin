@@ -429,13 +429,8 @@ pub fn get_policy_and_libs(
         })?;
     let external_libs = if should_repair {
         let sysroot = get_sysroot_path(target).unwrap_or_else(|_| PathBuf::from("/"));
-        find_external_libs(
-            &artifact.path,
-            &policy,
-            sysroot,
-            artifact.linked_paths.clone(),
-        )
-        .with_context(|| {
+        let ld_paths = artifact.linked_paths.iter().map(PathBuf::from).collect();
+        find_external_libs(&artifact.path, &policy, sysroot, ld_paths).with_context(|| {
             if let Some(platform_tag) = platform_tag {
                 format!("Error repairing wheel for {} compliance", platform_tag)
             } else {

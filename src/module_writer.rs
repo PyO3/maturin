@@ -1,9 +1,6 @@
 //! The wheel format is (mostly) specified in PEP 427
-
 use crate::project_layout::ProjectLayout;
-use crate::PythonInterpreter;
-use crate::Target;
-use crate::{BridgeModel, Metadata21};
+use crate::{BridgeModel, Metadata21, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use flate2::write::GzEncoder;
 use flate2::Compression;

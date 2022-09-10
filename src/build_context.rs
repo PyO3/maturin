@@ -201,7 +201,7 @@ impl BuildContext {
         platform_tag: &[PlatformTag],
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<(Policy, Vec<Library>)> {
-        if self.skip_auditwheel || self.editable {
+        if self.skip_auditwheel {
             return Ok((Policy::default(), Vec::new()));
         }
 
@@ -239,12 +239,43 @@ impl BuildContext {
         get_policy_and_libs(artifact, tag, &self.target)
     }
 
+    /// Add library search paths in Cargo target directory rpath when building in editable mode
+    fn add_rpath(&self, artifacts: &[&BuildArtifact]) -> Result<()> {
+        if self.editable && self.target.is_linux() {
+            for artifact in artifacts {
+                if artifact.linked_paths.is_empty() {
+                    continue;
+                }
+                let old_rpaths = patchelf::get_rpath(&artifact.path)?;
+                let mut new_rpaths: Vec<&str> =
+                    old_rpaths.split(':').filter(|r| !r.is_empty()).collect();
+                for path in &artifact.linked_paths {
+                    if !old_rpaths.contains(path) {
+                        new_rpaths.push(path);
+                    }
+                }
+                let new_rpath = new_rpaths.join(":");
+                if let Err(err) = patchelf::set_rpath(&artifact.path, &new_rpath) {
+                    println!(
+                        "⚠️ Warning: Failed to set rpath for {}: {}",
+                        artifact.path.display(),
+                        err
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn add_external_libs(
         &self,
         writer: &mut WheelWriter,
         artifacts: &[&BuildArtifact],
         ext_libs: &[Vec<Library>],
     ) -> Result<()> {
+        if self.editable {
+            return self.add_rpath(artifacts);
+        }
         if ext_libs.iter().all(|libs| libs.is_empty()) {
             return Ok(());
         }
@@ -343,7 +374,8 @@ impl BuildContext {
             let old_rpaths = patchelf::get_rpath(&artifact.path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
-            let mut new_rpaths: Vec<&str> = old_rpaths.split(':').collect();
+            let mut new_rpaths: Vec<&str> =
+                old_rpaths.split(':').filter(|r| !r.is_empty()).collect();
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap());
             let new_rpath = new_rpaths.join(":");

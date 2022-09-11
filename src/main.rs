@@ -102,14 +102,9 @@ enum Opt {
     /// This command is a workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
     #[clap(name = "sdist")]
     SDist {
-        #[clap(
-            short = 'm',
-            long = "manifest-path",
-            parse(from_os_str),
-            default_value = "Cargo.toml"
-        )]
+        #[clap(short = 'm', long = "manifest-path", parse(from_os_str))]
         /// The path to the Cargo.toml
-        manifest_path: PathBuf,
+        manifest_path: Option<PathBuf>,
         /// The directory to store the built wheels in. Defaults to a new "wheels"
         /// directory in the project's target directory
         #[clap(short, long, parse(from_os_str))]
@@ -413,7 +408,7 @@ fn run() -> Result<()> {
             let build_options = BuildOptions {
                 out,
                 cargo: CargoOptions {
-                    manifest_path: Some(manifest_path),
+                    manifest_path,
                     ..Default::default()
                 },
                 ..Default::default()

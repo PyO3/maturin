@@ -123,6 +123,7 @@ fn rewrite_cargo_toml(
 fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     pyproject_toml_path: impl AsRef<Path>,
+    pyproject: &PyProjectToml,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
@@ -199,6 +200,20 @@ fn add_crate_to_source_distribution(
                 PathBuf::from("pyproject.toml"),
                 pyproject_toml_path.to_path_buf(),
             ));
+            // Add readme and license files
+            if let Some(project) = pyproject.project.as_ref() {
+                if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref()
+                {
+                    target_source.push((PathBuf::from(readme), pyproject_dir.join(readme)));
+                }
+                if let Some(pyproject_toml::License {
+                    file: Some(license),
+                    text: None,
+                }) = project.license.as_ref()
+                {
+                    target_source.push((PathBuf::from(license), pyproject_dir.join(license)));
+                }
+            }
         } else {
             bail!(
                 "pyproject.toml was not included by `cargo package`. \
@@ -298,6 +313,7 @@ pub fn source_distribution(
         add_crate_to_source_distribution(
             &mut writer,
             &build_context.pyproject_toml_path,
+            pyproject,
             &path_dep,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
@@ -314,6 +330,7 @@ pub fn source_distribution(
     add_crate_to_source_distribution(
         &mut writer,
         &build_context.pyproject_toml_path,
+        pyproject,
         &manifest_path,
         &root_dir,
         &known_path_deps,

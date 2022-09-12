@@ -146,7 +146,6 @@ impl Metadata21 {
                 }
                 if let Some(license_path) = file {
                     let license_path = pyproject_dir.join(license_path);
-                    println!("license: {:?}", license_path);
                     self.license_files.push(license_path);
                 }
                 if let Some(license_text) = text {

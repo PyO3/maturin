@@ -176,19 +176,10 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the source distribution")?;
 
-        let include_cargo_lock = self.cargo_options.locked || self.cargo_options.frozen;
         match self.pyproject_toml.as_ref() {
             Some(pyproject) => {
-                let sdist_path = source_distribution(
-                    &self.out,
-                    &self.metadata21,
-                    &self.manifest_path,
-                    &self.cargo_metadata,
-                    pyproject.sdist_include(),
-                    include_cargo_lock,
-                    self.project_layout.data.as_deref(),
-                )
-                .context("Failed to build source distribution")?;
+                let sdist_path = source_distribution(self, pyproject)
+                    .context("Failed to build source distribution")?;
                 Ok(Some((sdist_path, "source".to_string())))
             }
             None => Ok(None),

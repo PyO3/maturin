@@ -1,5 +1,5 @@
 use crate::module_writer::{add_data, ModuleWriter};
-use crate::{Metadata21, SDistWriter};
+use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -238,17 +238,15 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
 /// and in
 /// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
 pub fn source_distribution(
-    wheel_dir: impl AsRef<Path>,
-    metadata21: &Metadata21,
-    manifest_path: impl AsRef<Path>,
-    cargo_metadata: &Metadata,
-    sdist_include: Option<&Vec<String>>,
-    include_cargo_lock: bool,
-    data: Option<&Path>,
+    build_context: &BuildContext,
+    pyproject: &PyProjectToml,
 ) -> Result<PathBuf> {
-    let known_path_deps = find_path_deps(cargo_metadata)?;
+    let metadata21 = &build_context.metadata21;
+    let manifest_path = &build_context.manifest_path;
 
-    let mut writer = SDistWriter::new(wheel_dir, metadata21)?;
+    let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+
+    let mut writer = SDistWriter::new(&build_context.out, metadata21)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
         &metadata21.get_distribution_escaped(),
@@ -280,14 +278,16 @@ pub fn source_distribution(
         true,
     )?;
 
-    let manifest_dir = manifest_path.as_ref().parent().unwrap();
+    let manifest_dir = manifest_path.parent().unwrap();
+    let include_cargo_lock =
+        build_context.cargo_options.locked || build_context.cargo_options.frozen;
     if include_cargo_lock {
         let cargo_lock_path = manifest_dir.join("Cargo.lock");
         let target = root_dir.join("Cargo.lock");
         writer.add_file(&target, &cargo_lock_path)?;
     }
 
-    if let Some(include_targets) = sdist_include {
+    if let Some(include_targets) = pyproject.sdist_include() {
         for pattern in include_targets {
             println!("📦 Including files matching \"{}\"", pattern);
             for source in glob::glob(&manifest_dir.join(pattern).to_string_lossy())
@@ -305,7 +305,7 @@ pub fn source_distribution(
         metadata21.to_file_contents()?.as_bytes(),
     )?;
 
-    add_data(&mut writer, data)?;
+    add_data(&mut writer, build_context.project_layout.data.as_deref())?;
     let source_distribution_path = writer.finish()?;
 
     println!(

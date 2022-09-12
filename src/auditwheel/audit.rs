@@ -467,6 +467,7 @@ pub fn relpath(to: &Path, from: &Path) -> PathBuf {
 #[cfg(test)]
 mod test {
     use crate::auditwheel::audit::relpath;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
 
     #[test]

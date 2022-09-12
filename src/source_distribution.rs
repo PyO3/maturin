@@ -20,6 +20,7 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
+    local_deps_folder: String,
     root_crate: bool,
 ) -> Result<String> {
     let text = fs::read_to_string(&manifest_path).context(format!(
@@ -63,7 +64,7 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
+                    toml_edit::value(format!("{}/{}", local_deps_folder, dep_name))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     toml_edit::value(format!("../{}", dep_name))
@@ -121,12 +122,14 @@ fn rewrite_cargo_toml(
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
 fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
+    pyproject_toml_path: impl AsRef<Path>,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
+    let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path)
@@ -154,18 +157,29 @@ fn add_crate_to_source_distribution(
         .collect();
 
     let manifest_dir = manifest_path.parent().unwrap();
+    let abs_manifest_dir = manifest_dir.canonicalize()?;
+    let pyproject_dir = pyproject_toml_path.parent().unwrap().canonicalize()?;
+    let cargo_toml_in_subdir = root_crate
+        && abs_manifest_dir != pyproject_dir
+        && abs_manifest_dir.starts_with(&pyproject_dir);
 
-    let target_source: Vec<(PathBuf, PathBuf)> = file_list
+    let mut target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
         .map(|relative_to_manifests| {
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
-            (relative_to_manifests.to_path_buf(), relative_to_cwd)
+            if root_crate && cargo_toml_in_subdir {
+                (relative_to_cwd.clone(), relative_to_cwd)
+            } else {
+                (relative_to_manifests.to_path_buf(), relative_to_cwd)
+            }
         })
         // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
             // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
             // and https://github.com/PyO3/maturin/issues/449
-            if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+            if target == Path::new("Cargo.toml.orig")
+                || (root_crate && target.file_name() == Some("Cargo.toml".as_ref()))
+            {
                 false
             } else {
                 source.exists()
@@ -178,20 +192,46 @@ fn add_crate_to_source_distribution(
             .iter()
             .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
-        bail!(
-            "pyproject.toml was not included by `cargo package`. \
-                 Please make sure pyproject.toml is not excluded or build without `--sdist`"
-        )
+        // Add pyproject.toml to the source distribution
+        // if Cargo.toml is in subdirectory of pyproject.toml directory
+        if cargo_toml_in_subdir {
+            target_source.push((
+                PathBuf::from("pyproject.toml"),
+                pyproject_toml_path.to_path_buf(),
+            ));
+        } else {
+            bail!(
+                "pyproject.toml was not included by `cargo package`. \
+                     Please make sure pyproject.toml is not excluded or build without `--sdist`"
+            )
+        }
     }
 
-    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, known_path_deps, root_crate)?;
+    let local_deps_folder = if cargo_toml_in_subdir {
+        let level = abs_manifest_dir
+            .strip_prefix(pyproject_dir)?
+            .components()
+            .count();
+        format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
+    } else {
+        LOCAL_DEPENDENCIES_FOLDER.to_string()
+    };
+    let rewritten_cargo_toml = rewrite_cargo_toml(
+        &manifest_path,
+        known_path_deps,
+        local_deps_folder,
+        root_crate,
+    )?;
 
     let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
-    writer.add_bytes(
-        prefix.join(manifest_path.file_name().unwrap()),
-        rewritten_cargo_toml.as_bytes(),
-    )?;
+
+    let cargo_toml = if cargo_toml_in_subdir {
+        prefix.join(manifest_path)
+    } else {
+        prefix.join(manifest_path.file_name().unwrap())
+    };
+    writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
     for (target, source) in target_source {
         writer.add_file(prefix.join(target), source)?;
     }
@@ -257,6 +297,7 @@ pub fn source_distribution(
     for (name, path_dep) in known_path_deps.iter() {
         add_crate_to_source_distribution(
             &mut writer,
+            &build_context.pyproject_toml_path,
             &path_dep,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
@@ -272,6 +313,7 @@ pub fn source_distribution(
     // Add the main crate
     add_crate_to_source_distribution(
         &mut writer,
+        &build_context.pyproject_toml_path,
         &manifest_path,
         &root_dir,
         &known_path_deps,

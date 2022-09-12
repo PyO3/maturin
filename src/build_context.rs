@@ -83,6 +83,8 @@ pub struct BuildContext {
     pub bridge: BridgeModel,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
+    /// The path to pyproject.toml. Required for the source distribution
+    pub pyproject_toml_path: PathBuf,
     /// Parsed pyproject.toml if any
     pub pyproject_toml: Option<PyProjectToml>,
     /// Python Package Metadata 2.1

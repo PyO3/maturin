@@ -489,6 +489,7 @@ impl BuildOptions {
             project_layout,
             cargo_toml_path,
             cargo_toml,
+            pyproject_toml_path,
             pyproject_toml,
             module_name,
             metadata21,
@@ -690,6 +691,7 @@ impl BuildOptions {
             target,
             bridge,
             project_layout,
+            pyproject_toml_path,
             pyproject_toml,
             metadata21,
             crate_name,
@@ -1175,6 +1177,7 @@ impl CargoOptions {
 #[cfg(test)]
 mod test {
     use cargo_metadata::MetadataCommand;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
 
     use super::*;

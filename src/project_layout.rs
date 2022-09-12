@@ -32,6 +32,8 @@ pub struct ProjectResolver {
     pub cargo_toml_path: PathBuf,
     /// Parsed Cargo.toml
     pub cargo_toml: CargoToml,
+    /// pyproject.toml path
+    pub pyproject_toml_path: PathBuf,
     /// Parsed pyproject.toml
     pub pyproject_toml: Option<PyProjectToml>,
     /// Rust module name
@@ -143,6 +145,7 @@ impl ProjectResolver {
             project_layout,
             cargo_toml_path: manifest_file,
             cargo_toml,
+            pyproject_toml_path: pyproject_file,
             pyproject_toml,
             module_name,
             metadata21,

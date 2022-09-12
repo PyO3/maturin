@@ -555,6 +555,7 @@ fn fold_header(text: &str) -> String {
 mod test {
     use super::*;
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use std::io::Write;
 
     fn assert_metadata_from_cargo_toml(readme: &str, cargo_toml: &str, expected: &str) {

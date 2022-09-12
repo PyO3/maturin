@@ -116,6 +116,7 @@ impl Policy {
 #[cfg(test)]
 mod test {
     use super::{Arch, Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_load_policy() {

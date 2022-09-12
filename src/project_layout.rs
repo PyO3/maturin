@@ -89,7 +89,8 @@ impl ProjectResolver {
         let mut metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
             .context("Failed to parse Cargo.toml into python metadata")?;
         if let Some(pyproject) = pyproject {
-            metadata21.merge_pyproject_toml(&manifest_dir, pyproject)?;
+            let pyproject_dir = pyproject_file.parent().unwrap();
+            metadata21.merge_pyproject_toml(&pyproject_dir, pyproject)?;
         }
         let extra_metadata = cargo_toml.remaining_core_metadata();
 

@@ -84,13 +84,13 @@ fn path_to_content_type(path: &Path) -> String {
 impl Metadata21 {
     /// Merge metadata with pyproject.toml, where pyproject.toml takes precedence
     ///
-    /// manifest_path must be the directory, not the file
+    /// pyproject_dir must be the directory containing pyproject.toml
     pub fn merge_pyproject_toml(
         &mut self,
-        manifest_path: impl AsRef<Path>,
+        pyproject_dir: impl AsRef<Path>,
         pyproject_toml: &PyProjectToml,
     ) -> Result<()> {
-        let manifest_path = manifest_path.as_ref();
+        let pyproject_dir = pyproject_dir.as_ref();
         if let Some(project) = &pyproject_toml.project {
             self.name = project.name.clone();
 
@@ -104,7 +104,7 @@ impl Metadata21 {
 
             match &project.readme {
                 Some(pyproject_toml::ReadMe::RelativePath(readme_path)) => {
-                    let readme_path = manifest_path.join(readme_path);
+                    let readme_path = pyproject_dir.join(readme_path);
                     let description = Some(fs::read_to_string(&readme_path).context(format!(
                         "Failed to read readme specified in pyproject.toml, which should be at {}",
                         readme_path.display()
@@ -121,7 +121,7 @@ impl Metadata21 {
                         bail!("file and text fields of 'project.readme' are mutually-exclusive, only one of them should be specified");
                     }
                     if let Some(readme_path) = file {
-                        let readme_path = manifest_path.join(readme_path);
+                        let readme_path = pyproject_dir.join(readme_path);
                         let description = Some(fs::read_to_string(&readme_path).context(format!(
                                 "Failed to read readme specified in pyproject.toml, which should be at {}",
                                 readme_path.display()
@@ -145,7 +145,8 @@ impl Metadata21 {
                     bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
                 }
                 if let Some(license_path) = file {
-                    let license_path = manifest_path.join(license_path);
+                    let license_path = pyproject_dir.join(license_path);
+                    println!("license: {:?}", license_path);
                     self.license_files.push(license_path);
                 }
                 if let Some(license_text) = text {
@@ -158,7 +159,7 @@ impl Metadata21 {
             // We're already emitting the License-Files metadata without issue.
             // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
             let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
-            let escaped_manifest_string = glob::Pattern::escape(manifest_path.to_str().unwrap());
+            let escaped_manifest_string = glob::Pattern::escape(pyproject_dir.to_str().unwrap());
             let escaped_manifest_path = Path::new(&escaped_manifest_string);
             for pattern in license_include_targets.iter() {
                 for license_path in

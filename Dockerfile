@@ -10,7 +10,10 @@ RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.63
 # Compile dependencies only for build caching
 ADD Cargo.toml /maturin/Cargo.toml
 ADD Cargo.lock /maturin/Cargo.lock
-RUN mkdir /maturin/src && \
+RUN --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/maturin/target,sharing=locked \
+    mkdir /maturin/src && \
     touch  /maturin/src/lib.rs && \
     echo 'fn main() { println!("Dummy") }' > /maturin/src/main.rs && \
     cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release -- -C link-arg=-s
@@ -20,9 +23,11 @@ ADD . /maturin/
 # Manually update the timestamps as ADD keeps the local timestamps and cargo would then believe the cache is fresh
 RUN touch /maturin/src/lib.rs /maturin/src/main.rs
 
-RUN cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s \
-    && mv /maturin/target/release/maturin /usr/bin/maturin \
-    && rm -rf /maturin
+RUN --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/maturin/target,sharing=locked \
+    cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s \
+    && mv /maturin/target/release/maturin /usr/bin/maturin
 
 FROM quay.io/pypa/manylinux2010_x86_64
 

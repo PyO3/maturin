@@ -157,13 +157,15 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let manifest_dir = manifest_path.parent().unwrap();
-    let abs_manifest_dir = manifest_dir.canonicalize()?;
-    let pyproject_dir = pyproject_toml_path.parent().unwrap().canonicalize()?;
+    let abs_manifest_path = manifest_path.canonicalize()?;
+    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
+    let pyproject_dir = pyproject_toml_path.parent().unwrap();
     let cargo_toml_in_subdir = root_crate
         && abs_manifest_dir != pyproject_dir
         && abs_manifest_dir.starts_with(&pyproject_dir);
 
+    // manifest_dir should be a relative path
+    let manifest_dir = manifest_path.parent().unwrap();
     let mut target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
         .map(|relative_to_manifests| {
@@ -298,6 +300,7 @@ pub fn source_distribution(
 ) -> Result<PathBuf> {
     let metadata21 = &build_context.metadata21;
     let manifest_path = &build_context.manifest_path;
+    let pyproject_toml_path = build_context.pyproject_toml_path.canonicalize()?;
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
 
@@ -312,7 +315,7 @@ pub fn source_distribution(
     for (name, path_dep) in known_path_deps.iter() {
         add_crate_to_source_distribution(
             &mut writer,
-            &build_context.pyproject_toml_path,
+            &pyproject_toml_path,
             pyproject,
             &path_dep,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
@@ -329,7 +332,7 @@ pub fn source_distribution(
     // Add the main crate
     add_crate_to_source_distribution(
         &mut writer,
-        &build_context.pyproject_toml_path,
+        &pyproject_toml_path,
         pyproject,
         &manifest_path,
         &root_dir,

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix sdist when `pyproject.toml` isn't in the same dir of `Cargo.toml` in [#1099](https://github.com/PyO3/maturin/pull/1099)
 * Change readme and license paths in `pyproject.toml` to be relative to `pyproject.toml` in [#1100](https://github.com/PyO3/maturin/pull/1100)
   It's technically a **breaking change**, but previously it doesn't work properly.
+* Add python source files specified in pyproject.toml to sdist in [#1102](https://github.com/PyO3/maturin/pull/1102)
 
 ## [0.13.2] - 2022-08-14
 

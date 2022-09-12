@@ -202,7 +202,7 @@ fn add_crate_to_source_distribution(
                 PathBuf::from("pyproject.toml"),
                 pyproject_toml_path.to_path_buf(),
             ));
-            // Add readme and license files
+            // Add readme, license and python source files
             if let Some(project) = pyproject.project.as_ref() {
                 if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref()
                 {
@@ -214,6 +214,13 @@ fn add_crate_to_source_distribution(
                 }) = project.license.as_ref()
                 {
                     target_source.push((PathBuf::from(license), pyproject_dir.join(license)));
+                }
+                if let Some(python_source) = pyproject.python_source() {
+                    for entry in ignore::Walk::new(pyproject_dir.join(python_source)) {
+                        let path = entry?.into_path();
+                        let relative_path = path.strip_prefix(&pyproject_dir)?;
+                        target_source.push((relative_path.to_path_buf(), path));
+                    }
                 }
             }
         } else {

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * auditwheel: find dylibs in Cargo target directory in [#1092](https://github.com/PyO3/maturin/pull/1092)
 * Add library search paths in Cargo target directory to rpath in editable mode on Linux in [#1094](https://github.com/PyO3/maturin/pull/1094)
 * Remove default manifest path for `maturin sdist` command in [#1097](https://github.com/PyO3/maturin/pull/1097)
+* Fix sdist when `pyproject.toml` isn't in the same dir of `Cargo.toml` in [#1099](https://github.com/PyO3/maturin/pull/1099)
 
 ## [0.13.2] - 2022-08-14
 

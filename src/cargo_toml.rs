@@ -184,6 +184,7 @@ pub struct RemainingCoreMetadata {
 mod test {
     use super::*;
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_metadata_from_cargo_toml() {

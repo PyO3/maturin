@@ -1,5 +1,5 @@
 use crate::module_writer::{add_data, ModuleWriter};
-use crate::{Metadata21, SDistWriter};
+use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -20,6 +20,7 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
+    local_deps_folder: String,
     root_crate: bool,
 ) -> Result<String> {
     let text = fs::read_to_string(&manifest_path).context(format!(
@@ -63,7 +64,7 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, dep_name))
+                    toml_edit::value(format!("{}/{}", local_deps_folder, dep_name))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     toml_edit::value(format!("../{}", dep_name))
@@ -121,12 +122,14 @@ fn rewrite_cargo_toml(
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
 fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
+    pyproject_toml_path: impl AsRef<Path>,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
+    let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
         .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path)
@@ -154,18 +157,29 @@ fn add_crate_to_source_distribution(
         .collect();
 
     let manifest_dir = manifest_path.parent().unwrap();
+    let abs_manifest_dir = manifest_dir.canonicalize()?;
+    let pyproject_dir = pyproject_toml_path.parent().unwrap().canonicalize()?;
+    let cargo_toml_in_subdir = root_crate
+        && abs_manifest_dir != pyproject_dir
+        && abs_manifest_dir.starts_with(&pyproject_dir);
 
-    let target_source: Vec<(PathBuf, PathBuf)> = file_list
+    let mut target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
         .map(|relative_to_manifests| {
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
-            (relative_to_manifests.to_path_buf(), relative_to_cwd)
+            if root_crate && cargo_toml_in_subdir {
+                (relative_to_cwd.clone(), relative_to_cwd)
+            } else {
+                (relative_to_manifests.to_path_buf(), relative_to_cwd)
+            }
         })
         // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
             // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
             // and https://github.com/PyO3/maturin/issues/449
-            if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+            if target == Path::new("Cargo.toml.orig")
+                || (root_crate && target.file_name() == Some("Cargo.toml".as_ref()))
+            {
                 false
             } else {
                 source.exists()
@@ -178,20 +192,46 @@ fn add_crate_to_source_distribution(
             .iter()
             .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
-        bail!(
-            "pyproject.toml was not included by `cargo package`. \
-                 Please make sure pyproject.toml is not excluded or build without `--sdist`"
-        )
+        // Add pyproject.toml to the source distribution
+        // if Cargo.toml is in subdirectory of pyproject.toml directory
+        if cargo_toml_in_subdir {
+            target_source.push((
+                PathBuf::from("pyproject.toml"),
+                pyproject_toml_path.to_path_buf(),
+            ));
+        } else {
+            bail!(
+                "pyproject.toml was not included by `cargo package`. \
+                     Please make sure pyproject.toml is not excluded or build without `--sdist`"
+            )
+        }
     }
 
-    let rewritten_cargo_toml = rewrite_cargo_toml(&manifest_path, known_path_deps, root_crate)?;
+    let local_deps_folder = if cargo_toml_in_subdir {
+        let level = abs_manifest_dir
+            .strip_prefix(pyproject_dir)?
+            .components()
+            .count();
+        format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
+    } else {
+        LOCAL_DEPENDENCIES_FOLDER.to_string()
+    };
+    let rewritten_cargo_toml = rewrite_cargo_toml(
+        &manifest_path,
+        known_path_deps,
+        local_deps_folder,
+        root_crate,
+    )?;
 
     let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
-    writer.add_bytes(
-        prefix.join(manifest_path.file_name().unwrap()),
-        rewritten_cargo_toml.as_bytes(),
-    )?;
+
+    let cargo_toml = if cargo_toml_in_subdir {
+        prefix.join(manifest_path)
+    } else {
+        prefix.join(manifest_path.file_name().unwrap())
+    };
+    writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
     for (target, source) in target_source {
         writer.add_file(prefix.join(target), source)?;
     }
@@ -238,17 +278,15 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
 /// and in
 /// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
 pub fn source_distribution(
-    wheel_dir: impl AsRef<Path>,
-    metadata21: &Metadata21,
-    manifest_path: impl AsRef<Path>,
-    cargo_metadata: &Metadata,
-    sdist_include: Option<&Vec<String>>,
-    include_cargo_lock: bool,
-    data: Option<&Path>,
+    build_context: &BuildContext,
+    pyproject: &PyProjectToml,
 ) -> Result<PathBuf> {
-    let known_path_deps = find_path_deps(cargo_metadata)?;
+    let metadata21 = &build_context.metadata21;
+    let manifest_path = &build_context.manifest_path;
 
-    let mut writer = SDistWriter::new(wheel_dir, metadata21)?;
+    let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+
+    let mut writer = SDistWriter::new(&build_context.out, metadata21)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
         &metadata21.get_distribution_escaped(),
@@ -259,6 +297,7 @@ pub fn source_distribution(
     for (name, path_dep) in known_path_deps.iter() {
         add_crate_to_source_distribution(
             &mut writer,
+            &build_context.pyproject_toml_path,
             &path_dep,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
@@ -274,20 +313,23 @@ pub fn source_distribution(
     // Add the main crate
     add_crate_to_source_distribution(
         &mut writer,
+        &build_context.pyproject_toml_path,
         &manifest_path,
         &root_dir,
         &known_path_deps,
         true,
     )?;
 
-    let manifest_dir = manifest_path.as_ref().parent().unwrap();
+    let manifest_dir = manifest_path.parent().unwrap();
+    let include_cargo_lock =
+        build_context.cargo_options.locked || build_context.cargo_options.frozen;
     if include_cargo_lock {
         let cargo_lock_path = manifest_dir.join("Cargo.lock");
         let target = root_dir.join("Cargo.lock");
         writer.add_file(&target, &cargo_lock_path)?;
     }
 
-    if let Some(include_targets) = sdist_include {
+    if let Some(include_targets) = pyproject.sdist_include() {
         for pattern in include_targets {
             println!("📦 Including files matching \"{}\"", pattern);
             for source in glob::glob(&manifest_dir.join(pattern).to_string_lossy())
@@ -305,7 +347,7 @@ pub fn source_distribution(
         metadata21.to_file_contents()?.as_bytes(),
     )?;
 
-    add_data(&mut writer, data)?;
+    add_data(&mut writer, build_context.project_layout.data.as_deref())?;
     let source_distribution_path = writer.finish()?;
 
     println!(

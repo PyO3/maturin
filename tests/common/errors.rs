@@ -2,6 +2,7 @@ use anyhow::format_err;
 use anyhow::{bail, Result};
 use clap::Parser;
 use maturin::BuildOptions;
+use pretty_assertions::assert_eq;
 
 pub fn abi3_without_version() -> Result<()> {
     // The first argument is ignored by clap

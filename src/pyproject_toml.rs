@@ -193,6 +193,7 @@ impl PyProjectToml {
 mod tests {
     use crate::PyProjectToml;
     use fs_err as fs;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
     use tempfile::TempDir;
 

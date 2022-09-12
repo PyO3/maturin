@@ -241,6 +241,7 @@ suppress_build_script_link_lines=false"#,
 #[cfg(test)]
 mod test {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_load_sysconfig() {

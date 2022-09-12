@@ -2,7 +2,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use flate2::read::GzDecoder;
 use maturin::{BuildOptions, CargoOptions};
-use std::collections::HashSet;
+use pretty_assertions::assert_eq;
+use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use tar::Archive;
@@ -139,14 +140,14 @@ pub fn test_source_distribution(
     let tar_gz = fs_err::File::open(path)?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
-    let mut files = HashSet::new();
+    let mut files = BTreeSet::new();
     for entry in archive.entries()? {
         let entry = entry?;
         files.insert(format!("{}", entry.path()?.display()));
     }
     assert_eq!(
         files,
-        HashSet::from_iter(expected_files.into_iter().map(ToString::to_string))
+        BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string))
     );
     Ok(())
 }

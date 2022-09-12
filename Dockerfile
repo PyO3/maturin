@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/root/.cargo/git \
     mkdir /maturin/src && \
     touch  /maturin/src/lib.rs && \
     echo 'fn main() { println!("Dummy") }' > /maturin/src/main.rs && \
-    cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release -- -C link-arg=-s
+    cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s
 
 ADD . /maturin/
 

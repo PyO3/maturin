@@ -448,9 +448,9 @@ dependencies = [
 
 [[package]]
 name = "configparser"
-version = "3.0.1"
+version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65cbde0d4b888436a51954624cafd198aee478d00cf5db866c3519a8986ecb18"
+checksum = "5458d9d1a587efaf5091602c59d299696a3877a439c8f6d461a2d3cce11df87a"
 
 [[package]]
 name = "console"
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "0.13.3-beta.4"
+version = "0.13.3-beta.5"
 dependencies = [
  "anyhow",
  "base64",

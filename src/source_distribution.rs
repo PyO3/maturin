@@ -123,7 +123,6 @@ fn rewrite_cargo_toml(
 fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     pyproject_toml_path: impl AsRef<Path>,
-    pyproject: &PyProjectToml,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
@@ -202,27 +201,6 @@ fn add_crate_to_source_distribution(
                 PathBuf::from("pyproject.toml"),
                 pyproject_toml_path.to_path_buf(),
             ));
-            // Add readme, license and python source files
-            if let Some(project) = pyproject.project.as_ref() {
-                if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref()
-                {
-                    target_source.push((PathBuf::from(readme), pyproject_dir.join(readme)));
-                }
-                if let Some(pyproject_toml::License {
-                    file: Some(license),
-                    text: None,
-                }) = project.license.as_ref()
-                {
-                    target_source.push((PathBuf::from(license), pyproject_dir.join(license)));
-                }
-                if let Some(python_source) = pyproject.python_source() {
-                    for entry in ignore::Walk::new(pyproject_dir.join(python_source)) {
-                        let path = entry?.into_path();
-                        let relative_path = path.strip_prefix(&pyproject_dir)?;
-                        target_source.push((relative_path.to_path_buf(), path));
-                    }
-                }
-            }
         } else {
             bail!(
                 "pyproject.toml was not included by `cargo package`. \
@@ -323,7 +301,6 @@ pub fn source_distribution(
         add_crate_to_source_distribution(
             &mut writer,
             &pyproject_toml_path,
-            pyproject,
             &path_dep,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
@@ -340,7 +317,6 @@ pub fn source_distribution(
     add_crate_to_source_distribution(
         &mut writer,
         &pyproject_toml_path,
-        pyproject,
         &manifest_path,
         &root_dir,
         &known_path_deps,
@@ -356,15 +332,44 @@ pub fn source_distribution(
         writer.add_file(&target, &cargo_lock_path)?;
     }
 
+    // Add readme, license and python source files
+    let pyproject_dir = pyproject_toml_path.parent().unwrap();
+    if let Some(project) = pyproject.project.as_ref() {
+        if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
+            writer.add_file(root_dir.join(readme), pyproject_dir.join(readme))?;
+        }
+        if let Some(pyproject_toml::License {
+            file: Some(license),
+            text: None,
+        }) = project.license.as_ref()
+        {
+            writer.add_file(root_dir.join(license), pyproject_dir.join(license))?;
+        }
+        if let Some(python_source) = pyproject.python_source() {
+            for entry in ignore::Walk::new(pyproject_dir.join(python_source)) {
+                let source = entry?.into_path();
+                let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
+                if source.is_dir() {
+                    writer.add_directory(target)?;
+                } else {
+                    writer.add_file(target, &source)?;
+                }
+            }
+        }
+    }
     if let Some(include_targets) = pyproject.sdist_include() {
         for pattern in include_targets {
             println!("📦 Including files matching \"{}\"", pattern);
-            for source in glob::glob(&manifest_dir.join(pattern).to_string_lossy())
+            for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
                 .expect("No files found for pattern")
                 .filter_map(Result::ok)
             {
-                let target = root_dir.join(&source.strip_prefix(manifest_dir)?);
-                writer.add_file(target, source)?;
+                let target = root_dir.join(&source.strip_prefix(pyproject_dir)?);
+                if source.is_dir() {
+                    writer.add_directory(target)?;
+                } else {
+                    writer.add_file(target, source)?;
+                }
             }
         }
     }

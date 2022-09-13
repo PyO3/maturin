@@ -15,9 +15,9 @@ use tar::Archive;
 #[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
     use anyhow::bail;
+    use fs_err as fs;
     use fs_err::File;
     use goblin::elf::Elf;
-    use std::fs;
     use std::io::ErrorKind;
     use std::io::Read;
     use std::process::Command;

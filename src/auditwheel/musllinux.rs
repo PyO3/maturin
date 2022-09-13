@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
+use fs_err as fs;
 use goblin::elf::Elf;
 use regex::Regex;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 

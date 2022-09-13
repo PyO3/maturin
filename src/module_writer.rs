@@ -274,7 +274,7 @@ impl WheelWriter {
         metadata21: &Metadata21,
     ) -> Result<()> {
         if let Some(python_module) = &project_layout.python_module {
-            let absolute_path = python_module.canonicalize()?;
+            let absolute_path = fs::canonicalize(python_module)?;
             if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
                 let name = metadata21.get_distribution_escaped();
                 self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;

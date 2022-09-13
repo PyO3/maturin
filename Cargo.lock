@@ -1181,9 +1181,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lddtree"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92d2d704bf2a5f0ab56f1c206472730f5accf1337228c1dd9380b98a5270d409"
+checksum = "191a3a89089ae35c8e04faf2ca9d2aef24bb0d3055181e0381d2cb82c03ec294"
 dependencies = [
  "fs-err",
  "glob",

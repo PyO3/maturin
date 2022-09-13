@@ -91,8 +91,7 @@ pub fn create_virtualenv(
         .unwrap()
         .to_string();
 
-    let venv_dir = PathBuf::from("test-crates")
-        .canonicalize()?
+    let venv_dir = fs::canonicalize(PathBuf::from("test-crates"))?
         .join("venvs")
         .join(format!("{}-{}", test_name, venv_suffix));
     let target = Target::from_target_triple(None)?;

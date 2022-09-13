@@ -2,6 +2,7 @@ use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
 use crate::{CargoToml, Metadata21, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
+use fs_err as fs;
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -164,7 +165,7 @@ impl ProjectResolver {
         // use command line argument if specified
         if let Some(path) = cargo_manifest_path {
             let workspace_root = Self::resolve_cargo_metadata(&path, cargo_options)?.workspace_root;
-            for parent in path.canonicalize()?.ancestors().skip(1) {
+            for parent in fs::canonicalize(&path)?.ancestors().skip(1) {
                 if !parent.starts_with(&workspace_root) {
                     break;
                 }
@@ -173,25 +174,23 @@ impl ProjectResolver {
                     // Don't return canonicalized manifest path
                     // cargo doesn't handle them well.
                     // See https://github.com/rust-lang/cargo/issues/9770
-                    return Ok((path.clone(), pyproject_file));
+                    return Ok((path, pyproject_file));
                 }
             }
             return Ok((path.clone(), path.parent().unwrap().join(PYPROJECT_TOML)));
         }
         // check `manifest-path` option in pyproject.toml
-        let current_dir = env::current_dir()
-            .context("Failed to detect current directory ಠ_ಠ")?
-            .canonicalize()?;
+        let current_dir = fs::canonicalize(
+            env::current_dir().context("Failed to detect current directory ಠ_ಠ")?,
+        )?;
         let pyproject_file = current_dir.join(PYPROJECT_TOML);
         if pyproject_file.is_file() {
             let pyproject =
                 PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
             if let Some(path) = pyproject.manifest_path() {
                 // pyproject.toml must be placed at top directory
-                let manifest_dir = path
-                    .parent()
-                    .context("missing parent directory")?
-                    .canonicalize()?;
+                let manifest_dir =
+                    fs::canonicalize(path.parent().context("missing parent directory")?)?;
                 if !manifest_dir.starts_with(&current_dir) {
                     bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
                 }

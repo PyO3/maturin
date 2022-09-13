@@ -156,7 +156,7 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let abs_manifest_path = manifest_path.canonicalize()?;
+    let abs_manifest_path = fs::canonicalize(manifest_path)?;
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     let cargo_toml_in_subdir = root_crate
@@ -285,7 +285,7 @@ pub fn source_distribution(
 ) -> Result<PathBuf> {
     let metadata21 = &build_context.metadata21;
     let manifest_path = &build_context.manifest_path;
-    let pyproject_toml_path = build_context.pyproject_toml_path.canonicalize()?;
+    let pyproject_toml_path = fs::canonicalize(&build_context.pyproject_toml_path)?;
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
 

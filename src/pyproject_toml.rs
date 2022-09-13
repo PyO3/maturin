@@ -1,8 +1,8 @@
 use crate::PlatformTag;
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, Result};
+use fs_err as fs;
 use pyproject_toml::PyProjectToml as ProjectToml;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The `[tool]` section of a pyproject.toml
@@ -80,10 +80,7 @@ impl PyProjectToml {
     /// source distributions
     pub fn new(pyproject_file: impl AsRef<Path>) -> Result<PyProjectToml> {
         let path = pyproject_file.as_ref();
-        let contents = fs::read_to_string(&path).context(format!(
-            "Couldn't find pyproject.toml at {}",
-            path.display()
-        ))?;
+        let contents = fs::read_to_string(&path)?;
         let pyproject: PyProjectToml = toml_edit::easy::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
         Ok(pyproject)

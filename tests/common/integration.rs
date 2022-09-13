@@ -45,12 +45,14 @@ pub fn test_integration(
         cli.push(bindings);
     }
 
-    if zig && (env::var("GITHUB_ACTIONS").is_ok() || Zig::find_zig().is_ok()) {
-        cli.push("--zig")
+    let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || Zig::find_zig().is_ok()) {
+        cli.push("--zig");
+        true
     } else {
         cli.push("--compatibility");
         cli.push("linux");
-    }
+        false
+    };
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
@@ -73,7 +75,7 @@ pub fn test_integration(
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
-        if zig && build_context.target.is_linux() && !build_context.target.is_musl_target() {
+        if test_zig && build_context.target.is_linux() && !build_context.target.is_musl_target() {
             assert!(filename
                 .to_string_lossy()
                 .ends_with("manylinux_2_12_x86_64.manylinux2010_x86_64.whl"))

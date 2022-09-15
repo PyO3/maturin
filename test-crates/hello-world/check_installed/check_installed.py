@@ -7,7 +7,7 @@ def main():
         raise Exception(output)
 
     output = check_output(["foo"]).decode("utf-8").strip()
-    if not output == "Hello, world!":
+    if not output == "🦀 Hello, world! 🦀":
         raise Exception(output)
     print("SUCCESS")
 

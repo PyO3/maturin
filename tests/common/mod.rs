@@ -76,7 +76,7 @@ pub fn handle_result<T>(result: Result<T>) -> T {
     match result {
         Err(e) => {
             for cause in e.chain().collect::<Vec<_>>().iter().rev() {
-                eprintln!("{}", cause);
+                eprintln!("Cause: {}", cause);
             }
             panic!("{}", e);
         }

@@ -3,7 +3,8 @@ use crate::auditwheel::{PlatformTag, Policy};
 use crate::build_options::CargoOptions;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
-    add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part, WheelWriter,
+    add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
+    write_wasm_launcher, WheelWriter,
 };
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
@@ -14,6 +15,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
 use lddtree::Library;
+use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
@@ -72,6 +74,58 @@ impl Display for BridgeModel {
             BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
         }
     }
+}
+
+/// Insert wasm launcher scripts as entrypoints and the wasmtime dependency
+fn bin_wasi_helper(
+    artifacts_and_files: &[(&BuildArtifact, String)],
+    mut metadata21: Metadata21,
+) -> Result<Metadata21> {
+    // escaped can contain [\w\d.], but i don't know how we'd handle dots correctly here
+    if metadata21.get_distribution_escaped().contains('.') {
+        bail!(
+            "Can't build wasm wheel if there is a dot in the name ('{}')",
+            metadata21.get_distribution_escaped()
+        )
+    }
+    if !metadata21.entry_points.is_empty() {
+        bail!("You can't define entrypoints yourself for a binary project");
+    }
+
+    let mut console_scripts = HashMap::new();
+    for (_, bin_name) in artifacts_and_files {
+        let base_name = bin_name
+            .strip_suffix(".wasm")
+            .context("No .wasm suffix in wasi binary")?;
+        console_scripts.insert(
+            base_name.to_string(),
+            format!(
+                "{}.{}:main",
+                metadata21.get_distribution_escaped(),
+                base_name.replace("-", "_")
+            ),
+        );
+    }
+
+    metadata21
+        .entry_points
+        .insert("console_scripts".to_string(), console_scripts);
+
+    // A real pip version specification parser would be better, but bearing this we use this regex
+    // which tries to find the name wasmtime and then any specification
+    let wasmtime_re = Regex::new("^wasmtime[^a-zA-Z.-_]").unwrap();
+    if !metadata21
+        .requires_dist
+        .iter()
+        .any(|requirement| wasmtime_re.is_match(requirement))
+    {
+        // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
+        metadata21
+            .requires_dist
+            .push("wasmtime>=0.40,<0.41".to_string());
+    }
+
+    Ok(metadata21)
 }
 
 /// Contains all the metadata required to build the crate
@@ -653,12 +707,37 @@ impl BuildContext {
         };
 
         if !self.metadata21.scripts.is_empty() {
-            bail!("Defining entrypoints and working with a binary doesn't mix well");
+            bail!("Defining scripts and working with a binary doesn't mix well");
         }
 
-        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
+        let mut artifacts_and_files = Vec::new();
+        for artifact in artifacts {
+            // I wouldn't know of any case where this would be the wrong (and neither do
+            // I know a better alternative)
+            let bin_name = artifact
+                .path
+                .file_name()
+                .context("Couldn't get the filename from the binary produced by cargo")?
+                .to_str()
+                .context("binary produced by cargo has non-utf8 filename")?
+                .to_string();
+            artifacts_and_files.push((artifact, bin_name))
+        }
+
+        let metadata21 = if self.target.is_wasi() {
+            bin_wasi_helper(&artifacts_and_files, self.metadata21.clone())?
+        } else {
+            self.metadata21.clone()
+        };
+
+        let mut writer = WheelWriter::new(&tag, &self.out, &metadata21, &tags)?;
 
         if let Some(python_module) = &self.project_layout.python_module {
+            if self.target.is_wasi() {
+                // TODO: Can we have python code and the wasm launchers coexisting
+                // without clashes?
+                bail!("Sorry, adding python code to a wasm binary is currently not supported")
+            }
             if !self.editable {
                 write_python_part(&mut writer, python_module)
                     .context("Failed to add the python module to the package")?;
@@ -666,15 +745,12 @@ impl BuildContext {
         }
 
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());
-        for artifact in artifacts {
-            artifacts_ref.push(artifact);
-            // I wouldn't know of any case where this would be the wrong (and neither do
-            // I know a better alternative)
-            let bin_name = artifact
-                .path
-                .file_name()
-                .expect("Couldn't get the filename from the binary produced by cargo");
+        for (artifact, bin_name) in &artifacts_and_files {
+            artifacts_ref.push(*artifact);
             write_bin(&mut writer, &artifact.path, &self.metadata21, bin_name)?;
+            if self.target.is_wasi() {
+                write_wasm_launcher(&mut writer, &self.metadata21, bin_name)?;
+            }
         }
         self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;
 

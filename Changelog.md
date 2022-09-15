@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2022-09-15
+
 * Allow user to override default Emscripten settings in [#1059](https://github.com/PyO3/maturin/pull/1059)
 * Enable `--crate-type cdylib` on Rust 1.64.0 in [#1060](https://github.com/PyO3/maturin/pull/1060)
 * Update MSRV to 1.59.0 in [#1071](https://github.com/PyO3/maturin/pull/1071)
@@ -695,7 +697,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.3...HEAD
+[0.13.2]: https://github.com/pyo3/maturin/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/pyo3/maturin/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/pyo3/maturin/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/pyo3/maturin/compare/v0.12.20...v0.13.0

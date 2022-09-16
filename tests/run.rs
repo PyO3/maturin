@@ -280,9 +280,16 @@ fn integration_wasm_hello_world() {
     ));
 
     // Make sure we're actually running wasm
-    assert!(
-        Path::new("test-crates/venvs/hello-world-py3-wasm32-wasi/bin/hello-world.wasm").is_file()
-    )
+    assert!(Path::new("test-crates")
+        .join("venvs")
+        .join("hello-world-py3-wasm32-wasi")
+        .join(if cfg!(target_os = "windows") {
+            "Scripts"
+        } else {
+            "bin"
+        })
+        .join("hello-world.wasm")
+        .is_file())
 }
 
 #[test]

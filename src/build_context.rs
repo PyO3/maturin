@@ -102,7 +102,7 @@ fn bin_wasi_helper(
             format!(
                 "{}.{}:main",
                 metadata21.get_distribution_escaped(),
-                base_name.replace("-", "_")
+                base_name.replace('-', "_")
             ),
         );
     }

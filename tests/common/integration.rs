@@ -46,7 +46,7 @@ pub fn test_integration(
         cli.push(bindings);
     }
 
-    if let Some(ref target) = target {
+    if let Some(target) = target {
         cli.push("--target");
         cli.push(target)
     }

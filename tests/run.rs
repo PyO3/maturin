@@ -256,6 +256,19 @@ fn integration_with_data() {
 }
 
 #[test]
+// Sourced from https://pypi.org/project/wasmtime/0.40.0/#files
+// update with wasmtime updates
+#[cfg(any(
+    all(target_os = "windows", target_arch = "x86_64"),
+    all(
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    ),
+    all(
+        target_os = "max",
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    ),
+))]
 fn integration_wasm_hello_world() {
     handle_result(integration::test_integration(
         "test-crates/hello-world",

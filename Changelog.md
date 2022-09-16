@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Fix `Cargo.toml` in new project template in [#1109](https://github.com/PyO3/maturin/pull/1109)
+* Fix `maturin develop` on Windows when using Python installed from msys2 in [#1112](https://github.com/PyO3/maturin/pull/1112)
 
 ## [0.13.3] - 2022-09-15
 

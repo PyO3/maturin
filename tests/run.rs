@@ -262,7 +262,8 @@ fn integration_with_data() {
     all(target_os = "windows", target_arch = "x86_64"),
     all(
         target_os = "linux",
-        any(target_arch = "x86_64", target_arch = "aarch64")
+        any(target_arch = "x86_64", target_arch = "aarch64"),
+        target_env = "gnu",
     ),
     all(
         target_os = "macos",

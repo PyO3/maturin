@@ -566,25 +566,32 @@ impl Target {
 
     /// Returns the path to the python executable inside a venv
     pub fn get_venv_python(&self, venv_base: impl AsRef<Path>) -> PathBuf {
-        if self.is_windows() {
-            let path = venv_base.as_ref().join("Scripts").join("python.exe");
-            if path.exists() {
-                path
-            } else {
-                // for conda environment
-                venv_base.as_ref().join("python.exe")
-            }
+        let python = if self.is_windows() {
+            "python.exe"
         } else {
-            venv_base.as_ref().join("bin").join("python")
-        }
+            "python"
+        };
+        self.get_venv_bin_dir(venv_base).join(python)
     }
 
     /// Returns the directory where the binaries are stored inside a venv
     pub fn get_venv_bin_dir(&self, venv_base: impl AsRef<Path>) -> PathBuf {
+        let venv = venv_base.as_ref();
         if self.is_windows() {
-            venv_base.as_ref().join("Scripts")
+            let bin_dir = venv.join("Scripts");
+            if bin_dir.exists() {
+                return bin_dir;
+            }
+            // Python innstalled via msys2 on Windows might produce a POSIX-like venv
+            // See https://github.com/PyO3/maturin/issues/1108
+            let bin_dir = venv.join("bin");
+            if bin_dir.exists() {
+                return bin_dir;
+            }
+            // for conda environment
+            venv.to_path_buf()
         } else {
-            venv_base.as_ref().join("bin")
+            venv.join("bin")
         }
     }
 

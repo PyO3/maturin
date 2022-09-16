@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix `Cargo.toml` in new project template in [#1109](https://github.com/PyO3/maturin/pull/1109)
+
 ## [0.13.3] - 2022-09-15
 
 * Allow user to override default Emscripten settings in [#1059](https://github.com/PyO3/maturin/pull/1059)

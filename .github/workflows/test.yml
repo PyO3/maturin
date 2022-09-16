@@ -148,6 +148,14 @@ jobs:
           rustup target add x86_64-unknown-linux-gnu
           export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
           cargo run -- build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
+      - name: test maturin new
+        shell: bash
+        run: |
+          set -ex
+          cargo run new -b pyo3 test-crates/pyo3-new
+          cargo run build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
+          cargo run new --mixed -b pyo3 test-crates/pyo3-new-mixed
+          cargo run build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
 
   test-emscripten:
     name: Test Emscripten

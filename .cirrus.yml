@@ -5,6 +5,7 @@ build_and_test: &BUILD_AND_TEST
   setup_script:
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --default-toolchain stable
+    - rustup target add wasm32-wasi
     - python3 -m pip install --upgrade cffi virtualenv
   build_script:
     - cargo build

@@ -179,9 +179,7 @@ fn add_crate_to_source_distribution(
         .filter(|(target, source)| {
             // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
             // and https://github.com/PyO3/maturin/issues/449
-            if target == Path::new("Cargo.toml.orig")
-                || (root_crate && target.file_name() == Some("Cargo.toml".as_ref()))
-            {
+            if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
                 false
             } else {
                 source.exists()

@@ -141,14 +141,17 @@ pub fn test_source_distribution(
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
     let mut files = BTreeSet::new();
+    let mut file_count = 0;
     for entry in archive.entries()? {
         let entry = entry?;
         files.insert(format!("{}", entry.path()?.display()));
+        file_count += 1;
     }
     assert_eq!(
         files,
         BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string))
     );
+    assert_eq!(file_count, files.len(), "duplicated files found in sdist");
     Ok(())
 }
 

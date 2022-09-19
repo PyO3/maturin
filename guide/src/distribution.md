@@ -15,7 +15,7 @@ The source distribution will contain the same files as `cargo package`. To only 
 
 You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and maturin.
 
-You can use the options `compatibility`, `skip-auditwheel`, `bindings`, `strip`, `cargo-extra-args` and `rustc-extra-args` under `[tool.maturin]` the same way you would when running maturin directly.
+You can use the options `compatibility`, `skip-auditwheel`, `bindings`, `strip` and common Cargo build options such as `features` under `[tool.maturin]` the same way you would when running maturin directly.
 The `bindings` key is required for cffi and bin projects as those can't be automatically detected. Currently, all builds are in release mode (see [this thread](https://discuss.python.org/t/pep-517-debug-vs-release-builds/1924) for details).
 
 For a non-manylinux build with cffi bindings you could use the following:

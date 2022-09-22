@@ -127,7 +127,7 @@ You can then import your Rust module inside your Python source as follows:
 from my_project import _my_project
 ```
 
-IDEs can then recognize the `_my_project` module as seperate from your main Python source module. This allows for code completion of the types inside your Rust Python module for certain IDEs.
+IDEs can then recognize the `_my_project` module as separate from your main Python source module. This allows for code completion of the types inside your Rust Python module for certain IDEs.
 
 
 ## Adding Python type information

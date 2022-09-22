@@ -76,9 +76,13 @@ pub fn test_integration(
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
         if test_zig && build_context.target.is_linux() && !build_context.target.is_musl_target() {
-            assert!(filename
-                .to_string_lossy()
-                .ends_with("manylinux_2_12_x86_64.manylinux2010_x86_64.whl"))
+            let rustc_ver = rustc_version::version()?;
+            let file_suffix = if rustc_ver >= semver::Version::new(1, 64, 0) {
+                "manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            } else {
+                "manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            };
+            assert!(filename.to_string_lossy().ends_with(file_suffix))
         }
         let venv_suffix = if supported_version == "py3" {
             "py3".to_string()

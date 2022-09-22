@@ -70,7 +70,7 @@ from my_project import my_project
 ```
 
 You can modify `__init__.py` yourself (see above) if you would like to import
-functions Rust functions from a higher-level namespace.
+Rust functions from a higher-level namespace.
 
 ### Alternate Python source directory (src layout)
 
@@ -111,6 +111,24 @@ my-rust-and-python-project
 └── src
     └── lib.rs
 ```
+#### Import Rust as a submodule of your project
+
+If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused. You might also want to discourage end users from using the Rust functions directly by giving it a different name, say '\_my_project'. This can be done by adding `name = <package name>.<rust pymodule name>` to the `[package.metadata.maturin]` in your `Cargo.toml`. For example:
+
+```toml
+[package.metadata.maturin]
+python-source = "python"
+name = "my_project._my_project"
+```
+
+You can then import your Rust module inside your Python source as follows:
+
+```python
+from my_project import _my_project
+```
+
+IDEs can then recognize the `_my_project` module as seperate from your main Python source module. This allows for code completion of the types inside your Rust Python module for certain IDEs.
+
 
 ## Adding Python type information
 
@@ -166,4 +184,4 @@ The data folder may have the following subfolder:
  * `purelib`: This also exists, but seems to be barely used
  * `platlib`: This also exists, but seems to be barely used
 
-If you add a symlink in the data directory, we'll include the actual file so you more flexibility 
+If you add a symlink in the data directory, we'll include the actual file so you have more flexibility.

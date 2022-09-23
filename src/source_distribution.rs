@@ -41,17 +41,25 @@ fn rewrite_cargo_toml(
         if let Some(table) = data.get_mut(*dep_category).and_then(|x| x.as_table_mut()) {
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
-                // There should either be no value for path, or it should be a string
-                if table.get(&dep_name).and_then(|x| x.get("path")).is_none() {
-                    continue;
-                }
-                if !table[&dep_name]["path"].is_str() {
-                    bail!(
-                        "In {}, {} {} has a path value that is not a string",
-                        manifest_path.as_ref().display(),
-                        dep_category,
-                        dep_name
-                    )
+                let workspace_inherit = table
+                    .get(&dep_name)
+                    .and_then(|x| x.get("workspace"))
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or_default();
+
+                if !workspace_inherit {
+                    // There should either be no value for path, or it should be a string
+                    if table.get(&dep_name).and_then(|x| x.get("path")).is_none() {
+                        continue;
+                    }
+                    if !table[&dep_name]["path"].is_str() {
+                        bail!(
+                            "In {}, {} {} has a path value that is not a string",
+                            manifest_path.as_ref().display(),
+                            dep_category,
+                            dep_name
+                        )
+                    }
                 }
                 if !known_path_deps.contains_key(&dep_name) {
                     bail!(
@@ -69,6 +77,10 @@ fn rewrite_cargo_toml(
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     toml_edit::value(format!("../{}", dep_name))
                 };
+                if workspace_inherit {
+                    // Remove workspace inheritance now that we converted it into a path dependency
+                    table[&dep_name].as_table_mut().unwrap().remove("workspace");
+                }
                 rewritten = true;
             }
         }

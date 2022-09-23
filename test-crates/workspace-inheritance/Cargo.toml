@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "generic_lib",
+  "python"
+]
+
+[workspace.dependencies]
+generic_lib = { path = "generic_lib" }

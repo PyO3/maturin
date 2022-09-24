@@ -1,28 +1,17 @@
 # x86_64 base
 FROM quay.io/pypa/manylinux2014_x86_64 as base-amd64
 # x86_64 builder
-FROM --platform=$BUILDPLATFORM quay.io/pypa/manylinux2014_x86_64 as builder-amd64
-ENV CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
+FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:x86_64-musl as builder-amd64
 
 # aarch64 base
 FROM quay.io/pypa/manylinux2014_aarch64 as base-arm64
 # aarch64 cross compile builder
-FROM --platform=$BUILDPLATFORM quay.io/pypa/manylinux2014_x86_64 as builder-arm64
-RUN yum makecache && yum install -y gcc-aarch64-linux-gnu gcc-c++-aarch64-linux-gnu glibc-headers
-ENV CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu \
-    CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-    CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-    CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
+FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:aarch64-musl as builder-arm64
 
 ARG TARGETARCH
 FROM builder-$TARGETARCH as builder
 
 ENV PATH /root/.cargo/bin:$PATH
-
-# Use an explicit version to actually install the version we require instead of using the cache
-# It would be even cooler to invalidate the cache depending on when the official rust image changes,
-# but I don't know how to do that
-RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.64.0 -y --target $CARGO_BUILD_TARGET
 
 # Compile dependencies only for build caching
 ADD Cargo.toml /maturin/Cargo.toml

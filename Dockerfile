@@ -1,11 +1,16 @@
-FROM quay.io/pypa/manylinux2010_x86_64 as builder
+FROM quay.io/pypa/manylinux2014_x86_64 as base-amd64
+
+FROM quay.io/pypa/manylinux2014_aarch64 as base-arm64
+
+ARG TARGETARCH
+FROM base-$TARGETARCH as builder
 
 ENV PATH /root/.cargo/bin:$PATH
 
 # Use an explicit version to actually install the version we require instead of using the cache
 # It would be even cooler to invalidate the cache depending on when the official rust image changes,
 # but I don't know how to do that
-RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.63.0 -y
+RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.64.0 -y
 
 # Compile dependencies only for build caching
 ADD Cargo.toml /maturin/Cargo.toml
@@ -29,7 +34,7 @@ RUN --mount=type=cache,target=/root/.cargo/git \
     cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s \
     && mv /maturin/target/release/maturin /usr/bin/maturin
 
-FROM quay.io/pypa/manylinux2010_x86_64
+FROM base-$TARGETARCH
 
 ENV PATH /root/.cargo/bin:$PATH
 # Add all supported python versions

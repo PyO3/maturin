@@ -1,16 +1,17 @@
+# x86_64 base
 FROM quay.io/pypa/manylinux2014_x86_64 as base-amd64
+# x86_64 builder
+FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:x86_64-musl as builder-amd64
 
+# aarch64 base
 FROM quay.io/pypa/manylinux2014_aarch64 as base-arm64
+# aarch64 cross compile builder
+FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:aarch64-musl as builder-arm64
 
 ARG TARGETARCH
-FROM base-$TARGETARCH as builder
+FROM builder-$TARGETARCH as builder
 
 ENV PATH /root/.cargo/bin:$PATH
-
-# Use an explicit version to actually install the version we require instead of using the cache
-# It would be even cooler to invalidate the cache depending on when the official rust image changes,
-# but I don't know how to do that
-RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.64.0 -y
 
 # Compile dependencies only for build caching
 ADD Cargo.toml /maturin/Cargo.toml
@@ -21,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cargo/git \
     mkdir /maturin/src && \
     touch  /maturin/src/lib.rs && \
     echo 'fn main() { println!("Dummy") }' > /maturin/src/main.rs && \
-    cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s
+    cargo rustc --target $CARGO_BUILD_TARGET --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s
 
 ADD . /maturin/
 
@@ -31,8 +32,8 @@ RUN touch /maturin/src/lib.rs /maturin/src/main.rs
 RUN --mount=type=cache,target=/root/.cargo/git \
     --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/maturin/target,sharing=locked \
-    cargo rustc --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s \
-    && mv /maturin/target/release/maturin /usr/bin/maturin
+    cargo rustc --target $CARGO_BUILD_TARGET --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s \
+    && mv /maturin/target/$CARGO_BUILD_TARGET/release/maturin /usr/bin/maturin
 
 FROM base-$TARGETARCH
 

@@ -250,5 +250,6 @@ name = "workspace-inheritance"
 version = "0.1.0"
 dependencies = [
  "generic_lib",
+ "libc",
  "pyo3",
 ]

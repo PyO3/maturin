@@ -5,4 +5,5 @@ members = [
 ]
 
 [workspace.dependencies]
+libc = { version = "0.2", features = ["std"] }
 generic_lib = { path = "generic_lib" }

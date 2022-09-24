@@ -11,3 +11,8 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
 generic_lib.workspace = true
+
+[dependencies.libc]
+workspace = true
+optional = true
+features = ["extra_traits"]

@@ -283,22 +283,20 @@ impl Metadata21 {
     pub fn from_cargo_toml(
         cargo_toml: &CargoToml,
         manifest_path: impl AsRef<Path>,
+        cargo_metadata: &cargo_metadata::Metadata,
     ) -> Result<Metadata21> {
-        let authors = cargo_toml
-            .package
-            .authors
-            .as_ref()
-            .map(|authors| authors.join(", "));
+        let package = cargo_metadata
+            .root_package()
+            .context("Expected cargo to return metadata with root_package")?;
+        let authors = package.authors.join(", ");
 
         let classifiers = cargo_toml.classifiers();
 
-        let author_email = authors.as_ref().and_then(|authors| {
-            if authors.contains('@') {
-                Some(authors.clone())
-            } else {
-                None
-            }
-        });
+        let author_email = if authors.contains('@') {
+            Some(authors.clone())
+        } else {
+            None
+        };
 
         let extra_metadata = cargo_toml.remaining_core_metadata();
 
@@ -306,9 +304,9 @@ impl Metadata21 {
         let mut description_content_type: Option<String> = None;
         // See https://packaging.python.org/specifications/core-metadata/#description
         // and https://doc.rust-lang.org/cargo/reference/manifest.html#the-readme-field
-        if cargo_toml.package.readme == Some("false".to_string()) {
+        if package.readme == Some("false".into()) {
             // > You can suppress this behavior by setting this field to false
-        } else if let Some(ref readme) = cargo_toml.package.readme {
+        } else if let Some(ref readme) = package.readme {
             let readme_path = manifest_path.as_ref().join(readme);
             description = Some(fs::read_to_string(&readme_path).context(format!(
                 "Failed to read Readme specified in Cargo.toml, which should be at {}",
@@ -345,9 +343,9 @@ impl Metadata21 {
                     name.clone()
                 }
             })
-            .unwrap_or_else(|| cargo_toml.package.name.clone());
+            .unwrap_or_else(|| package.name.clone());
         let mut project_url = extra_metadata.project_url.unwrap_or_default();
-        if let Some(repository) = cargo_toml.package.repository.as_ref() {
+        if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
 
@@ -356,21 +354,25 @@ impl Metadata21 {
 
             // Mapped from cargo metadata
             name,
-            version: cargo_toml.package.version.clone(),
-            summary: cargo_toml.package.description.clone(),
+            version: package.version.to_string(),
+            summary: package.description.clone(),
             description,
             description_content_type,
-            keywords: cargo_toml
-                .package
-                .keywords
-                .clone()
-                .map(|keywords| keywords.join(",")),
-            home_page: cargo_toml.package.homepage.clone(),
+            keywords: if package.keywords.is_empty() {
+                None
+            } else {
+                Some(package.keywords.join(","))
+            },
+            home_page: package.homepage.clone(),
             download_url: None,
             // Cargo.toml has no distinction between author and author email
-            author: authors,
+            author: if package.authors.is_empty() {
+                None
+            } else {
+                Some(authors)
+            },
             author_email,
-            license: cargo_toml.package.license.clone(),
+            license: package.license.clone(),
             license_files: Vec::new(),
 
             // Values provided through `[project.metadata.maturin]`
@@ -554,28 +556,41 @@ fn fold_header(text: &str) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+    use cargo_metadata::MetadataCommand;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use std::io::Write;
 
-    fn assert_metadata_from_cargo_toml(readme: &str, cargo_toml: &str, expected: &str) {
-        let mut readme_md = tempfile::NamedTempFile::new().unwrap();
+    fn assert_metadata_from_cargo_toml(
+        readme: &str,
+        cargo_toml: &str,
+        expected: &str,
+    ) -> Metadata21 {
+        let crate_dir = tempfile::tempdir().unwrap();
+        let crate_path = crate_dir.path();
+        let manifest_path = crate_path.join("Cargo.toml");
+        fs::create_dir(crate_path.join("src")).unwrap();
+        fs::write(crate_path.join("src/lib.rs"), "").unwrap();
+
+        let readme_path = crate_path.join("README.md");
+        fs::write(&readme_path, readme.as_bytes()).unwrap();
 
         let readme_path = if cfg!(windows) {
-            readme_md.path().to_str().unwrap().replace('\\', "/")
+            readme_path.to_str().unwrap().replace('\\', "/")
         } else {
-            readme_md.path().to_str().unwrap().to_string()
+            readme_path.to_str().unwrap().to_string()
         };
 
-        readme_md.write_all(readme.as_bytes()).unwrap();
-
         let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
+        fs::write(&manifest_path, &toml_with_path).unwrap();
 
         let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(&toml_with_path).unwrap();
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_path)
+            .exec()
+            .unwrap();
 
         let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml_struct, &readme_md.path().parent().unwrap())
-                .unwrap();
+            Metadata21::from_cargo_toml(&cargo_toml_struct, crate_path, &cargo_metadata).unwrap();
 
         let actual = metadata.to_file_contents().unwrap();
 
@@ -593,11 +608,15 @@ mod test {
                 && cargo_toml.contains("version = \"0.1.0\""),
             "cargo_toml name and version string do not match hardcoded values, test will fail",
         );
-        assert_eq!(
-            metadata.get_dist_info_dir(),
-            PathBuf::from("info_project-0.1.0.dist-info"),
-            "Dist info dir differed from expected"
-        );
+
+        if cargo_toml_struct.remaining_core_metadata().name.is_none() {
+            assert_eq!(
+                metadata.get_dist_info_dir(),
+                PathBuf::from("info_project-0.1.0.dist-info"),
+                "Dist info dir differed from expected"
+            );
+        }
+        metadata
     }
 
     #[test]
@@ -648,7 +667,7 @@ mod test {
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/plain; charset=UTF-8
+            Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
             Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/
 
             # Some test package
@@ -721,6 +740,13 @@ mod test {
 
     #[test]
     fn test_metadata_from_cargo_toml_name_override() {
+        let readme = indoc!(
+            r#"
+            Some test package
+            =================
+        "#
+        );
+
         let cargo_toml = indoc!(
             r#"
             [package]
@@ -729,6 +755,7 @@ mod test {
             version = "0.1.0"
             description = "A test project"
             homepage = "https://example.org"
+            readme = "REPLACE_README_PATH"
 
             [lib]
             crate-type = ["cdylib"]
@@ -754,21 +781,14 @@ mod test {
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
+            Description-Content-Type: text/x-rst
+
+            Some test package
+            =================
         "#
         );
 
-        let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(cargo_toml).unwrap();
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml_struct, "/not/exist/manifest/path").unwrap();
-        let actual = metadata.to_file_contents().unwrap();
-
-        assert_eq!(
-            actual.trim(),
-            expected.trim(),
-            "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
-            expected,
-            actual
-        );
+        let metadata = assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
 
         assert_eq!(
             metadata.get_dist_info_dir(),
@@ -804,7 +824,12 @@ mod test {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let mut metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir).unwrap();
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let mut metadata =
+            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -850,7 +875,12 @@ mod test {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let mut metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir).unwrap();
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let mut metadata =
+            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -866,9 +896,15 @@ mod test {
 
     #[test]
     fn test_implicit_readme() {
-        let cargo_toml_str = fs_err::read_to_string("test-crates/pyo3-mixed/Cargo.toml").unwrap();
+        let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
+        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let metadata = Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-mixed").unwrap();
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let metadata =
+            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
         assert!(metadata.description.unwrap().starts_with("# pyo3-mixed"));
         assert_eq!(
             metadata.description_content_type.unwrap(),
@@ -881,7 +917,12 @@ mod test {
         let manifest_dir = PathBuf::from("test-crates").join("license-test");
         let cargo_toml_str = fs_err::read_to_string(&manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
-        let mut metadata = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir).unwrap();
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let mut metadata =
+            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix `maturin develop` on Windows when using Python installed from msys2 in [#1112](https://github.com/PyO3/maturin/pull/1112)
 * Fix duplicated `Cargo.toml` of local dependencies in sdist in [#1114](https://github.com/PyO3/maturin/pull/1114)
 * Add support for Cargo workspace dependencies inheritance in [#1123](https://github.com/PyO3/maturin/pull/1123)
+* Add support for Cargo workspace metadata inheritance in [#1131](https://github.com/PyO3/maturin/pull/1131)
 
 ## [0.13.3] - 2022-09-15
 

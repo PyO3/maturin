@@ -16,20 +16,6 @@ pub(crate) struct CargoTomlLib {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct CargoTomlPackage {
-    // Those three fields are mandatory
-    // https://doc.rust-lang.org/cargo/reference/manifest.html#the-package-section
-    pub(crate) name: String,
-    pub(crate) version: String,
-    // All other fields are optional
-    pub(crate) authors: Option<Vec<String>>,
-    pub(crate) description: Option<String>,
-    pub(crate) documentation: Option<String>,
-    pub(crate) homepage: Option<String>,
-    pub(crate) repository: Option<String>,
-    pub(crate) readme: Option<String>,
-    pub(crate) keywords: Option<Vec<String>>,
-    pub(crate) categories: Option<Vec<String>>,
-    pub(crate) license: Option<String>,
     metadata: Option<CargoTomlMetadata>,
 }
 

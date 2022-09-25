@@ -9,6 +9,27 @@ use std::process::Command;
 use std::str;
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
+/// Inheritable workspace fields, see
+/// https://github.com/rust-lang/cargo/blob/13ae438cf079da58272edc71f4d4968043dbd27b/src/cargo/util/toml/mod.rs#L1140-L1158
+const WORKSPACE_INHERITABLE_FIELDS: &[&str] = &[
+    "version",
+    "authors",
+    "description",
+    "homepage",
+    "documentation",
+    "readme",
+    "keywords",
+    "categories",
+    "license",
+    "license-file",
+    "repository",
+    "publish",
+    "edition",
+    "badges",
+    "exclude",
+    "include",
+    "rust-version",
+];
 
 /// We need cargo to load the local dependencies from the location where we put them in the source
 /// distribution. Since there is no cargo-backed way to replace dependencies
@@ -44,7 +65,7 @@ fn rewrite_cargo_toml(
             let workspace_deps = workspace_manifest
                 .get("workspace")
                 .and_then(|x| x.get(dep_category))
-                .and_then(|x| x.as_table());
+                .and_then(|x| x.as_table_like());
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
                 let workspace_inherit = table
@@ -138,6 +159,28 @@ fn rewrite_cargo_toml(
             }
         }
     }
+
+    // Update workspace inherited metadata
+    if let Some(package) = data.get_mut("package").and_then(|x| x.as_table_mut()) {
+        let workspace_package = workspace_manifest
+            .get("workspace")
+            .and_then(|x| x.get("package"))
+            .and_then(|x| x.as_table_like());
+        for key in WORKSPACE_INHERITABLE_FIELDS.iter().copied() {
+            let workspace_inherited = package
+                .get(key)
+                .and_then(|x| x.get("workspace"))
+                .and_then(|x| x.as_bool())
+                .unwrap_or_default();
+            if workspace_inherited {
+                if let Some(workspace_value) = workspace_package.and_then(|ws| ws.get(key)) {
+                    package[key] = workspace_value.clone();
+                    rewritten = true;
+                }
+            }
+        }
+    }
+
     if root_crate {
         // Update workspace members
         if let Some(workspace) = data.get_mut("workspace").and_then(|x| x.as_table_mut()) {

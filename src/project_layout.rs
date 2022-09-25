@@ -31,8 +31,6 @@ pub struct ProjectResolver {
     pub project_layout: ProjectLayout,
     /// Cargo.toml path
     pub cargo_toml_path: PathBuf,
-    /// Parsed Cargo.toml
-    pub cargo_toml: CargoToml,
     /// pyproject.toml path
     pub pyproject_toml_path: PathBuf,
     /// Parsed pyproject.toml
@@ -87,15 +85,16 @@ impl ProjectResolver {
 
         let cargo_metadata = Self::resolve_cargo_metadata(&manifest_file, &cargo_options)?;
 
-        let mut metadata21 = Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir)
-            .context("Failed to parse Cargo.toml into python metadata")?;
+        let mut metadata21 =
+            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata)
+                .context("Failed to parse Cargo.toml into python metadata")?;
         if let Some(pyproject) = pyproject {
             let pyproject_dir = pyproject_file.parent().unwrap();
             metadata21.merge_pyproject_toml(&pyproject_dir, pyproject)?;
         }
         let extra_metadata = cargo_toml.remaining_core_metadata();
 
-        let crate_name = &cargo_toml.package.name;
+        let crate_name = &metadata21.name;
 
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name
@@ -146,7 +145,6 @@ impl ProjectResolver {
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,
-            cargo_toml,
             pyproject_toml_path: pyproject_file,
             pyproject_toml,
             module_name,

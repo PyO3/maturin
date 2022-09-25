@@ -4,6 +4,9 @@ members = [
   "python"
 ]
 
+[workspace.package]
+version = "0.1.0"
+
 [workspace.dependencies]
 libc = { version = "0.2", features = ["std"] }
 generic_lib = { path = "generic_lib" }

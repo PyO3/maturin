@@ -488,7 +488,6 @@ impl BuildOptions {
         let ProjectResolver {
             project_layout,
             cargo_toml_path,
-            cargo_toml,
             pyproject_toml_path,
             pyproject_toml,
             module_name,
@@ -685,7 +684,7 @@ impl BuildOptions {
             .target_dir
             .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
-        let crate_name = cargo_toml.package.name;
+        let crate_name = metadata21.name.clone();
 
         Ok(BuildContext {
             target,
@@ -1339,9 +1338,15 @@ mod test {
         use crate::CargoToml;
 
         // Nothing specified
-        let cargo_toml = CargoToml::from_path("test-crates/pyo3-pure/Cargo.toml").unwrap();
+        let manifest_path = "test-crates/pyo3-pure/Cargo.toml";
+        let cargo_toml = CargoToml::from_path(manifest_path).unwrap();
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_path)
+            .exec()
+            .unwrap();
         let metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-pure").unwrap();
+            Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-pure", &cargo_metadata)
+                .unwrap();
         assert_eq!(get_min_python_minor(&metadata21), None);
     }
 }

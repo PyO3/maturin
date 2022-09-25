@@ -19,17 +19,19 @@ const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// This method is rather frail, but unfortunately I don't know a better solution.
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
+    workspace_manifest: &toml_edit::Document,
     known_path_deps: &HashMap<String, PathBuf>,
     local_deps_folder: String,
     root_crate: bool,
 ) -> Result<String> {
+    let manifest_path = manifest_path.as_ref();
     let text = fs::read_to_string(&manifest_path).context(format!(
         "Can't read Cargo.toml at {}",
-        manifest_path.as_ref().display(),
+        manifest_path.display(),
     ))?;
     let mut data = text.parse::<toml_edit::Document>().context(format!(
         "Failed to parse Cargo.toml at {}",
-        manifest_path.as_ref().display()
+        manifest_path.display()
     ))?;
     let mut rewritten = false;
     //  ˇˇˇˇˇˇˇˇˇˇˇˇ dep_category
@@ -39,28 +41,84 @@ fn rewrite_cargo_toml(
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
         if let Some(table) = data.get_mut(*dep_category).and_then(|x| x.as_table_mut()) {
+            let workspace_deps = workspace_manifest
+                .get("workspace")
+                .and_then(|x| x.get(dep_category))
+                .and_then(|x| x.as_table());
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
-                // There should either be no value for path, or it should be a string
-                if table.get(&dep_name).and_then(|x| x.get("path")).is_none() {
-                    continue;
-                }
-                if !table[&dep_name]["path"].is_str() {
-                    bail!(
-                        "In {}, {} {} has a path value that is not a string",
-                        manifest_path.as_ref().display(),
-                        dep_category,
-                        dep_name
-                    )
-                }
-                if !known_path_deps.contains_key(&dep_name) {
-                    bail!(
-                        "cargo metadata does not know about the path for {}.{} present in {}, \
-                        which should never happen ಠ_ಠ",
-                        dep_category,
-                        dep_name,
-                        manifest_path.as_ref().display()
-                    );
+                let workspace_inherit = table
+                    .get(&dep_name)
+                    .and_then(|x| x.get("workspace"))
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or_default();
+
+                if !workspace_inherit {
+                    // There should either be no value for path, or it should be a string
+                    if table.get(&dep_name).and_then(|x| x.get("path")).is_none() {
+                        continue;
+                    }
+                    if !table[&dep_name]["path"].is_str() {
+                        bail!(
+                            "In {}, {} {} has a path value that is not a string",
+                            manifest_path.display(),
+                            dep_category,
+                            dep_name
+                        )
+                    }
+                    if !known_path_deps.contains_key(&dep_name) {
+                        bail!(
+                            "cargo metadata does not know about the path for {}.{} present in {}, \
+                            which should never happen ಠ_ಠ",
+                            dep_category,
+                            dep_name,
+                            manifest_path.display()
+                        );
+                    }
+                } else {
+                    // If a workspace inherited dependency isn't a path dep,
+                    // we need to replace `workspace = true` with its full requirement spec.
+                    if !known_path_deps.contains_key(&dep_name) {
+                        if let Some(workspace_dep) = workspace_deps.and_then(|x| x.get(&dep_name)) {
+                            let mut workspace_dep = workspace_dep.clone();
+                            // Merge optional and features from the current Cargo.toml
+                            if table[&dep_name].get("optional").is_some() {
+                                workspace_dep["optional"] = table[&dep_name]["optional"].clone();
+                            }
+                            if let Some(features) =
+                                table[&dep_name].get("features").and_then(|x| x.as_array())
+                            {
+                                let existing_features = workspace_dep
+                                    .as_table_like_mut()
+                                    .unwrap()
+                                    .entry("features")
+                                    .or_insert_with(|| {
+                                        toml_edit::Item::Value(toml_edit::Array::new().into())
+                                    })
+                                    .as_array_mut()
+                                    .with_context(|| {
+                                        format!(
+                                            "In {}, {} {} has a features value that is not an array",
+                                            manifest_path.display(),
+                                            dep_category,
+                                            dep_name
+                                        )
+                                    })?;
+                                existing_features.extend(features);
+                            }
+                            table[&dep_name] = workspace_dep;
+                            rewritten = true;
+                        } else {
+                            bail!(
+                                "In {}, {} {} is marked as `workspace = true`, but it is found neither in \
+                                the workspace manifest nor in the known path dependencies",
+                                manifest_path.display(),
+                                dep_category,
+                                dep_name
+                            )
+                        }
+                        continue;
+                    }
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
@@ -69,6 +127,13 @@ fn rewrite_cargo_toml(
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     toml_edit::value(format!("../{}", dep_name))
                 };
+                if workspace_inherit {
+                    // Remove workspace inheritance now that we converted it into a path dependency
+                    table[&dep_name]
+                        .as_table_like_mut()
+                        .unwrap()
+                        .remove("workspace");
+                }
                 rewritten = true;
             }
         }
@@ -124,6 +189,7 @@ fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     pyproject_toml_path: impl AsRef<Path>,
     manifest_path: impl AsRef<Path>,
+    workspace_manifest: &toml_edit::Document,
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
@@ -218,6 +284,7 @@ fn add_crate_to_source_distribution(
     };
     let rewritten_cargo_toml = rewrite_cargo_toml(
         &manifest_path,
+        workspace_manifest,
         known_path_deps,
         local_deps_folder,
         root_crate,
@@ -284,6 +351,12 @@ pub fn source_distribution(
     let metadata21 = &build_context.metadata21;
     let manifest_path = &build_context.manifest_path;
     let pyproject_toml_path = fs::canonicalize(&build_context.pyproject_toml_path)?;
+    let workspace_manifest_path = build_context
+        .cargo_metadata
+        .workspace_root
+        .join("Cargo.toml");
+    let workspace_manifest: toml_edit::Document =
+        fs::read_to_string(&workspace_manifest_path)?.parse()?;
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
 
@@ -300,6 +373,7 @@ pub fn source_distribution(
             &mut writer,
             &pyproject_toml_path,
             &path_dep,
+            &workspace_manifest,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
             false,
@@ -316,6 +390,7 @@ pub fn source_distribution(
         &mut writer,
         &pyproject_toml_path,
         &manifest_path,
+        &workspace_manifest,
         &root_dir,
         &known_path_deps,
         true,

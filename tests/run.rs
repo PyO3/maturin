@@ -293,6 +293,23 @@ fn workspace_with_path_dep_sdist() {
     ))
 }
 
+#[rustversion::since(1.64)]
+#[test]
+fn workspace_inheritance_sdist() {
+    handle_result(other::test_source_distribution(
+        "test-crates/workspace-inheritance/python",
+        vec![
+            "workspace_inheritance-0.1.0/local_dependencies/generic_lib/Cargo.toml",
+            "workspace_inheritance-0.1.0/local_dependencies/generic_lib/src/lib.rs",
+            "workspace_inheritance-0.1.0/Cargo.toml",
+            "workspace_inheritance-0.1.0/pyproject.toml",
+            "workspace_inheritance-0.1.0/src/lib.rs",
+            "workspace_inheritance-0.1.0/PKG-INFO",
+        ],
+        "workspace_inheritance_sdist",
+    ))
+}
+
 #[test]
 fn abi3_python_interpreter_args() {
     handle_result(other::abi3_python_interpreter_args());

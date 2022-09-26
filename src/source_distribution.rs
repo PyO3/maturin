@@ -1,7 +1,7 @@
 use crate::module_writer::{add_data, ModuleWriter};
 use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
-use cargo_metadata::Metadata;
+use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -411,12 +411,40 @@ pub fn source_distribution(
     ));
 
     // Add local path dependencies
+    let mut path_dep_workspace_manifests = HashMap::new();
     for (name, path_dep) in known_path_deps.iter() {
+        // Path dependencies may not be in the same workspace as the root crate,
+        // thus we need to find out its workspace root from `cargo metadata`
+        let path_dep_metadata = MetadataCommand::new()
+            .manifest_path(path_dep)
+            // We don't need to resolve the dependency graph
+            .no_deps()
+            .exec()
+            .with_context(|| {
+                format!(
+                    "Cargo metadata failed for {} at '{}'",
+                    name,
+                    path_dep.display()
+                )
+            })?;
+        let path_dep_workspace_manifest =
+            if path_dep_metadata.workspace_root == build_context.cargo_metadata.workspace_root {
+                &workspace_manifest
+            } else {
+                if !path_dep_workspace_manifests.contains_key(&path_dep_metadata.workspace_root) {
+                    let manifest: toml_edit::Document =
+                        fs::read_to_string(&path_dep_metadata.workspace_root.join("Cargo.toml"))?
+                            .parse()?;
+                    path_dep_workspace_manifests
+                        .insert(path_dep_metadata.workspace_root.clone(), manifest);
+                }
+                &path_dep_workspace_manifests[&path_dep_metadata.workspace_root]
+            };
         add_crate_to_source_distribution(
             &mut writer,
             &pyproject_toml_path,
             &path_dep,
-            &workspace_manifest,
+            path_dep_workspace_manifest,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
             false,

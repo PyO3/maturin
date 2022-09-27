@@ -579,13 +579,13 @@ impl Target {
         let venv = venv_base.as_ref();
         if self.is_windows() {
             let bin_dir = venv.join("Scripts");
-            if bin_dir.exists() {
+            if bin_dir.join("python.exe").exists() {
                 return bin_dir;
             }
             // Python innstalled via msys2 on Windows might produce a POSIX-like venv
             // See https://github.com/PyO3/maturin/issues/1108
             let bin_dir = venv.join("bin");
-            if bin_dir.exists() {
+            if bin_dir.join("python.exe").exists() {
                 return bin_dir;
             }
             // for conda environment

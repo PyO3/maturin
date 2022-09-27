@@ -16,6 +16,7 @@ pub(crate) struct CargoTomlLib {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct CargoTomlPackage {
+    pub(crate) name: String,
     metadata: Option<CargoTomlMetadata>,
 }
 

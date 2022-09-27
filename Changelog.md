@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix resolving crate name bug in [#1142](https://github.com/PyO3/maturin/pull/1142)
+
 ## [0.13.4] - 2022-09-27
 
 * Fix `Cargo.toml` in new project template in [#1109](https://github.com/PyO3/maturin/pull/1109)

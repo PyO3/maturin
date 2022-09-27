@@ -488,6 +488,7 @@ impl BuildOptions {
         let ProjectResolver {
             project_layout,
             cargo_toml_path,
+            cargo_toml,
             pyproject_toml_path,
             pyproject_toml,
             module_name,
@@ -684,7 +685,7 @@ impl BuildOptions {
             .target_dir
             .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
-        let crate_name = metadata21.name.clone();
+        let crate_name = cargo_toml.package.name;
 
         Ok(BuildContext {
             target,

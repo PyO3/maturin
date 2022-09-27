@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5] - 2022-09-27
+
 * Fix resolving crate name bug in [#1142](https://github.com/PyO3/maturin/pull/1142)
 
 ## [0.13.4] - 2022-09-27
@@ -708,7 +710,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.4...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.5...HEAD
+[0.13.5]: https://github.com/pyo3/maturin/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/pyo3/maturin/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/pyo3/maturin/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/pyo3/maturin/compare/v0.13.1...v0.13.2

@@ -44,6 +44,7 @@ jobs:
           args: --tests --all-features -- -D warnings
 
   black:
+    name: Black
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -53,6 +54,7 @@ jobs:
       - uses: psf/black@22.3.0
 
   spellcheck:
+    name: Spellcheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

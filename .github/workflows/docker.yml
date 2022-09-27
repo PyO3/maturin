@@ -8,6 +8,7 @@ on:
 
 jobs:
   publish-docker:
+    name: Publish Docker Images
     runs-on: ubuntu-latest
     environment:
       name: Docker Hub

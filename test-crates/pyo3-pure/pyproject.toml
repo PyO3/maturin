@@ -6,7 +6,9 @@ build-backend = "maturin"
 bindings = "pyo3"
 
 [project]
-name = "pyo3-pure"
+# The name pyo3_pure instead of pyo3-pure is intentional,
+# it's used as a crate name resolution regression test
+name = "pyo3_pure"
 version = "0.1.0+abc123de"
 classifiers = [
     "Programming Language :: Rust"

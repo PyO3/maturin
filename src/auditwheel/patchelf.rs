@@ -78,18 +78,19 @@ pub fn set_rpath<S: AsRef<OsStr>>(file: impl AsRef<Path>, rpath: &S) -> Result<(
 }
 
 /// Get the `RPATH` of executables and libraries
-pub fn get_rpath(file: impl AsRef<Path>) -> Result<String> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--print-rpath").arg(file.as_ref());
-    let output = cmd
-        .output()
-        .context("Failed to execute 'patchelf', did you install it?")?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --print-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+pub fn get_rpath(file: impl AsRef<Path>) -> Result<Vec<String>> {
+    let file = file.as_ref();
+    let contents = fs_err::read(&file)?;
+    match goblin::Object::parse(&contents) {
+        Ok(goblin::Object::Elf(elf)) => {
+            let rpaths = if !elf.runpaths.is_empty() {
+                elf.runpaths
+            } else {
+                elf.rpaths
+            };
+            Ok(rpaths.iter().map(|r| r.to_string()).collect())
+        }
+        Ok(_) => bail!("'{}' is not an ELF file", file.display()),
+        Err(e) => bail!("Failed to parse ELF file at '{}': {}", file.display(), e),
     }
-    let rpath = String::from_utf8(output.stdout)?;
-    Ok(rpath.trim().to_string())
 }

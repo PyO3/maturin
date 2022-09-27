@@ -162,14 +162,15 @@ fn integration_pyo3_mixed_py_subdir() {
     ));
 }
 
-#[cfg(target_os = "windows")]
 #[test]
-#[ignore]
 fn integration_pyo3_pure_conda() {
-    handle_result(integration::test_integration_conda(
-        "text-crates/pyo3-pure",
-        None,
-    ));
+    // Only run on GitHub Actions for now
+    if std::env::var("GITHUB_ACTIONS").is_ok() {
+        handle_result(integration::test_integration_conda(
+            "test-crates/pyo3-mixed",
+            None,
+        ));
+    }
 }
 
 #[test]

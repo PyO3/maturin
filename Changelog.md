@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix `maturin develop` in Windows conda virtual environment in [#1146](https://github.com/PyO3/maturin/pull/1146)
+
 ## [0.13.5] - 2022-09-27
 
 * Fix resolving crate name bug in [#1142](https://github.com/PyO3/maturin/pull/1142)

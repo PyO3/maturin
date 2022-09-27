@@ -121,3 +121,39 @@ pub fn create_virtualenv(
     let python = target.get_venv_python(&venv_dir);
     Ok((venv_dir, python))
 }
+
+/// Creates conda environments
+pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathBuf, PathBuf)> {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct CondaCreateResult {
+        prefix: PathBuf,
+        success: bool,
+    }
+
+    let mut cmd = if cfg!(windows) {
+        let mut cmd = Command::new("cmd.exe");
+        cmd.arg("/c").arg("conda");
+        cmd
+    } else {
+        Command::new("conda")
+    };
+    let output = cmd
+        .arg("create")
+        .arg("-n")
+        .arg(name)
+        .arg(format!("python={}.{}", major, minor))
+        .arg("-q")
+        .arg("-y")
+        .arg("--json")
+        .output()
+        .expect("Conda not available.");
+    let result: CondaCreateResult = serde_json::from_slice(&output.stdout)?;
+    if !result.success {
+        bail!("Failed to create conda environment {}.", name);
+    }
+    let target = Target::from_target_triple(None)?;
+    let python = target.get_venv_python(&result.prefix);
+    Ok((result.prefix, python))
+}

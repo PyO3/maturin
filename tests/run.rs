@@ -9,8 +9,22 @@ fn develop_pyo3_pure() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-pure",
         None,
-        "develop_pyo3_pure",
+        "develop-pyo3-pure",
+        false,
     ));
+}
+
+#[test]
+fn develop_pyo3_pure_conda() {
+    // Only run on GitHub Actions for now
+    if std::env::var("GITHUB_ACTIONS").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/pyo3-pure",
+            None,
+            "develop-pyo3-pure",
+            true,
+        ));
+    }
 }
 
 #[test]
@@ -18,7 +32,8 @@ fn develop_pyo3_mixed() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed",
         None,
-        "develop_pyo3_mixed",
+        "develop-pyo3-mixed",
+        false,
     ));
 }
 
@@ -27,7 +42,8 @@ fn develop_pyo3_mixed_submodule() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed-submodule",
         None,
-        "develop_pyo3_mixed_submodule",
+        "develop-pyo3-mixed-submodule",
+        false,
     ));
 }
 
@@ -36,7 +52,8 @@ fn develop_pyo3_mixed_py_subdir() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed-py-subdir",
         None,
-        "develop_pyo3_mixed_py_subdir",
+        "develop-pyo3-mixed-py-subdir",
+        false,
     ));
 }
 
@@ -45,7 +62,8 @@ fn develop_cffi_pure() {
     handle_result(develop::test_develop(
         "test-crates/cffi-pure",
         None,
-        "develop_cffi_pure",
+        "develop-cffi-pure",
+        false,
     ));
 }
 
@@ -54,7 +72,8 @@ fn develop_cffi_mixed() {
     handle_result(develop::test_develop(
         "test-crates/cffi-mixed",
         None,
-        "develop_cffi_mixed",
+        "develop-cffi-mixed",
+        false,
     ));
 }
 
@@ -63,7 +82,8 @@ fn develop_hello_world() {
     handle_result(develop::test_develop(
         "test-crates/hello-world",
         None,
-        "develop_hello_world",
+        "develop-hello-world",
+        false,
     ));
 }
 
@@ -72,7 +92,8 @@ fn develop_pyo3_ffi_pure() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-ffi-pure",
         None,
-        "develop_pyo3_ffi_pure",
+        "develop-pyo3-ffi-pure",
+        false,
     ));
 }
 

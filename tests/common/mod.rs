@@ -14,12 +14,19 @@ pub mod other;
 
 /// Check that the package is either not installed or works correctly
 pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
+    let path = if cfg!(windows) {
+        // on Windows, also add Scripts to PATH
+        let python_dir = python.parent().unwrap();
+        env::join_paths(&[&python_dir.join("Scripts"), python_dir])?.into()
+    } else {
+        python.parent().unwrap().to_path_buf()
+    };
     let check_installed = Path::new(package)
         .join("check_installed")
         .join("check_installed.py");
     let output = Command::new(&python)
         .arg(check_installed)
-        .env("PATH", python.parent().unwrap())
+        .env("PATH", path)
         .output()
         .unwrap();
     if !output.status.success() {

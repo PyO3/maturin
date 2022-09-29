@@ -1,4 +1,4 @@
-use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo};
+use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
 use anyhow::Result;
 use maturin::{develop, CargoOptions};
 use std::path::{Path, PathBuf};
@@ -11,10 +11,15 @@ pub fn test_develop(
     package: impl AsRef<Path>,
     bindings: Option<String>,
     unique_name: &str,
+    conda: bool,
 ) -> Result<()> {
     maybe_mock_cargo();
 
-    let (venv_dir, python) = create_virtualenv(&package, "develop", None)?;
+    let (venv_dir, python) = if conda {
+        create_conda_env(&format!("maturin-{}", unique_name), 3, 10)?
+    } else {
+        create_virtualenv(&package, "develop", None)?
+    };
 
     // Ensure the test doesn't wrongly pass
     check_installed(package.as_ref(), &python).unwrap_err();

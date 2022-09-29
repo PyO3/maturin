@@ -861,6 +861,11 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     let targets: Vec<_> = root_package
         .targets
         .iter()
+        .filter(|target| {
+            target.kind.iter().any(|kind| {
+                kind != "example" && kind != "test" && kind != "bench" && kind != "custom-build"
+            })
+        })
         .flat_map(|target| target.crate_types.iter())
         .map(String::as_str)
         .collect();

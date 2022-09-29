@@ -135,47 +135,32 @@ pub fn test_integration(
     Ok(())
 }
 
-/// Creates conda environments
-#[cfg(target_os = "windows")]
-fn create_conda_env(name: &str, major: usize, minor: usize) {
-    Command::new("conda")
-        .arg("create")
-        .arg("-n")
-        .arg(name)
-        .arg(format!("python={}.{}", major, minor))
-        .arg("-q")
-        .arg("-y")
-        .output()
-        .expect("Conda not available.");
-}
-
-#[cfg(target_os = "windows")]
 pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+    use crate::common::create_conda_env;
     use std::path::PathBuf;
     use std::process::Stdio;
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
-    // Since the python launcher has precedence over conda, we need to deactivate it.
-    // We do so by shadowing it with our own hello world binary.
-    let original_path = env::var_os("PATH").expect("PATH is not defined");
-    let py_dir = env::current_dir()?
-        .join("test-data")
-        .to_str()
-        .unwrap()
-        .to_string();
-    let mocked_path = py_dir + ";" + original_path.to_str().unwrap();
-    env::set_var("PATH", mocked_path);
-
     // Create environments to build against, prepended with "A" to ensure that integration
     // tests are executed with these environments
-    create_conda_env("A-pyo3-build-env-37", 3, 7);
-    create_conda_env("A-pyo3-build-env-38", 3, 8);
-    create_conda_env("A-pyo3-build-env-39", 3, 9);
-    create_conda_env("A-pyo3-build-env-310", 3, 10);
+    let mut interpreters = Vec::new();
+    for minor in 7..=10 {
+        let (_, venv_python) = create_conda_env(&format!("A-maturin-env-3{}", minor), 3, minor)?;
+        interpreters.push(venv_python);
+    }
 
     // The first argument is ignored by clap
-    let mut cli = vec!["build", "--manifest-path", &package_string, "--quiet"];
+    let mut cli = vec![
+        "build",
+        "--manifest-path",
+        &package_string,
+        "--quiet",
+        "--interpreter",
+    ];
+    for interp in &interpreters {
+        cli.push(interp.to_str().unwrap());
+    }
 
     if let Some(ref bindings) = bindings {
         cli.push("--bindings");
@@ -190,13 +175,13 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
     for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.interpreter) {
         let executable = python_interpreter.executable;
-        if executable.to_str().unwrap().contains("pyo3-build-env-") {
+        if executable.to_str().unwrap().contains("maturin-env-") {
             conda_wheels.push((filename.clone(), executable))
         }
     }
 
     assert_eq!(
-        3,
+        interpreters.len(),
         conda_wheels.len(),
         "Error creating or detecting conda environments."
     );
@@ -215,7 +200,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         if !output.status.success() {
             panic!();
         }
-        check_installed(&package.as_ref(), &executable)?;
+        check_installed(package.as_ref(), &executable)?;
     }
 
     Ok(())

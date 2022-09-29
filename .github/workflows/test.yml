@@ -23,6 +23,10 @@ jobs:
       RUST_BACKTRACE: '1'
     steps:
       - uses: actions/checkout@v3
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-activate-base: 'false'
+          activate-environment: ''
       - uses: actions/setup-python@v4
         with:
           python-version: "3.7"

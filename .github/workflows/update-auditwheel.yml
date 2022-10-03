@@ -6,8 +6,14 @@ on:
     # Run every week
     - cron: '0 0 * * 0'
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   update:
+    permissions:
+      contents: write  # for peter-evans/create-pull-request to create branch
+      pull-requests: write  # for peter-evans/create-pull-request to create a PR
     name: Update auditwheel policies
     runs-on: ubuntu-latest
     steps:

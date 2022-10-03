@@ -5,6 +5,9 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   release-crates-io:
     name: Release crates.io
@@ -267,6 +270,8 @@ jobs:
           echo "::set-output name=env_url::https://pypi.org/project/maturin/$VERSION"
 
   release-github:
+    permissions:
+      contents: write  # for softprops/action-gh-release to create GitHub release
     name: Publish to GitHub releases
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"

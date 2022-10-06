@@ -307,7 +307,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 
 fn run() -> Result<()> {
     #[cfg(feature = "log")]
-    pretty_env_logger::init();
+    tracing_subscriber::fmt::init();
 
     // Allow symlink `maturin` to `ar` to invoke `zig ar`
     // See https://github.com/messense/cargo-zigbuild/issues/52

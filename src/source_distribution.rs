@@ -3,7 +3,7 @@ use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -236,7 +236,7 @@ fn add_crate_to_source_distribution(
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
-) -> Result<HashSet<PathBuf>> {
+) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
     let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
@@ -336,24 +336,18 @@ fn add_crate_to_source_distribution(
     let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
 
-    let mut added_files = HashSet::new();
-    added_files.insert(prefix.to_path_buf());
-
     let cargo_toml = if cargo_toml_in_subdir {
         prefix.join(manifest_path)
     } else {
         prefix.join(manifest_path.file_name().unwrap())
     };
-    writer.add_bytes(&cargo_toml, rewritten_cargo_toml.as_bytes())?;
-    added_files.insert(cargo_toml);
+    writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
 
     for (target, source) in target_source {
-        let target = prefix.join(target);
-        writer.add_file(&target, source)?;
-        added_files.insert(target);
+        writer.add_file(prefix.join(target), source)?;
     }
 
-    Ok(added_files)
+    Ok(())
 }
 
 /// Finds all path dependencies of the crate
@@ -464,7 +458,7 @@ pub fn source_distribution(
     }
 
     // Add the main crate
-    let mut added_files = add_crate_to_source_distribution(
+    add_crate_to_source_distribution(
         &mut writer,
         &pyproject_toml_path,
         &manifest_path,
@@ -476,14 +470,10 @@ pub fn source_distribution(
 
     let manifest_dir = manifest_path.parent().unwrap();
     let cargo_lock_path = manifest_dir.join("Cargo.lock");
-    let target = root_dir.join("Cargo.lock");
     let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
     if cargo_lock_required || cargo_lock_path.exists() {
-        if !added_files.contains(&target) {
-            writer.add_file(&target, &cargo_lock_path)?;
-            added_files.insert(target);
-        }
+        writer.add_file(root_dir.join("Cargo.lock"), &cargo_lock_path)?;
     } else {
         println!(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \
@@ -495,34 +485,23 @@ pub fn source_distribution(
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     if let Some(project) = pyproject.project.as_ref() {
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
-            let target = root_dir.join(readme);
-            if !added_files.contains(&target) {
-                writer.add_file(&target, pyproject_dir.join(readme))?;
-                added_files.insert(target);
-            }
+            writer.add_file(root_dir.join(readme), pyproject_dir.join(readme))?;
         }
         if let Some(pyproject_toml::License {
             file: Some(license),
             text: None,
         }) = project.license.as_ref()
         {
-            let target = root_dir.join(license);
-            if !added_files.contains(&target) {
-                writer.add_file(&target, pyproject_dir.join(license))?;
-                added_files.insert(target);
-            }
+            writer.add_file(root_dir.join(license), pyproject_dir.join(license))?;
         }
         if let Some(python_source) = pyproject.python_source() {
             for entry in ignore::Walk::new(pyproject_dir.join(python_source)) {
                 let source = entry?.into_path();
                 let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
-                if !added_files.contains(&target) {
-                    if source.is_dir() {
-                        writer.add_directory(&target)?;
-                    } else {
-                        writer.add_file(&target, &source)?;
-                    }
-                    added_files.insert(target);
+                if source.is_dir() {
+                    writer.add_directory(target)?;
+                } else {
+                    writer.add_file(target, &source)?;
                 }
             }
         }
@@ -535,13 +514,10 @@ pub fn source_distribution(
                 .filter_map(Result::ok)
             {
                 let target = root_dir.join(&source.strip_prefix(pyproject_dir)?);
-                if !added_files.contains(&target) {
-                    if source.is_dir() {
-                        writer.add_directory(&target)?;
-                    } else {
-                        writer.add_file(&target, source)?;
-                    }
-                    added_files.insert(target);
+                if source.is_dir() {
+                    writer.add_directory(target)?;
+                } else {
+                    writer.add_file(target, source)?;
                 }
             }
         }

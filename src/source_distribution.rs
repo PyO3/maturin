@@ -344,7 +344,9 @@ fn add_crate_to_source_distribution(
     } else {
         prefix.join(manifest_path.file_name().unwrap())
     };
-    writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
+    writer.add_bytes(&cargo_toml, rewritten_cargo_toml.as_bytes())?;
+    added_files.insert(cargo_toml);
+
     for (target, source) in target_source {
         let target = prefix.join(target);
         writer.add_file(&target, source)?;
@@ -462,7 +464,7 @@ pub fn source_distribution(
     }
 
     // Add the main crate
-    let added_files = add_crate_to_source_distribution(
+    let mut added_files = add_crate_to_source_distribution(
         &mut writer,
         &pyproject_toml_path,
         &manifest_path,
@@ -480,6 +482,7 @@ pub fn source_distribution(
     if cargo_lock_required || cargo_lock_path.exists() {
         if !added_files.contains(&target) {
             writer.add_file(&target, &cargo_lock_path)?;
+            added_files.insert(target);
         }
     } else {
         println!(
@@ -492,23 +495,34 @@ pub fn source_distribution(
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     if let Some(project) = pyproject.project.as_ref() {
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
-            writer.add_file(root_dir.join(readme), pyproject_dir.join(readme))?;
+            let target = root_dir.join(readme);
+            if !added_files.contains(&target) {
+                writer.add_file(&target, pyproject_dir.join(readme))?;
+                added_files.insert(target);
+            }
         }
         if let Some(pyproject_toml::License {
             file: Some(license),
             text: None,
         }) = project.license.as_ref()
         {
-            writer.add_file(root_dir.join(license), pyproject_dir.join(license))?;
+            let target = root_dir.join(license);
+            if !added_files.contains(&target) {
+                writer.add_file(&target, pyproject_dir.join(license))?;
+                added_files.insert(target);
+            }
         }
         if let Some(python_source) = pyproject.python_source() {
             for entry in ignore::Walk::new(pyproject_dir.join(python_source)) {
                 let source = entry?.into_path();
                 let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
-                if source.is_dir() {
-                    writer.add_directory(target)?;
-                } else {
-                    writer.add_file(target, &source)?;
+                if !added_files.contains(&target) {
+                    if source.is_dir() {
+                        writer.add_directory(&target)?;
+                    } else {
+                        writer.add_file(&target, &source)?;
+                    }
+                    added_files.insert(target);
                 }
             }
         }
@@ -521,10 +535,13 @@ pub fn source_distribution(
                 .filter_map(Result::ok)
             {
                 let target = root_dir.join(&source.strip_prefix(pyproject_dir)?);
-                if source.is_dir() {
-                    writer.add_directory(target)?;
-                } else {
-                    writer.add_file(target, source)?;
+                if !added_files.contains(&target) {
+                    if source.is_dir() {
+                        writer.add_directory(&target)?;
+                    } else {
+                        writer.add_file(&target, source)?;
+                    }
+                    added_files.insert(target);
                 }
             }
         }

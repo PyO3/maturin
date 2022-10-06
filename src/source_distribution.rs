@@ -3,7 +3,7 @@ use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -236,7 +236,7 @@ fn add_crate_to_source_distribution(
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
-) -> Result<()> {
+) -> Result<HashSet<PathBuf>> {
     let manifest_path = manifest_path.as_ref();
     let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
@@ -336,6 +336,9 @@ fn add_crate_to_source_distribution(
     let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
 
+    let mut added_files = HashSet::new();
+    added_files.insert(prefix.to_path_buf());
+
     let cargo_toml = if cargo_toml_in_subdir {
         prefix.join(manifest_path)
     } else {
@@ -343,10 +346,12 @@ fn add_crate_to_source_distribution(
     };
     writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
     for (target, source) in target_source {
-        writer.add_file(prefix.join(target), source)?;
+        let target = prefix.join(target);
+        writer.add_file(&target, source)?;
+        added_files.insert(target);
     }
 
-    Ok(())
+    Ok(added_files)
 }
 
 /// Finds all path dependencies of the crate
@@ -457,7 +462,7 @@ pub fn source_distribution(
     }
 
     // Add the main crate
-    add_crate_to_source_distribution(
+    let added_files = add_crate_to_source_distribution(
         &mut writer,
         &pyproject_toml_path,
         &manifest_path,
@@ -468,12 +473,19 @@ pub fn source_distribution(
     )?;
 
     let manifest_dir = manifest_path.parent().unwrap();
-    let include_cargo_lock =
+    let cargo_lock_path = manifest_dir.join("Cargo.lock");
+    let target = root_dir.join("Cargo.lock");
+    let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
-    if include_cargo_lock {
-        let cargo_lock_path = manifest_dir.join("Cargo.lock");
-        let target = root_dir.join("Cargo.lock");
-        writer.add_file(&target, &cargo_lock_path)?;
+    if cargo_lock_required || cargo_lock_path.exists() {
+        if !added_files.contains(&target) {
+            writer.add_file(&target, &cargo_lock_path)?;
+        }
+    } else {
+        println!(
+            "⚠️  Warning: Cargo.lock is not found, it is recommended \
+            to include it in the source distribution"
+        );
     }
 
     // Add readme, license and python source files

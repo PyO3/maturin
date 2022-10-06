@@ -263,9 +263,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.10.2"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b4d44af0e3fdd773cbf70b6b826a28993839be0a36c2b7c00c47f2dadaca6c6"
+checksum = "f2ba119cbe3998beb157dff447d37fd845aa728b40c7ce9bcc472e486679ee1e"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -1133,9 +1133,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.0-rc.6"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2946516aa80379c1e6ee9cfa75a7b2faf23f63690f44d682e7fecd0141bbcaf2"
+checksum = "bfddc9561e8baf264e0e45e197fd7696320026eb10a8180340debc27b18f535b"
 dependencies = [
  "console",
  "number_prefix",
@@ -2897,9 +2897,9 @@ dependencies = [
 
 [[package]]
 name = "xwin"
-version = "0.2.5"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f66ef70cc262a6da73cb13fae0c767add6bd0b85fa46053b263732fecfb9b9f"
+checksum = "19d800084cf7137e4a3e80587ff027d53943e05586a50a3655c2622e6700ba3f"
 dependencies = [
  "anyhow",
  "bytes",

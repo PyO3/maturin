@@ -8,7 +8,7 @@ use fs_err as fs;
 use fs_err::File;
 use ignore::WalkBuilder;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fmt::Write as _;
 #[cfg(target_family = "unix")]
@@ -312,6 +312,7 @@ impl WheelWriter {
 pub struct SDistWriter {
     tar: tar::Builder<GzEncoder<File>>,
     path: PathBuf,
+    files: HashSet<PathBuf>,
 }
 
 impl ModuleWriter for SDistWriter {
@@ -325,35 +326,48 @@ impl ModuleWriter for SDistWriter {
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()> {
+        let target = target.as_ref();
+        if self.files.contains(target) {
+            // Ignore duplicate files
+            return Ok(());
+        }
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
         header.set_cksum();
         self.tar
-            .append_data(&mut header, &target, bytes)
+            .append_data(&mut header, target, bytes)
             .context(format!(
                 "Failed to add {} bytes to sdist as {}",
                 bytes.len(),
-                target.as_ref().display()
+                target.display()
             ))?;
+        self.files.insert(target.to_path_buf());
         Ok(())
     }
 
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        if source.as_ref() == self.path {
+        let source = source.as_ref();
+        let target = target.as_ref();
+        if source == self.path {
             bail!(
             "Attempting to include the sdist output tarball {} into itself! Check 'cargo package --list' output.",
-            source.as_ref().display()
+            source.display()
             );
+        }
+        if self.files.contains(target) {
+            // Ignore duplicate files
+            return Ok(());
         }
 
         self.tar
-            .append_path_with_name(&source, &target)
+            .append_path_with_name(source, target)
             .context(format!(
                 "Failed to add file from {} to sdist as {}",
-                source.as_ref().display(),
-                target.as_ref().display(),
+                source.display(),
+                target.display(),
             ))?;
+        self.files.insert(target.to_path_buf());
         Ok(())
     }
 }
@@ -371,7 +385,11 @@ impl SDistWriter {
         let enc = GzEncoder::new(tar_gz, Compression::default());
         let tar = tar::Builder::new(enc);
 
-        Ok(Self { tar, path })
+        Ok(Self {
+            tar,
+            path,
+            files: HashSet::new(),
+        })
     }
 
     /// Finished the .tar.gz archive

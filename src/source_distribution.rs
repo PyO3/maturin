@@ -342,6 +342,7 @@ fn add_crate_to_source_distribution(
         prefix.join(manifest_path.file_name().unwrap())
     };
     writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
+
     for (target, source) in target_source {
         writer.add_file(prefix.join(target), source)?;
     }
@@ -468,12 +469,16 @@ pub fn source_distribution(
     )?;
 
     let manifest_dir = manifest_path.parent().unwrap();
-    let include_cargo_lock =
+    let cargo_lock_path = manifest_dir.join("Cargo.lock");
+    let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
-    if include_cargo_lock {
-        let cargo_lock_path = manifest_dir.join("Cargo.lock");
-        let target = root_dir.join("Cargo.lock");
-        writer.add_file(&target, &cargo_lock_path)?;
+    if cargo_lock_required || cargo_lock_path.exists() {
+        writer.add_file(root_dir.join("Cargo.lock"), &cargo_lock_path)?;
+    } else {
+        println!(
+            "⚠️  Warning: Cargo.lock is not found, it is recommended \
+            to include it in the source distribution"
+        );
     }
 
     // Add readme, license and python source files

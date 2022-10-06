@@ -289,6 +289,7 @@ fn lib_with_path_dep_sdist() {
             "sdist_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/Cargo.toml",
             "sdist_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/src/lib.rs",
             "sdist_with_path_dep-0.1.0/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/Cargo.lock",
             "sdist_with_path_dep-0.1.0/pyproject.toml",
             "sdist_with_path_dep-0.1.0/src/lib.rs",
             "sdist_with_path_dep-0.1.0/PKG-INFO",

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix `maturin develop` in Windows conda virtual environment in [#1146](https://github.com/PyO3/maturin/pull/1146)
 * Fix build for crate using `pyo3` and `build.rs` without `cdylib` crate type in [#1150](https://github.com/PyO3/maturin/pull/1150)
 * Fix build on some 32-bit platform by downgrading `indicatif` in [#1163](https://github.com/PyO3/maturin/pull/1163)
+* Include `Cargo.lock` by default in source distribution in [#1170](https://github.com/PyO3/maturin/pull/1170)
 
 ## [0.13.5] - 2022-09-27
 

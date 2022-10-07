@@ -22,7 +22,7 @@ fn develop_pyo3_pure_conda() {
         handle_result(develop::test_develop(
             "test-crates/pyo3-pure",
             None,
-            "develop-pyo3-pure",
+            "develop-pyo3-pure-conda",
             true,
         ));
     }
@@ -54,6 +54,16 @@ fn develop_pyo3_mixed_py_subdir() {
         "test-crates/pyo3-mixed-py-subdir",
         None,
         "develop-pyo3-mixed-py-subdir",
+        false,
+    ));
+}
+
+#[test]
+fn develop_pyo3_mixed_src_layout() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-mixed-src/rust",
+        None,
+        "develop-pyo3-mixed-src",
         false,
     ));
 }
@@ -103,7 +113,7 @@ fn editable_pyo3_pure() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-pure",
         None,
-        "editable_pyo3_pure",
+        "editable-pyo3-pure",
     ));
 }
 
@@ -112,7 +122,7 @@ fn editable_pyo3_mixed() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-mixed",
         None,
-        "editable_pyo3_mixed",
+        "editable-pyo3-mixed",
     ));
 }
 
@@ -121,7 +131,7 @@ fn editable_pyo3_mixed_py_subdir() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-mixed-py-subdir",
         None,
-        "editable_pyo3_mixed_py_subdir",
+        "editable-pyo3-mixed-py-subdir",
     ));
 }
 
@@ -130,7 +140,7 @@ fn editable_pyo3_ffi_pure() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-ffi-pure",
         None,
-        "editable_pyo3_ffi_pure",
+        "editable-pyo3-ffi-pure",
     ));
 }
 
@@ -139,7 +149,7 @@ fn integration_pyo3_bin() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-bin",
         None,
-        "integration_pyo3_bin",
+        "integration-pyo3-bin",
         false,
         None,
     ));
@@ -150,7 +160,7 @@ fn integration_pyo3_pure() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-pure",
         None,
-        "integration_pyo3_pure",
+        "integration-pyo3-pure",
         false,
         None,
     ));
@@ -161,7 +171,7 @@ fn integration_pyo3_mixed() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed",
         None,
-        "integration_pyo3_mixed",
+        "integration-pyo3-mixed",
         false,
         None,
     ));
@@ -172,7 +182,7 @@ fn integration_pyo3_mixed_submodule() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed-submodule",
         None,
-        "integration_pyo3_mixed_submodule",
+        "integration-pyo3-mixed-submodule",
         false,
         None,
     ));
@@ -183,8 +193,19 @@ fn integration_pyo3_mixed_py_subdir() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-mixed-py-subdir",
         None,
-        "integration_pyo3_mixed_py_subdir",
+        "integration-pyo3-mixed-py-subdir",
         cfg!(unix),
+        None,
+    ));
+}
+
+#[test]
+fn integration_pyo3_mixed_src_layout() {
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-mixed-src/rust",
+        None,
+        "integration-pyo3-mixed-src",
+        false,
         None,
     ));
 }
@@ -205,7 +226,7 @@ fn integration_cffi_pure() {
     handle_result(integration::test_integration(
         "test-crates/cffi-pure",
         None,
-        "integration_cffi_pure",
+        "integration-cffi-pure",
         false,
         None,
     ));
@@ -216,7 +237,7 @@ fn integration_cffi_mixed() {
     handle_result(integration::test_integration(
         "test-crates/cffi-mixed",
         None,
-        "integration_cffi_mixed",
+        "integration-cffi-mixed",
         false,
         None,
     ));
@@ -227,7 +248,7 @@ fn integration_hello_world() {
     handle_result(integration::test_integration(
         "test-crates/hello-world",
         None,
-        "integration_hello_world",
+        "integration-hello-world",
         false,
         None,
     ));
@@ -238,7 +259,7 @@ fn integration_pyo3_ffi_pure() {
     handle_result(integration::test_integration(
         "test-crates/pyo3-ffi-pure",
         None,
-        "integration_pyo3_ffi_pure",
+        "integration-pyo3-ffi-pure",
         false,
         None,
     ));
@@ -249,7 +270,7 @@ fn integration_with_data() {
     handle_result(integration::test_integration(
         "test-crates/with-data",
         None,
-        "integration_with_data",
+        "integration-with-data",
         false,
         None,
     ));
@@ -274,7 +295,7 @@ fn integration_wasm_hello_world() {
     handle_result(integration::test_integration(
         "test-crates/hello-world",
         None,
-        "integration_wasm_hello_world",
+        "integration-wasm-hello-world",
         false,
         Some("wasm32-wasi"),
     ));
@@ -282,7 +303,7 @@ fn integration_wasm_hello_world() {
     // Make sure we're actually running wasm
     assert!(Path::new("test-crates")
         .join("venvs")
-        .join("hello-world-py3-wasm32-wasi")
+        .join("integration-wasm-hello-world-py3-wasm32-wasi")
         .join(if cfg!(target_os = "windows") {
             "Scripts"
         } else {
@@ -343,7 +364,7 @@ fn lib_with_path_dep_sdist() {
             "sdist_with_path_dep-0.1.0/src/lib.rs",
             "sdist_with_path_dep-0.1.0/PKG-INFO",
         ],
-        "lib_with_path_dep_sdist",
+        "sdist-lib-with-path-dep",
     ))
 }
 
@@ -361,7 +382,7 @@ fn workspace_with_path_dep_sdist() {
             "workspace_with_path_dep-0.1.0/src/lib.rs",
             "workspace_with_path_dep-0.1.0/PKG-INFO",
         ],
-        "workspace_with_path_dep_sdist",
+        "sdist-workspace-with-path-dep",
     ))
 }
 
@@ -378,7 +399,7 @@ fn workspace_inheritance_sdist() {
             "workspace_inheritance-0.1.0/src/lib.rs",
             "workspace_inheritance-0.1.0/PKG-INFO",
         ],
-        "workspace_inheritance_sdist",
+        "sdist-workspace-inheritance",
     ))
 }
 

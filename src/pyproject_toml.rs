@@ -86,6 +86,11 @@ impl PyProjectToml {
         Ok(pyproject)
     }
 
+    /// Returns the value of `[project.name]` in pyproject.toml
+    pub fn project_name(&self) -> Option<&str> {
+        self.project.as_ref().map(|project| project.name.as_str())
+    }
+
     /// Returns the values of `[tool.maturin]` in pyproject.toml
     #[inline]
     pub fn maturin(&self) -> Option<&ToolMaturin> {

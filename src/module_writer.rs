@@ -47,10 +47,6 @@ pub trait ModuleWriter {
 
     /// Copies the source file to the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        let target = target.as_ref();
-        let source = source.as_ref();
-        debug!("Adding {} from {}", target.display(), source.display());
-
         self.add_file_with_permissions(target, source, 0o644)
     }
 
@@ -62,12 +58,16 @@ pub trait ModuleWriter {
         source: impl AsRef<Path>,
         permissions: u32,
     ) -> Result<()> {
-        let read_failed_context = format!("Failed to read {}", source.as_ref().display());
-        let mut file = File::open(source.as_ref()).context(read_failed_context.clone())?;
+        let target = target.as_ref();
+        let source = source.as_ref();
+        debug!("Adding {} from {}", target.display(), source.display());
+
+        let read_failed_context = format!("Failed to read {}", source.display());
+        let mut file = File::open(source).context(read_failed_context.clone())?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).context(read_failed_context)?;
-        self.add_bytes_with_permissions(target.as_ref(), &buffer, permissions)
-            .context(format!("Failed to write to {}", target.as_ref().display()))?;
+        self.add_bytes_with_permissions(target, &buffer, permissions)
+            .context(format!("Failed to write to {}", target.display()))?;
         Ok(())
     }
 }
@@ -640,11 +640,6 @@ pub fn write_bindings_module(
     };
 
     if let Some(python_module) = &project_layout.python_module {
-        if !editable {
-            write_python_part(writer, python_module)
-                .context("Failed to add the python module to the package")?;
-        }
-
         if editable {
             let target = project_layout.rust_module.join(&so_filename);
             // Remove existing so file to avoid triggering SIGSEV in running process
@@ -658,9 +653,10 @@ pub fn write_bindings_module(
                 artifact.display(),
                 target.display()
             ))?;
-        }
+        } else {
+            write_python_part(writer, python_module)
+                .context("Failed to add the python module to the package")?;
 
-        if !editable {
             let relative = project_layout
                 .rust_module
                 .strip_prefix(python_module.parent().unwrap())?;

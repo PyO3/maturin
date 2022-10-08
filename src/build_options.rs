@@ -53,7 +53,7 @@ pub struct CargoOptions {
     pub profile: Option<String>,
 
     /// Space or comma separated list of features to activate
-    #[clap(short = 'F', long, multiple_occurrences = true)]
+    #[clap(short = 'F', long, action = clap::ArgAction::Append)]
     pub features: Vec<String>,
 
     /// Activate all available features
@@ -69,11 +69,11 @@ pub struct CargoOptions {
     pub target: Option<String>,
 
     /// Directory for all generated artifacts
-    #[clap(long, value_name = "DIRECTORY", parse(from_os_str))]
+    #[clap(long, value_name = "DIRECTORY", value_parser)]
     pub target_dir: Option<PathBuf>,
 
     /// Path to Cargo.toml
-    #[clap(short = 'm', long, value_name = "PATH", parse(from_os_str))]
+    #[clap(short = 'm', long, value_name = "PATH", value_parser)]
     pub manifest_path: Option<PathBuf>,
 
     /// Ignore `rust-version` specification in packages
@@ -81,8 +81,8 @@ pub struct CargoOptions {
     pub ignore_rust_version: bool,
 
     /// Use verbose output (-vv very verbose/build.rs output)
-    #[clap(short = 'v', long, parse(from_occurrences), max_occurrences = 2)]
-    pub verbose: usize,
+    #[clap(short = 'v', long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 
     /// Coloring: auto, always, never
     #[clap(long, value_name = "WHEN")]
@@ -101,11 +101,11 @@ pub struct CargoOptions {
     pub offline: bool,
 
     /// Override a configuration value (unstable)
-    #[clap(long, value_name = "KEY=VALUE", multiple_occurrences = true)]
+    #[clap(long, value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
     pub config: Vec<String>,
 
     /// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
-    #[clap(short = 'Z', value_name = "FLAG", multiple_occurrences = true)]
+    #[clap(short = 'Z', value_name = "FLAG", action = clap::ArgAction::Append)]
     pub unstable_flags: Vec<String>,
 
     /// Timing output formats (unstable) (comma separated): html, json
@@ -148,15 +148,15 @@ pub struct BuildOptions {
         name = "compatibility",
         long = "compatibility",
         alias = "manylinux",
-        parse(try_from_str),
+        value_parser,
         multiple_values = true,
-        multiple_occurrences = true
+        action = clap::ArgAction::Append
     )]
     pub platform_tag: Vec<PlatformTag>,
 
     /// The python versions to build wheels for, given as the names of the
     /// interpreters.
-    #[clap(short, long, multiple_values = true, multiple_occurrences = true)]
+    #[clap(short, long, multiple_values = true, action = clap::ArgAction::Append)]
     pub interpreter: Vec<PathBuf>,
 
     /// Find interpreters from the host machine
@@ -169,7 +169,7 @@ pub struct BuildOptions {
 
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     pub out: Option<PathBuf>,
 
     /// Don't check for manylinux compliance

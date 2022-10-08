@@ -236,9 +236,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98cdaeae47871a543692dac2ad7cef3efdf1f9559a41e68a42507367e38c424f"
+checksum = "1e154133a9bd3d46ad7e4be70b0c5915b62c1ddb57d4f31633146976fbdabe3d"
 dependencies = [
  "clap",
 ]
@@ -254,9 +254,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b4d44af0e3fdd773cbf70b6b826a28993839be0a36c2b7c00c47f2dadaca6c6"
+checksum = "4ef4ab668680f931f92137a21fa0c70a39039e251c8516de2e86d632e393c965"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -271,9 +271,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.12.3"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18595fee58047056c6041548a1fb9b7c33bca689a4d603a8fb39bca941ae57ad"
+checksum = "d9686be0aaee69600e8514deaa9ca47b62a571b41355c4eeb21a6c863bbec452"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -335,7 +335,7 @@ checksum = "d38f2da7a0a2c4ccf0065be06397cc26a81f4e528be095826eee9d4adbb8c60f"
 dependencies = [
  "byteorder",
  "fnv",
- "uuid 1.2.0",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1425,7 +1425,7 @@ dependencies = [
  "byteorder",
  "cfb",
  "encoding",
- "uuid 1.2.0",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -2708,9 +2708,9 @@ checksum = "099b7128301d285f79ddd55b9a83d5e6b9e97c92e0ea0daebee7263e932de992"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcc811dc4066ac62f84f11307873c4850cb653bfa9b1719cee2bd2204a4bc5dd"
+checksum = "6ceab39d59e4c9499d4e5a8ee0e2735b891bb7308ac83dfb4e80cad195c9f6f3"
 
 [[package]]
 name = "unicode-linebreak"
@@ -2784,9 +2784,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683f0a095f6dcf74520a5f17a12452ae6f970abbd2443299a1e226fd38195f2b"
+checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
 
 [[package]]
 name = "valuable"

@@ -115,7 +115,10 @@ exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
     { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
-    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" }
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
+    { allow = ["MPL-2.0"], name = "cbindgen" },
+    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+    { allow = ["MIT", "LGPL-3.0"], name = "configparser" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

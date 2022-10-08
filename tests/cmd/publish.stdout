@@ -1,0 +1,157 @@
+maturin[EXE]-publish 
+Build and publish the crate as python packages to pypi
+
+USAGE:
+    maturin[EXE] publish [OPTIONS] [--] [ARGS]...
+
+ARGS:
+    <ARGS>...
+            Rustc flags
+
+OPTIONS:
+        --debug
+            Do not pass --release to cargo
+
+        --no-strip
+            Do not strip the library for minimum file size
+
+        --no-sdist
+            Don't build a source distribution
+
+    -r, --repository <REPOSITORY>
+            The repository (package index) to upload the package to. Should be a section in the
+            config file.
+            
+            Can also be set via MATURIN_REPOSITORY environment variable.
+            
+            [env: MATURIN_REPOSITORY=]
+            [default: pypi]
+
+        --repository-url <REPOSITORY_URL>
+            The URL of the registry where the wheels are uploaded to. This overrides --repository.
+            
+            Can also be set via MATURIN_REPOSITORY_URL environment variable.
+            
+            [env: MATURIN_REPOSITORY_URL=]
+
+    -u, --username <USERNAME>
+            Username for pypi or your custom registry.
+            
+            Can also be set via MATURIN_USERNAME environment variable.
+            
+            Set MATURIN_PYPI_TOKEN variable to use token-based authentication instead
+            
+            [env: MATURIN_USERNAME=]
+
+    -p, --password <PASSWORD>
+            Password for pypi or your custom registry.
+            
+            Can also be set via MATURIN_PASSWORD environment variable.
+
+        --skip-existing
+            Continue uploading files if one already exists. (Only valid when uploading to PyPI.
+            Other implementations may not support this.)
+
+        --compatibility <compatibility>...
+            Control the platform tag on linux.
+            
+            Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
+            `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
+            
+            Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels
+            with the native `linux` tag will be rejected by pypi, unless they are separately
+            validated by `auditwheel`.
+            
+            The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing
+            matched
+            
+            This option is ignored on all non-linux platforms
+
+    -i, --interpreter <INTERPRETER>...
+            The python versions to build wheels for, given as the names of the interpreters
+
+    -f, --find-interpreter
+            Find interpreters from the host machine
+
+    -b, --bindings <BINDINGS>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+
+    -o, --out <OUT>
+            The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+            project's target directory
+
+        --skip-auditwheel
+            Don't check for manylinux compliance
+
+        --zig
+            For manylinux targets, use zig to ensure compliance for the chosen manylinux version
+            
+            Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
+            
+            Make sure you installed zig with `pip install maturin[zig]`
+
+        --universal2
+            Control whether to build universal2 wheel for macOS or not. Only applies to macOS
+            targets, do nothing otherwise
+
+    -q, --quiet
+            Do not print cargo log messages
+
+    -j, --jobs <N>
+            Number of parallel jobs, defaults to # of CPUs
+
+        --profile <PROFILE-NAME>
+            Build artifacts with the specified Cargo profile
+
+    -F, --features <FEATURES>
+            Space or comma separated list of features to activate
+
+        --all-features
+            Activate all available features
+
+        --no-default-features
+            Do not activate the `default` feature
+
+        --target <TRIPLE>
+            Build for the target triple
+            
+            [env: CARGO_BUILD_TARGET=]
+
+        --target-dir <DIRECTORY>
+            Directory for all generated artifacts
+
+    -m, --manifest-path <PATH>
+            Path to Cargo.toml
+
+        --ignore-rust-version
+            Ignore `rust-version` specification in packages
+
+    -v, --verbose
+            Use verbose output (-vv very verbose/build.rs output)
+
+        --color <WHEN>
+            Coloring: auto, always, never
+
+        --frozen
+            Require Cargo.lock and cache are up to date
+
+        --locked
+            Require Cargo.lock is up to date
+
+        --offline
+            Run without accessing the network
+
+        --config <KEY=VALUE>
+            Override a configuration value (unstable)
+
+    -Z <FLAG>
+            Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+        --timings[=<FMTS>...]
+            Timing output formats (unstable) (comma separated): html, json
+
+        --future-incompat-report
+            Outputs a future incompatibility report at the end of the build (unstable)
+
+    -h, --help
+            Print help information

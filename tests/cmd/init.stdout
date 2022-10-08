@@ -1,0 +1,15 @@
+maturin[EXE]-init 
+Create a new cargo project in an existing directory
+
+USAGE:
+    maturin[EXE] init [OPTIONS] [PATH]
+
+ARGS:
+    <PATH>    Project path
+
+OPTIONS:
+        --name <NAME>            Set the resulting package name, defaults to the directory name
+        --mixed                  Use mixed Rust/Python project layout
+    -b, --bindings <BINDINGS>    Which kind of bindings to use [possible values: pyo3, rust-cpython,
+                                 cffi, bin]
+    -h, --help                   Print help information

@@ -1,0 +1,9 @@
+maturin[EXE]-list-python 
+Search and list the available python installations
+
+USAGE:
+    maturin[EXE] list-python [OPTIONS]
+
+OPTIONS:
+        --target <TARGET>    
+    -h, --help               Print help information

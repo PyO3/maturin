@@ -1,0 +1,49 @@
+maturin[EXE]-upload 
+Upload python packages to pypi
+
+It is mostly similar to `twine upload`, but can only upload python wheels and source distributions.
+
+USAGE:
+    maturin[EXE] upload [OPTIONS] [FILE]...
+
+ARGS:
+    <FILE>...
+            The python packages to upload
+
+OPTIONS:
+    -r, --repository <REPOSITORY>
+            The repository (package index) to upload the package to. Should be a section in the
+            config file.
+            
+            Can also be set via MATURIN_REPOSITORY environment variable.
+            
+            [env: MATURIN_REPOSITORY=]
+            [default: pypi]
+
+        --repository-url <REPOSITORY_URL>
+            The URL of the registry where the wheels are uploaded to. This overrides --repository.
+            
+            Can also be set via MATURIN_REPOSITORY_URL environment variable.
+            
+            [env: MATURIN_REPOSITORY_URL=]
+
+    -u, --username <USERNAME>
+            Username for pypi or your custom registry.
+            
+            Can also be set via MATURIN_USERNAME environment variable.
+            
+            Set MATURIN_PYPI_TOKEN variable to use token-based authentication instead
+            
+            [env: MATURIN_USERNAME=]
+
+    -p, --password <PASSWORD>
+            Password for pypi or your custom registry.
+            
+            Can also be set via MATURIN_PASSWORD environment variable.
+
+        --skip-existing
+            Continue uploading files if one already exists. (Only valid when uploading to PyPI.
+            Other implementations may not support this.)
+
+    -h, --help
+            Print help information

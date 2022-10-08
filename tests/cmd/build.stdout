@@ -1,0 +1,123 @@
+maturin[EXE]-build 
+Build the crate into python packages
+
+USAGE:
+    maturin[EXE] build [OPTIONS] [--] [ARGS]...
+
+ARGS:
+    <ARGS>...
+            Rustc flags
+
+OPTIONS:
+    -r, --release
+            Build artifacts in release mode, with optimizations
+
+        --strip
+            Strip the library for minimum file size
+
+        --sdist
+            Build a source distribution
+
+        --compatibility <compatibility>...
+            Control the platform tag on linux.
+            
+            Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
+            `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
+            
+            Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels
+            with the native `linux` tag will be rejected by pypi, unless they are separately
+            validated by `auditwheel`.
+            
+            The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing
+            matched
+            
+            This option is ignored on all non-linux platforms
+
+    -i, --interpreter <INTERPRETER>...
+            The python versions to build wheels for, given as the names of the interpreters
+
+    -f, --find-interpreter
+            Find interpreters from the host machine
+
+    -b, --bindings <BINDINGS>
+            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+
+    -o, --out <OUT>
+            The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+            project's target directory
+
+        --skip-auditwheel
+            Don't check for manylinux compliance
+
+        --zig
+            For manylinux targets, use zig to ensure compliance for the chosen manylinux version
+            
+            Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
+            
+            Make sure you installed zig with `pip install maturin[zig]`
+
+        --universal2
+            Control whether to build universal2 wheel for macOS or not. Only applies to macOS
+            targets, do nothing otherwise
+
+    -q, --quiet
+            Do not print cargo log messages
+
+    -j, --jobs <N>
+            Number of parallel jobs, defaults to # of CPUs
+
+        --profile <PROFILE-NAME>
+            Build artifacts with the specified Cargo profile
+
+    -F, --features <FEATURES>
+            Space or comma separated list of features to activate
+
+        --all-features
+            Activate all available features
+
+        --no-default-features
+            Do not activate the `default` feature
+
+        --target <TRIPLE>
+            Build for the target triple
+            
+            [env: CARGO_BUILD_TARGET=]
+
+        --target-dir <DIRECTORY>
+            Directory for all generated artifacts
+
+    -m, --manifest-path <PATH>
+            Path to Cargo.toml
+
+        --ignore-rust-version
+            Ignore `rust-version` specification in packages
+
+    -v, --verbose
+            Use verbose output (-vv very verbose/build.rs output)
+
+        --color <WHEN>
+            Coloring: auto, always, never
+
+        --frozen
+            Require Cargo.lock and cache are up to date
+
+        --locked
+            Require Cargo.lock is up to date
+
+        --offline
+            Run without accessing the network
+
+        --config <KEY=VALUE>
+            Override a configuration value (unstable)
+
+    -Z <FLAG>
+            Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+        --timings[=<FMTS>...]
+            Timing output formats (unstable) (comma separated): html, json
+
+        --future-incompat-report
+            Outputs a future incompatibility report at the end of the build (unstable)
+
+    -h, --help
+            Print help information

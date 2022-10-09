@@ -47,6 +47,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          target: wasm32-wasi # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install aarch64-apple-darwin Rust target
@@ -351,7 +352,7 @@ jobs:
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
     steps:
       - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2

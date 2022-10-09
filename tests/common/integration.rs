@@ -15,6 +15,7 @@ pub fn test_integration(
     bindings: Option<String>,
     unique_name: &str,
     zig: bool,
+    target: Option<&str>,
 ) -> Result<()> {
     maybe_mock_cargo();
 
@@ -43,6 +44,11 @@ pub fn test_integration(
     if let Some(ref bindings) = bindings {
         cli.push("--bindings");
         cli.push(bindings);
+    }
+
+    if let Some(target) = target {
+        cli.push("--target");
+        cli.push(target)
     }
 
     let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || Zig::find_zig().is_ok()) {
@@ -84,11 +90,14 @@ pub fn test_integration(
             };
             assert!(filename.to_string_lossy().ends_with(file_suffix))
         }
-        let venv_suffix = if supported_version == "py3" {
+        let mut venv_suffix = if supported_version == "py3" {
             "py3".to_string()
         } else {
             format!("{}.{}", python_interpreter.major, python_interpreter.minor,)
         };
+        if let Some(target) = target {
+            venv_suffix = format!("{}-{}", venv_suffix, target);
+        }
         let (venv_dir, python) = create_virtualenv(
             &package,
             &venv_suffix,

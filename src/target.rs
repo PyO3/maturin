@@ -28,6 +28,7 @@ pub enum Os {
     Illumos,
     Haiku,
     Emscripten,
+    Wasi,
 }
 
 impl fmt::Display for Os {
@@ -43,6 +44,7 @@ impl fmt::Display for Os {
             Os::Illumos => write!(f, "Illumos"),
             Os::Haiku => write!(f, "Haiku"),
             Os::Emscripten => write!(f, "Emscripten"),
+            Os::Wasi => write!(f, "Wasi"),
         }
     }
 }
@@ -123,7 +125,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
         Os::Haiku => vec![Arch::X86_64],
-        Os::Emscripten => vec![Arch::Wasm32],
+        Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
     }
 }
 
@@ -176,6 +178,7 @@ impl Target {
             OperatingSystem::Illumos => Os::Illumos,
             OperatingSystem::Haiku => Os::Haiku,
             OperatingSystem::Emscripten => Os::Emscripten,
+            OperatingSystem::Wasi => Os::Wasi,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -353,6 +356,9 @@ impl Target {
                 let release = release.replace('.', "_").replace('-', "_");
                 format!("emscripten_{}_wasm32", release)
             }
+            (Os::Wasi, Arch::Wasm32) => {
+                "any".to_string()
+            }
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         };
         Ok(tag)
@@ -406,6 +412,8 @@ impl Target {
             Os::Illumos => "sunos",
             Os::Haiku => "haiku",
             Os::Emscripten => "emscripten",
+            // This isn't real, there's no sys.platform here
+            Os::Wasi => "wasi",
         }
     }
 
@@ -476,7 +484,8 @@ impl Target {
             | Os::Dragonfly
             | Os::Illumos
             | Os::Haiku
-            | Os::Emscripten => true,
+            | Os::Emscripten
+            | Os::Wasi => true,
         }
     }
 
@@ -533,6 +542,11 @@ impl Target {
     /// Returns true if the current platform is Emscripten
     pub fn is_emscripten(&self) -> bool {
         self.os == Os::Emscripten
+    }
+
+    /// Returns true if we're building a binary for wasm32-wasi
+    pub fn is_wasi(&self) -> bool {
+        self.os == Os::Wasi
     }
 
     /// Returns true if the current platform's target env is Musl

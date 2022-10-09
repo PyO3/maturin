@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+ * Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107). Note that wasmtime currently only support the five most popular platforms and that wasi binaries have restrictions when interacting with the host. Usage is by setting `--target wasm32-wasi`.
+
 ## [0.13.6] - 2022-10-08
 
 * Fix `maturin develop` in Windows conda virtual environment in [#1146](https://github.com/PyO3/maturin/pull/1146)

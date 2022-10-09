@@ -761,7 +761,7 @@ pub fn write_bin(
     writer: &mut impl ModuleWriter,
     artifact: &Path,
     metadata: &Metadata21,
-    bin_name: &OsStr,
+    bin_name: &str,
 ) -> Result<()> {
     let data_dir = PathBuf::from(format!(
         "{}-{}.data",
@@ -774,6 +774,58 @@ pub fn write_bin(
 
     // We can't use add_file since we need to mark the file as executable
     writer.add_file_with_permissions(&data_dir.join(bin_name), artifact, 0o755)?;
+    Ok(())
+}
+
+/// Adds a wrapper script that start the wasm binary through wasmtime.
+///
+/// Note that the wasm binary needs to be written separately by [write_bin]
+pub fn write_wasm_launcher(
+    writer: &mut impl ModuleWriter,
+    metadata: &Metadata21,
+    bin_name: &str,
+) -> Result<()> {
+    let entrypoint_script = format!(
+        r#"from pathlib import Path
+
+from wasmtime import Store, Module, Engine, WasiConfig, Linker
+
+import sysconfig
+
+def main():
+    # The actual executable
+    program_location = Path(sysconfig.get_path("scripts")).joinpath("{}")
+    # wasmtime-py boilerplate
+    engine = Engine()
+    store = Store(engine)
+    # TODO: is there an option to just get the default of the wasmtime cli here?
+    wasi = WasiConfig()
+    wasi.inherit_argv()
+    wasi.inherit_env()
+    wasi.inherit_stdout()
+    wasi.inherit_stderr()
+    wasi.inherit_stdin()
+    store.set_wasi(wasi)
+    linker = Linker(engine)
+    linker.define_wasi()
+    module = Module.from_file(store.engine, str(program_location))
+    linking1 = linker.instantiate(store, module)
+    # TODO: this is taken from https://docs.wasmtime.dev/api/wasmtime/struct.Linker.html#method.get_default
+    #       is this always correct?
+    start = linking1.exports(store).get("") or linking1.exports(store)["_start"]
+    start(store)
+
+if __name__ == '__main__':
+    main()
+    "#,
+        bin_name
+    );
+
+    // We can't use add_file since we want to mark the file as executable
+    let launcher_path = Path::new(&metadata.get_distribution_escaped())
+        .join(bin_name.replace('-', "_"))
+        .with_extension("py");
+    writer.add_bytes_with_permissions(&launcher_path, entrypoint_script.as_bytes(), 0o755)?;
     Ok(())
 }
 

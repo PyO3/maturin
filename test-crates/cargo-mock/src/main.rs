@@ -33,7 +33,8 @@ fn run() -> Result<()> {
         .replace("--quiet", "")
         .replace(&cwd, "")
         .replace(" ", "-")
-        .replace("/", "-");
+        .replace("/", "-")
+        .replace("-----C-link-arg=-s", "");
 
     let cache_path = base_cache_path.join(&env_key).join(&cargo_key);
     let stdout_path = cache_path.join("cargo.stdout");

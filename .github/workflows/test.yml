@@ -294,7 +294,6 @@ jobs:
       # Fix permissions from docker for caching
       - run: sudo chown $(id -u):$(id -g) -R test-crates/*/target
 
-
   test-cross-compile:
     name: Test Cross Compile
     runs-on: ubuntu-latest
@@ -417,3 +416,29 @@ jobs:
           key: maturin-${{ runner.os }}-msrv
       - name: cargo build
         run: cargo build --all
+
+  check:
+    name: Check ${{ matrix.platform.target }}
+    strategy:
+      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
+      matrix:
+        platform:
+          - target: armv5te-unknown-linux-gnueabi
+            apt-packages: gcc-arm-linux-gnueabi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.platform.apt-packages }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.platform.target }}
+          override: true
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v1
+      - name: cargo check
+        run: cargo check --target ${{ matrix.platform.target }}

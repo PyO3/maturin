@@ -31,6 +31,7 @@ pub trait ModuleWriter {
 
     /// Adds a file with bytes as content in target relative to the module base path
     fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
+        debug!("Adding {}", target.as_ref().display());
         // 0o644 is the default from the zip crate
         self.add_bytes_with_permissions(target, bytes, 0o644)
     }
@@ -46,13 +47,11 @@ pub trait ModuleWriter {
 
     /// Copies the source file to the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        let read_failed_context = format!("Failed to read {}", source.as_ref().display());
-        let mut file = File::open(source.as_ref()).context(read_failed_context.clone())?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).context(read_failed_context)?;
-        self.add_bytes(&target, &buffer)
-            .context(format!("Failed to write to {}", target.as_ref().display()))?;
-        Ok(())
+        let target = target.as_ref();
+        let source = source.as_ref();
+        debug!("Adding {} from {}", target.display(), source.display());
+
+        self.add_file_with_permissions(target, source, 0o644)
     }
 
     /// Copies the source file the the target path relative to the module base path while setting
@@ -150,7 +149,9 @@ impl PathWriter {
 
 impl ModuleWriter for PathWriter {
     fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        fs::create_dir_all(self.base_path.join(path))?;
+        let target = self.base_path.join(path);
+        debug!("Adding directory {}", target.display());
+        fs::create_dir_all(target)?;
         Ok(())
     }
 
@@ -277,7 +278,9 @@ impl WheelWriter {
             let absolute_path = fs::canonicalize(python_module)?;
             if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
                 let name = metadata21.get_distribution_escaped();
-                self.add_bytes(format!("{}.pth", name), python_path.as_bytes())?;
+                let target = format!("{}.pth", name);
+                debug!("Adding {} from {}", target, python_path);
+                self.add_bytes(target, python_path.as_bytes())?;
             } else {
                 println!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
             }
@@ -294,6 +297,7 @@ impl WheelWriter {
         };
         let options = zip::write::FileOptions::default().compression_method(compression_method);
         let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
+        debug!("Adding {}", record_filename);
         self.zip.start_file(&record_filename, options)?;
         for (filename, hash, len) in self.record {
             self.zip
@@ -331,6 +335,7 @@ impl ModuleWriter for SDistWriter {
             // Ignore duplicate files
             return Ok(());
         }
+
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
@@ -359,6 +364,7 @@ impl ModuleWriter for SDistWriter {
             // Ignore duplicate files
             return Ok(());
         }
+        debug!("Adding {} from {}", target.display(), source.display());
 
         self.tar
             .append_path_with_name(source, target)
@@ -486,6 +492,7 @@ fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result
 
         let header = tempdir.as_ref().join("header.h");
         bindings.write_to_file(&header);
+        debug!("Generated header.h at {}", header.display());
         Ok(header)
     }
 }
@@ -642,7 +649,10 @@ pub fn write_bindings_module(
             let target = project_layout.rust_module.join(&so_filename);
             // Remove existing so file to avoid triggering SIGSEV in running process
             // See https://github.com/PyO3/maturin/issues/758
+            debug!("Removing {}", target.display());
             let _ = fs::remove_file(&target);
+
+            debug!("Copying {} to {}", artifact.display(), target.display());
             fs::copy(&artifact, &target).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
@@ -676,12 +686,9 @@ if hasattr({module_name}, "__all__"):
             .rust_module
             .join(format!("{}.pyi", module_name));
         if type_stub.exists() {
-            writer.add_bytes(
-                &module.join("__init__.pyi"),
-                &fs_err::read(type_stub).context("Failed to read type stub file")?,
-            )?;
-            writer.add_bytes(&module.join("py.typed"), b"")?;
             println!("📖 Found type stub file at {}.pyi", module_name);
+            writer.add_file(&module.join("__init__.pyi"), type_stub)?;
+            writer.add_bytes(&module.join("py.typed"), b"")?;
         }
         writer.add_file_with_permissions(&module.join(so_filename), &artifact, 0o755)?;
     }
@@ -738,12 +745,9 @@ pub fn write_cffi_module(
             .rust_module
             .join(format!("{}.pyi", module_name));
         if type_stub.exists() {
-            writer.add_bytes(
-                &module.join("__init__.pyi"),
-                &fs_err::read(type_stub).context("Failed to read type stub file")?,
-            )?;
-            writer.add_bytes(&module.join("py.typed"), b"")?;
             println!("📖 Found type stub file at {}.pyi", module_name);
+            writer.add_file(&module.join("__init__.pyi"), type_stub)?;
+            writer.add_bytes(&module.join("py.typed"), b"")?;
         }
     };
 
@@ -843,6 +847,7 @@ pub fn write_python_part(
             // Ignore native libraries from develop, if any
             if let Some(extension) = relative.extension() {
                 if extension.to_string_lossy() == "so" {
+                    debug!("Ignoring native library {}", relative.display());
                     continue;
                 }
             }

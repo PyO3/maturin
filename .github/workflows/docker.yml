@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Setup QEMU
         uses: dbhi/qus/action@main
-      - uses: docker/setup-buildx-action@v1
+      - uses: docker/setup-buildx-action@v2
       - uses: docker/metadata-action@v4
         id: meta
         with:

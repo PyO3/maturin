@@ -251,7 +251,7 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [ build, build-musl, build-no-rustls ]
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: wheels
       - uses: actions/setup-python@v4
@@ -277,7 +277,7 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [ build, build-musl, build-no-rustls ]
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: binaries
       - name: Release

@@ -81,6 +81,7 @@ fn bin_wasi_helper(
     artifacts_and_files: &[(&BuildArtifact, String)],
     mut metadata21: Metadata21,
 ) -> Result<Metadata21> {
+    eprintln!("⚠️  Warning: wasi support is experimental");
     // escaped can contain [\w\d.], but i don't know how we'd handle dots correctly here
     if metadata21.get_distribution_escaped().contains('.') {
         bail!(
@@ -122,7 +123,7 @@ fn bin_wasi_helper(
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
             .requires_dist
-            .push("wasmtime>=0.40,<0.41".to_string());
+            .push("wasmtime>=1.0.1,<2.0.0".to_string());
     }
 
     Ok(metadata21)
@@ -721,6 +722,15 @@ impl BuildContext {
                 .to_str()
                 .context("binary produced by cargo has non-utf8 filename")?
                 .to_string();
+
+            // From https://packaging.python.org/en/latest/specifications/entry-points/
+            // > The name may contain any characters except =, but it cannot start or end with any
+            // > whitespace character, or start with [. For new entry points, it is recommended to
+            // > use only letters, numbers, underscores, dots and dashes (regex [\w.-]+).
+            // All of these rules are already enforced by cargo:
+            // https://github.com/rust-lang/cargo/blob/58a961314437258065e23cb6316dfc121d96fb71/src/cargo/util/restricted_names.rs#L39-L84
+            // i.e. we don't need to do any bin name validation here anymore
+
             artifacts_and_files.push((artifact, bin_name))
         }
 

@@ -100,7 +100,7 @@ pub struct GenerateProjectOptions {
     #[clap(long)]
     mixed: bool,
     /// Which kind of bindings to use
-    #[clap(short, long, possible_values = &["pyo3", "rust-cpython", "cffi", "bin"])]
+    #[clap(short, long, value_parser = ["pyo3", "rust-cpython", "cffi", "bin"])]
     bindings: Option<String>,
 }
 

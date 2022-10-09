@@ -89,7 +89,7 @@ enum Opt {
             long,
             use_value_delimiter = true,
             multiple_values = false,
-            multiple_occurrences = false
+            action = clap::ArgAction::Append
         )]
         extras: Vec<String>,
         #[clap(flatten)]
@@ -102,12 +102,12 @@ enum Opt {
     /// This command is a workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
     #[clap(name = "sdist")]
     SDist {
-        #[clap(short = 'm', long = "manifest-path", parse(from_os_str))]
+        #[clap(short = 'm', long = "manifest-path", value_parser)]
         /// The path to the Cargo.toml
         manifest_path: Option<PathBuf>,
         /// The directory to store the built wheels in. Defaults to a new "wheels"
         /// directory in the project's target directory
-        #[clap(short, long, parse(from_os_str))]
+        #[clap(short, long, value_parser)]
         out: Option<PathBuf>,
     },
     /// Create a new cargo project in an existing directory
@@ -136,7 +136,7 @@ enum Opt {
         #[clap(flatten)]
         publish: PublishOpt,
         /// The python packages to upload
-        #[clap(name = "FILE", parse(from_os_str))]
+        #[clap(name = "FILE", value_parser)]
         files: Vec<PathBuf>,
     },
     /// Backend for the PEP 517 integration. Not for human consumption
@@ -147,7 +147,7 @@ enum Opt {
     /// Generate shell completions
     #[clap(name = "completions", hide = true)]
     Completions {
-        #[clap(name = "SHELL", parse(try_from_str))]
+        #[clap(name = "SHELL", value_parser)]
         shell: Shell,
     },
     /// Zig linker wrapper
@@ -167,7 +167,7 @@ enum Pep517Command {
         #[clap(flatten)]
         build_options: BuildOptions,
         /// The metadata_directory argument to prepare_metadata_for_build_wheel
-        #[clap(long = "metadata-directory", parse(from_os_str))]
+        #[clap(long = "metadata-directory", value_parser)]
         metadata_directory: PathBuf,
         /// Strip the library for minimum file size
         #[clap(long)]
@@ -191,12 +191,12 @@ enum Pep517Command {
     #[clap(name = "write-sdist")]
     WriteSDist {
         /// The sdist_directory argument to build_sdist
-        #[clap(long = "sdist-directory", parse(from_os_str))]
+        #[clap(long = "sdist-directory", value_parser)]
         sdist_directory: PathBuf,
         #[clap(
             short = 'm',
             long = "manifest-path",
-            parse(from_os_str),
+            value_parser,
             default_value = "Cargo.toml",
             name = "PATH"
         )]

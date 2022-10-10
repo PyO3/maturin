@@ -90,19 +90,19 @@ pub fn test_integration(
             };
             assert!(filename.to_string_lossy().ends_with(file_suffix))
         }
-        let mut venv_suffix = if supported_version == "py3" {
-            "py3".to_string()
+        let mut venv_name = if supported_version == "py3" {
+            format!("{}-py3", unique_name)
         } else {
-            format!("{}.{}", python_interpreter.major, python_interpreter.minor,)
+            format!(
+                "{}-py{}.{}",
+                unique_name, python_interpreter.major, python_interpreter.minor,
+            )
         };
         if let Some(target) = target {
-            venv_suffix = format!("{}-{}", venv_suffix, target);
+            venv_name = format!("{}-{}", venv_name, target);
         }
-        let (venv_dir, python) = create_virtualenv(
-            &package,
-            &venv_suffix,
-            Some(python_interpreter.executable.clone()),
-        )?;
+        let (venv_dir, python) =
+            create_virtualenv(&venv_name, Some(python_interpreter.executable.clone()))?;
 
         let command = [
             "-m",

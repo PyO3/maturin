@@ -21,9 +21,16 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     } else {
         python.parent().unwrap().to_path_buf()
     };
-    let check_installed = Path::new(package)
+    let mut check_installed = Path::new(package)
         .join("check_installed")
         .join("check_installed.py");
+    if !check_installed.is_file() {
+        check_installed = Path::new(package)
+            .parent()
+            .unwrap()
+            .join("check_installed")
+            .join("check_installed.py");
+    }
     let output = Command::new(&python)
         .arg(check_installed)
         .env("PATH", path)
@@ -85,22 +92,10 @@ pub fn handle_result<T>(result: Result<T>) -> T {
 }
 
 /// Create virtualenv
-pub fn create_virtualenv(
-    package: impl AsRef<Path>,
-    venv_suffix: &str,
-    python_interp: Option<PathBuf>,
-) -> Result<(PathBuf, PathBuf)> {
-    let test_name = package
-        .as_ref()
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-
+pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(PathBuf, PathBuf)> {
     let venv_dir = fs::canonicalize(PathBuf::from("test-crates"))?
         .join("venvs")
-        .join(format!("{}-{}", test_name, venv_suffix));
+        .join(name);
     let target = Target::from_target_triple(None)?;
 
     if venv_dir.is_dir() {

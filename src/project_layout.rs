@@ -63,6 +63,10 @@ impl ProjectResolver {
                 manifest_file.display()
             );
         }
+
+        // Set Cargo manifest path
+        cargo_options.manifest_path = Some(manifest_file.clone());
+
         let cargo_toml = CargoToml::from_path(&manifest_file)?;
         cargo_toml.warn_deprecated_python_metadata();
 
@@ -123,7 +127,18 @@ impl ProjectResolver {
             Some(py_src) => py_src.to_path_buf(),
             None => match extra_metadata.python_source.as_ref() {
                 Some(py_src) => manifest_dir.join(py_src),
-                None => project_root.to_path_buf(),
+                None => match pyproject.and_then(|x| x.project_name()) {
+                    Some(project_name) => {
+                        // Detect src layout
+                        let import_name = project_name.replace('-', "_");
+                        if project_root.join("src").join(import_name).is_dir() {
+                            project_root.join("src")
+                        } else {
+                            project_root.to_path_buf()
+                        }
+                    }
+                    None => project_root.to_path_buf(),
+                },
             },
         };
         let data = match pyproject.and_then(|x| x.data()) {
@@ -166,8 +181,10 @@ impl ProjectResolver {
         // use command line argument if specified
         if let Some(path) = cargo_manifest_path {
             let workspace_root = Self::resolve_cargo_metadata(&path, cargo_options)?.workspace_root;
+            let workspace_parent = workspace_root.parent().unwrap_or(&workspace_root);
             for parent in fs::canonicalize(&path)?.ancestors().skip(1) {
-                if !parent.starts_with(&workspace_root) {
+                // Allow looking outside to the parent directory of Cargo workspace root
+                if !dunce::simplified(parent).starts_with(&workspace_parent) {
                     break;
                 }
                 let pyproject_file = parent.join(PYPROJECT_TOML);
@@ -196,6 +213,33 @@ impl ProjectResolver {
                     bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
                 }
                 return Ok((path.to_path_buf(), pyproject_file));
+            } else {
+                // Detect src layout:
+                //
+                // my-project
+                // ├── Readme.md
+                // ├── pyproject.toml
+                // ├── src
+                // │   └── my_project
+                // │       ├── __init__.py
+                // │       └── bar.py
+                // └── rust
+                //     ├── Cargo.toml
+                //     └── src
+                //         └── lib.rs
+                let path = current_dir.join("rust").join("Cargo.toml");
+                if path.exists() {
+                    if pyproject.python_source().is_some() {
+                        // python source directory is specified in pyproject.toml
+                        return Ok((path, pyproject_file));
+                    } else if let Some(project_name) = pyproject.project_name() {
+                        // Check if python source directory in `src/<project_name>`
+                        let import_name = project_name.replace('-', "_");
+                        if current_dir.join("src").join(import_name).is_dir() {
+                            return Ok((path, pyproject_file));
+                        }
+                    }
+                }
             }
         }
         // check Cargo.toml in current directory

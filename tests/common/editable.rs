@@ -16,7 +16,7 @@ pub fn test_editable(
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
-    let (venv_dir, python) = create_virtualenv(&package, "editable", None)?;
+    let (venv_dir, python) = create_virtualenv(unique_name, None)?;
     let interpreter = python.to_str().expect("invalid interpreter path");
     let target_dir = format!("test-crates/targets/{}", unique_name);
     let wheel_dir = format!("test-crates/wheels/{}", unique_name);

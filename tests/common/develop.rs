@@ -15,14 +15,15 @@ pub fn test_develop(
 ) -> Result<()> {
     maybe_mock_cargo();
 
+    let package = package.as_ref();
     let (venv_dir, python) = if conda {
         create_conda_env(&format!("maturin-{}", unique_name), 3, 10)?
     } else {
-        create_virtualenv(&package, "develop", None)?
+        create_virtualenv(unique_name, None)?
     };
 
     // Ensure the test doesn't wrongly pass
-    check_installed(package.as_ref(), &python).unwrap_err();
+    check_installed(package, &python).unwrap_err();
 
     let output = Command::new(&python)
         .args(&["-m", "pip", "install", "cffi"])
@@ -36,7 +37,7 @@ pub fn test_develop(
         );
     }
 
-    let manifest_file = package.as_ref().join("Cargo.toml");
+    let manifest_file = package.join("Cargo.toml");
     develop(
         bindings,
         CargoOptions {
@@ -54,6 +55,6 @@ pub fn test_develop(
         vec![],
     )?;
 
-    check_installed(package.as_ref(), &python)?;
+    check_installed(package, &python)?;
     Ok(())
 }

@@ -4,6 +4,7 @@ venv*/
 .pytest_cache/
 .tox/
 *.so
+*.py[cdo]
 __pycache__/
 *.egg-info/
 *.egg

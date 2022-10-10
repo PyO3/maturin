@@ -279,7 +279,11 @@ fn add_crate_to_source_distribution(
         .map(|relative_to_manifests| {
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
             if root_crate && cargo_toml_in_subdir {
-                (relative_to_cwd.clone(), relative_to_cwd)
+                let relative_to_project_root = abs_manifest_dir
+                    .strip_prefix(&pyproject_dir)
+                    .unwrap()
+                    .join(relative_to_manifests);
+                (relative_to_project_root, relative_to_cwd)
             } else {
                 (relative_to_manifests.to_path_buf(), relative_to_cwd)
             }
@@ -337,7 +341,8 @@ fn add_crate_to_source_distribution(
     writer.add_directory(prefix)?;
 
     let cargo_toml = if cargo_toml_in_subdir {
-        prefix.join(manifest_path)
+        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir)?;
+        prefix.join(relative_manifest_path)
     } else {
         prefix.join(manifest_path.file_name().unwrap())
     };
@@ -468,12 +473,19 @@ pub fn source_distribution(
         true,
     )?;
 
-    let manifest_dir = manifest_path.parent().unwrap();
-    let cargo_lock_path = manifest_dir.join("Cargo.lock");
+    let abs_manifest_path = fs::canonicalize(manifest_path)?;
+    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
+    let cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
     let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
     if cargo_lock_required || cargo_lock_path.exists() {
-        writer.add_file(root_dir.join("Cargo.lock"), &cargo_lock_path)?;
+        let project_root = pyproject_toml_path.parent().unwrap();
+        let relative_cargo_lock = if cargo_lock_path.starts_with(project_root) {
+            cargo_lock_path.strip_prefix(project_root)?
+        } else {
+            cargo_lock_path.strip_prefix(&abs_manifest_dir)?
+        };
+        writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
     } else {
         println!(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \
@@ -481,8 +493,21 @@ pub fn source_distribution(
         );
     }
 
-    // Add readme, license and python source files
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
+    // Add python source files
+    if let Some(python_source) = build_context.project_layout.python_module.as_ref() {
+        for entry in ignore::Walk::new(python_source) {
+            let source = entry?.into_path();
+            let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
+            if source.is_dir() {
+                writer.add_directory(target)?;
+            } else {
+                writer.add_file(target, &source)?;
+            }
+        }
+    }
+
+    // Add readme, license
     if let Some(project) = pyproject.project.as_ref() {
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
             writer.add_file(root_dir.join(readme), pyproject_dir.join(readme))?;
@@ -494,18 +519,8 @@ pub fn source_distribution(
         {
             writer.add_file(root_dir.join(license), pyproject_dir.join(license))?;
         }
-        if let Some(python_source) = pyproject.python_source() {
-            for entry in ignore::Walk::new(pyproject_dir.join(python_source)) {
-                let source = entry?.into_path();
-                let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
-                if source.is_dir() {
-                    writer.add_directory(target)?;
-                } else {
-                    writer.add_file(target, &source)?;
-                }
-            }
-        }
     }
+
     if let Some(include_targets) = pyproject.sdist_include() {
         for pattern in include_targets {
             println!("📦 Including files matching \"{}\"", pattern);

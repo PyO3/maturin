@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
+use tracing::debug;
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// Inheritable workspace fields, see
@@ -498,6 +499,18 @@ pub fn source_distribution(
     if let Some(python_source) = build_context.project_layout.python_module.as_ref() {
         for entry in ignore::Walk::new(python_source) {
             let source = entry?.into_path();
+            // Technically, `ignore` crate should handle this,
+            // but somehow it doesn't on Alpine Linux running in GitHub Actions,
+            // so we do it manually here.
+            // See https://github.com/PyO3/maturin/pull/1187#issuecomment-1273987013
+            if source
+                .extension()
+                .map(|ext| ext == "pyc" || ext == "pyd" || ext == "so")
+                .unwrap_or_default()
+            {
+                debug!("Ignoring {}", source.display());
+                continue;
+            }
             let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
             if source.is_dir() {
                 writer.add_directory(target)?;

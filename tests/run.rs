@@ -1,7 +1,6 @@
 //! To speed up the tests, they are tests all collected in a single module
 
 use common::{develop, editable, errors, handle_result, integration, other};
-use std::path::Path;
 
 mod common;
 
@@ -292,6 +291,8 @@ fn integration_with_data() {
     ),
 ))]
 fn integration_wasm_hello_world() {
+    use std::path::Path;
+
     handle_result(integration::test_integration(
         "test-crates/hello-world",
         None,
@@ -365,6 +366,24 @@ fn lib_with_path_dep_sdist() {
             "sdist_with_path_dep-0.1.0/PKG-INFO",
         ],
         "sdist-lib-with-path-dep",
+    ))
+}
+
+#[test]
+fn pyo3_mixed_src_layout_sdist() {
+    handle_result(other::test_source_distribution(
+        "test-crates/pyo3-mixed-src/rust",
+        vec![
+            "pyo3_mixed_src-2.1.3/pyproject.toml",
+            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/__init__.py",
+            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/__init__.py",
+            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/double.py",
+            "pyo3_mixed_src-2.1.3/rust/Cargo.toml",
+            "pyo3_mixed_src-2.1.3/rust/Cargo.lock",
+            "pyo3_mixed_src-2.1.3/rust/src/lib.rs",
+            "pyo3_mixed_src-2.1.3/PKG-INFO",
+        ],
+        "sdist-pyo3-mixed-src-layout",
     ))
 }
 

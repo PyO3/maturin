@@ -5,17 +5,29 @@ use fs_err as fs;
 use minijinja::{context, Environment};
 use std::path::Path;
 
+/// Mixed Rust/Python project layout
+#[derive(Debug, Clone, Copy)]
+enum ProjectLayout {
+    Mixed { src: bool },
+    PureRust,
+}
+
 struct ProjectGenerator<'a> {
     env: Environment<'a>,
     project_name: String,
     crate_name: String,
     bindings: String,
-    mixed: bool,
+    layout: ProjectLayout,
     overwrite: bool,
 }
 
 impl<'a> ProjectGenerator<'a> {
-    fn new(project_name: String, mixed: bool, bindings: String, overwrite: bool) -> Result<Self> {
+    fn new(
+        project_name: String,
+        layout: ProjectLayout,
+        bindings: String,
+        overwrite: bool,
+    ) -> Result<Self> {
         let crate_name = project_name.replace('-', "_");
         let mut env = Environment::new();
         env.add_template(".gitignore", include_str!("templates/.gitignore.j2"))?;
@@ -33,34 +45,48 @@ impl<'a> ProjectGenerator<'a> {
             project_name,
             crate_name,
             bindings,
-            mixed,
+            layout,
             overwrite,
         })
     }
 
     fn generate(&self, project_path: &Path) -> Result<()> {
-        let src_path = project_path.join("src");
-        fs::create_dir_all(&src_path)?;
-
+        fs::create_dir_all(project_path)?;
         self.write_project_file(project_path, ".gitignore")?;
-        self.write_project_file(project_path, "Cargo.toml")?;
         self.write_project_file(project_path, "pyproject.toml")?;
 
-        if self.bindings == "bin" {
-            self.write_project_file(&src_path, "main.rs")?;
-        } else {
-            self.write_project_file(&src_path, "lib.rs")?;
-        }
-
+        // CI configuration
         let gh_action_path = project_path.join(".github").join("workflows");
         fs::create_dir_all(&gh_action_path)?;
         self.write_project_file(&gh_action_path, "CI.yml")?;
 
-        if self.mixed {
-            let python_dir = project_path.join("python");
-            let py_path = python_dir.join(&self.crate_name);
-            fs::create_dir_all(&py_path)?;
-            self.write_project_file(&py_path, "__init__.py")?;
+        let rust_project = match self.layout {
+            ProjectLayout::Mixed { src } => {
+                let python_dir = if src {
+                    project_path.join("src")
+                } else {
+                    project_path.join("python")
+                };
+                let python_project = python_dir.join(&self.crate_name);
+                fs::create_dir_all(&python_project)?;
+                self.write_project_file(&python_project, "__init__.py")?;
+
+                if src {
+                    project_path.join("rust")
+                } else {
+                    project_path.to_path_buf()
+                }
+            }
+            ProjectLayout::PureRust => project_path.to_path_buf(),
+        };
+
+        let rust_src = rust_project.join("src");
+        fs::create_dir_all(&rust_src)?;
+        self.write_project_file(&rust_project, "Cargo.toml")?;
+        if self.bindings == "bin" {
+            self.write_project_file(&rust_src, "main.rs")?;
+        } else {
+            self.write_project_file(&rust_src, "lib.rs")?;
         }
 
         Ok(())
@@ -74,7 +100,7 @@ impl<'a> ProjectGenerator<'a> {
             name => self.project_name,
             crate_name => self.crate_name,
             bindings => self.bindings,
-            mixed => self.mixed,
+            mixed_non_src => matches!(self.layout, ProjectLayout::Mixed { src: false }),
             version_major => version_major,
             version_minor => version_minor
         ))?;
@@ -99,6 +125,9 @@ pub struct GenerateProjectOptions {
     /// Use mixed Rust/Python project layout
     #[clap(long)]
     mixed: bool,
+    /// Use Python first src layout for mixed Rust/Python project
+    #[clap(long)]
+    src: bool,
     /// Which kind of bindings to use
     #[clap(short, long, value_parser = ["pyo3", "rust-cpython", "cffi", "bin"])]
     bindings: Option<String>,
@@ -173,6 +202,11 @@ fn generate_project(
         bindings_items[selection].to_string()
     };
 
-    let generator = ProjectGenerator::new(name, options.mixed, bindings, overwrite)?;
+    let layout = if options.mixed {
+        ProjectLayout::Mixed { src: options.src }
+    } else {
+        ProjectLayout::PureRust
+    };
+    let generator = ProjectGenerator::new(name, layout, bindings, overwrite)?;
     generator.generate(project_path)
 }

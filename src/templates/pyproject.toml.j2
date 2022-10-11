@@ -14,12 +14,12 @@ classifiers = [
 dependencies = ["cffi"]
 {%- endif %}
 
-{% if bindings == "cffi" or bindings == "bin" or mixed -%}
+{% if bindings == "cffi" or bindings == "bin" or mixed_non_src -%}
 [tool.maturin]
 {% if bindings == "cffi" or bindings == "bin" -%}
 bindings = "{{ bindings }}"
 {% endif -%}
-{% if mixed -%}
+{% if mixed_non_src -%}
 python-source = "python"
 {% endif -%}
 {% endif -%}

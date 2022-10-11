@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107). 
    Note that wasmtime currently only support the five most popular platforms and that wasi binaries have restrictions when interacting with the host.
    Usage is by setting `--target wasm32-wasi`.
- * Add support for python first `src` project layout in [#1185](https://github.com/PyO3/maturin/pull/1185)
+ * Add support for python first [`src` project layout](https://py-pkgs.org/04-package-structure.html#the-source-layout) in [#1185](https://github.com/PyO3/maturin/pull/1185)
 
 ## [0.13.6] - 2022-10-08
 

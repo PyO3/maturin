@@ -262,6 +262,7 @@ maturin itself is manylinux compliant when compiled for the musl target.
 * [ballista](https://github.com/apache/arrow-ballista/tree/master/python) - A Python library that binds to Apache Arrow distributed query engine Ballista
 * [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
 * [datafusion](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
+* [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
 * [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
 * [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js
 * [pydantic-core](https://github.com/pydantic/pydantic-core) - Core validation logic for pydantic written in Rust
@@ -269,6 +270,9 @@ maturin itself is manylinux compliant when compiled for the musl target.
 * [pyxel](https://github.com/kitao/pyxel) - A retro game engine for Python
 * [roapi](https://github.com/roapi/roapi) - ROAPI automatically spins up read-only APIs for static datasets without requiring you to write a single line of code
 * [robyn](https://github.com/sansyrox/robyn) -  A fast and extensible async python web server with a Rust runtime
+* [ruff](https://github.com/charliermarsh/ruff) - An extremely fast Python linter, written in Rust
+* [tantivy-py](https://github.com/quickwit-oss/tantivy-py) - Python bindings for Tantivy
+* [watchfiles](https://github.com/samuelcolvin/watchfiles) - Simple, modern and high performance file watching and code reload in python
 * [wonnx](https://github.com/webonnx/wonnx/tree/master/wonnx-py) - Wonnx is a GPU-accelerated ONNX inference run-time written 100% in Rust
 
 ## Contributing

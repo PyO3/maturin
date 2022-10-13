@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Usage is by setting `--target wasm32-wasi`.
 * Add support for python first [`src` project layout](https://py-pkgs.org/04-package-structure.html#the-source-layout) in [#1185](https://github.com/PyO3/maturin/pull/1185)
 * Add `--src` option to generate src layout for mixed Python/Rust projects in [#1189](https://github.com/PyO3/maturin/pull/1189)
+* Add Python metadata support for `license-file` field of `Cargo.toml` in [#1195](https://github.com/PyO3/maturin/pull/1195)
 
 ## [0.13.6] - 2022-10-08
 

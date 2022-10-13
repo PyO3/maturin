@@ -348,6 +348,11 @@ impl Metadata21 {
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
+        let license_files = if let Some(license_file) = package.license_file.as_ref() {
+            vec![manifest_path.as_ref().join(license_file)]
+        } else {
+            Vec::new()
+        };
 
         let metadata = Metadata21 {
             metadata_version: "2.1".to_owned(),
@@ -373,7 +378,7 @@ impl Metadata21 {
             },
             author_email,
             license: package.license.clone(),
-            license_files: Vec::new(),
+            license_files,
 
             // Values provided through `[project.metadata.maturin]`
             classifiers,

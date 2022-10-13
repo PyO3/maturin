@@ -805,6 +805,9 @@ def main():
     wasi.inherit_stdout()
     wasi.inherit_stderr()
     wasi.inherit_stdin()
+    # TODO: Find a real solution here. Maybe there's an always allow callback?
+    # Even fancier would be something configurable in pyproject.toml
+    wasi.preopen_dir(".", ".")
     store.set_wasi(wasi)
     linker = Linker(engine)
     linker.define_wasi()

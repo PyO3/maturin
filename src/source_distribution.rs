@@ -511,6 +511,7 @@ pub fn source_distribution(
                 debug!("Ignoring {}", source.display());
                 continue;
             }
+            let source = fs::canonicalize(source)?;
             let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
             if source.is_dir() {
                 writer.add_directory(target)?;

@@ -62,11 +62,11 @@ You can download precompiled maturin binaries from the latest [GitHub Releases](
 You can install maturin from [crates.io](https://crates.io/crates/maturin) using cargo:
 
 ```bash
-cargo install maturin
+cargo install --locked maturin
 ```
 
 ### Git repository
 
 ```bash
-cargo install --git https://github.com/PyO3/maturin.git maturin
+cargo install --locked --git https://github.com/PyO3/maturin.git maturin
 ```

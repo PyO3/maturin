@@ -41,89 +41,88 @@ fn pyo3_ffi_minimum_python_minor_version(major_version: u64, minor_version: u64)
 #[serde(default, rename_all = "kebab-case")]
 pub struct CargoOptions {
     /// Do not print cargo log messages
-    #[clap(short = 'q', long)]
+    #[arg(short = 'q', long)]
     pub quiet: bool,
 
     /// Number of parallel jobs, defaults to # of CPUs
-    #[clap(short = 'j', long, value_name = "N")]
+    #[arg(short = 'j', long, value_name = "N")]
     pub jobs: Option<usize>,
 
     /// Build artifacts with the specified Cargo profile
-    #[clap(long, value_name = "PROFILE-NAME")]
+    #[arg(long, value_name = "PROFILE-NAME")]
     pub profile: Option<String>,
 
     /// Space or comma separated list of features to activate
-    #[clap(short = 'F', long, action = clap::ArgAction::Append)]
+    #[arg(short = 'F', long, action = clap::ArgAction::Append)]
     pub features: Vec<String>,
 
     /// Activate all available features
-    #[clap(long)]
+    #[arg(long)]
     pub all_features: bool,
 
     /// Do not activate the `default` feature
-    #[clap(long)]
+    #[arg(long)]
     pub no_default_features: bool,
 
     /// Build for the target triple
-    #[clap(long, name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
+    #[arg(long, value_name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
     pub target: Option<String>,
 
     /// Directory for all generated artifacts
-    #[clap(long, value_name = "DIRECTORY", value_parser)]
+    #[arg(long, value_name = "DIRECTORY")]
     pub target_dir: Option<PathBuf>,
 
     /// Path to Cargo.toml
-    #[clap(short = 'm', long, value_name = "PATH", value_parser)]
+    #[arg(short = 'm', long, value_name = "PATH")]
     pub manifest_path: Option<PathBuf>,
 
     /// Ignore `rust-version` specification in packages
-    #[clap(long)]
+    #[arg(long)]
     pub ignore_rust_version: bool,
 
     /// Use verbose output (-vv very verbose/build.rs output)
-    #[clap(short = 'v', long, action = clap::ArgAction::Count)]
+    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
     /// Coloring: auto, always, never
-    #[clap(long, value_name = "WHEN")]
+    #[arg(long, value_name = "WHEN")]
     pub color: Option<String>,
 
     /// Require Cargo.lock and cache are up to date
-    #[clap(long)]
+    #[arg(long)]
     pub frozen: bool,
 
     /// Require Cargo.lock is up to date
-    #[clap(long)]
+    #[arg(long)]
     pub locked: bool,
 
     /// Run without accessing the network
-    #[clap(long)]
+    #[arg(long)]
     pub offline: bool,
 
     /// Override a configuration value (unstable)
-    #[clap(long, value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
+    #[arg(long, value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
     pub config: Vec<String>,
 
     /// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
-    #[clap(short = 'Z', value_name = "FLAG", action = clap::ArgAction::Append)]
+    #[arg(short = 'Z', value_name = "FLAG", action = clap::ArgAction::Append)]
     pub unstable_flags: Vec<String>,
 
     /// Timing output formats (unstable) (comma separated): html, json
-    #[clap(
+    #[arg(
         long,
         value_name = "FMTS",
-        min_values = 0,
         value_delimiter = ',',
         require_equals = true
     )]
     pub timings: Option<Vec<String>>,
 
     /// Outputs a future incompatibility report at the end of the build (unstable)
-    #[clap(long)]
+    #[arg(long)]
     pub future_incompat_report: bool,
 
     /// Rustc flags
-    #[clap(takes_value = true, multiple_values = true)]
+    #[arg(num_args = 0.., trailing_var_arg = true)]
     pub args: Vec<String>,
 }
 
@@ -144,36 +143,35 @@ pub struct BuildOptions {
     /// The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
     ///
     /// This option is ignored on all non-linux platforms
-    #[clap(
-        name = "compatibility",
+    #[arg(
+        id = "compatibility",
         long = "compatibility",
         alias = "manylinux",
-        value_parser,
-        multiple_values = true,
+        num_args = 0..,
         action = clap::ArgAction::Append
     )]
     pub platform_tag: Vec<PlatformTag>,
 
     /// The python versions to build wheels for, given as the names of the
     /// interpreters.
-    #[clap(short, long, multiple_values = true, action = clap::ArgAction::Append)]
+    #[arg(short, long, num_args = 0.., action = clap::ArgAction::Append)]
     pub interpreter: Vec<PathBuf>,
 
     /// Find interpreters from the host machine
-    #[clap(short = 'f', long, conflicts_with = "interpreter")]
+    #[arg(short = 'f', long, conflicts_with = "interpreter")]
     pub find_interpreter: bool,
 
-    /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-    #[clap(short, long)]
+    /// Which kind of bindings to use.
+    #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "bin"])]
     pub bindings: Option<String>,
 
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
-    #[clap(short, long, value_parser)]
+    #[arg(short, long)]
     pub out: Option<PathBuf>,
 
     /// Don't check for manylinux compliance
-    #[clap(long = "skip-auditwheel")]
+    #[arg(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
 
     /// For manylinux targets, use zig to ensure compliance for the chosen manylinux version
@@ -181,16 +179,16 @@ pub struct BuildOptions {
     /// Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
     ///
     /// Make sure you installed zig with `pip install maturin[zig]`
-    #[clap(long)]
+    #[arg(long)]
     pub zig: bool,
 
     /// Control whether to build universal2 wheel for macOS or not.
     /// Only applies to macOS targets, do nothing otherwise.
-    #[clap(long)]
+    #[arg(long)]
     pub universal2: bool,
 
     /// Cargo build options
-    #[clap(flatten)]
+    #[command(flatten)]
     pub cargo: CargoOptions,
 }
 

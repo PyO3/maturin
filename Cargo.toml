@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 edition = "2018"
-rust-version = "1.59"
+rust-version = "1.61"
 
 [[bin]]
 name = "maturin"
@@ -24,9 +24,9 @@ anyhow = "1.0.63"
 base64 = "0.13.0"
 glob = "0.3.0"
 cargo_metadata = "0.15.0"
-cargo-options = "0.4.0"
-cargo-zigbuild = "0.13.0"
-cargo-xwin = { version = "0.11.0", default-features = false }
+cargo-options = "0.5.2"
+cargo-zigbuild = "0.14.0"
+cargo-xwin = { version = "0.12.0", default-features = false }
 cbindgen = { version = "0.24.2", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.5.4"
@@ -55,12 +55,12 @@ textwrap = "0.15.1"
 ignore = "0.4.18"
 dialoguer = { version = "0.10.2", default-features = false }
 console = "0.15.2"
-minijinja = "0.20.0"
+minijinja = "0.23.0"
 lddtree = "0.3.1"
 cc = "1.0.72"
-clap = { version = "3.2.19", features = ["derive", "env", "wrap_help"] }
-clap_complete = "3.1.3"
-clap_complete_fig = "3.1.0"
+clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
+clap_complete = "4.0.2"
+clap_complete_fig = "4.0.0"
 tracing = "0.1.36"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional = true }
 dunce = "1.0.2"
@@ -70,8 +70,7 @@ pep440 = "0.2.0"
 bytesize = { version = "1.0.1", optional = true }
 configparser = { version = "3.0.0", optional = true }
 multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
-# rpassword 7.0 requires Rust 1.60.0+
-rpassword = { version = "6.0.1", optional = true }
+rpassword = { version = "7.0.0", optional = true }
 ureq = { version = "2.3.1", features = ["gzip", "socks-proxy"], default-features = false, optional = true }
 native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
 
@@ -79,7 +78,7 @@ native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true 
 indoc = "1.0.3"
 pretty_assertions = "1.3.0"
 rustversion = "1.0.9"
-trycmd = "=0.13.6"
+trycmd = "0.14.0"
 
 [features]
 default = ["log", "upload", "rustls", "human-panic"]

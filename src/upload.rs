@@ -20,12 +20,12 @@ pub struct PublishOpt {
     /// The repository (package index) to upload the package to. Should be a section in the config file.
     ///
     /// Can also be set via MATURIN_REPOSITORY environment variable.
-    #[clap(short = 'r', long, env = "MATURIN_REPOSITORY", default_value = "pypi")]
+    #[arg(short = 'r', long, env = "MATURIN_REPOSITORY", default_value = "pypi")]
     repository: String,
     /// The URL of the registry where the wheels are uploaded to. This overrides --repository.
     ///
     /// Can also be set via MATURIN_REPOSITORY_URL environment variable.
-    #[clap(
+    #[arg(
         long = "repository-url",
         env = "MATURIN_REPOSITORY_URL",
         overrides_with = "repository"
@@ -36,16 +36,16 @@ pub struct PublishOpt {
     /// Can also be set via MATURIN_USERNAME environment variable.
     ///
     /// Set MATURIN_PYPI_TOKEN variable to use token-based authentication instead
-    #[clap(short, long, env = "MATURIN_USERNAME")]
+    #[arg(short, long, env = "MATURIN_USERNAME")]
     username: Option<String>,
     /// Password for pypi or your custom registry.
     ///
     /// Can also be set via MATURIN_PASSWORD environment variable.
-    #[clap(short, long)]
+    #[arg(short, long)]
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
-    #[clap(long = "skip-existing")]
+    #[arg(long = "skip-existing")]
     skip_existing: bool,
 }
 

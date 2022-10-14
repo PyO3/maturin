@@ -120,16 +120,16 @@ impl<'a> ProjectGenerator<'a> {
 #[derive(Debug, clap::Parser)]
 pub struct GenerateProjectOptions {
     /// Set the resulting package name, defaults to the directory name
-    #[clap(long)]
+    #[arg(long)]
     name: Option<String>,
     /// Use mixed Rust/Python project layout
-    #[clap(long)]
+    #[arg(long)]
     mixed: bool,
     /// Use Python first src layout for mixed Rust/Python project
-    #[clap(long)]
+    #[arg(long)]
     src: bool,
     /// Which kind of bindings to use
-    #[clap(short, long, value_parser = ["pyo3", "rust-cpython", "cffi", "bin"])]
+    #[arg(short, long, value_parser = ["pyo3", "rust-cpython", "cffi", "bin"])]
     bindings: Option<String>,
 }
 

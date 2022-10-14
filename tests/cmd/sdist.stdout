@@ -1,20 +1,18 @@
-maturin[EXE]-sdist 
 Build only a source distribution (sdist) without compiling.
 
 Building a source distribution requires a pyproject.toml with a `[build-system]` table.
 
 This command is a workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
 
-USAGE:
-    maturin[EXE] sdist [OPTIONS]
+Usage: maturin[EXE] sdist [OPTIONS]
 
-OPTIONS:
-    -m, --manifest-path <MANIFEST_PATH>
-            The path to the Cargo.toml
+Options:
+  -m, --manifest-path <MANIFEST_PATH>
+          The path to the Cargo.toml
 
-    -o, --out <OUT>
-            The directory to store the built wheels in. Defaults to a new "wheels" directory in the
-            project's target directory
+  -o, --out <OUT>
+          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+          project's target directory
 
-    -h, --help
-            Print help information
+  -h, --help
+          Print help information (use `-h` for a summary)

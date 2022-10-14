@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use cargo_zigbuild::Zig;
-use clap::{ArgEnum, IntoApp, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Generator;
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions, CargoOptions,
@@ -19,80 +19,79 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 #[derive(Debug, Parser)]
-#[clap(
+#[command(
     version,
     name = env!("CARGO_PKG_NAME"),
-    global_setting(clap::AppSettings::DeriveDisplayOrder)
+    display_order = 1,
 )]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
 enum Opt {
-    #[clap(name = "build", alias = "b")]
+    #[command(name = "build", alias = "b")]
     /// Build the crate into python packages
     Build {
         /// Build artifacts in release mode, with optimizations
-        #[clap(short = 'r', long)]
+        #[arg(short = 'r', long)]
         release: bool,
         /// Strip the library for minimum file size
-        #[clap(long)]
+        #[arg(long)]
         strip: bool,
         /// Build a source distribution
-        #[clap(long)]
+        #[arg(long)]
         sdist: bool,
-        #[clap(flatten)]
+        #[command(flatten)]
         build: BuildOptions,
     },
     #[cfg(feature = "upload")]
-    #[clap(name = "publish")]
+    #[command(name = "publish")]
     /// Build and publish the crate as python packages to pypi
     Publish {
         /// Do not pass --release to cargo
-        #[clap(long)]
+        #[arg(long)]
         debug: bool,
         /// Do not strip the library for minimum file size
-        #[clap(long = "no-strip")]
+        #[arg(long = "no-strip")]
         no_strip: bool,
         /// Don't build a source distribution
-        #[clap(long = "no-sdist")]
+        #[arg(long = "no-sdist")]
         no_sdist: bool,
-        #[clap(flatten)]
+        #[command(flatten)]
         publish: PublishOpt,
-        #[clap(flatten)]
+        #[command(flatten)]
         build: BuildOptions,
     },
-    #[clap(name = "list-python")]
+    #[command(name = "list-python")]
     /// Search and list the available python installations
     ListPython {
-        #[clap(long)]
+        #[arg(long)]
         target: Option<String>,
     },
-    #[clap(name = "develop", alias = "dev")]
+    #[command(name = "develop", alias = "dev")]
     /// Install the crate as module in the current virtualenv
     ///
     /// Note that this command doesn't create entrypoints
     Develop {
         /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-        #[clap(short = 'b', long = "bindings", alias = "binding-crate")]
+        #[arg(short = 'b', long = "bindings", alias = "binding-crate")]
         bindings: Option<String>,
         /// Pass --release to cargo
-        #[clap(short = 'r', long)]
+        #[arg(short = 'r', long)]
         release: bool,
         /// Strip the library for minimum file size
-        #[clap(long)]
+        #[arg(long)]
         strip: bool,
         /// Install extra requires aka. optional dependencies
         ///
         /// Use as `--extras=extra1,extra2`
-        #[clap(
+        #[arg(
             short = 'E',
             long,
-            use_value_delimiter = true,
-            multiple_values = false,
+            value_delimiter = ',',
             action = clap::ArgAction::Append
         )]
         extras: Vec<String>,
-        #[clap(flatten)]
+        #[command(flatten)]
         cargo_options: CargoOptions,
     },
     /// Build only a source distribution (sdist) without compiling.
@@ -100,30 +99,30 @@ enum Opt {
     /// Building a source distribution requires a pyproject.toml with a `[build-system]` table.
     ///
     /// This command is a workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041)
-    #[clap(name = "sdist")]
+    #[command(name = "sdist")]
     SDist {
-        #[clap(short = 'm', long = "manifest-path", value_parser)]
+        #[arg(short = 'm', long = "manifest-path")]
         /// The path to the Cargo.toml
         manifest_path: Option<PathBuf>,
         /// The directory to store the built wheels in. Defaults to a new "wheels"
         /// directory in the project's target directory
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         out: Option<PathBuf>,
     },
     /// Create a new cargo project in an existing directory
-    #[clap(name = "init")]
+    #[command(name = "init")]
     InitProject {
         /// Project path
         path: Option<String>,
-        #[clap(flatten)]
+        #[command(flatten)]
         options: GenerateProjectOptions,
     },
     /// Create a new cargo project
-    #[clap(name = "new")]
+    #[command(name = "new")]
     NewProject {
         /// Project path
         path: String,
-        #[clap(flatten)]
+        #[command(flatten)]
         options: GenerateProjectOptions,
     },
     /// Upload python packages to pypi
@@ -131,27 +130,27 @@ enum Opt {
     /// It is mostly similar to `twine upload`, but can only upload python wheels
     /// and source distributions.
     #[cfg(feature = "upload")]
-    #[clap(name = "upload")]
+    #[command(name = "upload")]
     Upload {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish: PublishOpt,
         /// The python packages to upload
-        #[clap(name = "FILE", value_parser)]
+        #[arg(value_name = "FILE")]
         files: Vec<PathBuf>,
     },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
     /// The commands are meant to be called from the python PEP 517
-    #[clap(subcommand)]
+    #[command(subcommand)]
     Pep517(Pep517Command),
     /// Generate shell completions
-    #[clap(name = "completions", hide = true)]
+    #[command(name = "completions", hide = true)]
     Completions {
-        #[clap(name = "SHELL", value_parser)]
+        #[arg(value_name = "SHELL")]
         shell: Shell,
     },
     /// Zig linker wrapper
-    #[clap(subcommand, hide = true)]
+    #[command(subcommand, hide = true)]
     Zig(Zig),
 }
 
@@ -159,53 +158,52 @@ enum Opt {
 ///
 /// The commands are meant to be called from the python PEP 517
 #[derive(Debug, Subcommand)]
-#[clap(name = "pep517", hide = true)]
+#[command(name = "pep517", hide = true)]
 enum Pep517Command {
     /// The implementation of prepare_metadata_for_build_wheel
-    #[clap(name = "write-dist-info")]
+    #[command(name = "write-dist-info")]
     WriteDistInfo {
-        #[clap(flatten)]
+        #[command(flatten)]
         build_options: BuildOptions,
         /// The metadata_directory argument to prepare_metadata_for_build_wheel
-        #[clap(long = "metadata-directory", value_parser)]
+        #[arg(long = "metadata-directory")]
         metadata_directory: PathBuf,
         /// Strip the library for minimum file size
-        #[clap(long)]
+        #[arg(long)]
         strip: bool,
     },
-    #[clap(name = "build-wheel")]
+    #[command(name = "build-wheel")]
     /// Implementation of build_wheel
     ///
     /// --release and --strip are currently unused by the PEP 517 implementation
     BuildWheel {
-        #[clap(flatten)]
+        #[command(flatten)]
         build_options: BuildOptions,
         /// Strip the library for minimum file size
-        #[clap(long)]
+        #[arg(long)]
         strip: bool,
         /// Build editable wheels
-        #[clap(long)]
+        #[arg(long)]
         editable: bool,
     },
     /// The implementation of build_sdist
-    #[clap(name = "write-sdist")]
+    #[command(name = "write-sdist")]
     WriteSDist {
         /// The sdist_directory argument to build_sdist
-        #[clap(long = "sdist-directory", value_parser)]
+        #[arg(long = "sdist-directory")]
         sdist_directory: PathBuf,
-        #[clap(
+        #[arg(
             short = 'm',
             long = "manifest-path",
-            value_parser,
             default_value = "Cargo.toml",
-            name = "PATH"
+            value_name = "PATH"
         )]
         /// The path to the Cargo.toml
         manifest_path: PathBuf,
     },
 }
 
-#[derive(Debug, Clone, Copy, ArgEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 #[allow(clippy::enum_variant_names)]
 enum Shell {
     Bash,

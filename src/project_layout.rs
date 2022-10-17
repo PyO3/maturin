@@ -68,7 +68,7 @@ impl ProjectResolver {
         cargo_options.manifest_path = Some(manifest_file.clone());
 
         let cargo_toml = CargoToml::from_path(&manifest_file)?;
-        cargo_toml.warn_deprecated_python_metadata();
+        cargo_toml.warn_removed_python_metadata();
 
         let manifest_dir = manifest_file.parent().unwrap();
         let pyproject_toml: Option<PyProjectToml> = if pyproject_file.is_file() {

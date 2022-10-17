@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// The `[lib]` section of a Cargo.toml
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct CargoTomlLib {
     pub(crate) crate_type: Option<Vec<String>>,
@@ -13,7 +13,7 @@ pub(crate) struct CargoTomlLib {
 }
 
 /// The `[package]` section of a Cargo.toml
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct CargoTomlPackage {
     pub(crate) name: String,
@@ -23,7 +23,7 @@ pub(crate) struct CargoTomlPackage {
 /// Extract of the Cargo.toml that can be reused for the python metadata
 ///
 /// See https://doc.rust-lang.org/cargo/reference/manifest.html for a specification
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CargoToml {
     pub(crate) lib: Option<CargoTomlLib>,
     pub(crate) package: CargoTomlPackage,
@@ -43,34 +43,6 @@ impl CargoToml {
         Ok(cargo_toml)
     }
 
-    /// Returns the python entrypoints
-    pub fn scripts(&self) -> HashMap<String, String> {
-        match self.package.metadata {
-            Some(CargoTomlMetadata {
-                maturin:
-                    Some(RemainingCoreMetadata {
-                        scripts: Some(ref scripts),
-                        ..
-                    }),
-            }) => scripts.clone(),
-            _ => HashMap::new(),
-        }
-    }
-
-    /// Returns the trove classifiers
-    pub fn classifiers(&self) -> Vec<String> {
-        match self.package.metadata {
-            Some(CargoTomlMetadata {
-                maturin:
-                    Some(RemainingCoreMetadata {
-                        classifiers: Some(ref classifier),
-                        ..
-                    }),
-            }) => classifier.clone(),
-            _ => Vec::new(),
-        }
-    }
-
     /// Returns the value of `[project.metadata.maturin]` or an empty stub
     pub fn remaining_core_metadata(&self) -> RemainingCoreMetadata {
         match &self.package.metadata {
@@ -81,50 +53,38 @@ impl CargoToml {
         }
     }
 
-    /// Warn about deprecated python metadata support
-    pub fn warn_deprecated_python_metadata(&self) -> bool {
-        let mut deprecated = Vec::new();
+    /// Warn about removed python metadata support in `Cargo.toml`
+    pub fn warn_removed_python_metadata(&self) -> bool {
+        let mut removed = Vec::new();
         if let Some(CargoTomlMetadata {
             maturin: Some(extra_metadata),
         }) = &self.package.metadata
         {
-            if extra_metadata.scripts.is_some() {
-                deprecated.push("scripts");
-            }
-            if extra_metadata.classifiers.is_some() {
-                deprecated.push("classifiers");
-            }
-            if extra_metadata.maintainer.is_some() {
-                deprecated.push("maintainer");
-            }
-            if extra_metadata.maintainer_email.is_some() {
-                deprecated.push("maintainer-email");
-            }
-            if extra_metadata.requires_dist.is_some() {
-                deprecated.push("requires-dist");
-            }
-            if extra_metadata.requires_python.is_some() {
-                deprecated.push("requires-python");
-            }
-            if extra_metadata.requires_external.is_some() {
-                deprecated.push("requires-external");
-            }
-            if extra_metadata.project_url.is_some() {
-                deprecated.push("project-url");
-            }
-            if extra_metadata.provides_extra.is_some() {
-                deprecated.push("provides-extra");
-            }
-            if extra_metadata.description_content_type.is_some() {
-                deprecated.push("description-content-type");
+            let removed_keys = [
+                "scripts",
+                "classifiers",
+                "classifier",
+                "maintainer",
+                "maintainer-email",
+                "requires-dist",
+                "requires-python",
+                "requires-external",
+                "project-url",
+                "provides-extra",
+                "description-content-type",
+            ];
+            for key in removed_keys {
+                if extra_metadata.other.contains_key(key) {
+                    removed.push(key);
+                }
             }
         }
-        if !deprecated.is_empty() {
+        if !removed.is_empty() {
             println!(
                 "⚠️  Warning: the following metadata fields in `package.metadata.maturin` section \
-                of Cargo.toml are deprecated and will be removed in future versions: {}, \
+                of Cargo.toml are removed since maturin 0.14.0: {}, \
                 please set them in pyproject.toml as PEP 621 specifies.",
-                deprecated.join(", ")
+                removed.join(", ")
             );
             true
         } else {
@@ -133,7 +93,7 @@ impl CargoToml {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 struct CargoTomlMetadata {
     maturin: Option<RemainingCoreMetadata>,
@@ -144,34 +104,22 @@ struct CargoTomlMetadata {
 /// Those fields are the part of the
 /// [python core metadata](https://packaging.python.org/specifications/core-metadata/)
 /// that doesn't have an equivalent in cargo's `[package]` table
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
-#[serde(deny_unknown_fields)]
 pub struct RemainingCoreMetadata {
     pub name: Option<String>,
-    pub scripts: Option<HashMap<String, String>>,
-    // For backward compatibility, we also allow classifier.
-    #[serde(alias = "classifier")]
-    pub classifiers: Option<Vec<String>>,
-    pub maintainer: Option<String>,
-    pub maintainer_email: Option<String>,
-    pub requires_dist: Option<Vec<String>>,
-    pub requires_python: Option<String>,
-    pub requires_external: Option<Vec<String>>,
-    pub project_url: Option<HashMap<String, String>>,
-    pub provides_extra: Option<Vec<String>>,
-    pub description_content_type: Option<String>,
     /// The directory with python module, contains `<module_name>/__init__.py`
     pub python_source: Option<String>,
     /// The directory containing the wheel data
     pub data: Option<String>,
+    #[serde(flatten)]
+    pub other: HashMap<String, toml_edit::easy::Value>,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_metadata_from_cargo_toml() {
@@ -198,51 +146,8 @@ mod test {
         "#
         );
 
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(cargo_toml).unwrap();
-
-        let mut scripts = HashMap::new();
-        scripts.insert("ph".to_string(), "maturin:print_hello".to_string());
-
-        let classifiers = vec!["Programming Language :: Python".to_string()];
-
-        let requires_dist = Some(vec!["flask~=1.1.0".to_string(), "toml==0.10.0".to_string()]);
-
-        assert_eq!(cargo_toml.scripts(), scripts);
-        assert_eq!(cargo_toml.classifiers(), classifiers);
-        assert_eq!(
-            cargo_toml.remaining_core_metadata().requires_dist,
-            requires_dist
-        );
-    }
-
-    #[test]
-    fn test_old_classifier_works() {
-        let cargo_toml = indoc!(
-            r#"
-            [package]
-            authors = ["konstin <konstin@mailbox.org>"]
-            name = "info-project"
-            version = "0.1.0"
-            description = "A test project"
-            homepage = "https://example.org"
-            keywords = ["ffi", "test"]
-
-            [lib]
-            crate-type = ["cdylib"]
-            name = "pyo3_pure"
-
-            [package.metadata.maturin]
-            # Not classifiers
-            classifier = ["Programming Language :: Python"]
-        "#
-        );
-
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(cargo_toml).unwrap();
-
-        let classifiers = vec!["Programming Language :: Python".to_string()];
-
-        assert_eq!(cargo_toml.classifiers(), classifiers);
-        assert!(cargo_toml.warn_deprecated_python_metadata());
+        let cargo_toml: Result<CargoToml, _> = toml_edit::easy::from_str(cargo_toml);
+        assert!(cargo_toml.is_ok());
     }
 
     #[test]

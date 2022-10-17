@@ -23,7 +23,7 @@ pub struct WheelMetadata {
 
 /// Python Package Metadata 2.1 as specified in
 /// https://packaging.python.org/specifications/core-metadata/
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct Metadata21 {
@@ -289,9 +289,6 @@ impl Metadata21 {
             .root_package()
             .context("Expected cargo to return metadata with root_package")?;
         let authors = package.authors.join(", ");
-
-        let classifiers = cargo_toml.classifiers();
-
         let author_email = if authors.contains('@') {
             Some(authors.clone())
         } else {
@@ -313,9 +310,7 @@ impl Metadata21 {
                 readme_path.display()
             ))?);
 
-            description_content_type = extra_metadata
-                .description_content_type
-                .or_else(|| Some(path_to_content_type(&readme_path)));
+            description_content_type = Some(path_to_content_type(&readme_path));
         } else {
             // > If no value is specified for this field, and a file named
             // > README.md, README.txt or README exists in the package root
@@ -344,7 +339,7 @@ impl Metadata21 {
                 }
             })
             .unwrap_or_else(|| package.name.clone());
-        let mut project_url = extra_metadata.project_url.unwrap_or_default();
+        let mut project_url = HashMap::new();
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
@@ -379,27 +374,8 @@ impl Metadata21 {
             author_email,
             license: package.license.clone(),
             license_files,
-
-            // Values provided through `[project.metadata.maturin]`
-            classifiers,
-            maintainer: extra_metadata.maintainer,
-            maintainer_email: extra_metadata.maintainer_email,
-            requires_dist: extra_metadata.requires_dist.unwrap_or_default(),
-            requires_python: extra_metadata.requires_python,
-            requires_external: extra_metadata.requires_external.unwrap_or_default(),
             project_url,
-            provides_extra: extra_metadata.provides_extra.unwrap_or_default(),
-
-            // Officially rarely used, and afaik not applicable with pyo3
-            provides_dist: Vec::new(),
-            obsoletes_dist: Vec::new(),
-
-            // Open question: Should those also be supported? And if so, how?
-            platform: Vec::new(),
-            supported_platform: Vec::new(),
-            scripts: cargo_toml.scripts(),
-            gui_scripts: HashMap::new(),
-            entry_points: HashMap::new(),
+            ..Default::default()
         };
         Ok(metadata)
     }
@@ -648,14 +624,6 @@ mod test {
             [lib]
             crate-type = ["cdylib"]
             name = "pyo3_pure"
-
-            [package.metadata.maturin.scripts]
-            ph = "maturin:print_hello"
-
-            [package.metadata.maturin]
-            classifiers = ["Programming Language :: Python"]
-            requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
-            project-url = { "Bug Tracker" = "http://bitbucket.org/tarek/distribute/issues/" }
         "#
         );
 
@@ -664,79 +632,16 @@ mod test {
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
-            Classifier: Programming Language :: Python
-            Requires-Dist: flask~=1.1.0
-            Requires-Dist: toml==0.10.0
             Summary: A test project
             Keywords: ffi,test
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
-            Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/
 
             # Some test package
 
             This is the readme for a test package
-        "#
-        );
-
-        assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
-    }
-
-    #[test]
-    fn test_metadata_from_cargo_toml_rst() {
-        let readme = indoc!(
-            r#"
-            Some test package
-            =================
-        "#
-        );
-
-        let cargo_toml = indoc!(
-            r#"
-            [package]
-            authors = ["konstin <konstin@mailbox.org>"]
-            name = "info-project"
-            version = "0.1.0"
-            description = "A test project"
-            homepage = "https://example.org"
-            repository = "https://example.org"
-            readme = "REPLACE_README_PATH"
-            keywords = ["ffi", "test"]
-
-            [lib]
-            crate-type = ["cdylib"]
-            name = "pyo3_pure"
-
-            [package.metadata.maturin.scripts]
-            ph = "maturin:print_hello"
-
-            [package.metadata.maturin]
-            classifiers = ["Programming Language :: Python"]
-            requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
-            description-content-type = "text/x-rst"
-        "#
-        );
-
-        let expected = indoc!(
-            r#"
-            Metadata-Version: 2.1
-            Name: info-project
-            Version: 0.1.0
-            Classifier: Programming Language :: Python
-            Requires-Dist: flask~=1.1.0
-            Requires-Dist: toml==0.10.0
-            Summary: A test project
-            Keywords: ffi,test
-            Home-Page: https://example.org
-            Author: konstin <konstin@mailbox.org>
-            Author-email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/x-rst
-            Project-URL: Source Code, https://example.org
-
-            Some test package
-            =================
         "#
         );
 
@@ -766,13 +671,8 @@ mod test {
             crate-type = ["cdylib"]
             name = "pyo3_pure"
 
-            [package.metadata.maturin.scripts]
-            ph = "maturin:print_hello"
-
             [package.metadata.maturin]
             name = "info"
-            classifiers = ["Programming Language :: Python"]
-            description-content-type = "text/x-rst"
         "#
         );
 
@@ -781,12 +681,11 @@ mod test {
             Metadata-Version: 2.1
             Name: info
             Version: 0.1.0
-            Classifier: Programming Language :: Python
             Summary: A test project
             Home-Page: https://example.org
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/x-rst
+            Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
 
             Some test package
             =================

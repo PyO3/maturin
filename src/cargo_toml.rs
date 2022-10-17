@@ -99,11 +99,7 @@ struct CargoTomlMetadata {
     maturin: Option<RemainingCoreMetadata>,
 }
 
-/// The `[project.metadata.maturin]` with the python specific metadata
-///
-/// Those fields are the part of the
-/// [python core metadata](https://packaging.python.org/specifications/core-metadata/)
-/// that doesn't have an equivalent in cargo's `[package]` table
+/// The `[project.metadata.maturin]` with the maturin specific metadata
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct RemainingCoreMetadata {

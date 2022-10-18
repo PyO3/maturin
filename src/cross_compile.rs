@@ -1,6 +1,7 @@
 use crate::{PythonInterpreter, Target};
 use anyhow::{bail, Result};
 use fs_err::{self as fs, DirEntry};
+use normpath::PathExt as _;
 use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -123,7 +124,7 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
     let mut sysconfig_paths = sysconfig_paths
         .iter()
         .filter_map(|p| {
-            let canonical = fs::canonicalize(p).ok();
+            let canonical = p.normalize().ok().map(|p| p.into_path_buf());
             match &sysconfig_name {
                 Some(_) => canonical.filter(|p| p.file_stem() == sysconfig_name.as_deref()),
                 None => canonical,

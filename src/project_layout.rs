@@ -2,7 +2,7 @@ use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
 use crate::{CargoToml, Metadata21, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
-use fs_err as fs;
+use normpath::PathExt as _;
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -63,6 +63,17 @@ impl ProjectResolver {
                 manifest_file.display()
             );
         }
+        // Sanity checks in debug build
+        debug_assert!(
+            manifest_file.is_absolute(),
+            "manifest_file {} is not absolute",
+            manifest_file.display()
+        );
+        debug_assert!(
+            pyproject_file.is_absolute(),
+            "pyproject_file {} is not absolute",
+            pyproject_file.display()
+        );
 
         // Set Cargo manifest path
         cargo_options.manifest_path = Some(manifest_file.clone());
@@ -180,39 +191,42 @@ impl ProjectResolver {
     ) -> Result<(PathBuf, PathBuf)> {
         // use command line argument if specified
         if let Some(path) = cargo_manifest_path {
+            let path = path.normalize()?.into_path_buf();
             let workspace_root = Self::resolve_cargo_metadata(&path, cargo_options)?.workspace_root;
             let workspace_parent = workspace_root.parent().unwrap_or(&workspace_root);
-            for parent in fs::canonicalize(&path)?.ancestors().skip(1) {
+            for parent in path.ancestors().skip(1) {
                 // Allow looking outside to the parent directory of Cargo workspace root
                 if !dunce::simplified(parent).starts_with(&workspace_parent) {
                     break;
                 }
                 let pyproject_file = parent.join(PYPROJECT_TOML);
                 if pyproject_file.is_file() {
-                    // Don't return canonicalized manifest path
-                    // cargo doesn't handle them well.
-                    // See https://github.com/rust-lang/cargo/issues/9770
                     return Ok((path, pyproject_file));
                 }
             }
-            return Ok((path.clone(), path.parent().unwrap().join(PYPROJECT_TOML)));
+            let pyproject_file = path.parent().unwrap().join(PYPROJECT_TOML);
+            return Ok((path, pyproject_file));
         }
         // check `manifest-path` option in pyproject.toml
-        let current_dir = fs::canonicalize(
-            env::current_dir().context("Failed to detect current directory ಠ_ಠ")?,
-        )?;
+        let current_dir = env::current_dir()
+            .context("Failed to detect current directory ಠ_ಠ")?
+            .normalize()?
+            .into_path_buf();
         let pyproject_file = current_dir.join(PYPROJECT_TOML);
         if pyproject_file.is_file() {
             let pyproject =
                 PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
             if let Some(path) = pyproject.manifest_path() {
                 // pyproject.toml must be placed at top directory
-                let manifest_dir =
-                    fs::canonicalize(path.parent().context("missing parent directory")?)?;
+                let manifest_dir = path
+                    .parent()
+                    .context("missing parent directory")?
+                    .normalize()?
+                    .into_path_buf();
                 if !manifest_dir.starts_with(&current_dir) {
                     bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
                 }
-                return Ok((path.to_path_buf(), pyproject_file));
+                return Ok((path.normalize()?.into_path_buf(), pyproject_file));
             } else {
                 // Detect src layout:
                 //
@@ -243,9 +257,9 @@ impl ProjectResolver {
             }
         }
         // check Cargo.toml in current directory
-        let path = PathBuf::from("Cargo.toml");
+        let path = current_dir.join("Cargo.toml");
         if path.exists() {
-            Ok((path, PathBuf::from(PYPROJECT_TOML)))
+            Ok((path, current_dir.join(PYPROJECT_TOML)))
         } else {
             Err(format_err!(
                 "Can't find {} (in {})",

@@ -7,6 +7,7 @@ use flate2::Compression;
 use fs_err as fs;
 use fs_err::File;
 use ignore::WalkBuilder;
+use normpath::PathExt as _;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -275,7 +276,7 @@ impl WheelWriter {
         metadata21: &Metadata21,
     ) -> Result<()> {
         if let Some(python_module) = &project_layout.python_module {
-            let absolute_path = fs::canonicalize(python_module)?;
+            let absolute_path = python_module.normalize()?.into_path_buf();
             if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
                 let name = metadata21.get_distribution_escaped();
                 let target = format!("{}.pth", name);

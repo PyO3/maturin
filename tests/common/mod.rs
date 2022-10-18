@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use fs_err as fs;
 use maturin::Target;
+use normpath::PathExt as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -93,7 +94,9 @@ pub fn handle_result<T>(result: Result<T>) -> T {
 
 /// Create virtualenv
 pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(PathBuf, PathBuf)> {
-    let venv_dir = fs::canonicalize(PathBuf::from("test-crates"))?
+    let venv_dir = PathBuf::from("test-crates")
+        .normalize()?
+        .into_path_buf()
         .join("venvs")
         .join(name);
     let target = Target::from_target_triple(None)?;

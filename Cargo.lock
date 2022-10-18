@@ -249,7 +249,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6755badfe5e0224c6e2ae710d82cd7dce5866e8ebcb22e5f3eced8f25fbd1ace"
 dependencies = [
- "clap 4.0.15",
+ "clap 4.0.16",
 ]
 
 [[package]]
@@ -269,7 +269,7 @@ checksum = "c0051cd416c6a5dd0db1583f2063580357eabc46e9e8f23abda2e7b78f309b6e"
 dependencies = [
  "anyhow",
  "cargo-options",
- "clap 4.0.15",
+ "clap 4.0.16",
  "dirs",
  "fs-err",
  "indicatif",
@@ -287,7 +287,7 @@ dependencies = [
  "anyhow",
  "cargo-options",
  "cargo_metadata",
- "clap 4.0.15",
+ "clap 4.0.16",
  "dirs",
  "fs-err",
  "path-slash",
@@ -407,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.15"
+version = "4.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bf8832993da70a4c6d13c581f4463c2bdda27b9bf1c5498dc4365543abe6d6f"
+checksum = "2ef582e2c00a63a0c0aa1fb4a4870781c4f5729f51196d3537fa7c1c1992eaa3"
 dependencies = [
  "atty",
  "bitflags",
@@ -427,7 +427,7 @@ version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11cba7abac9b56dfe2f035098cdb3a43946f276e6db83b72c4e692343f9aab9a"
 dependencies = [
- "clap 4.0.15",
+ "clap 4.0.16",
 ]
 
 [[package]]
@@ -436,7 +436,7 @@ version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf2fc15aa585faf3c59b96c40923b2f4d119c710a84e8a81251eed54ba75335c"
 dependencies = [
- "clap 4.0.15",
+ "clap 4.0.16",
  "clap_complete",
 ]
 
@@ -1403,7 +1403,7 @@ dependencies = [
  "cargo_metadata",
  "cbindgen",
  "cc",
- "clap 4.0.15",
+ "clap 4.0.16",
  "clap_complete",
  "clap_complete_fig",
  "configparser",
@@ -1424,6 +1424,7 @@ dependencies = [
  "minijinja",
  "multipart",
  "native-tls",
+ "normpath",
  "once_cell",
  "pep440",
  "platform-info",
@@ -1571,6 +1572,15 @@ name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
+
+[[package]]
+name = "normpath"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04aaf5e9cb0fbf883cc0423159eacdf96a9878022084b35c462c428cab73bcaf"
+dependencies = [
+ "winapi",
+]
 
 [[package]]
 name = "nu-ansi-term"
@@ -1968,9 +1978,9 @@ checksum = "dbf0c48bc1d91375ae5c3cd81e3722dff1abcf81a30960240640d223f59fe0e5"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.46"
+version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94e2ef8dbfc347b10c094890f778ee2e36ca9bb4262e86dc99cd217e35f3470b"
+checksum = "5ea3d908b0e36316caf9e9e2c4625cdde190a7e6f440d794667ed17a1855e725"
 dependencies = [
  "unicode-ident",
 ]

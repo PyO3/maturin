@@ -3,6 +3,7 @@ use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
+use normpath::PathExt as _;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -266,7 +267,7 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let abs_manifest_path = fs::canonicalize(manifest_path)?;
+    let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     let cargo_toml_in_subdir = root_crate
@@ -401,7 +402,10 @@ pub fn source_distribution(
 ) -> Result<PathBuf> {
     let metadata21 = &build_context.metadata21;
     let manifest_path = &build_context.manifest_path;
-    let pyproject_toml_path = fs::canonicalize(&build_context.pyproject_toml_path)?;
+    let pyproject_toml_path = build_context
+        .pyproject_toml_path
+        .normalize()?
+        .into_path_buf();
     let workspace_manifest_path = build_context
         .cargo_metadata
         .workspace_root
@@ -475,7 +479,7 @@ pub fn source_distribution(
         true,
     )?;
 
-    let abs_manifest_path = fs::canonicalize(manifest_path)?;
+    let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
     let cargo_lock_required =

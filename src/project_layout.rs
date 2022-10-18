@@ -63,6 +63,17 @@ impl ProjectResolver {
                 manifest_file.display()
             );
         }
+        // Sanity checks in debug build
+        debug_assert!(
+            manifest_file.is_absolute(),
+            "manifest_file {} is not absolute",
+            manifest_file.display()
+        );
+        debug_assert!(
+            pyproject_file.is_absolute(),
+            "pyproject_file {} is not absolute",
+            pyproject_file.display()
+        );
 
         // Set Cargo manifest path
         cargo_options.manifest_path = Some(manifest_file.clone());
@@ -243,9 +254,9 @@ impl ProjectResolver {
             }
         }
         // check Cargo.toml in current directory
-        let path = PathBuf::from("Cargo.toml");
+        let path = current_dir.join("Cargo.toml");
         if path.exists() {
-            Ok((path, PathBuf::from(PYPROJECT_TOML)))
+            Ok((path, current_dir.join(PYPROJECT_TOML)))
         } else {
             Err(format_err!(
                 "Can't find {} (in {})",

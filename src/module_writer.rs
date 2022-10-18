@@ -659,7 +659,8 @@ pub fn write_bindings_module(
 
             let relative = project_layout
                 .rust_module
-                .strip_prefix(python_module.parent().unwrap())?;
+                .strip_prefix(python_module.parent().unwrap())
+                .unwrap();
             writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
         }
     } else {
@@ -729,7 +730,8 @@ pub fn write_cffi_module(
 
         let relative = project_layout
             .rust_module
-            .strip_prefix(python_module.parent().unwrap())?;
+            .strip_prefix(python_module.parent().unwrap())
+            .unwrap();
         module = relative.join(&project_layout.extension_name);
         if !editable {
             writer.add_directory(&module)?;
@@ -839,7 +841,9 @@ pub fn write_python_part(
 ) -> Result<()> {
     for absolute in WalkBuilder::new(&python_module).hidden(false).build() {
         let absolute = absolute?.into_path();
-        let relative = absolute.strip_prefix(python_module.as_ref().parent().unwrap())?;
+        let relative = absolute
+            .strip_prefix(python_module.as_ref().parent().unwrap())
+            .unwrap();
         if absolute.is_dir() {
             writer.add_directory(relative)?;
         } else {
@@ -936,7 +940,7 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
                     .build()
                 {
                     let file = file?;
-                    let relative = file.path().strip_prefix(data.parent().unwrap())?;
+                    let relative = file.path().strip_prefix(data.parent().unwrap()).unwrap();
 
                     if file.path_is_symlink() {
                         // Copy the actual file contents, not the link, so that you can create a

@@ -323,7 +323,8 @@ fn add_crate_to_source_distribution(
 
     let local_deps_folder = if cargo_toml_in_subdir {
         let level = abs_manifest_dir
-            .strip_prefix(pyproject_dir)?
+            .strip_prefix(pyproject_dir)
+            .unwrap()
             .components()
             .count();
         format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
@@ -342,7 +343,7 @@ fn add_crate_to_source_distribution(
     writer.add_directory(prefix)?;
 
     let cargo_toml = if cargo_toml_in_subdir {
-        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir)?;
+        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
         prefix.join(relative_manifest_path)
     } else {
         prefix.join(manifest_path.file_name().unwrap())
@@ -482,9 +483,9 @@ pub fn source_distribution(
     if cargo_lock_required || cargo_lock_path.exists() {
         let project_root = pyproject_toml_path.parent().unwrap();
         let relative_cargo_lock = if cargo_lock_path.starts_with(project_root) {
-            cargo_lock_path.strip_prefix(project_root)?
+            cargo_lock_path.strip_prefix(project_root).unwrap()
         } else {
-            cargo_lock_path.strip_prefix(&abs_manifest_dir)?
+            cargo_lock_path.strip_prefix(&abs_manifest_dir).unwrap()
         };
         writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
     } else {
@@ -512,7 +513,7 @@ pub fn source_distribution(
                 continue;
             }
             let source = fs::canonicalize(source)?;
-            let target = root_dir.join(source.strip_prefix(&pyproject_dir)?);
+            let target = root_dir.join(source.strip_prefix(&pyproject_dir).unwrap());
             if source.is_dir() {
                 writer.add_directory(target)?;
             } else {
@@ -542,7 +543,7 @@ pub fn source_distribution(
                 .expect("No files found for pattern")
                 .filter_map(Result::ok)
             {
-                let target = root_dir.join(&source.strip_prefix(pyproject_dir)?);
+                let target = root_dir.join(&source.strip_prefix(pyproject_dir).unwrap());
                 if source.is_dir() {
                     writer.add_directory(target)?;
                 } else {

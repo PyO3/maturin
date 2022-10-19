@@ -297,41 +297,45 @@ jobs:
   test-cross-compile:
     name: Test Cross Compile
     runs-on: ubuntu-latest
+    container: ${{ matrix.platform.container }}
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
         platform:
           # CPython
           - target: aarch64-unknown-linux-gnu
-            arch: aarch64
             abi: cp37-cp37m
             python: python3.7
+            container: messense/manylinux2014-cross:aarch64
           - target: armv7-unknown-linux-gnueabihf
-            arch: armv7
             abi: cp39-cp39
             python: python3.9
+            container: messense/manylinux2014-cross:armv7
           - target: s390x-unknown-linux-gnu
-            arch: s390x
             abi: cp310-cp310
             python: python3.10
+            container: messense/manylinux2014-cross:s390x
           # PyPy
           - target: aarch64-unknown-linux-gnu
-            arch: aarch64
             abi: pp37-pypy37_pp73
             python: pypy3.7
+            container: messense/manylinux2014-cross:aarch64
           - target: aarch64-unknown-linux-gnu
-            arch: aarch64
             abi: pp38-pypy38_pp73
             python: pypy3.8
+            container: messense/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v3
-      - name: Build Wheels
+      - uses: actions-rs/toolchain@v1
+        id: rustup
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: ${{ matrix.platform.target }}
+      - name: Build wheels
         run: |
-          echo 'set -ex
-          curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
-          source ~/.cargo/env
-          rustup target add ${{ matrix.platform.target }}
-
+          set -ex
           # Use bundled sysconfig
           cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
 
@@ -342,8 +346,6 @@ jobs:
 
           # Test abi3
           cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
-          ' > build-wheel.sh
-          docker run --rm -v "$PWD":/io -w /io messense/manylinux2014-cross:${{ matrix.platform.arch }} bash build-wheel.sh
 
   test-bootstrap:
     name: Test Bootstrap

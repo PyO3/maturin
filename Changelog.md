@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix macOS `LC_ID_DYLIB` for abi3 wheels in [#1208](https://github.com/PyO3/maturin/pull/1208)
+
 ## [0.13.6] - 2022-10-08
 
 * Fix `maturin develop` in Windows conda virtual environment in [#1146](https://github.com/PyO3/maturin/pull/1146)

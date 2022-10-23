@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add `--src` option to generate src layout for mixed Python/Rust projects in [#1189](https://github.com/PyO3/maturin/pull/1189)
 * Add Python metadata support for `license-file` field of `Cargo.toml` in [#1195](https://github.com/PyO3/maturin/pull/1195)
 * Upgrade to clap 4.0 in [#1197](https://github.com/PyO3/maturin/pull/1197). This bumps MSRV to 1.61.0.
+* Fix macOS `LC_ID_DYLIB` for abi3 wheels in [#1208](https://github.com/PyO3/maturin/pull/1208)
 
 ## [0.13.6] - 2022-10-08
 

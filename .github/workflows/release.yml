@@ -168,7 +168,7 @@ jobs:
           { target: "i686-unknown-linux-musl", image_tag: "i686-musl", manylinux: "2010"},
         ]
     container:
-      image: docker://messense/rust-musl-cross:${{ matrix.platform.image_tag }}
+      image: docker://ghcr.io/messense/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
@@ -202,11 +202,11 @@ jobs:
       matrix:
         platform:
           - target: "powerpc64le-unknown-linux-musl"
-            image: "messense/rust-musl-cross:powerpc64le-musl"
+            image: "ghcr.io/messense/rust-musl-cross:powerpc64le-musl"
             manylinux: "2014"
             musllinux: "musllinux_1_1"
           - target: "s390x-unknown-linux-gnu"
-            image: "messense/manylinux2014-cross:s390x"
+            image: "ghcr.io/messense/manylinux2014-cross:s390x"
             manylinux: "2014"
             musllinux: ""
     container:

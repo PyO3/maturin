@@ -909,9 +909,9 @@ dependencies = [
 
 [[package]]
 name = "fat-macho"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3e1eb8ca92711774ac8be2853c1be22f3d0194e165c9a688eab2a16a68b0f0"
+checksum = "67f07131a2b944c2b42b6a58104600ef049c11df5454478d2b44ff5dfe58d149"
 dependencies = [
  "goblin",
 ]
@@ -1126,9 +1126,9 @@ dependencies = [
 
 [[package]]
 name = "goblin"
-version = "0.5.4"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7666983ed0dd8d21a6f6576ee00053ca0926fb281a5522577a4dbd0f1b54143"
+checksum = "572564d6cba7d09775202c8e7eebc4d534d5ae36578ab402fb21e182a0ac9505"
 dependencies = [
  "log",
  "plain",
@@ -1324,9 +1324,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lddtree"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "191a3a89089ae35c8e04faf2ca9d2aef24bb0d3055181e0381d2cb82c03ec294"
+checksum = "7580a02d700ecc9e06c72b7aace6e74427a56a69310f18fdd420a5fac3832969"
 dependencies = [
  "fs-err",
  "glob",

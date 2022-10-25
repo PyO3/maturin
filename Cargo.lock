@@ -301,15 +301,16 @@ dependencies = [
 
 [[package]]
 name = "cargo_metadata"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3abb7553d5b9b8421c6de7cb02606ff15e0c6eea7d8eadd75ef013fd636bec36"
+checksum = "406c859255d568f4f742b3146d51851f3bfd49f734a2c289d9107c4395ee0062"
 dependencies = [
  "camino",
  "cargo-platform",
  "semver",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -389,9 +390,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.21"
+version = "3.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ed5341b2301a26ab80be5cbdced622e80ed808483c52e45e3310a877d3b37d7"
+checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
 dependencies = [
  "atty",
  "bitflags",
@@ -401,8 +402,8 @@ dependencies = [
  "once_cell",
  "strsim",
  "termcolor",
- "terminal_size 0.1.17",
- "textwrap 0.15.0",
+ "terminal_size 0.2.1",
+ "textwrap",
 ]
 
 [[package]]
@@ -552,9 +553,9 @@ dependencies = [
 
 [[package]]
 name = "const-random"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f590d95d011aa80b063ffe3253422ed5aa462af4e9867d43ce8337562bac77c4"
+checksum = "acf7ab93790ae0eac37744aff15866e9e3dcc31515d7bf34a6d0fc6c9726b564"
 dependencies = [
  "const-random-macro",
  "proc-macro-hack",
@@ -562,12 +563,12 @@ dependencies = [
 
 [[package]]
 name = "const-random-macro"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "615f6e27d000a2bffbc7f2f6a8669179378fa27ee4d0a509e985dfc0a7defb40"
+checksum = "9c6495bfab021aa116773c3e215be28cee0604417ea358f49966fba050c40d9c"
 dependencies = [
  "getrandom",
- "lazy_static",
+ "once_cell",
  "proc-macro-hack",
  "tiny-keccak",
 ]
@@ -1442,7 +1443,7 @@ dependencies = [
  "tar",
  "target-lexicon",
  "tempfile",
- "textwrap 0.16.0",
+ "textwrap",
  "thiserror",
  "toml_edit",
  "tracing",
@@ -2591,20 +2592,12 @@ dependencies = [
 
 [[package]]
 name = "textwrap"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1141d4d61095b28419e22cb0bbf02755f5e54e0526f97f1e3d1d160e60885fb"
-dependencies = [
- "terminal_size 0.1.17",
-]
-
-[[package]]
-name = "textwrap"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 dependencies = [
  "smawk",
+ "terminal_size 0.2.1",
  "unicode-linebreak",
  "unicode-width",
 ]
@@ -3173,7 +3166,7 @@ dependencies = [
  "bytes",
  "cab",
  "camino",
- "clap 3.2.21",
+ "clap 3.2.23",
  "cli-table",
  "flate2",
  "indicatif",

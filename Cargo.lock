@@ -1998,9 +1998,9 @@ dependencies = [
 
 [[package]]
 name = "python-pkginfo"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f51c51da2adc8c5cc4321a274b87b8073e58e6215d17c362dacedc1f8e9503f2"
+checksum = "0b8cf2d8981a1c967eebacac69c68a54d9786c1b84b813841d0aab2994705608"
 dependencies = [
  "flate2",
  "fs-err",
@@ -2137,9 +2137,9 @@ dependencies = [
 
 [[package]]
 name = "rfc2047-decoder"
-version = "0.1.3"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2cc5bba09a7d67fd0e4cddea6fad36b4bd7508c293d113bf4e226e79fda2d4b"
+checksum = "11347d014ae34e1d367aaf9191c37bf071b161e2e1c09c8559c7717e87030e11"
 dependencies = [
  "base64",
  "charset",

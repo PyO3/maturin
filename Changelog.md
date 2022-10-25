@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Fix macOS `LC_ID_DYLIB` for abi3 wheels in [#1208](https://github.com/PyO3/maturin/pull/1208)
+* Pass `--locked` to Cargo when bootstrap from sdist in [#1212](https://github.com/PyO3/maturin/pull/1212)
 
 ## [0.13.6] - 2022-10-08
 

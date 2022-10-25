@@ -74,7 +74,9 @@ setup(
     python_requires=">=3.7",
     cmdclass={"bdist_wheel": bdist_wheel},
     packages=["maturin"],
-    rust_extensions=[RustBin("maturin", args=cargo_args)],
+    rust_extensions=[
+        RustBin("maturin", args=cargo_args, cargo_manifest_args=["--locked"])
+    ],
     classifiers=[
         "Topic :: Software Development :: Build Tools",
         "Programming Language :: Rust",

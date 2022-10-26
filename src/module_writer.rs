@@ -573,7 +573,16 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
     println!("⚠️ cffi not found. Trying to install it");
     // Call pip through python to don't do the wrong thing when python and pip
     // are coming from different environments
-    let output = call_python(python, &["-m", "pip", "install", "cffi"])?;
+    let output = call_python(
+        python,
+        &[
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "cffi",
+        ],
+    )?;
     if !output.status.success() {
         bail!(
             "Installing cffi with `{:?} -m pip install cffi` failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\nPlease install cffi yourself.",

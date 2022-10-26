@@ -74,7 +74,12 @@ pub fn develop(
 
     // Install dependencies
     if !build_context.metadata21.requires_dist.is_empty() {
-        let mut args = vec!["-m".to_string(), "pip".to_string(), "install".to_string()];
+        let mut args = vec![
+            "-m".to_string(),
+            "pip".to_string(),
+            "install".to_string(),
+            "--disable-pip-version-check".to_string(),
+        ];
         args.extend(build_context.metadata21.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
             // Remove extra marker to make it installable with pip

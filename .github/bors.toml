@@ -1,0 +1,12 @@
+delete_merged_branches = true
+required_approvals = 0
+use_codeowners = false
+status = [
+    # GitHub Actions
+    "conclusion",
+    # Cirrus CI
+    "Test (x86_64 FreeBSD)",
+    "Test (arm64 macOS)",
+    "Test (arm64 Linux)"
+]
+timeout_sec = 21600

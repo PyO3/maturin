@@ -26,7 +26,13 @@ pub fn test_develop(
     check_installed(package, &python).unwrap_err();
 
     let output = Command::new(&python)
-        .args(&["-m", "pip", "install", "cffi"])
+        .args(&[
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "cffi",
+        ])
         .output()?;
     if !output.status.success() {
         panic!(

@@ -80,6 +80,9 @@ The `sysconfig` folder contains the output of `python -m sysconfig` for differen
 
 You need to install `cffi` and `virtualenv` (`pip install cffi virtualenv`) to run the tests.
 
+You can set the `MATURIN_TEST_PYTHON` environment variable to run the tests against a specific Python version, 
+for example `MATURIN_TEST_PYTHON=python3.11 cargo test` will run the tests against Python 3.11.
+
 There are some optional hacks that can speed up the tests (over 80s to 17s on my machine).
 1. By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python version.
 2. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactivate it.

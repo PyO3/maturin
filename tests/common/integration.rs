@@ -30,6 +30,7 @@ pub fn test_integration(
     // The first argument is ignored by clap
     let shed = format!("test-crates/wheels/{}", unique_name);
     let target_dir = format!("test-crates/targets/{}", unique_name);
+    let python_interp = env::var("MATURIN_TEST_PYTHON");
     let mut cli = vec![
         "build",
         "--quiet",
@@ -59,6 +60,11 @@ pub fn test_integration(
         cli.push("linux");
         false
     };
+
+    if let Ok(interp) = python_interp.as_ref() {
+        cli.push("--interpreter");
+        cli.push(interp);
+    }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;

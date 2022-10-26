@@ -106,7 +106,8 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
     }
 
     let mut cmd = Command::new("virtualenv");
-    if let Some(interp) = python_interp {
+    let interp = python_interp.or_else(|| env::var_os("MATURIN_TEST_PYTHON").map(|p| p.into()));
+    if let Some(interp) = interp {
         cmd.arg("-p").arg(interp);
     }
     let output = cmd

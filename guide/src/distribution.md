@@ -224,7 +224,7 @@ or providing any Windows Python library files.
 
 ```toml
 [dependencies]
-pyo3 = { version = "0.16.5", features = ["extension-module", "generate-import-lib"] }
+pyo3 = { version = "0.17.2", features = ["extension-module", "generate-import-lib"] }
 ```
 
 It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to 

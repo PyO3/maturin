@@ -4,30 +4,31 @@ version = 3
 
 [[package]]
 name = "libc"
-version = "0.2.119"
+version = "0.2.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
+checksum = "fc7fcc620a3bff7cdd7a365be3376c97191aeaccc2a603e600951e452615bf89"
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.16.0"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "386a68f0f5f2f9932815068bc8049a56989f2437d96dbb31d1fb11b63ce90364"
+checksum = "bf0708c9ed01692635cbf056e286008e5a2927ab1a5e48cdd3aeb1ba5a6fef47"
 dependencies = [
  "once_cell",
+ "target-lexicon",
 ]
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.16.0"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9a4e2f74dc77eea5ce11d19f0afaeb632b6590f8cbb1d5ee2f1330b766803e8"
+checksum = "90352dea4f486932b72ddf776264d293f85b79a1d214de1d023927b41461132d"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -39,3 +40,9 @@ version = "1.0.0"
 dependencies = [
  "pyo3-ffi",
 ]
+
+[[package]]
+name = "target-lexicon"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c02424087780c9b71cc96799eaeddff35af2bc513278cda5c99fc1f5d026d3c1"

@@ -5,4 +5,4 @@ version = "0.7.3"
 edition = "2018"
 
 [dependencies]
-pyo3 = { version = "0.16.5", optional = true }
+pyo3 = { version = "0.17.2", optional = true }

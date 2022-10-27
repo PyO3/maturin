@@ -145,6 +145,27 @@ fn editable_pyo3_ffi_pure() {
 
 #[test]
 fn integration_pyo3_bin() {
+    use common::test_python_path;
+    use maturin::Target;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
+        let target = Target::from_target_triple(None).unwrap();
+        target.get_python()
+    });
+    let code = "import sys; print(sys.implementation.name, end='')";
+    let output = Command::new(python)
+        .arg("-c")
+        .arg(code)
+        .output()
+        .expect("Failed to execute python");
+    let python_implementation = String::from_utf8(output.stdout).unwrap();
+    if python_implementation == "pypy" {
+        // PyPy doesn't support the 'auto-initialize' feature of pyo3
+        return;
+    }
+
     handle_result(integration::test_integration(
         "test-crates/pyo3-bin",
         None,

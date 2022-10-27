@@ -1,4 +1,4 @@
-use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo};
+use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo, test_python_path};
 use anyhow::{bail, Context, Result};
 use cargo_zigbuild::Zig;
 use clap::Parser;
@@ -30,7 +30,7 @@ pub fn test_integration(
     // The first argument is ignored by clap
     let shed = format!("test-crates/wheels/{}", unique_name);
     let target_dir = format!("test-crates/targets/{}", unique_name);
-    let python_interp = env::var("MATURIN_TEST_PYTHON");
+    let python_interp = test_python_path();
     let mut cli = vec![
         "build",
         "--quiet",
@@ -61,7 +61,7 @@ pub fn test_integration(
         false
     };
 
-    if let Ok(interp) = python_interp.as_ref() {
+    if let Some(interp) = python_interp.as_ref() {
         cli.push("--interpreter");
         cli.push(interp);
     }

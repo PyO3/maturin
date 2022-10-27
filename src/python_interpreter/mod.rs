@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
-use std::io;
+use std::io::{self, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -542,8 +542,7 @@ impl PythonInterpreter {
             }
             Err(err) => {
                 if err.kind() == io::ErrorKind::NotFound {
-                    #[cfg(windows)]
-                    {
+                    if cfg!(windows) {
                         if let Some(python) = executable.as_ref().to_str() {
                             let ver = if python.starts_with("python") {
                                 python.strip_prefix("python").unwrap_or(python)
@@ -551,10 +550,16 @@ impl PythonInterpreter {
                                 python
                             };
                             // Try py -x.y on Windows
-                            let output = Command::new("py")
+                            let mut metadata_py = tempfile::NamedTempFile::new()?;
+                            write!(metadata_py, "{}", GET_INTERPRETER_METADATA)?;
+                            let mut cmd = Command::new("cmd");
+                            cmd.arg("/c")
+                                .arg("py")
                                 .arg(format!("-{}-{}", ver, target.pointer_width()))
-                                .args(&["-c", GET_INTERPRETER_METADATA])
-                                .output();
+                                .arg(metadata_py.path());
+                            println!("{:?}", cmd);
+                            let output = cmd.output();
+                            println!("{:?}", output);
                             match output {
                                 Ok(output) if output.status.success() => output,
                                 _ => return Ok(None),
@@ -562,9 +567,9 @@ impl PythonInterpreter {
                         } else {
                             return Ok(None);
                         }
+                    } else {
+                        return Ok(None);
                     }
-                    #[cfg(not(windows))]
-                    return Ok(None);
                 } else {
                     return Err(err).context(err_msg);
                 }
@@ -751,7 +756,6 @@ impl PythonInterpreter {
             .stderr(Stdio::inherit())
             .spawn()
             .and_then(|mut child| {
-                use std::io::Write;
                 child
                     .stdin
                     .as_mut()

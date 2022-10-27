@@ -106,7 +106,7 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
     }
 
     let mut cmd = Command::new("virtualenv");
-    let interp = python_interp.or_else(|| env::var_os("MATURIN_TEST_PYTHON").map(|p| p.into()));
+    let interp = python_interp.or_else(|| test_python_path().map(PathBuf::from));
     if let Some(interp) = interp {
         cmd.arg("-p").arg(interp);
     }
@@ -162,4 +162,9 @@ pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathB
     let target = Target::from_target_triple(None)?;
     let python = target.get_venv_python(&result.prefix);
     Ok((result.prefix, python))
+}
+
+/// Path to the python interpreter for testing
+pub fn test_python_path() -> Option<String> {
+    env::var("MATURIN_TEST_PYTHON").ok()
 }

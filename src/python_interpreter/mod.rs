@@ -313,7 +313,7 @@ impl FromStr for InterpreterKind {
 
 /// The output format of [GET_INTERPRETER_METADATA]
 #[derive(Deserialize)]
-struct IntepreterMetadataMessage {
+struct InterpreterMetadataMessage {
     executable: Option<String>,
     major: usize,
     minor: usize,
@@ -363,7 +363,7 @@ impl Deref for PythonInterpreter {
 ///  - python 3 + Unix: Use ABIFLAGS
 ///  - python 3 + Windows: No ABIFLAGS, return an empty string
 fn fun_with_abiflags(
-    message: &IntepreterMetadataMessage,
+    message: &InterpreterMetadataMessage,
     target: &Target,
     bridge: &BridgeModel,
 ) -> Result<String> {
@@ -566,7 +566,7 @@ impl PythonInterpreter {
                 }
             }
         };
-        let message: IntepreterMetadataMessage = serde_json::from_slice(&output.stdout)
+        let message: InterpreterMetadataMessage = serde_json::from_slice(&output.stdout)
             .context(err_msg)
             .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 

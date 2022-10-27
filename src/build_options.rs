@@ -564,7 +564,14 @@ impl BuildOptions {
         } else {
             // User given list of interpreters
             let interpreter = if self.interpreter.is_empty() && !target.cross_compiling() {
-                vec![PathBuf::from("python3")]
+                if cfg!(test) {
+                    match env::var_os("MATURIN_TEST_PYTHON") {
+                        Some(python) => vec![python.into()],
+                        None => vec![PathBuf::from("python3")],
+                    }
+                } else {
+                    vec![PathBuf::from("python3")]
+                }
             } else {
                 self.interpreter.clone()
             };

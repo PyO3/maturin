@@ -92,13 +92,30 @@ pub fn handle_result<T>(result: Result<T>) -> T {
     }
 }
 
+/// Get Python implementation
+pub fn get_python_implementation(python_interp: &Path) -> Result<String> {
+    let code = "import sys; print(sys.implementation.name, end='')";
+    let output = Command::new(python_interp).arg("-c").arg(code).output()?;
+    let python_impl = String::from_utf8(output.stdout).unwrap();
+    Ok(python_impl)
+}
+
 /// Create virtualenv
 pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(PathBuf, PathBuf)> {
+    let interp = python_interp.or_else(|| test_python_path().map(PathBuf::from));
+    let venv_interp = interp.clone().unwrap_or_else(|| {
+        let target = Target::from_target_triple(None).unwrap();
+        target.get_python()
+    });
+    let venv_name = match get_python_implementation(&venv_interp) {
+        Ok(python_impl) => format!("{}-{}", name, python_impl),
+        Err(_) => name.to_string(),
+    };
     let venv_dir = PathBuf::from("test-crates")
         .normalize()?
         .into_path_buf()
         .join("venvs")
-        .join(name);
+        .join(venv_name);
     let target = Target::from_target_triple(None)?;
 
     if venv_dir.is_dir() {
@@ -106,7 +123,6 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
     }
 
     let mut cmd = Command::new("virtualenv");
-    let interp = python_interp.or_else(|| test_python_path().map(PathBuf::from));
     if let Some(interp) = interp {
         cmd.arg("-p").arg(interp);
     }

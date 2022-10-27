@@ -1,6 +1,11 @@
 //! To speed up the tests, they are tests all collected in a single module
 
-use common::{develop, editable, errors, handle_result, integration, other};
+use common::{
+    develop, editable, errors, get_python_implementation, handle_result, integration, other,
+    test_python_path,
+};
+use maturin::Target;
+use std::path::PathBuf;
 
 mod common;
 
@@ -145,22 +150,11 @@ fn editable_pyo3_ffi_pure() {
 
 #[test]
 fn integration_pyo3_bin() {
-    use common::test_python_path;
-    use maturin::Target;
-    use std::path::PathBuf;
-    use std::process::Command;
-
     let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
         let target = Target::from_target_triple(None).unwrap();
         target.get_python()
     });
-    let code = "import sys; print(sys.implementation.name, end='')";
-    let output = Command::new(python)
-        .arg("-c")
-        .arg(code)
-        .output()
-        .expect("Failed to execute python");
-    let python_implementation = String::from_utf8(output.stdout).unwrap();
+    let python_implementation = get_python_implementation(&python).unwrap();
     if python_implementation == "pypy" {
         // PyPy doesn't support the 'auto-initialize' feature of pyo3
         return;
@@ -322,10 +316,20 @@ fn integration_wasm_hello_world() {
         Some("wasm32-wasi"),
     ));
 
+    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
+        let target = Target::from_target_triple(None).unwrap();
+        target.get_python()
+    });
+    let python_implementation = get_python_implementation(&python).unwrap();
+    let venv_name = format!(
+        "integration-wasm-hello-world-py3-wasm32-wasi-{}",
+        python_implementation
+    );
+
     // Make sure we're actually running wasm
     assert!(Path::new("test-crates")
         .join("venvs")
-        .join("integration-wasm-hello-world-py3-wasm32-wasi")
+        .join(venv_name)
         .join(if cfg!(target_os = "windows") {
             "Scripts"
         } else {

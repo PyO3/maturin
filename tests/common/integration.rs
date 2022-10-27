@@ -74,7 +74,7 @@ pub fn test_integration(
     let interpreter = if build_context.interpreter.is_empty() {
         let error_message = "python3 should be a python interpreter";
         let venv_interpreter = PythonInterpreter::check_executable(
-            "python3",
+            python_interp.as_deref().unwrap_or("python3"),
             &build_context.target,
             &build_context.bridge,
         )

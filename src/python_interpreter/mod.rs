@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt;
-use std::io;
+use std::io::{self, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -96,35 +96,39 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
 
     // If Python is installed from Python.org it should include the "python launcher"
     // which is used to find the installed interpreters
-    let execution = Command::new("py").arg("-0").output();
+    let execution = Command::new("cmd")
+        .arg("/c")
+        .arg("py")
+        .arg("--list-paths")
+        .output();
     if let Ok(output) = execution {
-        // x86_64: ' -3.10-64 *'
-        // arm64:  ' -V:3.11-arm64 * Python 3.11 (ARM64)
-        let expr = Regex::new(r" -(V:)?(\d).(\d+)-(arm)?(\d+)(?: .*)?").unwrap();
-        let lines = str::from_utf8(&output.stdout).unwrap().lines();
-        for line in lines {
+        // x86_64: ' -3.10-64 * C:\Users\xxx\AppData\Local\Programs\Python\Python310\python.exe'
+        // x86_64: ' -3.11 * C:\Users\xxx\AppData\Local\Programs\Python\Python310\python.exe'
+        // arm64:  ' -V:3.11-arm64 * C:\Users\xxx\AppData\Local\Programs\Python\Python311-arm64\python.exe
+        let expr = Regex::new(r" -(V:)?(\d).(\d+)-?(arm)?(\d*)\s*\*?\s*(.*)?").unwrap();
+        let stdout = str::from_utf8(&output.stdout).unwrap();
+        for line in stdout.lines() {
             if let Some(capture) = expr.captures(line) {
-                let context = "Expected a digit";
-
                 let major = capture
                     .get(2)
                     .unwrap()
                     .as_str()
                     .parse::<usize>()
-                    .context(context)?;
+                    .context("Expected a digit for major version")?;
                 let minor = capture
                     .get(3)
                     .unwrap()
                     .as_str()
                     .parse::<usize>()
-                    .context(context)?;
+                    .context("Expected a digit for minor version")?;
                 if !versions_found.contains(&(major, minor)) {
                     let pointer_width = capture
                         .get(5)
-                        .unwrap()
-                        .as_str()
+                        .map(|m| m.as_str())
+                        .filter(|m| !m.is_empty())
+                        .unwrap_or("64")
                         .parse::<usize>()
-                        .context(context)?;
+                        .context("Expected a digit for pointer width")?;
 
                     if windows_interpreter_no_build(
                         major,
@@ -136,10 +140,10 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                         continue;
                     }
 
+                    let executable = capture.get(6).unwrap().as_str();
                     let version = format!("-{}.{}-{}", major, minor, pointer_width);
-
-                    let output = Command::new("py")
-                        .args(&[&version, "-c", code])
+                    let output = Command::new(executable)
+                        .args(&["-c", code])
                         .output()
                         .unwrap();
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
@@ -538,8 +542,7 @@ impl PythonInterpreter {
             }
             Err(err) => {
                 if err.kind() == io::ErrorKind::NotFound {
-                    #[cfg(windows)]
-                    {
+                    if cfg!(windows) {
                         if let Some(python) = executable.as_ref().to_str() {
                             let ver = if python.starts_with("python") {
                                 python.strip_prefix("python").unwrap_or(python)
@@ -547,10 +550,14 @@ impl PythonInterpreter {
                                 python
                             };
                             // Try py -x.y on Windows
-                            let output = Command::new("py")
+                            let mut metadata_py = tempfile::NamedTempFile::new()?;
+                            write!(metadata_py, "{}", GET_INTERPRETER_METADATA)?;
+                            let mut cmd = Command::new("cmd");
+                            cmd.arg("/c")
+                                .arg("py")
                                 .arg(format!("-{}-{}", ver, target.pointer_width()))
-                                .args(&["-c", GET_INTERPRETER_METADATA])
-                                .output();
+                                .arg(metadata_py.path());
+                            let output = cmd.output();
                             match output {
                                 Ok(output) if output.status.success() => output,
                                 _ => return Ok(None),
@@ -558,9 +565,9 @@ impl PythonInterpreter {
                         } else {
                             return Ok(None);
                         }
+                    } else {
+                        return Ok(None);
                     }
-                    #[cfg(not(windows))]
-                    return Ok(None);
                 } else {
                     return Err(err).context(err_msg);
                 }
@@ -747,7 +754,6 @@ impl PythonInterpreter {
             .stderr(Stdio::inherit())
             .spawn()
             .and_then(|mut child| {
-                use std::io::Write;
                 child
                     .stdin
                     .as_mut()

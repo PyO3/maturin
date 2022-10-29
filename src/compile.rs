@@ -213,21 +213,19 @@ fn compile_target(
         }
     }
 
-    let module_name = &context.module_name;
-    let so_filename = match python_interpreter {
-        Some(python_interpreter) => python_interpreter.get_library_name(module_name),
-        // abi3
-        None => {
-            format!("{base}.abi3.so", base = module_name)
-        }
-    };
-
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
         if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bindings_crate {
             // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
             // non-existent library.
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
+            let module_name = &context.module_name;
+            let so_filename = match bindings_crate {
+                BridgeModel::BindingsAbi3(..) => format!("{base}.abi3.so", base = module_name),
+                _ => python_interpreter
+                    .expect("missing python interpreter for non-abi3 wheel build")
+                    .get_library_name(module_name),
+            };
             let macos_dylib_install_name =
                 format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
             let mac_args = [

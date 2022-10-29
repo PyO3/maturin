@@ -557,9 +557,7 @@ impl PythonInterpreter {
                                 .arg("py")
                                 .arg(format!("-{}-{}", ver, target.pointer_width()))
                                 .arg(metadata_py.path());
-                            println!("{:?}", cmd);
                             let output = cmd.output();
-                            println!("{:?}", output);
                             match output {
                                 Ok(output) if output.status.success() => output,
                                 _ => return Ok(None),

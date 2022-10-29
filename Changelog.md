@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add `--src` option to generate src layout for mixed Python/Rust projects in [#1189](https://github.com/PyO3/maturin/pull/1189)
 * Add Python metadata support for `license-file` field of `Cargo.toml` in [#1195](https://github.com/PyO3/maturin/pull/1195)
 * Upgrade to clap 4.0 in [#1197](https://github.com/PyO3/maturin/pull/1197). This bumps MSRV to 1.61.0.
+
+## [0.13.7] - 2022-10-29
+
 * Fix macOS `LC_ID_DYLIB` for abi3 wheels in [#1208](https://github.com/PyO3/maturin/pull/1208)
 * Pass `--locked` to Cargo when bootstrap from sdist in [#1212](https://github.com/PyO3/maturin/pull/1212)
 * Fix build for Python 3.11 on Windows in [#1222](https://github.com/PyO3/maturin/pull/1222)
@@ -730,7 +733,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.6...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.7...HEAD
+[0.13.7]: https://github.com/pyo3/maturin/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/pyo3/maturin/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/pyo3/maturin/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/pyo3/maturin/compare/v0.13.3...v0.13.4

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Upgrade to clap 4.0 in [#1197](https://github.com/PyO3/maturin/pull/1197). This bumps MSRV to 1.61.0.
 * Fix macOS `LC_ID_DYLIB` for abi3 wheels in [#1208](https://github.com/PyO3/maturin/pull/1208)
 * Pass `--locked` to Cargo when bootstrap from sdist in [#1212](https://github.com/PyO3/maturin/pull/1212)
+* Fix build for Python 3.11 on Windows in [#1222](https://github.com/PyO3/maturin/pull/1222)
 
 ## [0.13.6] - 2022-10-08
 

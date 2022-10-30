@@ -187,20 +187,31 @@ fn rewrite_cargo_toml(
         // Update workspace members
         if let Some(workspace) = data.get_mut("workspace").and_then(|x| x.as_table_mut()) {
             if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array_mut()) {
-                let mut new_members = toml_edit::Array::new();
-                for member in members.iter() {
-                    if let toml_edit::Value::String(ref s) = member {
-                        let path = Path::new(s.value());
-                        if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
-                            if known_path_deps.contains_key(name) {
-                                new_members.push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                if known_path_deps.is_empty() {
+                    // Remove workspace members when there isn't any path dep
+                    workspace.remove("members");
+                    if workspace.is_empty() {
+                        // Remove workspace all together if it's empty
+                        data.remove("workspace");
+                    }
+                    rewritten = true;
+                } else {
+                    let mut new_members = toml_edit::Array::new();
+                    for member in members.iter() {
+                        if let toml_edit::Value::String(ref s) = member {
+                            let path = Path::new(s.value());
+                            if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
+                                if known_path_deps.contains_key(name) {
+                                    new_members
+                                        .push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                                }
                             }
                         }
                     }
-                }
-                if !new_members.is_empty() {
-                    workspace["members"] = toml_edit::value(new_members);
-                    rewritten = true;
+                    if !new_members.is_empty() {
+                        workspace["members"] = toml_edit::value(new_members);
+                        rewritten = true;
+                    }
                 }
             }
         }

@@ -744,7 +744,7 @@ mod test {
         );
         assert_eq!(
             metadata.description,
-            Some(fs_err::read_to_string("test-crates/pyo3-pure/Readme.md").unwrap())
+            Some(fs_err::read_to_string("test-crates/pyo3-pure/README.md").unwrap())
         );
         assert_eq!(metadata.classifiers, &["Programming Language :: Rust"]);
         assert_eq!(

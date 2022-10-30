@@ -404,7 +404,6 @@ fn workspace_members_non_local_dep_sdist() {
             "pyo3_pure-0.1.0+abc123de/LICENSE",
             "pyo3_pure-0.1.0+abc123de/PKG-INFO",
             "pyo3_pure-0.1.0+abc123de/README.md",
-            "pyo3_pure-0.1.0+abc123de/Readme.md",
             "pyo3_pure-0.1.0+abc123de/check_installed/check_installed.py",
             "pyo3_pure-0.1.0+abc123de/pyo3_pure.pyi",
             "pyo3_pure-0.1.0+abc123de/pyproject.toml",

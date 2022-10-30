@@ -4,4 +4,4 @@ Welcome to the maturin user guide! It contains examples and documentation to exp
 
 Please choose from the chapters on the left to jump to individual topics, or continue below to start with maturin's README.
 
-{{#include ../../Readme.md}}
+{{#include ../../README.md}}

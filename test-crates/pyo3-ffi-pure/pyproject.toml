@@ -8,7 +8,7 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 description = "Tests compilation of packages using pyo3-ffi bindings"
-readme = "Readme.md"
+readme = "README.md"
 maintainers = [
     {name = "messense", email = "messense@icloud.com"}
 ]

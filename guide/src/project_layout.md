@@ -56,7 +56,7 @@ my-rust-and-python-project
 │   ├── __init__.py
 │   └── bar.py
 ├── pyproject.toml
-├── Readme.md
+├── README.md
 └── src
     └── lib.rs
 ```

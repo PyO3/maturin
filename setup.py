@@ -38,7 +38,7 @@ try:
 except ImportError:
     bdist_wheel = None
 
-with open("Readme.md", encoding="utf-8", errors="ignore") as fp:
+with open("README.md", encoding="utf-8", errors="ignore") as fp:
     long_description = fp.read()
 
 with open("Cargo.toml", "rb") as fp:

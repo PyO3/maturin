@@ -103,7 +103,7 @@ my-project
 │   ├── __init__.py
 │   └── bar.py
 ├── pyproject.toml
-├── Readme.md
+├── README.md
 └── src
     └── lib.rs
 ```
@@ -135,7 +135,7 @@ my-project
 │       ├── __init__.py
 │       └── bar.py
 ├── pyproject.toml
-├── Readme.md
+├── README.md
 └── src
     └── lib.rs
 ```
@@ -156,7 +156,7 @@ my-project
 │   ├── __init__.py
 │   ├── bar.py
 │   └── my_project.cpython-36m-x86_64-linux-gnu.so
-├── Readme.md
+├── README.md
 └── src
     └── lib.rs
 ```

@@ -4,8 +4,9 @@ use common::{
     develop, editable, errors, get_python_implementation, handle_result, integration, other,
     test_python_path,
 };
+use indoc::indoc;
 use maturin::Target;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod common;
 
@@ -376,6 +377,46 @@ fn workspace_cargo_lock() {
 }
 
 #[test]
+fn workspace_members_non_local_dep_sdist() {
+    let cargo_toml = indoc!(
+        r#"
+        [package]
+        authors = ["konstin <konstin@mailbox.org>"]
+        name = "pyo3-pure"
+        version = "2.1.2"
+        edition = "2018"
+        description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
+        license = "MIT"
+
+        [dependencies]
+        pyo3 = { version = "0.17.2", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+
+        [lib]
+        name = "pyo3_pure"
+        crate-type = ["cdylib"]
+        "#
+    );
+    handle_result(other::test_source_distribution(
+        "test-crates/pyo3-pure",
+        vec![
+            "pyo3_pure-0.1.0+abc123de/Cargo.lock",
+            "pyo3_pure-0.1.0+abc123de/Cargo.toml",
+            "pyo3_pure-0.1.0+abc123de/LICENSE",
+            "pyo3_pure-0.1.0+abc123de/PKG-INFO",
+            "pyo3_pure-0.1.0+abc123de/README.md",
+            "pyo3_pure-0.1.0+abc123de/check_installed/check_installed.py",
+            "pyo3_pure-0.1.0+abc123de/pyo3_pure.pyi",
+            "pyo3_pure-0.1.0+abc123de/pyproject.toml",
+            "pyo3_pure-0.1.0+abc123de/src/lib.rs",
+            "pyo3_pure-0.1.0+abc123de/tests/test_pyo3_pure.py",
+            "pyo3_pure-0.1.0+abc123de/tox.ini",
+        ],
+        Some((Path::new("pyo3_pure-0.1.0+abc123de/Cargo.toml"), cargo_toml)),
+        "sdist-workspace-members-non-local-dep",
+    ))
+}
+
+#[test]
 fn lib_with_path_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/sdist_with_path_dep",
@@ -390,6 +431,7 @@ fn lib_with_path_dep_sdist() {
             "sdist_with_path_dep-0.1.0/src/lib.rs",
             "sdist_with_path_dep-0.1.0/PKG-INFO",
         ],
+        None,
         "sdist-lib-with-path-dep",
     ))
 }
@@ -408,6 +450,7 @@ fn pyo3_mixed_src_layout_sdist() {
             "pyo3_mixed_src-2.1.3/rust/src/lib.rs",
             "pyo3_mixed_src-2.1.3/PKG-INFO",
         ],
+        None,
         "sdist-pyo3-mixed-src-layout",
     ))
 }
@@ -426,6 +469,7 @@ fn workspace_with_path_dep_sdist() {
             "workspace_with_path_dep-0.1.0/src/lib.rs",
             "workspace_with_path_dep-0.1.0/PKG-INFO",
         ],
+        None,
         "sdist-workspace-with-path-dep",
     ))
 }
@@ -443,6 +487,7 @@ fn workspace_inheritance_sdist() {
             "workspace_inheritance-0.1.0/src/lib.rs",
             "workspace_inheritance-0.1.0/PKG-INFO",
         ],
+        None,
         "sdist-workspace-inheritance",
     ))
 }

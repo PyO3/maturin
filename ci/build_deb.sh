@@ -30,7 +30,7 @@ install -Dm755 "target/$TARGET/release/$BINARY_NAME" "$tempdir/usr/bin/$BINARY_N
 strip "$tempdir/usr/bin/$BINARY_NAME"
 
 # readme and license
-install -Dm644 Readme.md "$tempdir/usr/share/doc/$BINARY_NAME/Readme.md"
+install -Dm644 README.md "$tempdir/usr/share/doc/$BINARY_NAME/README.md"
 install -Dm644 license-mit "$tempdir/usr/share/doc/$BINARY_NAME/license-mit"
 install -Dm644 license-apache "$tempdir/usr/share/doc/$BINARY_NAME/license-apache"
 

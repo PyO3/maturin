@@ -231,7 +231,7 @@ impl ProjectResolver {
                 // Detect src layout:
                 //
                 // my-project
-                // ├── Readme.md
+                // ├── README.md
                 // ├── pyproject.toml
                 // ├── src
                 // │   └── my_project

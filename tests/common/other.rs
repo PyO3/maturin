@@ -4,6 +4,7 @@ use flate2::read::GzDecoder;
 use maturin::{BuildOptions, CargoOptions};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
+use std::io::Read;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use tar::Archive;
@@ -19,7 +20,6 @@ pub fn test_musl() -> Result<bool> {
     use fs_err::File;
     use goblin::elf::Elf;
     use std::io::ErrorKind;
-    use std::io::Read;
     use std::process::Command;
 
     let get_target_list = Command::new("rustup")
@@ -114,6 +114,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 pub fn test_source_distribution(
     package: impl AsRef<Path>,
     expected_files: Vec<&str>,
+    expected_cargo_toml: Option<(&Path, &str)>,
     unique_name: &str,
 ) -> Result<()> {
     let manifest_path = package.as_ref().join("Cargo.toml");
@@ -142,16 +143,30 @@ pub fn test_source_distribution(
     let mut archive = Archive::new(tar);
     let mut files = BTreeSet::new();
     let mut file_count = 0;
+    let mut cargo_toml = None;
     for entry in archive.entries()? {
-        let entry = entry?;
+        let mut entry = entry?;
         files.insert(format!("{}", entry.path()?.display()));
         file_count += 1;
+        if let Some(cargo_toml_path) = expected_cargo_toml.as_ref().map(|(p, _)| *p) {
+            if entry.path()? == cargo_toml_path {
+                let mut contents = String::new();
+                entry.read_to_string(&mut contents)?;
+                cargo_toml = Some(contents);
+            }
+        }
     }
     assert_eq!(
         files,
         BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string))
     );
     assert_eq!(file_count, files.len(), "duplicated files found in sdist");
+
+    if let Some((cargo_toml_path, expected)) = expected_cargo_toml {
+        let cargo_toml = cargo_toml
+            .with_context(|| format!("{} not found in sdist", cargo_toml_path.display()))?;
+        assert_eq!(cargo_toml, expected);
+    }
     Ok(())
 }
 

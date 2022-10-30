@@ -14,7 +14,7 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 description = "Implements a dummy function in Rust"
-readme = "Readme.md"
+readme = "README.md"
 maintainers = [
     {name = "messense", email = "messense@icloud.com"}
 ]

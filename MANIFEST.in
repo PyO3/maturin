@@ -1,5 +1,5 @@
 include Cargo.toml Cargo.lock
-include Readme.md
+include README.md
 include license-apache license-mit
 recursive-include src *.rs *.py
 recursive-include src/auditwheel *.json

@@ -349,7 +349,14 @@ fn abi3_without_version() {
 #[test]
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 fn pyo3_no_extension_module() {
-    handle_result(errors::pyo3_no_extension_module())
+    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
+        let target = Target::from_target_triple(None).unwrap();
+        target.get_python()
+    });
+    let python_implementation = get_python_implementation(&python).unwrap();
+    if python_implementation == "cpython" {
+        handle_result(errors::pyo3_no_extension_module())
+    }
 }
 
 #[test]

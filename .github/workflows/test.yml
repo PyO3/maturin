@@ -155,7 +155,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: test-crates/targets
-          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ matrix.python-version }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: cargo test
         run: cargo nextest run --features password-storage
       - name: test cross compiling with zig

@@ -156,6 +156,10 @@ jobs:
         with:
           path: test-crates/targets
           key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ matrix.python-version }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
+      - name: Set MATURIN_TEST_PYTHON for PyPy
+        shell: bash
+        if: contains(matrix.python-version, 'pypy')
+        run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
       - name: cargo test
         run: cargo nextest run --features password-storage
       - name: test cross compiling with zig

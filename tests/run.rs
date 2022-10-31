@@ -21,6 +21,7 @@ fn develop_pyo3_pure() {
 }
 
 #[test]
+#[ignore]
 fn develop_pyo3_pure_conda() {
     // Only run on GitHub Actions for now
     if std::env::var("GITHUB_ACTIONS").is_ok() {

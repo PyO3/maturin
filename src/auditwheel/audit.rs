@@ -212,7 +212,7 @@ fn policy_is_satisfied(
         ));
     }
     // Check for libpython and forbidden libraries
-    let is_libpython = Regex::new(r"^libpython3\.\d+\.so\.\d+\.\d+$").unwrap();
+    let is_libpython = Regex::new(r"^libpython3\.\d+m?u?\.so\.\d+\.\d+$").unwrap();
     let offenders: Vec<String> = offending_libs.into_iter().collect();
     match offenders.as_slice() {
         [] => Ok(()),

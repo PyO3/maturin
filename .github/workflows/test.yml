@@ -38,7 +38,7 @@ jobs:
           python-version: "3.9"
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.10.0"
+          python-version: "3.10"
       - name: Install cffi and virtualenv
         run: pip install cffi virtualenv ziglang~=0.9.0 twine
       - uses: actions-rs/toolchain@v1
@@ -110,7 +110,7 @@ jobs:
           cargo run -- pep517 build-wheel -i pypy3 -m test-crates/pyo3-pure/Cargo.toml -vv
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.10.0"
+          python-version: "3.10"
       - name: test cross compiling with zig
         shell: bash
         run: |

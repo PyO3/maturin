@@ -149,7 +149,7 @@ jobs:
         with:
           key: maturin-${{ runner.os }}
       - name: Cache test crates cargo build
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: test-crates/targets
           key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-${{ matrix.python-version }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
@@ -267,7 +267,7 @@ jobs:
         with:
           key: maturin-${{ runner.os }}-alpine
       - name: Cache test crates cargo build
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: test-crates/targets
           key: test-crates-${{ runner.os }}-alpine-${{ hashFiles('test-crates/*/Cargo.lock') }}
@@ -300,7 +300,7 @@ jobs:
         with:
           key: maturin-${{ runner.os }}
       - name: Cache test crates cargo build
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: test-crates/*/target
           key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
@@ -330,7 +330,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Cache test crates cargo build
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: test-crates/*/target
           # Dockerfile contains the rustc version

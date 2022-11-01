@@ -16,3 +16,7 @@ crate-type = ["cdylib"]
 [package.metadata.maturin]
 python-source = "python"
 name = "pyo3_mixed_py_subdir._pyo3_mixed"
+
+[patch.crates-io]
+pyo3-ffi = { git = "https://github.com/PyO3/pyo3.git", branch = "main" }
+pyo3 = { git = "https://github.com/PyO3/pyo3.git", branch = "main" }

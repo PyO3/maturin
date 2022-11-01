@@ -113,13 +113,10 @@ jobs:
         run: pip install cffi
       - name: Install python packages
         run: pip install virtualenv ziglang~=0.9.0 twine
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: wasm32-wasi # Additional target
+          targets: wasm32-wasi  # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install aarch64-apple-darwin Rust target
@@ -155,7 +152,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: test-crates/targets
-          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ matrix.python-version }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-${{ matrix.python-version }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash
         if: contains(matrix.python-version, 'pypy')
@@ -233,13 +230,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
           components: rust-src
-          target: wasm32-unknown-emscripten
-          override: true
+          targets: wasm32-unknown-emscripten
       - uses: Swatinem/rust-cache@v1
       - run: pip install nox
       - name: Setup Pyodide
@@ -298,12 +292,8 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         id: rustup
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1
@@ -313,7 +303,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: test-crates/*/target
-          key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Compliant Build
         run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
@@ -383,13 +373,9 @@ jobs:
             container: ghcr.io/messense/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        id: rustup
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.platform.target }}
+          targets: ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
           set -ex
@@ -423,12 +409,8 @@ jobs:
               - 'setup.py'
               - 'MANIFEST.in'
               - '.github/workflows/test.yml'
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         if: steps.changes.outputs.changed == 'true'
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
       # Caching
       - name: Cache cargo build
         if: steps.changes.outputs.changed == 'true'
@@ -463,11 +445,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: '1.61.0'
-          override: true
+      - uses: dtolnay/rust-toolchain@1.61.0
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1
@@ -491,12 +469,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.platform.apt-packages }}
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          target: ${{ matrix.platform.target }}
-          override: true
+          targets: ${{ matrix.platform.target }}
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v1
       - name: cargo check

@@ -18,18 +18,11 @@ jobs:
       url: ${{ steps.set_url.outputs.env_url }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: login
-          args: ${{ secrets.CRATES_IO_TOKEN }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: publish
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo login
+        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
+      - name: cargo publish
+        run: cargo publish
       - name: Set environment url
         id: set_url
         run: |
@@ -67,12 +60,9 @@ jobs:
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.target }}
+          targets: ${{ matrix.target }}
 
       - name: Install musl tools
         if: matrix.os == 'ubuntu-latest'
@@ -214,13 +204,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       # powerpc64le-unknown-linux-musl doesn't have official std library release
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         if: matrix.platform.target == 's390x-unknown-linux-gnu'
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.platform.target }}
+          targets: ${{ matrix.platform.target }}
       - name: Build wheel
         run: |
           sudo python3 -m pip install -U --pre maturin

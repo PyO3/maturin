@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Upgrade to clap 4.0 in [#1197](https://github.com/PyO3/maturin/pull/1197). This bumps MSRV to 1.61.0.
 * Remove `workspace.members` in `Cargo.toml` from sdist if there isn't any path dependency in #[1227](https://github.com/PyO3/maturin/pull/1227)
 * Fix auditwheel `libpython` check on Python 3.7 and older versions in [#1229](https://github.com/PyO3/maturin/pull/1229)
+* Use generic tags when `sys.implementation.name` != `platform.python_implementation()` in [#1232](https://github.com/PyO3/maturin/pull/1232).
+  Fixes the compatibility tags for Pyston.
 
 ## [0.13.7] - 2022-10-29
 

@@ -270,11 +270,10 @@ impl BuildOptions {
                         let ext_suffix = sysconfig_data
                             .get("EXT_SUFFIX")
                             .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
-                        let abi_tag = sysconfig_data
-                            .get("SOABI")
-                            .and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
-                        let interpreter_kind = sysconfig_data
-                            .get("SOABI")
+                        let soabi = sysconfig_data.get("SOABI");
+                        let abi_tag =
+                            soabi.and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
+                        let interpreter_kind = soabi
                             .and_then(|tag| {
                                 if tag.starts_with("pypy") {
                                     Some(InterpreterKind::PyPy)
@@ -298,6 +297,8 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
+                            implmentation_name: interpreter_kind.to_string().to_ascii_lowercase(),
+                            soabi: soabi.cloned(),
                         });
                     } else {
                         if interpreter.is_empty() && !self.find_interpreter {
@@ -376,6 +377,8 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
+                            implmentation_name: "cpython".to_string(),
+                            soabi: None,
                         }])
                     } else if let Some(interp) = interpreters.get(0) {
                         println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interp);
@@ -396,6 +399,8 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
+                            implmentation_name: "cpython".to_string(),
+                            soabi: None,
                         }])
                     } else {
                         bail!("Failed to find a python interpreter");
@@ -438,6 +443,8 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
+                            implmentation_name: "cpython".to_string(),
+                            soabi: None,
                         }])
                     } else if target.cross_compiling() {
                         let mut interps = Vec::with_capacity(found_interpreters.len());

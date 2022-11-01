@@ -22,7 +22,7 @@ jobs:
       python-version: ${{ steps.generate-matrix.outputs.python-version }}
       fail-fast: ${{ steps.generate-matrix.outputs.fail-fast }}
     steps:
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: 16
       - run: npm install js-yaml

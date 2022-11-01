@@ -145,7 +145,7 @@ jobs:
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
           key: maturin-${{ runner.os }}
       - name: Cache test crates cargo build
@@ -234,7 +234,7 @@ jobs:
         with:
           components: rust-src
           targets: wasm32-unknown-emscripten
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: pip install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
@@ -263,7 +263,7 @@ jobs:
           apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd
           pip3 install cffi virtualenv
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
           key: maturin-${{ runner.os }}-alpine
       - name: Cache test crates cargo build
@@ -296,7 +296,7 @@ jobs:
         id: rustup
       # Caching
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
           key: maturin-${{ runner.os }}
       - name: Cache test crates cargo build
@@ -414,7 +414,7 @@ jobs:
       # Caching
       - name: Cache cargo build
         if: steps.changes.outputs.changed == 'true'
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
           key: maturin-${{ runner.os }}-bootstrap
       - uses: actions/setup-python@v4
@@ -448,7 +448,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.61.0
       # Caching
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
           key: maturin-${{ runner.os }}-msrv
       - name: cargo build
@@ -473,7 +473,7 @@ jobs:
         with:
           targets: ${{ matrix.platform.target }}
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
       - name: cargo check
         run: cargo check --target ${{ matrix.platform.target }}
 

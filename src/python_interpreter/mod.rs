@@ -318,6 +318,7 @@ impl FromStr for InterpreterKind {
 /// The output format of [GET_INTERPRETER_METADATA]
 #[derive(Deserialize)]
 struct InterpreterMetadataMessage {
+    implementation_name: String,
     executable: Option<String>,
     major: usize,
     minor: usize,
@@ -328,6 +329,7 @@ struct InterpreterMetadataMessage {
     platform: String,
     // comes from `platform.system()`
     system: String,
+    soabi: Option<String>,
     abi_tag: Option<String>,
 }
 
@@ -350,6 +352,10 @@ pub struct PythonInterpreter {
     /// When cross compile the target interpreter isn't runnable,
     /// and it's `executable` is empty
     pub runnable: bool,
+    /// Comes from `sys.platform.name`
+    pub implmentation_name: String,
+    /// Comes from sysconfig var `SOABI`
+    pub soabi: Option<String>,
 }
 
 impl Deref for PythonInterpreter {
@@ -440,40 +446,57 @@ impl PythonInterpreter {
         } else {
             target.get_platform_tag(platform_tags, universal2)?
         };
-        let tag = match self.interpreter_kind {
-            InterpreterKind::CPython => {
-                if target.is_unix() {
+        let tag = if self.implmentation_name.parse::<InterpreterKind>().is_err() {
+            // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston
+            // See also https://github.com/pypa/packaging/blob/0031046f7fad649580bc3127d1cef9157da0dd79/packaging/tags.py#L234-L261
+            format!(
+                "{interpreter}{major}{minor}-{soabi}-{platform}",
+                interpreter = self.implmentation_name,
+                major = self.major,
+                minor = self.minor,
+                soabi = self
+                    .soabi
+                    .as_deref()
+                    .unwrap_or("none")
+                    .replace(['-', '.'], "_"),
+                platform = platform
+            )
+        } else {
+            match self.interpreter_kind {
+                InterpreterKind::CPython => {
+                    if target.is_unix() {
+                        format!(
+                            "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                            major = self.major,
+                            minor = self.minor,
+                            abiflags = self.abiflags,
+                            platform = platform
+                        )
+                    } else {
+                        // On windows the abiflags are missing, but this seems to work
+                        format!(
+                            "cp{major}{minor}-none-{platform}",
+                            major = self.major,
+                            minor = self.minor,
+                            platform = platform
+                        )
+                    }
+                }
+                InterpreterKind::PyPy => {
+                    // pypy uses its version as part of the ABI, e.g.
+                    // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2014_x86_64.whl
                     format!(
-                        "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                        "pp{major}{minor}-pypy{major}{minor}_{abi_tag}-{platform}",
                         major = self.major,
                         minor = self.minor,
-                        abiflags = self.abiflags,
-                        platform = platform
-                    )
-                } else {
-                    // On windows the abiflags are missing, but this seems to work
-                    format!(
-                        "cp{major}{minor}-none-{platform}",
-                        major = self.major,
-                        minor = self.minor,
-                        platform = platform
+                        // TODO: Proper tag handling for pypy
+                        abi_tag = self
+                            .abi_tag
+                            .clone()
+                            .expect("PyPy's syconfig didn't define an `SOABI` ಠ_ಠ"),
+                        platform = platform,
                     )
                 }
-            }
-            InterpreterKind::PyPy => {
-                // pypy uses its version as part of the ABI, e.g.
-                // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2014_x86_64.whl
-                format!(
-                    "pp{major}{minor}-pypy{major}{minor}_{abi_tag}-{platform}",
-                    major = self.major,
-                    minor = self.minor,
-                    // TODO: Proper tag handling for pypy
-                    abi_tag = self
-                        .abi_tag
-                        .clone()
-                        .expect("PyPy's syconfig didn't define an `SOABI` ಠ_ಠ"),
-                    platform = platform,
-                )
             }
         };
         Ok(tag)
@@ -598,13 +621,7 @@ impl PythonInterpreter {
             // We don't use platform from sysconfig on macOS
             None
         } else {
-            Some(
-                message
-                    .platform
-                    .to_lowercase()
-                    .replace('-', "_")
-                    .replace('.', "_"),
-            )
+            Some(message.platform.to_lowercase().replace(['-', '.'], "_"))
         };
 
         Ok(Some(PythonInterpreter {
@@ -625,16 +642,21 @@ impl PythonInterpreter {
                 .unwrap_or_else(|| executable.as_ref().to_path_buf()),
             platform,
             runnable: true,
+            implmentation_name: message.implementation_name,
+            soabi: message.soabi,
         }))
     }
 
     /// Construct a `PythonInterpreter` from a sysconfig and target
     pub fn from_config(config: InterpreterConfig) -> Self {
+        let implmentation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
         PythonInterpreter {
             config,
             executable: PathBuf::new(),
             platform: None,
             runnable: false,
+            implmentation_name,
+            soabi: None,
         }
     }
 

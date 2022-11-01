@@ -2,6 +2,8 @@ env:
   RUST_BACKTRACE: 1
 
 build_and_test: &BUILD_AND_TEST
+  # only run tasks on pull request or bors related branches
+  only_if: $CIRRUS_BRANCH == 'staging' || $CIRRUS_BRANCH == 'trying' || $CIRRUS_PR != ""
   setup_script:
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --default-toolchain stable

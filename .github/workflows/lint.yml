@@ -8,6 +8,12 @@ on:
       # for bors try
       - trying
   pull_request:
+    paths-ignore:
+      - 'sysconfig/**'
+      - '**.md'
+      - '.cirrus.yml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}

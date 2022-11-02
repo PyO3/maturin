@@ -7,6 +7,7 @@ use crate::module_writer::{
     write_wasm_launcher, WheelWriter,
 };
 use crate::project_layout::ProjectLayout;
+use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::{
     compile, BuildArtifact, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
@@ -189,6 +190,8 @@ impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
     /// correct builder.
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
+        use itertools::Itertools;
+
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -198,28 +201,39 @@ impl BuildContext {
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
             BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
             BridgeModel::BindingsAbi3(major, minor) => {
-                let cpythons: Vec<_> = self
+                let abi3_interps: Vec<_> = self
                     .interpreter
                     .iter()
-                    .filter(|interp| interp.interpreter_kind.is_cpython())
+                    .filter(|interp| interp.has_stable_api())
                     .cloned()
                     .collect();
-                let pypys: Vec<_> = self
+                let non_abi3_interps: Vec<_> = self
                     .interpreter
                     .iter()
-                    .filter(|interp| interp.interpreter_kind.is_pypy())
+                    .filter(|interp| !interp.has_stable_api())
                     .cloned()
                     .collect();
                 let mut built_wheels = Vec::new();
-                if !cpythons.is_empty() {
-                    built_wheels.extend(self.build_binding_wheel_abi3(&cpythons, *major, *minor)?);
+                if !abi3_interps.is_empty() {
+                    built_wheels.extend(self.build_binding_wheel_abi3(
+                        &abi3_interps,
+                        *major,
+                        *minor,
+                    )?);
                 }
-                if !pypys.is_empty() {
+                if !non_abi3_interps.is_empty() {
+                    let interp_names: HashSet<_> = non_abi3_interps
+                        .iter()
+                        .map(|interp| match interp.interpreter_kind {
+                            InterpreterKind::CPython => interp.implmentation_name.to_string(),
+                            InterpreterKind::PyPy => "PyPy".to_string(),
+                        })
+                        .collect();
                     println!(
-                        "⚠️ Warning: PyPy does not yet support abi3 so the build artifacts will be version-specific. \
-                        See https://foss.heptapod.net/pypy/pypy/-/issues/3397 for more information."
+                        "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
+                        interp_names.iter().join(", ")
                     );
-                    built_wheels.extend(self.build_binding_wheels(&pypys)?);
+                    built_wheels.extend(self.build_binding_wheels(&non_abi3_interps)?);
                 }
                 built_wheels
             }

@@ -420,6 +420,18 @@ fn fun_with_abiflags(
 }
 
 impl PythonInterpreter {
+    /// Does this interpreter have PEP 384 stable api aka. abi3 support?
+    pub fn has_stable_api(&self) -> bool {
+        if self.implmentation_name.parse::<InterpreterKind>().is_err() {
+            false
+        } else {
+            match self.interpreter_kind {
+                InterpreterKind::CPython => true,
+                InterpreterKind::PyPy => false,
+            }
+        }
+    }
+
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:
     /// {python tag}-{abi tag}-{platform tag}
     ///

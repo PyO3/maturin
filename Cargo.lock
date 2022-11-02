@@ -1436,6 +1436,7 @@ dependencies = [
  "human-panic",
  "ignore",
  "indoc",
+ "itertools",
  "keyring",
  "lddtree",
  "minijinja",

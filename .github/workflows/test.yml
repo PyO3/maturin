@@ -147,7 +147,7 @@ jobs:
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
-          key: maturin-${{ runner.os }}
+          shared-key: maturin-build
       - name: Cache test crates cargo build
         uses: actions/cache@v3
         with:
@@ -235,6 +235,8 @@ jobs:
           components: rust-src
           targets: wasm32-unknown-emscripten
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: maturin-build
       - run: pip install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
@@ -265,7 +267,7 @@ jobs:
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
-          key: maturin-${{ runner.os }}-alpine
+          shared-key: maturin-build
       - name: Cache test crates cargo build
         uses: actions/cache@v3
         with:
@@ -298,12 +300,12 @@ jobs:
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
-          key: maturin-${{ runner.os }}
+          shared-key: maturin-build
       - name: Cache test crates cargo build
         uses: actions/cache@v3
         with:
-          path: test-crates/*/target
-          key: auditwheel-test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
+          path: test-crates/targets
+          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-auditwheel-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Compliant Build
         run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
@@ -334,7 +336,7 @@ jobs:
         with:
           path: test-crates/*/target
           # Dockerfile contains the rustc version
-          key: docker-test-crates-${{ hashFiles('Dockerfile', 'test-crates/*/Cargo.lock') }}
+          key: test-crates-docker-${{ hashFiles('Dockerfile', 'test-crates/*/Cargo.lock') }}
       - name: Test the Docker container
         run: ./test-dockerfile.sh
       # Fix permissions from docker for caching
@@ -416,7 +418,7 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         uses: Swatinem/rust-cache@v2
         with:
-          key: maturin-${{ runner.os }}-bootstrap
+          shared-key: maturin-build
       - uses: actions/setup-python@v4
         if: steps.changes.outputs.changed == 'true'
         with:
@@ -450,7 +452,7 @@ jobs:
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
-          key: maturin-${{ runner.os }}-msrv
+          key: msrv
       - name: cargo build
         run: cargo build --all
 

@@ -8,6 +8,13 @@ on:
       # for bors try
       - trying
   pull_request:
+    paths-ignore:
+      - 'guide/**'
+      - 'sysconfig/**'
+      - '**.md'
+      - '.cirrus.yml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
   workflow_dispatch:
 
 concurrency:
@@ -19,6 +26,7 @@ jobs:
     name: Generate Matrix
     runs-on: ubuntu-latest
     outputs:
+      os: ${{ steps.generate-matrix.outputs.os }}
       python-version: ${{ steps.generate-matrix.outputs.python-version }}
       fail-fast: ${{ steps.generate-matrix.outputs.fail-fast }}
     steps:
@@ -32,10 +40,12 @@ jobs:
         with:
           script: |
             const yaml = require('js-yaml')
+            const OS = yaml.load(process.env.OS_MATRIX)
             const PYTHON_VERSIONS = yaml.load(process.env.PYTHON_VERSION)
 
             if (context.eventName == 'workflow_dispatch') {
               // Run all of them on workflow dispatch
+              core.setOutput('os', OS)
               core.setOutput('python-version', PYTHON_VERSIONS)
               core.setOutput('fail-fast', 'false')
             } else if (context.eventName == 'push') {
@@ -53,6 +63,7 @@ jobs:
                   core.setOutput('fail-fast', 'false')
                 }
               }
+              core.setOutput('os', OS)
               core.setOutput('python-version', PYTHON_VERSIONS)
             } else if (context.eventName == 'pull_request') {
               const { data: { labels: labels } } = await github.rest.pulls.get({
@@ -68,6 +79,9 @@ jobs:
               const firstPyPy = PYTHON_VERSIONS.findIndex(version => version.startsWith('pypy'))
               const pythonVersions = [PYTHON_VERSIONS[firstPyPy - 1], PYTHON_VERSIONS[PYTHON_VERSIONS.length - 1]]
               core.setOutput('python-version', pythonVersions)
+
+              // Skip macOS tests on pull requests, it's slow and already partially covered by Cirrus CI
+              core.setOutput('os', OS.filter(os => !os.startsWith('macos')))
             }
     env:
       COMMIT_MESSAGE: >
@@ -77,6 +91,10 @@ jobs:
               github.event.head_commit.author.username == 'bors[bot]'
             ) && github.event.head_commit.message) || ''
           }}
+      OS_MATRIX: |
+        - ubuntu-latest
+        - macos-latest
+        - windows-latest
       PYTHON_VERSION: |
         - '3.7'
         - '3.8'
@@ -93,7 +111,7 @@ jobs:
     strategy:
       fail-fast: ${{ needs.generate-matrix.outputs.fail-fast != 'false' }}
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: ${{ fromJson(needs.generate-matrix.outputs.os) }}
         python-version: ${{ fromJson(needs.generate-matrix.outputs.python-version) }}
     runs-on: ${{ matrix.os }}
     env:

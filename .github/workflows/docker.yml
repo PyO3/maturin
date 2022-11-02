@@ -15,20 +15,36 @@ jobs:
       url: https://ghcr.io/pyo3/maturin
     steps:
       - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            changed:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'src/**'
+              - 'Dockerfile'
+              - '.github/workflows/docker.yml'
+              - '.dockerignore'
       - name: Setup QEMU
+        if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
         uses: dbhi/qus/action@main
       - uses: docker/setup-buildx-action@v2
+        if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
       - uses: docker/metadata-action@v4
+        if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
         id: meta
         with:
           images: ghcr.io/pyo3/maturin
       - name: Login to GitHub Container Registry
+        if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push
+        if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
         uses: docker/build-push-action@v3
         with:
           context: .

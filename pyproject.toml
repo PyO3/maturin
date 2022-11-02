@@ -23,7 +23,7 @@ dynamic = [
 
 [project.optional-dependencies]
 zig = [
-    "ziglang~=0.9.0",
+    "ziglang~=0.10.0",
 ]
 patchelf = [
     "patchelf",

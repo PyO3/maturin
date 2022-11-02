@@ -21,7 +21,7 @@ pub fn find_musl_libc() -> Result<Option<PathBuf>> {
 /// Dynamic Program Loader
 pub fn get_musl_version(ld_path: impl AsRef<Path>) -> Result<Option<(u16, u16)>> {
     let ld_path = ld_path.as_ref();
-    let output = Command::new(&ld_path)
+    let output = Command::new(ld_path)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .output()?;

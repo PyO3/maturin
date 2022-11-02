@@ -24,7 +24,7 @@ pub fn develop(
 ) -> Result<()> {
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
     let target = Target::from_target_triple(cargo_options.target)?;
-    let python = target.get_venv_python(&venv_dir);
+    let python = target.get_venv_python(venv_dir);
 
     // check python platform and architecture
     if !target.user_specified {
@@ -110,7 +110,7 @@ pub fn develop(
             "--force-reinstall",
         ];
         let output = Command::new(&python)
-            .args(&command)
+            .args(command)
             .arg(dunce::simplified(filename))
             .output()
             .context(format!("pip install failed with {:?}", python))?;

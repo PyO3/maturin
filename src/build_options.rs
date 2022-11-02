@@ -1363,7 +1363,7 @@ mod test {
             .exec()
             .unwrap();
         let metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, &"test-crates/pyo3-pure", &cargo_metadata)
+            Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure", &cargo_metadata)
                 .unwrap();
         assert_eq!(get_min_python_minor(&metadata21), None);
     }

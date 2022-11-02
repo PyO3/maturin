@@ -48,7 +48,7 @@ fn rewrite_cargo_toml(
     root_crate: bool,
 ) -> Result<String> {
     let manifest_path = manifest_path.as_ref();
-    let text = fs::read_to_string(&manifest_path).context(format!(
+    let text = fs::read_to_string(manifest_path).context(format!(
         "Can't read Cargo.toml at {}",
         manifest_path.display(),
     ))?;
@@ -63,7 +63,7 @@ fn rewrite_cargo_toml(
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(table) = data.get_mut(*dep_category).and_then(|x| x.as_table_mut()) {
+        if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
             let workspace_deps = workspace_manifest
                 .get("workspace")
                 .and_then(|x| x.get(dep_category))
@@ -253,7 +253,7 @@ fn add_crate_to_source_distribution(
     let manifest_path = manifest_path.as_ref();
     let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
-        .args(&["package", "--list", "--allow-dirty", "--manifest-path"])
+        .args(["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path)
         .output()
         .with_context(|| {
@@ -283,7 +283,7 @@ fn add_crate_to_source_distribution(
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     let cargo_toml_in_subdir = root_crate
         && abs_manifest_dir != pyproject_dir
-        && abs_manifest_dir.starts_with(&pyproject_dir);
+        && abs_manifest_dir.starts_with(pyproject_dir);
 
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
@@ -293,7 +293,7 @@ fn add_crate_to_source_distribution(
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
             if root_crate && cargo_toml_in_subdir {
                 let relative_to_project_root = abs_manifest_dir
-                    .strip_prefix(&pyproject_dir)
+                    .strip_prefix(pyproject_dir)
                     .unwrap()
                     .join(relative_to_manifests);
                 (relative_to_project_root, relative_to_cwd)
@@ -344,7 +344,7 @@ fn add_crate_to_source_distribution(
         LOCAL_DEPENDENCIES_FOLDER.to_string()
     };
     let rewritten_cargo_toml = rewrite_cargo_toml(
-        &manifest_path,
+        manifest_path,
         workspace_manifest,
         known_path_deps,
         local_deps_folder,
@@ -466,7 +466,7 @@ pub fn source_distribution(
         add_crate_to_source_distribution(
             &mut writer,
             &pyproject_toml_path,
-            &path_dep,
+            path_dep,
             path_dep_workspace_manifest,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
             &known_path_deps,
@@ -483,7 +483,7 @@ pub fn source_distribution(
     add_crate_to_source_distribution(
         &mut writer,
         &pyproject_toml_path,
-        &manifest_path,
+        manifest_path,
         &workspace_manifest,
         &root_dir,
         &known_path_deps,
@@ -500,7 +500,7 @@ pub fn source_distribution(
         let relative_cargo_lock = if cargo_lock_path.starts_with(project_root) {
             cargo_lock_path.strip_prefix(project_root).unwrap()
         } else {
-            cargo_lock_path.strip_prefix(&abs_manifest_dir).unwrap()
+            cargo_lock_path.strip_prefix(abs_manifest_dir).unwrap()
         };
         writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
     } else {
@@ -527,7 +527,7 @@ pub fn source_distribution(
                 debug!("Ignoring {}", source.display());
                 continue;
             }
-            let target = root_dir.join(source.strip_prefix(&pyproject_dir).unwrap());
+            let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
             if source.is_dir() {
                 writer.add_directory(target)?;
             } else {
@@ -557,7 +557,7 @@ pub fn source_distribution(
                 .expect("No files found for pattern")
                 .filter_map(Result::ok)
             {
-                let target = root_dir.join(&source.strip_prefix(pyproject_dir).unwrap());
+                let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
                 if source.is_dir() {
                     writer.add_directory(target)?;
                 } else {

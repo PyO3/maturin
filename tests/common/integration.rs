@@ -119,7 +119,7 @@ pub fn test_integration(
             "--force-reinstall",
         ];
         let output = Command::new(&python)
-            .args(&command)
+            .args(command)
             .arg(dunce::simplified(filename))
             .output()
             .context(format!("pip install failed with {:?}", python))?;
@@ -202,7 +202,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     );
     for (wheel_file, executable) in conda_wheels {
         let output = Command::new(&executable)
-            .args(&[
+            .args([
                 "-m",
                 "pip",
                 "--disable-pip-version-check",

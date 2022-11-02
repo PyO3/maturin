@@ -23,7 +23,7 @@ pub fn test_musl() -> Result<bool> {
     use std::process::Command;
 
     let get_target_list = Command::new("rustup")
-        .args(&["target", "list", "--installed"])
+        .args(["target", "list", "--installed"])
         .output();
 
     match get_target_list {
@@ -91,7 +91,7 @@ pub fn test_musl() -> Result<bool> {
 /// https://github.com/PyO3/maturin/issues/449
 pub fn test_workspace_cargo_lock() -> Result<()> {
     // The first arg gets ignored
-    let options: BuildOptions = BuildOptions::try_parse_from(&[
+    let options: BuildOptions = BuildOptions::try_parse_from([
         "build",
         "--manifest-path",
         "test-crates/workspace/py/Cargo.toml",

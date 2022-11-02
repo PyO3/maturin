@@ -58,7 +58,7 @@ pub fn test_editable(
             "--force-reinstall",
         ];
         let output = Command::new(&python)
-            .args(&command)
+            .args(command)
             .arg(dunce::simplified(filename))
             .output()
             .context(format!("pip install failed with {:?}", python))?;

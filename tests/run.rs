@@ -397,7 +397,7 @@ fn workspace_members_non_local_dep_sdist() {
         license = "MIT"
 
         [dependencies]
-        pyo3 = { version = "0.17.2", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+        pyo3 = { version = "0.17.3", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
 
         [lib]
         name = "pyo3_pure"

@@ -392,7 +392,7 @@ fn workspace_members_non_local_dep_sdist() {
         authors = ["konstin <konstin@mailbox.org>"]
         name = "pyo3-pure"
         version = "2.1.2"
-        edition = "2018"
+        edition = "2021"
         description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
         license = "MIT"
 

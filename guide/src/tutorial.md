@@ -6,7 +6,7 @@ run in Python using pyo3.
 
 ## Create a new Rust project
 
-First, create a new Rust library project using `cargo new --lib --edition 2018
+First, create a new Rust library project using `cargo new --lib --edition 2021
 guessing-game`. This will create a directory with the following structure.
 
 ```ignore
@@ -25,7 +25,7 @@ stable ABI (`abi3`).
 [package]
 name = "guessing-game"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "guessing_game"

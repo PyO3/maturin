@@ -13,7 +13,6 @@ use tar::Archive;
 /// given that rustup and the the musl target are installed
 ///
 /// The bool in the Ok() response says whether the test was actually run
-#[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
     use anyhow::bail;
     use fs_err as fs;
@@ -48,7 +47,7 @@ pub fn test_musl() -> Result<bool> {
     };
 
     // The first arg gets ignored
-    let options: BuildOptions = BuildOptions::try_parse_from(&[
+    let options: BuildOptions = BuildOptions::try_parse_from([
         "build",
         "--manifest-path",
         "test-crates/hello-world/Cargo.toml",

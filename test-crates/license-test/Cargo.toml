@@ -2,7 +2,7 @@
 name = "license-test"
 version = "0.1.0"
 authors = ["konstin <konstin@mailbox.org>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 
 [dependencies]

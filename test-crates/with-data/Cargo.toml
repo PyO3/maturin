@@ -2,7 +2,7 @@
 name = "with-data"
 version = "0.1.0"
 authors = ["konstin <konstin@mailbox.org>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "with_data"

@@ -2,6 +2,6 @@
 name = "py"
 version = "0.1.0"
 authors = ["konstin <konstin@mailbox.org>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]

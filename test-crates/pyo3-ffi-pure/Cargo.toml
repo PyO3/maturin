@@ -1,7 +1,7 @@
 [package]
 name = "pyo3-ffi-pure"
 version = "1.0.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 pyo3-ffi = { version = "0.17.3", features = ["abi3-py37", "extension-module"] }

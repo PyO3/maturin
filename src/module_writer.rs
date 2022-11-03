@@ -83,7 +83,7 @@ impl PathWriter {
     /// Creates a [ModuleWriter] that adds the module to the current virtualenv
     pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self> {
         let interpreter =
-            PythonInterpreter::check_executable(target.get_venv_python(&venv_dir), target, bridge)?
+            PythonInterpreter::check_executable(target.get_venv_python(venv_dir), target, bridge)?
                 .ok_or_else(|| {
                     anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
                 })?;
@@ -185,7 +185,7 @@ impl ModuleWriter for PathWriter {
         file.write_all(bytes)
             .context(format!("Failed to write to file at {}", path.display()))?;
 
-        let hash = base64::encode_config(&Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
+        let hash = base64::encode_config(Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
         self.record.push((
             target.as_ref().to_str().unwrap().to_owned(),
             hash,
@@ -231,7 +231,7 @@ impl ModuleWriter for WheelWriter {
         self.zip.start_file(target.clone(), options)?;
         self.zip.write_all(bytes)?;
 
-        let hash = base64::encode_config(&Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
+        let hash = base64::encode_config(Sha256::digest(bytes), base64::URL_SAFE_NO_PAD);
         self.record.push((target, hash, bytes.len()));
 
         Ok(())
@@ -453,7 +453,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::new(&python)
+    Command::new(python)
         .args(args)
         .output()
         .context(format!("Failed to run python at {:?}", &python))
@@ -479,7 +479,7 @@ fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result
             );
         }
 
-        let mut config = cbindgen::Config::from_root_or_default(&crate_dir);
+        let mut config = cbindgen::Config::from_root_or_default(crate_dir);
         config.defines = HashMap::new();
         config.include_guard = None;
 
@@ -534,7 +534,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
         header = header.display(),
     );
 
-    let output = call_python(python, &["-c", &cffi_invocation])?;
+    let output = call_python(python, ["-c", &cffi_invocation])?;
     let install_cffi = if !output.status.success() {
         // First, check whether the error was cffi not being installed
         let last_line = str::from_utf8(&output.stderr)?.lines().last().unwrap_or("");
@@ -544,7 +544,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
             // https://stackoverflow.com/a/42580137/3549270
             let output = call_python(
                 python,
-                &["-c", "import sys\nprint(sys.base_prefix != sys.prefix)"],
+                ["-c", "import sys\nprint(sys.base_prefix != sys.prefix)"],
             )?;
 
             match str::from_utf8(&output.stdout)?.trim() {
@@ -575,7 +575,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
     // are coming from different environments
     let output = call_python(
         python,
-        &[
+        [
             "-m",
             "pip",
             "install",
@@ -595,7 +595,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
     println!("🎁 Installed cffi");
 
     // Try again
-    let output = call_python(python, &["-c", &cffi_invocation])?;
+    let output = call_python(python, ["-c", &cffi_invocation])?;
     handle_cffi_call_result(python, tempdir, &ffi_py, &output)
 }
 
@@ -618,7 +618,7 @@ fn handle_cffi_call_result(
         // Don't swallow warnings
         io::stderr().write_all(&output.stderr)?;
 
-        let ffi_py_content = fs::read_to_string(&ffi_py)?;
+        let ffi_py_content = fs::read_to_string(ffi_py)?;
         tempdir.close()?;
         Ok(ffi_py_content)
     }
@@ -658,7 +658,7 @@ pub fn write_bindings_module(
             let _ = fs::remove_file(&target);
 
             debug!("Copying {} to {}", artifact.display(), target.display());
-            fs::copy(&artifact, &target).context(format!(
+            fs::copy(artifact, &target).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
                 target.display()
@@ -671,7 +671,7 @@ pub fn write_bindings_module(
                 .rust_module
                 .strip_prefix(python_module.parent().unwrap())
                 .unwrap();
-            writer.add_file_with_permissions(relative.join(&so_filename), &artifact, 0o755)?;
+            writer.add_file_with_permissions(relative.join(&so_filename), artifact, 0o755)?;
         }
     } else {
         let module = PathBuf::from(module_name);
@@ -697,7 +697,7 @@ if hasattr({module_name}, "__all__"):
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
-        writer.add_file_with_permissions(&module.join(so_filename), &artifact, 0o755)?;
+        writer.add_file_with_permissions(&module.join(so_filename), artifact, 0o755)?;
     }
 
     Ok(())
@@ -726,10 +726,10 @@ pub fn write_cffi_module(
         }
 
         if editable {
-            let base_path = python_module.join(&module_name);
+            let base_path = python_module.join(module_name);
             fs::create_dir_all(&base_path)?;
             let target = base_path.join("native.so");
-            fs::copy(&artifact, &target).context(format!(
+            fs::copy(artifact, &target).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
                 target.display()
@@ -762,7 +762,7 @@ pub fn write_cffi_module(
     if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
         writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
-        writer.add_file_with_permissions(&module.join("native.so"), &artifact, 0o755)?;
+        writer.add_file_with_permissions(&module.join("native.so"), artifact, 0o755)?;
     }
 
     Ok(())

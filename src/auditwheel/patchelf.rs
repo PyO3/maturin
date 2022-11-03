@@ -80,7 +80,7 @@ pub fn set_rpath<S: AsRef<OsStr>>(file: impl AsRef<Path>, rpath: &S) -> Result<(
 /// Get the `RPATH` of executables and libraries
 pub fn get_rpath(file: impl AsRef<Path>) -> Result<Vec<String>> {
     let file = file.as_ref();
-    let contents = fs_err::read(&file)?;
+    let contents = fs_err::read(file)?;
     match goblin::Object::parse(&contents) {
         Ok(goblin::Object::Elf(elf)) => {
             let rpaths = if !elf.runpaths.is_empty() {

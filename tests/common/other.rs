@@ -13,7 +13,6 @@ use tar::Archive;
 /// given that rustup and the the musl target are installed
 ///
 /// The bool in the Ok() response says whether the test was actually run
-#[cfg(target_os = "linux")]
 pub fn test_musl() -> Result<bool> {
     use anyhow::bail;
     use fs_err as fs;
@@ -23,7 +22,7 @@ pub fn test_musl() -> Result<bool> {
     use std::process::Command;
 
     let get_target_list = Command::new("rustup")
-        .args(&["target", "list", "--installed"])
+        .args(["target", "list", "--installed"])
         .output();
 
     match get_target_list {
@@ -48,7 +47,7 @@ pub fn test_musl() -> Result<bool> {
     };
 
     // The first arg gets ignored
-    let options: BuildOptions = BuildOptions::try_parse_from(&[
+    let options: BuildOptions = BuildOptions::try_parse_from([
         "build",
         "--manifest-path",
         "test-crates/hello-world/Cargo.toml",
@@ -91,7 +90,7 @@ pub fn test_musl() -> Result<bool> {
 /// https://github.com/PyO3/maturin/issues/449
 pub fn test_workspace_cargo_lock() -> Result<()> {
     // The first arg gets ignored
-    let options: BuildOptions = BuildOptions::try_parse_from(&[
+    let options: BuildOptions = BuildOptions::try_parse_from([
         "build",
         "--manifest-path",
         "test-crates/workspace/py/Cargo.toml",

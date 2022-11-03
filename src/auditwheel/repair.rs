@@ -4,6 +4,8 @@ use anyhow::Result;
 use lddtree::DependencyAnalyzer;
 use std::path::{Path, PathBuf};
 
+/// Find external shared library dependencies
+#[allow(clippy::result_large_err)]
 pub fn find_external_libs(
     artifact: impl AsRef<Path>,
     policy: &Policy,

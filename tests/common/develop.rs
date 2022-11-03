@@ -26,7 +26,7 @@ pub fn test_develop(
     check_installed(package, &python).unwrap_err();
 
     let output = Command::new(&python)
-        .args(&[
+        .args([
             "-m",
             "pip",
             "install",

@@ -92,6 +92,7 @@ pub fn find_versioned_libraries(elf: &Elf) -> Vec<VersionedLibrary> {
 }
 
 /// Find incompliant symbols from symbol versions
+#[allow(clippy::result_large_err)]
 fn find_incompliant_symbols(
     elf: &Elf,
     symbol_versions: &[String],
@@ -111,6 +112,7 @@ fn find_incompliant_symbols(
     Ok(symbols)
 }
 
+#[allow(clippy::result_large_err)]
 fn policy_is_satisfied(
     policy: &Policy,
     elf: &Elf,
@@ -253,6 +255,7 @@ fn get_default_platform_policies() -> Vec<Policy> {
 /// a higher version would be possible.
 ///
 /// Does nothing for `platform_tag` set to `Off`/`Linux` or non-linux platforms.
+#[allow(clippy::result_large_err)]
 pub fn auditwheel_rs(
     artifact: &BuildArtifact,
     target: &Target,

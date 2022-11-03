@@ -30,7 +30,6 @@ pub fn abi3_without_version() -> Result<()> {
 }
 
 /// Check that you get a good error message if you forgot to set the extension-module feature
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
 pub fn pyo3_no_extension_module() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![
@@ -103,7 +102,6 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
 /// Don't panic if the manylinux version doesn't exit
 ///
 /// https://github.com/PyO3/maturin/issues/739
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
 pub fn invalid_manylinux_does_not_panic() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![

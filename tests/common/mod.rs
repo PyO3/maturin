@@ -18,7 +18,7 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     let path = if cfg!(windows) {
         // on Windows, also add Scripts to PATH
         let python_dir = python.parent().unwrap();
-        env::join_paths(&[&python_dir.join("Scripts"), python_dir])?.into()
+        env::join_paths([&python_dir.join("Scripts"), python_dir])?.into()
     } else {
         python.parent().unwrap().to_path_buf()
     };
@@ -32,7 +32,7 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
             .join("check_installed")
             .join("check_installed.py");
     }
-    let output = Command::new(&python)
+    let output = Command::new(python)
         .arg(check_installed)
         .env("PATH", path)
         .output()

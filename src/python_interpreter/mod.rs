@@ -143,7 +143,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     let executable = capture.get(6).unwrap().as_str();
                     let version = format!("-{}.{}-{}", major, minor, pointer_width);
                     let output = Command::new(executable)
-                        .args(&["-c", code])
+                        .args(["-c", code])
                         .output()
                         .unwrap();
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
@@ -231,7 +231,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
 }
 
 fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
-    let python_info = Command::new(&executable)
+    let python_info = Command::new(executable)
         .arg("-c")
         .arg("import sys; print(sys.version)")
         .output();
@@ -546,8 +546,8 @@ impl PythonInterpreter {
         target: &Target,
         bridge: &BridgeModel,
     ) -> Result<Option<PythonInterpreter>> {
-        let output = Command::new(&executable.as_ref())
-            .args(&["-c", GET_INTERPRETER_METADATA])
+        let output = Command::new(executable.as_ref())
+            .args(["-c", GET_INTERPRETER_METADATA])
             .output();
 
         let err_msg = format!(
@@ -825,7 +825,7 @@ impl PythonInterpreter {
             return true;
         }
         let out = Command::new(&self.executable)
-            .args(&[
+            .args([
                 "-m",
                 "pip",
                 "debug",

@@ -347,7 +347,7 @@ fn abi3_without_version() {
 }
 
 #[test]
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[cfg_attr(not(all(target_os = "linux", target_env = "gnu")), ignore)]
 fn pyo3_no_extension_module() {
     let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
         let target = Target::from_target_triple(None).unwrap();
@@ -365,13 +365,13 @@ fn locked_doesnt_build_without_cargo_lock() {
 }
 
 #[test]
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[cfg_attr(not(all(target_os = "linux", target_env = "gnu")), ignore)]
 fn invalid_manylinux_does_not_panic() {
     handle_result(errors::invalid_manylinux_does_not_panic())
 }
 
 #[test]
-#[cfg(target_os = "linux")]
+#[cfg_attr(not(target_os = "linux"), ignore)]
 fn musl() {
     let ran = handle_result(other::test_musl());
     if !ran {

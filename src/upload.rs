@@ -259,8 +259,9 @@ fn canonicalize_name(name: &str) -> String {
 }
 
 /// Uploads a single wheel to the registry
+#[allow(clippy::result_large_err)]
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
-    let hash_hex = hash_file(&wheel_path)?;
+    let hash_hex = hash_file(wheel_path)?;
 
     let dist = python_pkginfo::Distribution::new(wheel_path)
         .map_err(|err| UploadError::PkgInfoError(wheel_path.to_owned(), err))?;
@@ -321,7 +322,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     add_vec("requires_external", &metadata.requires_external);
     add_vec("project_urls", &metadata.project_urls);
 
-    let wheel = File::open(&wheel_path)?;
+    let wheel = File::open(wheel_path)?;
     let wheel_name = wheel_path
         .file_name()
         .expect("Wheel path has a file name")
@@ -464,7 +465,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                         continue;
                     }
                 }
-                let filesize = fs::metadata(&i)
+                let filesize = fs::metadata(i)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| format!("Failed to get the filesize of {:?}: {}", &i, e));
                 return Err(err)

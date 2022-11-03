@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: messense/maturin-action@v1
+    - uses: PyO3/maturin-action@v1
       with:
         manylinux: auto
         command: build
@@ -27,7 +27,7 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: messense/maturin-action@v1
+    - uses: PyO3/maturin-action@v1
       with:
         command: build
         args: --release -o dist --find-interpreter
@@ -41,7 +41,7 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: messense/maturin-action@v1
+    - uses: PyO3/maturin-action@v1
       with:
         command: build
         args: --release -o dist --universal2 --find-interpreter
@@ -61,7 +61,7 @@ jobs:
         with:
           name: wheels
       - name: Publish to PyPI
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: {{ '${{ secrets.PYPI_API_TOKEN }}' }}
         with:

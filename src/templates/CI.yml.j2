@@ -6,6 +6,7 @@ on:
       - main
       - master
   pull_request:
+  workflow_dispatch:
 
 jobs:
   linux:
@@ -18,7 +19,7 @@ jobs:
         command: build
         args: --release --sdist -o dist --find-interpreter
     - name: Upload wheels
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: wheels
         path: dist
@@ -32,7 +33,7 @@ jobs:
         command: build
         args: --release -o dist --find-interpreter
     - name: Upload wheels
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: wheels
         path: dist
@@ -46,7 +47,7 @@ jobs:
         command: build
         args: --release -o dist --universal2 --find-interpreter
     - name: Upload wheels
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: wheels
         path: dist
@@ -57,7 +58,7 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [ macos, windows, linux ]
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: wheels
       - name: Publish to PyPI

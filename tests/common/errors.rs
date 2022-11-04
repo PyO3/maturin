@@ -85,11 +85,7 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
             .source()
             .ok_or_else(|| format_err!("{}", err))?
             .to_string();
-        // Sometimes the first message is "waiting for file lock on package cache",
-        // so we can only check if the lock file is in the message somewhere
-        if !err_string.starts_with("`cargo metadata` exited with an error:")
-            || !err_string.contains("lock file")
-        {
+        if !err_string.starts_with("`cargo metadata` exited with an error:") {
             bail!("{:?}", err_string);
         }
     } else {

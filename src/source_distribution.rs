@@ -1,4 +1,5 @@
 use crate::module_writer::{add_data, ModuleWriter};
+use crate::polyfill::MetadataCommandExt;
 use crate::{BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
@@ -442,7 +443,7 @@ pub fn source_distribution(
             .manifest_path(path_dep)
             // We don't need to resolve the dependency graph
             .no_deps()
-            .exec()
+            .exec_inherit_stderr()
             .with_context(|| {
                 format!(
                     "Cargo metadata failed for {} at '{}'",

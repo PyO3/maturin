@@ -52,6 +52,7 @@ mod develop;
 mod metadata;
 mod module_writer;
 mod new_project;
+mod polyfill;
 mod project_layout;
 mod pyproject_toml;
 mod python_interpreter;

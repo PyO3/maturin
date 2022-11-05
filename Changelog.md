@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix auditwheel `libpython` check on Python 3.7 and older versions in [#1229](https://github.com/PyO3/maturin/pull/1229)
 * Use generic tags when `sys.implementation.name` != `platform.python_implementation()` in [#1232](https://github.com/PyO3/maturin/pull/1232).
   Fixes the compatibility tags for Pyston.
+* Set default macOS deployment target version if `MACOSX_DEPLOYMENT_TARGET` isn't specified in [#1251](https://github.com/PyO3/maturin/pull/1251)
 
 ## [0.13.7] - 2022-10-29
 

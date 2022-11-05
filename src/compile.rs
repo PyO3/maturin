@@ -1,5 +1,5 @@
 use crate::build_context::BridgeModel;
-use crate::target::RUST_1_64_0;
+use crate::target::{Arch, RUST_1_64_0};
 use crate::{BuildContext, PlatformTag, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
@@ -382,6 +382,15 @@ fn compile_target(
 
     if let Some(lib_dir) = env::var_os("MATURIN_PYTHON_SYSCONFIGDATA_DIR") {
         build_command.env("PYO3_CROSS_LIB_DIR", lib_dir);
+    }
+
+    // Set default macOS deployment target version
+    if target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
+        let min_version = match target.target_arch() {
+            Arch::Aarch64 => "11.0",
+            _ => "10.7",
+        };
+        build_command.env("MACOSX_DEPLOYMENT_TARGET", min_version);
     }
 
     let mut cargo_build = build_command

@@ -56,7 +56,7 @@ ignore = "0.4.18"
 itertools = "0.10.5"
 dialoguer = { version = "0.10.2", default-features = false }
 console = "0.15.2"
-minijinja = "0.24.0"
+minijinja = "0.25.0"
 lddtree = "0.3.2"
 cc = "1.0.72"
 clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }

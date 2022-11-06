@@ -118,6 +118,15 @@
       "ext_suffix": ".cp310-win32.pyd",
       "abi_tag": null,
       "pointer_width": 32
+    },
+    {
+      "major": 3,
+      "minor": 11,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cp311-win32.pyd",
+      "abi_tag": null,
+      "pointer_width": 32
     }
   ],
   "aarch64": [

@@ -25,6 +25,8 @@ pub struct ToolMaturin {
     skip_auditwheel: bool,
     #[serde(default)]
     strip: bool,
+    #[serde(default)]
+    ignore_git_ignore: bool,
     /// The directory with python module, contains `<module_name>/__init__.py`
     python_source: Option<PathBuf>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
@@ -140,6 +142,13 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
         self.maturin()?.manifest_path.as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.ignore_git_ignore]` in pyproject.toml
+    pub fn ignore_git_ignore(&self) -> bool {
+        self.maturin()
+            .map(|maturin| maturin.ignore_git_ignore)
+            .unwrap_or_default()
     }
 
     /// Having a pyproject.toml without a version constraint is a bad idea

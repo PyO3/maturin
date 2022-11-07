@@ -48,6 +48,9 @@ Options:
       --skip-auditwheel
           Don't check for manylinux compliance
 
+      --ignore-git-ignore
+          Ignore `.gitignore` files when including files for the Python part of a mixed project
+
       --zig
           For manylinux targets, use zig to ensure compliance for the chosen manylinux version
           

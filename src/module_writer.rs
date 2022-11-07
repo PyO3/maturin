@@ -634,6 +634,7 @@ pub fn write_bindings_module(
     python_interpreter: Option<&PythonInterpreter>,
     target: &Target,
     editable: bool,
+    ignore_git_ignore: bool,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
     let so_filename = match python_interpreter {
@@ -664,7 +665,7 @@ pub fn write_bindings_module(
                 target.display()
             ))?;
         } else {
-            write_python_part(writer, python_module)
+            write_python_part(writer, python_module, ignore_git_ignore)
                 .context("Failed to add the python module to the package")?;
 
             let relative = project_layout
@@ -714,6 +715,7 @@ pub fn write_cffi_module(
     artifact: &Path,
     python: &Path,
     editable: bool,
+    ignore_git_ignore: bool,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
@@ -721,7 +723,7 @@ pub fn write_cffi_module(
 
     if let Some(python_module) = &project_layout.python_module {
         if !editable {
-            write_python_part(writer, python_module)
+            write_python_part(writer, python_module, ignore_git_ignore)
                 .context("Failed to add the python module to the package")?;
         }
 
@@ -848,8 +850,13 @@ if __name__ == '__main__':
 pub fn write_python_part(
     writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
+    ignore_git_ignore: bool,
 ) -> Result<()> {
-    for absolute in WalkBuilder::new(&python_module).hidden(false).build() {
+    for absolute in WalkBuilder::new(&python_module)
+        .git_ignore(!ignore_git_ignore)
+        .hidden(false)
+        .build()
+    {
         let absolute = absolute?.into_path();
         let relative = absolute
             .strip_prefix(python_module.as_ref().parent().unwrap())

@@ -174,6 +174,10 @@ pub struct BuildOptions {
     #[arg(long = "skip-auditwheel")]
     pub skip_auditwheel: bool,
 
+    /// Ignore `.gitignore` files when including files for the Python part of a mixed project
+    #[arg(long = "ignore-git-ignore")]
+    pub ignore_git_ignore: bool,
+
     /// For manylinux targets, use zig to ensure compliance for the chosen manylinux version
     ///
     /// Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
@@ -597,6 +601,8 @@ impl BuildOptions {
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
+        let ignore_git_ignore =
+            pyproject.map(|x| x.ignore_git_ignore()).unwrap_or_default() || self.ignore_git_ignore;
         let platform_tags = if self.platform_tag.is_empty() {
             let compatibility = pyproject
                 .and_then(|x| {
@@ -721,6 +727,7 @@ impl BuildOptions {
             universal2,
             editable,
             cargo_options,
+            ignore_git_ignore,
         })
     }
 }

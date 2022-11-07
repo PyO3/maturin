@@ -57,6 +57,7 @@ pub fn develop(
         bindings,
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
+        ignore_git_ignore: false,
         zig: false,
         universal2: false,
         cargo: CargoOptions {

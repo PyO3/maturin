@@ -178,6 +178,8 @@ pub struct BuildContext {
     pub editable: bool,
     /// Cargo build options
     pub cargo_options: CargoOptions,
+    /// Ignore `.gitignore` files when including files for the Python part of a mixed project
+    pub ignore_git_ignore: bool,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -474,6 +476,7 @@ impl BuildContext {
             None,
             &self.target,
             self.editable,
+            self.ignore_git_ignore,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -545,6 +548,7 @@ impl BuildContext {
             Some(python_interpreter),
             &self.target,
             self.editable,
+            self.ignore_git_ignore,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -663,6 +667,7 @@ impl BuildContext {
             &artifact.path,
             &self.interpreter[0].executable,
             self.editable,
+            self.ignore_git_ignore,
         )?;
 
         self.add_pth(&mut writer)?;
@@ -763,7 +768,7 @@ impl BuildContext {
                 bail!("Sorry, adding python code to a wasm binary is currently not supported")
             }
             if !self.editable {
-                write_python_part(&mut writer, python_module)
+                write_python_part(&mut writer, python_module, self.ignore_git_ignore)
                     .context("Failed to add the python module to the package")?;
             }
         }

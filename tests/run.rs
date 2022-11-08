@@ -494,7 +494,7 @@ fn pyo3_mixed_src_layout_sdist() {
 }
 
 #[test]
-fn pyo3_mixed_include_exclude_src_layout_sdist() {
+fn pyo3_mixed_include_exclude_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-mixed-include-exclude",
         vec![
@@ -515,7 +515,7 @@ fn pyo3_mixed_include_exclude_src_layout_sdist() {
             "pyo3_mixed_include_exclude-2.1.3/tox.ini",
         ],
         None,
-        "sdist-pyo3-mixed-include-exclude-src-layout",
+        "sdist-pyo3-mixed-include-exclude",
     ))
 }
 

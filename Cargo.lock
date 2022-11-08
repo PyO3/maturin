@@ -273,9 +273,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0051cd416c6a5dd0db1583f2063580357eabc46e9e8f23abda2e7b78f309b6e"
+checksum = "fff9dcba0018e9156cfb5802be23e5e1e4edf228e7b09034dcf0f4fb4b9a2d2a"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -343,9 +343,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.74"
+version = "1.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "581f5dba903aac52ea3feb5ec4810848460ee833876f1f9b0fdeab1f19091574"
+checksum = "76a284da2e6fe2092f2353e51713435363112dfd60030e22add80be333fb928f"
 
 [[package]]
 name = "cfb"
@@ -1267,12 +1267,13 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.0-rc.6"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2946516aa80379c1e6ee9cfa75a7b2faf23f63690f44d682e7fecd0141bbcaf2"
+checksum = "4295cbb7573c16d310e99e713cf9e75101eb190ab31fccd35f2d2691b4352b19"
 dependencies = [
  "console",
  "number_prefix",
+ "portable-atomic",
  "unicode-width",
 ]
 
@@ -1895,9 +1896,9 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "platform-info"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95f26dfd50c79dacf549a8a784734fff83a5e42736487464d782fc8a3a2f5563"
+checksum = "4278b2b54a23c9a91d5bae9b09e21d566f8b23890491951160b05d64f29d1d8b"
 dependencies = [
  "libc",
  "winapi",
@@ -1916,6 +1917,12 @@ dependencies = [
  "wepoll-ffi",
  "winapi",
 ]
+
+[[package]]
+name = "portable-atomic"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15eb2c6e362923af47e13c23ca5afb859e83d54452c55b0b9ac763b8f7c1ac16"
 
 [[package]]
 name = "ppv-lite86"
@@ -3223,9 +3230,9 @@ dependencies = [
 
 [[package]]
 name = "xwin"
-version = "0.2.5"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f66ef70cc262a6da73cb13fae0c767add6bd0b85fa46053b263732fecfb9b9f"
+checksum = "19d800084cf7137e4a3e80587ff027d53943e05586a50a3655c2622e6700ba3f"
 dependencies = [
  "anyhow",
  "bytes",

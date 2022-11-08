@@ -234,6 +234,7 @@ jobs:
 
   test-emscripten:
     name: Test Emscripten
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       PYODIDE_VERSION: '0.21.3'
@@ -300,6 +301,7 @@ jobs:
 
   test-auditwheel:
     name: Test Auditwheel
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
@@ -412,6 +414,7 @@ jobs:
 
   test-bootstrap:
     name: Test Bootstrap
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
@@ -506,6 +509,7 @@ jobs:
 
   check:
     name: Check ${{ matrix.platform.target }}
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:

@@ -506,7 +506,6 @@ fn pyo3_mixed_include_exclude_src_layout_sdist() {
             "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
             "pyo3_mixed_include_exclude-2.1.3/include_this_file", // included
             // "pyo3_mixed_include_exclude-2.1.3/exclude_this_file, excluded
-            "pyo3_mixed_include_exclude-2.1.3/pyo3-config.txt",
             "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
             "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
             "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",

@@ -55,17 +55,17 @@ impl Formats {
 pub enum GlobPattern {
     /// A glob
     Path(String),
-    /// A glob `path` with a `format` key to specify one ore more [Format] values
+    /// A glob `path` with a `format` key to specify one or more [Format] values
     WithFormat {
         /// A glob
         path: String,
-        /// One ore more [Format] values
+        /// One or more [Format] values
         format: Formats,
     },
 }
 
 impl GlobPattern {
-    /// Returns the glob pattern for this patter if it targets the given [Format], else this returns `None`.
+    /// Returns the glob pattern for this pattern if it targets the given [Format], else this returns `None`.
     pub fn targets(&self, format: Format) -> Option<&str> {
         match self {
             // Not specified defaults to both

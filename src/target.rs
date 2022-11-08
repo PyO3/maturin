@@ -119,6 +119,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Aarch64,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
+            Arch::X86,
             Arch::X86_64,
         ],
         Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
@@ -227,7 +228,8 @@ impl Target {
     ) -> Result<String> {
         let tag = match (&self.os, &self.arch) {
             // FreeBSD
-            (Os::FreeBsd, Arch::X86_64)
+            (Os::FreeBsd, Arch::X86)
+            | (Os::FreeBsd, Arch::X86_64)
             | (Os::FreeBsd, Arch::Aarch64)
             | (Os::FreeBsd, Arch::Powerpc64)
             | (Os::FreeBsd, Arch::Powerpc64Le)

@@ -32,11 +32,11 @@ compatibility = "linux"
 
 `manylinux` option is also accepted as an alias of `compatibility` for backward compatibility with old version of maturin.
 
-To include arbitrary files in the sdist for use during compilation specify `sdist-include` as an array of globs:
+To include arbitrary files in the sdist for use during compilation specify `include` as an array of `path` globs with `format` set to `sdist`:
 
 ```toml
 [tool.maturin]
-sdist-include = ["path/**/*"]
+include = [{ path = "path/**/*", format = "sdist" }]
 ```
 
 ## Build Wheels

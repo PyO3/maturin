@@ -45,6 +45,16 @@ fn develop_pyo3_mixed() {
 }
 
 #[test]
+fn develop_pyo3_mixed_include_exclude() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-mixed-include-exclude",
+        None,
+        "develop-pyo3-mixed-include-exclude",
+        false,
+    ));
+}
+
+#[test]
 fn develop_pyo3_mixed_submodule() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed-submodule",
@@ -133,6 +143,15 @@ fn editable_pyo3_mixed() {
 }
 
 #[test]
+fn editable_pyo3_mixed_include_exclude() {
+    handle_result(editable::test_editable(
+        "test-crates/pyo3-mixed-include-exclude",
+        None,
+        "editable-pyo3-mixed-include-exclude",
+    ));
+}
+
+#[test]
 fn editable_pyo3_mixed_py_subdir() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-mixed-py-subdir",
@@ -188,6 +207,17 @@ fn integration_pyo3_mixed() {
         "test-crates/pyo3-mixed",
         None,
         "integration-pyo3-mixed",
+        false,
+        None,
+    ));
+}
+
+#[test]
+fn integration_pyo3_mixed_include_exclude() {
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-mixed-include-exclude",
+        None,
+        "integration-pyo3-mixed-include-exclude",
         false,
         None,
     ));
@@ -460,6 +490,33 @@ fn pyo3_mixed_src_layout_sdist() {
         ],
         None,
         "sdist-pyo3-mixed-src-layout",
+    ))
+}
+
+#[test]
+fn pyo3_mixed_include_exclude_src_layout_sdist() {
+    handle_result(other::test_source_distribution(
+        "test-crates/pyo3-mixed-include-exclude",
+        vec![
+            // "pyo3_mixed_include_exclude-2.1.3/.gitignore", // excluded
+            "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
+            "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
+            "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
+            "pyo3_mixed_include_exclude-2.1.3/README.md",
+            "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
+            "pyo3_mixed_include_exclude-2.1.3/include_this_file", // included
+            // "pyo3_mixed_include_exclude-2.1.3/exclude_this_file, excluded
+            "pyo3_mixed_include_exclude-2.1.3/pyo3-config.txt",
+            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
+            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
+            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",
+            "pyo3_mixed_include_exclude-2.1.3/pyproject.toml",
+            "pyo3_mixed_include_exclude-2.1.3/src/lib.rs",
+            // "pyo3_mixed_include_exclude-2.1.3/tests/test_pyo3_mixed_include_exclude.py", excluded
+            "pyo3_mixed_include_exclude-2.1.3/tox.ini",
+        ],
+        None,
+        "sdist-pyo3-mixed-include-exclude-src-layout",
     ))
 }
 

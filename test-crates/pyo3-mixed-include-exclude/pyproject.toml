@@ -12,5 +12,14 @@ dependencies = ["boltons"]
 get_42 = "pyo3_mixed_include_exclude:get_42"
 
 [tool.maturin]
-include = ["include_this_file", "missing"]
-exclude = ["exclude_this_file", "tests/**/*", ".gitignore", "unused"]
+include = [
+  "pyo3_mixed_include_exclude/include_this_file",
+  "missing",
+  "README.md",
+]
+exclude = [
+  "pyo3_mixed_include_exclude/exclude_this_file",
+  "pyo3_mixed_include_exclude/.gitignore",
+  "tests/**/*",
+  "unused",
+]

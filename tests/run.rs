@@ -504,9 +504,9 @@ fn pyo3_mixed_include_exclude_sdist() {
             "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
             "pyo3_mixed_include_exclude-2.1.3/README.md",
             "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
-            "pyo3_mixed_include_exclude-2.1.3/include_this_file", // included
-            // "pyo3_mixed_include_exclude-2.1.3/exclude_this_file, excluded
+            // "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/exclude_this_file, excluded
             "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
+            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/include_this_file", // included
             "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
             "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",
             "pyo3_mixed_include_exclude-2.1.3/pyproject.toml",
@@ -516,6 +516,25 @@ fn pyo3_mixed_include_exclude_sdist() {
         ],
         None,
         "sdist-pyo3-mixed-include-exclude",
+    ))
+}
+
+#[test]
+fn pyo3_mixed_include_exclude_wheel_files() {
+    handle_result(other::check_wheel_files(
+        "test-crates/pyo3-mixed-include-exclude",
+        vec![
+            "pyo3_mixed_include_exclude-2.1.3.dist-info/METADATA",
+            "pyo3_mixed_include_exclude-2.1.3.dist-info/RECORD",
+            "pyo3_mixed_include_exclude-2.1.3.dist-info/WHEEL",
+            "pyo3_mixed_include_exclude-2.1.3.dist-info/entry_points.txt",
+            "pyo3_mixed_include_exclude/__init__.py",
+            "pyo3_mixed_include_exclude/include_this_file",
+            "pyo3_mixed_include_exclude/python_module/__init__.py",
+            "pyo3_mixed_include_exclude/python_module/double.py",
+            "README.md",
+        ],
+        "wheel-files-pyo3-mixed-include-exclude",
     ))
 }
 

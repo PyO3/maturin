@@ -673,7 +673,6 @@ pub fn write_bindings_module(
     python_interpreter: Option<&PythonInterpreter>,
     target: &Target,
     editable: bool,
-    metadata: &Metadata21,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
@@ -705,7 +704,7 @@ pub fn write_bindings_module(
                 target.display()
             ))?;
         } else {
-            write_python_part(writer, python_module, metadata, pyproject_toml)
+            write_python_part(writer, python_module, pyproject_toml)
                 .context("Failed to add the python module to the package")?;
 
             let relative = project_layout
@@ -755,7 +754,6 @@ pub fn write_cffi_module(
     artifact: &Path,
     python: &Path,
     editable: bool,
-    metadata21: &Metadata21,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
@@ -764,7 +762,7 @@ pub fn write_cffi_module(
 
     if let Some(python_module) = &project_layout.python_module {
         if !editable {
-            write_python_part(writer, python_module, metadata21, pyproject_toml)
+            write_python_part(writer, python_module, pyproject_toml)
                 .context("Failed to add the python module to the package")?;
         }
 
@@ -891,7 +889,6 @@ if __name__ == '__main__':
 pub fn write_python_part(
     writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
-    metadata21: &Metadata21,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let python_module = python_module.as_ref();
@@ -918,22 +915,18 @@ pub fn write_python_part(
 
     // Include additional files
     if let Some(pyproject) = pyproject_toml {
-        let root_dir = PathBuf::from(format!(
-            "{}-{}",
-            &metadata21.get_distribution_escaped(),
-            &metadata21.get_version_escaped()
-        ));
+        let pyproject_dir = python_module.parent().unwrap();
         if let Some(glob_patterns) = pyproject.include() {
             for pattern in glob_patterns
                 .iter()
                 .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
             {
                 println!("📦 Including files matching \"{}\"", pattern);
-                for source in glob::glob(&python_module.join(pattern).to_string_lossy())
+                for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
                     .expect("No files found for pattern")
                     .filter_map(Result::ok)
                 {
-                    let target = root_dir.join(source.strip_prefix(python_module).unwrap());
+                    let target = source.strip_prefix(pyproject_dir)?.to_path_buf();
                     if source.is_dir() {
                         writer.add_directory(target)?;
                     } else {

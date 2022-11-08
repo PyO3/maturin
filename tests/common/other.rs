@@ -4,10 +4,12 @@ use flate2::read::GzDecoder;
 use maturin::{BuildOptions, CargoOptions};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
+use std::fs::File;
 use std::io::Read;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use tar::Archive;
+use zip::ZipArchive;
 
 /// Tries to compile a sample crate (pyo3-pure) for musl,
 /// given that rustup and the the musl target are installed
@@ -166,6 +168,48 @@ pub fn test_source_distribution(
             .with_context(|| format!("{} not found in sdist", cargo_toml_path.display()))?;
         assert_eq!(cargo_toml, expected);
     }
+    Ok(())
+}
+
+pub fn check_wheel_files(
+    package: impl AsRef<Path>,
+    expected_files: Vec<&str>,
+    unique_name: &str,
+) -> Result<()> {
+    let manifest_path = package.as_ref().join("Cargo.toml");
+    let wheel_directory = Path::new("test-crates").join("wheels").join(unique_name);
+
+    let build_options = BuildOptions {
+        out: Some(wheel_directory),
+        cargo: CargoOptions {
+            manifest_path: Some(manifest_path),
+            quiet: true,
+            target_dir: Some(PathBuf::from(
+                "test-crates/targets/test_workspace_cargo_lock",
+            )),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let build_context = build_options.into_build_context(false, false, false)?;
+    let wheels = build_context
+        .build_wheels()
+        .context("Failed to build wheels")?;
+    assert!(!wheels.is_empty());
+    let (wheel_path, _) = &wheels[0];
+
+    let wheel = ZipArchive::new(File::open(wheel_path)?)?;
+    let drop_platform_specific_files = |file: &&str| -> bool {
+        !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
+    };
+    assert_eq!(
+        wheel
+            .file_names()
+            .filter(drop_platform_specific_files)
+            .collect::<BTreeSet<_>>(),
+        expected_files.into_iter().collect::<BTreeSet<_>>()
+    );
     Ok(())
 }
 

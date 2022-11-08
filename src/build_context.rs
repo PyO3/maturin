@@ -501,7 +501,6 @@ impl BuildContext {
             None,
             &self.target,
             self.editable,
-            &self.metadata21,
             self.pyproject_toml.as_ref(),
         )
         .context("Failed to add the files to the wheel")?;
@@ -580,7 +579,6 @@ impl BuildContext {
             Some(python_interpreter),
             &self.target,
             self.editable,
-            &self.metadata21,
             self.pyproject_toml.as_ref(),
         )
         .context("Failed to add the files to the wheel")?;
@@ -706,7 +704,6 @@ impl BuildContext {
             &artifact.path,
             &self.interpreter[0].executable,
             self.editable,
-            &self.metadata21,
             self.pyproject_toml.as_ref(),
         )?;
 
@@ -814,13 +811,8 @@ impl BuildContext {
                 bail!("Sorry, adding python code to a wasm binary is currently not supported")
             }
             if !self.editable {
-                write_python_part(
-                    &mut writer,
-                    python_module,
-                    &metadata21,
-                    self.pyproject_toml.as_ref(),
-                )
-                .context("Failed to add the python module to the package")?;
+                write_python_part(&mut writer, python_module, self.pyproject_toml.as_ref())
+                    .context("Failed to add the python module to the package")?;
             }
         }
 

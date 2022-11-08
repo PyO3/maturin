@@ -571,7 +571,9 @@ pub fn source_distribution(
 
     #[allow(deprecated)]
     if let Some(include_targets) = pyproject.sdist_include() {
-        warn!("`[tool.maturin.sdist-include]` is deprecated, please use `[tool.maturin.include]`");
+        eprintln!(
+            "`[tool.maturin.sdist-include]` is deprecated, please use `[tool.maturin.include]`"
+        );
         for pattern in include_targets {
             include(pattern.as_str())?;
         }

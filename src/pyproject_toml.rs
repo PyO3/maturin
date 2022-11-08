@@ -12,12 +12,82 @@ pub struct Tool {
     maturin: Option<ToolMaturin>,
 }
 
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+/// The target format for the include or exclude [GlobPattern].
+///
+/// See [Formats].
+pub enum Format {
+    /// Source distribution
+    Sdist,
+    /// Wheel
+    Wheel,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
+/// A single [Format] or multiple [Format] values for a [GlobPattern].
+pub enum Formats {
+    /// A single [Format] value
+    Single(Format),
+    /// Multiple [Format] values
+    Multiple(Vec<Format>),
+}
+
+impl Formats {
+    /// Returns `true` if the inner [Format] value(s) target the given [Format]
+    pub fn targets(&self, format: Format) -> bool {
+        match self {
+            Self::Single(val) if val == &format => true,
+            Self::Multiple(formats) if formats.contains(&format) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
+/// A glob pattern for the include and exclude configuration.
+///
+/// See [PyProjectToml::include] and [PyProject::exclude].
+///
+/// Based on <https://python-poetry.org/docs/pyproject/#include-and-exclude>.
+pub enum GlobPattern {
+    /// A glob
+    Path(String),
+    /// A glob `path` with a `format` key to specify one ore more [Format] values
+    WithFormat {
+        /// A glob
+        path: String,
+        /// One ore more [Format] values
+        format: Formats,
+    },
+}
+
+impl GlobPattern {
+    /// Returns the glob pattern for this patter if it targets the given [Format], else this returns `None`.
+    pub fn targets(&self, format: Format) -> Option<&str> {
+        match self {
+            // Not specified defaults to both
+            Self::Path(ref glob) => Some(glob),
+            Self::WithFormat {
+                path,
+                format: formats,
+            } if formats.targets(format) => Some(path),
+            _ => None,
+        }
+    }
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
+    // TODO(0.15.0): remove deprecated
     sdist_include: Option<Vec<String>>,
+    include: Option<Vec<GlobPattern>>,
+    exclude: Option<Vec<GlobPattern>>,
     bindings: Option<String>,
     #[serde(alias = "manylinux")]
     compatibility: Option<PlatformTag>,
@@ -98,8 +168,22 @@ impl PyProjectToml {
     }
 
     /// Returns the value of `[tool.maturin.sdist-include]` in pyproject.toml
+    #[deprecated(
+        since = "0.14.0",
+        note = "please use `PyProjectToml::include` (<https://github.com/PyO3/maturin/pulls/1255>)"
+    )]
     pub fn sdist_include(&self) -> Option<&Vec<String>> {
         self.maturin()?.sdist_include.as_ref()
+    }
+
+    /// Returns the value of `[tool.maturin.include]` in pyproject.toml
+    pub fn include(&self) -> Option<&[GlobPattern]> {
+        self.maturin()?.include.as_ref().map(AsRef::as_ref)
+    }
+
+    /// Returns the value of `[tool.maturin.exclude]` in pyproject.toml
+    pub fn exclude(&self) -> Option<&[GlobPattern]> {
+        self.maturin()?.exclude.as_ref().map(AsRef::as_ref)
     }
 
     /// Returns the value of `[tool.maturin.bindings]` in pyproject.toml
@@ -193,7 +277,10 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
-    use crate::PyProjectToml;
+    use crate::{
+        pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
+        PyProjectToml,
+    };
     use fs_err as fs;
     use pretty_assertions::assert_eq;
     use std::path::Path;
@@ -260,5 +347,67 @@ mod tests {
         .unwrap();
         let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
         assert!(!without_constraint.warn_missing_maturin_version());
+    }
+
+    #[test]
+    fn deserialize_include_exclude() {
+        let single = r#"include = ["single"]"#;
+        assert_eq!(
+            toml_edit::easy::from_str::<ToolMaturin>(single)
+                .unwrap()
+                .include,
+            Some(vec![GlobPattern::Path("single".to_string())])
+        );
+
+        let multiple = r#"include = ["one", "two"]"#;
+        assert_eq!(
+            toml_edit::easy::from_str::<ToolMaturin>(multiple)
+                .unwrap()
+                .include,
+            Some(vec![
+                GlobPattern::Path("one".to_string()),
+                GlobPattern::Path("two".to_string())
+            ])
+        );
+
+        let single_format = r#"include = [{path = "path", format="sdist"}]"#;
+        assert_eq!(
+            toml_edit::easy::from_str::<ToolMaturin>(single_format)
+                .unwrap()
+                .include,
+            Some(vec![GlobPattern::WithFormat {
+                path: "path".to_string(),
+                format: Formats::Single(Format::Sdist)
+            },])
+        );
+
+        let multiple_formats = r#"include = [{path = "path", format=["sdist", "wheel"]}]"#;
+        assert_eq!(
+            toml_edit::easy::from_str::<ToolMaturin>(multiple_formats)
+                .unwrap()
+                .include,
+            Some(vec![GlobPattern::WithFormat {
+                path: "path".to_string(),
+                format: Formats::Multiple(vec![Format::Sdist, Format::Wheel])
+            },])
+        );
+
+        let mixed = r#"include = ["one", {path = "two", format="sdist"}, {path = "three", format=["sdist", "wheel"]}]"#;
+        assert_eq!(
+            toml_edit::easy::from_str::<ToolMaturin>(mixed)
+                .unwrap()
+                .include,
+            Some(vec![
+                GlobPattern::Path("one".to_string()),
+                GlobPattern::WithFormat {
+                    path: "two".to_string(),
+                    format: Formats::Single(Format::Sdist),
+                },
+                GlobPattern::WithFormat {
+                    path: "three".to_string(),
+                    format: Formats::Multiple(vec![Format::Sdist, Format::Wheel])
+                }
+            ])
+        );
     }
 }

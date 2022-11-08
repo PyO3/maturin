@@ -35,7 +35,7 @@ pub use crate::module_writer::{
     write_dist_info, ModuleWriter, PathWriter, SDistWriter, WheelWriter,
 };
 pub use crate::new_project::{init_project, new_project, GenerateProjectOptions};
-pub use crate::pyproject_toml::PyProjectToml;
+pub use crate::pyproject_toml::{Format, Formats, GlobPattern, PyProjectToml};
 pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::Target;
 #[cfg(feature = "upload")]

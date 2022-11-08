@@ -1,15 +1,16 @@
 use crate::module_writer::{add_data, ModuleWriter};
 use crate::polyfill::MetadataCommandExt;
-use crate::{BuildContext, PyProjectToml, SDistWriter};
+use crate::{BuildContext, Format, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
+use ignore::overrides::Override;
 use normpath::PathExt as _;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
-use tracing::debug;
+use tracing::{debug, warn};
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// Inheritable workspace fields, see
@@ -411,6 +412,7 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
 pub fn source_distribution(
     build_context: &BuildContext,
     pyproject: &PyProjectToml,
+    excludes: Option<Override>,
 ) -> Result<PathBuf> {
     let metadata21 = &build_context.metadata21;
     let manifest_path = &build_context.manifest_path;
@@ -427,7 +429,7 @@ pub fn source_distribution(
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
 
-    let mut writer = SDistWriter::new(&build_context.out, metadata21)?;
+    let mut writer = SDistWriter::new(&build_context.out, metadata21, excludes)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
         &metadata21.get_distribution_escaped(),
@@ -551,20 +553,35 @@ pub fn source_distribution(
         }
     }
 
-    if let Some(include_targets) = pyproject.sdist_include() {
-        for pattern in include_targets {
-            println!("📦 Including files matching \"{}\"", pattern);
-            for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
-                .expect("No files found for pattern")
-                .filter_map(Result::ok)
-            {
-                let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-                if source.is_dir() {
-                    writer.add_directory(target)?;
-                } else {
-                    writer.add_file(target, source)?;
-                }
+    let mut include = |pattern| -> Result<()> {
+        println!("📦 Including files matching \"{}\"", pattern);
+        for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
+            .expect("No files found for pattern")
+            .filter_map(Result::ok)
+        {
+            let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
+            if source.is_dir() {
+                writer.add_directory(target)?;
+            } else {
+                writer.add_file(target, source)?;
             }
+        }
+        Ok(())
+    };
+
+    if let Some(include_targets) = pyproject.sdist_include() {
+        warn!("`[tool.maturin.sdist-include]` is deprecated, please use `[tool.maturin.include]`");
+        for pattern in include_targets {
+            include(pattern.as_str())?;
+        }
+    }
+
+    if let Some(glob_patterns) = pyproject.include() {
+        for pattern in glob_patterns
+            .iter()
+            .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
+        {
+            include(pattern)?;
         }
     }
 

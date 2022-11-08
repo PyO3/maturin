@@ -1,11 +1,12 @@
 //! The wheel format is (mostly) specified in PEP 427
 use crate::project_layout::ProjectLayout;
-use crate::{BridgeModel, Metadata21, PythonInterpreter, Target};
+use crate::{BridgeModel, Format, Metadata21, PyProjectToml, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use fs_err as fs;
 use fs_err::File;
+use ignore::overrides::Override;
 use ignore::WalkBuilder;
 use normpath::PathExt as _;
 use sha2::{Digest, Sha256};
@@ -202,6 +203,7 @@ pub struct WheelWriter {
     record: Vec<(String, String, usize)>,
     record_file: PathBuf,
     wheel_path: PathBuf,
+    excludes: Option<Override>,
 }
 
 impl ModuleWriter for WheelWriter {
@@ -215,8 +217,12 @@ impl ModuleWriter for WheelWriter {
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()> {
+        let target = target.as_ref();
+        if self.exclude(target) {
+            return Ok(());
+        }
         // The zip standard mandates using unix style paths
-        let target = target.as_ref().to_str().unwrap().replace('\\', "/");
+        let target = target.to_str().unwrap().replace('\\', "/");
 
         // Unlike users which can use the develop subcommand, the tests have to go through
         // packing a zip which pip than has to unpack. This makes this 2-3 times faster
@@ -247,6 +253,7 @@ impl WheelWriter {
         wheel_dir: &Path,
         metadata21: &Metadata21,
         tags: &[String],
+        excludes: Option<Override>,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
@@ -262,6 +269,7 @@ impl WheelWriter {
             record: Vec::new(),
             record_file: metadata21.get_dist_info_dir().join("RECORD"),
             wheel_path,
+            excludes,
         };
 
         write_dist_info(&mut builder, metadata21, tags)?;
@@ -287,6 +295,15 @@ impl WheelWriter {
             }
         }
         Ok(())
+    }
+
+    /// Returns `true` if the given path should be excluded
+    fn exclude(&self, path: impl AsRef<Path>) -> bool {
+        if let Some(excludes) = &self.excludes {
+            excludes.matched(path.as_ref(), false).is_whitelist()
+        } else {
+            false
+        }
     }
 
     /// Creates the record file and finishes the zip
@@ -318,6 +335,7 @@ pub struct SDistWriter {
     tar: tar::Builder<GzEncoder<File>>,
     path: PathBuf,
     files: HashSet<PathBuf>,
+    excludes: Option<Override>,
 }
 
 impl ModuleWriter for SDistWriter {
@@ -332,6 +350,10 @@ impl ModuleWriter for SDistWriter {
         permissions: u32,
     ) -> Result<()> {
         let target = target.as_ref();
+        if self.exclude(target) {
+            return Ok(());
+        }
+
         if self.files.contains(target) {
             // Ignore duplicate files
             return Ok(());
@@ -354,6 +376,9 @@ impl ModuleWriter for SDistWriter {
 
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
         let source = source.as_ref();
+        if self.exclude(source) {
+            return Ok(());
+        }
         let target = target.as_ref();
         if source == self.path {
             bail!(
@@ -381,7 +406,11 @@ impl ModuleWriter for SDistWriter {
 
 impl SDistWriter {
     /// Create a source distribution .tar.gz which can be subsequently expanded
-    pub fn new(wheel_dir: impl AsRef<Path>, metadata21: &Metadata21) -> Result<Self, io::Error> {
+    pub fn new(
+        wheel_dir: impl AsRef<Path>,
+        metadata21: &Metadata21,
+        excludes: Option<Override>,
+    ) -> Result<Self, io::Error> {
         let path = wheel_dir.as_ref().join(format!(
             "{}-{}.tar.gz",
             &metadata21.get_distribution_escaped(),
@@ -396,7 +425,17 @@ impl SDistWriter {
             tar,
             path,
             files: HashSet::new(),
+            excludes,
         })
+    }
+
+    /// Returns `true` if the given path should be excluded
+    fn exclude(&self, path: impl AsRef<Path>) -> bool {
+        if let Some(excludes) = &self.excludes {
+            excludes.matched(path.as_ref(), false).is_whitelist()
+        } else {
+            false
+        }
     }
 
     /// Finished the .tar.gz archive
@@ -634,6 +673,8 @@ pub fn write_bindings_module(
     python_interpreter: Option<&PythonInterpreter>,
     target: &Target,
     editable: bool,
+    metadata: &Metadata21,
+    pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
     let so_filename = match python_interpreter {
@@ -664,7 +705,7 @@ pub fn write_bindings_module(
                 target.display()
             ))?;
         } else {
-            write_python_part(writer, python_module)
+            write_python_part(writer, python_module, metadata, pyproject_toml)
                 .context("Failed to add the python module to the package")?;
 
             let relative = project_layout
@@ -714,6 +755,8 @@ pub fn write_cffi_module(
     artifact: &Path,
     python: &Path,
     editable: bool,
+    metadata21: &Metadata21,
+    pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
@@ -721,7 +764,7 @@ pub fn write_cffi_module(
 
     if let Some(python_module) = &project_layout.python_module {
         if !editable {
-            write_python_part(writer, python_module)
+            write_python_part(writer, python_module, metadata21, pyproject_toml)
                 .context("Failed to add the python module to the package")?;
         }
 
@@ -848,11 +891,14 @@ if __name__ == '__main__':
 pub fn write_python_part(
     writer: &mut impl ModuleWriter,
     python_module: impl AsRef<Path>,
+    metadata21: &Metadata21,
+    pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
-    for absolute in WalkBuilder::new(&python_module).hidden(false).build() {
+    let python_module = python_module.as_ref();
+    for absolute in WalkBuilder::new(python_module).hidden(false).build() {
         let absolute = absolute?.into_path();
         let relative = absolute
-            .strip_prefix(python_module.as_ref().parent().unwrap())
+            .strip_prefix(python_module.parent().unwrap())
             .unwrap();
         if absolute.is_dir() {
             writer.add_directory(relative)?;
@@ -867,6 +913,34 @@ pub fn write_python_part(
             writer
                 .add_file(relative, &absolute)
                 .context(format!("File to add file from {}", absolute.display()))?;
+        }
+    }
+
+    // Include additional files
+    if let Some(pyproject) = pyproject_toml {
+        let root_dir = PathBuf::from(format!(
+            "{}-{}",
+            &metadata21.get_distribution_escaped(),
+            &metadata21.get_version_escaped()
+        ));
+        if let Some(glob_patterns) = pyproject.include() {
+            for pattern in glob_patterns
+                .iter()
+                .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
+            {
+                println!("📦 Including files matching \"{}\"", pattern);
+                for source in glob::glob(&python_module.join(pattern).to_string_lossy())
+                    .expect("No files found for pattern")
+                    .filter_map(Result::ok)
+                {
+                    let target = root_dir.join(source.strip_prefix(python_module).unwrap());
+                    if source.is_dir() {
+                        writer.add_directory(target)?;
+                    } else {
+                        writer.add_file(target, source)?;
+                    }
+                }
+            }
         }
     }
 
@@ -971,4 +1045,45 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use ignore::overrides::OverrideBuilder;
+
+    use super::*;
+
+    #[test]
+    // The mechanism is the same for wheel_writer
+    fn sdist_writer_excludes() -> Result<(), Box<dyn std::error::Error>> {
+        let metadata = Metadata21::default();
+        let perm = 0o777;
+
+        // No excludes
+        let tmp_dir = TempDir::new()?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, None)?;
+        assert!(writer.files.is_empty());
+        writer.add_bytes_with_permissions("test", &[], perm)?;
+        assert_eq!(writer.files.len(), 1);
+        writer.finish()?;
+        tmp_dir.close()?;
+
+        // A test filter
+        let tmp_dir = TempDir::new()?;
+        let mut excludes = OverrideBuilder::new(&tmp_dir);
+        excludes.add("test*")?;
+        excludes.add("!test2")?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Some(excludes.build()?))?;
+        writer.add_bytes_with_permissions("test1", &[], perm)?;
+        writer.add_bytes_with_permissions("test3", &[], perm)?;
+        assert!(writer.files.is_empty());
+        writer.add_bytes_with_permissions("test2", &[], perm)?;
+        assert!(!writer.files.is_empty());
+        writer.add_bytes_with_permissions("yes", &[], perm)?;
+        assert_eq!(writer.files.len(), 2);
+        writer.finish()?;
+        tmp_dir.close()?;
+
+        Ok(())
+    }
 }

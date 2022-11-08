@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
-use tracing::{debug, warn};
+use tracing::debug;
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
 /// Inheritable workspace fields, see

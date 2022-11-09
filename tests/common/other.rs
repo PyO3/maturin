@@ -185,7 +185,7 @@ pub fn check_wheel_files(
             manifest_path: Some(manifest_path),
             quiet: true,
             target_dir: Some(PathBuf::from(
-                "test-crates/targets/test_workspace_cargo_lock",
+                format!("test-crates/targets/{}", unique_name),
             )),
             ..Default::default()
         },

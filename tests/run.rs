@@ -143,15 +143,6 @@ fn editable_pyo3_mixed() {
 }
 
 #[test]
-fn editable_pyo3_mixed_include_exclude() {
-    handle_result(editable::test_editable(
-        "test-crates/pyo3-mixed-include-exclude",
-        None,
-        "editable-pyo3-mixed-include-exclude",
-    ));
-}
-
-#[test]
 fn editable_pyo3_mixed_py_subdir() {
     handle_result(editable::test_editable(
         "test-crates/pyo3-mixed-py-subdir",

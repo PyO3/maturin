@@ -1,9 +1,10 @@
 use crate::module_writer::{add_data, ModuleWriter};
 use crate::polyfill::MetadataCommandExt;
-use crate::{BuildContext, PyProjectToml, SDistWriter};
+use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
+use ignore::overrides::Override;
 use normpath::PathExt as _;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -304,9 +305,17 @@ fn add_crate_to_source_distribution(
         })
         // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
+            #[allow(clippy::if_same_then_else)]
             // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
             // and https://github.com/PyO3/maturin/issues/449
             if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+                false
+            } else if matches!(target.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so") {
+                // Technically, `cargo package --list` should handle this,
+                // but somehow it doesn't on Alpine Linux running in GitHub Actions,
+                // so we do it manually here.
+                // See https://github.com/PyO3/maturin/pull/1255#issuecomment-1308838786
+                debug!("Ignoring {}", target.display());
                 false
             } else {
                 source.exists()
@@ -411,6 +420,7 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
 pub fn source_distribution(
     build_context: &BuildContext,
     pyproject: &PyProjectToml,
+    excludes: Option<Override>,
 ) -> Result<PathBuf> {
     let metadata21 = &build_context.metadata21;
     let manifest_path = &build_context.manifest_path;
@@ -427,7 +437,7 @@ pub fn source_distribution(
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
 
-    let mut writer = SDistWriter::new(&build_context.out, metadata21)?;
+    let mut writer = SDistWriter::new(&build_context.out, metadata21, excludes)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
         &metadata21.get_distribution_escaped(),
@@ -551,20 +561,38 @@ pub fn source_distribution(
         }
     }
 
-    if let Some(include_targets) = pyproject.sdist_include() {
-        for pattern in include_targets {
-            println!("📦 Including files matching \"{}\"", pattern);
-            for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
-                .expect("No files found for pattern")
-                .filter_map(Result::ok)
-            {
-                let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-                if source.is_dir() {
-                    writer.add_directory(target)?;
-                } else {
-                    writer.add_file(target, source)?;
-                }
+    let mut include = |pattern| -> Result<()> {
+        println!("📦 Including files matching \"{}\"", pattern);
+        for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
+            .expect("No files found for pattern")
+            .filter_map(Result::ok)
+        {
+            let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
+            if source.is_dir() {
+                writer.add_directory(target)?;
+            } else {
+                writer.add_file(target, source)?;
             }
+        }
+        Ok(())
+    };
+
+    #[allow(deprecated)]
+    if let Some(include_targets) = pyproject.sdist_include() {
+        eprintln!(
+            "⚠️  Warning: `[tool.maturin.sdist-include]` is deprecated, please use `[tool.maturin.include]`"
+        );
+        for pattern in include_targets {
+            include(pattern.as_str())?;
+        }
+    }
+
+    if let Some(glob_patterns) = pyproject.include() {
+        for pattern in glob_patterns
+            .iter()
+            .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
+        {
+            include(pattern)?;
         }
     }
 

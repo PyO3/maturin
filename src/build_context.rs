@@ -10,12 +10,15 @@ use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::{
-    compile, BuildArtifact, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
+    compile, pyproject_toml::Format, BuildArtifact, Metadata21, ModuleWriter, PyProjectToml,
+    PythonInterpreter, Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
+use ignore::overrides::{Override, OverrideBuilder};
 use lddtree::Library;
+use normpath::PathExt;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -249,8 +252,9 @@ impl BuildContext {
 
         match self.pyproject_toml.as_ref() {
             Some(pyproject) => {
-                let sdist_path = source_distribution(self, pyproject)
-                    .context("Failed to build source distribution")?;
+                let sdist_path =
+                    source_distribution(self, pyproject, self.excludes(Format::Sdist)?)
+                        .context("Failed to build source distribution")?;
                 Ok(Some((sdist_path, "source".to_string())))
             }
             None => Ok(None),
@@ -450,6 +454,23 @@ impl BuildContext {
         Ok(())
     }
 
+    fn excludes(&self, format: Format) -> Result<Option<Override>> {
+        if let Some(pyproject) = self.pyproject_toml.as_ref() {
+            let pyproject_dir = self.pyproject_toml_path.normalize()?.into_path_buf();
+            if let Some(glob_patterns) = &pyproject.exclude() {
+                let mut excludes = OverrideBuilder::new(pyproject_dir.parent().unwrap());
+                for glob in glob_patterns
+                    .iter()
+                    .filter_map(|glob_pattern| glob_pattern.targets(format))
+                {
+                    excludes.add(glob)?;
+                }
+                return Ok(Some(excludes.build()?));
+            }
+        }
+        Ok(None)
+    }
+
     fn write_binding_wheel_abi3(
         &self,
         artifact: BuildArtifact,
@@ -463,7 +484,13 @@ impl BuildContext {
             .get_platform_tag(platform_tags, self.universal2)?;
         let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
 
-        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &self.metadata21,
+            &[tag.clone()],
+            self.excludes(Format::Wheel)?,
+        )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         write_bindings_module(
@@ -474,6 +501,7 @@ impl BuildContext {
             None,
             &self.target,
             self.editable,
+            self.pyproject_toml.as_ref(),
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -534,7 +562,13 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(&self.target, platform_tags, self.universal2)?;
 
-        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &[tag.clone()])?;
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &self.metadata21,
+            &[tag.clone()],
+            self.excludes(Format::Wheel)?,
+        )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         write_bindings_module(
@@ -545,6 +579,7 @@ impl BuildContext {
             Some(python_interpreter),
             &self.target,
             self.editable,
+            self.pyproject_toml.as_ref(),
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -651,7 +686,13 @@ impl BuildContext {
             .target
             .get_universal_tags(platform_tags, self.universal2)?;
 
-        let mut writer = WheelWriter::new(&tag, &self.out, &self.metadata21, &tags)?;
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &self.metadata21,
+            &tags,
+            self.excludes(Format::Wheel)?,
+        )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         write_cffi_module(
@@ -663,6 +704,7 @@ impl BuildContext {
             &artifact.path,
             &self.interpreter[0].executable,
             self.editable,
+            self.pyproject_toml.as_ref(),
         )?;
 
         self.add_pth(&mut writer)?;
@@ -754,7 +796,13 @@ impl BuildContext {
             self.metadata21.clone()
         };
 
-        let mut writer = WheelWriter::new(&tag, &self.out, &metadata21, &tags)?;
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &metadata21,
+            &tags,
+            self.excludes(Format::Wheel)?,
+        )?;
 
         if let Some(python_module) = &self.project_layout.python_module {
             if self.target.is_wasi() {
@@ -763,7 +811,7 @@ impl BuildContext {
                 bail!("Sorry, adding python code to a wasm binary is currently not supported")
             }
             if !self.editable {
-                write_python_part(&mut writer, python_module)
+                write_python_part(&mut writer, python_module, self.pyproject_toml.as_ref())
                     .context("Failed to add the python module to the package")?;
             }
         }

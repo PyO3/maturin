@@ -223,11 +223,11 @@ compatibility = "linux"
 
 `manylinux` option is also accepted as an alias of `compatibility` for backward compatibility with old version of maturin.
 
-To include arbitrary files in the sdist for use during compilation specify `sdist-include` as an array of globs:
+To include arbitrary files in the sdist for use during compilation specify `include` as an array of `path` globs with `format` set to `sdist`:
 
 ```toml
 [tool.maturin]
-sdist-include = ["path/**/*"]
+include = [{ path = "path/**/*", format = "sdist" }]
 ```
 
 There's a `maturin sdist` command for only building a source distribution as workaround for [pypa/pip#6041](https://github.com/pypa/pip/issues/6041).

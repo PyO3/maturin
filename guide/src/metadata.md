@@ -108,7 +108,12 @@ in the `tool.maturin` section of `pyproject.toml`.
 ```toml
 [tool.maturin]
 # Include arbitrary files in the sdist
+# NOTE: deprecated, please use `include` with `format="sdist"`
 sdist-include = []
+# Include additional files
+include = []
+# Exclude files
+exclude = []
 # Bindings type
 bindings = "pyo3"
 # Control the platform tag on linux
@@ -138,3 +143,26 @@ unstable-flags = []
 # Extra arguments that will be passed to rustc as `cargo rustc [...] -- [...] [arg1] [arg2]`
 rustc-args = []
 ```
+
+The `[tool.maturin.include]` and `[tool.maturin.exclude]` configuration are
+inspired by
+[Poetry](https://python-poetry.org/docs/pyproject/#include-and-exclude).
+
+To specify files or globs directly:
+
+```toml
+include = ["path/**/*", "some/other/file"]
+```
+
+To specify a specific target format (`sdist` or `wheel`):
+
+```toml
+include = [
+  { path = "path/**/*", format = "sdist" },
+  { path = "all", format = ["sdist", "wheel"] },
+  { path = "for/wheel/**/*", format = "wheel" }
+]
+```
+
+The default behavior is apply these configurations to both `sdist` and `wheel`
+targets.

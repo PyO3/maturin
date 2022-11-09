@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Fixes the compatibility tags for Pyston.
 * Set default macOS deployment target version if `MACOSX_DEPLOYMENT_TARGET` isn't specified in [#1251](https://github.com/PyO3/maturin/pull/1251)
 * Add support for 32-bit x86 FreeBSD target in [#1254](https://github.com/PyO3/maturin/pull/1254)
+* Add `[tool.maturin.include]` and `[tool.maturin.exclude]` and deprecate `[tool.maturin.sdist-include]` [#1255](https://github.com/PyO3/maturin/pull/1255)
 
 ## [0.13.7] - 2022-10-29
 

@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use flate2::read::GzDecoder;
-use maturin::{BuildOptions, CargoOptions};
+use maturin::{BuildOptions, CargoOptions, PlatformTag};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::fs::File;
@@ -190,6 +190,7 @@ pub fn check_wheel_files(
             ))),
             ..Default::default()
         },
+        platform_tag: vec![PlatformTag::Linux],
         ..Default::default()
     };
 

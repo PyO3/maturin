@@ -10,8 +10,8 @@ use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::{
-    compile, BuildArtifact, Format, Metadata21, ModuleWriter, PyProjectToml, PythonInterpreter,
-    Target,
+    compile, pyproject_toml::Format, BuildArtifact, Metadata21, ModuleWriter, PyProjectToml,
+    PythonInterpreter, Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;

@@ -1,6 +1,8 @@
 //! The wheel format is (mostly) specified in PEP 427
 use crate::project_layout::ProjectLayout;
-use crate::{BridgeModel, Format, Metadata21, PyProjectToml, PythonInterpreter, Target};
+use crate::{
+    pyproject_toml::Format, BridgeModel, Metadata21, PyProjectToml, PythonInterpreter, Target,
+};
 use anyhow::{anyhow, bail, Context, Result};
 use flate2::write::GzEncoder;
 use flate2::Compression;

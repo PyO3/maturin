@@ -1,3 +1,5 @@
+//! A pyproject.toml as specified in PEP 517
+
 use crate::PlatformTag;
 use anyhow::{format_err, Result};
 use fs_err as fs;
@@ -118,6 +120,7 @@ pub struct ToolMaturin {
     pub config: Option<Vec<String>>,
     /// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
     pub unstable_flags: Option<Vec<String>>,
+    /// Additional rustc arguments
     pub rustc_args: Option<Vec<String>>,
 }
 

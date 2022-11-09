@@ -1,6 +1,6 @@
 use crate::module_writer::{add_data, ModuleWriter};
 use crate::polyfill::MetadataCommandExt;
-use crate::{BuildContext, Format, PyProjectToml, SDistWriter};
+use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;

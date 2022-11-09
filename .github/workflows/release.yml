@@ -5,8 +5,11 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:
 
-permissions:  # added using https://github.com/step-security/secure-workflows
-  contents: read
+permissions:
+  # Used to sign the release's artifacts with sigstore-python.
+  id-token: write
+  # Used to attach signing artifacts to the published release.
+  contents: write
 
 jobs:
   release-crates-io:
@@ -27,7 +30,7 @@ jobs:
         id: set_url
         run: |
           VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
-          echo "::set-output name=env_url::https://crates.io/crates/maturin/$VERSION"
+          echo "env_url=https://crates.io/crates/maturin/$VERSION" >> $GITHUB_OUTPUT
 
   build:
     name: Build ${{ matrix.target }}
@@ -254,7 +257,12 @@ jobs:
         id: set_url
         run: |
           VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
-          echo "::set-output name=env_url::https://pypi.org/project/maturin/$VERSION"
+          echo "env_url=https://pypi.org/project/maturin/$VERSION" >> $GITHUB_OUTPUT
+      - name: Sigstore Sign
+        uses: sigstore/gh-action-sigstore-python@v0.0.11
+        with:
+          inputs: ./*.tar.gz ./*.whl
+          release-signing-artifacts: true
 
   release-github:
     permissions:
@@ -276,3 +284,8 @@ jobs:
             *.deb
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
           generate_release_notes: true
+      - name: Sigstore Sign
+        uses: sigstore/gh-action-sigstore-python@v0.0.11
+        with:
+          inputs: ./*.tar.gz ./*.zip ./*.deb
+          release-signing-artifacts: true

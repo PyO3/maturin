@@ -305,9 +305,17 @@ fn add_crate_to_source_distribution(
         })
         // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
+            #[allow(clippy::if_same_then_else)]
             // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
             // and https://github.com/PyO3/maturin/issues/449
             if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+                false
+            } else if matches!(target.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so") {
+                // Technically, `cargo package --list` should handle this,
+                // but somehow it doesn't on Alpine Linux running in GitHub Actions,
+                // so we do it manually here.
+                // See https://github.com/PyO3/maturin/pull/1255#issuecomment-1308838786
+                debug!("Ignoring {}", target.display());
                 false
             } else {
                 source.exists()

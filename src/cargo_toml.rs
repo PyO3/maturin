@@ -80,7 +80,7 @@ impl CargoToml {
             }
         }
         if !removed.is_empty() {
-            println!(
+            eprintln!(
                 "⚠️  Warning: the following metadata fields in `package.metadata.maturin` section \
                 of Cargo.toml are removed since maturin 0.14.0: {}, \
                 please set them in pyproject.toml as PEP 621 specifies.",

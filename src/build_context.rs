@@ -232,7 +232,7 @@ impl BuildContext {
                             InterpreterKind::PyPy => "PyPy".to_string(),
                         })
                         .collect();
-                    println!(
+                    eprintln!(
                         "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
                         interp_names.iter().join(", ")
                     );
@@ -321,7 +321,7 @@ impl BuildContext {
                 }
                 let new_rpath = new_rpaths.join(":");
                 if let Err(err) = patchelf::set_rpath(&artifact.path, &new_rpath) {
-                    println!(
+                    eprintln!(
                         "⚠️ Warning: Failed to set rpath for {}: {}",
                         artifact.path.display(),
                         err

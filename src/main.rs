@@ -422,7 +422,7 @@ fn run() -> Result<()> {
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {
-                println!("⚠️  Warning: No files given, exiting.");
+                eprintln!("⚠️  Warning: No files given, exiting.");
                 return Ok(());
             }
 

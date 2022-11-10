@@ -422,7 +422,7 @@ fn compile_target(
                             && !artifact.features.contains(&"rustc-dep-of-std".to_string());
                         if should_warn {
                             // This is a spurious error I don't really understand
-                            println!(
+                            eprintln!(
                                 "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
                                 package_id
                             );
@@ -551,7 +551,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     }
 
     if !found {
-        println!(
+        eprintln!(
             "⚠️  Warning: Couldn't find the symbol `{}` in the native library. \
              Python will fail to import this module. \
              If you're using pyo3, check that `#[pymodule]` uses `{}` as module name",

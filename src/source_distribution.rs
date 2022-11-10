@@ -515,7 +515,7 @@ pub fn source_distribution(
         };
         writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
     } else {
-        println!(
+        eprintln!(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \
             to include it in the source distribution"
         );

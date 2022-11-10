@@ -353,7 +353,7 @@ pub fn auditwheel_rs(
     } else if let Some(policy) = highest_policy {
         Ok(policy)
     } else {
-        println!(
+        eprintln!(
             "⚠️  Warning: No compatible platform tag found, using the linux tag instead. \
             You won't be able to upload those wheels to PyPI."
         );

@@ -920,7 +920,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             let pyo3_node = deps[lib];
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
                 let version = cargo_metadata[&pyo3_node.id].version.to_string();
-                println!(
+                eprintln!(
                     "⚠️  Warning: You're building a library without activating {}'s \
                      `extension-module` feature. \
                      See https://pyo3.rs/v{}/building_and_distribution.html#linking",

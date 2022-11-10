@@ -308,7 +308,7 @@
       "minor": 7,
       "abiflags": "",
       "interpreter": "pypy",
-      "ext_suffix": ".pypy37-pp73-linux-gnu.so",
+      "ext_suffix": ".pypy37-pp73-ppc_64-linux-gnu.so",
       "abi_tag": "pp73",
       "pointer_width": 64
     },
@@ -384,6 +384,33 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-311-s390x-linux-gnu.so",
       "abi_tag": "311",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 7,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy37-pp73-s390x-linux-gnu.so",
+      "abi_tag": "pp73",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy38-pp73-s390x-linux-gnu.so",
+      "abi_tag": "pp73",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy39-pp73-s390x-linux-gnu.so",
+      "abi_tag": "pp73",
       "pointer_width": 64
     }
   ],

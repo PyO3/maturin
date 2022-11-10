@@ -265,7 +265,15 @@ jobs:
         with:
           inputs: ./*.tar.gz ./*.whl
           upload-signing-artifacts: true
-          release-signing-artifacts: true
+      - name: Release signing artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            *.sig
+            *.crt
+            *.rekor
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          generate_release_notes: true
 
   release-github:
     permissions:
@@ -281,6 +289,11 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: binaries
+      - name: Sigstore Sign
+        uses: sigstore/gh-action-sigstore-python@v0.0.11
+        with:
+          inputs: ./*.tar.gz ./*.zip ./*.deb
+          upload-signing-artifacts: true
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
@@ -288,11 +301,8 @@ jobs:
             *.tar.gz
             *.zip
             *.deb
+            *.sig
+            *.crt
+            *.rekor
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
           generate_release_notes: true
-      - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v0.0.11
-        with:
-          inputs: ./*.tar.gz ./*.zip ./*.deb
-          upload-signing-artifacts: true
-          release-signing-artifacts: true

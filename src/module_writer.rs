@@ -383,10 +383,11 @@ impl ModuleWriter for SDistWriter {
         }
         let target = target.as_ref();
         if source == self.path {
-            bail!(
-            "Attempting to include the sdist output tarball {} into itself! Check 'cargo package --list' output.",
-            source.display()
+            eprintln!(
+                "⚠️  Warning: Attempting to include the sdist output tarball {} into itself! Check 'cargo package --list' output.",
+                source.display()
             );
+            return Ok(());
         }
         if self.files.contains(target) {
             // Ignore duplicate files

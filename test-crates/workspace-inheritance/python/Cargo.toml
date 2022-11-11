@@ -16,3 +16,11 @@ generic_lib.workspace = true
 workspace = true
 optional = true
 features = ["extra_traits"]
+
+[dependencies.cfg-if]
+workspace = true
+optional = true
+
+[dependencies.rand]
+workspace = true
+features = ["small_rng"]

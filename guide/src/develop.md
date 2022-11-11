@@ -6,89 +6,88 @@ For local development, the `maturin develop` command can be used to quickly
 build a package in debug mode by default and install it to virtualenv.
 
 ```
-USAGE:
-    maturin develop [OPTIONS] [--] [ARGS]...
+Usage: maturin develop [OPTIONS] [ARGS]...
 
-ARGS:
-    <ARGS>...
-            Rustc flags
+Arguments:
+  [ARGS]...
+          Rustc flags
 
-OPTIONS:
-    -b, --bindings <BINDINGS>
-            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+Options:
+  -b, --bindings <BINDINGS>
+          Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
 
-    -r, --release
-            Pass --release to cargo
+  -r, --release
+          Pass --release to cargo
 
-        --strip
-            Strip the library for minimum file size
+      --strip
+          Strip the library for minimum file size
 
-    -E, --extras <EXTRAS>
-            Install extra requires aka. optional dependencies
+  -E, --extras <EXTRAS>
+          Install extra requires aka. optional dependencies
 
-            Use as `--extras=extra1,extra2`
+          Use as `--extras=extra1,extra2`
 
-    -q, --quiet
-            Do not print cargo log messages
+  -q, --quiet
+          Do not print cargo log messages
 
-    -j, --jobs <N>
-            Number of parallel jobs, defaults to # of CPUs
+  -j, --jobs <N>
+          Number of parallel jobs, defaults to # of CPUs
 
-        --profile <PROFILE-NAME>
-            Build artifacts with the specified Cargo profile
+      --profile <PROFILE-NAME>
+          Build artifacts with the specified Cargo profile
 
-    -F, --features <FEATURES>
-            Space or comma separated list of features to activate
+  -F, --features <FEATURES>
+          Space or comma separated list of features to activate
 
-        --all-features
-            Activate all available features
+      --all-features
+          Activate all available features
 
-        --no-default-features
-            Do not activate the `default` feature
+      --no-default-features
+          Do not activate the `default` feature
 
-        --target <TRIPLE>
-            Build for the target triple
+      --target <TRIPLE>
+          Build for the target triple
 
-            [env: CARGO_BUILD_TARGET=]
+          [env: CARGO_BUILD_TARGET=]
 
-        --target-dir <DIRECTORY>
-            Directory for all generated artifacts
+      --target-dir <DIRECTORY>
+          Directory for all generated artifacts
 
-    -m, --manifest-path <PATH>
-            Path to Cargo.toml
+  -m, --manifest-path <PATH>
+          Path to Cargo.toml
 
-        --ignore-rust-version
-            Ignore `rust-version` specification in packages
+      --ignore-rust-version
+          Ignore `rust-version` specification in packages
 
-    -v, --verbose
-            Use verbose output (-vv very verbose/build.rs output)
+  -v, --verbose...
+          Use verbose output (-vv very verbose/build.rs output)
 
-        --color <WHEN>
-            Coloring: auto, always, never
+      --color <WHEN>
+          Coloring: auto, always, never
 
-        --frozen
-            Require Cargo.lock and cache are up to date
+      --frozen
+          Require Cargo.lock and cache are up to date
 
-        --locked
-            Require Cargo.lock is up to date
+      --locked
+          Require Cargo.lock is up to date
 
-        --offline
-            Run without accessing the network
+      --offline
+          Run without accessing the network
 
-        --config <KEY=VALUE>
-            Override a configuration value (unstable)
+      --config <KEY=VALUE>
+          Override a configuration value (unstable)
 
-    -Z <FLAG>
-            Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+  -Z <FLAG>
+          Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
 
-        --timings[=<FMTS>...]
-            Timing output formats (unstable) (comma separated): html, json
+      --timings=<FMTS>
+          Timing output formats (unstable) (comma separated): html, json
 
-        --future-incompat-report
-            Outputs a future incompatibility report at the end of the build (unstable)
+      --future-incompat-report
+          Outputs a future incompatibility report at the end of the build (unstable)
 
-    -h, --help
-            Print help information
+  -h, --help
+          Print help information (use `-h` for a summary)
 ```
 
 ## PEP 660 Editable Installs

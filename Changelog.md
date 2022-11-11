@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.14.0] - 2022-11-??
+## [0.14.0] - 2022-11-19
 
 * **Breaking Change**: Remove support for specifying python package metadata in `Cargo.toml` in [#1200](https://github.com/PyO3/maturin/pull/1200).
   Python package metadata should be specified in the `project` section of `pyproject.toml` instead as [PEP 621](https://peps.python.org/pep-0621/) specifies.

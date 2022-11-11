@@ -23,7 +23,7 @@ def main():
         content = root.joinpath(path).read_text()
 
         matcher = re.compile(
-            r"```\nUSAGE:\n    maturin (\w+) (.*?)```", re.MULTILINE | re.DOTALL
+            r"```\nUsage: maturin (\w+) (.*?)```", re.MULTILINE | re.DOTALL
         )
 
         replaces = {}
@@ -31,10 +31,10 @@ def main():
             command_output = subprocess.check_output(
                 ["cargo", "run", "--", command.lower(), "--help"], text=True
             )
-            new = "USAGE:" + command_output.strip().split("USAGE:")[1] + "\n"
+            new = "Usage:" + command_output.strip().split("Usage:")[1] + "\n"
             # Remove trailing whitespace
             new = re.sub(" +\n", "\n", new)
-            old = "USAGE:\n    maturin " + command + " " + old
+            old = "Usage: maturin " + command + " " + old
             replaces[old] = new
 
         for old, new in replaces.items():

@@ -350,7 +350,12 @@ fn compile_target(
                 || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
                     && interpreter.interpreter_kind.is_pypy())
             {
-                build_command.env("PYO3_PYTHON", &interpreter.executable);
+                build_command
+                    .env("PYO3_PYTHON", &interpreter.executable)
+                    .env(
+                        "PYO3_ENVIRONMENT_SIGNATURE",
+                        interpreter.environment_signature(),
+                    );
             }
 
             // rust-cpython, and legacy pyo3 versions

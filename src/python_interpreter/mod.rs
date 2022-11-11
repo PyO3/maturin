@@ -846,6 +846,16 @@ impl PythonInterpreter {
             }
         }
     }
+
+    /// An opaque string that uniquely identifies this Python interpreter.
+    /// Used to trigger rebuilds for `pyo3` when the Python interpreter changes.
+    pub fn environment_signature(&self) -> String {
+        let pointer_width = self.pointer_width.unwrap_or(64);
+        format!(
+            "{}-{}.{}-{}bit",
+            self.implmentation_name, self.major, self.minor, pointer_width
+        )
+    }
 }
 
 impl fmt::Display for PythonInterpreter {

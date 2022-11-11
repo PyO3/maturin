@@ -248,6 +248,7 @@ fn integration_pyo3_mixed_src_layout() {
 }
 
 #[test]
+#[cfg_attr(target_os = "macos", ignore)] // Don't run it on macOS, too slow
 fn integration_pyo3_pure_conda() {
     // Only run on GitHub Actions for now
     if std::env::var("GITHUB_ACTIONS").is_ok() {

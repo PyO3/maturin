@@ -1,0 +1,13 @@
+[package]
+name = "numpy-user"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rust_ext"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.17", features = ["extension-module"] }
+numpy = { version = "0.17", git = "https://github.com/PyO3/rust-numpy", branch = "python-requires-in-cargo-metadata" }
+lazy_static = { version = "1.4.0", optional = true }

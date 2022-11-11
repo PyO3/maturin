@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use tracing::debug;
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
 // These should be treated almost identically but must be correctly identified
@@ -497,7 +498,7 @@ impl BuildOptions {
             pyproject_toml_path,
             pyproject_toml,
             module_name,
-            metadata21,
+            mut metadata21,
             mut cargo_options,
             cargo_metadata,
             mut pyproject_toml_maturin_options,
@@ -640,45 +641,10 @@ impl BuildOptions {
             }
         }
 
-        match bridge {
-            BridgeModel::Bin(None) => {
-                // Only support two different kind of platform tags when compiling to musl target without any binding crates
-                if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
-                    bail!(
-                        "Cannot mix musllinux and manylinux platform tags when compiling to {}",
-                        target.target_triple()
-                    );
-                }
-
-                #[allow(clippy::comparison_chain)]
-                if platform_tags.len() > 2 {
-                    bail!(
-                        "Expected only one or two platform tags but found {}",
-                        platform_tags.len()
-                    );
-                } else if platform_tags.len() == 2 {
-                    // The two platform tags can't be the same kind
-                    let tag_types = platform_tags
-                        .iter()
-                        .map(|tag| tag.is_musllinux())
-                        .collect::<HashSet<_>>();
-                    if tag_types.len() == 1 {
-                        bail!(
-                            "Expected only one platform tag but found {}",
-                            platform_tags.len()
-                        );
-                    }
-                }
-            }
-            _ => {
-                if platform_tags.len() > 1 {
-                    bail!(
-                        "Expected only one platform tag but found {}",
-                        platform_tags.len()
-                    );
-                }
-            }
-        }
+        validate_bridge_type(&bridge, &target, &platform_tags)?;
+        metadata21.requires_dist =
+            collect_transitive_requires(&metadata21.requires_dist, &cargo_metadata)?;
+        debug!("Merged dependencies: {:?}", metadata21.requires_dist);
 
         // linux tag can not be mixed with manylinux and musllinux tags
         if platform_tags.len() > 1 && platform_tags.iter().any(|tag| !tag.is_portable()) {
@@ -723,6 +689,166 @@ impl BuildOptions {
             cargo_options,
         })
     }
+}
+
+/// Checks for bridge/platform type edge cases
+fn validate_bridge_type(
+    bridge: &BridgeModel,
+    target: &Target,
+    platform_tags: &[PlatformTag],
+) -> Result<()> {
+    match bridge {
+        BridgeModel::Bin(None) => {
+            // Only support two different kind of platform tags when compiling to musl target without any binding crates
+            if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
+                bail!(
+                    "Cannot mix musllinux and manylinux platform tags when compiling to {}",
+                    target.target_triple()
+                );
+            }
+
+            #[allow(clippy::comparison_chain)]
+            if platform_tags.len() > 2 {
+                bail!(
+                    "Expected only one or two platform tags but found {}",
+                    platform_tags.len()
+                );
+            } else if platform_tags.len() == 2 {
+                // The two platform tags can't be the same kind
+                let tag_types = platform_tags
+                    .iter()
+                    .map(|tag| tag.is_musllinux())
+                    .collect::<HashSet<_>>();
+                if tag_types.len() == 1 {
+                    bail!(
+                        "Expected only one platform tag but found {}",
+                        platform_tags.len()
+                    );
+                }
+            }
+        }
+        _ => {
+            if platform_tags.len() > 1 {
+                bail!(
+                    "Expected only one platform tag but found {}",
+                    platform_tags.len()
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Returns the merged list of dependencies
+///
+/// Ideally, we'd like to parse the version constraints from the user and merge them with those
+/// from the transitive requirements, but that's not implemented yet
+fn collect_transitive_requires(
+    main_dependencies: &[String],
+    metadata: &Metadata,
+) -> Result<Vec<String>> {
+    let mut merged_requires = main_dependencies.to_vec();
+
+    // https://peps.python.org/pep-0508/#names
+    // https://peps.python.org/pep-0440/#version-specifiers
+    // This isn't the full version spec regex (not sure if that even exists anywhere),
+    // but it should be good enough
+    let distribution_name_re = Regex::new(
+        r"^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])\s*(~=|==|!=|<=|>=|<|>|===|;|$).*",
+    )
+    .unwrap();
+    // Since we don't have PEP440 parsing, we do this very simple scheme and to warn the user when we have multiple requires
+    let get_distribution_name = |dep: String| {
+        distribution_name_re
+            .captures(&dep)
+            .with_context(|| {
+                format!(
+                    "Invalid expression (no matching distribution name) in dependencies: `{}`",
+                    dep
+                )
+            })
+            .map(|name| name.get(1).unwrap().as_str().to_string())
+    };
+
+    let mut main_deps_names: HashMap<String, String> = HashMap::new();
+    for dep in main_dependencies {
+        let dist_name = get_distribution_name(dep.clone())
+            .context("Your dependencies table in pyproject.toml is invalid")?;
+        main_deps_names.insert(dist_name, dep.to_string());
+    }
+    debug!("main dependencies {:?}", main_deps_names);
+
+    // distribution name -> (requires string, crate name)
+    let mut metadata_deps_names: HashMap<String, Vec<(String, String)>> = HashMap::new();
+    // I've manually tested that this doesn't include optional dependencies
+    for package in &metadata.packages {
+        let dependencies = package
+            .metadata
+            .get("pyo3-packaging")
+            // also called dependencies after https://peps.python.org/pep-0621/#dependencies-optional-dependencies
+            .and_then(|pyo3_metadata| pyo3_metadata.get("dependencies"))
+            .and_then(|dependencies| {
+                serde_json::from_value::<Vec<String>>(dependencies.clone()).ok()
+            })
+            .unwrap_or_default();
+        if !dependencies.is_empty() {
+            debug!("crate {} got dependencies {:?}", package.name, dependencies);
+        }
+
+        for dep in dependencies {
+            let dist_name = get_distribution_name(dep.clone())
+                .context("Your dependencies table in pyproject.toml is invalid")?;
+            if let Some(main_requires) = main_deps_names.get(&dist_name) {
+                // Ideally, with full PEP440 support, we could merge all those ourselves and just
+                // notify the user like "added {} and merged {} python dependencies from the
+                // metadata of cargo dependencies"
+                println!(
+                    "➡️ Replacing '{}' from crate {} with pyproject.toml '{}'",
+                    dep, package.name, main_requires
+                );
+                continue;
+            }
+            let requires_and_source = metadata_deps_names
+                .entry(dist_name.to_string())
+                .or_default();
+            // If the two crates use the exact same requires string
+            if !requires_and_source
+                .iter()
+                .any(|(requires, _cargo_package)| requires == &dep)
+            {
+                requires_and_source.push((dep.clone(), package.name.clone()));
+            }
+            merged_requires.push(dep.clone());
+        }
+    }
+    debug!("metadata dependencies {:?}", metadata_deps_names);
+
+    for (dep_name, sources) in metadata_deps_names {
+        if sources.len() > 1 {
+            let joined = sources
+                .iter()
+                .map(|(requires, cargo_package)| {
+                    format!("'{}' in crate {}", requires, cargo_package)
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+            println!(
+                "⚠️ Warning: {dep_name} is specified multiple times: {joined}. \
+                maturin can't merge these (yet). \
+                You can silence this warning by putting your own version range for {dep_name}\
+                into pyproject.toml under [dependencies]",
+                dep_name = dep_name,
+                joined = joined
+            );
+        }
+    }
+
+    println!(
+        "📊 Adding {} python dependencies from cargo packages",
+        merged_requires.len() - main_dependencies.len()
+    );
+    Ok(merged_requires)
 }
 
 /// Uses very simple PEP 440 subset parsing to determine the
@@ -1193,9 +1319,12 @@ impl CargoOptions {
 
 #[cfg(test)]
 mod test {
+    use crate::{CargoToml, PyProjectToml};
     use cargo_metadata::MetadataCommand;
     use pretty_assertions::assert_eq;
+    use std::fs;
     use std::path::Path;
+    use std::process::Command;
 
     use super::*;
 
@@ -1366,5 +1495,47 @@ mod test {
             Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure", &cargo_metadata)
                 .unwrap();
         assert_eq!(get_min_python_minor(&metadata21), None);
+    }
+
+    #[test]
+    fn test_python_deps_from_crates() {
+        let manifest_dir = Path::new("test-crates/numpy-user");
+        let cargo_toml = CargoToml::from_path(manifest_dir.join("Cargo.toml")).unwrap();
+        let metadata_str = fs::read_to_string(manifest_dir.join("cargo-metadata.json")).unwrap();
+        let metadata: Metadata = serde_json::from_str(&metadata_str).unwrap();
+        let mut metadata21 =
+            Metadata21::from_cargo_toml(&cargo_toml, manifest_dir, &metadata).unwrap();
+        let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
+        metadata21
+            .merge_pyproject_toml(manifest_dir, &pyproject_toml)
+            .unwrap();
+
+        let mut merged_deps =
+            collect_transitive_requires(&metadata21.requires_dist, &metadata).unwrap();
+        merged_deps.sort();
+        assert_eq!(
+            merged_deps,
+            vec![
+                "numpy>=1.19,<2.0",
+                "patchelf; extra == 'patchelf'",
+                "tomli>=1.1.0 ; python_version<'3.11'"
+            ]
+        )
+    }
+
+    #[ignore]
+    #[test]
+    fn test_cargo_metadata_up_to_date() {
+        // This takes 0.5s
+        let stdout = Command::new("cargo")
+            .args(["metadata", "--format-version", "1"])
+            .current_dir("test-crates/numpy-user")
+            .output()
+            .unwrap()
+            .stdout;
+        let metadata_real = String::from_utf8(stdout).unwrap();
+        let metadata_saved =
+            fs::read_to_string("test-crates/numpy-user/cargo-metadata.json").unwrap();
+        assert_eq!(metadata_real, metadata_saved);
     }
 }

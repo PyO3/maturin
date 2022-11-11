@@ -66,6 +66,15 @@ name = "my-project"
 dependencies = ["flask~=1.1.0", "toml==0.10.0"]
 ```
 
+There are some rust crates that you might depend on which require python packages themselves. The most prominent example is [rust-numpy](https://github.com/PyO3/rust-numpy). These can state their dependencies in their Cargo.toml under `package.metadata.pyo3-packaging`:
+
+```toml
+[package.metadata.pyo3-packaging]
+dependencies = [
+    "numpy>=1.19,<2.0"
+]
+```
+
 ## Add console scripts
 
 Pip allows adding so called console scripts, which are shell commands that execute some function in you program. You can add console scripts in a section `[project.scripts]`.

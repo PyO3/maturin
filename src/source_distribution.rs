@@ -108,11 +108,13 @@ fn rewrite_cargo_toml(
                             let mut workspace_dep = workspace_dep.clone();
                             // Merge optional and features from the current Cargo.toml
                             if table[&dep_name].get("optional").is_some() {
+                                ensure_dep_is_inline_table(&mut workspace_dep);
                                 workspace_dep["optional"] = table[&dep_name]["optional"].clone();
                             }
                             if let Some(features) =
                                 table[&dep_name].get("features").and_then(|x| x.as_array())
                             {
+                                ensure_dep_is_inline_table(&mut workspace_dep);
                                 let existing_features = workspace_dep
                                     .as_table_like_mut()
                                     .unwrap()
@@ -236,6 +238,20 @@ fn rewrite_cargo_toml(
         Ok(data.to_string())
     } else {
         Ok(text)
+    }
+}
+
+/// Make sure that the dep entry is an inline table
+/// e.g. in the form of `{ version = "..." }`
+/// so that we can add entries for `optional` and `features`
+fn ensure_dep_is_inline_table(dep: &mut toml_edit::Item) {
+    if let Some(v) = dep.as_value_mut() {
+        if v.is_str() {
+            let val = std::mem::replace(v, toml_edit::Value::from(false));
+            let mut tab = toml_edit::InlineTable::new();
+            tab.insert("version", val);
+            *v = toml_edit::Value::InlineTable(tab);
+        }
     }
 }
 

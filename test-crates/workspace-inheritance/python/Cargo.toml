@@ -22,3 +22,11 @@ cfg-if.workspace = true
 
 [dev-dependencies]
 cfg-if.workspace = true
+
+[dependencies.cfg-if]
+workspace = true
+optional = true
+
+[dependencies.rand]
+workspace = true
+features = ["small_rng"]

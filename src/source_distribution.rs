@@ -68,7 +68,7 @@ fn rewrite_cargo_toml(
         if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
             let workspace_deps = workspace_manifest
                 .get("workspace")
-                .and_then(|x| x.get(dep_category))
+                .and_then(|x| x.get("dependencies"))
                 .and_then(|x| x.as_table_like());
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {

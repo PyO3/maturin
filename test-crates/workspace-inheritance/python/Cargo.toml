@@ -17,6 +17,12 @@ workspace = true
 optional = true
 features = ["extra_traits"]
 
+[build-dependencies]
+cfg-if.workspace = true
+
+[dev-dependencies]
+cfg-if.workspace = true
+
 [dependencies.cfg-if]
 workspace = true
 optional = true

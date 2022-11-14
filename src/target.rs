@@ -10,7 +10,7 @@ use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str;
-use target_lexicon::{Environment, Triple};
+use target_lexicon::{Architecture, Environment, Triple};
 
 pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
 
@@ -36,7 +36,7 @@ impl fmt::Display for Os {
         match *self {
             Os::Linux => write!(f, "Linux"),
             Os::Windows => write!(f, "Windows"),
-            Os::Macos => write!(f, "MacOS"),
+            Os::Macos => write!(f, "macOS"),
             Os::FreeBsd => write!(f, "FreeBSD"),
             Os::NetBsd => write!(f, "NetBSD"),
             Os::OpenBsd => write!(f, "OpenBSD"),
@@ -151,7 +151,7 @@ impl Target {
     /// Fails if the target triple isn't supported
     pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
         use target_lexicon::{
-            Architecture, ArmArchitecture, Mips32Architecture, Mips64Architecture, OperatingSystem,
+            ArmArchitecture, Mips32Architecture, Mips64Architecture, OperatingSystem,
         };
 
         let rustc_version = rustc_version_meta()?;
@@ -680,21 +680,27 @@ fn rustc_version_meta() -> Result<VersionMeta> {
     Ok(meta)
 }
 
+/// Get the default macOS deployment target version
 fn macosx_deployment_target(
     deploy_target: Option<&str>,
     universal2: bool,
-) -> Result<((usize, usize), (usize, usize))> {
-    let x86_64_default = if universal2 { (10, 9) } else { (10, 7) };
-    let arm64_default = (11, 0);
+) -> Result<((u16, u16), (u16, u16))> {
+    let x86_64_default_rustc = rustc_macosx_target_version("x86_64-apple-darwin");
+    let x86_64_default = if universal2 && x86_64_default_rustc.1 < 9 {
+        (10, 9)
+    } else {
+        x86_64_default_rustc
+    };
+    let arm64_default = rustc_macosx_target_version("aarch64-apple-darwin");
     let mut x86_64_ver = x86_64_default;
     let mut arm64_ver = arm64_default;
     if let Some(deploy_target) = deploy_target {
         let err_ctx = "MACOSX_DEPLOYMENT_TARGET is invalid";
         let mut parts = deploy_target.split('.');
         let major = parts.next().context(err_ctx)?;
-        let major: usize = major.parse().context(err_ctx)?;
+        let major: u16 = major.parse().context(err_ctx)?;
         let minor = parts.next().context(err_ctx)?;
-        let minor: usize = minor.parse().context(err_ctx)?;
+        let minor: u16 = minor.parse().context(err_ctx)?;
         if (major, minor) > x86_64_default {
             x86_64_ver = (major, minor);
         }
@@ -703,6 +709,47 @@ fn macosx_deployment_target(
         }
     }
     Ok((x86_64_ver, arm64_ver))
+}
+
+pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
+    use std::process::Command;
+    use target_lexicon::OperatingSystem;
+
+    let fallback_version = if target == "aarch64-apple-darwin" {
+        (11, 0)
+    } else {
+        (10, 7)
+    };
+
+    let rustc_target_version = || -> Result<(u16, u16)> {
+        let cmd = Command::new("rustc")
+            .arg("-Z")
+            .arg("unstable-options")
+            .arg("--print")
+            .arg("target-spec-json")
+            .arg("--target")
+            .arg(target)
+            .env("RUSTC_BOOTSTRAP", "1")
+            .output()
+            .context("Failed to run rustc to get the target spec")?;
+        let stdout = String::from_utf8(cmd.stdout).context("rustc output is not valid utf-8")?;
+        let spec: serde_json::Value =
+            serde_json::from_str(&stdout).context("rustc output is not valid json")?;
+        let llvm_target = spec
+            .as_object()
+            .context("rustc output is not a json object")?
+            .get("llvm-target")
+            .context("rustc output does not contain llvm-target")?
+            .as_str()
+            .context("llvm-target is not a string")?;
+        let triple: Triple = llvm_target.parse()?;
+        let (major, minor) = match triple.operating_system {
+            OperatingSystem::MacOSX { major, minor, .. } => (major, minor),
+            _ => fallback_version,
+        };
+        Ok((major, minor))
+    };
+    rustc_target_version().unwrap_or(fallback_version)
 }
 
 fn emcc_version() -> Result<String> {

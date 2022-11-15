@@ -55,6 +55,13 @@ apk add maturin
 
 You can download precompiled maturin binaries from the latest [GitHub Releases](https://github.com/PyO3/maturin/releases/latest).
 
+You can also use [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) to install maturin from GitHub Releases:
+
+```bash
+# Run `cargo install cargo-binstall` first if you don't have cargo-binstall installed.
+cargo binstall maturin
+```
+
 ## Build from source
 
 ### crates.io

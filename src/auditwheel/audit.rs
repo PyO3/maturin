@@ -7,12 +7,16 @@ use anyhow::{bail, Context, Result};
 use fs_err::File;
 use goblin::elf::{sym::STT_FUNC, Elf};
 use lddtree::Library;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+static IS_LIBPYTHON: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^libpython3\.\d+m?u?\.so\.\d+\.\d+$").unwrap());
 
 /// Error raised during auditing an elf file for manylinux/musllinux compatibility
 #[derive(Error, Debug)]
@@ -119,6 +123,7 @@ fn policy_is_satisfied(
     arch: &str,
     deps: &[String],
     versioned_libraries: &[VersionedLibrary],
+    allow_linking_libpython: bool,
 ) -> Result<(), AuditWheelError> {
     let arch_versions = &policy.symbol_versions.get(arch).ok_or_else(|| {
         AuditWheelError::UnsupportedArchitecture(policy.clone(), arch.to_string())
@@ -137,12 +142,16 @@ fn policy_is_satisfied(
             }
         })
         .collect();
+
     for dep in deps {
         // Skip dynamic linker/loader
         if dep.starts_with("ld-linux") || dep == "ld64.so.2" || dep == "ld64.so.1" {
             continue;
         }
         if !policy.lib_whitelist.contains(dep) {
+            if allow_linking_libpython && IS_LIBPYTHON.is_match(dep) {
+                continue;
+            }
             offending_libs.insert(dep.clone());
         }
         if let Some(sym_list) = policy.blacklist.get(dep) {
@@ -214,11 +223,10 @@ fn policy_is_satisfied(
         ));
     }
     // Check for libpython and forbidden libraries
-    let is_libpython = Regex::new(r"^libpython3\.\d+m?u?\.so\.\d+\.\d+$").unwrap();
     let offenders: Vec<String> = offending_libs.into_iter().collect();
     match offenders.as_slice() {
         [] => Ok(()),
-        [lib] if is_libpython.is_match(lib) => {
+        [lib] if IS_LIBPYTHON.is_match(lib) => {
             Err(AuditWheelError::LinksLibPythonError(lib.clone()))
         }
         offenders => Err(AuditWheelError::LinksForbiddenLibrariesError(
@@ -260,6 +268,7 @@ pub fn auditwheel_rs(
     artifact: &BuildArtifact,
     target: &Target,
     platform_tag: Option<PlatformTag>,
+    allow_linking_libpython: bool,
 ) -> Result<(Policy, bool), AuditWheelError> {
     if !target.is_linux() || platform_tag == Some(PlatformTag::Linux) {
         return Ok((Policy::default(), false));
@@ -301,7 +310,14 @@ pub fn auditwheel_rs(
     let mut highest_policy = None;
     let mut should_repair = false;
     for policy in platform_policies.iter() {
-        let result = policy_is_satisfied(policy, &elf, &arch, &deps, &versioned_libraries);
+        let result = policy_is_satisfied(
+            policy,
+            &elf,
+            &arch,
+            &deps,
+            &versioned_libraries,
+            allow_linking_libpython,
+        );
         match result {
             Ok(_) => {
                 highest_policy = Some(policy.clone());
@@ -339,7 +355,14 @@ pub fn auditwheel_rs(
             }
         }
 
-        match policy_is_satisfied(&policy, &elf, &arch, &deps, &versioned_libraries) {
+        match policy_is_satisfied(
+            &policy,
+            &elf,
+            &arch,
+            &deps,
+            &versioned_libraries,
+            allow_linking_libpython,
+        ) {
             Ok(_) => {
                 should_repair = false;
                 Ok(policy)
@@ -421,25 +444,37 @@ pub fn get_policy_and_libs(
     artifact: &BuildArtifact,
     platform_tag: Option<PlatformTag>,
     target: &Target,
+    allow_linking_libpython: bool,
 ) -> Result<(Policy, Vec<Library>)> {
     let (policy, should_repair) =
-        auditwheel_rs(artifact, target, platform_tag).with_context(|| {
-            if let Some(platform_tag) = platform_tag {
-                format!("Error ensuring {} compliance", platform_tag)
-            } else {
-                "Error checking for manylinux/musllinux compliance".to_string()
-            }
-        })?;
+        auditwheel_rs(artifact, target, platform_tag, allow_linking_libpython).with_context(
+            || {
+                if let Some(platform_tag) = platform_tag {
+                    format!("Error ensuring {} compliance", platform_tag)
+                } else {
+                    "Error checking for manylinux/musllinux compliance".to_string()
+                }
+            },
+        )?;
     let external_libs = if should_repair {
         let sysroot = get_sysroot_path(target).unwrap_or_else(|_| PathBuf::from("/"));
         let ld_paths = artifact.linked_paths.iter().map(PathBuf::from).collect();
-        find_external_libs(&artifact.path, &policy, sysroot, ld_paths).with_context(|| {
-            if let Some(platform_tag) = platform_tag {
-                format!("Error repairing wheel for {} compliance", platform_tag)
-            } else {
-                "Error repairing wheel for manylinux/musllinux compliance".to_string()
-            }
-        })?
+        let external_libs = find_external_libs(&artifact.path, &policy, sysroot, ld_paths)
+            .with_context(|| {
+                if let Some(platform_tag) = platform_tag {
+                    format!("Error repairing wheel for {} compliance", platform_tag)
+                } else {
+                    "Error repairing wheel for manylinux/musllinux compliance".to_string()
+                }
+            })?;
+        if allow_linking_libpython {
+            external_libs
+                .into_iter()
+                .filter(|lib| !IS_LIBPYTHON.is_match(&lib.name))
+                .collect()
+        } else {
+            external_libs
+        }
     } else {
         Vec::new()
     };

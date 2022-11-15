@@ -297,12 +297,19 @@ impl BuildContext {
             .collect();
         others.sort();
 
+        // only bin bindings allow linking to libpython, extension modules must not
+        let allow_linking_libpython = self.bridge.is_bin();
         if self.bridge.is_bin() && !musllinux.is_empty() {
-            return get_policy_and_libs(artifact, Some(musllinux[0]), &self.target);
+            return get_policy_and_libs(
+                artifact,
+                Some(musllinux[0]),
+                &self.target,
+                allow_linking_libpython,
+            );
         }
 
         let tag = others.get(0).or_else(|| musllinux.get(0)).copied();
-        get_policy_and_libs(artifact, tag, &self.target)
+        get_policy_and_libs(artifact, tag, &self.target, allow_linking_libpython)
     }
 
     /// Add library search paths in Cargo target directory rpath when building in editable mode

@@ -1,8 +1,7 @@
 //! To speed up the tests, they are tests all collected in a single module
 
 use common::{
-    develop, editable, errors, get_python_implementation, handle_result, integration, other,
-    test_python_path,
+    develop, errors, get_python_implementation, handle_result, integration, other, test_python_path,
 };
 use indoc::indoc;
 use maturin::Target;
@@ -121,42 +120,6 @@ fn develop_pyo3_ffi_pure() {
         None,
         "develop-pyo3-ffi-pure",
         false,
-    ));
-}
-
-#[test]
-fn editable_pyo3_pure() {
-    handle_result(editable::test_editable(
-        "test-crates/pyo3-pure",
-        None,
-        "editable-pyo3-pure",
-    ));
-}
-
-#[test]
-fn editable_pyo3_mixed() {
-    handle_result(editable::test_editable(
-        "test-crates/pyo3-mixed",
-        None,
-        "editable-pyo3-mixed",
-    ));
-}
-
-#[test]
-fn editable_pyo3_mixed_py_subdir() {
-    handle_result(editable::test_editable(
-        "test-crates/pyo3-mixed-py-subdir",
-        None,
-        "editable-pyo3-mixed-py-subdir",
-    ));
-}
-
-#[test]
-fn editable_pyo3_ffi_pure() {
-    handle_result(editable::test_editable(
-        "test-crates/pyo3-ffi-pure",
-        None,
-        "editable-pyo3-ffi-pure",
     ));
 }
 

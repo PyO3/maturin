@@ -8,7 +8,6 @@ use std::process::{Command, Stdio};
 use std::{env, io, str};
 
 pub mod develop;
-pub mod editable;
 pub mod errors;
 pub mod integration;
 pub mod other;

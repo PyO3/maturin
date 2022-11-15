@@ -819,7 +819,7 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
         let manifest_dir = PathBuf::from("test-crates").join("license-test");
-        let cargo_toml_str = fs_err::read_to_string(&manifest_dir.join("Cargo.toml")).unwrap();
+        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
         let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))

@@ -449,7 +449,7 @@ pub fn source_distribution(
         .workspace_root
         .join("Cargo.toml");
     let workspace_manifest: toml_edit::Document =
-        fs::read_to_string(&workspace_manifest_path)?.parse()?;
+        fs::read_to_string(workspace_manifest_path)?.parse()?;
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
 
@@ -483,7 +483,7 @@ pub fn source_distribution(
             } else {
                 if !path_dep_workspace_manifests.contains_key(&path_dep_metadata.workspace_root) {
                     let manifest: toml_edit::Document =
-                        fs::read_to_string(&path_dep_metadata.workspace_root.join("Cargo.toml"))?
+                        fs::read_to_string(path_dep_metadata.workspace_root.join("Cargo.toml"))?
                             .parse()?;
                     path_dep_workspace_manifests
                         .insert(path_dep_metadata.workspace_root.clone(), manifest);

@@ -740,7 +740,7 @@ impl PythonInterpreter {
         };
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(&executable, target, bridge)?
+            if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)?
             {
                 available_versions.push(version);
             }

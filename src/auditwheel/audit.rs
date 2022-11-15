@@ -238,7 +238,7 @@ fn policy_is_satisfied(
 
 fn get_default_platform_policies() -> Vec<Policy> {
     if let Ok(Some(musl_libc)) = find_musl_libc() {
-        if let Ok(Some((major, minor))) = get_musl_version(&musl_libc) {
+        if let Ok(Some((major, minor))) = get_musl_version(musl_libc) {
             return MUSLLINUX_POLICIES
                 .iter()
                 .filter(|policy| {

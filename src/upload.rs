@@ -336,7 +336,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     form.add_stream("content", &wheel, Some(wheel_name), None);
     let multipart_data = form.prepare().map_err(|e| e.error)?;
 
-    let encoded = base64::encode(&format!("{}:{}", registry.username, registry.password));
+    let encoded = base64::encode(format!("{}:{}", registry.username, registry.password));
 
     let http_proxy = env::var("HTTPS_PROXY")
         .or_else(|_| env::var("https_proxy"))

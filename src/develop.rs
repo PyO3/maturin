@@ -90,7 +90,7 @@ pub fn develop(
             }
             pkg
         }));
-        let status = Command::new(&interpreter.executable)
+        let status = Command::new(interpreter.executable)
             .args(&args)
             .status()
             .context("Failed to run pip install")?;

@@ -191,6 +191,12 @@ jobs:
           if [[ "${{ matrix.python-version }}" != "pypy"* ]]; then
             cargo run -- build -i ${{ matrix.python-version }} -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
           fi
+
+          if [[ "${{ matrix.python-version }}" == "3.1"* ]]; then
+            # Check abi3 wheels with abi3audit on CPython only
+            pip install abi3audit
+            abi3audit test-crates/pyo3-pure/target/wheels/*.whl
+          fi
           # Check wheels with twine
           twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
 

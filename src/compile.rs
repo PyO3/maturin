@@ -200,7 +200,10 @@ fn compile_target(
         BridgeModel::Bin(..) => {
             cargo_rustc.bin.push(binding_target.name.clone());
         }
-        BridgeModel::Cffi | BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) => {
+        BridgeModel::Cffi
+        | BridgeModel::UniFfi
+        | BridgeModel::Bindings(..)
+        | BridgeModel::BindingsAbi3(..) => {
             cargo_rustc.lib = true;
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries

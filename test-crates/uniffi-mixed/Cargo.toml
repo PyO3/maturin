@@ -1,0 +1,17 @@
+[package]
+name = "uniffi-mixed"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "uniffi_mixed"
+crate-type = ["cdylib"]
+
+[dependencies]
+uniffi = "0.21.0"
+uniffi_macros = "0.21.0"
+
+[build-dependencies]
+uniffi_build = { version = "0.21.0", features = ["builtin-bindgen"] }

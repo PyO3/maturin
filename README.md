@@ -10,7 +10,7 @@ _formerly pyo3-pack_
 [![Maturin User Guide](https://img.shields.io/badge/user-guide-brightgreen?logo=readthedocs&style=flat-square)](https://maturin.rs)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?logo=gitter&style=flat-square)](https://gitter.im/PyO3/Lobby)
 
-Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages.
+Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages.
 
 This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake).
 It supports building wheels for python 3.5+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
@@ -92,6 +92,11 @@ fn main() {
 ```
 
 </details>
+
+## uniffi
+
+uniffi bindings use [uniffi-rs](https://mozilla.github.io/uniffi-rs/) to generate Python `ctypes` bindings
+from an interface definition file. uniffi wheels are compatible with all python versions including pypy.
 
 ## Mixed rust/python projects
 

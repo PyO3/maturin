@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for 32-bit x86 FreeBSD target in [#1254](https://github.com/PyO3/maturin/pull/1254)
 * Add `[tool.maturin.include]` and `[tool.maturin.exclude]` and deprecate `[tool.maturin.sdist-include]` [#1255](https://github.com/PyO3/maturin/pull/1255)
 * Ignore sdist tar ball instead of error out in [#1259](https://github.com/PyO3/maturin/pull/1259)
+* Add support for [`uniffi`](https://github.com/mozilla/uniffi-rs) bindings in [#1275](https://github.com/PyO3/maturin/pull/1275)
 
 ## [0.13.7] - 2022-10-29
 

@@ -28,6 +28,7 @@ cargo-options = "0.5.2"
 cargo-zigbuild = "0.14.1"
 cargo-xwin = { version = "0.12.2", default-features = false }
 cbindgen = { version = "0.24.2", default-features = false }
+uniffi_bindgen = "0.21.0"
 flate2 = "1.0.18"
 goblin = "0.6.0"
 human-panic = { version = "1.0.3", optional = true }

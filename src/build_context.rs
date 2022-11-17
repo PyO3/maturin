@@ -4,7 +4,7 @@ use crate::build_options::CargoOptions;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
-    write_wasm_launcher, WheelWriter,
+    write_uniffi_module, write_wasm_launcher, WheelWriter,
 };
 use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
@@ -29,8 +29,6 @@ use std::path::{Path, PathBuf};
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BridgeModel {
-    /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
-    Cffi,
     /// A rust binary to be shipped a python package
     /// The String is the name of the bindings
     /// providing crate, e.g. pyo3, the number is the minimum minor python version
@@ -42,6 +40,10 @@ pub enum BridgeModel {
     /// for all cpython versions (pypy still needs multiple versions).
     /// The numbers are the minimum major and minor version
     BindingsAbi3(u8, u8),
+    /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
+    Cffi,
+    /// A native module generated from uniffi
+    UniFfi,
 }
 
 impl BridgeModel {
@@ -71,11 +73,12 @@ impl BridgeModel {
 impl Display for BridgeModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::Bin(Some((name, _))) => write!(f, "{} bin", name),
             BridgeModel::Bin(None) => write!(f, "bin"),
             BridgeModel::Bindings(name, _) => write!(f, "{}", name),
             BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
+            BridgeModel::Cffi => write!(f, "cffi"),
+            BridgeModel::UniFfi => write!(f, "uniffi"),
         }
     }
 }
@@ -199,7 +202,6 @@ impl BuildContext {
             .context("Failed to create the target directory for the wheels")?;
 
         let wheels = match &self.bridge {
-            BridgeModel::Cffi => self.build_cffi_wheel()?,
             BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
             BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
@@ -240,6 +242,8 @@ impl BuildContext {
                 }
                 built_wheels
             }
+            BridgeModel::Cffi => self.build_cffi_wheel()?,
+            BridgeModel::UniFfi => self.build_uniffi_wheel()?,
         };
 
         Ok(wheels)
@@ -744,6 +748,61 @@ impl BuildContext {
                 e.g: `dependencies = [\"cffi\"]`. This will become an error."
             );
         }
+
+        println!("📦 Built wheel to {}", wheel_path.display());
+        wheels.push((wheel_path, tag));
+
+        Ok(wheels)
+    }
+
+    fn write_uniffi_wheel(
+        &self,
+        artifact: BuildArtifact,
+        platform_tags: &[PlatformTag],
+        ext_libs: Vec<Library>,
+    ) -> Result<BuiltWheelMetadata> {
+        let (tag, tags) = self
+            .target
+            .get_universal_tags(platform_tags, self.universal2)?;
+
+        let mut writer = WheelWriter::new(
+            &tag,
+            &self.out,
+            &self.metadata21,
+            &tags,
+            self.excludes(Format::Wheel)?,
+        )?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+
+        write_uniffi_module(
+            &mut writer,
+            &self.project_layout,
+            self.manifest_path.parent().unwrap(),
+            &self.target_dir,
+            &self.module_name,
+            &artifact.path,
+            self.target.target_os(),
+            self.editable,
+            self.pyproject_toml.as_ref(),
+        )?;
+
+        self.add_pth(&mut writer)?;
+        add_data(&mut writer, self.project_layout.data.as_deref())?;
+        let wheel_path = writer.finish()?;
+        Ok((wheel_path, "py3".to_string()))
+    }
+
+    /// Builds a wheel with uniffi bindings
+    pub fn build_uniffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
+        let mut wheels = Vec::new();
+        let artifact = self.compile_cdylib(None, None)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
+        let platform_tags = if self.platform_tag.is_empty() {
+            vec![policy.platform_tag()]
+        } else {
+            self.platform_tag.clone()
+        };
+        let (wheel_path, tag) = self.write_uniffi_wheel(artifact, &platform_tags, external_libs)?;
 
         println!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));

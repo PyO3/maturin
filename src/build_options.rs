@@ -162,7 +162,7 @@ pub struct BuildOptions {
     pub find_interpreter: bool,
 
     /// Which kind of bindings to use.
-    #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "bin"])]
+    #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"])]
     pub bindings: Option<String>,
 
     /// The directory to store the built wheels in. Defaults to a new "wheels"
@@ -347,7 +347,7 @@ impl BuildOptions {
                 println!("🐍 Using {} to generate the cffi bindings", interpreter);
                 Ok(vec![interpreter])
             }
-            BridgeModel::Bin(None) => Ok(vec![]),
+            BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
             BridgeModel::BindingsAbi3(major, minor) => {
                 if target.is_windows() {
                     // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
@@ -838,6 +838,8 @@ fn find_bindings(
         Some(("pyo3-ffi".to_string(), minor))
     } else if deps.contains_key("cpython") {
         Some(("rust-cpython".to_string(), MINIMUM_PYTHON_MINOR))
+    } else if deps.contains_key("uniffi") {
+        Some(("uniffi".to_string(), MINIMUM_PYTHON_MINOR))
     } else {
         None
     }
@@ -860,7 +862,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         .iter()
         .filter_map(|pkg| {
             let name = &pkg.name;
-            if name == "pyo3" || name == "pyo3-ffi" || name == "cpython" {
+            if name == "pyo3" || name == "pyo3-ffi" || name == "cpython" || name == "uniffi" {
                 Some((name.as_ref(), pkg))
             } else {
                 None
@@ -885,6 +887,8 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     let bridge = if let Some(bindings) = bridge {
         if bindings == "cffi" {
             BridgeModel::Cffi
+        } else if bindings == "uniffi" {
+            BridgeModel::UniFfi
         } else if bindings == "bin" {
             BridgeModel::Bin(find_bindings(&deps, &packages))
         } else {
@@ -900,6 +904,8 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     } else if let Some((bindings, minor)) = find_bindings(&deps, &packages) {
         if !targets.contains(&"cdylib") && targets.contains(&"bin") {
             BridgeModel::Bin(Some((bindings, minor)))
+        } else if bindings == "uniffi" {
+            BridgeModel::UniFfi
         } else {
             BridgeModel::Bindings(bindings, minor)
         }

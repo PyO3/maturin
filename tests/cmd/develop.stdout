@@ -10,7 +10,9 @@ Arguments:
 
 Options:
   -b, --bindings <BINDINGS>
-          Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+          Which kind of bindings to use
+          
+          [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, uniffi, bin]
 
   -r, --release
           Pass --release to cargo

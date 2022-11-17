@@ -20,4 +20,10 @@ py_module_initializer!({{crate_name}}, |py, m| {
     m.add(py, "__doc__", "Module documentation string")?;
     Ok(())
 });
+{%- elif bindings == "uniffi" -%}
+fn add(a: u32, b: u32) -> u32 {
+    a + b
+}
+
+uniffi_macros::include_scaffolding!("example");
 {%- endif %}

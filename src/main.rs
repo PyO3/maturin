@@ -72,8 +72,13 @@ enum Opt {
     ///
     /// Note that this command doesn't create entrypoints
     Develop {
-        /// Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
-        #[arg(short = 'b', long = "bindings", alias = "binding-crate")]
+        /// Which kind of bindings to use
+        #[arg(
+            short = 'b',
+            long = "bindings",
+            alias = "binding-crate",
+            value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"]
+        )]
         bindings: Option<String>,
         /// Pass --release to cargo
         #[arg(short = 'r', long)]
@@ -258,7 +263,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                         .get_platform_tag(&[PlatformTag::Linux], context.universal2)?;
                     vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
                 }
-                BridgeModel::Bin(None) | BridgeModel::Cffi => {
+                BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
                     context
                         .target
                         .get_universal_tags(&[PlatformTag::Linux], context.universal2)?

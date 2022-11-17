@@ -1,5 +1,6 @@
 //! The wheel format is (mostly) specified in PEP 427
 use crate::project_layout::ProjectLayout;
+use crate::target::Os;
 use crate::{
     pyproject_toml::Format, BridgeModel, Metadata21, PyProjectToml, PythonInterpreter, Target,
 };
@@ -807,6 +808,125 @@ pub fn write_cffi_module(
         writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
         writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
         writer.add_file_with_permissions(&module.join("native.so"), artifact, 0o755)?;
+    }
+
+    Ok(())
+}
+
+fn generate_uniffi_bindings(crate_dir: &Path, target_dir: &Path) -> Result<PathBuf> {
+    let binding_dir = target_dir.join("maturin").join("uniffi");
+    fs::create_dir_all(&binding_dir)?;
+
+    let pattern = crate_dir.join("src").join("*.udl");
+    let udls = glob::glob(pattern.to_str().unwrap())?
+        .map(|p| p.unwrap())
+        .collect::<Vec<_>>();
+    if udls.is_empty() {
+        bail!("No UDL files found in {}", crate_dir.join("src").display());
+    } else if udls.len() > 1 {
+        bail!(
+            "Multiple UDL files found in {}",
+            crate_dir.join("src").display()
+        );
+    }
+
+    let udl = &udls[0];
+    uniffi_bindgen::generate_bindings(
+        udl.as_path().try_into().expect("path contains non-utf8"),
+        None,
+        vec!["python"],
+        Some(
+            binding_dir
+                .as_path()
+                .try_into()
+                .expect("path contains non-utf8"),
+        ),
+        None,
+        false,
+    )?;
+    let py_binding_name = udl.file_stem().unwrap();
+    let py_binding = binding_dir.join(py_binding_name).with_extension("py");
+    Ok(py_binding)
+}
+
+/// Creates the uniffi module with the shared library
+#[allow(clippy::too_many_arguments)]
+pub fn write_uniffi_module(
+    writer: &mut impl ModuleWriter,
+    project_layout: &ProjectLayout,
+    crate_dir: &Path,
+    target_dir: &Path,
+    module_name: &str,
+    artifact: &Path,
+    target_os: Os,
+    editable: bool,
+    pyproject_toml: Option<&PyProjectToml>,
+) -> Result<()> {
+    let uniffi_binding = generate_uniffi_bindings(crate_dir, target_dir)?;
+    let binding_name = uniffi_binding.file_stem().unwrap().to_str().unwrap();
+    let py_init = format!("from .{} import *  # NOQA\n", binding_name);
+    // uniffi bindings hardcoded the extension filenames
+    let dylib_name = match target_os {
+        Os::Macos => format!("libuniffi_{}.dylib", binding_name),
+        Os::Windows => format!("uniffi_{}.dll", binding_name),
+        _ => format!("libuniffi_{}.so", binding_name),
+    };
+
+    let module;
+
+    if let Some(python_module) = &project_layout.python_module {
+        if !editable {
+            write_python_part(writer, python_module, pyproject_toml)
+                .context("Failed to add the python module to the package")?;
+        }
+
+        if editable {
+            let base_path = python_module.join(module_name);
+            fs::create_dir_all(&base_path)?;
+            let target = base_path.join(&dylib_name);
+            fs::copy(artifact, &target).context(format!(
+                "Failed to copy {} to {}",
+                artifact.display(),
+                target.display()
+            ))?;
+
+            File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
+            let target = base_path.join(binding_name).with_extension("py");
+            fs::copy(&uniffi_binding, &target).context(format!(
+                "Failed to copy {} to {}",
+                uniffi_binding.display(),
+                target.display()
+            ))?;
+        }
+
+        let relative = project_layout
+            .rust_module
+            .strip_prefix(python_module.parent().unwrap())
+            .unwrap();
+        module = relative.join(&project_layout.extension_name);
+        if !editable {
+            writer.add_directory(&module)?;
+        }
+    } else {
+        module = PathBuf::from(module_name);
+        writer.add_directory(&module)?;
+        let type_stub = project_layout
+            .rust_module
+            .join(format!("{}.pyi", module_name));
+        if type_stub.exists() {
+            println!("📖 Found type stub file at {}.pyi", module_name);
+            writer.add_file(&module.join("__init__.pyi"), type_stub)?;
+            writer.add_bytes(&module.join("py.typed"), b"")?;
+        }
+    };
+
+    if !editable || project_layout.python_module.is_none() {
+        writer.add_bytes(&module.join("__init__.py"), py_init.as_bytes())?;
+        writer.add_file(
+            module.join(binding_name).with_extension("py"),
+            uniffi_binding,
+        )?;
+        writer.add_file_with_permissions(&module.join(dylib_name), artifact, 0o755)?;
     }
 
     Ok(())

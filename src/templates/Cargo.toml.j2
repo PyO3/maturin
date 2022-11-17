@@ -15,4 +15,10 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.17.3", features = ["extension-module"] }
 {% elif bindings == "rust-cpython" -%}
 cpython = { version = "0.7.1", features = ["extension-module"] }
+{% elif bindings == "uniffi" -%}
+uniffi = "0.21.0"
+uniffi_macros = "0.21.0"
+
+[build-dependencies]
+uniffi_build = { version = "0.21.0", features = ["builtin-bindgen"] }
 {% endif -%}

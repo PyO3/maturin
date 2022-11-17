@@ -90,3 +90,8 @@ directory of a virtual environment) once installed.
 
 > **Note**: Maturin _does not_ automatically detect `bin` bindings. You _must_
 > specify them via either command line with `-b bin` or in `pyproject.toml`.
+
+## `uniffi`
+
+uniffi bindings use [uniffi-rs](https://mozilla.github.io/uniffi-rs/) to generate Python `ctypes` bindings
+from an interface definition file. uniffi wheels are compatible with all python versions including pypy. 

@@ -1,0 +1,5 @@
+{%- if bindings == "uniffi" -%}
+fn main() {
+    uniffi_build::generate_scaffolding("./src/example.udl").unwrap();
+}
+{% endif -%}

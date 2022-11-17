@@ -38,8 +38,10 @@ impl<'a> ProjectGenerator<'a> {
         )?;
         env.add_template("lib.rs", include_str!("templates/lib.rs.j2"))?;
         env.add_template("main.rs", include_str!("templates/main.rs.j2"))?;
+        env.add_template("build.rs", include_str!("templates/build.rs.j2"))?;
         env.add_template("__init__.py", include_str!("templates/__init__.py.j2"))?;
         env.add_template("CI.yml", include_str!("templates/CI.yml.j2"))?;
+        env.add_template("example.udl", include_str!("templates/example.udl.j2"))?;
         Ok(Self {
             env,
             project_name,
@@ -87,6 +89,10 @@ impl<'a> ProjectGenerator<'a> {
             self.write_project_file(&rust_src, "main.rs")?;
         } else {
             self.write_project_file(&rust_src, "lib.rs")?;
+            if self.bindings == "uniffi" {
+                self.write_project_file(&rust_project, "build.rs")?;
+                self.write_project_file(&rust_src, "example.udl")?;
+            }
         }
 
         Ok(())
@@ -129,7 +135,11 @@ pub struct GenerateProjectOptions {
     #[arg(long)]
     src: bool,
     /// Which kind of bindings to use
-    #[arg(short, long, value_parser = ["pyo3", "rust-cpython", "cffi", "bin"])]
+    #[arg(
+        short,
+        long,
+        value_parser = ["pyo3", "rust-cpython", "cffi", "uniffi", "bin"]
+    )]
     bindings: Option<String>,
 }
 
@@ -184,9 +194,9 @@ fn generate_project(
             .to_string()
     };
     let bindings_items = if options.mixed {
-        vec!["pyo3", "rust-cpython", "cffi"]
+        vec!["pyo3", "rust-cpython", "cffi", "uniffi"]
     } else {
-        vec!["pyo3", "rust-cpython", "cffi", "bin"]
+        vec!["pyo3", "rust-cpython", "cffi", "uniffi", "bin"]
     };
     let bindings = if let Some(bindings) = options.bindings {
         bindings

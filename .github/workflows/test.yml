@@ -281,6 +281,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
     container: alpine:edge
     steps:
       - uses: actions/checkout@v3
@@ -342,6 +344,9 @@ jobs:
     name: Test Docker
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4

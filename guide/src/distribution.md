@@ -70,126 +70,126 @@ or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decod
 
 
 ```
-USAGE:
-    maturin build [OPTIONS] [--] [ARGS]...
+Usage: maturin build [OPTIONS] [ARGS]...
 
-ARGS:
-    <ARGS>...
-            Rustc flags
+Arguments:
+  [ARGS]...
+          Rustc flags
 
-OPTIONS:
-    -r, --release
-            Build artifacts in release mode, with optimizations
+Options:
+  -r, --release
+          Build artifacts in release mode, with optimizations
 
-        --strip
-            Strip the library for minimum file size
+      --strip
+          Strip the library for minimum file size
 
-        --sdist
-            Build a source distribution
+      --sdist
+          Build a source distribution
 
-        --compatibility <compatibility>...
-            Control the platform tag on linux.
+      --compatibility [<compatibility>...]
+          Control the platform tag on linux.
 
-            Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or
-            `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
+          Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux`
+          tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
 
-            Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels
-            with the native `linux` tag will be rejected by pypi, unless they are separately
-            validated by `auditwheel`.
+          Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels
+          with the native `linux` tag will be rejected by pypi, unless they are separately validated
+          by `auditwheel`.
 
-            The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing
-            matched
+          The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
 
-            This option is ignored on all non-linux platforms
+          This option is ignored on all non-linux platforms
 
-    -i, --interpreter <INTERPRETER>...
-            The python versions to build wheels for, given as the names of the interpreters
+  -i, --interpreter [<INTERPRETER>...]
+          The python versions to build wheels for, given as the names of the interpreters
 
-    -f, --find-interpreter
-            Find interpreters from the host machine
+  -f, --find-interpreter
+          Find interpreters from the host machine
 
-    -b, --bindings <BINDINGS>
-            Which kind of bindings to use. Possible values are pyo3, rust-cpython, cffi and bin
+  -b, --bindings <BINDINGS>
+          Which kind of bindings to use
 
-    -o, --out <OUT>
-            The directory to store the built wheels in. Defaults to a new "wheels" directory in the
-            project's target directory
+          [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, bin]
 
-        --skip-auditwheel
-            Don't check for manylinux compliance
+  -o, --out <OUT>
+          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+          project's target directory
 
-        --zig
-            For manylinux targets, use zig to ensure compliance for the chosen manylinux version
+      --skip-auditwheel
+          Don't check for manylinux compliance
 
-            Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
+      --zig
+          For manylinux targets, use zig to ensure compliance for the chosen manylinux version
 
-            Make sure you installed zig with `pip install maturin[zig]`
+          Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
 
-        --universal2
-            Control whether to build universal2 wheel for macOS or not. Only applies to macOS
-            targets, do nothing otherwise
+          Make sure you installed zig with `pip install maturin[zig]`
 
-    -q, --quiet
-            Do not print cargo log messages
+      --universal2
+          Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets,
+          do nothing otherwise
 
-    -j, --jobs <N>
-            Number of parallel jobs, defaults to # of CPUs
+  -q, --quiet
+          Do not print cargo log messages
 
-        --profile <PROFILE-NAME>
-            Build artifacts with the specified Cargo profile
+  -j, --jobs <N>
+          Number of parallel jobs, defaults to # of CPUs
 
-    -F, --features <FEATURES>
-            Space or comma separated list of features to activate
+      --profile <PROFILE-NAME>
+          Build artifacts with the specified Cargo profile
 
-        --all-features
-            Activate all available features
+  -F, --features <FEATURES>
+          Space or comma separated list of features to activate
 
-        --no-default-features
-            Do not activate the `default` feature
+      --all-features
+          Activate all available features
 
-        --target <TRIPLE>
-            Build for the target triple
+      --no-default-features
+          Do not activate the `default` feature
 
-            [env: CARGO_BUILD_TARGET=]
+      --target <TRIPLE>
+          Build for the target triple
 
-        --target-dir <DIRECTORY>
-            Directory for all generated artifacts
+          [env: CARGO_BUILD_TARGET=]
 
-    -m, --manifest-path <PATH>
-            Path to Cargo.toml
+      --target-dir <DIRECTORY>
+          Directory for all generated artifacts
 
-        --ignore-rust-version
-            Ignore `rust-version` specification in packages
+  -m, --manifest-path <PATH>
+          Path to Cargo.toml
 
-    -v, --verbose
-            Use verbose output (-vv very verbose/build.rs output)
+      --ignore-rust-version
+          Ignore `rust-version` specification in packages
 
-        --color <WHEN>
-            Coloring: auto, always, never
+  -v, --verbose...
+          Use verbose output (-vv very verbose/build.rs output)
 
-        --frozen
-            Require Cargo.lock and cache are up to date
+      --color <WHEN>
+          Coloring: auto, always, never
 
-        --locked
-            Require Cargo.lock is up to date
+      --frozen
+          Require Cargo.lock and cache are up to date
 
-        --offline
-            Run without accessing the network
+      --locked
+          Require Cargo.lock is up to date
 
-        --config <KEY=VALUE>
-            Override a configuration value (unstable)
+      --offline
+          Run without accessing the network
 
-    -Z <FLAG>
-            Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+      --config <KEY=VALUE>
+          Override a configuration value (unstable)
 
-        --timings[=<FMTS>...]
-            Timing output formats (unstable) (comma separated): html, json
+  -Z <FLAG>
+          Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
 
-        --future-incompat-report
-            Outputs a future incompatibility report at the end of the build (unstable)
+      --timings=<FMTS>
+          Timing output formats (unstable) (comma separated): html, json
 
-    -h, --help
-            Print help information
+      --future-incompat-report
+          Outputs a future incompatibility report at the end of the build (unstable)
+
+  -h, --help
+          Print help information (use `-h` for a summary)
 ```
 
 ### Cross Compiling

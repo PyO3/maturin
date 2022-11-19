@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2022-11-19
+
 * **Breaking Change**: Remove support for specifying python package metadata in `Cargo.toml` in [#1200](https://github.com/PyO3/maturin/pull/1200).
   Python package metadata should be specified in the `project` section of `pyproject.toml` instead as [PEP 621](https://peps.python.org/pep-0621/) specifies.
 * Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107). 
@@ -742,7 +744,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.13.7...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/pyo3/maturin/compare/v0.13.7...v0.14.0
 [0.13.7]: https://github.com/pyo3/maturin/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/pyo3/maturin/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/pyo3/maturin/compare/v0.13.4...v0.13.5

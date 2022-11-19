@@ -1,6 +1,6 @@
 [profile.default]
-# Terminate slow tests after 5 minutes
-slow-timeout = { period = "60s", terminate-after = 5 }
+# Terminate slow tests after 10 minutes
+slow-timeout = { period = "60s", terminate-after = 10 }
 
 [[profile.default.overrides]]
 # See https://nexte.st/book/threads-required.html

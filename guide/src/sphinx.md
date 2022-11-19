@@ -14,7 +14,7 @@ properly configured it to build source distributions, for example a minimal conf
 
 ```toml
 [build-system]
-requires = ["maturin>=0.13,<0.14"]
+requires = ["maturin>=0.14,<0.15"]
 build-backend = "maturin"
 ```
 

@@ -813,7 +813,31 @@ pub fn write_cffi_module(
     Ok(())
 }
 
-fn generate_uniffi_bindings(crate_dir: &Path, target_dir: &Path) -> Result<PathBuf> {
+/// uniffi.toml
+#[derive(Debug, serde::Deserialize)]
+struct UniFfiToml {
+    #[serde(default)]
+    bindings: HashMap<String, UniFfiBindingsConfig>,
+}
+
+/// `bindings` section of uniffi.toml
+#[derive(Debug, serde::Deserialize)]
+struct UniFfiBindingsConfig {
+    cdylib_name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct UniFfiBindings {
+    name: String,
+    cdylib: String,
+    path: PathBuf,
+}
+
+fn generate_uniffi_bindings(
+    crate_dir: &Path,
+    target_dir: &Path,
+    target_os: Os,
+) -> Result<UniFfiBindings> {
     let binding_dir = target_dir.join("maturin").join("uniffi");
     fs::create_dir_all(&binding_dir)?;
 
@@ -831,9 +855,29 @@ fn generate_uniffi_bindings(crate_dir: &Path, target_dir: &Path) -> Result<PathB
     }
 
     let udl = &udls[0];
+    let config_file = crate_dir.join("uniffi.toml");
+    let mut cdylib_name = None;
+    let config_file = {
+        if config_file.is_file() {
+            let uniffi_toml: UniFfiToml =
+                toml_edit::easy::from_str(&fs::read_to_string(&config_file)?)?;
+            cdylib_name = uniffi_toml
+                .bindings
+                .get("python")
+                .and_then(|py| py.cdylib_name.clone());
+            Some(
+                config_file
+                    .as_path()
+                    .try_into()
+                    .expect("path contains non-utf8"),
+            )
+        } else {
+            None
+        }
+    };
     uniffi_bindgen::generate_bindings(
         udl.as_path().try_into().expect("path contains non-utf8"),
-        None,
+        config_file,
         vec!["python"],
         Some(
             binding_dir
@@ -846,7 +890,24 @@ fn generate_uniffi_bindings(crate_dir: &Path, target_dir: &Path) -> Result<PathB
     )?;
     let py_binding_name = udl.file_stem().unwrap();
     let py_binding = binding_dir.join(py_binding_name).with_extension("py");
-    Ok(py_binding)
+    let name = py_binding_name.to_str().unwrap().to_string();
+
+    // uniffi bindings hardcoded the extension filenames
+    let cdylib_name = match cdylib_name {
+        Some(name) => name,
+        None => format!("uniffi_{}", name),
+    };
+    let cdylib = match target_os {
+        Os::Macos => format!("lib{}.dylib", cdylib_name),
+        Os::Windows => format!("{}.dll", cdylib_name),
+        _ => format!("lib{}.so", cdylib_name),
+    };
+
+    Ok(UniFfiBindings {
+        name,
+        cdylib,
+        path: py_binding,
+    })
 }
 
 /// Creates the uniffi module with the shared library
@@ -862,15 +923,12 @@ pub fn write_uniffi_module(
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
-    let uniffi_binding = generate_uniffi_bindings(crate_dir, target_dir)?;
-    let binding_name = uniffi_binding.file_stem().unwrap().to_str().unwrap();
+    let UniFfiBindings {
+        name: binding_name,
+        cdylib,
+        path: uniffi_binding,
+    } = generate_uniffi_bindings(crate_dir, target_dir, target_os)?;
     let py_init = format!("from .{} import *  # NOQA\n", binding_name);
-    // uniffi bindings hardcoded the extension filenames
-    let dylib_name = match target_os {
-        Os::Macos => format!("libuniffi_{}.dylib", binding_name),
-        Os::Windows => format!("uniffi_{}.dll", binding_name),
-        _ => format!("libuniffi_{}.so", binding_name),
-    };
 
     let module;
 
@@ -883,7 +941,7 @@ pub fn write_uniffi_module(
         if editable {
             let base_path = python_module.join(module_name);
             fs::create_dir_all(&base_path)?;
-            let target = base_path.join(&dylib_name);
+            let target = base_path.join(&cdylib);
             fs::copy(artifact, &target).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
@@ -891,7 +949,7 @@ pub fn write_uniffi_module(
             ))?;
 
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
-            let target = base_path.join(binding_name).with_extension("py");
+            let target = base_path.join(&binding_name).with_extension("py");
             fs::copy(&uniffi_binding, &target).context(format!(
                 "Failed to copy {} to {}",
                 uniffi_binding.display(),
@@ -926,7 +984,7 @@ pub fn write_uniffi_module(
             module.join(binding_name).with_extension("py"),
             uniffi_binding,
         )?;
-        writer.add_file_with_permissions(&module.join(dylib_name), artifact, 0o755)?;
+        writer.add_file_with_permissions(&module.join(cdylib), artifact, 0o755)?;
     }
 
     Ok(())

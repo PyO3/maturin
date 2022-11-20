@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2022-11-20
+
 * Downgrade `cargo_metadata` to 0.15.0 to fix `maturin build` on old Rust versions like 1.48.0 in [#1279](https://github.com/PyO3/maturin/pull/1279)
 
 ## [0.14.0] - 2022-11-19
@@ -746,7 +748,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/pyo3/maturin/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pyo3/maturin/compare/v0.13.7...v0.14.0
 [0.13.7]: https://github.com/pyo3/maturin/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/pyo3/maturin/compare/v0.13.5...v0.13.6

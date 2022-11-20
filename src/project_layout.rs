@@ -7,6 +7,7 @@ use normpath::PathExt as _;
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 const PYPROJECT_TOML: &str = "pyproject.toml";
 
@@ -193,6 +194,10 @@ impl ProjectResolver {
         // use command line argument if specified
         if let Some(path) = cargo_manifest_path {
             let path = path.normalize()?.into_path_buf();
+            debug!(
+                "Using cargo manifest path from command line argument: {:?}",
+                path
+            );
             let workspace_root = Self::resolve_cargo_metadata(&path, cargo_options)?.workspace_root;
             let workspace_parent = workspace_root.parent().unwrap_or(&workspace_root);
             for parent in path.ancestors().skip(1) {
@@ -202,10 +207,12 @@ impl ProjectResolver {
                 }
                 let pyproject_file = parent.join(PYPROJECT_TOML);
                 if pyproject_file.is_file() {
+                    debug!("Found pyproject.toml at {:?}", pyproject_file);
                     return Ok((path, pyproject_file));
                 }
             }
             let pyproject_file = path.parent().unwrap().join(PYPROJECT_TOML);
+            debug!("Trying pyproject.toml at {:?}", pyproject_file);
             return Ok((path, pyproject_file));
         }
         // check `manifest-path` option in pyproject.toml
@@ -215,6 +222,10 @@ impl ProjectResolver {
             .into_path_buf();
         let pyproject_file = current_dir.join(PYPROJECT_TOML);
         if pyproject_file.is_file() {
+            debug!(
+                "Found pyproject.toml in working directory at {:?}",
+                pyproject_file
+            );
             let pyproject =
                 PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
             if let Some(path) = pyproject.manifest_path() {
@@ -227,6 +238,7 @@ impl ProjectResolver {
                 if !manifest_dir.starts_with(&current_dir) {
                     bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
                 }
+                debug!("Using cargo manifest path from pyproject.toml {:?}", path);
                 return Ok((path.normalize()?.into_path_buf(), pyproject_file));
             } else {
                 // Detect src layout:
@@ -260,6 +272,10 @@ impl ProjectResolver {
         // check Cargo.toml in current directory
         let path = current_dir.join("Cargo.toml");
         if path.exists() {
+            debug!(
+                "Using cargo manifest path from working directory: {:?}",
+                path
+            );
             Ok((path, current_dir.join(PYPROJECT_TOML)))
         } else {
             Err(format_err!(
@@ -274,6 +290,7 @@ impl ProjectResolver {
         manifest_path: &Path,
         cargo_options: &CargoOptions,
     ) -> Result<Metadata> {
+        debug!("Resolving cargo metadata from {:?}", manifest_path);
         let cargo_metadata_extra_args = extract_cargo_metadata_args(cargo_options)?;
         let result = MetadataCommand::new()
             .manifest_path(manifest_path)

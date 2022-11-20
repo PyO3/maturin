@@ -10,6 +10,7 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
+use tracing::debug;
 
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
@@ -77,6 +78,8 @@ fn compile_universal2(
     } else {
         "cdylib"
     };
+    debug!("Building an universal2 {}", build_type);
+
     let mut aarch64_context = context.clone();
     aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
 
@@ -189,6 +192,7 @@ fn compile_target(
         // `--crate-type` is stable since Rust 1.64.0
         // See https://github.com/rust-lang/cargo/pull/10838
         if target.rustc_version.semver >= RUST_1_64_0 {
+            debug!("Setting crate_type to cdylib for Rust >= 1.64.0");
             cargo_rustc.crate_type = vec!["cdylib".to_string()];
         }
     }
@@ -209,6 +213,7 @@ fn compile_target(
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
             if context.target.is_musl_target() {
+                debug!("Setting `-C target-features=-crt-static` for musl dylib");
                 rust_flags
                     .get_or_insert_with(Default::default)
                     .push(" -C target-feature=-crt-static");
@@ -239,6 +244,7 @@ fn compile_target(
                 "-C".to_string(),
                 macos_dylib_install_name,
             ];
+            debug!("Setting additional linker args for macOS: {:?}", mac_args);
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
@@ -265,6 +271,10 @@ fn compile_target(
             emscripten_args.push("-C".to_string());
             emscripten_args.push("link-arg=-sWASM_BIGINT".to_string());
         }
+        debug!(
+            "Setting additional linker args for Emscripten: {:?}",
+            emscripten_args
+        );
         cargo_rustc.args.extend(emscripten_args);
     }
 
@@ -400,6 +410,8 @@ fn compile_target(
         build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{}.{}", major, minor));
     }
 
+    debug!("Running {:?}", build_command);
+
     let mut cargo_build = build_command
         .spawn()
         .context("Failed to run `cargo rustc`")?;
@@ -412,7 +424,9 @@ fn compile_target(
         .take()
         .expect("Cargo build should have a stdout");
     for message in cargo_metadata::Message::parse_stream(BufReader::new(stream)) {
-        match message.context("Failed to parse message coming from cargo")? {
+        let message = message.context("Failed to parse cargo metadata message")?;
+        debug!("cargo message: {:?}", message);
+        match message {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let package_in_metadata = context
                     .cargo_metadata

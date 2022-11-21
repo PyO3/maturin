@@ -144,7 +144,14 @@ impl ProjectResolver {
                     Some(project_name) => {
                         // Detect src layout
                         let import_name = project_name.replace('-', "_");
-                        if project_root.join("src").join(import_name).is_dir() {
+                        let rust_cargo_toml_found =
+                            project_root.join("rust").join("Cargo.toml").is_file();
+                        let python_src_found = project_root
+                            .join("src")
+                            .join(import_name)
+                            .join("__init__.py")
+                            .is_file();
+                        if rust_cargo_toml_found && python_src_found {
                             project_root.join("src")
                         } else {
                             project_root.to_path_buf()
@@ -255,14 +262,20 @@ impl ProjectResolver {
                 //     └── src
                 //         └── lib.rs
                 let path = current_dir.join("rust").join("Cargo.toml");
-                if path.exists() {
+                if path.is_file() {
+                    debug!("Python first src-layout detected");
                     if pyproject.python_source().is_some() {
                         // python source directory is specified in pyproject.toml
                         return Ok((path, pyproject_file));
                     } else if let Some(project_name) = pyproject.project_name() {
                         // Check if python source directory in `src/<project_name>`
                         let import_name = project_name.replace('-', "_");
-                        if current_dir.join("src").join(import_name).is_dir() {
+                        if current_dir
+                            .join("src")
+                            .join(import_name)
+                            .join("__init__.py")
+                            .is_file()
+                        {
                             return Ok((path, pyproject_file));
                         }
                     }
@@ -339,6 +352,13 @@ impl ProjectLayout {
                 module_name.to_string(),
             )
         };
+        debug!(
+            project_root = %project_root.display(),
+            rust_module = %rust_module.display(),
+            python_module = %python_module.display(),
+            extension_name = %extension_name,
+            "Project layout resolved"
+        );
 
         let data = if let Some(data) = data {
             if !data.is_dir() {

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Tighten src-layout detection logic in [#1281](https://github.com/PyO3/maturin/pull/1282)
+
 ## [0.14.1] - 2022-11-20
 
 * Downgrade `cargo_metadata` to 0.15.0 to fix `maturin build` on old Rust versions like 1.48.0 in [#1279](https://github.com/PyO3/maturin/pull/1279)

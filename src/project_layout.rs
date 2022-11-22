@@ -1,5 +1,4 @@
 use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
-use crate::polyfill::MetadataCommandExt;
 use crate::{CargoToml, Metadata21, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
@@ -307,8 +306,9 @@ impl ProjectResolver {
         let cargo_metadata_extra_args = extract_cargo_metadata_args(cargo_options)?;
         let result = MetadataCommand::new()
             .manifest_path(manifest_path)
+            .verbose(true)
             .other_options(cargo_metadata_extra_args)
-            .exec_inherit_stderr();
+            .exec();
 
         let cargo_metadata = match result {
             Ok(cargo_metadata) => cargo_metadata,

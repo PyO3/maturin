@@ -1,5 +1,4 @@
 use crate::module_writer::{add_data, ModuleWriter};
-use crate::polyfill::MetadataCommandExt;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
@@ -467,9 +466,10 @@ pub fn source_distribution(
         // thus we need to find out its workspace root from `cargo metadata`
         let path_dep_metadata = MetadataCommand::new()
             .manifest_path(path_dep)
+            .verbose(true)
             // We don't need to resolve the dependency graph
             .no_deps()
-            .exec_inherit_stderr()
+            .exec()
             .with_context(|| {
                 format!(
                     "Cargo metadata failed for {} at '{}'",

@@ -197,14 +197,9 @@ enum Pep517Command {
         /// The sdist_directory argument to build_sdist
         #[arg(long = "sdist-directory")]
         sdist_directory: PathBuf,
-        #[arg(
-            short = 'm',
-            long = "manifest-path",
-            default_value = "Cargo.toml",
-            value_name = "PATH"
-        )]
+        #[arg(short = 'm', long = "manifest-path", value_name = "PATH")]
         /// The path to the Cargo.toml
-        manifest_path: PathBuf,
+        manifest_path: Option<PathBuf>,
     },
 }
 
@@ -292,7 +287,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             let build_options = BuildOptions {
                 out: Some(sdist_directory),
                 cargo: CargoOptions {
-                    manifest_path: Some(manifest_path),
+                    manifest_path,
                     ..Default::default()
                 },
                 ..Default::default()

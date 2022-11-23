@@ -126,13 +126,13 @@ pub fn develop(
         }
         if !output.stderr.is_empty() {
             eprintln!(
-                "⚠️  Warning: pip raised a warning running {:?}:\n{}",
+                "⚠️ Warning: pip raised a warning running {:?}:\n{}",
                 &command,
                 String::from_utf8_lossy(&output.stderr).trim(),
             );
         }
         println!(
-            "🛠  Installed {}-{}",
+            "🛠 Installed {}-{}",
             build_context.metadata21.name, build_context.metadata21.version
         );
     }

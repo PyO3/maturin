@@ -80,20 +80,12 @@ modules. A popular way to avoid this is with the `src`-layout, where the Python
 package is nested within a `src` directory. Unfortunately this interferes with
 the structure of a typical Rust project. Fortunately, Python is nor particular
 about the name of the parent source directory. You tell maturin to use a
-different Python source directory in `pyproject.toml` by setting `tool.maturin.python-source`
-or in `Cargo.toml` by setting `package.metadata.maturin.python-source`, for example
+different Python source directory in `pyproject.toml` by setting `tool.maturin.python-source`, for example
 
 **pyproject.toml**
 
 ```toml
 [tool.maturin]
-python-source = "python"
-```
-
-**Cargo.toml**
-
-```toml
-[package.metadata.maturin]
 python-source = "python"
 ```
 
@@ -117,7 +109,6 @@ If the Python module created by Rust has the same name as the Python package in 
 
 ```toml
 [package.metadata.maturin]
-python-source = "python"
 name = "my_project._my_project"
 ```
 

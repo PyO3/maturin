@@ -136,9 +136,12 @@ impl ProjectResolver {
             manifest_dir
         };
         let py_root = match pyproject.and_then(|x| x.python_source()) {
-            Some(py_src) => py_src.to_path_buf(),
+            Some(py_src) => project_root.join(py_src),
             None => match extra_metadata.python_source.as_ref() {
-                Some(py_src) => manifest_dir.join(py_src),
+                Some(py_src) => {
+                    println!("⚠️ Warning: specify python-source in Cargo.toml is deprecated, use python-source in [tool.maturin] section in pyproject.toml instead");
+                    manifest_dir.join(py_src)
+                }
                 None => match pyproject.and_then(|x| x.project_name()) {
                     Some(project_name) => {
                         // Detect src layout

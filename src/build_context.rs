@@ -392,6 +392,12 @@ impl BuildContext {
             fs::copy(&lib_path, &dest_path)?;
             libs_copied.insert(lib_path);
 
+            // fs::copy copies permissions as well, and the original
+            // file may have been read-only
+            let mut perms = fs::metadata(&dest_path)?.permissions();
+            perms.set_readonly(false);
+            fs::set_permissions(&dest_path, perms)?;
+
             patchelf::set_soname(&dest_path, &new_soname)?;
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
                 patchelf::set_rpath(&dest_path, &libs_dir)?;

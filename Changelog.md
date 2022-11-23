@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Tighten src-layout detection logic in [#1281](https://github.com/PyO3/maturin/pull/1282)
+* Fix generating pep517 sdist for src-layout in [#1288](https://github.com/PyO3/maturin/pull/1288)
 
 ## [0.14.1] - 2022-11-20
 

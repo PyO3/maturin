@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -282,7 +282,7 @@ jobs:
       RUST_BACKTRACE: '1'
       CARGO_INCREMENTAL: '0'
       CARGO_TERM_COLOR: always
-    container: alpine:edge
+    container: alpine:latest
     steps:
       - uses: actions/checkout@v3
       - name: Install build requirements

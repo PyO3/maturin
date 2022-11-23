@@ -10,7 +10,7 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
-use tracing::debug;
+use tracing::{debug, trace};
 
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
@@ -425,7 +425,7 @@ fn compile_target(
         .expect("Cargo build should have a stdout");
     for message in cargo_metadata::Message::parse_stream(BufReader::new(stream)) {
         let message = message.context("Failed to parse cargo metadata message")?;
-        debug!("cargo message: {:?}", message);
+        trace!("cargo message: {:?}", message);
         match message {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let package_in_metadata = context

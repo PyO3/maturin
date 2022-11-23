@@ -16,6 +16,13 @@ body:
     validations:
       required: true
   - type: input
+    id: maturin_version
+    attributes:
+      label: Your maturin version (`maturin --version`)
+      placeholder: ex. 0.14.1
+    validations:
+      required: true
+  - type: input
     id: py_version
     attributes:
       label: Your Python version (`python -V`)
@@ -37,6 +44,7 @@ body:
         - "pyo3"
         - "rust-cpython"
         - "cffi"
+        - "uniffi"
         - "bin"
     validations:
       required: false

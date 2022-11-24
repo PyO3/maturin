@@ -142,9 +142,6 @@ jobs:
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin
-      - name: Install musl tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y musl-tools
       - name: Setup Xcode env
         if: matrix.os == 'macos-latest'
         shell: bash

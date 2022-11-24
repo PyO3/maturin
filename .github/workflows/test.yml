@@ -21,6 +21,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  NEXTEST_EXPERIMENTAL_DOUBLE_SPAWN: '1'
+
 jobs:
   generate-matrix:
     name: Generate Matrix

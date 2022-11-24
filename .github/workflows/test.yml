@@ -21,6 +21,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  NEXTEST_EXPERIMENTAL_DOUBLE_SPAWN: '1'
+
 jobs:
   generate-matrix:
     name: Generate Matrix
@@ -139,9 +142,6 @@ jobs:
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin
-      - name: Install musl tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y musl-tools
       - name: Setup Xcode env
         if: matrix.os == 'macos-latest'
         shell: bash

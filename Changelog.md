@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2022-11-24
+
 * Tighten src-layout detection logic in [#1281](https://github.com/PyO3/maturin/pull/1282)
 * Fix generating pep517 sdist for src-layout in [#1288](https://github.com/PyO3/maturin/pull/1288)
-* Deprecate `python-source` option in Cargo.toml in [#1291](https://github.com/PyO3/maturin/pull/1291)
+* Deprecate `python-source` option in `Cargo.toml` in favor of the one in `pyproject.toml` in [#1291](https://github.com/PyO3/maturin/pull/1291)
 * Fix auditwheel with read-only libraries in [#1292](https://github.com/PyO3/maturin/pull/1292)
 
 ## [0.14.1] - 2022-11-20
@@ -753,7 +755,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.2...HEAD
+[0.14.2]: https://github.com/pyo3/maturin/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/pyo3/maturin/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pyo3/maturin/compare/v0.13.7...v0.14.0
 [0.13.7]: https://github.com/pyo3/maturin/compare/v0.13.6...v0.13.7

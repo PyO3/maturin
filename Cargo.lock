@@ -166,7 +166,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.5.4",
  "object",
  "rustc-demangle",
 ]
@@ -327,9 +327,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.12.2"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fff9dcba0018e9156cfb5802be23e5e1e4edf228e7b09034dcf0f4fb4b9a2d2a"
+checksum = "84ea5370ab5eae7b28393674773c0ff5aed52aae2f7ca35649a1dd45f3e04e2d"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -466,7 +466,6 @@ dependencies = [
  "once_cell",
  "strsim",
  "termcolor",
- "terminal_size 0.2.2",
  "textwrap",
 ]
 
@@ -1001,12 +1000,12 @@ dependencies = [
 
 [[package]]
 name = "flate2"
-version = "1.0.24"
+version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f82b0f4c27ad9f8bfd1f3208d882da2b09c301bc1c828fd3a00d0216d2fbbff6"
+checksum = "a8a2db397cb1c8772f31494cb8917e48cd1e64f0fa7efac59fbd741a0a8ce841"
 dependencies = [
  "crc32fast",
- "miniz_oxide",
+ "miniz_oxide 0.6.2",
 ]
 
 [[package]]
@@ -1597,6 +1596,15 @@ name = "miniz_oxide"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96590ba8f175222643a85693f33d26e9c8a015f599c216509b1a6894af675d34"
+dependencies = [
+ "adler",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b275950c28b37e794e8c55d88aeb5e139d0ce23fdbbeda68f8d7174abdf9e8fa"
 dependencies = [
  "adler",
 ]
@@ -2710,7 +2718,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 dependencies = [
  "smawk",
- "terminal_size 0.2.2",
  "unicode-linebreak",
  "unicode-width",
 ]
@@ -3367,15 +3374,15 @@ dependencies = [
 
 [[package]]
 name = "xwin"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19d800084cf7137e4a3e80587ff027d53943e05586a50a3655c2622e6700ba3f"
+checksum = "025e692f4ac32316c2a7e13d04a2e42108f110d087d022f4a971c882514ea88b"
 dependencies = [
  "anyhow",
  "bytes",
  "cab",
  "camino",
- "clap 3.2.23",
+ "clap 4.0.26",
  "cli-table",
  "flate2",
  "indicatif",

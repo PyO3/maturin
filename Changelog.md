@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Bump MSRV to 1.62.0 in [#1297](https://github.com/PyO3/maturin/pull/1297)
+
 ## [0.14.2] - 2022-11-24
 
 * Tighten src-layout detection logic in [#1281](https://github.com/PyO3/maturin/pull/1282)

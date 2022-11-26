@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Bump MSRV to 1.62.0 in [#1297](https://github.com/PyO3/maturin/pull/1297)
+* Fix build error when required features of bin target isn't enabled in [#1299](https://github.com/PyO3/maturin/pull/1299)
 
 ## [0.14.2] - 2022-11-24
 

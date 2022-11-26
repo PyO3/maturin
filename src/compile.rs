@@ -38,11 +38,30 @@ pub fn compile(
     bindings_crate: &BridgeModel,
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let root_pkg = context.cargo_metadata.root_package().unwrap();
+    let resolved_features = context
+        .cargo_metadata
+        .resolve
+        .as_ref()
+        .and_then(|resolve| resolve.nodes.iter().find(|node| node.id == root_pkg.id))
+        .map(|node| node.features.clone())
+        .unwrap_or_default();
     let mut targets: Vec<_> = root_pkg
         .targets
         .iter()
         .filter(|target| match bindings_crate {
-            BridgeModel::Bin(_) => target.kind.contains(&"bin".to_string()),
+            BridgeModel::Bin(_) => {
+                let is_bin = target.kind.contains(&"bin".to_string());
+                if target.required_features.is_empty() {
+                    is_bin
+                } else {
+                    // Check all required features are enabled for this bin target
+                    is_bin
+                        && target
+                            .required_features
+                            .iter()
+                            .all(|f| resolved_features.contains(f))
+                }
+            }
             _ => target.kind.contains(&"cdylib".to_string()),
         })
         .collect();

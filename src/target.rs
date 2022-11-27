@@ -11,6 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str;
 use target_lexicon::{Architecture, Environment, Triple};
+use tracing::error;
 
 pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
 
@@ -297,13 +298,7 @@ impl Target {
             }
             // Linux
             (Os::Linux, _) => {
-                let arch = if self.cross_compiling {
-                    self.arch.to_string()
-                } else {
-                    PlatformInfo::new()
-                        .map(|info| info.machine().into_owned())
-                        .unwrap_or_else(|_| self.arch.to_string())
-                };
+                let arch = self.get_platform_arch()?;
                 let mut platform_tags = platform_tags.to_vec();
                 platform_tags.sort();
                 let mut tags = vec![];
@@ -364,6 +359,29 @@ impl Target {
             (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
         };
         Ok(tag)
+    }
+
+    fn get_platform_arch(&self) -> Result<String> {
+        if self.cross_compiling {
+            return Ok(self.arch.to_string());
+        }
+        let machine = PlatformInfo::new().map(|info| info.machine().into_owned());
+        let arch = match machine {
+            Ok(machine) => {
+                if machine == "x86_64" && self.arch != Arch::X86_64 {
+                    // When running in Docker sometimes uname returns x86_64 but the container is actually x86,
+                    // In this case we trust the architecture of rustc target
+                    self.arch.to_string()
+                } else {
+                    machine
+                }
+            }
+            Err(err) => {
+                error!("Failed to get machine architecture: {}", err);
+                self.arch.to_string()
+            }
+        };
+        Ok(arch)
     }
 
     fn get_platform_release(&self) -> Result<String> {

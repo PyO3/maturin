@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Bump MSRV to 1.62.0 in [#1297](https://github.com/PyO3/maturin/pull/1297)
 * Fix build error when required features of bin target isn't enabled in [#1299](https://github.com/PyO3/maturin/pull/1299)
+* Fix wrong platform tag when building in i386 docker container in [#1301](https://github.com/PyO3/maturin/pull/1301)
 
 ## [0.14.2] - 2022-11-24
 

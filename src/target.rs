@@ -368,8 +368,10 @@ impl Target {
         let machine = PlatformInfo::new().map(|info| info.machine().into_owned());
         let arch = match machine {
             Ok(machine) => {
-                if machine == "x86_64" && self.arch != Arch::X86_64 {
-                    // When running in Docker sometimes uname returns x86_64 but the container is actually x86,
+                let linux32 = (machine == "x86_64" && self.arch != Arch::X86_64)
+                    || (machine == "aarch64" && self.arch != Arch::Aarch64);
+                if linux32 {
+                    // When running in Docker sometimes uname returns 64-bit architecture while the container is actually 32-bit,
                     // In this case we trust the architecture of rustc target
                     self.arch.to_string()
                 } else {

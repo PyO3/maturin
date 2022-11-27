@@ -165,11 +165,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - name: Cache test crates cargo build
-        uses: actions/cache@v3
-        with:
-          path: test-crates/targets
-          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-${{ matrix.python-version }}-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash
         if: contains(matrix.python-version, 'pypy')
@@ -294,11 +289,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - name: Cache test crates cargo build
-        uses: actions/cache@v3
-        with:
-          path: test-crates/targets
-          key: test-crates-${{ runner.os }}-alpine-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: cargo test
@@ -328,11 +318,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - name: Cache test crates cargo build
-        uses: actions/cache@v3
-        with:
-          path: test-crates/targets
-          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-auditwheel-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: Compliant Build
         run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
@@ -361,16 +346,8 @@ jobs:
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Cache test crates cargo build
-        uses: actions/cache@v3
-        with:
-          path: test-crates/*/target
-          # Dockerfile contains the rustc version
-          key: test-crates-docker-${{ hashFiles('Dockerfile', 'test-crates/*/Cargo.lock') }}
       - name: Test the Docker container
         run: ./test-dockerfile.sh
-      # Fix permissions from docker for caching
-      - run: sudo chown $(id -u):$(id -g) -R test-crates/*/target
 
   test-cross-compile:
     name: Test Cross Compile
@@ -505,11 +482,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - name: Cache test crates cargo build
-        uses: actions/cache@v3
-        with:
-          path: test-crates/targets
-          key: test-crates-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}-pyston-${{ hashFiles('test-crates/*/Cargo.lock') }}
       - name: cargo test
         env:
           MATURIN_TEST_PYTHON: pyston

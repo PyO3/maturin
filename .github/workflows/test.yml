@@ -278,16 +278,11 @@ jobs:
     name: Test Alpine Linux
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        container:
-          - amd64/alpine:latest
-          - i386/alpine:latest
     env:
       RUST_BACKTRACE: '1'
       CARGO_INCREMENTAL: '0'
       CARGO_TERM_COLOR: always
-    container: ${{ matrix.container }}
+    container: alpine:latest
     steps:
       - uses: actions/checkout@v3
       - name: Install build requirements

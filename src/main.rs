@@ -5,8 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use cargo_zigbuild::Zig;
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::Generator;
+use clap::{CommandFactory, Parser, Subcommand};
 use maturin::{
     develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions, CargoOptions,
     GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
@@ -16,7 +15,6 @@ use maturin::{upload_ui, PublishOpt};
 use std::env;
 use std::io;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -152,7 +150,7 @@ enum Opt {
     #[command(name = "completions", hide = true)]
     Completions {
         #[arg(value_name = "SHELL")]
-        shell: Shell,
+        shell: clap_complete_command::Shell,
     },
     /// Zig linker wrapper
     #[command(subcommand, hide = true)]
@@ -201,33 +199,6 @@ enum Pep517Command {
         /// The path to the Cargo.toml
         manifest_path: Option<PathBuf>,
     },
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-#[allow(clippy::enum_variant_names)]
-enum Shell {
-    Bash,
-    Elvish,
-    Fish,
-    PowerShell,
-    Zsh,
-    Fig,
-}
-
-impl FromStr for Shell {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "bash" => Ok(Shell::Bash),
-            "elvish" => Ok(Shell::Elvish),
-            "fish" => Ok(Shell::Fish),
-            "powershell" => Ok(Shell::PowerShell),
-            "zsh" => Ok(Shell::Zsh),
-            "fig" => Ok(Shell::Fig),
-            _ => Err("[valid values: bash, elvish, fish, powershell, zsh, fig]".to_string()),
-        }
-    }
 }
 
 /// Dispatches into the native implementations of the PEP 517 functions
@@ -429,30 +400,7 @@ fn run() -> Result<()> {
             upload_ui(&files, &publish)?
         }
         Opt::Completions { shell } => {
-            let mut cmd = Opt::command();
-            match shell {
-                Shell::Fig => {
-                    cmd.set_bin_name(env!("CARGO_BIN_NAME"));
-                    let fig = clap_complete_fig::Fig;
-                    fig.generate(&cmd, &mut io::stdout());
-                }
-                _ => {
-                    let shell = match shell {
-                        Shell::Bash => clap_complete::Shell::Bash,
-                        Shell::Elvish => clap_complete::Shell::Elvish,
-                        Shell::Fish => clap_complete::Shell::Fish,
-                        Shell::PowerShell => clap_complete::Shell::PowerShell,
-                        Shell::Zsh => clap_complete::Shell::Zsh,
-                        Shell::Fig => unreachable!(),
-                    };
-                    clap_complete::generate(
-                        shell,
-                        &mut cmd,
-                        env!("CARGO_BIN_NAME"),
-                        &mut io::stdout(),
-                    )
-                }
-            }
+            shell.generate(&mut Opt::command(), &mut io::stdout());
         }
         Opt::Zig(subcommand) => {
             subcommand

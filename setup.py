@@ -55,10 +55,10 @@ if platform.machine() in (
     "riscv64",
     "sparc64",
 ) or (sys.platform == "win32" and platform.machine() == "ARM64"):
-    cargo_args.extend(["--no-default-features", "--features=upload,log,human-panic"])
+    cargo_args.extend(["--no-default-features", "--features=upload,log"])
 elif sys.platform.startswith("haiku"):
     # mio and ring doesn't build on haiku
-    cargo_args.extend(["--no-default-features", "--features=log,human-panic"])
+    cargo_args.extend(["--no-default-features", "--features=log"])
 
 setup(
     name="maturin",

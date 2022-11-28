@@ -413,11 +413,6 @@ fn run() -> Result<()> {
 }
 
 fn main() {
-    #[cfg(feature = "human-panic")]
-    {
-        human_panic::setup_panic!();
-    }
-
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");
         for cause in e.chain().collect::<Vec<_>>().iter() {

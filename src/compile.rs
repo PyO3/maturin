@@ -1,6 +1,8 @@
 use crate::build_context::BridgeModel;
 use crate::target::RUST_1_64_0;
-use crate::{BuildContext, PlatformTag, PythonInterpreter, Target};
+#[cfg(feature = "zig")]
+use crate::PlatformTag;
+use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
@@ -305,34 +307,55 @@ fn compile_target(
 
     let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
-        let mut build = cargo_xwin::Rustc::from(cargo_rustc);
+        #[cfg(feature = "xwin")]
+        {
+            let mut build = cargo_xwin::Rustc::from(cargo_rustc);
 
-        build.target = vec![target_triple.to_string()];
-        build.build_command()?
-    } else {
-        let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
-        if !context.zig {
-            build.disable_zig_linker = true;
+            build.target = vec![target_triple.to_string()];
+            build.build_command()?
+        }
+        #[cfg(not(feature = "xwin"))]
+        {
             if target.user_specified {
-                build.target = vec![target_triple.to_string()];
+                cargo_rustc.target = vec![target_triple.to_string()];
             }
-        } else {
-            build.enable_zig_ar = true;
-            let zig_triple = if target.is_linux() && !target.is_musl_target() {
-                match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
-                    Some(PlatformTag::Manylinux { x, y }) => {
-                        format!("{}.{}.{}", target_triple, x, y)
-                    }
-                    _ => target_triple.to_string(),
+            cargo_rustc.command()
+        }
+    } else {
+        #[cfg(feature = "zig")]
+        {
+            let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
+            if !context.zig {
+                build.disable_zig_linker = true;
+                if target.user_specified {
+                    build.target = vec![target_triple.to_string()];
                 }
             } else {
-                target_triple.to_string()
-            };
-            build.target = vec![zig_triple];
+                build.enable_zig_ar = true;
+                let zig_triple = if target.is_linux() && !target.is_musl_target() {
+                    match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
+                        Some(PlatformTag::Manylinux { x, y }) => {
+                            format!("{}.{}.{}", target_triple, x, y)
+                        }
+                        _ => target_triple.to_string(),
+                    }
+                } else {
+                    target_triple.to_string()
+                };
+                build.target = vec![zig_triple];
+            }
+            build.build_command()?
         }
-        build.build_command()?
+        #[cfg(not(feature = "zig"))]
+        {
+            if target.user_specified {
+                cargo_rustc.target = vec![target_triple.to_string()];
+            }
+            cargo_rustc.command()
+        }
     };
 
+    #[cfg(feature = "zig")]
     if context.zig {
         // Pass zig command to downstream, eg. python3-dll-a
         if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {

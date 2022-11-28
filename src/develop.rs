@@ -57,6 +57,7 @@ pub fn develop(
         bindings,
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
+        #[cfg(feature = "zig")]
         zig: false,
         universal2: false,
         cargo: CargoOptions {

@@ -31,7 +31,6 @@ cbindgen = { version = "0.24.2", default-features = false }
 uniffi_bindgen = "0.21.0"
 flate2 = "1.0.18"
 goblin = "0.6.0"
-keyring = { version = "1.1.1", optional = true }
 platform-info = "1.0.0"
 regex = "1.7.0"
 serde = { version = "1.0.141", features = ["derive"] }
@@ -54,18 +53,24 @@ python-pkginfo = "0.5.5"
 textwrap = "0.16.0"
 ignore = "0.4.18"
 itertools = "0.10.5"
-dialoguer = { version = "0.10.2", default-features = false }
-console = "0.15.2"
-minijinja = "0.26.0"
 lddtree = "0.3.2"
 cc = "1.0.72"
-clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
-clap_complete_command = "0.4.0"
-tracing = "0.1.36"
-tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional = true }
 dunce = "1.0.2"
 normpath = "0.3.2"
 pep440 = "0.2.0"
+
+# cli
+clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
+clap_complete_command = "0.4.0"
+
+# log
+tracing = "0.1.36"
+tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional = true }
+
+# project scaffolding, maturin new/init
+dialoguer = { version = "0.10.2", default-features = false }
+console = "0.15.2"
+minijinja = "0.26.0"
 
 # upload
 bytesize = { version = "1.0.1", optional = true }
@@ -74,6 +79,7 @@ multipart = { version = "0.18.0", features = ["client"], default-features = fals
 rpassword = { version = "7.0.0", optional = true }
 ureq = { version = "2.3.1", features = ["gzip", "socks-proxy"], default-features = false, optional = true }
 native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
+keyring = { version = "1.1.1", optional = true }
 
 [dev-dependencies]
 indoc = "1.0.3"

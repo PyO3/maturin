@@ -31,7 +31,6 @@ cbindgen = { version = "0.24.2", default-features = false }
 uniffi_bindgen = "0.21.0"
 flate2 = "1.0.18"
 goblin = "0.6.0"
-human-panic = { version = "1.0.3", optional = true }
 keyring = { version = "1.1.1", optional = true }
 platform-info = "1.0.0"
 regex = "1.7.0"
@@ -83,7 +82,7 @@ rustversion = "1.0.9"
 trycmd = "0.14.0"
 
 [features]
-default = ["log", "upload", "rustls", "human-panic"]
+default = ["log", "upload", "rustls"]
 upload = ["ureq", "multipart", "rpassword", "configparser", "bytesize"]
 password-storage = ["upload", "keyring"]
 log = ["tracing-subscriber"]
@@ -91,6 +90,8 @@ rustls = ["ureq/tls", "cargo-xwin/rustls-tls"]
 native-tls = ["ureq/native-tls", "native-tls-crate", "cargo-xwin/native-tls"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
+# Deprecated features, keep it now for compatibility
+human-panic = []
 
 # Without this, compressing the .gz archive becomes notably slow for debug builds
 [profile.dev.package.miniz_oxide]

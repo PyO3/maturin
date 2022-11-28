@@ -85,7 +85,7 @@ jobs:
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features log,upload,human-panic
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features log,upload
 
       - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
@@ -221,7 +221,7 @@ jobs:
             --target ${{ matrix.platform.target }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --no-default-features \
-            --features log,upload,human-panic,password-storage
+            --features log,upload,password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts

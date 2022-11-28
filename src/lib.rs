@@ -5,7 +5,7 @@
 //!
 //! # Cargo features
 //!
-//! Default features: log, upload, rustls, human-panic
+//! Default features: log, upload, rustls
 //!
 //! - log: Configures pretty-env-logger, even though maturin doesn't use logging itself.
 //!
@@ -15,8 +15,6 @@
 //! docker container and which maturin itself manylinux compliant.
 //!
 //! - native-tls: Makes ureq use the platform native tls stack
-//!
-//! - human-panic: Adds https://github.com/rust-clique/human-panic
 //!
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except

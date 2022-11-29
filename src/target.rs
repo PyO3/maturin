@@ -26,6 +26,7 @@ pub enum Os {
     NetBsd,
     OpenBsd,
     Dragonfly,
+    Solaris,
     Illumos,
     Haiku,
     Emscripten,
@@ -42,6 +43,7 @@ impl fmt::Display for Os {
             Os::NetBsd => write!(f, "NetBSD"),
             Os::OpenBsd => write!(f, "OpenBSD"),
             Os::Dragonfly => write!(f, "DragonFly"),
+            Os::Solaris => write!(f, "Solaris"),
             Os::Illumos => write!(f, "Illumos"),
             Os::Haiku => write!(f, "Haiku"),
             Os::Emscripten => write!(f, "Emscripten"),
@@ -127,6 +129,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
         Os::Haiku => vec![Arch::X86_64],
+        Os::Solaris => vec![Arch::X86_64, Arch::Sparc64],
         Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
     }
 }
@@ -177,6 +180,7 @@ impl Target {
             OperatingSystem::Freebsd => Os::FreeBsd,
             OperatingSystem::Openbsd => Os::OpenBsd,
             OperatingSystem::Dragonfly => Os::Dragonfly,
+            OperatingSystem::Solaris => Os::Solaris,
             OperatingSystem::Illumos => Os::Illumos,
             OperatingSystem::Haiku => Os::Haiku,
             OperatingSystem::Emscripten => Os::Emscripten,
@@ -272,7 +276,9 @@ impl Target {
                     "x86_64"
                 )
             }
-            // Illumos
+            // Solaris and Illumos
+            (Os::Solaris, Arch::X86_64) |
+            (Os::Solaris, Arch::Sparc64) |
             (Os::Illumos, Arch::X86_64) => {
                 let info = PlatformInfo::new()?;
                 let mut release = info.release().replace(['.', '-'], "_");
@@ -280,13 +286,15 @@ impl Target {
 
                 let mut os = self.os.to_string().to_ascii_lowercase();
                 // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
-                if let Some((major, other)) = release.split_once('_') {
-                    let major_ver: u64 = major.parse().context("illumos major version is not a number")?;
-                    if major_ver >= 5 {
-                        // SunOS 5 == Solaris 2
-                        os = "solaris".to_string();
-                        release = format!("{}_{}", major_ver - 3, other);
-                        arch = format!("{}_64bit", arch);
+                if os.starts_with("sunos") {
+                    if let Some((major, other)) = release.split_once('_') {
+                        let major_ver: u64 = major.parse().context("illumos major version is not a number")?;
+                        if major_ver >= 5 {
+                            // SunOS 5 == Solaris 2
+                            os = "solaris".to_string();
+                            release = format!("{}_{}", major_ver - 3, other);
+                            arch = format!("{}_64bit", arch);
+                        }
                     }
                 }
                 format!(
@@ -431,6 +439,7 @@ impl Target {
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
             Os::Dragonfly => "dragonfly",
+            Os::Solaris => "sunos",
             Os::Illumos => "sunos",
             Os::Haiku => "haiku",
             Os::Emscripten => "emscripten",
@@ -504,6 +513,7 @@ impl Target {
             | Os::NetBsd
             | Os::OpenBsd
             | Os::Dragonfly
+            | Os::Solaris
             | Os::Illumos
             | Os::Haiku
             | Os::Emscripten

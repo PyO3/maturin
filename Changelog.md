@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix build error when required features of bin target isn't enabled in [#1299](https://github.com/PyO3/maturin/pull/1299)
 * Fix wrong platform tag when building in i386 docker container on x86_64 host in [#1301](https://github.com/PyO3/maturin/pull/1301)
 * Fix wrong platform tag when building in armv7 docker container on aarch64 host in [#1303](https://github.com/PyO3/maturin/pull/1303)
+* Add Solaris operating system support in [#1310](https://github.com/PyO3/maturin/pull/1310)
+* Add armv6 and armv7 target support for FreeBSD in [#1312](https://github.com/PyO3/maturin/pull/1312)
 
 ## [0.14.2] - 2022-11-24
 

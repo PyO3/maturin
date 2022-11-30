@@ -126,6 +126,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Powerpc64Le,
             Arch::X86,
             Arch::X86_64,
+            Arch::Riscv64,
         ],
         Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Dragonfly => vec![Arch::X86_64],
@@ -242,6 +243,7 @@ impl Target {
             | (Os::FreeBsd, Arch::Armv7L)
             | (Os::FreeBsd, Arch::Powerpc64)
             | (Os::FreeBsd, Arch::Powerpc64Le)
+            | (Os::FreeBsd, Arch::Riscv64)
             // NetBSD
             | (Os::NetBsd, Arch::X86)
             | (Os::NetBsd, Arch::X86_64)
@@ -258,6 +260,7 @@ impl Target {
                     Arch::Armv6L | Arch::Armv7L => "arm",
                     Arch::Powerpc64 => "powerpc64",
                     Arch::Powerpc64Le => "powerpc64le",
+                    Arch::Riscv64 => "riscv",
                     _ => panic!(
                         "unsupported architecture should not have reached get_platform_tag()"
                     ),

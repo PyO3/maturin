@@ -120,6 +120,8 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::NetBsd => vec![Arch::Aarch64, Arch::X86, Arch::X86_64],
         Os::FreeBsd => vec![
             Arch::Aarch64,
+            Arch::Armv6L,
+            Arch::Armv7L,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
             Arch::X86,
@@ -236,6 +238,8 @@ impl Target {
             (Os::FreeBsd, Arch::X86)
             | (Os::FreeBsd, Arch::X86_64)
             | (Os::FreeBsd, Arch::Aarch64)
+            | (Os::FreeBsd, Arch::Armv6L)
+            | (Os::FreeBsd, Arch::Armv7L)
             | (Os::FreeBsd, Arch::Powerpc64)
             | (Os::FreeBsd, Arch::Powerpc64Le)
             // NetBSD
@@ -251,6 +255,7 @@ impl Target {
                     Arch::X86_64 => "amd64",
                     Arch::X86 => "i386",
                     Arch::Aarch64 => "arm64",
+                    Arch::Armv6L | Arch::Armv7L => "arm",
                     Arch::Powerpc64 => "powerpc64",
                     Arch::Powerpc64Le => "powerpc64le",
                     _ => panic!(

@@ -241,6 +241,7 @@ impl Target {
             | (Os::FreeBsd, Arch::Aarch64)
             | (Os::FreeBsd, Arch::Armv6L)
             | (Os::FreeBsd, Arch::Armv7L)
+            | (Os::FreeBsd, Arch::Powerpc)
             | (Os::FreeBsd, Arch::Powerpc64)
             | (Os::FreeBsd, Arch::Powerpc64Le)
             | (Os::FreeBsd, Arch::Riscv64)
@@ -258,8 +259,7 @@ impl Target {
                     Arch::X86 => "i386",
                     Arch::Aarch64 => "arm64",
                     Arch::Armv6L | Arch::Armv7L => "arm",
-                    Arch::Powerpc64 => "powerpc64",
-                    Arch::Powerpc64Le => "powerpc64le",
+                    Arch::Powerpc | Arch::Powerpc64 | Arch::Powerpc64Le => "powerpc",
                     Arch::Riscv64 => "riscv",
                     _ => panic!(
                         "unsupported architecture should not have reached get_platform_tag()"

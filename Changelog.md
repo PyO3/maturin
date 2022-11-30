@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix wrong platform tag when building in armv7 docker container on aarch64 host in [#1303](https://github.com/PyO3/maturin/pull/1303)
 * Add Solaris operating system support in [#1310](https://github.com/PyO3/maturin/pull/1310)
 * Add armv6 and armv7 target support for FreeBSD in [#1312](https://github.com/PyO3/maturin/pull/1312)
-* Add riscv64 target support for FreeBSD in [#1313](https://github.com/PyO3/maturin/pull/1313)
+* Add riscv64 and powerpc target support for FreeBSD in [#1313](https://github.com/PyO3/maturin/pull/1313)
+* Fix powerpc64 and powerpc64le Python wheel platform tag for FreeBSD in [#1313](https://github.com/PyO3/maturin/pull/1313)
 
 ## [0.14.2] - 2022-11-24
 

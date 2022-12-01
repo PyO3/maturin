@@ -118,6 +118,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: '1'
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
@@ -154,17 +155,13 @@ jobs:
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
 
       # Caching
-      # Install gnu-tar because BSD tar is buggy
-      # https://github.com/actions/cache/issues/403
-      - name: Install GNU tar (Macos)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install gnu-tar
-          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: maturin-build
+      - run: pip install sccache
+      - uses: crazy-max/ghaction-github-runtime@v2
+      - run: sccache --start-server
+        env:
+          SCCACHE_GHA_CACHE_TO: sccache-latest
+          SCCACHE_GHA_CACHE_FROM: sccache-
+
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash
         if: contains(matrix.python-version, 'pypy')
@@ -234,6 +231,7 @@ jobs:
           cargo run build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
           cargo run new --mixed -b pyo3 test-crates/pyo3-new-mixed
           cargo run build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
+      - run: sccache --show-stats
 
   test-emscripten:
     name: Test Emscripten

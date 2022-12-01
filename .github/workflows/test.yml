@@ -171,6 +171,9 @@ jobs:
         run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
       - name: cargo test
         run: cargo nextest run --features password-storage
+      - name: free up disk space
+        shell: bash
+        run: rm -rf test-crates/venvs test-crates/targets
       - name: test cross compiling with zig
         shell: bash
         run: |

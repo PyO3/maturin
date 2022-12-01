@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] - 2022-12-01
+
 * Bump MSRV to 1.62.0 in [#1297](https://github.com/PyO3/maturin/pull/1297)
 * Fix build error when required features of bin target isn't enabled in [#1299](https://github.com/PyO3/maturin/pull/1299)
 * Fix wrong platform tag when building in i386 docker container on x86_64 host in [#1301](https://github.com/PyO3/maturin/pull/1301)
@@ -764,7 +766,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.3...HEAD
+[0.14.3]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.3
 [0.14.2]: https://github.com/pyo3/maturin/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/pyo3/maturin/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pyo3/maturin/compare/v0.13.7...v0.14.0

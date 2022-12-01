@@ -4,5 +4,9 @@ slow-timeout = { period = "60s", terminate-after = 10 }
 
 [[profile.default.overrides]]
 # See https://nexte.st/book/threads-required.html
-filter = 'test(/_uniffi_/)'
-threads-required = "num-cpus"
+filter = 'test(/develop_/)'
+threads-required = 2
+
+[[profile.default.overrides]]
+filter = 'test(/integration_/)'
+threads-required = 2

@@ -279,11 +279,11 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6755badfe5e0224c6e2ae710d82cd7dce5866e8ebcb22e5f3eced8f25fbd1ace"
+checksum = "860cd643171bc868500aff16c2405559b42fc71bd3130d761c2847b3e9e71cdc"
 dependencies = [
- "clap 4.0.28",
+ "clap 4.0.29",
 ]
 
 [[package]]
@@ -297,13 +297,13 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.13.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84ea5370ab5eae7b28393674773c0ff5aed52aae2f7ca35649a1dd45f3e04e2d"
+checksum = "e1396a7cea49da420388d759e81653a7b46cd9a207c82129c3453d8ccba8121e"
 dependencies = [
  "anyhow",
  "cargo-options",
- "clap 4.0.28",
+ "clap 4.0.29",
  "dirs",
  "fs-err",
  "indicatif",
@@ -314,14 +314,14 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.14.1"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10e51487576b4ad8ef787545325fa5841a685365bd12c0b3812e004b76ebb379"
+checksum = "364c8bae773d8879ae9ea3bf63e7c052b3e47c095e871f03027e176489df5477"
 dependencies = [
  "anyhow",
  "cargo-options",
  "cargo_metadata",
- "clap 4.0.28",
+ "clap 4.0.29",
  "dirs",
  "fs-err",
  "path-slash",
@@ -441,9 +441,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.28"
+version = "4.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f94eecf2f2d0e0220737d9e6d8530da1e903b97dde58ebaf749262e85ce133c9"
+checksum = "4d63b9e9c07271b9957ad22c173bae2a4d9a81127680962039296abcd2f8251d"
 dependencies = [
  "bitflags",
  "clap_derive 4.0.21",
@@ -461,7 +461,7 @@ version = "4.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7b3c9eae0de7bf8e3f904a5e40612b21fb2e2e566456d177809a48b892d24da"
 dependencies = [
- "clap 4.0.28",
+ "clap 4.0.29",
 ]
 
 [[package]]
@@ -470,7 +470,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4160b4a4f72ef58bd766bad27c09e6ef1cc9d82a22f6a0f55d152985a4a48e31"
 dependencies = [
- "clap 4.0.28",
+ "clap 4.0.29",
  "clap_complete",
  "clap_complete_fig",
 ]
@@ -481,7 +481,7 @@ version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46b30e010e669cd021e5004f3be26cff6b7c08d2a8a0d65b48d43a8cc0efd6c3"
 dependencies = [
- "clap 4.0.28",
+ "clap 4.0.29",
  "clap_complete",
 ]
 
@@ -1470,7 +1470,7 @@ dependencies = [
  "cargo_metadata",
  "cbindgen",
  "cc",
- "clap 4.0.28",
+ "clap 4.0.29",
  "clap_complete_command",
  "configparser",
  "console",
@@ -1892,9 +1892,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dc9e0dc2adc1c69d09143aff38d3d30c5c3f0df0dad82e6d25547af174ebec0"
+checksum = "7ff9f3fef3968a3ec5945535ed654cb38ff72d7495a25619e2247fb15a2ed9ba"
 dependencies = [
  "cfg-if",
  "libc",
@@ -1967,9 +1967,9 @@ dependencies = [
 
 [[package]]
 name = "polling"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7d73f1eaed1ca1fb37b54dcc9b38e3b17d6c7b8ecb7abfffcac8d0351f17d4"
+checksum = "166ca89eb77fd403230b9c156612965a81e094ec6ec3aa13663d4c8b113fa748"
 dependencies = [
  "autocfg",
  "cfg-if",
@@ -3041,6 +3041,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
+name = "versions"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee97e1d97bd593fb513912a07691b742361b3dd64ad56f2c694ea2dbfe0665d3"
+dependencies = [
+ "itertools",
+ "nom",
+]
+
+[[package]]
 name = "wait-timeout"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3326,15 +3336,15 @@ dependencies = [
 
 [[package]]
 name = "xwin"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "025e692f4ac32316c2a7e13d04a2e42108f110d087d022f4a971c882514ea88b"
+checksum = "5c53c43cb1b0385c4e1482f160cd72e4e43b8a9f436a42e3f539480c52056492"
 dependencies = [
  "anyhow",
  "bytes",
  "cab",
  "camino",
- "clap 4.0.28",
+ "clap 4.0.29",
  "cli-table",
  "flate2",
  "indicatif",
@@ -3351,6 +3361,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "ureq",
+ "versions",
  "zip",
 ]
 

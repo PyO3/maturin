@@ -21,9 +21,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-env:
-  NEXTEST_EXPERIMENTAL_DOUBLE_SPAWN: '1'
-
 jobs:
   generate-matrix:
     name: Generate Matrix
@@ -138,8 +135,6 @@ jobs:
         id: rustup
         with:
           targets: wasm32-wasi  # Additional target
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin
@@ -177,7 +172,7 @@ jobs:
         if: contains(matrix.python-version, 'pypy')
         run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
       - name: cargo test
-        run: cargo nextest run --features password-storage
+        run: cargo test --features password-storage
       - name: free up disk space
         shell: bash
         run: rm -rf test-crates/venvs test-crates/targets
@@ -300,12 +295,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests
-          env -u GITHUB_ACTIONS cargo nextest run --features password-storage
+          env -u GITHUB_ACTIONS cargo test --features password-storage
 
   test-auditwheel:
     name: Test Auditwheel
@@ -484,8 +477,6 @@ jobs:
         id: rustup
         with:
           targets: wasm32-wasi
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
       - name: Install python packages
         run: pip install virtualenv cffi
       # Caching
@@ -498,7 +489,7 @@ jobs:
           MATURIN_TEST_PYTHON: pyston
         run: |
           # unset GITHUB_ACTIONS env var to disable zig and conda related tests
-          env -u GITHUB_ACTIONS cargo nextest run --features password-storage
+          env -u GITHUB_ACTIONS cargo test --features password-storage
 
   check:
     name: Check ${{ matrix.platform.target }}

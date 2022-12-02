@@ -49,6 +49,7 @@ RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && python3.8 -m pip install --no-cache-dir cffi \
     && python3.9 -m pip install --no-cache-dir cffi \
     && python3.10 -m pip install --no-cache-dir cffi \
+    && python3.11 -m pip install --no-cache-dir cffi \
     && mkdir /io
 
 COPY --from=builder /usr/bin/maturin /usr/bin/maturin

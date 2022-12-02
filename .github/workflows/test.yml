@@ -164,8 +164,8 @@ jobs:
       - uses: crazy-max/ghaction-github-runtime@v2
       - run: sccache --start-server
         env:
-          SCCACHE_GHA_CACHE_TO: sccache-latest
-          SCCACHE_GHA_CACHE_FROM: sccache-
+          SCCACHE_GHA_CACHE_TO: sccache-${{ runner.os }}-${{ steps.rustup.outputs.cachekey }}
+          SCCACHE_GHA_CACHE_FROM: sccache-${{ runner.os }}
 
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash

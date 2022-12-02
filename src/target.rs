@@ -97,6 +97,29 @@ impl fmt::Display for Arch {
     }
 }
 
+impl Arch {
+    /// Represents the hardware platform.
+    ///
+    /// This is the same as the native platform's `uname -m` output.
+    pub fn machine(&self) -> &'static str {
+        // See https://www.freebsd.org/cgi/man.cgi?query=arch&sektion=7&format=html
+        // MACHINE_ARCH	vs MACHINE_CPUARCH vs MACHINE section
+        match self {
+            Arch::Aarch64 => "arm64",
+            Arch::Armv6L | Arch::Armv7L => "arm",
+            Arch::Powerpc | Arch::Powerpc64Le | Arch::Powerpc64 => "powerpc",
+            Arch::X86 => "i386",
+            Arch::X86_64 => "amd64",
+            Arch::Riscv64 => "riscv",
+            Arch::Mips64el | Arch::Mipsel => "mips",
+            // sparc64 is unsupported since FreeBSD 13.0
+            Arch::Sparc64 => "sparc64",
+            Arch::Wasm32 => "wasm32",
+            Arch::S390X => "s390x",
+        }
+    }
+}
+
 // Returns the set of supported architectures for each operating system
 fn get_supported_architectures(os: &Os) -> Vec<Arch> {
     match os {
@@ -117,18 +140,31 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
-        Os::NetBsd => vec![Arch::Aarch64, Arch::X86, Arch::X86_64],
-        Os::FreeBsd => vec![
+        Os::FreeBsd | Os::NetBsd => vec![
             Arch::Aarch64,
             Arch::Armv6L,
             Arch::Armv7L,
+            Arch::Powerpc,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
             Arch::X86,
             Arch::X86_64,
             Arch::Riscv64,
+            Arch::Mips64el,
+            Arch::Mipsel,
+            Arch::Sparc64,
         ],
-        Os::OpenBsd => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
+        Os::OpenBsd => vec![
+            Arch::X86,
+            Arch::X86_64,
+            Arch::Aarch64,
+            Arch::Armv7L,
+            Arch::Powerpc,
+            Arch::Powerpc64,
+            Arch::Powerpc64Le,
+            Arch::Riscv64,
+            Arch::Sparc64,
+        ],
         Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
         Os::Haiku => vec![Arch::X86_64],
@@ -235,83 +271,10 @@ impl Target {
         universal2: bool,
     ) -> Result<String> {
         let tag = match (&self.os, &self.arch) {
-            // FreeBSD
-            (Os::FreeBsd, Arch::X86)
-            | (Os::FreeBsd, Arch::X86_64)
-            | (Os::FreeBsd, Arch::Aarch64)
-            | (Os::FreeBsd, Arch::Armv6L)
-            | (Os::FreeBsd, Arch::Armv7L)
-            | (Os::FreeBsd, Arch::Powerpc)
-            | (Os::FreeBsd, Arch::Powerpc64)
-            | (Os::FreeBsd, Arch::Powerpc64Le)
-            | (Os::FreeBsd, Arch::Riscv64)
-            // NetBSD
-            | (Os::NetBsd, Arch::X86)
-            | (Os::NetBsd, Arch::X86_64)
-            | (Os::NetBsd, Arch::Aarch64)
-            // OpenBSD
-            | (Os::OpenBsd, Arch::X86)
-            | (Os::OpenBsd, Arch::X86_64)
-            | (Os::OpenBsd, Arch::Aarch64) => {
-                let release = self.get_platform_release()?;
-                let arch = match self.arch {
-                    Arch::X86_64 => "amd64",
-                    Arch::X86 => "i386",
-                    Arch::Aarch64 => "arm64",
-                    Arch::Armv6L | Arch::Armv7L => "arm",
-                    Arch::Powerpc | Arch::Powerpc64 | Arch::Powerpc64Le => "powerpc",
-                    Arch::Riscv64 => "riscv",
-                    _ => panic!(
-                        "unsupported architecture should not have reached get_platform_tag()"
-                    ),
-                };
-                format!(
-                    "{}_{}_{}",
-                    self.os.to_string().to_ascii_lowercase(),
-                    release,
-                    arch
-                )
-            }
-            // DragonFly
-            (Os::Dragonfly, Arch::X86_64)
-            // Haiku
-            | (Os::Haiku, Arch::X86_64) => {
-                let release = self.get_platform_release()?;
-                format!(
-                    "{}_{}_{}",
-                    self.os.to_string().to_ascii_lowercase(),
-                    release.to_ascii_lowercase(),
-                    "x86_64"
-                )
-            }
-            // Solaris and Illumos
-            (Os::Solaris, Arch::X86_64) |
-            (Os::Solaris, Arch::Sparc64) |
-            (Os::Illumos, Arch::X86_64) => {
-                let info = PlatformInfo::new()?;
-                let mut release = info.release().replace(['.', '-'], "_");
-                let mut arch = info.machine().replace([' ', '/'], "_");
-
-                let mut os = self.os.to_string().to_ascii_lowercase();
-                // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
-                if os.starts_with("sunos") {
-                    if let Some((major, other)) = release.split_once('_') {
-                        let major_ver: u64 = major.parse().context("illumos major version is not a number")?;
-                        if major_ver >= 5 {
-                            // SunOS 5 == Solaris 2
-                            os = "solaris".to_string();
-                            release = format!("{}_{}", major_ver - 3, other);
-                            arch = format!("{}_64bit", arch);
-                        }
-                    }
-                }
-                format!(
-                    "{}_{}_{}",
-                    os,
-                    release,
-                    arch
-                )
-            }
+            // Windows
+            (Os::Windows, Arch::X86) => "win32".to_string(),
+            (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
+            (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
             // Linux
             (Os::Linux, _) => {
                 let arch = self.get_platform_arch()?;
@@ -327,7 +290,7 @@ impl Target {
                 tags.join(".")
             }
             // macOS
-            (Os::Macos, Arch::X86_64) => {
+            (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
                 let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
                 if universal2 {
                     format!(
@@ -337,28 +300,38 @@ impl Target {
                         arm64_major = arm64_major,
                         arm64_minor = arm64_minor
                     )
+                } else if self.arch == Arch::Aarch64 {
+                    format!("macosx_{}_{}_arm64", arm64_major, arm64_minor)
                 } else {
                     format!("macosx_{}_{}_x86_64", x86_64_major, x86_64_minor)
                 }
             }
-            (Os::Macos, Arch::Aarch64) => {
-                let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
-                if universal2 {
-                    format!(
-                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2",
-                        x86_64_major = x86_64_major,
-                        x86_64_minor = x86_64_minor,
-                        arm64_major = arm64_major,
-                        arm64_minor = arm64_minor
-                    )
-                } else {
-                    format!("macosx_{}_{}_arm64", arm64_major, arm64_minor)
-                }
+            // FreeBSD
+            (Os::FreeBsd, _)
+            // NetBSD
+            | (Os::NetBsd, _)
+            // OpenBSD
+            | (Os::OpenBsd, _) => {
+                let release = self.get_platform_release()?;
+                format!(
+                    "{}_{}_{}",
+                    self.os.to_string().to_ascii_lowercase(),
+                    release,
+                    self.arch.machine(),
+                )
             }
-            // Windows
-            (Os::Windows, Arch::X86) => "win32".to_string(),
-            (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
-            (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
+            // DragonFly
+            (Os::Dragonfly, Arch::X86_64)
+            // Haiku
+            | (Os::Haiku, Arch::X86_64) => {
+                let release = self.get_platform_release()?;
+                format!(
+                    "{}_{}_{}",
+                    self.os.to_string().to_ascii_lowercase(),
+                    release.to_ascii_lowercase(),
+                    "x86_64"
+                )
+            }
             // Emscripten
             (Os::Emscripten, Arch::Wasm32) => {
                 let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
@@ -372,7 +345,33 @@ impl Target {
             (Os::Wasi, Arch::Wasm32) => {
                 "any".to_string()
             }
-            (_, _) => panic!("unsupported target should not have reached get_platform_tag()"),
+            // osname_release_machine fallback for any POSIX system
+            (_, _) => {
+                let info = PlatformInfo::new()?;
+                let mut release = info.release().replace(['.', '-'], "_");
+                let mut machine = info.machine().replace([' ', '/'], "_");
+
+                let mut os = self.os.to_string().to_ascii_lowercase();
+                // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
+                if os.starts_with("sunos") {
+                    // Solaris / Illumos
+                    if let Some((major, other)) = release.split_once('_') {
+                        let major_ver: u64 = major.parse().context("illumos major version is not a number")?;
+                        if major_ver >= 5 {
+                            // SunOS 5 == Solaris 2
+                            os = "solaris".to_string();
+                            release = format!("{}_{}", major_ver - 3, other);
+                            machine = format!("{}_64bit", machine);
+                        }
+                    }
+                }
+                format!(
+                    "{}_{}_{}",
+                    os,
+                    release,
+                    machine
+                )
+            }
         };
         Ok(tag)
     }

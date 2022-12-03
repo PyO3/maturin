@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Expanded architecture support for FreeBSD, NetBSD and OpenBSD in [#1318](https://github.com/PyO3/maturin/pull/1318)
+* Better error message when upload failed with status code 403 in [#1323](https://github.com/PyO3/maturin/pull/1323)
+
 ## [0.14.3] - 2022-12-01
 
 * Bump MSRV to 1.62.0 in [#1297](https://github.com/PyO3/maturin/pull/1297)

@@ -13,6 +13,7 @@ use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use tracing::debug;
 
 /// An account with a registry, possibly incomplete
 #[derive(Debug, clap::Parser)]
@@ -67,7 +68,7 @@ pub enum UploadError {
     UreqError(#[source] ureq::Error),
     /// The registry returned a "403 Forbidden"
     #[error("Username or password are incorrect")]
-    AuthenticationError,
+    AuthenticationError(String),
     /// Reading the wheel failed
     #[error("IO Error")]
     IoError(#[source] io::Error),
@@ -391,6 +392,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
                     e
                 )
             });
+            debug!("Upload error response: {}", err_text);
             // Detect FileExistsError the way twine does
             // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
             if status == 403 {
@@ -398,7 +400,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
                     // Artifactory (https://jfrog.com/artifactory/)
                     Err(UploadError::FileExistsError(err_text))
                 } else {
-                    Err(UploadError::AuthenticationError)
+                    Err(UploadError::AuthenticationError(err_text))
                 }
             } else {
                 let status_string = status.to_string();
@@ -431,8 +433,18 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
 
         match upload_result {
             Ok(()) => (),
-            Err(UploadError::AuthenticationError) => {
-                println!("⛔ Username and/or password are wrong");
+            Err(UploadError::AuthenticationError(msg)) => {
+                let title_re = regex::Regex::new(r"<title>(.+?)</title>").unwrap();
+                let title = title_re
+                    .captures(&msg)
+                    .and_then(|c| c.get(1))
+                    .map(|m| m.as_str());
+                match title {
+                    Some(title) => {
+                        println!("⛔ {}", title);
+                    }
+                    None => println!("⛔ Username and/or password are wrong"),
+                }
 
                 #[cfg(feature = "keyring")]
                 {
@@ -452,7 +464,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                     }
                 }
 
-                bail!("Username and/or password are wrong");
+                bail!("Username and/or password are possibly wrong");
             }
             Err(err) => {
                 let filename = i.file_name().unwrap_or(i.as_os_str());

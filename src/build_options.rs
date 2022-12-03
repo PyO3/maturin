@@ -640,45 +640,7 @@ impl BuildOptions {
             }
         }
 
-        match bridge {
-            BridgeModel::Bin(None) => {
-                // Only support two different kind of platform tags when compiling to musl target without any binding crates
-                if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
-                    bail!(
-                        "Cannot mix musllinux and manylinux platform tags when compiling to {}",
-                        target.target_triple()
-                    );
-                }
-
-                #[allow(clippy::comparison_chain)]
-                if platform_tags.len() > 2 {
-                    bail!(
-                        "Expected only one or two platform tags but found {}",
-                        platform_tags.len()
-                    );
-                } else if platform_tags.len() == 2 {
-                    // The two platform tags can't be the same kind
-                    let tag_types = platform_tags
-                        .iter()
-                        .map(|tag| tag.is_musllinux())
-                        .collect::<HashSet<_>>();
-                    if tag_types.len() == 1 {
-                        bail!(
-                            "Expected only one platform tag but found {}",
-                            platform_tags.len()
-                        );
-                    }
-                }
-            }
-            _ => {
-                if platform_tags.len() > 1 {
-                    bail!(
-                        "Expected only one platform tag but found {}",
-                        platform_tags.len()
-                    );
-                }
-            }
-        }
+        validate_bridge_type(&bridge, &target, &platform_tags)?;
 
         // linux tag can not be mixed with manylinux and musllinux tags
         if platform_tags.len() > 1 && platform_tags.iter().any(|tag| !tag.is_portable()) {
@@ -723,6 +685,54 @@ impl BuildOptions {
             cargo_options,
         })
     }
+}
+
+/// Checks for bridge/platform type edge cases
+fn validate_bridge_type(
+    bridge: &BridgeModel,
+    target: &Target,
+    platform_tags: &[PlatformTag],
+) -> Result<()> {
+    match bridge {
+        BridgeModel::Bin(None) => {
+            // Only support two different kind of platform tags when compiling to musl target without any binding crates
+            if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
+                bail!(
+                    "Cannot mix musllinux and manylinux platform tags when compiling to {}",
+                    target.target_triple()
+                );
+            }
+
+            #[allow(clippy::comparison_chain)]
+            if platform_tags.len() > 2 {
+                bail!(
+                    "Expected only one or two platform tags but found {}",
+                    platform_tags.len()
+                );
+            } else if platform_tags.len() == 2 {
+                // The two platform tags can't be the same kind
+                let tag_types = platform_tags
+                    .iter()
+                    .map(|tag| tag.is_musllinux())
+                    .collect::<HashSet<_>>();
+                if tag_types.len() == 1 {
+                    bail!(
+                        "Expected only one platform tag but found {}",
+                        platform_tags.len()
+                    );
+                }
+            }
+        }
+        _ => {
+            if platform_tags.len() > 1 {
+                bail!(
+                    "Expected only one platform tag but found {}",
+                    platform_tags.len()
+                );
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Uses very simple PEP 440 subset parsing to determine the

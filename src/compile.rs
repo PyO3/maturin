@@ -17,7 +17,9 @@ use tracing::{debug, trace};
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
-const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
+pub(crate) const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
+
+pub(crate) type CompileTarget<'a> = (&'a cargo_metadata::Target, &'a BridgeModel);
 
 /// A cargo build artifact
 #[derive(Debug, Clone)]
@@ -32,92 +34,46 @@ pub struct BuildArtifact {
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
-pub fn compile(
-    context: &BuildContext,
+pub fn compile<'a>(
+    context: &'a BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
+    targets: &[CompileTarget<'a>],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
-    let root_pkg = context.cargo_metadata.root_package().unwrap();
-    let resolved_features = context
-        .cargo_metadata
-        .resolve
-        .as_ref()
-        .and_then(|resolve| resolve.nodes.iter().find(|node| node.id == root_pkg.id))
-        .map(|node| node.features.clone())
-        .unwrap_or_default();
-    let mut targets: Vec<_> = root_pkg
-        .targets
-        .iter()
-        .filter(|target| match bindings_crate {
-            BridgeModel::Bin(_) => {
-                let is_bin = target.kind.contains(&"bin".to_string());
-                if target.required_features.is_empty() {
-                    is_bin
-                } else {
-                    // Check all required features are enabled for this bin target
-                    is_bin
-                        && target
-                            .required_features
-                            .iter()
-                            .all(|f| resolved_features.contains(f))
-                }
-            }
-            _ => target.kind.contains(&"cdylib".to_string()),
-        })
-        .collect();
-    if targets.is_empty() && !bindings_crate.is_bin() {
-        // No `crate-type = ["cdylib"]` in `Cargo.toml`
-        // Let's try compile one of the target with `--crate-type cdylib`
-        let lib_target = root_pkg.targets.iter().find(|target| {
-            target
-                .kind
-                .iter()
-                .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
-        });
-        if let Some(target) = lib_target {
-            targets.push(target);
-        }
-    }
     if context.target.is_macos() && context.universal2 {
-        compile_universal2(context, python_interpreter, bindings_crate, &targets)
+        compile_universal2(context, python_interpreter, targets)
     } else {
-        compile_targets(context, python_interpreter, bindings_crate, &targets)
+        compile_targets(context, python_interpreter, targets)
     }
 }
 
 /// Build an universal2 wheel for macos which contains both an x86 and an aarch64 binary
-fn compile_universal2(
-    context: &BuildContext,
+fn compile_universal2<'a>(
+    context: &'a BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
-    targets: &[&cargo_metadata::Target],
+    targets: &[CompileTarget<'a>],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
-    let build_type = if bindings_crate.is_bin() {
-        "bin"
-    } else {
-        "cdylib"
-    };
-    debug!("Building an universal2 {}", build_type);
-
     let mut aarch64_context = context.clone();
     aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
 
-    let aarch64_artifacts = compile_targets(
-        &aarch64_context,
-        python_interpreter,
-        bindings_crate,
-        targets,
-    )
-    .context("Failed to build a aarch64 library through cargo")?;
+    let aarch64_artifacts = compile_targets(&aarch64_context, python_interpreter, targets)
+        .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
     x86_64_context.target = Target::from_target_triple(Some("x86_64-apple-darwin".to_string()))?;
 
-    let x86_64_artifacts =
-        compile_targets(&x86_64_context, python_interpreter, bindings_crate, targets)
-            .context("Failed to build a x86_64 library through cargo")?;
+    let x86_64_artifacts = compile_targets(&x86_64_context, python_interpreter, targets)
+        .context("Failed to build a x86_64 library through cargo")?;
 
     let mut universal_artifacts = Vec::with_capacity(targets.len());
-    for (aarch64_artifact, x86_64_artifact) in aarch64_artifacts.iter().zip(x86_64_artifacts) {
+    for (bridge_model, (aarch64_artifact, x86_64_artifact)) in targets
+        .iter()
+        .map(|(_, bridge_model)| bridge_model)
+        .zip(aarch64_artifacts.iter().zip(&x86_64_artifacts))
+    {
+        let build_type = if bridge_model.is_bin() {
+            "bin"
+        } else {
+            "cdylib"
+        };
         let aarch64_artifact = aarch64_artifact.get(build_type).cloned().ok_or_else(|| {
             if build_type == "cdylib" {
                 anyhow!(
@@ -168,14 +124,13 @@ fn compile_universal2(
     Ok(universal_artifacts)
 }
 
-fn compile_targets(
-    context: &BuildContext,
+fn compile_targets<'a>(
+    context: &'a BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
-    targets: &[&cargo_metadata::Target],
+    targets: &[CompileTarget<'a>],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
-    for target in targets {
+    for (target, bindings_crate) in targets {
         artifacts.push(compile_target(
             context,
             python_interpreter,

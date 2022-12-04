@@ -318,7 +318,7 @@ impl BuildContext {
 
     /// Add library search paths in Cargo target directory rpath when building in editable mode
     fn add_rpath(&self, artifacts: &[&BuildArtifact]) -> Result<()> {
-        if self.editable && self.target.is_linux() {
+        if self.editable && self.target.is_linux() && !artifacts.is_empty() {
             for artifact in artifacts {
                 if artifact.linked_paths.is_empty() {
                     continue;
@@ -355,6 +355,9 @@ impl BuildContext {
         if ext_libs.iter().all(|libs| libs.is_empty()) {
             return Ok(());
         }
+
+        patchelf::verify_patchelf()?;
+
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
         let mut libs_dir = self

@@ -130,11 +130,11 @@ fn compile_targets<'a>(
     targets: &[CompileTarget<'a>],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
-    for (target, bindings_crate) in targets {
+    for (target, bridge_model) in targets {
         artifacts.push(compile_target(
             context,
             python_interpreter,
-            bindings_crate,
+            bridge_model,
             target,
         )?);
     }
@@ -144,7 +144,7 @@ fn compile_targets<'a>(
 fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
+    bridge_model: &BridgeModel,
     binding_target: &cargo_metadata::Target,
 ) -> Result<HashMap<String, BuildArtifact>> {
     let target = &context.target;
@@ -174,7 +174,7 @@ fn compile_target(
     let mut rust_flags = env::var_os("RUSTFLAGS");
 
     // We need to pass --bin / --lib
-    match bindings_crate {
+    match bridge_model {
         BridgeModel::Bin(..) => {
             cargo_rustc.bin.push(binding_target.name.clone());
         }
@@ -197,12 +197,12 @@ fn compile_target(
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
-        if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bindings_crate {
+        if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bridge_model {
             // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
             // non-existent library.
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
             let module_name = &context.module_name;
-            let so_filename = match bindings_crate {
+            let so_filename = match bridge_model {
                 BridgeModel::BindingsAbi3(..) => format!("{base}.abi3.so", base = module_name),
                 _ => python_interpreter
                     .expect("missing python interpreter for non-abi3 wheel build")
@@ -313,7 +313,7 @@ fn compile_target(
         build_command.env("RUSTFLAGS", flags);
     }
 
-    if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
+    if let BridgeModel::BindingsAbi3(_, _) = bridge_model {
         let is_pypy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy())
             .unwrap_or(false);
@@ -332,9 +332,9 @@ fn compile_target(
     if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling
         if interpreter.runnable {
-            if bindings_crate.is_bindings("pyo3")
-                || bindings_crate.is_bindings("pyo3-ffi")
-                || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
+            if bridge_model.is_bindings("pyo3")
+                || bridge_model.is_bindings("pyo3-ffi")
+                || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
                     && interpreter.interpreter_kind.is_pypy())
             {
                 build_command
@@ -347,9 +347,9 @@ fn compile_target(
 
             // rust-cpython, and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
-        } else if (bindings_crate.is_bindings("pyo3")
-            || bindings_crate.is_bindings("pyo3-ffi")
-            || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
+        } else if (bridge_model.is_bindings("pyo3")
+            || bridge_model.is_bindings("pyo3-ffi")
+            || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
                 && interpreter.interpreter_kind.is_pypy()))
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {

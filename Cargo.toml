@@ -95,6 +95,7 @@ full = ["cross-compile", "log", "scaffolding", "upload"]
 log = ["tracing-subscriber"]
 
 upload = ["ureq", "multipart", "rpassword", "configparser", "bytesize"]
+# keyring doesn't support *BSD so it's not enabled in `full` by default
 password-storage = ["upload", "keyring"]
 
 rustls = ["ureq/tls", "cargo-xwin/rustls-tls"]

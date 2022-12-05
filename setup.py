@@ -1,16 +1,15 @@
-# maturin is self bootstraping, however on platforms like alpine linux that aren't
-# manylinux, pip will try installing maturin from the source distribution.
+# maturin is self bootstrapping, however on platforms like FreeBSD that aren't
+# manylinux/musllinux, pip will try installing maturin from the source distribution.
 # That source distribution obviously can't depend on maturin, so we're using
 # the always available setuptools.
 #
 # Note that this is really only a workaround for bootstrapping and not suited
 # for general purpose packaging, i.e. only building a wheel (as in
 # `python setup.py bdist_wheel`) and installing (as in
-# `pip install <source dir>` are supported. For creating a source distribution
+# `pip install <source dir>`) are supported. For creating a source distribution
 # for maturin itself use `maturin sdist`.
 
-import platform
-import sys
+import os
 
 try:
     import tomllib
@@ -24,7 +23,7 @@ from setuptools_rust import RustBin
 # https://stackoverflow.com/a/45150383/3549270
 # There's also the much more concise solution in
 # https://stackoverflow.com/a/53463910/3549270,
-# but that would requires python-dev
+# but that would require python-dev
 try:
     # noinspection PyPackageRequirements,PyUnresolvedReferences
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -44,21 +43,11 @@ with open("README.md", encoding="utf-8", errors="ignore") as fp:
 with open("Cargo.toml", "rb") as fp:
     version = tomllib.load(fp)["package"]["version"]
 
-cargo_args = []
-if platform.machine() in (
-    "mips",
-    "mips64",
-    "ppc",
-    "ppc64le",
-    "ppc64",
-    "powerpc",
-    "riscv64",
-    "sparc64",
-) or (sys.platform == "win32" and platform.machine() == "ARM64"):
-    cargo_args.extend(["--no-default-features", "--features=upload,log"])
-elif sys.platform.startswith("haiku"):
-    # mio and ring doesn't build on haiku
-    cargo_args.extend(["--no-default-features", "--features=log"])
+# Use `--no-default-features` by default for a minimal build to support PEP 517.
+# `MATURIN_SETUP_ARGS` env var can be used to pass customized arguments to cargo.
+cargo_args = ["--no-default-features"]
+if os.getenv("MATURIN_SETUP_ARGS"):
+    cargo_args = os.getenv("MATURIN_SETUP_ARGS").split()
 
 setup(
     name="maturin",

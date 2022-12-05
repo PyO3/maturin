@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4] - 2022-12-05
+
 * Expanded architecture support for FreeBSD, NetBSD and OpenBSD in [#1318](https://github.com/PyO3/maturin/pull/1318)
 * Better error message when upload failed with status code 403 in [#1323](https://github.com/PyO3/maturin/pull/1323)
 
@@ -769,8 +771,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.3...HEAD
-[0.14.3]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.3
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.4...HEAD
+[0.14.4]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.4
+[0.14.3]: https://github.com/pyo3/maturin/compare/v0.14.2...v0.14.3
 [0.14.2]: https://github.com/pyo3/maturin/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/pyo3/maturin/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pyo3/maturin/compare/v0.13.7...v0.14.0

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * **Breaking Change**: Build with `--no-default-features` by default when bootstrapping from sdist in [#1333](https://github.com/PyO3/maturin/pull/1333)
+* **Breaking Change**: Remove deprecated `sdist-include` option in `pyproject.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
+* **Breaking Change**: Remove deprecated `python-source` option in `Cargo.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
+* **Breaking Change**: Turn `patchelf` version warning into a hard error in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * Support `SOURCE_DATE_EPOCH` when building wheels in [#1334](https://github.com/PyO3/maturin/pull/1334)
 
 ## [0.14.4] - 2022-12-05

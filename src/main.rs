@@ -8,9 +8,11 @@ use anyhow::{bail, Context, Result};
 use cargo_zigbuild::Zig;
 use clap::{CommandFactory, Parser, Subcommand};
 use maturin::{
-    develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions, CargoOptions,
-    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
+    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, PathWriter, PlatformTag,
+    PythonInterpreter, Target,
 };
+#[cfg(feature = "scaffolding")]
+use maturin::{init_project, new_project, GenerateProjectOptions};
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
 use std::env;
@@ -114,6 +116,7 @@ enum Opt {
         out: Option<PathBuf>,
     },
     /// Create a new cargo project in an existing directory
+    #[cfg(feature = "scaffolding")]
     #[command(name = "init")]
     InitProject {
         /// Project path
@@ -122,6 +125,7 @@ enum Opt {
         options: GenerateProjectOptions,
     },
     /// Create a new cargo project
+    #[cfg(feature = "scaffolding")]
     #[command(name = "new")]
     NewProject {
         /// Project path
@@ -393,7 +397,9 @@ fn run() -> Result<()> {
                 .context("Failed to build source distribution, pyproject.toml not found")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
+        #[cfg(feature = "scaffolding")]
         Opt::InitProject { path, options } => init_project(path, options)?,
+        #[cfg(feature = "scaffolding")]
         Opt::NewProject { path, options } => new_project(path, options)?,
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {

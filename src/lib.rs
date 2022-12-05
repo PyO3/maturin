@@ -32,6 +32,7 @@ pub use crate::metadata::{Metadata21, WheelMetadata};
 pub use crate::module_writer::{
     write_dist_info, ModuleWriter, PathWriter, SDistWriter, WheelWriter,
 };
+#[cfg(feature = "scaffolding")]
 pub use crate::new_project::{init_project, new_project, GenerateProjectOptions};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
@@ -49,6 +50,7 @@ mod cross_compile;
 mod develop;
 mod metadata;
 mod module_writer;
+#[cfg(feature = "scaffolding")]
 mod new_project;
 mod project_layout;
 pub mod pyproject_toml;

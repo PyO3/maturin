@@ -138,7 +138,7 @@ fn get_password(_username: &str) -> String {
     {
         let service = env!("CARGO_PKG_NAME");
         let keyring = keyring::Entry::new(service, _username);
-        if let Ok(password) = keyring.get_password() {
+        if let Ok(password) = keyring.and_then(|keyring| keyring.get_password()) {
             return password;
         };
     }
@@ -216,7 +216,6 @@ fn resolve_pypi_cred(
         .clone()
         .or_else(|| env::var("MATURIN_PASSWORD").ok())
         .unwrap_or_else(|| get_password(&username));
-
     (username, password)
 }
 
@@ -500,8 +499,9 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 {
                     // Delete the wrong password from the keyring
                     let old_username = registry.username;
-                    let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &old_username);
-                    match keyring.delete_password() {
+                    match keyring::Entry::new(env!("CARGO_PKG_NAME"), &old_username)
+                        .and_then(|keyring| keyring.delete_password())
+                    {
                         Ok(()) => {
                             println!("🔑 Removed wrong password from keyring")
                         }
@@ -540,9 +540,10 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
     {
         // We know the password is correct, so we can save it in the keyring
         let username = registry.username.clone();
-        let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &username);
         let password = registry.password;
-        match keyring.set_password(&password) {
+        match keyring::Entry::new(env!("CARGO_PKG_NAME"), &username)
+            .and_then(|keyring| keyring.set_password(&password))
+        {
             Ok(())
             | Err(keyring::Error::NoStorageAccess(_))
             | Err(keyring::Error::PlatformFailure(_)) => {}

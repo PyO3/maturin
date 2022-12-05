@@ -137,30 +137,24 @@ impl ProjectResolver {
         };
         let py_root = match pyproject.and_then(|x| x.python_source()) {
             Some(py_src) => project_root.join(py_src),
-            None => match extra_metadata.python_source.as_ref() {
-                Some(py_src) => {
-                    println!("⚠️ Warning: specify python-source in Cargo.toml is deprecated, use python-source in [tool.maturin] section in pyproject.toml instead");
-                    manifest_dir.join(py_src)
-                }
-                None => match pyproject.and_then(|x| x.project_name()) {
-                    Some(project_name) => {
-                        // Detect src layout
-                        let import_name = project_name.replace('-', "_");
-                        let rust_cargo_toml_found =
-                            project_root.join("rust").join("Cargo.toml").is_file();
-                        let python_src_found = project_root
-                            .join("src")
-                            .join(import_name)
-                            .join("__init__.py")
-                            .is_file();
-                        if rust_cargo_toml_found && python_src_found {
-                            project_root.join("src")
-                        } else {
-                            project_root.to_path_buf()
-                        }
+            None => match pyproject.and_then(|x| x.project_name()) {
+                Some(project_name) => {
+                    // Detect src layout
+                    let import_name = project_name.replace('-', "_");
+                    let rust_cargo_toml_found =
+                        project_root.join("rust").join("Cargo.toml").is_file();
+                    let python_src_found = project_root
+                        .join("src")
+                        .join(import_name)
+                        .join("__init__.py")
+                        .is_file();
+                    if rust_cargo_toml_found && python_src_found {
+                        project_root.join("src")
+                    } else {
+                        project_root.to_path_buf()
                     }
-                    None => project_root.to_path_buf(),
-                },
+                }
+                None => project_root.to_path_buf(),
             },
         };
         let data = match pyproject.and_then(|x| x.data()) {

@@ -179,6 +179,7 @@ pub struct BuildOptions {
     /// Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
     ///
     /// Make sure you installed zig with `pip install maturin[zig]`
+    #[cfg(feature = "zig")]
     #[arg(long)]
     pub zig: bool,
 
@@ -598,6 +599,10 @@ impl BuildOptions {
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
         let platform_tags = if self.platform_tag.is_empty() {
+            #[cfg(feature = "zig")]
+            let use_zig = self.zig;
+            #[cfg(not(feature = "zig"))]
+            let use_zig = false;
             let compatibility = pyproject
                 .and_then(|x| {
                     if x.compatibility().is_some() {
@@ -605,7 +610,7 @@ impl BuildOptions {
                     }
                     x.compatibility()
                 })
-                .or(if self.zig {
+                .or(if use_zig {
                     if target.is_musl_target() {
                         // Zig bundles musl 1.2
                         Some(PlatformTag::Musllinux { x: 1, y: 2 })
@@ -676,6 +681,7 @@ impl BuildOptions {
             release,
             strip,
             skip_auditwheel,
+            #[cfg(feature = "zig")]
             zig: self.zig,
             platform_tag: platform_tags,
             interpreter,

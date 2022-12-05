@@ -462,6 +462,7 @@ jobs:
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
+      - run: cargo build --no-default-features
       - name: cargo build
         run: cargo build --all
 

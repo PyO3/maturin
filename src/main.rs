@@ -4,6 +4,7 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
+#[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::{CommandFactory, Parser, Subcommand};
 use maturin::{
@@ -153,6 +154,7 @@ enum Opt {
         shell: clap_complete_command::Shell,
     },
     /// Zig linker wrapper
+    #[cfg(feature = "zig")]
     #[command(subcommand, hide = true)]
     Zig(Zig),
 }
@@ -278,17 +280,20 @@ fn run() -> Result<()> {
     #[cfg(feature = "log")]
     tracing_subscriber::fmt::init();
 
-    // Allow symlink `maturin` to `ar` to invoke `zig ar`
-    // See https://github.com/messense/cargo-zigbuild/issues/52
-    let mut args = env::args();
-    let program_path = PathBuf::from(args.next().expect("no program path"));
-    let program_name = program_path.file_stem().expect("no program name");
-    if program_name.eq_ignore_ascii_case("ar") {
-        let zig = Zig::Ar {
-            args: args.collect(),
-        };
-        zig.execute()?;
-        return Ok(());
+    #[cfg(feature = "zig")]
+    {
+        // Allow symlink `maturin` to `ar` to invoke `zig ar`
+        // See https://github.com/messense/cargo-zigbuild/issues/52
+        let mut args = env::args();
+        let program_path = PathBuf::from(args.next().expect("no program path"));
+        let program_name = program_path.file_stem().expect("no program name");
+        if program_name.eq_ignore_ascii_case("ar") {
+            let zig = Zig::Ar {
+                args: args.collect(),
+            };
+            zig.execute()?;
+            return Ok(());
+        }
     }
 
     let opt = Opt::parse();
@@ -402,6 +407,7 @@ fn run() -> Result<()> {
         Opt::Completions { shell } => {
             shell.generate(&mut Opt::command(), &mut io::stdout());
         }
+        #[cfg(feature = "zig")]
         Opt::Zig(subcommand) => {
             subcommand
                 .execute()

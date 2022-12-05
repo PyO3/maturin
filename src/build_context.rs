@@ -171,6 +171,7 @@ pub struct BuildContext {
     /// Skip checking the linked libraries for manylinux/musllinux compliance
     pub skip_auditwheel: bool,
     /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
+    #[cfg(feature = "zig")]
     pub zig: bool,
     /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
     pub platform_tag: Vec<PlatformTag>,

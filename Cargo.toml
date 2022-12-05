@@ -25,8 +25,8 @@ base64 = "0.13.0"
 glob = "0.3.0"
 cargo_metadata = "0.15.2"
 cargo-options = "0.5.2"
-cargo-zigbuild = "0.14.1"
-cargo-xwin = { version = "0.13.0", default-features = false }
+cargo-zigbuild = { version = "0.14.1", optional = true }
+cargo-xwin = { version = "0.13.0", default-features = false, optional = true }
 cbindgen = { version = "0.24.2", default-features = false }
 uniffi_bindgen = "0.21.0"
 flate2 = "1.0.18"
@@ -88,12 +88,16 @@ rustversion = "1.0.9"
 trycmd = "0.14.0"
 
 [features]
-default = ["log", "upload", "rustls"]
+default = ["cross-compile", "log", "upload", "rustls"]
 upload = ["ureq", "multipart", "rpassword", "configparser", "bytesize"]
 password-storage = ["upload", "keyring"]
 log = ["tracing-subscriber"]
 rustls = ["ureq/tls", "cargo-xwin/rustls-tls"]
 native-tls = ["ureq/native-tls", "native-tls-crate", "cargo-xwin/native-tls"]
+# cross compile using zig or xwin
+cross-compile = ["zig", "xwin"]
+zig = ["cargo-zigbuild"]
+xwin = ["cargo-xwin"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
 # Deprecated features, keep it now for compatibility

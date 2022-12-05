@@ -86,8 +86,6 @@ impl GlobPattern {
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
-    // TODO(0.15.0): remove deprecated
-    sdist_include: Option<Vec<String>>,
     include: Option<Vec<GlobPattern>>,
     exclude: Option<Vec<GlobPattern>>,
     bindings: Option<String>,
@@ -168,15 +166,6 @@ impl PyProjectToml {
     #[inline]
     pub fn maturin(&self) -> Option<&ToolMaturin> {
         self.tool.as_ref()?.maturin.as_ref()
-    }
-
-    /// Returns the value of `[tool.maturin.sdist-include]` in pyproject.toml
-    #[deprecated(
-        since = "0.14.0",
-        note = "please use `PyProjectToml::include` (<https://github.com/PyO3/maturin/pulls/1255>)"
-    )]
-    pub fn sdist_include(&self) -> Option<&Vec<String>> {
-        self.maturin()?.sdist_include.as_ref()
     }
 
     /// Returns the value of `[tool.maturin.include]` in pyproject.toml

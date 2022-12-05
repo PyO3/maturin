@@ -107,9 +107,6 @@ in the `tool.maturin` section of `pyproject.toml`.
 
 ```toml
 [tool.maturin]
-# Include arbitrary files in the sdist
-# NOTE: deprecated, please use `include` with `format="sdist"`
-sdist-include = []
 # Include additional files
 include = []
 # Exclude files

@@ -326,12 +326,8 @@ impl WheelWriter {
         let min_dt = datetime!(1980-01-01 0:00 UTC);
         let dt = dt.max(min_dt);
 
-        let dt = DateTime::from_time(dt);
-
-        match dt {
-            Ok(dt) => Ok(dt),
-            Err(_) => Err(anyhow!("failed to build zip DateTime")),
-        }
+        let dt = DateTime::from_time(dt).map_err(|_| anyhow!("Failed to build zip DateTime"))?;
+        Ok(dt)
     }
 
     /// Creates the record file and finishes the zip

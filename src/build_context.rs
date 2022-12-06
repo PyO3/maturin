@@ -1,7 +1,7 @@
 use crate::auditwheel::{get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::build_options::CargoOptions;
-use crate::compile::{warn_missing_py_init, CompileTarget, LIB_CRATE_TYPES};
+use crate::compile::{warn_missing_py_init, CompileTarget};
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
     write_uniffi_module, write_wasm_launcher, WheelWriter,
@@ -141,8 +141,8 @@ fn bin_wasi_helper(
 pub struct BuildContext {
     /// The platform, i.e. os and pointer width
     pub target: Target,
-    /// Whether to use cffi or pyo3/rust-cpython
-    pub bridge: BridgeModel,
+    /// List of Cargo targets to compile
+    pub cargo_targets: Vec<CompileTarget>,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
     /// The path to pyproject.toml. Required for the source distribution
@@ -202,7 +202,7 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
-        let wheels = match &self.bridge {
+        let wheels = match self.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
             BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
@@ -248,6 +248,12 @@ impl BuildContext {
         };
 
         Ok(wheels)
+    }
+
+    /// Bridge model
+    pub fn bridge(&self) -> &BridgeModel {
+        // FIXME: currently we only allow multiple bin targets so bridges are all the same
+        &self.cargo_targets[0].1
     }
 
     /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
@@ -303,8 +309,8 @@ impl BuildContext {
         others.sort();
 
         // only bin bindings allow linking to libpython, extension modules must not
-        let allow_linking_libpython = self.bridge.is_bin();
-        if self.bridge.is_bin() && !musllinux.is_empty() {
+        let allow_linking_libpython = self.bridge().is_bin();
+        if self.bridge().is_bin() && !musllinux.is_empty() {
             return get_policy_and_libs(
                 artifact,
                 Some(musllinux[0]),
@@ -658,52 +664,6 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    fn cargo_compile_targets(&self) -> Vec<CompileTarget> {
-        let root_pkg = self.cargo_metadata.root_package().unwrap();
-        let resolved_features = self
-            .cargo_metadata
-            .resolve
-            .as_ref()
-            .and_then(|resolve| resolve.nodes.iter().find(|node| node.id == root_pkg.id))
-            .map(|node| node.features.clone())
-            .unwrap_or_default();
-        let mut targets: Vec<_> = root_pkg
-            .targets
-            .iter()
-            .filter(|target| match self.bridge {
-                BridgeModel::Bin(_) => {
-                    let is_bin = target.kind.contains(&"bin".to_string());
-                    if target.required_features.is_empty() {
-                        is_bin
-                    } else {
-                        // Check all required features are enabled for this bin target
-                        is_bin
-                            && target
-                                .required_features
-                                .iter()
-                                .all(|f| resolved_features.contains(f))
-                    }
-                }
-                _ => target.kind.contains(&"cdylib".to_string()),
-            })
-            .map(|target| (target, &self.bridge))
-            .collect();
-        if targets.is_empty() && !self.bridge.is_bin() {
-            // No `crate-type = ["cdylib"]` in `Cargo.toml`
-            // Let's try compile one of the target with `--crate-type cdylib`
-            let lib_target = root_pkg.targets.iter().find(|target| {
-                target
-                    .kind
-                    .iter()
-                    .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
-            });
-            if let Some(target) = lib_target {
-                targets.push((target, &self.bridge));
-            }
-        }
-        targets
-    }
-
     /// Runs cargo build, extracts the cdylib from the output and returns the path to it
     ///
     /// The module name is used to warn about missing a `PyInit_<module name>` function for
@@ -713,7 +673,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
     ) -> Result<BuildArtifact> {
-        let artifacts = compile(self, python_interpreter, &self.cargo_compile_targets())
+        let artifacts = compile(self, python_interpreter, &self.cargo_targets)
             .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
@@ -873,7 +833,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: &[Vec<Library>],
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = match (&self.bridge, python_interpreter) {
+        let (tag, tags) = match (self.bridge(), python_interpreter) {
             (BridgeModel::Bin(None), _) => self
                 .target
                 .get_universal_tags(platform_tags, self.universal2)?,
@@ -964,7 +924,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifacts = compile(self, python_interpreter, &self.cargo_compile_targets())
+        let artifacts = compile(self, python_interpreter, &self.cargo_targets)
             .context("Failed to build a native library through cargo")?;
         if artifacts.is_empty() {
             bail!("Cargo didn't build a binary")

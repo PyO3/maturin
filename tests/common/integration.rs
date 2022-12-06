@@ -82,7 +82,7 @@ pub fn test_integration(
         let venv_interpreter = PythonInterpreter::check_executable(
             python_interp.as_deref().unwrap_or("python3"),
             &build_context.target,
-            &build_context.bridge,
+            build_context.bridge(),
         )
         .context(error_message)?
         .context(error_message)?;

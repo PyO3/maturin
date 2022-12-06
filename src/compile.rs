@@ -21,7 +21,7 @@ const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 pub(crate) const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
 
-pub(crate) type CompileTarget<'a> = (&'a cargo_metadata::Target, &'a BridgeModel);
+pub(crate) type CompileTarget = (cargo_metadata::Target, BridgeModel);
 
 /// A cargo build artifact
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ pub struct BuildArtifact {
 pub fn compile<'a>(
     context: &'a BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    targets: &[CompileTarget<'a>],
+    targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     if context.target.is_macos() && context.universal2 {
         compile_universal2(context, python_interpreter, targets)
@@ -52,7 +52,7 @@ pub fn compile<'a>(
 fn compile_universal2<'a>(
     context: &'a BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    targets: &[CompileTarget<'a>],
+    targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut aarch64_context = context.clone();
     aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
@@ -126,10 +126,10 @@ fn compile_universal2<'a>(
     Ok(universal_artifacts)
 }
 
-fn compile_targets<'a>(
-    context: &'a BuildContext,
+fn compile_targets(
+    context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    targets: &[CompileTarget<'a>],
+    targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
     for (target, bridge_model) in targets {

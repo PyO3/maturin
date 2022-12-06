@@ -25,8 +25,6 @@ base64 = "0.13.0"
 glob = "0.3.0"
 cargo_metadata = "0.15.2"
 cargo-options = "0.5.2"
-cargo-zigbuild = { version = "0.14.1", optional = true }
-cargo-xwin = { version = "0.13.0", default-features = false, optional = true }
 cbindgen = { version = "0.24.2", default-features = false }
 uniffi_bindgen = "0.21.0"
 flate2 = "1.0.18"
@@ -58,10 +56,15 @@ cc = "1.0.72"
 dunce = "1.0.2"
 normpath = "0.3.2"
 pep440 = "0.2.0"
+time = "0.3.17"
 
 # cli
 clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
 clap_complete_command = "0.4.0"
+
+# cross compile
+cargo-zigbuild = { version = "0.14.1", optional = true }
+cargo-xwin = { version = "0.13.0", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
@@ -80,7 +83,6 @@ rpassword = { version = "7.0.0", optional = true }
 ureq = { version = "2.3.1", features = ["gzip", "socks-proxy"], default-features = false, optional = true }
 native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
 keyring = { version = "1.1.1", optional = true }
-time = "0.3.17"
 
 [dev-dependencies]
 indoc = "1.0.3"

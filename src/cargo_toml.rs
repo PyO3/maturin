@@ -104,8 +104,6 @@ struct CargoTomlMetadata {
 #[serde(rename_all = "kebab-case")]
 pub struct RemainingCoreMetadata {
     pub name: Option<String>,
-    /// The directory with python module, contains `<module_name>/__init__.py`
-    pub python_source: Option<String>,
     /// The directory containing the wheel data
     pub data: Option<String>,
     #[serde(flatten)]

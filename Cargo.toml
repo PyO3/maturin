@@ -79,7 +79,6 @@ minijinja = { version = "0.26.0", optional = true }
 bytesize = { version = "1.0.1", optional = true }
 configparser = { version = "3.0.0", optional = true }
 multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
-rpassword = { version = "7.0.0", optional = true }
 ureq = { version = "2.3.1", features = ["gzip", "socks-proxy"], default-features = false, optional = true }
 native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
 keyring = { version = "1.1.1", optional = true }
@@ -97,7 +96,7 @@ full = ["cross-compile", "log", "scaffolding", "upload"]
 
 log = ["tracing-subscriber"]
 
-upload = ["ureq", "multipart", "rpassword", "configparser", "bytesize"]
+upload = ["ureq", "multipart", "configparser", "bytesize", "dialoguer/password"]
 # keyring doesn't support *BSD so it's not enabled in `full` by default
 password-storage = ["upload", "keyring"]
 

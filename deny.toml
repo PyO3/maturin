@@ -147,7 +147,7 @@ registries = [
 # https://embarkstudios.github.io/cargo-deny/checks/bans/cfg.html
 [bans]
 # Lint level for when multiple versions of the same crate are detected
-multiple-versions = "warn"
+multiple-versions = "deny"
 # Lint level for when a crate version requirement is `*`
 wildcards = "allow"
 # The graph highlighting used when creating dotgraphs for crates
@@ -173,6 +173,17 @@ deny = [
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
     #{ name = "ansi_term", version = "=0.11.0" },
+
+    # from uniffi-bindgen
+    { name = "goblin", version = "0.5.4" },
+    # from console
+    { name = "terminal_size", version = "0.1.7" },
+    # from secret-service
+    { name = "block-buffer",  version = "0.9.0" },
+    { name = "digest", version = "0.9.0" },
+    { name = "memoffset", version = "0.6.5" },
+    { name = "proc-macro-crate", version = "0.1.5" },
+    { name = "sha2", version = "0.9.9" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
@@ -180,6 +191,8 @@ skip = [
 # by default infinite
 skip-tree = [
     #{ name = "ansi_term", version = "=0.11.0", depth = 20 },
+    { name = "clap", version = "3.2.23" },
+    { name = "windows-sys", version = "0.36.1" },
 ]
 
 # This section is considered when running `cargo deny check sources`.

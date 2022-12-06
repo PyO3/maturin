@@ -141,14 +141,17 @@ fn get_password(_username: &str) -> String {
         };
     }
 
-    rpassword::prompt_password("Please enter your password: ").unwrap_or_else(|_| {
-        // So we need this fallback for pycharm on windows
-        let mut password = String::new();
-        io::stdin()
-            .read_line(&mut password)
-            .expect("Failed to read line");
-        password.trim().to_string()
-    })
+    dialoguer::Password::new()
+        .with_prompt("Please enter your password")
+        .interact()
+        .unwrap_or_else(|_| {
+            // So we need this fallback for pycharm on windows
+            let mut password = String::new();
+            io::stdin()
+                .read_line(&mut password)
+                .expect("Failed to read line");
+            password.trim().to_string()
+        })
 }
 
 fn get_username() -> String {

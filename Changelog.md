@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.5] - 2022-12-08
+
 * Support `SOURCE_DATE_EPOCH` when building wheels in [#1334](https://github.com/PyO3/maturin/pull/1334)
 * Fix sdist when all Cargo workspace members are excluded in [#1343](https://github.com/PyO3/maturin/pull/1343)
 
@@ -774,7 +776,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.4...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.5...HEAD
+[0.14.5]: https://github.com/pyo3/maturin/compare/v0.14.4...v0.14.5
 [0.14.4]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.4
 [0.14.3]: https://github.com/pyo3/maturin/compare/v0.14.2...v0.14.3
 [0.14.2]: https://github.com/pyo3/maturin/compare/v0.14.1...v0.14.2

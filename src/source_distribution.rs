@@ -213,8 +213,10 @@ fn rewrite_cargo_toml(
                     }
                     if !new_members.is_empty() {
                         workspace["members"] = toml_edit::value(new_members);
-                        rewritten = true;
+                    } else {
+                        workspace.remove("members");
                     }
+                    rewritten = true;
                 }
             }
         }

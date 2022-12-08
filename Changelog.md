@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Support `SOURCE_DATE_EPOCH` when building wheels in [#1334](https://github.com/PyO3/maturin/pull/1334)
+* Fix sdist when all Cargo workspace members are excluded in [#1343](https://github.com/PyO3/maturin/pull/1343)
+
 ## [0.14.4] - 2022-12-05
 
 * Expanded architecture support for FreeBSD, NetBSD and OpenBSD in [#1318](https://github.com/PyO3/maturin/pull/1318)

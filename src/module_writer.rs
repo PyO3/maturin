@@ -14,6 +14,7 @@ use ignore::WalkBuilder;
 use normpath::PathExt as _;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
 #[cfg(target_family = "unix")]
@@ -26,8 +27,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 use tempfile::{tempdir, TempDir};
+use time::macros::datetime;
+use time::OffsetDateTime;
 use tracing::debug;
-use zip::{self, ZipWriter};
+use zip::{self, DateTime, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
@@ -234,9 +237,15 @@ impl ModuleWriter for WheelWriter {
         } else {
             zip::CompressionMethod::Deflated
         };
-        let options = zip::write::FileOptions::default()
+
+        let mut options = zip::write::FileOptions::default()
             .unix_permissions(permissions)
             .compression_method(compression_method);
+        let mtime = self.mtime().ok();
+        if let Some(mtime) = mtime {
+            options = options.last_modified_time(mtime);
+        }
+
         self.zip.start_file(target.clone(), options)?;
         self.zip.write_all(bytes)?;
 
@@ -309,6 +318,18 @@ impl WheelWriter {
         }
     }
 
+    /// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
+    /// Note that the earliest timestamp a zip file can represent is 1980-01-01
+    fn mtime(&self) -> Result<DateTime> {
+        let epoch: i64 = env::var("SOURCE_DATE_EPOCH")?.parse()?;
+        let dt = OffsetDateTime::from_unix_timestamp(epoch)?;
+        let min_dt = datetime!(1980-01-01 0:00 UTC);
+        let dt = dt.max(min_dt);
+
+        let dt = DateTime::from_time(dt).map_err(|_| anyhow!("Failed to build zip DateTime"))?;
+        Ok(dt)
+    }
+
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
         let compression_method = if cfg!(feature = "faster-tests") {
@@ -316,7 +337,13 @@ impl WheelWriter {
         } else {
             zip::CompressionMethod::Deflated
         };
-        let options = zip::write::FileOptions::default().compression_method(compression_method);
+
+        let mut options = zip::write::FileOptions::default().compression_method(compression_method);
+        let mtime = self.mtime().ok();
+        if let Some(mtime) = mtime {
+            options = options.last_modified_time(mtime);
+        }
+
         let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
         debug!("Adding {}", record_filename);
         self.zip.start_file(&record_filename, options)?;

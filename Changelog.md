@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Allow Rust crate to be placed outside of the directory containing `pyproject.toml` in [#1347](https://github.com/PyO3/maturin/pull/1347)
+
 ## [0.14.5] - 2022-12-08
 
 * Support `SOURCE_DATE_EPOCH` when building wheels in [#1334](https://github.com/PyO3/maturin/pull/1334)

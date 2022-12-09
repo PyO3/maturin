@@ -238,15 +238,6 @@ impl ProjectResolver {
             let pyproject =
                 PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
             if let Some(path) = pyproject.manifest_path() {
-                // pyproject.toml must be placed at top directory
-                let manifest_dir = path
-                    .parent()
-                    .context("missing parent directory")?
-                    .normalize()?
-                    .into_path_buf();
-                if !manifest_dir.starts_with(&current_dir) {
-                    bail!("Cargo.toml can not be placed outside of the directory containing pyproject.toml");
-                }
                 debug!("Using cargo manifest path from pyproject.toml {:?}", path);
                 return Ok((path.normalize()?.into_path_buf(), pyproject_file));
             } else {

@@ -12,6 +12,8 @@ use std::str;
 use tracing::debug;
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
+const RUST_SRC_FOLDER: &str = "rust_src";
+
 /// Inheritable workspace fields, see
 /// https://github.com/rust-lang/cargo/blob/13ae438cf079da58272edc71f4d4968043dbd27b/src/cargo/util/toml/mod.rs#L1140-L1158
 const WORKSPACE_INHERITABLE_FIELDS: &[&str] = &[
@@ -256,6 +258,38 @@ fn ensure_dep_is_inline_table(dep: &mut toml_edit::Item) {
     }
 }
 
+/// When `Cargo.toml` is outside of the directory containing `pyproject.toml`,
+/// we put Rust crate source to `RUST_SRC_FOLDER` and
+/// update `tool.maturin.manifest-path` in `pyproject.toml`.
+fn rewrite_pyproject_toml(pyproject_toml_path: &Path) -> Result<String> {
+    let text = fs::read_to_string(pyproject_toml_path).context(format!(
+        "Can't read pyproject.toml at {}",
+        pyproject_toml_path.display(),
+    ))?;
+    let mut data = text.parse::<toml_edit::Document>().context(format!(
+        "Failed to parse pyproject.toml at {}",
+        pyproject_toml_path.display()
+    ))?;
+    if let Some(tool) = data.get_mut("tool").and_then(|x| x.as_table_mut()) {
+        if let Some(maturin) = tool.get_mut("maturin").and_then(|x| x.as_table_mut()) {
+            if let Some(manifest_path) = maturin.get_mut("manifest-path") {
+                // original: ../$crate/Cargo.toml or ../../$crate/Cargo.toml
+                // rewrite to: $RUST_SRC_FOLDER/$crate/Cargo.toml
+                let path =
+                    Path::new(manifest_path.as_str().context(
+                        "tool.maturin.manifest-path in pyproject.toml must be a string",
+                    )?);
+                let crate_name = path.parent().unwrap().file_name().unwrap();
+                let new_path = Path::new(RUST_SRC_FOLDER)
+                    .join(crate_name)
+                    .join("Cargo.toml");
+                *manifest_path = toml_edit::value(new_path.to_str().unwrap());
+            }
+        }
+    }
+    Ok(data.to_string())
+}
+
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies
 /// and rewriting path entries in Cargo.toml
 ///
@@ -340,25 +374,66 @@ fn add_crate_to_source_distribution(
         })
         .collect();
 
+    let prefix = prefix.as_ref();
+    writer.add_directory(prefix)?;
+
+    let mut cargo_toml_in_rust_src = false;
+
     if root_crate
         && !target_source
             .iter()
             .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
         // Add pyproject.toml to the source distribution
-        // if Cargo.toml is in subdirectory of pyproject.toml directory
         if cargo_toml_in_subdir {
+            // if Cargo.toml is in subdirectory of pyproject.toml directory
             target_source.push((
                 PathBuf::from("pyproject.toml"),
                 pyproject_toml_path.to_path_buf(),
             ));
         } else {
-            bail!(
-                "pyproject.toml was not included by `cargo package`. \
-                     Please make sure pyproject.toml is not excluded or build without `--sdist`"
-            )
+            // if pyproject.toml was not included by `cargo package --list`
+            // (e.g. because it is in a parent directory)
+            // we need to add `cargo package --list` files to a subdirectory
+            // and rewrite `tool.maturin.manifest-path` in pyproject.toml
+            let crate_name = abs_manifest_dir.file_name().unwrap();
+            // check that there isn't already a $RUST_SRC_FOLDER/$crate_name/ folder in python root
+            let rust_src = Path::new(RUST_SRC_FOLDER).join(crate_name);
+            if target_source
+                .iter()
+                .any(|(target, _)| target.starts_with(&rust_src))
+            {
+                bail!(
+                    "Cannot add crate {} to source distribution because there is already a {} folder, consider rename it to avoid conflicts",
+                    crate_name.to_string_lossy(),
+                    rust_src.display(),
+                );
+            }
+            target_source.iter_mut().for_each(|(target, _)| {
+                *target = rust_src.join(&target);
+            });
+            // rewrite `tool.maturin.manifest-path` in pyproject.toml
+            let rewritten_pyproject_toml = rewrite_pyproject_toml(pyproject_toml_path)?;
+            writer.add_bytes(
+                prefix.join("pyproject.toml"),
+                rewritten_pyproject_toml.as_bytes(),
+            )?;
+            cargo_toml_in_rust_src = true;
         }
     }
+
+    let cargo_toml_path = if cargo_toml_in_subdir {
+        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
+        prefix.join(relative_manifest_path)
+    } else if cargo_toml_in_rust_src {
+        let crate_name = abs_manifest_dir.file_name().unwrap();
+        prefix
+            .join(RUST_SRC_FOLDER)
+            .join(crate_name)
+            .join(manifest_path.file_name().unwrap())
+    } else {
+        prefix.join(manifest_path.file_name().unwrap())
+    };
 
     let local_deps_folder = if cargo_toml_in_subdir {
         let level = abs_manifest_dir
@@ -367,6 +442,8 @@ fn add_crate_to_source_distribution(
             .components()
             .count();
         format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
+    } else if cargo_toml_in_rust_src {
+        format!("../../{}", LOCAL_DEPENDENCIES_FOLDER)
     } else {
         LOCAL_DEPENDENCIES_FOLDER.to_string()
     };
@@ -378,16 +455,7 @@ fn add_crate_to_source_distribution(
         root_crate,
     )?;
 
-    let prefix = prefix.as_ref();
-    writer.add_directory(prefix)?;
-
-    let cargo_toml = if cargo_toml_in_subdir {
-        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
-        prefix.join(relative_manifest_path)
-    } else {
-        prefix.join(manifest_path.file_name().unwrap())
-    };
-    writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
+    writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
 
     for (target, source) in target_source {
         writer.add_file(prefix.join(target), source)?;

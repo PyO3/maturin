@@ -154,6 +154,24 @@
       "ext_suffix": ".cpython-312-darwin.so",
       "abi_tag": "312",
       "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 8,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy38-pp73-darwin.so",
+      "abi_tag": "pp73",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 9,
+      "abiflags": "",
+      "interpreter": "pypy",
+      "ext_suffix": ".pypy39-pp73-darwin.so",
+      "abi_tag": "pp73",
+      "pointer_width": 64
     }
   ]
 }

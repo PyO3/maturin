@@ -1345,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "0.14.5"
+version = "0.14.6"
 dependencies = [
  "anyhow",
  "base64",
@@ -1847,9 +1847,9 @@ dependencies = [
 
 [[package]]
 name = "polling"
-version = "2.5.1"
+version = "2.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "166ca89eb77fd403230b9c156612965a81e094ec6ec3aa13663d4c8b113fa748"
+checksum = "22122d5ec4f9fe1b3916419b76be1e80bcb93f618d071d2edf841b137b2a2bd6"
 dependencies = [
  "autocfg",
  "cfg-if",

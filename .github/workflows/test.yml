@@ -119,6 +119,11 @@ jobs:
     env:
       RUST_BACKTRACE: '1'
     steps:
+      - name: Cleanup Disk
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -132,7 +137,7 @@ jobs:
         if: ${{ !contains(matrix.python-version, 'pypy') }}
         run: pip install cffi
       - name: Install python packages
-        run: pip install virtualenv ziglang~=0.10.0 twine
+        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
@@ -170,10 +175,9 @@ jobs:
         if: contains(matrix.python-version, 'pypy')
         run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
       - name: cargo test
+        env:
+          RUSTFLAGS: "-C debuginfo=0"  # save disk space
         run: cargo nextest run --features password-storage
-      - name: free up disk space
-        shell: bash
-        run: rm -rf test-crates/venvs test-crates/targets
       - name: test cross compiling with zig
         shell: bash
         run: |

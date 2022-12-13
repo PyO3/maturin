@@ -881,40 +881,39 @@ fn generate_uniffi_bindings(
         );
     }
 
+    let mut cmd = Command::new("uniffi-bindgen");
+    cmd.args([
+        "generate",
+        "--no-format",
+        "--language",
+        "python",
+        "--out-dir",
+    ]);
+    cmd.arg(&binding_dir);
+
     let udl = &udls[0];
     let config_file = crate_dir.join("uniffi.toml");
     let mut cdylib_name = None;
-    let config_file = {
-        if config_file.is_file() {
-            let uniffi_toml: UniFfiToml =
-                toml_edit::easy::from_str(&fs::read_to_string(&config_file)?)?;
-            cdylib_name = uniffi_toml
-                .bindings
-                .get("python")
-                .and_then(|py| py.cdylib_name.clone());
-            Some(
-                config_file
-                    .as_path()
-                    .try_into()
-                    .expect("path contains non-utf8"),
-            )
-        } else {
-            None
-        }
-    };
-    uniffi_bindgen::generate_bindings(
-        udl.as_path().try_into().expect("path contains non-utf8"),
-        config_file,
-        vec!["python"],
-        Some(
-            binding_dir
-                .as_path()
-                .try_into()
-                .expect("path contains non-utf8"),
-        ),
-        None,
-        false,
+    if config_file.is_file() {
+        let uniffi_toml: UniFfiToml =
+            toml_edit::easy::from_str(&fs::read_to_string(&config_file)?)?;
+        cdylib_name = uniffi_toml
+            .bindings
+            .get("python")
+            .and_then(|py| py.cdylib_name.clone());
+        cmd.arg("--config");
+        cmd.arg(config_file);
+    }
+    cmd.arg(udl);
+    debug!("Running {:?}", cmd);
+    let mut child = cmd.spawn().context(
+        "Failed to run uniffi-bindgen, did you install it? Try `cargo install uniffi_bindgen`",
     )?;
+    let exit_status = child.wait().context("Failed to run uniffi-bindgen")?;
+    if !exit_status.success() {
+        bail!("Command {:?} failed", cmd);
+    }
+
     let py_binding_name = udl.file_stem().unwrap();
     let py_binding = binding_dir.join(py_binding_name).with_extension("py");
     let name = py_binding_name.to_str().unwrap().to_string();

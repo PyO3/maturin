@@ -10,6 +10,7 @@ build_and_test: &BUILD_AND_TEST
     - rustup target add wasm32-wasi
     - python3 -m pip install --upgrade cffi virtualenv
   build_script:
+    - cargo install uniffi_bindgen
     - cargo build
   test_script:
     - cargo test

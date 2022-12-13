@@ -139,6 +139,8 @@ jobs:
           targets: wasm32-wasi  # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: Install uniffi_bindgen
+        run: cargo install uniffi_bindgen
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin

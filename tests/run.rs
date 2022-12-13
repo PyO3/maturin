@@ -8,6 +8,7 @@ use maturin::Target;
 use std::env;
 use std::path::{Path, PathBuf};
 use time::macros::datetime;
+use which::which;
 
 mod common;
 
@@ -25,7 +26,7 @@ fn develop_pyo3_pure() {
 #[ignore]
 fn develop_pyo3_pure_conda() {
     // Only run on GitHub Actions for now
-    if std::env::var("GITHUB_ACTIONS").is_ok() {
+    if env::var("GITHUB_ACTIONS").is_ok() {
         handle_result(develop::test_develop(
             "test-crates/pyo3-pure",
             None,
@@ -107,22 +108,26 @@ fn develop_cffi_mixed() {
 
 #[test]
 fn develop_uniffi_pure() {
-    handle_result(develop::test_develop(
-        "test-crates/uniffi-pure",
-        None,
-        "develop-uniffi-pure",
-        false,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/uniffi-pure",
+            None,
+            "develop-uniffi-pure",
+            false,
+        ));
+    }
 }
 
 #[test]
 fn develop_uniffi_mixed() {
-    handle_result(develop::test_develop(
-        "test-crates/uniffi-mixed",
-        None,
-        "develop-uniffi-mixed",
-        false,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/uniffi-mixed",
+            None,
+            "develop-uniffi-mixed",
+            false,
+        ));
+    }
 }
 
 #[test]
@@ -236,7 +241,7 @@ fn integration_pyo3_mixed_src_layout() {
 #[cfg_attr(target_os = "macos", ignore)] // Don't run it on macOS, too slow
 fn integration_pyo3_pure_conda() {
     // Only run on GitHub Actions for now
-    if std::env::var("GITHUB_ACTIONS").is_ok() {
+    if env::var("GITHUB_ACTIONS").is_ok() {
         handle_result(integration::test_integration_conda(
             "test-crates/pyo3-mixed",
             None,
@@ -268,24 +273,28 @@ fn integration_cffi_mixed() {
 
 #[test]
 fn integration_uniffi_pure() {
-    handle_result(integration::test_integration(
-        "test-crates/uniffi-pure",
-        None,
-        "integration-uniffi-pure",
-        false,
-        None,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(integration::test_integration(
+            "test-crates/uniffi-pure",
+            None,
+            "integration-uniffi-pure",
+            false,
+            None,
+        ));
+    }
 }
 
 #[test]
 fn integration_uniffi_mixed() {
-    handle_result(integration::test_integration(
-        "test-crates/uniffi-mixed",
-        None,
-        "integration-uniffi-mixed",
-        false,
-        None,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(integration::test_integration(
+            "test-crates/uniffi-mixed",
+            None,
+            "integration-uniffi-mixed",
+            false,
+            None,
+        ));
+    }
 }
 
 #[test]

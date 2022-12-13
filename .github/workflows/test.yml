@@ -119,6 +119,11 @@ jobs:
     env:
       RUST_BACKTRACE: '1'
     steps:
+      - name: Cleanup Disk
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -169,11 +174,12 @@ jobs:
         shell: bash
         if: contains(matrix.python-version, 'pypy')
         run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
+      # To save disk space
+      - name: Disable debuginfo on Windows
+        if: startsWith(matrix.os, 'windows')
+        run: echo "RUSTFLAGS="-C debuginfo=0"" >> $GITHUB_ENV
       - name: cargo test
         run: cargo nextest run --features password-storage
-      - name: free up disk space
-        shell: bash
-        run: rm -rf test-crates/venvs test-crates/targets
       - name: test cross compiling with zig
         shell: bash
         run: |

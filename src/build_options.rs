@@ -906,7 +906,10 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else if bindings == "uniffi" {
             BridgeModel::UniFfi
         } else if bindings == "bin" {
-            BridgeModel::Bin(find_bindings(&deps, &packages))
+            // uniffi bindings don't support bin
+            let bindings =
+                find_bindings(&deps, &packages).filter(|(bindings, _)| bindings != "uniffi");
+            BridgeModel::Bin(bindings)
         } else {
             if !deps.contains_key(bindings) {
                 bail!(
@@ -919,7 +922,12 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         }
     } else if let Some((bindings, minor)) = find_bindings(&deps, &packages) {
         if !targets.contains(&"cdylib") && targets.contains(&"bin") {
-            BridgeModel::Bin(Some((bindings, minor)))
+            if bindings == "uniffi" {
+                // uniffi bindings don't support bin
+                BridgeModel::Bin(None)
+            } else {
+                BridgeModel::Bin(Some((bindings, minor)))
+            }
         } else if bindings == "uniffi" {
             BridgeModel::UniFfi
         } else {

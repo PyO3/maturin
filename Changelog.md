@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.6] - 2022-12-13
+
 * Allow Rust crate to be placed outside of the directory containing `pyproject.toml` in [#1347](https://github.com/PyO3/maturin/pull/1347)
+* Disallow uniffi bin bindings in [#1353](https://github.com/PyO3/maturin/pull/1353)
+* Update bundled Python sysconfigs for Linux and macOS
 
 ## [0.14.5] - 2022-12-08
 
@@ -778,7 +782,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.5...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.6...HEAD
+[0.14.6]: https://github.com/pyo3/maturin/compare/v0.14.5...v0.14.6
 [0.14.5]: https://github.com/pyo3/maturin/compare/v0.14.4...v0.14.5
 [0.14.4]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.4
 [0.14.3]: https://github.com/pyo3/maturin/compare/v0.14.2...v0.14.3

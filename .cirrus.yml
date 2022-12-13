@@ -10,7 +10,6 @@ build_and_test: &BUILD_AND_TEST
     - rustup target add wasm32-wasi
     - python3 -m pip install --upgrade cffi virtualenv
   build_script:
-    - cargo install uniffi_bindgen
     - cargo build
   test_script:
     - cargo test
@@ -54,6 +53,7 @@ macos_arm64_task:
       - cat Cargo.lock
   install_script:
     - brew install python3
+    - python3 -m pip install uniffi-bindgen
   <<: *BUILD_AND_TEST
 
 linux_aarch64_task:
@@ -74,4 +74,6 @@ linux_aarch64_task:
     fingerprint_script:
       - echo $CIRRUS_OS
       - cat Cargo.lock
+  install_script:
+    - python3 -m pip install uniffi-bindgen
   <<: *BUILD_AND_TEST

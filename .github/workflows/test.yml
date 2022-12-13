@@ -132,15 +132,13 @@ jobs:
         if: ${{ !contains(matrix.python-version, 'pypy') }}
         run: pip install cffi
       - name: Install python packages
-        run: pip install virtualenv ziglang~=0.10.0 twine
+        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
           targets: wasm32-wasi  # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Install uniffi_bindgen
-        run: cargo install uniffi_bindgen
       - name: Install aarch64-apple-darwin Rust target
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin

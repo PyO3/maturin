@@ -40,6 +40,7 @@ jobs:
           - x86_64-pc-windows-msvc
           - i686-pc-windows-msvc
           - aarch64-pc-windows-msvc
+          - arm64-apple-darwin
         include:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
@@ -47,6 +48,9 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-latest
             name: maturin-x86_64-apple-darwin.tar.gz
+          - target: arm64-apple-darwin
+            os: macos-latest
+            name: maturin-aarch64-apple-darwin.tar.gz 
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             name: maturin-x86_64-pc-windows-msvc.zip
@@ -92,7 +96,7 @@ jobs:
         run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage
 
       - name: Build wheel (macOS universal2)
-        if: matrix.target == 'x86_64-apple-darwin'
+        if: matrix.target == 'x86_64-apple-darwin' || matrix.target == 'arm64-apple-darwin'
         env:
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           MACOSX_DEPLOYMENT_TARGET: '10.9'

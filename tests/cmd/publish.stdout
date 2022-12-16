@@ -65,7 +65,8 @@ Options:
           This option is ignored on all non-linux platforms
 
   -i, --interpreter [<INTERPRETER>...]
-          The python versions to build wheels for, given as the names of the interpreters
+          The python versions to build wheels for, given as the executables of interpreters such as
+          `python3.9` or `/usr/bin/python3.8`
 
   -f, --find-interpreter
           Find interpreters from the host machine

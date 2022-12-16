@@ -152,8 +152,8 @@ pub struct BuildOptions {
     )]
     pub platform_tag: Vec<PlatformTag>,
 
-    /// The python versions to build wheels for, given as the names of the
-    /// interpreters.
+    /// The python versions to build wheels for, given as the executables of
+    /// interpreters such as `python3.9` or `/usr/bin/python3.8`.
     #[arg(short, long, num_args = 0.., action = clap::ArgAction::Append)]
     pub interpreter: Vec<PathBuf>,
 

@@ -10,8 +10,8 @@ name = "uniffi_mixed"
 crate-type = ["cdylib"]
 
 [dependencies]
-uniffi = "0.21.0"
-uniffi_macros = "0.21.0"
+uniffi = "0.22.0"
+uniffi_macros = "0.22.0"
 
 [build-dependencies]
-uniffi_build = { version = "0.21.0", features = ["builtin-bindgen"] }
+uniffi_build = { version = "0.22.0", features = ["builtin-bindgen"] }

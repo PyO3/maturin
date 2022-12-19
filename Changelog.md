@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add workspace lock file to sdist as a fallback in [#1362](https://github.com/PyO3/maturin/pull/1362)
+
 ## [0.14.6] - 2022-12-13
 
 * Allow Rust crate to be placed outside of the directory containing `pyproject.toml` in [#1347](https://github.com/PyO3/maturin/pull/1347)

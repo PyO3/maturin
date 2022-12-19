@@ -547,6 +547,22 @@ fn pyo3_mixed_include_exclude_wheel_files() {
 }
 
 #[test]
+fn workspace_sdist() {
+    handle_result(other::test_source_distribution(
+        "test-crates/workspace/py",
+        vec![
+            "py-0.1.0/Cargo.lock",
+            "py-0.1.0/Cargo.toml",
+            "py-0.1.0/PKG-INFO",
+            "py-0.1.0/pyproject.toml",
+            "py-0.1.0/src/main.rs",
+        ],
+        None,
+        "sdist-workspace",
+    ))
+}
+
+#[test]
 fn workspace_with_path_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/workspace_with_path_dep/python",
@@ -555,6 +571,7 @@ fn workspace_with_path_dep_sdist() {
             "workspace_with_path_dep-0.1.0/local_dependencies/generic_lib/src/lib.rs",
             "workspace_with_path_dep-0.1.0/local_dependencies/transitive_lib/Cargo.toml",
             "workspace_with_path_dep-0.1.0/local_dependencies/transitive_lib/src/lib.rs",
+            "workspace_with_path_dep-0.1.0/Cargo.lock",
             "workspace_with_path_dep-0.1.0/Cargo.toml",
             "workspace_with_path_dep-0.1.0/pyproject.toml",
             "workspace_with_path_dep-0.1.0/src/lib.rs",
@@ -573,6 +590,7 @@ fn workspace_inheritance_sdist() {
         vec![
             "workspace_inheritance-0.1.0/local_dependencies/generic_lib/Cargo.toml",
             "workspace_inheritance-0.1.0/local_dependencies/generic_lib/src/lib.rs",
+            "workspace_inheritance-0.1.0/Cargo.lock",
             "workspace_inheritance-0.1.0/Cargo.toml",
             "workspace_inheritance-0.1.0/pyproject.toml",
             "workspace_inheritance-0.1.0/src/lib.rs",

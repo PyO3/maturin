@@ -590,16 +590,27 @@ pub fn source_distribution(
     let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
+    let cargo_lock_exists = cargo_lock_path.exists();
+    let workspace_cargo_lock = build_context
+        .cargo_metadata
+        .workspace_root
+        .join("Cargo.lock");
+    let workspace_cargo_lock_exists = workspace_cargo_lock.exists();
     let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
-    if cargo_lock_required || cargo_lock_path.exists() {
+    if cargo_lock_required || cargo_lock_exists || workspace_cargo_lock_exists {
         let project_root = pyproject_toml_path.parent().unwrap();
         let relative_cargo_lock = if cargo_lock_path.starts_with(project_root) {
             cargo_lock_path.strip_prefix(project_root).unwrap()
         } else {
             cargo_lock_path.strip_prefix(abs_manifest_dir).unwrap()
         };
-        writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
+        if cargo_lock_exists {
+            writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
+        } else {
+            // Fallback to workspace Cargo lock file
+            writer.add_file(root_dir.join(relative_cargo_lock), workspace_cargo_lock)?;
+        }
     } else {
         eprintln!(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \

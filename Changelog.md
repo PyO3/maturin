@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking Change**: Remove deprecated `python-source` option in `Cargo.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * **Breaking Change**: Turn `patchelf` version warning into a hard error in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * **Breaking Change**: [`uniffi_bindgen` CLI](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) is required for building `uniffi` bindings wheels in [#1352](https://github.com/PyO3/maturin/pull/1352)
+
+## [0.14.7] - 2022-12-20
+
 * Add workspace lock file to sdist as a fallback in [#1362](https://github.com/PyO3/maturin/pull/1362)
 
 ## [0.14.6] - 2022-12-13
@@ -789,7 +792,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.6...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.7...HEAD
+[0.14.7]: https://github.com/pyo3/maturin/compare/v0.14.6...v0.14.7
 [0.14.6]: https://github.com/pyo3/maturin/compare/v0.14.5...v0.14.6
 [0.14.5]: https://github.com/pyo3/maturin/compare/v0.14.4...v0.14.5
 [0.14.4]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.4

@@ -72,6 +72,35 @@ from my_project import my_project
 You can modify `__init__.py` yourself (see above) if you would like to import
 Rust functions from a higher-level namespace.
 
+You can specify a different python source directory in `pyproject.toml` by setting `tool.maturin.python-source`, for example
+
+**pyproject.toml**
+
+```toml
+[tool.maturin]
+python-source = "python"
+```
+
+then the project structure would look like this:
+
+```
+my-rust-and-python-project
+├── Cargo.toml
+├── python
+│   └── my_project
+│       ├── __init__.py
+│       └── bar.py
+├── pyproject.toml
+├── README.md
+└── src
+    └── lib.rs
+```
+
+> **Note**
+>
+> This structure is recommended to avoid [a common `ImportError` pitfall](https://github.com/PyO3/maturin/issues/490)
+
+
 ### Alternate Python source directory (src layout)
 
 Having a directory with `package_name` in the root of the project can

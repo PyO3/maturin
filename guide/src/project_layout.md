@@ -108,29 +108,22 @@ occasionally cause confusion as Python allows importing local packages and
 modules. A popular way to avoid this is with the `src`-layout, where the Python
 package is nested within a `src` directory. Unfortunately this interferes with
 the structure of a typical Rust project. Fortunately, Python is nor particular
-about the name of the parent source directory. You tell maturin to use a
-different Python source directory in `pyproject.toml` by setting `tool.maturin.python-source`, for example
+about the name of the parent source directory.
 
-**pyproject.toml**
-
-```toml
-[tool.maturin]
-python-source = "python"
-```
-
-then the project structure would look like this:
+maturin will detect the following src layout automatically:
 
 ```
 my-rust-and-python-project
-├── Cargo.toml
-├── python
+├── src  # put python code in src folder
 │   └── my_project
 │       ├── __init__.py
 │       └── bar.py
 ├── pyproject.toml
 ├── README.md
-└── src
-    └── lib.rs
+└── rust # put rust code in rust folder
+    |── Cargo.toml
+    └── src
+        └── lib.rs
 ```
 #### Import Rust as a submodule of your project
 

@@ -249,9 +249,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.14.2"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "364c8bae773d8879ae9ea3bf63e7c052b3e47c095e871f03027e176489df5477"
+checksum = "b56c289fa331582c3637f30a066fdd442fa7e7388541d97e76bc9a15d5688096"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -1852,9 +1852,9 @@ dependencies = [
 
 [[package]]
 name = "portable-atomic"
-version = "0.3.18"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81bdd679d533107e090c2704a35982fc06302e30898e63ffa26a81155c012e92"
+checksum = "26f6a7b87c2e435a3241addceeeff740ff8b7e76b74c13bf9acb17fa454ea00b"
 
 [[package]]
 name = "ppv-lite86"

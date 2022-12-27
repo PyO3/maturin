@@ -97,6 +97,8 @@ pub struct ToolMaturin {
     strip: bool,
     /// The directory with python module, contains `<module_name>/__init__.py`
     python_source: Option<PathBuf>,
+    /// Python packages to include
+    python_packages: Option<Vec<String>>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
     data: Option<PathBuf>,
     // Some customizable cargo options
@@ -208,6 +210,12 @@ impl PyProjectToml {
             .and_then(|maturin| maturin.python_source.as_deref())
     }
 
+    /// Returns the value of `[tool.maturin.python-packages]` in pyproject.toml
+    pub fn python_packages(&self) -> Option<&[String]> {
+        self.maturin()
+            .and_then(|maturin| maturin.python_packages.as_deref())
+    }
+
     /// Returns the value of `[tool.maturin.data]` in pyproject.toml
     pub fn data(&self) -> Option<&Path> {
         self.maturin().and_then(|maturin| maturin.data.as_deref())
@@ -291,6 +299,7 @@ mod tests {
 
             [tool.maturin]
             manylinux = "2010"
+            python-packages = ["foo", "bar"]
             manifest-path = "Cargo.toml"
             profile = "dev"
             features = ["foo", "bar"]
@@ -316,6 +325,10 @@ mod tests {
         assert_eq!(
             maturin.rustc_args,
             Some(vec!["-Z".to_string(), "unstable-options".to_string()])
+        );
+        assert_eq!(
+            maturin.python_packages,
+            Some(vec!["foo".to_string(), "bar".to_string()])
         );
     }
 

@@ -491,6 +491,7 @@ fn pyo3_mixed_src_layout_sdist() {
             "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/__init__.py",
             "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/__init__.py",
             "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/double.py",
+            "pyo3_mixed_src-2.1.3/src/tests/test_pyo3_mixed.py",
             "pyo3_mixed_src-2.1.3/rust/Cargo.toml",
             "pyo3_mixed_src-2.1.3/rust/Cargo.lock",
             "pyo3_mixed_src-2.1.3/rust/src/lib.rs",

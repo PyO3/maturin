@@ -303,7 +303,7 @@ impl WheelWriter {
                 debug!("Adding {} from {}", target, python_path);
                 self.add_bytes(target, python_path.as_bytes())?;
             } else {
-                println!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
+                eprintln!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
             }
         }
         Ok(())
@@ -1098,31 +1098,46 @@ pub fn write_python_part(
     python_module: impl AsRef<Path>,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
-    let python_module = python_module.as_ref();
-    for absolute in WalkBuilder::new(python_module).hidden(false).build() {
-        let absolute = absolute?.into_path();
-        let relative = absolute
-            .strip_prefix(python_module.parent().unwrap())
-            .unwrap();
-        if absolute.is_dir() {
-            writer.add_directory(relative)?;
-        } else {
-            // Ignore native libraries from develop, if any
-            if let Some(extension) = relative.extension() {
-                if extension.to_string_lossy() == "so" {
-                    debug!("Ignoring native library {}", relative.display());
+    let python_module = python_module.as_ref().to_path_buf();
+    let python_dir = python_module.parent().unwrap().to_path_buf();
+    let mut python_packages = vec![python_module];
+    if let Some(pyproject_toml) = pyproject_toml {
+        if let Some(packages) = pyproject_toml.python_packages() {
+            for package in packages {
+                let package_path = python_dir.join(package);
+                if python_packages.iter().any(|p| *p == package_path) {
                     continue;
                 }
+                python_packages.push(package_path);
             }
-            writer
-                .add_file(relative, &absolute)
-                .context(format!("File to add file from {}", absolute.display()))?;
+        }
+    }
+
+    for package in python_packages {
+        for absolute in WalkBuilder::new(package).hidden(false).build() {
+            let absolute = absolute?.into_path();
+            let relative = absolute.strip_prefix(&python_dir).unwrap();
+            if absolute.is_dir() {
+                writer.add_directory(relative)?;
+            } else {
+                // Ignore native libraries from develop, if any
+                if let Some(extension) = relative.extension() {
+                    if extension.to_string_lossy() == "so" {
+                        debug!("Ignoring native library {}", relative.display());
+                        continue;
+                    }
+                }
+                writer
+                    .add_file(relative, &absolute)
+                    .context(format!("File to add file from {}", absolute.display()))?;
+            }
         }
     }
 
     // Include additional files
     if let Some(pyproject) = pyproject_toml {
-        let pyproject_dir = python_module.parent().unwrap();
+        // FIXME: in src-layout pyproject.toml isn't located directly in python dir
+        let pyproject_dir = &python_dir;
         if let Some(glob_patterns) = pyproject.include() {
             for pattern in glob_patterns
                 .iter()

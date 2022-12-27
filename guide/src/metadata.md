@@ -120,6 +120,10 @@ bindings = "pyo3"
 compatibility = "manylinux2014"
 # Don't check for manylinux compliance
 skip-auditwheel = false
+# Python source directory
+python-source = "src"
+# Python packages to include
+python-packages = ["foo", "bar"]
 # Strip the library for minimum file size
 strip = true
 # Build artifacts with the specified Cargo profile

@@ -13,6 +13,8 @@ const PYPROJECT_TOML: &str = "pyproject.toml";
 /// Whether this project is pure rust or rust mixed with python and whether it has wheel data
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProjectLayout {
+    /// Contains the absolute path to the python source directory
+    pub python_dir: PathBuf,
     /// Contains the canonicalized (i.e. absolute) path to the python part of the project
     /// If none, we have a rust crate compiled into a shared library with only some glue python for cffi
     /// If some, we have a python package that is extended by a native rust module.
@@ -348,6 +350,7 @@ impl ProjectLayout {
         };
         debug!(
             project_root = %project_root.display(),
+            python_dir = %python_root.display(),
             rust_module = %rust_module.display(),
             python_module = %python_module.display(),
             extension_name = %extension_name,
@@ -375,6 +378,7 @@ impl ProjectLayout {
             println!("🍹 Building a mixed python/rust project");
 
             Ok(ProjectLayout {
+                python_dir: python_root,
                 python_module: Some(python_module),
                 rust_module,
                 extension_name,
@@ -382,6 +386,7 @@ impl ProjectLayout {
             })
         } else {
             Ok(ProjectLayout {
+                python_dir: python_root,
                 python_module: None,
                 rust_module: project_root.to_path_buf(),
                 extension_name,

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for packaging multiple pure Python packages in [#1378](https://github.com/PyO3/maturin/pull/1378)
+
 ## [0.14.7] - 2022-12-20
 
 * Add workspace lock file to sdist as a fallback in [#1362](https://github.com/PyO3/maturin/pull/1362)

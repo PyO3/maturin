@@ -175,8 +175,6 @@ skip = [
     #{ name = "ansi_term", version = "=0.11.0" },
     { name = "ahash", version = "0.3.8" },
     { name = "hermit-abi", version = "0.1.19" },
-    # from console
-    { name = "terminal_size", version = "0.1.7" },
     # from secret-service
     { name = "block-buffer",  version = "0.9.0" },
     { name = "digest", version = "0.9.0" },

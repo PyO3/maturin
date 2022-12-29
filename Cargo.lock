@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.14.2"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "364c8bae773d8879ae9ea3bf63e7c052b3e47c095e871f03027e176489df5477"
+checksum = "b56c289fa331582c3637f30a066fdd442fa7e7388541d97e76bc9a15d5688096"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -398,9 +398,9 @@ dependencies = [
 
 [[package]]
 name = "chunked_transfer"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fff857943da45f546682664a79488be82e69e43c1a7a2307679ab9afb3a66d2e"
+checksum = "cca491388666e04d7248af3f60f0c40cfb0991c72205595d7c396e3510207d1a"
 
 [[package]]
 name = "cipher"
@@ -424,7 +424,7 @@ dependencies = [
  "once_cell",
  "strsim",
  "termcolor",
- "terminal_size 0.2.3",
+ "terminal_size",
 ]
 
 [[package]]
@@ -523,16 +523,15 @@ checksum = "5458d9d1a587efaf5091602c59d299696a3877a439c8f6d461a2d3cce11df87a"
 
 [[package]]
 name = "console"
-version = "0.15.2"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c050367d967ced717c04b65d8c619d863ef9292ce0c5760028655a2fb298718c"
+checksum = "5556015fe3aad8b968e5d4124980fbe2f6aaee7aeec6b749de1faaa2ca5d0a4c"
 dependencies = [
  "encode_unicode",
  "lazy_static",
  "libc",
- "terminal_size 0.1.17",
  "unicode-width",
- "winapi",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]
@@ -1137,15 +1136,6 @@ checksum = "2540771e65fc8cb83cd6e8a237f70c319bd5c29f78ed1084ba5d50eeac86f7f9"
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "hermit-abi"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee512640fe35acbfb4bb779db6f0d80704c2cacfa2e39b601ef3e3f47d1ae4c7"
@@ -1266,11 +1256,11 @@ dependencies = [
 
 [[package]]
 name = "is-terminal"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "927609f78c2913a6f6ac3c27a4fe87f43e2a35367c0c4b0f8265e8f49a104330"
+checksum = "28dfb6c8100ccc63462345b67d1bbc3679177c75ee4bf59bf29c8b1d110b8189"
 dependencies = [
- "hermit-abi 0.2.6",
+ "hermit-abi",
  "io-lifetimes",
  "rustix",
  "windows-sys 0.42.0",
@@ -1388,7 +1378,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "0.14.7"
+version = "0.14.8-beta.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -1591,12 +1581,11 @@ dependencies = [
 
 [[package]]
 name = "nom8"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75d908f0297c3526d34e478d438b07eefe3d7b0416494d7ffccb17f1c7f7262c"
+checksum = "ae01545c9c7fc4486ab7debaf2aad7003ac19431791868fb2e8066df97fad2f8"
 dependencies = [
  "memchr",
- "minimal-lexical",
 ]
 
 [[package]]
@@ -1702,11 +1691,11 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.14.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6058e64324c71e02bc2b150e4f3bc8286db6c83092132ffa3f6b1eab0f9def5"
+checksum = "0fac9e2da13b5eb447a6ce3d392f23a29d8694bff781bf03a16cd9ac8697593b"
 dependencies = [
- "hermit-abi 0.1.19",
+ "hermit-abi",
  "libc",
 ]
 
@@ -1730,9 +1719,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.44"
+version = "0.10.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29d971fd5722fec23977260f6e81aa67d2f22cadbdc2aa049f1022d9a3be1566"
+checksum = "b102428fd03bc5edf97f62620f7298614c45cedf287c271e7ed450bbaf83f2e1"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -1771,9 +1760,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.79"
+version = "0.9.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5454462c0eced1e97f2ec09036abc8da362e66802f66fd20f86854d9d8cbcbc4"
+checksum = "23bbbf7854cd45b83958ebe919f0e8e516793727652e27fda10a8384cfc790b7"
 dependencies = [
  "autocfg",
  "cc",
@@ -1921,9 +1910,9 @@ dependencies = [
 
 [[package]]
 name = "portable-atomic"
-version = "0.3.18"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81bdd679d533107e090c2704a35982fc06302e30898e63ffa26a81155c012e92"
+checksum = "26f6a7b87c2e435a3241addceeeff740ff8b7e76b74c13bf9acb17fa454ea00b"
 
 [[package]]
 name = "ppv-lite86"
@@ -2210,9 +2199,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.36.5"
+version = "0.36.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3807b5d10909833d3e9acd1eb5fb988f79376ff10fce42937de71a449c4c588"
+checksum = "4feacf7db682c6c329c4ede12649cd36ecab0f3be5b7d74e6a20304725db4549"
 dependencies = [
  "bitflags",
  "errno",
@@ -2361,18 +2350,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.151"
+version = "1.0.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fed41fc1a24994d044e6db6935e69511a1153b52c15eb42493b26fa87feba0"
+checksum = "bb7d1f0d3021d347a83e556fc4683dea2ea09d87bccdf88ff5c12545d89d5efb"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.151"
+version = "1.0.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "255abe9a125a985c05190d687b320c12f9b1f0b99445e608c21ba0782c719ad8"
+checksum = "af487d118eecd09402d70a5d72551860e788df87b464af30e5ea6a38c75c541e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2599,16 +2588,6 @@ dependencies = [
 
 [[package]]
 name = "terminal_size"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "633c1a546cee861a1a6d0dc69ebeca693bf4296661ba7852b9d21d159e0506df"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "terminal_size"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb20089a8ba2b69debd491f8d2d023761cbf196e999218c591fa1e7e15a21907"
@@ -2728,9 +2707,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.16.0"
+version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcd65b83c7473af53e3fd994eb2888dfddfeb28cac9a82825ec5803c233c882c"
+checksum = "dd30deba9a1cd7153c22aecf93e86df639e7b81c622b0af8d9255e989991a7b7"
 dependencies = [
  "indexmap",
  "itertools",

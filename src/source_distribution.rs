@@ -620,26 +620,42 @@ pub fn source_distribution(
 
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     // Add python source files
-    if let Some(python_source) = build_context.project_layout.python_module.as_ref() {
-        for entry in ignore::Walk::new(python_source) {
-            let source = entry?.into_path();
-            // Technically, `ignore` crate should handle this,
-            // but somehow it doesn't on Alpine Linux running in GitHub Actions,
-            // so we do it manually here.
-            // See https://github.com/PyO3/maturin/pull/1187#issuecomment-1273987013
-            if source
-                .extension()
-                .map(|ext| ext == "pyc" || ext == "pyd" || ext == "so")
-                .unwrap_or_default()
-            {
-                debug!("Ignoring {}", source.display());
+    if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
+        let mut python_packages = vec![python_module.to_path_buf()];
+        for package in build_context
+            .pyproject_toml
+            .as_ref()
+            .and_then(|toml| toml.python_packages())
+            .unwrap_or_default()
+        {
+            let package_path = build_context.project_layout.python_dir.join(package);
+            if python_packages.iter().any(|p| *p == package_path) {
                 continue;
             }
-            let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-            if source.is_dir() {
-                writer.add_directory(target)?;
-            } else {
-                writer.add_file(target, &source)?;
+            python_packages.push(package_path);
+        }
+
+        for package in python_packages {
+            for entry in ignore::Walk::new(package) {
+                let source = entry?.into_path();
+                // Technically, `ignore` crate should handle this,
+                // but somehow it doesn't on Alpine Linux running in GitHub Actions,
+                // so we do it manually here.
+                // See https://github.com/PyO3/maturin/pull/1187#issuecomment-1273987013
+                if source
+                    .extension()
+                    .map(|ext| ext == "pyc" || ext == "pyd" || ext == "so")
+                    .unwrap_or_default()
+                {
+                    debug!("Ignoring {}", source.display());
+                    continue;
+                }
+                let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
+                if source.is_dir() {
+                    writer.add_directory(target)?;
+                } else {
+                    writer.add_file(target, &source)?;
+                }
             }
         }
     }

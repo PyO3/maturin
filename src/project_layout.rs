@@ -3,6 +3,7 @@ use crate::{CargoToml, Metadata21, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use normpath::PathExt as _;
+use std::collections::HashSet;
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,8 @@ pub struct ProjectLayout {
     /// If none, we have a rust crate compiled into a shared library with only some glue python for cffi
     /// If some, we have a python package that is extended by a native rust module.
     pub python_module: Option<PathBuf>,
+    /// Python packages to include
+    pub python_packages: Vec<String>,
     /// Contains the canonicalized (i.e. absolute) path to the rust part of the project
     pub rust_module: PathBuf,
     /// Rust extension name
@@ -137,19 +140,30 @@ impl ProjectResolver {
         } else {
             manifest_dir
         };
+        let python_packages = pyproject
+            .and_then(|x| x.python_packages())
+            .unwrap_or_default()
+            .to_vec();
         let py_root = match pyproject.and_then(|x| x.python_source()) {
             Some(py_src) => project_root.join(py_src),
             None => match pyproject.and_then(|x| x.project_name()) {
                 Some(project_name) => {
                     // Detect src layout
-                    let import_name = project_name.replace('-', "_");
                     let rust_cargo_toml_found =
                         project_root.join("rust").join("Cargo.toml").is_file();
-                    let python_src_found = project_root
-                        .join("src")
-                        .join(import_name)
-                        .join("__init__.py")
-                        .is_file();
+                    let import_name = project_name.replace('-', "_");
+                    let mut package_init = HashSet::new();
+                    package_init.insert(
+                        project_root
+                            .join("src")
+                            .join(import_name)
+                            .join("__init__.py"),
+                    );
+                    for package in &python_packages {
+                        package_init
+                            .insert(project_root.join("src").join(package).join("__init__.py"));
+                    }
+                    let python_src_found = package_init.iter().any(|x| x.is_file());
                     if rust_cargo_toml_found && python_src_found {
                         project_root.join("src")
                     } else {
@@ -176,7 +190,8 @@ impl ProjectResolver {
                 }
             }),
         };
-        let project_layout = ProjectLayout::determine(project_root, extension_name, py_root, data)?;
+        let project_layout =
+            ProjectLayout::determine(project_root, extension_name, py_root, python_packages, data)?;
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,
@@ -259,12 +274,18 @@ impl ProjectResolver {
                     } else if let Some(project_name) = pyproject.project_name() {
                         // Check if python source directory in `src/<project_name>`
                         let import_name = project_name.replace('-', "_");
-                        if current_dir
-                            .join("src")
-                            .join(import_name)
-                            .join("__init__.py")
-                            .is_file()
-                        {
+                        let mut package_init = HashSet::new();
+                        package_init.insert(
+                            current_dir
+                                .join("src")
+                                .join(import_name)
+                                .join("__init__.py"),
+                        );
+                        for package in pyproject.python_packages().unwrap_or_default() {
+                            package_init
+                                .insert(current_dir.join("src").join(package).join("__init__.py"));
+                        }
+                        if package_init.iter().any(|x| x.is_file()) {
                             return Ok((path, pyproject_file));
                         }
                     }
@@ -322,6 +343,7 @@ impl ProjectLayout {
         project_root: impl AsRef<Path>,
         module_name: &str,
         python_root: PathBuf,
+        python_packages: Vec<String>,
         data: Option<PathBuf>,
     ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
@@ -373,6 +395,7 @@ impl ProjectLayout {
 
             Ok(ProjectLayout {
                 python_dir: python_root,
+                python_packages,
                 python_module: Some(python_module),
                 rust_module,
                 extension_name,
@@ -381,6 +404,7 @@ impl ProjectLayout {
         } else {
             Ok(ProjectLayout {
                 python_dir: python_root,
+                python_packages,
                 python_module: None,
                 rust_module: project_root.to_path_buf(),
                 extension_name,

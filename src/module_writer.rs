@@ -295,9 +295,9 @@ impl WheelWriter {
         project_layout: &ProjectLayout,
         metadata21: &Metadata21,
     ) -> Result<()> {
-        if let Some(python_module) = &project_layout.python_module {
-            let absolute_path = python_module.normalize()?.into_path_buf();
-            if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
+        if project_layout.python_module.is_some() || !project_layout.python_packages.is_empty() {
+            let absolute_path = project_layout.python_dir.normalize()?.into_path_buf();
+            if let Some(python_path) = absolute_path.to_str() {
                 let name = metadata21.get_distribution_escaped();
                 let target = format!("{}.pth", name);
                 debug!("Adding {} from {}", target, python_path);
@@ -720,6 +720,10 @@ pub fn write_bindings_module(
         }
     };
 
+    if !editable {
+        write_python_part(writer, project_layout, pyproject_toml)
+            .context("Failed to add the python module to the package")?;
+    }
     if let Some(python_module) = &project_layout.python_module {
         if editable {
             let target = project_layout.rust_module.join(&so_filename);
@@ -735,9 +739,6 @@ pub fn write_bindings_module(
                 target.display()
             ))?;
         } else {
-            write_python_part(writer, python_module, pyproject_toml)
-                .context("Failed to add the python module to the package")?;
-
             let relative = project_layout
                 .rust_module
                 .strip_prefix(python_module.parent().unwrap())
@@ -789,14 +790,13 @@ pub fn write_cffi_module(
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
+    if !editable {
+        write_python_part(writer, project_layout, pyproject_toml)
+            .context("Failed to add the python module to the package")?;
+    }
+
     let module;
-
     if let Some(python_module) = &project_layout.python_module {
-        if !editable {
-            write_python_part(writer, python_module, pyproject_toml)
-                .context("Failed to add the python module to the package")?;
-        }
-
         if editable {
             let base_path = python_module.join(module_name);
             fs::create_dir_all(&base_path)?;
@@ -956,14 +956,13 @@ pub fn write_uniffi_module(
     } = generate_uniffi_bindings(crate_dir, target_dir, target_os)?;
     let py_init = format!("from .{} import *  # NOQA\n", binding_name);
 
+    if !editable {
+        write_python_part(writer, project_layout, pyproject_toml)
+            .context("Failed to add the python module to the package")?;
+    }
+
     let module;
-
     if let Some(python_module) = &project_layout.python_module {
-        if !editable {
-            write_python_part(writer, python_module, pyproject_toml)
-                .context("Failed to add the python module to the package")?;
-        }
-
         if editable {
             let base_path = python_module.join(module_name);
             fs::create_dir_all(&base_path)?;
@@ -1095,28 +1094,26 @@ if __name__ == '__main__':
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(
     writer: &mut impl ModuleWriter,
-    python_module: impl AsRef<Path>,
+    project_layout: &ProjectLayout,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
-    let python_module = python_module.as_ref().to_path_buf();
-    let python_dir = python_module.parent().unwrap().to_path_buf();
-    let mut python_packages = vec![python_module];
-    if let Some(pyproject_toml) = pyproject_toml {
-        if let Some(packages) = pyproject_toml.python_packages() {
-            for package in packages {
-                let package_path = python_dir.join(package);
-                if python_packages.iter().any(|p| *p == package_path) {
-                    continue;
-                }
-                python_packages.push(package_path);
-            }
+    let python_dir = &project_layout.python_dir;
+    let mut python_packages = Vec::new();
+    if let Some(python_module) = project_layout.python_module.as_ref() {
+        python_packages.push(python_module.to_path_buf());
+    }
+    for package in &project_layout.python_packages {
+        let package_path = python_dir.join(package);
+        if python_packages.iter().any(|p| *p == package_path) {
+            continue;
         }
+        python_packages.push(package_path);
     }
 
     for package in python_packages {
         for absolute in WalkBuilder::new(package).hidden(false).build() {
             let absolute = absolute?.into_path();
-            let relative = absolute.strip_prefix(&python_dir).unwrap();
+            let relative = absolute.strip_prefix(python_dir).unwrap();
             if absolute.is_dir() {
                 writer.add_directory(relative)?;
             } else {
@@ -1137,7 +1134,7 @@ pub fn write_python_part(
     // Include additional files
     if let Some(pyproject) = pyproject_toml {
         // FIXME: in src-layout pyproject.toml isn't located directly in python dir
-        let pyproject_dir = &python_dir;
+        let pyproject_dir = python_dir;
         if let Some(glob_patterns) = pyproject.include() {
             for pattern in glob_patterns
                 .iter()

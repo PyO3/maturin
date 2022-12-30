@@ -926,16 +926,18 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
         )?;
 
-        if let Some(python_module) = &self.project_layout.python_module {
-            if self.target.is_wasi() {
-                // TODO: Can we have python code and the wasm launchers coexisting
-                // without clashes?
-                bail!("Sorry, adding python code to a wasm binary is currently not supported")
-            }
-            if !self.editable {
-                write_python_part(&mut writer, python_module, self.pyproject_toml.as_ref())
-                    .context("Failed to add the python module to the package")?;
-            }
+        if self.project_layout.python_module.is_some() && self.target.is_wasi() {
+            // TODO: Can we have python code and the wasm launchers coexisting
+            // without clashes?
+            bail!("Sorry, adding python code to a wasm binary is currently not supported")
+        }
+        if !self.editable {
+            write_python_part(
+                &mut writer,
+                &self.project_layout,
+                self.pyproject_toml.as_ref(),
+            )
+            .context("Failed to add the python module to the package")?;
         }
 
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());

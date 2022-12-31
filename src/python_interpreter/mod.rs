@@ -11,6 +11,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::{self, FromStr};
+use tracing::debug;
 
 mod config;
 
@@ -613,6 +614,10 @@ impl PythonInterpreter {
             .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 
         if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
+            debug!(
+                "Skipping outdated python interpreter '{}'",
+                executable.as_ref().display()
+            );
             return Ok(None);
         }
 
@@ -636,6 +641,15 @@ impl PythonInterpreter {
             Some(message.platform.to_lowercase().replace(['-', '.'], "_"))
         };
 
+        let executable = message
+            .executable
+            .map(PathBuf::from)
+            .unwrap_or_else(|| executable.as_ref().to_path_buf());
+        debug!(
+            "Found {} interpreter at {}",
+            interpreter,
+            executable.display()
+        );
         Ok(Some(PythonInterpreter {
             config: InterpreterConfig {
                 major: message.major,
@@ -648,10 +662,7 @@ impl PythonInterpreter {
                 abi_tag: message.abi_tag,
                 pointer_width: None,
             },
-            executable: message
-                .executable
-                .map(PathBuf::from)
-                .unwrap_or_else(|| executable.as_ref().to_path_buf()),
+            executable,
             platform,
             runnable: true,
             implmentation_name: message.implementation_name,

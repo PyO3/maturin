@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use tracing::debug;
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
 // These should be treated almost identically but must be correctly identified
@@ -219,7 +220,6 @@ impl BuildOptions {
     ) -> Result<Vec<PythonInterpreter>> {
         match bridge {
             BridgeModel::Bindings(binding_name, _) | BridgeModel::Bin(Some((binding_name, _))) => {
-                let mut native_interpreters = false;
                 let mut interpreters = Vec::new();
                 if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
                     if !binding_name.starts_with("pyo3") {
@@ -308,25 +308,12 @@ impl BuildOptions {
                         interpreters =
                             find_interpreter_in_sysconfig(interpreter, target, min_python_minor)?;
                     }
+                } else if binding_name.starts_with("pyo3") {
+                    // Only pyo3/pyo3-ffi bindings supports bundled sysconfig interpreters
+                    interpreters = find_interpreter(bridge, interpreter, target, min_python_minor)?;
                 } else {
-                    match find_interpreter_in_host(bridge, interpreter, target, min_python_minor) {
-                        Ok(host_interps) => {
-                            interpreters = host_interps;
-                            native_interpreters = true;
-                        }
-                        Err(err) => {
-                            if binding_name.starts_with("pyo3") && target.is_unix() {
-                                interpreters = find_interpreter_in_sysconfig(
-                                    interpreter,
-                                    target,
-                                    min_python_minor,
-                                )
-                                .map_err(|_| err)?;
-                            } else {
-                                return Err(err);
-                            }
-                        }
-                    }
+                    interpreters =
+                        find_interpreter_in_host(bridge, interpreter, target, min_python_minor)?;
                 }
 
                 let interpreters_str = interpreters
@@ -334,11 +321,7 @@ impl BuildOptions {
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ");
-                if native_interpreters {
-                    println!("🐍 Found {}", interpreters_str);
-                } else {
-                    println!("🐍 Found cross compiling target {}", interpreters_str);
-                }
+                println!("🐍 Found {}", interpreters_str);
 
                 Ok(interpreters)
             }
@@ -1000,6 +983,43 @@ fn find_single_python_interpreter(
     Ok(interpreter)
 }
 
+/// Find python interpreters in host machine first,
+/// fallback to bundled sysconfig if not found in host machine
+fn find_interpreter(
+    bridge: &BridgeModel,
+    interpreter: &[PathBuf],
+    target: &Target,
+    min_python_minor: Option<usize>,
+) -> Result<Vec<PythonInterpreter>> {
+    let mut interpreters = Vec::new();
+    if !interpreter.is_empty() {
+        let mut missing = Vec::new();
+        for interp in interpreter {
+            match PythonInterpreter::check_executable(interp.clone(), target, bridge) {
+                Ok(Some(interp)) => interpreters.push(interp),
+                _ => missing.push(interp.clone()),
+            }
+        }
+        if !missing.is_empty() {
+            let sysconfig_interps =
+                find_interpreter_in_sysconfig(&missing, target, min_python_minor)?;
+            interpreters.extend(sysconfig_interps);
+        }
+    } else {
+        interpreters = PythonInterpreter::find_all(target, bridge, min_python_minor)
+            .context("Finding python interpreters failed")?;
+    };
+
+    if interpreters.is_empty() {
+        if let Some(minor) = min_python_minor {
+            bail!("Couldn't find any python interpreters with version >= 3.{}. Please specify at least one with -i", minor);
+        } else {
+            bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+        }
+    }
+    Ok(interpreters)
+}
+
 /// Find python interpreters in the host machine
 fn find_interpreter_in_host(
     bridge: &BridgeModel,
@@ -1076,7 +1096,16 @@ fn find_interpreter_in_sysconfig(
             python_impl,
             (ver_major, ver_minor),
         )
-        .context("Failed to find a python interpreter")?;
+        .with_context(|| {
+            format!(
+                "Failed to find a {} {}.{} interpreter",
+                python_impl, ver_major, ver_minor
+            )
+        })?;
+        debug!(
+            "Found {} {}.{} in bundled sysconfig",
+            sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor,
+        );
         interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
     }
     Ok(interpreters)

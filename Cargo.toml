@@ -69,7 +69,7 @@ tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional =
 
 # project scaffolding, maturin new/init
 dialoguer = { version = "0.10.2", default-features = false }
-console = "0.15.2"
+console = "0.15.4"
 minijinja = "0.27.0"
 
 # upload
@@ -77,7 +77,7 @@ bytesize = { version = "1.0.1", optional = true }
 configparser = { version = "3.0.0", optional = true }
 multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
 rpassword = { version = "7.0.0", optional = true }
-ureq = { version = "2.3.1", features = ["gzip", "socks-proxy"], default-features = false, optional = true }
+ureq = { version = "2.6.1", features = ["gzip", "socks-proxy"], default-features = false, optional = true }
 native-tls-crate = { package = "native-tls", version = "0.2.8", optional = true }
 keyring = { version = "1.1.1", optional = true }
 time = "0.3.17"

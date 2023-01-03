@@ -19,7 +19,6 @@ pub fn verify_patchelf() -> Result<()> {
     let semver = version
         .parse::<semver::Version>()
         .context("Failed to parse patchelf version")?;
-    println!("{:?}", semver);
     if semver < semver::Version::new(0, 14, 0) {
         bail!(
             "patchelf {} found. auditwheel repair requires patchelf >= 0.14.",

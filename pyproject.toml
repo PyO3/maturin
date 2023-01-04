@@ -48,31 +48,3 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 120
 target-version = "py37"
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-    # maturin specific excludes
-    "venvs",
-    "target",
-    "targets",
-    # auto-generated files
-    "test-crates/cffi-mixed/cffi_mixed/cffi_mixed/ffi.py",
-    "test-crates/uniffi-mixed/uniffi_mixed/uniffi_mixed/math.py",
-]

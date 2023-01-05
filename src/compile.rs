@@ -380,9 +380,7 @@ fn compile_target(
             let maturin_target_dir = context.target_dir.join("maturin");
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
-                target.target_triple(),
-                interpreter.major,
-                interpreter.minor
+                target_triple, interpreter.major, interpreter.minor
             ));
             fs::create_dir_all(&maturin_target_dir)?;
             fs::write(&config_file, pyo3_config).with_context(|| {
@@ -403,8 +401,12 @@ fn compile_target(
     if target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
         use crate::target::rustc_macosx_target_version;
 
-        let (major, minor) = rustc_macosx_target_version(target.target_triple());
+        let (major, minor) = rustc_macosx_target_version(target_triple);
         build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{}.{}", major, minor));
+        eprintln!(
+            "💻 Using `MACOSX_DEPLOYMENT_TARGET={}.{}` for {} by default",
+            major, minor, target_triple
+        );
     }
 
     debug!("Running {:?}", build_command);

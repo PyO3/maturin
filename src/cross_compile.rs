@@ -133,10 +133,7 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
         .collect::<Vec<PathBuf>>();
     sysconfig_paths.dedup();
     if sysconfig_paths.is_empty() {
-        bail!(
-            "Could not find either libpython.so or _sysconfigdata*.py in {}",
-            lib_dir.display()
-        );
+        bail!("Could not find _sysconfigdata*.py in {}", lib_dir.display());
     } else if sysconfig_paths.len() > 1 {
         bail!(
             "Detected multiple possible python versions, please set the PYO3_PYTHON_VERSION \

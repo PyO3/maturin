@@ -38,7 +38,7 @@ serde_json = "1.0.80"
 sha2 = "0.10.3"
 tar = "0.4.38"
 tempfile = "3.2.0"
-toml_edit = { version = "0.16.0", features = ["easy"] }
+toml_edit = { version = "0.17.1", features = ["easy"] }
 zip = { version = "0.6.1", default-features = false, features = ["bzip2", "deflate", "time"] }
 thiserror = "1.0.37"
 dirs = "4.0.0"

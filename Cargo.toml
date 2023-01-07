@@ -35,7 +35,7 @@ serde_json = "1.0.80"
 sha2 = "0.10.3"
 tar = "0.4.38"
 tempfile = "3.2.0"
-toml_edit = { version = "0.16.0", features = ["easy"] }
+toml_edit = { version = "0.17.1", features = ["easy"] }
 zip = { version = "0.6.1", default-features = false, features = ["bzip2", "deflate", "time"] }
 thiserror = "1.0.37"
 dirs = "4.0.0"
@@ -72,7 +72,7 @@ tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional =
 # project scaffolding, maturin new/init
 dialoguer = { version = "0.10.2", default-features = false, optional = true }
 console = { version = "0.15.4", optional = true }
-minijinja = { version = "0.27.0", optional = true }
+minijinja = { version = "0.28.0", optional = true }
 
 # upload
 bytesize = { version = "1.0.1", optional = true }

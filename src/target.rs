@@ -767,6 +767,7 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
             .arg("--target")
             .arg(target)
             .env("RUSTC_BOOTSTRAP", "1")
+            .env_remove("MACOSX_DEPLOYMENT_TARGET")
             .output()
             .context("Failed to run rustc to get the target spec")?;
         let stdout = String::from_utf8(cmd.stdout).context("rustc output is not valid utf-8")?;

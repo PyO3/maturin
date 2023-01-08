@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Don't pass `MACOSX_DEPLOYMENT_TARGET` when query default value from rustc in [#1395](https://github.com/PyO3/maturin/pull/1395)
+
 ## [0.14.8] - 2022-12-31
 
 * Add support for packaging multiple pure Python packages in [#1378](https://github.com/PyO3/maturin/pull/1378)

@@ -10,7 +10,7 @@ For a detailed list of all changes, see the [CHANGELOG](changelog.md).
 maturin 0.14 removed support for specifying python package metadata in `Cargo.toml`,
 Python package metadata should be specified in the `project` section of `pyproject.toml` instead as [PEP 621](https://peps.python.org/pep-0621/) specifies.
 
-### Deprecated `[tool.maturin.sdist-include]`
+### Deprecate `[tool.maturin.sdist-include]`
 
 maturin 0.14 added `[tool.maturin.include]` and `[tool.maturin.exclude]`
 to replace `[tool.maturin.sdist-include]` which was sdist only, the new options
@@ -19,7 +19,7 @@ can be configured to apply to sdist and/or wheel.
 ### macOS deployment target version defaults what `rustc` supports
 
 If you don't set the `MACOSX_DEPLOYMENT_TARGET` environment variable,
-maturin 0.14 will use the default target version quried from `rustc`, 
+maturin 0.14 will use the default target version quired from `rustc`, 
 this may cause build issue for projects that depend on C/C++ code,
 usually you can fix it by setting a correct `MACOSX_DEPLOYMENT_TARGET`, for example
 

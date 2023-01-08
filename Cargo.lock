@@ -233,9 +233,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.13.3"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f574a8d2827f03d03829efb03607297ab3cfd82583f1a1e6d9ec211ee4741433"
+checksum = "570ef9c57470aa820aae02ec06456a9e2148149598c9927943ae8afba56ba322"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -244,6 +244,8 @@ dependencies = [
  "fs-err",
  "indicatif",
  "path-slash",
+ "serde",
+ "serde_json",
  "which",
  "xwin",
 ]

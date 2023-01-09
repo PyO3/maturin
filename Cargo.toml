@@ -23,6 +23,7 @@ name = "maturin"
 anyhow = "1.0.63"
 base64 = "0.13.0"
 glob = "0.3.0"
+cargo-config2 = "0.1.1"
 cargo_metadata = "0.15.2"
 cargo-options = "0.5.2"
 cbindgen = { version = "0.24.2", default-features = false }

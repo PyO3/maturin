@@ -214,6 +214,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-config2"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59a3dbc2202646fb5a83a0f0f45259be618f006862edc0d20938f247f2678706"
+dependencies = [
+ "cfg-expr",
+ "home",
+ "once_cell",
+ "serde",
+ "shell-escape",
+ "toml_edit",
+]
+
+[[package]]
 name = "cargo-options"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -233,19 +247,18 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.13.5"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "570ef9c57470aa820aae02ec06456a9e2148149598c9927943ae8afba56ba322"
+checksum = "ce9653c9f9630bbdb6c3566f9e77ad568e38eeb4c4849b0913a65aa5c43c12df"
 dependencies = [
  "anyhow",
+ "cargo-config2",
  "cargo-options",
  "clap",
  "dirs",
  "fs-err",
  "indicatif",
  "path-slash",
- "serde",
- "serde_json",
  "which",
  "xwin",
 ]
@@ -318,6 +331,15 @@ dependencies = [
  "byteorder",
  "fnv",
  "uuid",
+]
+
+[[package]]
+name = "cfg-expr"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a327683d7499ecc47369531a679fe38acdd300e09bf8c852d08b1e10558622bd"
+dependencies = [
+ "smallvec",
 ]
 
 [[package]]
@@ -1108,6 +1130,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "home"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "747309b4b440c06d57b0b25f2aee03ee9b5e5397d288c60e21fc709bb98a7408"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1327,6 +1358,7 @@ dependencies = [
  "anyhow",
  "base64",
  "bytesize",
+ "cargo-config2",
  "cargo-options",
  "cargo-xwin",
  "cargo-zigbuild",
@@ -2337,6 +2369,12 @@ checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "shell-escape"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45bb67a18fa91266cc7807181f62f9178a6873bfad7dc788c42e6430db40184f"
 
 [[package]]
 name = "shlex"

@@ -173,7 +173,10 @@ fn compile_target(
         }
     }
 
-    let mut rust_flags = env::var_os("RUSTFLAGS");
+    let target_triple = target.target_triple();
+
+    let manifest_dir = context.manifest_path.parent().unwrap();
+    let mut rust_flags = get_rustflags(manifest_dir, target_triple)?;
 
     // We need to pass --bin / --lib
     match bridge_model {
@@ -189,10 +192,11 @@ fn compile_target(
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
             if context.target.is_musl_target() {
-                debug!("Setting `-C target-features=-crt-static` for musl dylib");
-                rust_flags
-                    .get_or_insert_with(Default::default)
-                    .push(" -C target-feature=-crt-static");
+                let flags = rust_flags.get_or_insert_with(Default::default);
+                if !flags.contains("target-feature=-crt-static") {
+                    debug!("Setting `-C target-features=-crt-static` for musl dylib");
+                    flags.push_str(" -C target-feature=-crt-static");
+                }
             }
         }
     }
@@ -226,8 +230,9 @@ fn compile_target(
     } else if target.is_emscripten() {
         let flags = rust_flags.get_or_insert_with(Default::default);
         // Allow user to override these default flags
-        if !flags.to_string_lossy().contains("link-native-libraries") {
-            flags.push(" -Z link-native-libraries=no");
+        if !flags.contains("link-native-libraries") {
+            debug!("Setting `-Z link-native-libraries=no` for Emscripten");
+            flags.push_str(" -Z link-native-libraries=no");
         }
         let mut emscripten_args = Vec::new();
         // Allow user to override these default settings
@@ -260,7 +265,6 @@ fn compile_target(
             .extend(["-C".to_string(), "link-arg=-s".to_string()]);
     }
 
-    let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
         {
@@ -503,6 +507,19 @@ fn compile_target(
     }
 
     Ok(artifacts)
+}
+
+/// Get `RUSTFLAGS` in the following order:
+///
+/// 1. `RUSTFLAGS` environment variable
+/// 2. `rustflags` cargo configuration
+fn get_rustflags(workdir: &Path, target: &str) -> Result<Option<String>> {
+    let cargo_config = cargo_config2::Config::load_with_cwd(workdir)?;
+    let rustflags = cargo_config.rustflags(target)?;
+    match rustflags {
+        Some(rustflags) => Ok(Some(rustflags.encode_space_separated()?)),
+        None => Ok(None),
+    }
 }
 
 /// Checks that the native library contains a function called `PyInit_<module name>` and warns

@@ -1,0 +1,21 @@
+Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as
+python packages
+
+Usage: maturin[EXE] <COMMAND>
+
+Commands:
+  build        Build the crate into python packages
+  publish      Build and publish the crate as python packages to pypi
+  list-python  Search and list the available python installations
+  develop      Install the crate as module in the current virtualenv
+  sdist        Build only a source distribution (sdist) without compiling
+  init         Create a new cargo project in an existing directory
+  new          Create a new cargo project
+  upload       Upload python packages to pypi
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help information
+  -V, --version  Print version information
+
+Visit https://maturin.rs to learn more about maturin.

@@ -1,5 +1,6 @@
 use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo, test_python_path};
 use anyhow::{bail, Context, Result};
+#[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
 use maturin::{BuildOptions, PythonInterpreter};
@@ -52,7 +53,12 @@ pub fn test_integration(
         cli.push(target)
     }
 
-    let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || Zig::find_zig().is_ok()) {
+    #[cfg(feature = "zig")]
+    let zig_found = Zig::find_zig().is_ok();
+    #[cfg(not(feature = "zig"))]
+    let zig_found = false;
+
+    let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
         cli.push("--zig");
         true
     } else {

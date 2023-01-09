@@ -203,8 +203,9 @@ fn generate_project(
     } else {
         let selection = Select::with_theme(&ColorfulTheme::default())
             .with_prompt(format!(
-                "🤷 {}",
-                style("Which kind of bindings to use?").bold()
+                "🤷 {}\n  📖 {}",
+                style("Which kind of bindings to use?").bold(),
+                style("Documentation: https://maturin.rs/bindings.html").dim()
             ))
             .items(&bindings_items)
             .default(0)

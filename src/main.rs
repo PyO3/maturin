@@ -21,6 +21,7 @@ use std::path::PathBuf;
     version,
     name = env!("CARGO_PKG_NAME"),
     display_order = 1,
+    after_help = "Visit https://maturin.rs to learn more about maturin."
 )]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well

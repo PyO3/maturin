@@ -176,7 +176,9 @@ fn compile_target(
     let target_triple = target.target_triple();
 
     let manifest_dir = context.manifest_path.parent().unwrap();
-    let mut rust_flags = get_rustflags(manifest_dir, target_triple)?;
+    let mut rustflags = cargo_config2::Config::load_with_cwd(manifest_dir)?
+        .rustflags(target_triple)?
+        .unwrap_or_default();
 
     // We need to pass --bin / --lib
     match bridge_model {
@@ -191,12 +193,15 @@ fn compile_target(
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
-            if context.target.is_musl_target() {
-                let flags = rust_flags.get_or_insert_with(Default::default);
-                if !flags.contains("target-feature=-crt-static") {
-                    debug!("Setting `-C target-features=-crt-static` for musl dylib");
-                    flags.push_str(" -C target-feature=-crt-static");
-                }
+            if context.target.is_musl_target()
+                && !rustflags
+                    .flags
+                    .iter()
+                    .any(|f| f == "target-feature=-crt-static")
+            {
+                debug!("Setting `-C target-features=-crt-static` for musl dylib");
+                rustflags.push("-C");
+                rustflags.push("target-feature=-crt-static");
             }
         }
     }
@@ -228,11 +233,11 @@ fn compile_target(
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
-        let flags = rust_flags.get_or_insert_with(Default::default);
         // Allow user to override these default flags
-        if !flags.contains("link-native-libraries") {
+        if !rustflags.flags.iter().any(|f| f == "link-native-libraries") {
             debug!("Setting `-Z link-native-libraries=no` for Emscripten");
-            flags.push_str(" -Z link-native-libraries=no");
+            rustflags.push("-Z");
+            rustflags.push("link-native-libraries=no");
         }
         let mut emscripten_args = Vec::new();
         // Allow user to override these default settings
@@ -336,8 +341,8 @@ fn compile_target(
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
 
-    if let Some(flags) = rust_flags {
-        build_command.env("RUSTFLAGS", flags);
+    if !rustflags.flags.is_empty() {
+        build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bridge_model {
@@ -507,19 +512,6 @@ fn compile_target(
     }
 
     Ok(artifacts)
-}
-
-/// Get `RUSTFLAGS` in the following order:
-///
-/// 1. `RUSTFLAGS` environment variable
-/// 2. `rustflags` cargo configuration
-fn get_rustflags(workdir: &Path, target: &str) -> Result<Option<String>> {
-    let cargo_config = cargo_config2::Config::load_with_cwd(workdir)?;
-    let rustflags = cargo_config.rustflags(target)?;
-    match rustflags {
-        Some(rustflags) => Ok(Some(rustflags.encode_space_separated()?)),
-        None => Ok(None),
-    }
 }
 
 /// Checks that the native library contains a function called `PyInit_<module name>` and warns

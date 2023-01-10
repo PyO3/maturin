@@ -1322,7 +1322,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "0.14.8"
+version = "0.14.9"
 dependencies = [
  "anyhow",
  "base64",
@@ -1823,9 +1823,9 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "platform-info"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4278b2b54a23c9a91d5bae9b09e21d566f8b23890491951160b05d64f29d1d8b"
+checksum = "4e7c23cfae725ae06d9e43010153fa77bdfa8c827bf08fe4beeb2a3514e6be12"
 dependencies = [
  "libc",
  "winapi",
@@ -2042,9 +2042,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.7.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e076559ef8e241f2ae3479e36f97bd5741c0330689e217ad51ce2c76808b868a"
+checksum = "48aaa5748ba571fb95cd2c85c09f629215d3a6ece942baa100950af03a34f733"
 dependencies = [
  "aho-corasick",
  "memchr",

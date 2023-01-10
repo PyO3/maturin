@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.9] - 2023-01-10
+
 * Don't pass `MACOSX_DEPLOYMENT_TARGET` when query default value from rustc in [#1395](https://github.com/PyO3/maturin/pull/1395)
 
 ## [0.14.8] - 2022-12-31
@@ -793,7 +795,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.8...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.9...HEAD
+[0.14.9]: https://github.com/pyo3/maturin/compare/v0.14.8...v0.14.9
 [0.14.8]: https://github.com/pyo3/maturin/compare/v0.14.7...v0.14.8
 [0.14.7]: https://github.com/pyo3/maturin/compare/v0.14.6...v0.14.7
 [0.14.6]: https://github.com/pyo3/maturin/compare/v0.14.5...v0.14.6

@@ -260,9 +260,9 @@ dependencies = [
 
 [[package]]
 name = "camino"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88ad0e1e3e88dd237a156ab9f571021b8a158caa0ae44b1968a241efb5144c1e"
+checksum = "c77df041dc383319cc661b428b6961a005db4d6808d5e12536931b1ca9556055"
 dependencies = [
  "serde",
 ]
@@ -1373,7 +1373,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "0.14.8"
+version = "0.14.9"
 dependencies = [
  "anyhow",
  "base64",
@@ -1881,9 +1881,9 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "platform-info"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4278b2b54a23c9a91d5bae9b09e21d566f8b23890491951160b05d64f29d1d8b"
+checksum = "4e7c23cfae725ae06d9e43010153fa77bdfa8c827bf08fe4beeb2a3514e6be12"
 dependencies = [
  "libc",
  "winapi",
@@ -2100,9 +2100,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.7.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e076559ef8e241f2ae3479e36f97bd5741c0330689e217ad51ce2c76808b868a"
+checksum = "48aaa5748ba571fb95cd2c85c09f629215d3a6ece942baa100950af03a34f733"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2135,9 +2135,9 @@ dependencies = [
 
 [[package]]
 name = "rfc2047-decoder"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11347d014ae34e1d367aaf9191c37bf071b161e2e1c09c8559c7717e87030e11"
+checksum = "6e0df53c9deb8931ce779840148cda205fd17475ce59193ff7f8d136ef755481"
 dependencies = [
  "base64",
  "charset",

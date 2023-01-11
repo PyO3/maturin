@@ -173,7 +173,12 @@ fn compile_target(
         }
     }
 
-    let mut rust_flags = env::var_os("RUSTFLAGS");
+    let target_triple = target.target_triple();
+
+    let manifest_dir = context.manifest_path.parent().unwrap();
+    let mut rustflags = cargo_config2::Config::load_with_cwd(manifest_dir)?
+        .rustflags(target_triple)?
+        .unwrap_or_default();
 
     // We need to pass --bin / --lib
     match bridge_model {
@@ -188,11 +193,15 @@ fn compile_target(
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
-            if context.target.is_musl_target() {
+            if context.target.is_musl_target()
+                && !rustflags
+                    .flags
+                    .iter()
+                    .any(|f| f == "target-feature=-crt-static")
+            {
                 debug!("Setting `-C target-features=-crt-static` for musl dylib");
-                rust_flags
-                    .get_or_insert_with(Default::default)
-                    .push(" -C target-feature=-crt-static");
+                rustflags.push("-C");
+                rustflags.push("target-feature=-crt-static");
             }
         }
     }
@@ -224,10 +233,11 @@ fn compile_target(
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
-        let flags = rust_flags.get_or_insert_with(Default::default);
         // Allow user to override these default flags
-        if !flags.to_string_lossy().contains("link-native-libraries") {
-            flags.push(" -Z link-native-libraries=no");
+        if !rustflags.flags.iter().any(|f| f == "link-native-libraries") {
+            debug!("Setting `-Z link-native-libraries=no` for Emscripten");
+            rustflags.push("-Z");
+            rustflags.push("link-native-libraries=no");
         }
         let mut emscripten_args = Vec::new();
         // Allow user to override these default settings
@@ -260,7 +270,6 @@ fn compile_target(
             .extend(["-C".to_string(), "link-arg=-s".to_string()]);
     }
 
-    let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
         {
@@ -332,8 +341,8 @@ fn compile_target(
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
 
-    if let Some(flags) = rust_flags {
-        build_command.env("RUSTFLAGS", flags);
+    if !rustflags.flags.is_empty() {
+        build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bridge_model {

@@ -428,7 +428,7 @@ fn run() -> Result<()> {
 fn main() {
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");
-        for cause in e.chain().collect::<Vec<_>>().iter() {
+        for cause in e.chain() {
             eprintln!("  Caused by: {}", cause);
         }
         std::process::exit(1);

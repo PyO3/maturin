@@ -143,7 +143,7 @@ fn copy_artifacts(cache_path: &Path, stdout_path: &Path, is_cached: bool) -> Res
 fn main() {
     if let Err(e) = run() {
         eprintln!("💥 Cargo mock failed");
-        for cause in e.chain().collect::<Vec<_>>().iter() {
+        for cause in e.chain() {
             eprintln!("  Caused by: {}", cause);
         }
         std::process::exit(1);

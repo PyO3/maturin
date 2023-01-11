@@ -20,7 +20,12 @@
 targets = [
     # The triple can be any string, but only the target triples built in to
     # rustc (as of 1.40) can be checked against actual config expressions
-    #{ triple = "x86_64-unknown-linux-musl" },
+    { triple = "x86_64-unknown-linux-musl" },
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-pc-windows-msvc" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "aarch64-apple-darwin" },
     # You can also specify which target_features you promise are enabled for a
     # particular target. target_features are currently not validated against
     # the actual valid features supported by the target architecture.
@@ -174,7 +179,6 @@ deny = [
 skip = [
     #{ name = "ansi_term", version = "=0.11.0" },
     { name = "ahash", version = "0.3.8" },
-    { name = "hermit-abi", version = "0.1.19" },
     # from secret-service
     { name = "block-buffer",  version = "0.9.0" },
     { name = "digest", version = "0.9.0" },

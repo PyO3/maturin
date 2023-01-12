@@ -68,10 +68,10 @@ pub fn develop(
 
     let build_context = build_options.into_build_context(release, strip, true)?;
 
-    let interpreter = PythonInterpreter::check_executable(&python, &target, &build_context.bridge)?
-        .ok_or_else(|| {
-            anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-        })?;
+    let interpreter =
+        PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
+            || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
+        )?;
 
     // Install dependencies
     if !build_context.metadata21.requires_dist.is_empty() {

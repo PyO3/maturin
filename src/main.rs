@@ -222,7 +222,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             let context = build_options.into_build_context(true, strip, false)?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
-            let tags = match context.bridge {
+            let tags = match context.bridge() {
                 BridgeModel::Bindings(..) | BridgeModel::Bin(Some(..)) => {
                     vec![context.interpreter[0].get_tag(
                         &context.target,

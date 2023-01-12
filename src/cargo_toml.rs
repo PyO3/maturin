@@ -120,8 +120,9 @@ pub struct CargoTarget {
     pub name: String,
     /// Kind of target ("bin", "lib")
     pub kind: Option<String>,
-    /// Bridge model, which kind of bindings to use
-    pub bindings: Option<String>,
+    // TODO: Add bindings option
+    // Bridge model, which kind of bindings to use
+    // pub bindings: Option<String>,
 }
 
 #[cfg(test)]

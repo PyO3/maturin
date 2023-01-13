@@ -501,8 +501,9 @@ impl BuildOptions {
 
         if !bridge.is_bin() && module_name.contains('-') {
             bail!(
-                "The module name must not contains a minus \
-                 (Make sure you have set an appropriate [lib] name in your Cargo.toml)"
+                "The module name must not contain a minus `-` \
+                 (Make sure you have set an appropriate [lib] name or \
+                 [package.metadata.maturin] name in your Cargo.toml)"
             );
         }
 

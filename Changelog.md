@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Use module name specified by `[package.metadata.maturin]` in [#1409](https://github.com/PyO3/maturin/pull/1409)
+
 ## [0.14.9] - 2023-01-10
 
 * Don't pass `MACOSX_DEPLOYMENT_TARGET` when query default value from rustc in [#1395](https://github.com/PyO3/maturin/pull/1395)

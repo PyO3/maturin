@@ -128,12 +128,7 @@ impl ProjectResolver {
             .unwrap_or(crate_name)
             .to_owned();
 
-        // Only use extension name from extra metadata if it contains dot
-        let extension_name = extra_metadata
-            .name
-            .as_ref()
-            .filter(|name| name.contains('.'))
-            .unwrap_or(&module_name);
+        let extension_name = extra_metadata.name.as_ref().unwrap_or(&module_name);
 
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)

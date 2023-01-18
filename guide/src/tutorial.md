@@ -36,7 +36,7 @@ crate-type = ["cdylib"]
 rand = "0.8.4"
 
 [dependencies.pyo3]
-version = "0.17.3"
+version = "0.18.0"
 # "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
 # "abi3-py37" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.7
 features = ["extension-module", "abi3-py37"]
@@ -190,7 +190,7 @@ So let's use maturin to build and install in our current environment.
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % maturin develop
 🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.7
 🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)
-   Compiling pyo3-build-config v0.17.3
+   Compiling pyo3-build-config v0.18.0
    Compiling libc v0.2.119
    Compiling once_cell v1.10.0
    Compiling cfg-if v1.0.0
@@ -211,10 +211,10 @@ So let's use maturin to build and install in our current environment.
    Compiling rand_chacha v0.3.1
    Compiling rand v0.8.5
    Compiling quote v1.0.15
-   Compiling pyo3-ffi v0.17.3
-   Compiling pyo3 v0.17.3
-   Compiling pyo3-macros-backend v0.17.3
-   Compiling pyo3-macros v0.17.3
+   Compiling pyo3-ffi v0.18.0
+   Compiling pyo3 v0.18.0
+   Compiling pyo3-macros-backend v0.18.0
+   Compiling pyo3-macros v0.18.0
    Compiling guessing-game v0.1.0 (/Users/ferris/src/rust/guessing-game)
     Finished dev [unoptimized + debuginfo] target(s) in 13.31s
 ```

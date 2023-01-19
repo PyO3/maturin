@@ -63,6 +63,17 @@ jobs:
       - run: pip install ruff
       - run: ruff .
 
+  mypy:
+    name: Mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - run: pip install mypy
+      - run: mypy maturin
+
   spellcheck:
     name: Spellcheck
     runs-on: ubuntu-latest

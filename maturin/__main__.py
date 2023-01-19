@@ -1,17 +1,18 @@
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
 import sysconfig
-from typing import Optional
 
 
-def get_maturin_path() -> Optional[Path]:
+def get_maturin_path() -> Path | None:
     SCRIPT_NAME = "maturin"
 
-    def script_dir(scheme: str) -> Path:
+    def script_dir(scheme: str) -> str:
         return sysconfig.get_path("scripts", scheme)
 
-    def script_exists(dir: Path) -> bool:
+    def script_exists(dir: str) -> bool:
         for _, _, files in os.walk(dir):
             for f in files:
                 name, *_ = os.path.splitext(f)

@@ -1,31 +1,39 @@
+from __future__ import annotations
+
 import contextlib
 import importlib
 import importlib.util
-from importlib import abc
-from importlib.machinery import ModuleSpec
 import os
 import pathlib
 import shutil
-import sys
 import subprocess
-from typing import Optional
+import sys
+from importlib import abc
+from importlib.machinery import ModuleSpec
+from types import ModuleType
+from typing import Sequence
 
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore
 
 
 class Importer(abc.MetaPathFinder):
     """A meta-path importer for the maturin based packages"""
 
-    def __init__(self, bindings: Optional[str] = None, release: bool = False):
+    def __init__(self, bindings: str | None = None, release: bool = False):
         self.bindings = bindings
         self.release = release
 
-    def find_spec(self, fullname, path, target=None):
+    def find_spec(
+        self,
+        fullname: str,
+        path: Sequence[str | bytes] | None = None,
+        target: ModuleType | None = None,
+    ) -> ModuleSpec | None:
         if fullname in sys.modules:
-            return
+            return None
         mod_parts = fullname.split(".")
         module_name = mod_parts[-1]
 
@@ -51,17 +59,21 @@ class Importer(abc.MetaPathFinder):
             cargo_toml = project_dir / "Cargo.toml"
             return self._build_and_load(fullname, cargo_toml)
 
-    def _build_and_load(self, fullname: str, cargo_toml: pathlib.Path) -> ModuleSpec:
+        return None
+
+    def _build_and_load(
+        self, fullname: str, cargo_toml: pathlib.Path
+    ) -> ModuleSpec | None:
         build_module(cargo_toml, bindings=self.bindings)
         loader = Loader(fullname)
         return importlib.util.spec_from_loader(fullname, loader)
 
 
 class Loader(abc.Loader):
-    def __init__(self, fullname):
+    def __init__(self, fullname: str):
         self.fullname = fullname
 
-    def load_module(self, fullname):
+    def load_module(self, fullname: str) -> ModuleType:
         return importlib.import_module(self.fullname)
 
 
@@ -84,7 +96,7 @@ def generate_project(rust_file: pathlib.Path, bindings: str = "pyo3") -> pathlib
     if project_dir.exists():
         shutil.rmtree(project_dir)
 
-    command = ["maturin", "new", "-b", bindings, project_dir]
+    command: list[str] = ["maturin", "new", "-b", bindings, str(project_dir)]
     result = subprocess.run(command, stdout=subprocess.PIPE)
     if result.returncode != 0:
         sys.stderr.write(
@@ -101,9 +113,9 @@ def generate_project(rust_file: pathlib.Path, bindings: str = "pyo3") -> pathlib
 
 
 def build_module(
-    manifest_path: pathlib.Path, bindings: Optional[str] = None, release: bool = False
-):
-    command = ["maturin", "develop", "-m", manifest_path]
+    manifest_path: pathlib.Path, bindings: str | None = None, release: bool = False
+) -> None:
+    command = ["maturin", "develop", "-m", str(manifest_path)]
     if bindings:
         command.append("-b")
         command.append(bindings)
@@ -126,7 +138,7 @@ def _have_importer() -> bool:
     return False
 
 
-def install(bindings: Optional[str] = None, release: bool = False):
+def install(bindings: str | None = None, release: bool = False) -> Importer | None:
     """
     Install the import hook.
 
@@ -136,13 +148,13 @@ def install(bindings: Optional[str] = None, release: bool = False):
     :param release: Build in release mode, otherwise debug mode by default
     """
     if _have_importer():
-        return
+        return None
     importer = Importer(bindings=bindings, release=release)
     sys.meta_path.append(importer)
     return importer
 
 
-def uninstall(importer: Importer):
+def uninstall(importer: Importer) -> None:
     """
     Uninstall the import hook.
     """

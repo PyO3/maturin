@@ -130,7 +130,7 @@ fn bin_wasi_helper(
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
             .requires_dist
-            .push("wasmtime>=4.0.0,<5.0.0".to_string());
+            .push("wasmtime>=5.0.0,<6.0.0".to_string());
     }
 
     Ok(metadata21)

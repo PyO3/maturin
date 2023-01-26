@@ -44,7 +44,7 @@ ENV PATH /opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-c
 ENV USER root
 
 RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && yum install -y libffi-devel \
+    && yum install -y libffi-devel openssh-client \
     && python3.7 -m pip install --no-cache-dir cffi \
     && python3.8 -m pip install --no-cache-dir cffi \
     && python3.9 -m pip install --no-cache-dir cffi \

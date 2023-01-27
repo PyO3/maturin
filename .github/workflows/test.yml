@@ -353,8 +353,8 @@ jobs:
           push: false
           tags: maturin
           load: true
-          cache-from: type=registry,ref=maturin-buildcache
-          cache-to: type=registry,ref=maturin-buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:maturin-buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:maturin-buildcache,mode=max
       - name: Test the Docker container
         run: ./test-dockerfile.sh
 

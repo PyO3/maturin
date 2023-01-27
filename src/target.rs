@@ -282,9 +282,9 @@ impl Target {
                 platform_tags.sort();
                 let mut tags = vec![];
                 for platform_tag in platform_tags {
-                    tags.push(format!("{}_{}", platform_tag, arch));
+                    tags.push(format!("{platform_tag}_{arch}"));
                     for alias in platform_tag.aliases() {
-                        tags.push(format!("{}_{}", alias, arch));
+                        tags.push(format!("{alias}_{arch}"));
                     }
                 }
                 tags.join(".")
@@ -294,16 +294,12 @@ impl Target {
                 let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
                 if universal2 {
                     format!(
-                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2",
-                        x86_64_major = x86_64_major,
-                        x86_64_minor = x86_64_minor,
-                        arm64_major = arm64_major,
-                        arm64_minor = arm64_minor
+                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2"
                     )
                 } else if self.arch == Arch::Aarch64 {
-                    format!("macosx_{}_{}_arm64", arm64_major, arm64_minor)
+                    format!("macosx_{arm64_major}_{arm64_minor}_arm64")
                 } else {
-                    format!("macosx_{}_{}_x86_64", x86_64_major, x86_64_minor)
+                    format!("macosx_{x86_64_major}_{x86_64_minor}_x86_64")
                 }
             }
             // FreeBSD
@@ -340,7 +336,7 @@ impl Target {
                     Err(_) => emcc_version()?,
                 };
                 let release = release.replace(['.', '-'], "_");
-                format!("emscripten_{}_wasm32", release)
+                format!("emscripten_{release}_wasm32")
             }
             (Os::Wasi, Arch::Wasm32) => {
                 "any".to_string()
@@ -361,15 +357,12 @@ impl Target {
                             // SunOS 5 == Solaris 2
                             os = "solaris".to_string();
                             release = format!("{}_{}", major_ver - 3, other);
-                            machine = format!("{}_64bit", machine);
+                            machine = format!("{machine}_64bit");
                         }
                     }
                 }
                 format!(
-                    "{}_{}_{}",
-                    os,
-                    release,
-                    machine
+                    "{os}_{release}_{machine}"
                 )
             }
         };

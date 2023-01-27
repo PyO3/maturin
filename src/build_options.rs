@@ -239,10 +239,7 @@ impl BuildOptions {
                             min_python_minor,
                         )?;
                         let host_python = &host_interpreters[0];
-                        println!(
-                            "🐍 Using host {} for cross-compiling preparation",
-                            host_python
-                        );
+                        println!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
                         env::set_var("PYO3_PYTHON", &host_python.executable);
                         // rust-cpython, and legacy pyo3 versions
@@ -322,14 +319,14 @@ impl BuildOptions {
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ");
-                println!("🐍 Found {}", interpreters_str);
+                println!("🐍 Found {interpreters_str}");
 
                 Ok(interpreters)
             }
             BridgeModel::Cffi => {
                 let interpreter =
                     find_single_python_interpreter(bridge, interpreter, target, "cffi")?;
-                println!("🐍 Using {} to generate the cffi bindings", interpreter);
+                println!("🐍 Using {interpreter} to generate the cffi bindings");
                 Ok(vec![interpreter])
             }
             BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
@@ -366,7 +363,7 @@ impl BuildOptions {
                             soabi: None,
                         }])
                     } else if let Some(interp) = interpreters.get(0) {
-                        println!("🐍 Using {} to generate to link bindings (With abi3, an interpreter is only required on windows)", interp);
+                        println!("🐍 Using {interp} to generate to link bindings (With abi3, an interpreter is only required on windows)");
                         Ok(interpreters)
                     } else if generate_import_lib {
                         println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
@@ -623,10 +620,7 @@ impl BuildOptions {
 
         for platform_tag in &platform_tags {
             if !platform_tag.is_supported() {
-                eprintln!(
-                    "⚠️  Warning: {} is unsupported by the Rust compiler.",
-                    platform_tag
-                );
+                eprintln!("⚠️  Warning: {platform_tag} is unsupported by the Rust compiler.");
             }
         }
 
@@ -860,7 +854,7 @@ fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
                         ))
                     })
                     .collect::<Result<Vec<(u8, u8)>>>()
-                    .context(format!("Bogus {} cargo features", lib))?
+                    .context(format!("Bogus {lib} cargo features"))?
                     .into_iter()
                     .min();
                 if abi3_selected && min_abi3_version.is_none() {
@@ -1009,7 +1003,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     };
 
     if !(bridge.is_bindings("pyo3") || bridge.is_bindings("pyo3-ffi")) {
-        println!("🔗 Found {} bindings", bridge);
+        println!("🔗 Found {bridge} bindings");
     }
 
     for &lib in PYO3_BINDING_CRATES.iter() {
@@ -1018,21 +1012,17 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
                 let version = cargo_metadata[&pyo3_node.id].version.to_string();
                 eprintln!(
-                    "⚠️  Warning: You're building a library without activating {}'s \
+                    "⚠️  Warning: You're building a library without activating {lib}'s \
                      `extension-module` feature. \
-                     See https://pyo3.rs/v{}/building_and_distribution.html#linking",
-                    lib, version
+                     See https://pyo3.rs/v{version}/building_and_distribution.html#linking"
                 );
             }
 
             return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
-                println!(
-                    "🔗 Found {} bindings with abi3 support for Python ≥ {}.{}",
-                    lib, major, minor
-                );
+                println!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
                 Ok(BridgeModel::BindingsAbi3(major, minor))
             } else {
-                println!("🔗 Found {} bindings", lib);
+                println!("🔗 Found {lib} bindings");
                 Ok(bridge)
             };
         }
@@ -1163,16 +1153,10 @@ fn find_interpreter_in_sysconfig(
             .split_once('.')
             .context("Invalid python interpreter version")?;
         let ver_major = ver_major.parse::<usize>().with_context(|| {
-            format!(
-                "Invalid python interpreter major version '{}', expect a digit",
-                ver_major
-            )
+            format!("Invalid python interpreter major version '{ver_major}', expect a digit")
         })?;
         let ver_minor = ver_minor.parse::<usize>().with_context(|| {
-            format!(
-                "Invalid python interpreter minor version '{}', expect a digit",
-                ver_minor
-            )
+            format!("Invalid python interpreter minor version '{ver_minor}', expect a digit")
         })?;
         let sysconfig = InterpreterConfig::lookup(
             target.target_os(),
@@ -1181,10 +1165,7 @@ fn find_interpreter_in_sysconfig(
             (ver_major, ver_minor),
         )
         .with_context(|| {
-            format!(
-                "Failed to find a {} {}.{} interpreter",
-                python_impl, ver_major, ver_minor
-            )
+            format!("Failed to find a {python_impl} {ver_major}.{ver_minor} interpreter")
         })?;
         debug!(
             "Found {} {}.{} in bundled sysconfig",

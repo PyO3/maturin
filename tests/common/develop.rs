@@ -17,7 +17,7 @@ pub fn test_develop(
 
     let package = package.as_ref();
     let (venv_dir, python) = if conda {
-        create_conda_env(&format!("maturin-{}", unique_name), 3, 10)?
+        create_conda_env(&format!("maturin-{unique_name}"), 3, 10)?
     } else {
         create_virtualenv(unique_name, None)?
     };
@@ -49,10 +49,7 @@ pub fn test_develop(
         CargoOptions {
             manifest_path: Some(manifest_file),
             quiet: true,
-            target_dir: Some(PathBuf::from(format!(
-                "test-crates/targets/{}",
-                unique_name
-            ))),
+            target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
         &venv_dir,

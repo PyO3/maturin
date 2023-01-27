@@ -150,10 +150,10 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", local_deps_folder, dep_name))
+                    toml_edit::value(format!("{local_deps_folder}/{dep_name}"))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    toml_edit::value(format!("../{}", dep_name))
+                    toml_edit::value(format!("../{dep_name}"))
                 };
                 if workspace_inherit {
                     // Remove workspace inheritance now that we converted it into a path dependency
@@ -207,8 +207,7 @@ fn rewrite_cargo_toml(
                             let path = Path::new(s.value());
                             if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
                                 if known_path_deps.contains_key(name) {
-                                    new_members
-                                        .push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                                    new_members.push(format!("{LOCAL_DEPENDENCIES_FOLDER}/{name}"));
                                 }
                             }
                         }
@@ -443,7 +442,7 @@ fn add_crate_to_source_distribution(
             .count();
         format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
     } else if cargo_toml_in_rust_src {
-        format!("../../{}", LOCAL_DEPENDENCIES_FOLDER)
+        format!("../../{LOCAL_DEPENDENCIES_FOLDER}")
     } else {
         LOCAL_DEPENDENCIES_FOLDER.to_string()
     };
@@ -671,7 +670,7 @@ pub fn source_distribution(
     }
 
     let mut include = |pattern| -> Result<()> {
-        println!("📦 Including files matching \"{}\"", pattern);
+        println!("📦 Including files matching \"{pattern}\"");
         for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
             .expect("No files found for pattern")
             .filter_map(Result::ok)

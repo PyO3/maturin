@@ -382,7 +382,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
             "User-Agent",
             &format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
         )
-        .set("Authorization", &format!("Basic {}", encoded))
+        .set("Authorization", &format!("Basic {encoded}"))
         .send(multipart_data);
 
     match response {
@@ -391,8 +391,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
             let err_text = response.into_string().unwrap_or_else(|e| {
                 format!(
                     "The registry should return some text, \
-                    even in case of an error, but didn't ({})",
-                    e
+                    even in case of an error, but didn't ({e})"
                 )
             });
             debug!("Upload error response: {}", err_text);
@@ -444,7 +443,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                     .map(|m| m.as_str());
                 match title {
                     Some(title) => {
-                        println!("⛔ {}", title);
+                        println!("⛔ {title}");
                     }
                     None => println!("⛔ Username and/or password are wrong"),
                 }
@@ -462,7 +461,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                         | Err(keyring::Error::NoStorageAccess(_))
                         | Err(keyring::Error::PlatformFailure(_)) => {}
                         Err(err) => {
-                            eprintln!("⚠️ Warning: Failed to remove password from keyring: {}", err)
+                            eprintln!("⚠️ Warning: Failed to remove password from keyring: {err}")
                         }
                     }
                 }
@@ -474,8 +473,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
                         println!(
-                            "⚠️ Note: Skipping {:?} because it appears to already exist",
-                            filename
+                            "⚠️ Note: Skipping {filename:?} because it appears to already exist"
                         );
                         continue;
                     }
@@ -483,8 +481,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 let filesize = fs::metadata(i)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| format!("Failed to get the filesize of {:?}: {}", &i, e));
-                return Err(err)
-                    .context(format!("💥 Failed to upload {:?} ({})", filename, filesize));
+                return Err(err).context(format!("💥 Failed to upload {filename:?} ({filesize})"));
             }
         }
     }
@@ -502,10 +499,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
             | Err(keyring::Error::NoStorageAccess(_))
             | Err(keyring::Error::PlatformFailure(_)) => {}
             Err(err) => {
-                eprintln!(
-                    "⚠️ Warning: Failed to store the password in the keyring: {:?}",
-                    err
-                );
+                eprintln!("⚠️ Warning: Failed to store the password in the keyring: {err:?}");
             }
         }
     }

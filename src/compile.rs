@@ -36,8 +36,8 @@ pub struct BuildArtifact {
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
-pub fn compile<'a>(
-    context: &'a BuildContext,
+pub fn compile(
+    context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
@@ -49,8 +49,8 @@ pub fn compile<'a>(
 }
 
 /// Build an universal2 wheel for macos which contains both an x86 and an aarch64 binary
-fn compile_universal2<'a>(
-    context: &'a BuildContext,
+fn compile_universal2(
+    context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
@@ -214,13 +214,13 @@ fn compile_target(
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
             let module_name = &context.module_name;
             let so_filename = match bridge_model {
-                BridgeModel::BindingsAbi3(..) => format!("{base}.abi3.so", base = module_name),
+                BridgeModel::BindingsAbi3(..) => format!("{module_name}.abi3.so"),
                 _ => python_interpreter
                     .expect("missing python interpreter for non-abi3 wheel build")
                     .get_library_name(module_name),
             };
             let macos_dylib_install_name =
-                format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
+                format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
             let mac_args = [
                 "-C".to_string(),
                 "link-arg=-undefined".to_string(),
@@ -299,7 +299,7 @@ fn compile_target(
                 let zig_triple = if target.is_linux() && !target.is_musl_target() {
                     match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
                         Some(PlatformTag::Manylinux { x, y }) => {
-                            format!("{}.{}.{}", target_triple, x, y)
+                            format!("{target_triple}.{x}.{y}")
                         }
                         _ => target_triple.to_string(),
                     }
@@ -411,10 +411,9 @@ fn compile_target(
         use crate::target::rustc_macosx_target_version;
 
         let (major, minor) = rustc_macosx_target_version(target_triple);
-        build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{}.{}", major, minor));
+        build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{major}.{minor}"));
         eprintln!(
-            "💻 Using `MACOSX_DEPLOYMENT_TARGET={}.{}` for {} by default",
-            major, minor, target_triple
+            "💻 Using `MACOSX_DEPLOYMENT_TARGET={major}.{minor}` for {target_triple} by default"
         );
     }
 
@@ -452,8 +451,7 @@ fn compile_target(
                         if should_warn {
                             // This is a spurious error I don't really understand
                             eprintln!(
-                                "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
-                                package_id
+                                "⚠️  Warning: The package {package_id} wasn't listed in `cargo metadata`"
                             );
                         }
                         continue;
@@ -522,7 +520,7 @@ fn compile_target(
 ///
 /// Currently the check is only run on linux, macOS and Windows
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
-    let py_init = format!("PyInit_{}", module_name);
+    let py_init = format!("PyInit_{module_name}");
     let mut fd = File::open(artifact)?;
     let mut buffer = Vec::new();
     fd.read_to_end(&mut buffer)?;
@@ -581,10 +579,9 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
 
     if !found {
         eprintln!(
-            "⚠️  Warning: Couldn't find the symbol `{}` in the native library. \
+            "⚠️  Warning: Couldn't find the symbol `{py_init}` in the native library. \
              Python will fail to import this module. \
-             If you're using pyo3, check that `#[pymodule]` uses `{}` as module name",
-            py_init, module_name
+             If you're using pyo3, check that `#[pymodule]` uses `{module_name}` as module name"
         )
     }
 

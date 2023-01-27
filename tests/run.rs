@@ -361,10 +361,7 @@ fn integration_wasm_hello_world() {
         target.get_python()
     });
     let python_implementation = get_python_implementation(&python).unwrap();
-    let venv_name = format!(
-        "integration-wasm-hello-world-py3-wasm32-wasi-{}",
-        python_implementation
-    );
+    let venv_name = format!("integration-wasm-hello-world-py3-wasm32-wasi-{python_implementation}");
 
     // Make sure we're actually running wasm
     assert!(Path::new("test-crates")

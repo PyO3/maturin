@@ -147,25 +147,19 @@ impl InterpreterConfig {
             .split_once('.')
             .context("Invalid python interpreter version")?;
         let major = ver_major.parse::<usize>().with_context(|| {
-            format!(
-                "Invalid python interpreter major version '{}', expect a digit",
-                ver_major
-            )
+            format!("Invalid python interpreter major version '{ver_major}', expect a digit")
         })?;
         let minor = ver_minor.parse::<usize>().with_context(|| {
-            format!(
-                "Invalid python interpreter minor version '{}', expect a digit",
-                ver_minor
-            )
+            format!("Invalid python interpreter minor version '{ver_minor}', expect a digit")
         })?;
         let implementation = implementation.unwrap_or_else(|| "cpython".to_string());
         let interpreter_kind = implementation.parse().map_err(|e| format_err!("{}", e))?;
         let abi_tag = match interpreter_kind {
             InterpreterKind::CPython => {
                 if (major, minor) >= (3, 8) {
-                    abi_tag.unwrap_or_else(|| format!("{}{}", major, minor))
+                    abi_tag.unwrap_or_else(|| format!("{major}{minor}"))
                 } else {
-                    abi_tag.unwrap_or_else(|| format!("{}{}m", major, minor))
+                    abi_tag.unwrap_or_else(|| format!("{major}{minor}m"))
                 }
             }
             InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| "pp73".to_string()),
@@ -232,7 +226,7 @@ suppress_build_script_link_lines=false"#,
             minor = self.minor,
         );
         if let Some(pointer_width) = self.pointer_width {
-            write!(content, "\npointer_width={}", pointer_width).unwrap();
+            write!(content, "\npointer_width={pointer_width}").unwrap();
         }
         content
     }

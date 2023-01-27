@@ -180,7 +180,7 @@ impl Metadata21 {
                 for author in authors {
                     match (&author.name, &author.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{} <{}>", name, email));
+                            emails.push(format!("{name} <{email}>"));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -205,7 +205,7 @@ impl Metadata21 {
                 for maintainer in maintainers {
                     match (&maintainer.name, &maintainer.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{} <{}>", name, email));
+                            emails.push(format!("{name} <{email}>"));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -248,9 +248,9 @@ impl Metadata21 {
                             // optional dependency already has environment markers
                             let new_marker =
                                 format!("({}) and extra == '{}'", marker.trim(), extra);
-                            format!("{}; {}", dep, new_marker)
+                            format!("{dep}; {new_marker}")
                         } else {
-                            format!("{}; extra == '{}'", dep, extra)
+                            format!("{dep}; extra == '{extra}'")
                         };
                         self.requires_dist.push(dist);
                     }
@@ -433,7 +433,7 @@ impl Metadata21 {
         // "A string containing a browsable URL for the project and a label for it, separated by a comma."
         // `Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/`
         for (key, value) in self.project_url.iter() {
-            fields.push(("Project-URL", format!("{}, {}", key, value)))
+            fields.push(("Project-URL", format!("{key}, {value}")))
         }
 
         // Description shall be last, so we can ignore RFC822 and just put the description
@@ -464,11 +464,11 @@ impl Metadata21 {
         };
 
         for (key, value) in fields {
-            writeln!(out, "{}: {}", key, value)?;
+            writeln!(out, "{key}: {value}")?;
         }
 
         if let Some(body) = body {
-            writeln!(out, "\n{}", body)?;
+            writeln!(out, "\n{body}")?;
         }
 
         Ok(out)

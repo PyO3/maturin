@@ -85,8 +85,8 @@ impl PlatformTag {
 impl fmt::Display for PlatformTag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            PlatformTag::Manylinux { x, y } => write!(f, "manylinux_{}_{}", x, y),
-            PlatformTag::Musllinux { x, y } => write!(f, "musllinux_{}_{}", x, y),
+            PlatformTag::Manylinux { x, y } => write!(f, "manylinux_{x}_{y}"),
+            PlatformTag::Musllinux { x, y } => write!(f, "musllinux_{x}_{y}"),
             PlatformTag::Linux => write!(f, "linux"),
         }
     }

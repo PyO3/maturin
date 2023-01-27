@@ -373,8 +373,8 @@ impl ProjectLayout {
                 bail!("No such data directory {}", data.display());
             }
             Some(data)
-        } else if project_root.join(format!("{}.data", module_name)).is_dir() {
-            Some(project_root.join(format!("{}.data", module_name)))
+        } else if project_root.join(format!("{module_name}.data")).is_dir() {
+            Some(project_root.join(format!("{module_name}.data")))
         } else {
             None
         };

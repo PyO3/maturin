@@ -234,7 +234,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                     let platform = context
                         .target
                         .get_platform_tag(&[PlatformTag::Linux], context.universal2)?;
-                    vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
+                    vec![format!("cp{major}{minor}-abi3-{platform}")]
                 }
                 BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
                     context
@@ -355,7 +355,7 @@ fn run() -> Result<()> {
             };
             println!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
-                println!(" - {}", interpreter);
+                println!(" - {interpreter}");
             }
         }
         Opt::Develop {
@@ -429,7 +429,7 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");
         for cause in e.chain() {
-            eprintln!("  Caused by: {}", cause);
+            eprintln!("  Caused by: {cause}");
         }
         std::process::exit(1);
     }

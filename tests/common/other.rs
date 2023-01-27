@@ -181,10 +181,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
-            target_dir: Some(PathBuf::from(format!(
-                "test-crates/targets/{}",
-                unique_name
-            ))),
+            target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
         platform_tag: vec![PlatformTag::Linux],

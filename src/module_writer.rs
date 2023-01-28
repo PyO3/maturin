@@ -296,7 +296,16 @@ impl WheelWriter {
         metadata21: &Metadata21,
     ) -> Result<()> {
         if project_layout.python_module.is_some() || !project_layout.python_packages.is_empty() {
-            let absolute_path = project_layout.python_dir.normalize()?.into_path_buf();
+            let absolute_path = project_layout
+                .python_dir
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "failed to normalize path `{}`",
+                        project_layout.python_dir.display()
+                    )
+                })?
+                .into_path_buf();
             if let Some(python_path) = absolute_path.to_str() {
                 let name = metadata21.get_distribution_escaped();
                 let target = format!("{}.pth", name);

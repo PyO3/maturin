@@ -214,7 +214,10 @@ impl ProjectResolver {
     ) -> Result<(PathBuf, PathBuf)> {
         // use command line argument if specified
         if let Some(path) = cargo_manifest_path {
-            let path = path.normalize()?.into_path_buf();
+            let path = path
+                .normalize()
+                .with_context(|| format!("failed to normalize path `{}`", path.display()))?
+                .into_path_buf();
             debug!(
                 "Using cargo manifest path from command line argument: {:?}",
                 path
@@ -251,7 +254,12 @@ impl ProjectResolver {
                 PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
             if let Some(path) = pyproject.manifest_path() {
                 debug!("Using cargo manifest path from pyproject.toml {:?}", path);
-                return Ok((path.normalize()?.into_path_buf(), pyproject_file));
+                return Ok((
+                    path.normalize()
+                        .with_context(|| format!("failed to normalize path `{}`", path.display()))?
+                        .into_path_buf(),
+                    pyproject_file,
+                ));
             } else {
                 // Detect src layout:
                 //

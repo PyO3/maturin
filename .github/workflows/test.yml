@@ -9,12 +9,12 @@ on:
       - trying
   pull_request:
     paths-ignore:
-      - 'guide/**'
-      - 'sysconfig/**'
-      - '**.md'
-      - '.cirrus.yml'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/dependabot.yml'
+      - "guide/**"
+      - "sysconfig/**"
+      - "**.md"
+      - ".cirrus.yml"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/dependabot.yml"
   workflow_dispatch:
 
 concurrency:
@@ -106,7 +106,7 @@ jobs:
 
   test:
     name: Test
-    needs: [ generate-matrix ]
+    needs: [generate-matrix]
     strategy:
       fail-fast: ${{ needs.generate-matrix.outputs.fail-fast != 'false' }}
       matrix:
@@ -114,22 +114,29 @@ jobs:
         python-version: ${{ fromJson(needs.generate-matrix.outputs.python-version) }}
     runs-on: ${{ matrix.os }}
     env:
-      RUST_BACKTRACE: '1'
+      RUST_BACKTRACE: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
     steps:
       - name: Cleanup Disk
         if: ${{ !startsWith(matrix.os, 'windows') }}
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
+      - name: Sccache Setup
+        # Just for test, come back to upstream after released
+        uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
+        with:
+          version: "v0.4.0-pre.6"
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-activate-base: 'false'
-          activate-environment: ''
+          auto-activate-base: "false"
+          activate-environment: ""
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: 'x64'
+          architecture: "x64"
       - name: Install cffi
         if: ${{ !contains(matrix.python-version, 'pypy') }}
         run: pip install cffi
@@ -138,7 +145,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
-          targets: wasm32-wasi  # Additional target
+          targets: wasm32-wasi # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install aarch64-apple-darwin Rust target
@@ -163,10 +170,6 @@ jobs:
         run: |
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: maturin-build
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash
         if: contains(matrix.python-version, 'pypy')
@@ -243,8 +246,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-20.04
     env:
-      PYODIDE_VERSION: '0.22.0'
-      PYTHON_VERSION: '3.10.2'
+      PYODIDE_VERSION: "0.22.0"
+      PYTHON_VERSION: "3.10.2"
       NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v3
@@ -280,8 +283,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
-      RUST_BACKTRACE: '1'
-      CARGO_INCREMENTAL: '0'
+      RUST_BACKTRACE: "1"
+      CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     container: alpine:latest
     steps:
@@ -313,7 +316,7 @@ jobs:
         # could be an upstream Rust issue, disable it for now
         #
         # manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
-        manylinux: [ 'manylinux_2_24' ]
+        manylinux: ["manylinux_2_24"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v3
@@ -335,13 +338,19 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
-      CARGO_INCREMENTAL: '0'
+      CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v2
       - name: Build
         uses: docker/build-push-action@v3
@@ -350,8 +359,8 @@ jobs:
           push: false
           tags: maturin
           load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/pyo3/maturin:buildcache
+          cache-to: type=registry,ref=ghcr.io/pyo3/maturin:buildcache,mode=max
       - name: Test the Docker container
         run: ./test-dockerfile.sh
 
@@ -412,7 +421,7 @@ jobs:
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2

@@ -482,7 +482,16 @@ impl BuildContext {
 
     fn excludes(&self, format: Format) -> Result<Option<Override>> {
         if let Some(pyproject) = self.pyproject_toml.as_ref() {
-            let pyproject_dir = self.pyproject_toml_path.normalize()?.into_path_buf();
+            let pyproject_dir = self
+                .pyproject_toml_path
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "failed to normalize path `{}`",
+                        self.pyproject_toml_path.display()
+                    )
+                })?
+                .into_path_buf();
             if let Some(glob_patterns) = &pyproject.exclude() {
                 let mut excludes = OverrideBuilder::new(pyproject_dir.parent().unwrap());
                 for glob in glob_patterns

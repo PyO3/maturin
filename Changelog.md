@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add Cargo compile targets configuration for filtering multiple bin targets in [#1339](https://github.com/PyO3/maturin/pull/1339)
 * Respect `rustflags` settings in cargo configuration file in [#1405](https://github.com/PyO3/maturin/pull/1405)
 * Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
+* Don't package dev-only path dependencies in sdist in [#1435](https://github.com/PyO3/maturin/pull/1435)
 
 ## [0.14.10] - 2023-01-13
 

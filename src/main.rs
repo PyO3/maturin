@@ -425,7 +425,32 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(debug_assertions))]
+fn setup_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        eprintln!("\n===================================================================");
+        eprintln!("maturin has panicked. This is a bug in maturin. Please report this");
+        eprintln!("at https://github.com/PyO3/maturin/issues/new/choose.");
+        eprintln!("If you can reliably reproduce this panic, include the");
+        eprintln!("reproduction steps and re-run with the RUST_BACKTRACE=1 environment");
+        eprintln!("variable set and include the backtrace in your report.");
+        eprintln!();
+        eprintln!("Platform: {} {}", env::consts::OS, env::consts::ARCH);
+        eprintln!("Version: {}", env!("CARGO_PKG_VERSION"));
+        eprintln!("Args: {}", env::args().collect::<Vec<_>>().join(" "));
+        eprintln!();
+        default_hook(panic_info);
+        // Rust set exit code to 101 when the process panicked,
+        // so here we use the same exit code
+        std::process::exit(101);
+    }));
+}
+
 fn main() {
+    #[cfg(not(debug_assertions))]
+    setup_panic_hook();
+
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");
         for cause in e.chain() {

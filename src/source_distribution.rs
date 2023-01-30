@@ -65,8 +65,14 @@ fn rewrite_cargo_toml(
     // some_path_dep = { path = "../some_path_dep" }
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
-    for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
+    for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
         if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
+            if dep_category == "dev-dependencies" {
+                // Remove dev-dependencies since building from sdist doesn't need them
+                data.remove(dep_category);
+                rewritten = true;
+                continue;
+            }
             let workspace_deps = workspace_manifest
                 .get("workspace")
                 .and_then(|x| x.get("dependencies"))
@@ -478,6 +484,14 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
     while let Some(top) = stack.pop() {
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
+                if matches!(dependency.kind, cargo_metadata::DependencyKind::Development) {
+                    // Skip dev-only dependency
+                    debug!(
+                        "Skipping development only dependency {} ({})",
+                        dependency.name, path
+                    );
+                    continue;
+                }
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");

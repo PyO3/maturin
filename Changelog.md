@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Don't package dev-only path dependencies in sdist in [#1435](https://github.com/PyO3/maturin/pull/1435)
+
 ## [0.14.10] - 2023-01-13
 
 * Use module name specified by `[package.metadata.maturin]` in [#1409](https://github.com/PyO3/maturin/pull/1409)

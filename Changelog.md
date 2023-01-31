@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.12] - 2023-01-31
+
+* Keep `dev-dependencies` in sdist when there are no path dependencies in [#1441](https://github.com/PyO3/maturin/pull/1441)
+
 ## [0.14.11] - 2023-01-31
 
 * Don't package dev-only path dependencies in sdist in [#1435](https://github.com/PyO3/maturin/pull/1435)
@@ -803,7 +807,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.11...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.12...HEAD
+[0.14.12]: https://github.com/pyo3/maturin/compare/v0.14.11...v0.14.12
 [0.14.11]: https://github.com/pyo3/maturin/compare/v0.14.10...v0.14.11
 [0.14.10]: https://github.com/pyo3/maturin/compare/v0.14.9...v0.14.10
 [0.14.9]: https://github.com/pyo3/maturin/compare/v0.14.8...v0.14.9

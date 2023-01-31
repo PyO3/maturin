@@ -67,8 +67,10 @@ fn rewrite_cargo_toml(
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
         if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
-            if dep_category == "dev-dependencies" {
-                // Remove dev-dependencies since building from sdist doesn't need them
+            if dep_category == "dev-dependencies" && !known_path_deps.is_empty() {
+                // Remove dev-dependencies since building from sdist doesn't need them,
+                // Keep it when there are no path dependencies to support building from
+                // sdist with `--locked`/`--frozen`.
                 data.remove(dep_category);
                 rewritten = true;
                 continue;

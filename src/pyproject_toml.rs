@@ -154,7 +154,7 @@ impl PyProjectToml {
     pub fn new(pyproject_file: impl AsRef<Path>) -> Result<PyProjectToml> {
         let path = pyproject_file.as_ref();
         let contents = fs::read_to_string(path)?;
-        let pyproject: PyProjectToml = toml_edit::easy::from_str(&contents)
+        let pyproject: PyProjectToml = toml::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
         Ok(pyproject)
     }
@@ -357,17 +357,13 @@ mod tests {
     fn deserialize_include_exclude() {
         let single = r#"include = ["single"]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(single)
-                .unwrap()
-                .include,
+            toml::from_str::<ToolMaturin>(single).unwrap().include,
             Some(vec![GlobPattern::Path("single".to_string())])
         );
 
         let multiple = r#"include = ["one", "two"]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(multiple)
-                .unwrap()
-                .include,
+            toml::from_str::<ToolMaturin>(multiple).unwrap().include,
             Some(vec![
                 GlobPattern::Path("one".to_string()),
                 GlobPattern::Path("two".to_string())
@@ -376,7 +372,7 @@ mod tests {
 
         let single_format = r#"include = [{path = "path", format="sdist"}]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(single_format)
+            toml::from_str::<ToolMaturin>(single_format)
                 .unwrap()
                 .include,
             Some(vec![GlobPattern::WithFormat {
@@ -387,7 +383,7 @@ mod tests {
 
         let multiple_formats = r#"include = [{path = "path", format=["sdist", "wheel"]}]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(multiple_formats)
+            toml::from_str::<ToolMaturin>(multiple_formats)
                 .unwrap()
                 .include,
             Some(vec![GlobPattern::WithFormat {
@@ -398,9 +394,7 @@ mod tests {
 
         let mixed = r#"include = ["one", {path = "two", format="sdist"}, {path = "three", format=["sdist", "wheel"]}]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(mixed)
-                .unwrap()
-                .include,
+            toml::from_str::<ToolMaturin>(mixed).unwrap().include,
             Some(vec![
                 GlobPattern::Path("one".to_string()),
                 GlobPattern::WithFormat {

@@ -564,7 +564,7 @@ mod test {
         let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
         fs::write(&manifest_path, &toml_with_path).unwrap();
 
-        let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(&toml_with_path).unwrap();
+        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_path)
             .exec()
@@ -727,7 +727,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_toml() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -778,7 +778,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -802,7 +802,7 @@ mod test {
     fn test_implicit_readme() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -820,7 +820,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
         let manifest_dir = PathBuf::from("test-crates").join("license-test");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()

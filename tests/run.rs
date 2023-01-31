@@ -322,7 +322,7 @@ fn integration_with_data() {
 }
 
 #[test]
-// Sourced from https://pypi.org/project/wasmtime/4.0.0/#files
+// Sourced from https://pypi.org/project/wasmtime/5.0.0/#files
 // update with wasmtime updates
 #[cfg(any(
     all(target_os = "windows", target_arch = "x86_64"),
@@ -352,10 +352,7 @@ fn integration_wasm_hello_world() {
         target.get_python()
     });
     let python_implementation = get_python_implementation(&python).unwrap();
-    let venv_name = format!(
-        "integration-wasm-hello-world-py3-wasm32-wasi-{}",
-        python_implementation
-    );
+    let venv_name = format!("integration-wasm-hello-world-py3-wasm32-wasi-{python_implementation}");
 
     // Make sure we're actually running wasm
     assert!(Path::new("test-crates")
@@ -426,7 +423,7 @@ fn workspace_members_non_local_dep_sdist() {
         license = "MIT"
 
         [dependencies]
-        pyo3 = { version = "0.17.3", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+        pyo3 = { version = "0.18.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
 
         [lib]
         name = "pyo3_pure"

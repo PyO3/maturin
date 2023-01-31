@@ -73,9 +73,9 @@ impl BridgeModel {
 impl Display for BridgeModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            BridgeModel::Bin(Some((name, _))) => write!(f, "{} bin", name),
+            BridgeModel::Bin(Some((name, _))) => write!(f, "{name} bin"),
             BridgeModel::Bin(None) => write!(f, "bin"),
-            BridgeModel::Bindings(name, _) => write!(f, "{}", name),
+            BridgeModel::Bindings(name, _) => write!(f, "{name}"),
             BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
@@ -130,7 +130,7 @@ fn bin_wasi_helper(
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
             .requires_dist
-            .push("wasmtime>=4.0.0,<5.0.0".to_string());
+            .push("wasmtime>=5.0.0,<6.0.0".to_string());
     }
 
     Ok(metadata21)
@@ -281,8 +281,7 @@ impl BuildContext {
                 && !python_interpreter.support_portable_wheels()
             {
                 println!(
-                    "🐍 Skipping auditwheel because {} does not support manylinux/musllinux wheels",
-                    python_interpreter
+                    "🐍 Skipping auditwheel because {python_interpreter} does not support manylinux/musllinux wheels"
                 );
                 return Ok((Policy::default(), Vec::new()));
             }
@@ -383,10 +382,10 @@ impl BuildContext {
             // Generate a new soname with a short hash
             let short_hash = &hash_file(&lib_path)?[..8];
             let (file_stem, file_ext) = lib.name.split_once('.').unwrap();
-            let new_soname = if !file_stem.ends_with(&format!("-{}", short_hash)) {
-                format!("{}-{}.{}", file_stem, short_hash, file_ext)
+            let new_soname = if !file_stem.ends_with(&format!("-{short_hash}")) {
+                format!("{file_stem}-{short_hash}.{file_ext}")
             } else {
-                format!("{}.{}", file_stem, file_ext)
+                format!("{file_stem}.{file_ext}")
             };
 
             // Copy the original lib to a tmpdir and modify some of its properties
@@ -476,7 +475,16 @@ impl BuildContext {
 
     fn excludes(&self, format: Format) -> Result<Option<Override>> {
         if let Some(pyproject) = self.pyproject_toml.as_ref() {
-            let pyproject_dir = self.pyproject_toml_path.normalize()?.into_path_buf();
+            let pyproject_dir = self
+                .pyproject_toml_path
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "failed to normalize path `{}`",
+                        self.pyproject_toml_path.display()
+                    )
+                })?
+                .into_path_buf();
             if let Some(glob_patterns) = &pyproject.exclude() {
                 let mut excludes = OverrideBuilder::new(pyproject_dir.parent().unwrap());
                 for glob in glob_patterns
@@ -502,7 +510,7 @@ impl BuildContext {
         let platform = self
             .target
             .get_platform_tag(platform_tags, self.universal2)?;
-        let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
+        let tag = format!("cp{major}{min_minor}-abi3-{platform}");
 
         let mut writer = WheelWriter::new(
             &tag,
@@ -528,7 +536,7 @@ impl BuildContext {
         self.add_pth(&mut writer)?;
         add_data(&mut writer, self.project_layout.data.as_deref())?;
         let wheel_path = writer.finish()?;
-        Ok((wheel_path, format!("cp{}{}", major, min_minor)))
+        Ok((wheel_path, format!("cp{major}{min_minor}")))
     }
 
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter

@@ -48,7 +48,7 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     let message = str::from_utf8(&output.stdout).unwrap().trim();
 
     if message != "SUCCESS" {
-        panic!("Not SUCCESS: {}", message);
+        panic!("Not SUCCESS: {message}");
     }
 
     Ok(())
@@ -83,7 +83,7 @@ pub fn handle_result<T>(result: Result<T>) -> T {
     match result {
         Err(e) => {
             for cause in e.chain().collect::<Vec<_>>().iter().rev() {
-                eprintln!("Cause: {}", cause);
+                eprintln!("Cause: {cause}");
             }
             panic!("{}", e);
         }
@@ -107,7 +107,7 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
         target.get_python()
     });
     let venv_name = match get_python_implementation(&venv_interp) {
-        Ok(python_impl) => format!("{}-{}", name, python_impl),
+        Ok(python_impl) => format!("{name}-{python_impl}"),
         Err(_) => name.to_string(),
     };
     let venv_dir = PathBuf::from("test-crates")
@@ -164,7 +164,7 @@ pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathB
         .arg("create")
         .arg("-n")
         .arg(name)
-        .arg(format!("python={}.{}", major, minor))
+        .arg(format!("python={major}.{minor}"))
         .arg("-q")
         .arg("-y")
         .arg("--json")

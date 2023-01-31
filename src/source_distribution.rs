@@ -65,8 +65,14 @@ fn rewrite_cargo_toml(
     // some_path_dep = { path = "../some_path_dep" }
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
-    for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
+    for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
         if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
+            if dep_category == "dev-dependencies" {
+                // Remove dev-dependencies since building from sdist doesn't need them
+                data.remove(dep_category);
+                rewritten = true;
+                continue;
+            }
             let workspace_deps = workspace_manifest
                 .get("workspace")
                 .and_then(|x| x.get("dependencies"))
@@ -150,10 +156,10 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", local_deps_folder, dep_name))
+                    toml_edit::value(format!("{local_deps_folder}/{dep_name}"))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    toml_edit::value(format!("../{}", dep_name))
+                    toml_edit::value(format!("../{dep_name}"))
                 };
                 if workspace_inherit {
                     // Remove workspace inheritance now that we converted it into a path dependency
@@ -207,8 +213,7 @@ fn rewrite_cargo_toml(
                             let path = Path::new(s.value());
                             if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
                                 if known_path_deps.contains_key(name) {
-                                    new_members
-                                        .push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                                    new_members.push(format!("{LOCAL_DEPENDENCIES_FOLDER}/{name}"));
                                 }
                             }
                         }
@@ -331,7 +336,10 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
+    let abs_manifest_path = manifest_path
+        .normalize()
+        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
+        .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     let cargo_toml_in_subdir = root_crate
@@ -443,7 +451,7 @@ fn add_crate_to_source_distribution(
             .count();
         format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
     } else if cargo_toml_in_rust_src {
-        format!("../../{}", LOCAL_DEPENDENCIES_FOLDER)
+        format!("../../{LOCAL_DEPENDENCIES_FOLDER}")
     } else {
         LOCAL_DEPENDENCIES_FOLDER.to_string()
     };
@@ -475,6 +483,14 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
     while let Some(top) = stack.pop() {
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
+                if matches!(dependency.kind, cargo_metadata::DependencyKind::Development) {
+                    // Skip dev-only dependency
+                    debug!(
+                        "Skipping development only dependency {} ({})",
+                        dependency.name, path
+                    );
+                    continue;
+                }
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
@@ -511,7 +527,13 @@ pub fn source_distribution(
     let manifest_path = &build_context.manifest_path;
     let pyproject_toml_path = build_context
         .pyproject_toml_path
-        .normalize()?
+        .normalize()
+        .with_context(|| {
+            format!(
+                "failed to normalize path `{}`",
+                build_context.pyproject_toml_path.display()
+            )
+        })?
         .into_path_buf();
     let workspace_manifest_path = build_context
         .cargo_metadata
@@ -587,7 +609,10 @@ pub fn source_distribution(
         true,
     )?;
 
-    let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
+    let abs_manifest_path = manifest_path
+        .normalize()
+        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
+        .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
     let cargo_lock_exists = cargo_lock_path.exists();
@@ -671,7 +696,7 @@ pub fn source_distribution(
     }
 
     let mut include = |pattern| -> Result<()> {
-        println!("📦 Including files matching \"{}\"", pattern);
+        println!("📦 Including files matching \"{pattern}\"");
         for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
             .expect("No files found for pattern")
             .filter_map(Result::ok)

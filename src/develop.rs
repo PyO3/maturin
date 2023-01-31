@@ -85,8 +85,8 @@ pub fn develop(
             // Remove extra marker to make it installable with pip
             for extra in &extras {
                 pkg = pkg
-                    .replace(&format!(" and extra == '{}'", extra), "")
-                    .replace(&format!("; extra == '{}'", extra), "");
+                    .replace(&format!(" and extra == '{extra}'"), "")
+                    .replace(&format!("; extra == '{extra}'"), "");
             }
             pkg
         }));
@@ -113,7 +113,7 @@ pub fn develop(
             .args(command)
             .arg(dunce::simplified(filename))
             .output()
-            .context(format!("pip install failed with {:?}", python))?;
+            .context(format!("pip install failed with {python:?}"))?;
         if !output.status.success() {
             bail!(
                 "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",

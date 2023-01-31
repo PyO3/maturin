@@ -420,6 +420,9 @@ jobs:
   test-bootstrap:
     name: Test Bootstrap
     runs-on: ${{ matrix.os }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
@@ -439,11 +442,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@beta
         if: steps.changes.outputs.changed == 'true'
       # Caching
-      - name: Cache cargo build
+      - name: Sccache Setup
         if: steps.changes.outputs.changed == 'true'
-        uses: Swatinem/rust-cache@v2
+        uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
         with:
-          shared-key: maturin-build
+          version: "v0.4.0-pre.6"
       - uses: actions/setup-python@v4
         if: steps.changes.outputs.changed == 'true'
         with:

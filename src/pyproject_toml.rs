@@ -277,8 +277,7 @@ impl PyProjectToml {
         if self.build_system.build_backend.as_deref() != Some(maturin) {
             eprintln!(
                 "⚠️  Warning: `build-backend` in pyproject.toml is not set to `{maturin}`, \
-                    packaging tools such as pip will not use maturin to build this project.",
-                maturin = maturin
+                    packaging tools such as pip will not use maturin to build this project."
             );
             return false;
         }

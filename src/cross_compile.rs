@@ -152,7 +152,7 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
     let (cpython_version_pat, pypy_version_pat) = if let Some(v) =
         env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap())
     {
-        (format!("python{}", v), format!("pypy{}", v))
+        (format!("python{v}"), format!("pypy{v}"))
     } else {
         ("python3.".into(), "pypy3.".into())
     };

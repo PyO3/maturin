@@ -137,7 +137,7 @@ impl PathWriter {
 
         for (filename, hash, len) in self.record {
             buffer
-                .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())
+                .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())
                 .context(format!(
                     "Failed to write to file at {}",
                     record_file.display()
@@ -308,7 +308,7 @@ impl WheelWriter {
                 .into_path_buf();
             if let Some(python_path) = absolute_path.to_str() {
                 let name = metadata21.get_distribution_escaped();
-                let target = format!("{}.pth", name);
+                let target = format!("{name}.pth");
                 debug!("Adding {} from {}", target, python_path);
                 self.add_bytes(target, python_path.as_bytes())?;
             } else {
@@ -358,11 +358,11 @@ impl WheelWriter {
         self.zip.start_file(&record_filename, options)?;
         for (filename, hash, len) in self.record {
             self.zip
-                .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
+                .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())?;
         }
         // Write the record for the RECORD file itself
         self.zip
-            .write_all(format!("{},,\n", record_filename).as_bytes())?;
+            .write_all(format!("{record_filename},,\n").as_bytes())?;
 
         self.zip.finish()?;
         Ok(self.wheel_path)
@@ -496,7 +496,7 @@ Root-Is-Purelib: false
     );
 
     for tag in tags {
-        writeln!(wheel_file, "Tag: {}", tag)?;
+        writeln!(wheel_file, "Tag: {tag}")?;
     }
 
     Ok(wheel_file)
@@ -509,7 +509,7 @@ fn entry_points_txt(
 ) -> String {
     entrypoints
         .iter()
-        .fold(format!("[{}]\n", entry_type), |text, (k, v)| {
+        .fold(format!("[{entry_type}]\n"), |text, (k, v)| {
             text + k + "=" + v + "\n"
         })
 }
@@ -721,10 +721,10 @@ pub fn write_bindings_module(
         // abi3
         None => {
             if target.is_unix() {
-                format!("{base}.abi3.so", base = ext_name)
+                format!("{ext_name}.abi3.so")
             } else {
                 // Apparently there is no tag for abi3 on windows
-                format!("{base}.pyd", base = ext_name)
+                format!("{ext_name}.pyd")
             }
         }
     };
@@ -765,16 +765,15 @@ pub fn write_bindings_module(
 
 __doc__ = {module_name}.__doc__
 if hasattr({module_name}, "__all__"):
-    __all__ = {module_name}.__all__"#,
-                module_name = module_name
+    __all__ = {module_name}.__all__"#
             )
             .as_bytes(),
         )?;
         let type_stub = project_layout
             .rust_module
-            .join(format!("{}.pyi", module_name));
+            .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {}.pyi", module_name);
+            println!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -832,9 +831,9 @@ pub fn write_cffi_module(
         writer.add_directory(&module)?;
         let type_stub = project_layout
             .rust_module
-            .join(format!("{}.pyi", module_name));
+            .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {}.pyi", module_name);
+            println!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -931,12 +930,12 @@ fn generate_uniffi_bindings(
     // uniffi bindings hardcoded the extension filenames
     let cdylib_name = match cdylib_name {
         Some(name) => name,
-        None => format!("uniffi_{}", name),
+        None => format!("uniffi_{name}"),
     };
     let cdylib = match target_os {
-        Os::Macos => format!("lib{}.dylib", cdylib_name),
-        Os::Windows => format!("{}.dll", cdylib_name),
-        _ => format!("lib{}.so", cdylib_name),
+        Os::Macos => format!("lib{cdylib_name}.dylib"),
+        Os::Windows => format!("{cdylib_name}.dll"),
+        _ => format!("lib{cdylib_name}.so"),
     };
 
     Ok(UniFfiBindings {
@@ -964,7 +963,7 @@ pub fn write_uniffi_module(
         cdylib,
         path: uniffi_binding,
     } = generate_uniffi_bindings(crate_dir, target_dir, target_os)?;
-    let py_init = format!("from .{} import *  # NOQA\n", binding_name);
+    let py_init = format!("from .{binding_name} import *  # NOQA\n");
 
     if !editable {
         write_python_part(writer, project_layout, pyproject_toml)
@@ -1005,9 +1004,9 @@ pub fn write_uniffi_module(
         writer.add_directory(&module)?;
         let type_stub = project_layout
             .rust_module
-            .join(format!("{}.pyi", module_name));
+            .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {}.pyi", module_name);
+            println!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -1063,7 +1062,7 @@ import sysconfig
 
 def main():
     # The actual executable
-    program_location = Path(sysconfig.get_path("scripts")).joinpath("{}")
+    program_location = Path(sysconfig.get_path("scripts")).joinpath("{bin_name}")
     # wasmtime-py boilerplate
     engine = Engine()
     store = Store(engine)
@@ -1089,8 +1088,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-    "#,
-        bin_name
+    "#
     );
 
     // We can't use add_file since we want to mark the file as executable
@@ -1150,7 +1148,7 @@ pub fn write_python_part(
                 .iter()
                 .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
             {
-                println!("📦 Including files matching \"{}\"", pattern);
+                println!("📦 Including files matching \"{pattern}\"");
                 for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
                     .expect("No files found for pattern")
                     .filter_map(Result::ok)

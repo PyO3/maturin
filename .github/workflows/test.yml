@@ -21,6 +21,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+
 jobs:
   generate-matrix:
     name: Generate Matrix
@@ -142,7 +145,7 @@ jobs:
         run: pip install cffi
       - name: Install python packages
         run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.22.0
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@beta
         id: rustup
         with:
           targets: wasm32-wasi # Additional target
@@ -320,7 +323,7 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@beta
         id: rustup
       # Caching
       - name: Cache cargo build
@@ -397,7 +400,7 @@ jobs:
             container: ghcr.io/messense/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@beta
         with:
           targets: ${{ matrix.platform.target }}
       - name: Build wheels
@@ -434,7 +437,7 @@ jobs:
               - 'setup.py'
               - 'MANIFEST.in'
               - '.github/workflows/test.yml'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@beta
         if: steps.changes.outputs.changed == 'true'
       # Caching
       - name: Cache cargo build
@@ -485,7 +488,7 @@ jobs:
     container: pyston/pyston:2.3.5
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@beta
         id: rustup
         with:
           targets: wasm32-wasi
@@ -521,7 +524,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.platform.apt-packages }}
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@beta
         with:
           targets: ${{ matrix.platform.target }}
       - name: Cache cargo build

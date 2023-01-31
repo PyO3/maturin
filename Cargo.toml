@@ -70,7 +70,7 @@ tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional =
 # project scaffolding, maturin new/init
 dialoguer = { version = "0.10.2", default-features = false }
 console = "0.15.4"
-minijinja = "0.28.0"
+minijinja = "0.30.2"
 
 # upload
 bytesize = { version = "1.0.1", optional = true }

@@ -903,8 +903,7 @@ fn generate_uniffi_bindings(
     let config_file = crate_dir.join("uniffi.toml");
     let mut cdylib_name = None;
     if config_file.is_file() {
-        let uniffi_toml: UniFfiToml =
-            toml_edit::easy::from_str(&fs::read_to_string(&config_file)?)?;
+        let uniffi_toml: UniFfiToml = toml::from_str(&fs::read_to_string(&config_file)?)?;
         cdylib_name = uniffi_toml
             .bindings
             .get("python")

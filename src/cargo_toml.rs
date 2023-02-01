@@ -36,7 +36,7 @@ impl CargoToml {
             "Can't read Cargo.toml at {}",
             manifest_file.as_ref().display(),
         ))?;
-        let cargo_toml = toml_edit::easy::from_str(&contents).context(format!(
+        let cargo_toml = toml::from_str(&contents).context(format!(
             "Failed to parse Cargo.toml at {}",
             manifest_file.as_ref().display()
         ))?;
@@ -109,7 +109,7 @@ pub struct RemainingCoreMetadata {
     /// Cargo compile targets
     pub targets: Option<Vec<CargoTarget>>,
     #[serde(flatten)]
-    pub other: HashMap<String, toml_edit::easy::Value>,
+    pub other: HashMap<String, toml::Value>,
 }
 
 /// Cargo compile target
@@ -160,7 +160,7 @@ mod test {
         "#
         );
 
-        let cargo_toml: Result<CargoToml, _> = toml_edit::easy::from_str(cargo_toml);
+        let cargo_toml: Result<CargoToml, _> = toml::from_str(cargo_toml);
         assert!(cargo_toml.is_ok());
 
         let maturin = cargo_toml.unwrap().remaining_core_metadata();
@@ -192,7 +192,7 @@ mod test {
         "#
         );
 
-        let cargo_toml: Result<CargoToml, _> = toml_edit::easy::from_str(cargo_toml);
+        let cargo_toml: Result<CargoToml, _> = toml::from_str(cargo_toml);
         assert!(cargo_toml.is_ok());
     }
 }

@@ -271,7 +271,7 @@ jobs:
       - run: pip install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
-      - uses: mymindstorm/setup-emsdk@v11
+      - uses: mymindstorm/setup-emsdk@v12
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache

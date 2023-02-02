@@ -1228,8 +1228,6 @@ impl From<CargoOptions> for cargo_options::Rustc {
                     None => Vec::new(),
                 },
                 target_dir: cargo.target_dir,
-                manifest_path: cargo.manifest_path,
-                ignore_rust_version: cargo.ignore_rust_version,
                 verbose: cargo.verbose,
                 color: cargo.color,
                 frozen: cargo.frozen,
@@ -1240,6 +1238,8 @@ impl From<CargoOptions> for cargo_options::Rustc {
                 timings: cargo.timings,
                 ..Default::default()
             },
+            manifest_path: cargo.manifest_path,
+            ignore_rust_version: cargo.ignore_rust_version,
             future_incompat_report: cargo.future_incompat_report,
             args: cargo.args,
             ..Default::default()

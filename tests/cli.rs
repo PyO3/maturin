@@ -19,6 +19,7 @@ fn cli_tests() {
     {
         t.skip("tests/cmd/new.toml");
         t.skip("tests/cmd/init.toml");
+        t.skip("tests/cmd/generate-ci.toml");
     }
 
     #[cfg(not(all(feature = "upload", feature = "zig", feature = "scaffolding")))]

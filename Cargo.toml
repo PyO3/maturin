@@ -71,7 +71,7 @@ cargo-xwin = { version = "0.14.0", default-features = false, optional = true }
 tracing = "0.1.36"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional = true }
 
-# project scaffolding, maturin new/init
+# project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.10.2", default-features = false, optional = true }
 console = { version = "0.15.4", optional = true }
 minijinja = { version = "0.30.2", optional = true }

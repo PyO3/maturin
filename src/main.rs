@@ -7,12 +7,12 @@ use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::{CommandFactory, Parser, Subcommand};
+#[cfg(feature = "scaffolding")]
+use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
     develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, PathWriter, PlatformTag,
     PythonInterpreter, Target,
 };
-#[cfg(feature = "scaffolding")]
-use maturin::{init_project, new_project, GenerateProjectOptions};
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
 use std::env;
@@ -134,6 +134,9 @@ enum Opt {
         #[command(flatten)]
         options: GenerateProjectOptions,
     },
+    #[cfg(feature = "scaffolding")]
+    #[command(name = "generate-ci")]
+    GenerateCI(GenerateCI),
     /// Upload python packages to pypi
     ///
     /// It is mostly similar to `twine upload`, but can only upload python wheels
@@ -402,6 +405,8 @@ fn run() -> Result<()> {
         Opt::InitProject { path, options } => init_project(path, options)?,
         #[cfg(feature = "scaffolding")]
         Opt::NewProject { path, options } => new_project(path, options)?,
+        #[cfg(feature = "scaffolding")]
+        Opt::GenerateCI(generate_ci) => generate_ci.execute()?,
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {

@@ -27,8 +27,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 use tempfile::{tempdir, TempDir};
-use time::macros::datetime;
-use time::OffsetDateTime;
 use tracing::debug;
 use zip::{self, DateTime, ZipWriter};
 
@@ -331,11 +329,14 @@ impl WheelWriter {
     /// Note that the earliest timestamp a zip file can represent is 1980-01-01
     fn mtime(&self) -> Result<DateTime> {
         let epoch: i64 = env::var("SOURCE_DATE_EPOCH")?.parse()?;
-        let dt = OffsetDateTime::from_unix_timestamp(epoch)?;
-        let min_dt = datetime!(1980-01-01 0:00 UTC);
+        let dt = time::OffsetDateTime::from_unix_timestamp(epoch)?;
+        let min_dt = time::Date::from_calendar_date(1980, time::Month::January, 1)
+            .unwrap()
+            .midnight()
+            .assume_offset(time::UtcOffset::UTC);
         let dt = dt.max(min_dt);
 
-        let dt = DateTime::from_time(dt).map_err(|_| anyhow!("Failed to build zip DateTime"))?;
+        let dt = DateTime::try_from(dt).map_err(|_| anyhow!("Failed to build zip DateTime"))?;
         Ok(dt)
     }
 

@@ -274,8 +274,9 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
+#[clap(rename_all = "lower")]
 pub enum InterpreterKind {
     CPython,
     PyPy,

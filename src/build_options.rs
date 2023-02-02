@@ -929,7 +929,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     };
 
     if !(bridge.is_bindings("pyo3") || bridge.is_bindings("pyo3-ffi")) {
-        println!("🔗 Found {bridge} bindings");
+        eprintln!("🔗 Found {bridge} bindings");
     }
 
     for &lib in PYO3_BINDING_CRATES.iter() {
@@ -945,10 +945,10 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             }
 
             return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
-                println!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
+                eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
                 Ok(BridgeModel::BindingsAbi3(major, minor))
             } else {
-                println!("🔗 Found {lib} bindings");
+                eprintln!("🔗 Found {lib} bindings");
                 Ok(bridge)
             };
         }

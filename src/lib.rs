@@ -44,6 +44,8 @@ mod auditwheel;
 mod build_context;
 mod build_options;
 mod cargo_toml;
+/// Generate CI configuration
+pub mod ci;
 mod compile;
 mod cross_compile;
 mod develop;

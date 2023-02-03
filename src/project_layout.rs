@@ -394,7 +394,7 @@ impl ProjectLayout {
                 bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
             }
 
-            println!("🍹 Building a mixed python/rust project");
+            eprintln!("🍹 Building a mixed python/rust project");
 
             Ok(ProjectLayout {
                 python_dir: python_root,

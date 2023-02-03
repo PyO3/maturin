@@ -509,6 +509,12 @@ impl BuildOptions {
         let mut target_triple = self.target.clone();
 
         let mut universal2 = self.universal2;
+        if universal2 {
+            eprintln!("⚠️  Warning: `--universal2` is deprecated, use `--target univeral2-apple-darwin` instead");
+        } else if target_triple.as_deref() == Some("universal2-apple-darwin") {
+            universal2 = true;
+            target_triple = None;
+        }
         // Also try to determine universal2 from ARCHFLAGS environment variable
         if let Ok(arch_flags) = env::var("ARCHFLAGS") {
             let arches: HashSet<&str> = arch_flags

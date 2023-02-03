@@ -301,6 +301,15 @@ impl BuildOptions {
                         if interpreter.is_empty() && !self.find_interpreter {
                             bail!("Couldn't find any python interpreters. Please specify at least one with -i");
                         }
+                        for interp in interpreter {
+                            // If `-i` looks like a file path, check if it's a valid interpreter
+                            if interp.components().count() > 1
+                                && PythonInterpreter::check_executable(interp, target, bridge)?
+                                    .is_none()
+                            {
+                                bail!("{} is not a valid python interpreter", interp.display());
+                            }
+                        }
                         interpreters =
                             find_interpreter_in_sysconfig(interpreter, target, min_python_minor)?;
                     }

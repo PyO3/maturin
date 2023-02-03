@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Deprecate `--univeral2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
+
 ## [0.14.12] - 2023-01-31
 
 * Keep `dev-dependencies` in sdist when there are no path dependencies in [#1441](https://github.com/PyO3/maturin/pull/1441)

@@ -258,9 +258,9 @@ maturin itself is manylinux compliant when compiled for the musl target.
 
 ## Examples
 
-* [ballista](https://github.com/apache/arrow-ballista/tree/master/python) - A Python library that binds to Apache Arrow distributed query engine Ballista
+* [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
 * [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
-* [datafusion](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
+* [datafusion-python](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
 * [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
 * [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
 * [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js

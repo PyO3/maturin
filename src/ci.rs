@@ -102,17 +102,27 @@ impl GenerateCI {
         } = ProjectResolver::resolve(self.manifest_path.clone(), cargo_options)?;
         let pyproject = pyproject_toml.as_ref();
         let bridge = find_bridge(&cargo_metadata, pyproject.and_then(|x| x.bindings()))?;
-        let is_abi3 = matches!(bridge, BridgeModel::BindingsAbi3(..));
         let project_name = pyproject
             .and_then(|project| project.project_name())
             .unwrap_or(&project_layout.extension_name);
 
         match self.ci {
-            Provider::GitHub => self.generate_github(project_name, is_abi3),
+            Provider::GitHub => self.generate_github(project_name, &bridge),
         }
     }
 
-    fn generate_github(&self, project_name: &str, is_abi3: bool) -> Result<String> {
+    fn generate_github(&self, project_name: &str, bridge_model: &BridgeModel) -> Result<String> {
+        let is_abi3 = matches!(bridge_model, BridgeModel::BindingsAbi3(..));
+        let is_bin = bridge_model.is_bin();
+        let setup_python = self.pytest
+            || matches!(
+                bridge_model,
+                BridgeModel::Bin(Some(_))
+                    | BridgeModel::Bindings(..)
+                    | BridgeModel::BindingsAbi3(..)
+                    | BridgeModel::Cffi
+                    | BridgeModel::UniFfi
+            );
         let mut conf = "on:
   push:
     branches:
@@ -151,17 +161,21 @@ jobs:\n"
             // job steps
             conf.push_str(
                 "    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-",
+      - uses: actions/checkout@v3\n",
             );
-            if matches!(platform, Platform::Windows) {
-                conf.push_str("          architecture: ${{ matrix.target }}\n");
+            // setup python on demand
+            if setup_python {
+                conf.push_str(
+                    "      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'\n",
+                );
+                if matches!(platform, Platform::Windows) {
+                    conf.push_str("          architecture: ${{ matrix.target }}\n");
+                }
             }
             // build wheels
-            let mut maturin_args = if is_abi3 {
+            let mut maturin_args = if is_abi3 || (is_bin && !setup_python) {
                 Vec::new()
             } else {
                 vec!["--find-interpreter".to_string()]
@@ -295,13 +309,14 @@ jobs:\n"
 #[cfg(test)]
 mod tests {
     use super::GenerateCI;
+    use crate::BridgeModel;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn test_generate_github() {
         let conf = GenerateCI::default()
-            .generate_github("example", false)
+            .generate_github("example", &BridgeModel::Bindings("pyo3".to_string(), 7))
             .unwrap();
         let expected = indoc! {r#"
             on:
@@ -401,7 +416,7 @@ mod tests {
     #[test]
     fn test_generate_github_abi3() {
         let conf = GenerateCI::default()
-            .generate_github("example", true)
+            .generate_github("example", &BridgeModel::BindingsAbi3(3, 7))
             .unwrap();
         let expected = indoc! {r#"
             on:
@@ -505,7 +520,9 @@ mod tests {
             pytest: true,
             ..Default::default()
         };
-        let conf = gen.generate_github("example", false).unwrap();
+        let conf = gen
+            .generate_github("example", &BridgeModel::Bindings("pyo3".to_string(), 7))
+            .unwrap();
         let expected = indoc! {r#"
             on:
               push:
@@ -619,6 +636,96 @@ mod tests {
                       pip install example --find-links dist --force-reinstall
                       pip install pytest
                       pytest
+
+              release:
+                name: Release
+                runs-on: ubuntu-latest
+                if: "startsWith(github.ref, 'refs/tags/')"
+                needs: [linux, windows, macos]
+                steps:
+                  - uses: actions/download-artifact@v3
+                    with:
+                      name: wheels
+                  - name: Publish to PyPI
+                    uses: PyO3/maturin-action@v1
+                    env:
+                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+                    with:
+                      command: upload
+                      args: --skip-existing *
+        "#};
+        assert_eq!(conf, expected);
+    }
+
+    #[test]
+    fn test_generate_github_bin_no_binding() {
+        let conf = GenerateCI::default()
+            .generate_github("example", &BridgeModel::Bin(None))
+            .unwrap();
+        let expected = indoc! {r#"
+            on:
+              push:
+                branches:
+                  - main
+                  - master
+              pull_request:
+              workflow_dispatch:
+
+            jobs:
+              linux:
+                runs-on: ubuntu-latest
+                strategy:
+                  matrix:
+                    target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
+                steps:
+                  - uses: actions/checkout@v3
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.target }}
+                      args: --release --out dist
+                      manylinux: auto
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v3
+                    with:
+                      name: wheels
+                      path: dist
+
+              windows:
+                runs-on: windows-latest
+                strategy:
+                  matrix:
+                    target: [x64, x86]
+                steps:
+                  - uses: actions/checkout@v3
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.target }}
+                      args: --release --out dist
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v3
+                    with:
+                      name: wheels
+                      path: dist
+
+              macos:
+                runs-on: macos-latest
+                strategy:
+                  matrix:
+                    target: [x86_64, aarch64]
+                steps:
+                  - uses: actions/checkout@v3
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.target }}
+                      args: --release --out dist
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v3
+                    with:
+                      name: wheels
+                      path: dist
 
               release:
                 name: Release

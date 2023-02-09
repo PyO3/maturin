@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -53,8 +53,8 @@ impl CargoToml {
         }
     }
 
-    /// Warn about removed python metadata support in `Cargo.toml`
-    pub fn warn_removed_python_metadata(&self) -> bool {
+    /// Check removed python metadata support in `Cargo.toml`
+    pub fn check_removed_python_metadata(&self) -> Result<()> {
         let mut removed = Vec::new();
         if let Some(CargoTomlMetadata {
             maturin: Some(extra_metadata),
@@ -80,16 +80,14 @@ impl CargoToml {
             }
         }
         if !removed.is_empty() {
-            eprintln!(
-                "⚠️  Warning: the following metadata fields in `package.metadata.maturin` section \
+            bail!(
+                "The following metadata fields in `package.metadata.maturin` section \
                 of Cargo.toml are removed since maturin 0.14.0: {}, \
                 please set them in pyproject.toml as PEP 621 specifies.",
                 removed.join(", ")
             );
-            true
-        } else {
-            false
         }
+        Ok(())
     }
 }
 

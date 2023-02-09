@@ -111,7 +111,11 @@ impl GenerateCI {
         }
     }
 
-    fn generate_github(&self, project_name: &str, bridge_model: &BridgeModel) -> Result<String> {
+    pub(crate) fn generate_github(
+        &self,
+        project_name: &str,
+        bridge_model: &BridgeModel,
+    ) -> Result<String> {
         let is_abi3 = matches!(bridge_model, BridgeModel::BindingsAbi3(..));
         let is_bin = bridge_model.is_bin();
         let setup_python = self.pytest

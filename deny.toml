@@ -187,6 +187,7 @@ skip = [
     { name = "memoffset", version = "0.6.5" },
     { name = "proc-macro-crate", version = "0.1.5" },
     { name = "sha2", version = "0.9.9" },
+    { name = "nix", version = "0.22.3" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive

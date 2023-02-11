@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-* `maturin develop` now just like `maturin run` also look for a virtualenv .venv in the current or any parent directory if no environment is active.
+* `maturin develop` now looks for a virtualenv `.venv` in the current or any parent directory if no virtual environment is active.
 * Deprecate `--univeral2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
 * Raise an error when `Cargo.toml` contains removed python package metadata in [#1471](https://github.com/PyO3/maturin/pull/1471)
 

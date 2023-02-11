@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
 * Deprecate `--univeral2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
 * Raise an error when `Cargo.toml` contains removed python package metadata in [#1471](https://github.com/PyO3/maturin/pull/1471)
+* New subcommand: `maturin run <args>`. Equivalent to `python <args>`, except if neither a virtualenv nor a conda environment are activated, it looks for a virtualenv `.venv` in the current or any parent directory. This is inspired by [PEP 704](https://peps.python.org/pep-0704/). Note that on unix-like platforms this uses `execv` while on windows this uses a subcommand, for other platforms you can deactivate the `maturin-run` feature when building maturin.
 
 ## [0.14.12] - 2023-01-31
 

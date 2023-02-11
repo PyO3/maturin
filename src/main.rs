@@ -16,8 +16,12 @@ use maturin::{
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
 use std::env;
+#[cfg(unix)]
+use std::ffi::CString;
 use std::io;
 use std::path::PathBuf;
+#[cfg(windows)]
+use std::process::Command;
 use tracing::debug;
 
 #[derive(Debug, Parser)]
@@ -151,6 +155,12 @@ enum Opt {
         #[arg(value_name = "FILE")]
         files: Vec<PathBuf>,
     },
+    /// Run python from the virtualenv in `.venv` in the current or any parent folder
+    ///
+    /// On linux/mac, `maturin run <args>` is equivalent to `.venv/bin/python <args>`
+    #[cfg(feature = "maturin-run")]
+    #[structopt(external_subcommand)]
+    Run(Vec<String>),
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
     /// The commands are meant to be called from the python PEP 517
@@ -331,6 +341,64 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
     Ok(())
 }
 
+/// `maturin run` implementation. Looks for a virtualenv .venv in cwd or any parent and execve
+/// python from there with args
+#[cfg(feature = "maturin-run")]
+fn python_run(mut args: Vec<String>) -> Result<()> {
+    // Not sure if it's even feasible to support other target triples here given the restrictions
+    // with argument parsing
+    let target = Target::from_target_triple(None)?;
+    let venv_dir = detect_venv(&target)?;
+    let python = target.get_venv_python(venv_dir);
+
+    // We get the args in the format ["run", "arg1", "arg2"] but python shouldn't see the "run"
+    assert_eq!(args[0], "run");
+    args.remove(0);
+
+    #[cfg(unix)]
+    {
+        debug!("launching (execv) {}", python.display());
+        // Sorry for all the to_string_lossy
+        // https://stackoverflow.com/a/38948854/3549270
+        let executable_c_str = CString::new(python.to_string_lossy().as_bytes())
+            .context("Failed to convert executable path")?;
+        // Python needs first entry to be the binary (as it is common on unix) so python will
+        // pick up the pyvenv.cfg
+        args.insert(0, python.to_string_lossy().to_string());
+        let args_c_string = args
+            .iter()
+            .map(|arg| {
+                CString::new(arg.as_bytes()).context("Failed to convert executable argument")
+            })
+            .collect::<Result<Vec<CString>>>()?;
+
+        // We replace the current process with the new process is it's like actually just running
+        // the real thing.
+        // Note the that this may launch a python script, a native binary or anything else
+        nix::unistd::execv(&executable_c_str, &args_c_string)
+            .context("Failed to launch process")?;
+        unreachable!()
+    }
+    #[cfg(windows)]
+    {
+        debug!("launching (new process) {}", python.display());
+        // TODO: What's the correct equivalent of execv on windows?
+        let status = Command::new(python)
+            .args(args.iter())
+            .status()
+            .context("Failed to launch process")?;
+        std::process::exit(
+            status
+                .code()
+                .context("Process didn't return an exit code")?,
+        )
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        compile_error!("Unsupported Platform, please disable the maturin-run feature.")
+    }
+}
+
 fn run() -> Result<()> {
     #[cfg(feature = "log")]
     tracing_subscriber::fmt::init();
@@ -447,6 +515,8 @@ fn run() -> Result<()> {
                 .build_source_distribution()?
                 .context("Failed to build source distribution, pyproject.toml not found")?;
         }
+        #[cfg(feature = "maturin-run")]
+        Opt::Run(args) => python_run(args)?,
         Opt::Pep517(subcommand) => pep517(subcommand)?,
         #[cfg(feature = "scaffolding")]
         Opt::InitProject { path, options } => init_project(path, options)?,

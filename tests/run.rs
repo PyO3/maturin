@@ -613,3 +613,13 @@ fn pyo3_source_date_epoch() {
         "pyo3_source_date_epoch",
     ))
 }
+
+#[test]
+fn maturin_run() {
+    handle_result(other::maturin_run())
+}
+
+#[test]
+fn maturin_run_error() {
+    handle_result(other::maturin_run_error())
+}

@@ -8,7 +8,11 @@ use std::fs::File;
 use std::io::Read;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::str;
+use std::{env, fs};
 use tar::Archive;
+use tempfile::TempDir;
 use time::OffsetDateTime;
 use zip::ZipArchive;
 
@@ -22,7 +26,6 @@ pub fn test_musl() -> Result<bool> {
     use fs_err::File;
     use goblin::elf::Elf;
     use std::io::ErrorKind;
-    use std::process::Command;
 
     let get_target_list = Command::new("rustup")
         .args(["target", "list", "--installed"])
@@ -287,6 +290,62 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
         assert!(result.is_err());
     }
+
+    Ok(())
+}
+
+/// Check that `maturin run` picks up a `.venv` in a parent directory
+pub fn maturin_run() -> Result<()> {
+    let main_dir = env::current_dir()?
+        .join("test-crates")
+        .join("venvs")
+        .join("maturin-run");
+    fs::create_dir_all(&main_dir)?;
+    // We can't use the same function as the other tests here because it needs to be called `.venv`
+    let venv_dir = main_dir.join(".venv");
+    if !venv_dir.is_dir() {
+        let status = Command::new("virtualenv").arg(&venv_dir).status()?;
+        assert!(status.success());
+    }
+
+    let work_dir = main_dir.join("some_work_dir");
+    fs::create_dir_all(&work_dir)?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(["run", "-c", "import sys; print(sys.prefix)"])
+        .current_dir(&work_dir)
+        .output()
+        .expect("Failed to launch maturin");
+    if !output.status.success() {
+        panic!(
+            "`maturin run` failed: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
+    // Check that the prefix ends with .venv, i.e. that we found the right venv
+    assert_eq!(
+        Path::new(&String::from_utf8(output.stdout)?.trim()),
+        &venv_dir
+    );
+
+    Ok(())
+}
+
+/// Check that `maturin run` fails when there is no `.venv`
+pub fn maturin_run_error() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(["run", "-c", "import sys; print(sys.prefix)"])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to launch maturin");
+    assert!(!output.status.success());
+    // Don't check the exact error message but make sure it tells the user about .venv
+    assert!(str::from_utf8(&output.stderr)?.contains(".venv"));
 
     Ok(())
 }

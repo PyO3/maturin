@@ -807,7 +807,7 @@ pub fn write_cffi_module(
     let module;
     if let Some(python_module) = &project_layout.python_module {
         if editable {
-            let base_path = python_module.join(module_name);
+            let base_path = python_module.join(&project_layout.extension_name);
             fs::create_dir_all(&base_path)?;
             let target = base_path.join("native.so");
             fs::copy(artifact, &target).context(format!(

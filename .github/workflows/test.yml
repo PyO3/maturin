@@ -440,15 +440,15 @@ jobs:
               - 'MANIFEST.in'
               - '.github/workflows/test.yml'
       - uses: dtolnay/rust-toolchain@beta
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       # Caching
       - name: Sccache Setup
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
         with:
           version: "v0.4.0-pre.6"
       - uses: actions/setup-python@v4
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:
           python-version: "3.10"
       - name: Build and install
@@ -457,13 +457,13 @@ jobs:
           set -ex
           cargo run sdist -o dist
           pip install -v dist/maturin-*.tar.gz
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - run: maturin --version
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - run: python3 -m maturin --version
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - name: Upload wheel artifacts
-        if: steps.changes.outputs.changed == 'true'
+        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         uses: actions/upload-artifact@v3
         with:
           name: wheels

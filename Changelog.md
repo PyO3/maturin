@@ -12,10 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking Change**: Remove deprecated `python-source` option in `Cargo.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * **Breaking Change**: Turn `patchelf` version warning into a hard error in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * **Breaking Change**: [`uniffi_bindgen` CLI](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) is required for building `uniffi` bindings wheels in [#1352](https://github.com/PyO3/maturin/pull/1352)
-* `maturin develop` now looks for a virtualenv `.venv` in the current or any parent directory if no virtual environment is active.
 * Add Cargo compile targets configuration for filtering multiple bin targets in [#1339](https://github.com/PyO3/maturin/pull/1339)
 * Respect `rustflags` settings in cargo configuration file in [#1405](https://github.com/PyO3/maturin/pull/1405)
 * Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
+
+## [0.14.13] - 2023-02-12
+
+* `maturin develop` now looks for a virtualenv `.venv` in the current or any parent directory if no virtual environment is active.
+* Add a new `generate-ci` command to generate CI configuration in [#1456](https://github.com/PyO3/maturin/pull/1456)
 * Deprecate `--univeral2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
 * Raise an error when `Cargo.toml` contains removed python package metadata in [#1471](https://github.com/PyO3/maturin/pull/1471)
 * Use `extension_name` instead of `module_name` for CFFI extensions in develop mode in [#1476](https://github.com/PyO3/maturin/pull/1476)
@@ -820,7 +824,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.12...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.13...HEAD
+[0.14.13]: https://github.com/pyo3/maturin/compare/v0.14.12...v0.14.13
 [0.14.12]: https://github.com/pyo3/maturin/compare/v0.14.11...v0.14.12
 [0.14.11]: https://github.com/pyo3/maturin/compare/v0.14.10...v0.14.11
 [0.14.10]: https://github.com/pyo3/maturin/compare/v0.14.9...v0.14.10

@@ -37,9 +37,21 @@ rand = "0.8.4"
 
 [dependencies.pyo3]
 version = "0.18.0"
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
 # "abi3-py37" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.7
-features = ["extension-module", "abi3-py37"]
+features = ["abi3-py37"]
+```
+
+Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements
+and enable the `extension-module` feature of pyo3.
+
+```toml
+[build-system]
+requires = ["maturin>=0.14,<0.15"]
+build-backend = "maturin"
+
+[tool.maturin]
+# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+features = ["pyo3/extension-module"]
 ```
 
 ### Use `maturin new`
@@ -47,20 +59,20 @@ features = ["extension-module", "abi3-py37"]
 New projects can also be quickly created using the `maturin new` command:
 
 ```bash
-USAGE:
-    maturin new [FLAGS] [OPTIONS] <path>
+maturin new --help
+Create a new cargo project
 
-FLAGS:
-    -h, --help       Prints help information
-        --mixed      Use mixed Rust/Python project layout
-    -V, --version    Prints version information
+Usage: maturin new [OPTIONS] <PATH>
 
-OPTIONS:
-    -b, --bindings <bindings>    Which kind of bindings to use [possible values: pyo3, rust-cpython, cffi, bin]
-        --name <name>            Set the resulting package name, defaults to the directory name
+Arguments:
+  <PATH>  Project path
 
-ARGS:
-    <path>    Project path
+Options:
+      --name <NAME>          Set the resulting package name, defaults to the directory name
+      --mixed                Use mixed Rust/Python project layout
+      --src                  Use Python first src layout for mixed Rust/Python project
+  -b, --bindings <BINDINGS>  Which kind of bindings to use [possible values: pyo3, rust-cpython, cffi, uniffi, bin]
+  -h, --help                 Print help information
 ```
 
 The above process can be achieved by running `maturin new -b pyo3 guessing_game`

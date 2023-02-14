@@ -262,6 +262,38 @@ fn canonicalize_name(name: &str) -> String {
         .to_lowercase()
 }
 
+fn http_proxy() -> Result<String, env::VarError> {
+    env::var("HTTPS_PROXY")
+        .or_else(|_| env::var("https_proxy"))
+        .or_else(|_| env::var("HTTP_PROXY"))
+        .or_else(|_| env::var("http_proxy"))
+}
+
+#[cfg(feature = "native-tls")]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    use std::sync::Arc;
+
+    let mut builder =
+        ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    Ok(builder.build())
+}
+
+#[cfg(not(feature = "native-tls"))]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    Ok(builder.build())
+}
+
 /// Uploads a single wheel to the registry
 #[allow(clippy::result_large_err)]
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
@@ -339,35 +371,9 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 
     form.add_stream("content", &wheel, Some(wheel_name), None);
     let multipart_data = form.prepare().map_err(|e| e.error)?;
-
     let encoded = base64::encode(format!("{}:{}", registry.username, registry.password));
 
-    let http_proxy = env::var("HTTPS_PROXY")
-        .or_else(|_| env::var("https_proxy"))
-        .or_else(|_| env::var("HTTP_PROXY"))
-        .or_else(|_| env::var("http_proxy"));
-
-    #[cfg(not(feature = "native-tls"))]
-    let agent = {
-        let mut builder = ureq::builder();
-        if let Ok(proxy) = http_proxy {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        };
-        builder.build()
-    };
-
-    #[cfg(feature = "native-tls")]
-    let agent = {
-        use std::sync::Arc;
-        let mut builder =
-            ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
-        if let Ok(proxy) = http_proxy {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        };
-        builder.build()
-    };
+    let agent = http_agent()?;
 
     let response = agent
         .post(registry.url.as_str())

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Respect `rustflags` settings in cargo configuration file in [#1405](https://github.com/PyO3/maturin/pull/1405)
 * Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
 * Add support for uniffi 0.23 in [#1481](https://github.com/PyO3/maturin/pull/1481)
+* Add support for custom TLS certificate authority bundle in [#1483](https://github.com/PyO3/maturin/pull/1483)
 * Add support for Emscripten in `generate-ci` command in [#1484](https://github.com/PyO3/maturin/pull/1484)
 
 ## [0.14.13] - 2023-02-12

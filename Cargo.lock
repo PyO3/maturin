@@ -857,9 +857,9 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "fastrand"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
+checksum = "e51093e27b0797c359783294ca4f0a911c270184cb10f85783b118614a1501be"
 dependencies = [
  "instant",
 ]
@@ -1353,7 +1353,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "0.14.13"
+version = "1.0.0-beta.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -1457,9 +1457,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "0.30.2"
+version = "0.30.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18b0af1900a114a8183b10b4266a9a4fc2816afdb7089592492c8eadd07f1629"
+checksum = "f95c8f0999f88dd509934824ce03582ffbbcabf8af6484107572618732660c54"
 dependencies = [
  "serde",
 ]

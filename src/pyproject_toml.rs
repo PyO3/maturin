@@ -239,17 +239,15 @@ impl PyProjectToml {
             .iter()
             .find(|x| x.starts_with(maturin))
         {
-            // Note: Update this once 1.0 is out
-            assert_eq!(env!("CARGO_PKG_VERSION_MAJOR"), "0");
-            let current_minor: usize = env!("CARGO_PKG_VERSION_MINOR").parse().unwrap();
+            let current_major: usize = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
             if requires_maturin == maturin {
                 eprintln!(
                     "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
-                    e.g. `requires = [\"{maturin}>=0.{current},<0.{next}\"]`. \
+                    e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \
                     This will become an error.",
                     maturin = maturin,
-                    current = current_minor,
-                    next = current_minor + 1,
+                    current = current_major,
+                    next = current_major + 1,
                 );
                 return false;
             }

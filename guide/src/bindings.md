@@ -96,8 +96,10 @@ directory of a virtual environment) once installed.
 uniffi bindings use [uniffi-rs](https://mozilla.github.io/uniffi-rs/) to generate Python `ctypes` bindings
 from an interface definition file. uniffi wheels are compatible with all python versions including pypy.
 
-You need to install [uniffi_bindgen](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) first to build wheels for `uniffi` bindings:
+You need to install [uniffi-bindgen](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) first to build wheels for `uniffi` bindings:
 
 ```bash
-cargo install uniffi_bindgen
+pip install uniffi-bindgen==0.23.0
 ```
+
+Note that `uniffi-bindgen` version should be aligned with your Rust `uniffi` dependency version.

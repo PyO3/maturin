@@ -227,7 +227,7 @@ jobs:\n"
                 conf.push_str("      - run: pip install pyodide-build\n");
                 conf.push_str("      - shell: bash\n        run: echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
                 conf.push_str(
-                    "      - uses: mymindstorm/setup-emsdk@v11
+                    "      - uses: mymindstorm/setup-emsdk@v12
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache\n",

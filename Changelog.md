@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Add support for Emscripten in `generate-ci` command in [#1484](https://github.com/PyO3/maturin/pull/1484)
+* Add support for linking with pyo3 in abi3 debug mode on Windows in [#1487](https://github.com/PyO3/maturin/pull/1487)
 
 ## [0.14.13] - 2023-02-12
 

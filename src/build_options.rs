@@ -369,6 +369,11 @@ impl BuildOptions {
                             implmentation_name: "cpython".to_string(),
                             soabi: None,
                         }])
+                    } else if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
+                        let interpreter_config =
+                            InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
+                                .context("Invalid PYO3_CONFIG_FILE")?;
+                        Ok(vec![PythonInterpreter::from_config(interpreter_config)])
                     } else if let Some(interp) = interpreters.get(0) {
                         println!("🐍 Using {interp} to generate to link bindings (With abi3, an interpreter is only required on windows)");
                         Ok(interpreters)

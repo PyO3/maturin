@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -18,23 +19,44 @@ pub enum Provider {
 }
 
 /// Platform
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 #[clap(rename_all = "lower")]
 pub enum Platform {
+    /// All
+    All,
     /// Linux
     Linux,
     /// Windows
     Windows,
     /// macOS
     Macos,
+    /// Emscripten
+    Emscripten,
+}
+
+impl Platform {
+    fn defaults() -> Vec<Self> {
+        vec![Platform::Linux, Platform::Windows, Platform::Macos]
+    }
+
+    fn all() -> Vec<Self> {
+        vec![
+            Platform::Linux,
+            Platform::Windows,
+            Platform::Macos,
+            Platform::Emscripten,
+        ]
+    }
 }
 
 impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Platform::All => write!(f, "all"),
             Platform::Linux => write!(f, "linux"),
             Platform::Windows => write!(f, "windows"),
             Platform::Macos => write!(f, "macos"),
+            Platform::Emscripten => write!(f, "emscripten"),
         }
     }
 }
@@ -56,7 +78,7 @@ pub struct GenerateCI {
         id = "platform",
         long,
         action = ArgAction::Append,
-        num_args = 0..,
+        num_args = 1..,
         default_values_t = vec![Platform::Linux, Platform::Windows, Platform::Macos],
     )]
     pub platforms: Vec<Platform>,
@@ -139,10 +161,28 @@ jobs:\n"
             .to_string();
 
         let mut needs = Vec::new();
-        for platform in &self.platforms {
+        let platforms: BTreeSet<_> = self
+            .platforms
+            .iter()
+            .flat_map(|p| {
+                if matches!(p, Platform::All) {
+                    if !bridge_model.is_bin() {
+                        Platform::all()
+                    } else {
+                        Platform::defaults()
+                    }
+                } else {
+                    vec![*p]
+                }
+            })
+            .collect();
+        for platform in &platforms {
+            if bridge_model.is_bin() && matches!(platform, Platform::Emscripten) {
+                continue;
+            }
             let plat_name = platform.to_string();
             let os_name = match platform {
-                Platform::Linux => "ubuntu",
+                Platform::Linux | Platform::Emscripten => "ubuntu",
                 _ => &plat_name,
             };
             needs.push(platform.to_string());
@@ -155,13 +195,16 @@ jobs:\n"
                 Platform::Linux => vec!["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"],
                 Platform::Windows => vec!["x64", "x86"],
                 Platform::Macos => vec!["x86_64", "aarch64"],
+                _ => Vec::new(),
             };
-            conf.push_str(&format!(
-                "    strategy:
+            if !targets.is_empty() {
+                conf.push_str(&format!(
+                    "    strategy:
       matrix:
         target: [{targets}]\n",
-                targets = targets.join(", ")
-            ));
+                    targets = targets.join(", ")
+                ));
+            }
             // job steps
             conf.push_str(
                 "    steps:
@@ -178,9 +221,24 @@ jobs:\n"
                     conf.push_str("          architecture: ${{ matrix.target }}\n");
                 }
             }
+
+            // install pyodide-build for emscripten
+            if matches!(platform, Platform::Emscripten) {
+                conf.push_str("      - run: pip install pyodide-build\n");
+                conf.push_str("      - shell: bash\n        run: echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
+                conf.push_str(
+                    "      - uses: mymindstorm/setup-emsdk@v11
+        with:
+          version: ${{ env.EMSCRIPTEN_VERSION }}
+          actions-cache-folder: emsdk-cache\n",
+                );
+            }
+
             // build wheels
             let mut maturin_args = if is_abi3 || (is_bin && !setup_python) {
                 Vec::new()
+            } else if matches!(platform, Platform::Emscripten) {
+                vec!["-i".to_string(), "3.10".to_string()]
             } else {
                 vec!["--find-interpreter".to_string()]
             };
@@ -198,26 +256,38 @@ jobs:\n"
             } else {
                 format!(" {}", maturin_args.join(" "))
             };
+            let maturin_target = if matches!(platform, Platform::Emscripten) {
+                "wasm32-unknown-emscripten"
+            } else {
+                "${{ matrix.target }}"
+            };
             conf.push_str(&format!(
                 "      - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{{{ matrix.target }}}}
+          target: {maturin_target}
           args: --release --out dist{maturin_args}
 "
             ));
             if matches!(platform, Platform::Linux) {
                 conf.push_str("          manylinux: auto\n");
+            } else if matches!(platform, Platform::Emscripten) {
+                conf.push_str("          rust-toolchain: nightly\n");
             }
             // upload wheels
-            conf.push_str(
+            let artifact_name = if matches!(platform, Platform::Emscripten) {
+                "wasm-wheels"
+            } else {
+                "wheels"
+            };
+            conf.push_str(&format!(
                 "      - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
-          name: wheels
+          name: {artifact_name}
           path: dist
-",
-            );
+"
+            ));
             // pytest
             let mut chdir = String::new();
             if let Some(manifest_path) = self.manifest_path.as_ref() {
@@ -259,6 +329,24 @@ jobs:\n"
             {chdir}pytest
 "
                     ));
+                } else if matches!(platform, Platform::Emscripten) {
+                    conf.push_str(
+                        "      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+",
+                    );
+                    conf.push_str(&format!(
+                        "      - name: pytest
+        run: |
+          set -e
+          pyodide venv .venv
+          source .venv/bin/activate
+          pip install {project_name} --find-links dist --force-reinstall
+          pip install pytest
+          {chdir} python -m pytest
+"
+                    ));
                 } else {
                     conf.push_str(&format!(
                         "      - name: pytest
@@ -297,6 +385,21 @@ jobs:\n"
 "#,
             needs = needs.join(", ")
         ));
+        if platforms.contains(&Platform::Emscripten) {
+            conf.push_str(
+                "      - uses: actions/download-artifact@v3
+        with:
+          name: wasm-wheels
+          path: wasm
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            wasm/*.whl
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+",
+            );
+        }
         Ok(conf)
     }
 

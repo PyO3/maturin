@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for Emscripten in `generate-ci` command in [#1484](https://github.com/PyO3/maturin/pull/1484)
+
 ## [0.14.13] - 2023-02-12
 
 * `maturin develop` now looks for a virtualenv `.venv` in the current or any parent directory if no virtual environment is active.

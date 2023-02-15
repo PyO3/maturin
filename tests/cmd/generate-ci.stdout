@@ -18,15 +18,17 @@ Options:
           
           [default: -]
 
-      --platform [<platform>...]
+      --platform <platform>...
           Platform support
           
           [default: linux windows macos]
 
           Possible values:
-          - linux:   Linux
-          - windows: Windows
-          - macos:   macOS
+          - all:        All
+          - linux:      Linux
+          - windows:    Windows
+          - macos:      macOS
+          - emscripten: Emscripten
 
       --pytest
           Enable pytest

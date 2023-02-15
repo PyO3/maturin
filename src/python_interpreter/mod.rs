@@ -539,6 +539,11 @@ impl PythonInterpreter {
         )
     }
 
+    /// Is this a debug build of Python for Windows?
+    pub fn is_windows_debug(&self) -> bool {
+        self.ext_suffix.starts_with("_d.") && self.ext_suffix.ends_with(".pyd")
+    }
+
     /// Checks whether the given command is a python interpreter and returns a
     /// [PythonInterpreter] if that is the case
     pub fn check_executable(

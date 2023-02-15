@@ -6,7 +6,9 @@
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
-use clap::{CommandFactory, Parser, Subcommand};
+#[cfg(feature = "cli-completion")]
+use clap::CommandFactory;
+use clap::{Parser, Subcommand};
 #[cfg(feature = "scaffolding")]
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
@@ -16,7 +18,6 @@ use maturin::{
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
 use std::env;
-use std::io;
 use std::path::PathBuf;
 use tracing::debug;
 
@@ -157,6 +158,7 @@ enum Opt {
     #[command(subcommand)]
     Pep517(Pep517Command),
     /// Generate shell completions
+    #[cfg(feature = "cli-completion")]
     #[command(name = "completions", hide = true)]
     Completions {
         #[arg(value_name = "SHELL")]
@@ -449,8 +451,9 @@ fn run() -> Result<()> {
 
             upload_ui(&files, &publish)?
         }
+        #[cfg(feature = "cli-completion")]
         Opt::Completions { shell } => {
-            shell.generate(&mut Opt::command(), &mut io::stdout());
+            shell.generate(&mut Opt::command(), &mut std::io::stdout());
         }
         #[cfg(feature = "zig")]
         Opt::Zig(subcommand) => {

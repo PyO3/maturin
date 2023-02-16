@@ -168,23 +168,13 @@ impl ProjectResolver {
                 None => project_root.to_path_buf(),
             },
         };
-        let data = match pyproject.and_then(|x| x.data()) {
-            Some(data) => {
-                if data.is_absolute() {
-                    Some(data.to_path_buf())
-                } else {
-                    Some(project_root.join(data))
-                }
+        let data = pyproject.and_then(|x| x.data()).map(|data| {
+            if data.is_absolute() {
+                data.to_path_buf()
+            } else {
+                project_root.join(data)
             }
-            None => extra_metadata.data.as_ref().map(|data| {
-                let data = Path::new(data);
-                if data.is_absolute() {
-                    data.to_path_buf()
-                } else {
-                    manifest_dir.join(data)
-                }
-            }),
-        };
+        });
         let project_layout =
             ProjectLayout::determine(project_root, extension_name, py_root, python_packages, data)?;
         Ok(Self {

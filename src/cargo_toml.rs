@@ -64,6 +64,7 @@ impl CargoToml {
                 "scripts",
                 "classifiers",
                 "classifier",
+                "data",
                 "maintainer",
                 "maintainer-email",
                 "requires-dist",
@@ -102,8 +103,6 @@ struct CargoTomlMetadata {
 #[serde(rename_all = "kebab-case")]
 pub struct RemainingCoreMetadata {
     pub name: Option<String>,
-    /// The directory containing the wheel data
-    pub data: Option<String>,
     /// Cargo compile targets
     pub targets: Option<Vec<CargoTarget>>,
     #[serde(flatten)]

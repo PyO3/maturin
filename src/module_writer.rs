@@ -712,22 +712,28 @@ pub fn write_bindings_module(
     module_name: &str,
     artifact: &Path,
     python_interpreter: Option<&PythonInterpreter>,
+    is_abi3: bool,
     target: &Target,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
-    let so_filename = match python_interpreter {
-        Some(python_interpreter) => python_interpreter.get_library_name(ext_name),
-        // abi3
-        None => {
-            if target.is_unix() {
-                format!("{ext_name}.abi3.so")
-            } else {
+    let so_filename = if is_abi3 {
+        if target.is_unix() {
+            format!("{ext_name}.abi3.so")
+        } else {
+            match python_interpreter {
+                Some(python_interpreter) if python_interpreter.is_windows_debug() => {
+                    format!("{ext_name}_d.pyd")
+                }
                 // Apparently there is no tag for abi3 on windows
-                format!("{ext_name}.pyd")
+                _ => format!("{ext_name}.pyd"),
             }
         }
+    } else {
+        let python_interpreter =
+            python_interpreter.expect("A python interpreter is required for non-abi3 build");
+        python_interpreter.get_library_name(ext_name)
     };
 
     if !editable {

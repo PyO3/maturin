@@ -127,7 +127,7 @@ jobs:
         # Just for test, come back to upstream after released
         uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
         with:
-          version: "v0.4.0-pre.6"
+          version: "v0.4.0-pre.7"
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -443,7 +443,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
         with:
-          version: "v0.4.0-pre.6"
+          version: "v0.4.0-pre.7"
       - uses: actions/setup-python@v4
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:

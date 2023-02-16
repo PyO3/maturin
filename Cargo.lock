@@ -1353,7 +1353,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -1685,9 +1685,9 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "once_cell"
-version = "1.17.0"
+version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
+checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 
 [[package]]
 name = "opaque-debug"
@@ -2613,9 +2613,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.17"
+version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
+checksum = "af0097eaf301d576d0b2aead7a59facab6d53cc636340f0291fab8446a2e8613"
 dependencies = [
  "serde",
  "time-core",

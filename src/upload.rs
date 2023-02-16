@@ -10,6 +10,8 @@ use fs_err::File;
 use multipart::client::lazy::Multipart;
 use regex::Regex;
 use std::env;
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -84,7 +86,7 @@ pub enum UploadError {
     /// TLS error
     #[cfg(feature = "native-tls")]
     #[error("TLS Error")]
-    TlsError(#[source] native_tls_crate::Error),
+    TlsError(#[source] native_tls::Error),
 }
 
 impl From<io::Error> for UploadError {
@@ -100,8 +102,8 @@ impl From<ureq::Error> for UploadError {
 }
 
 #[cfg(feature = "native-tls")]
-impl From<native_tls_crate::Error> for UploadError {
-    fn from(error: native_tls_crate::Error) -> Self {
+impl From<native_tls::Error> for UploadError {
+    fn from(error: native_tls::Error) -> Self {
         UploadError::TlsError(error)
     }
 }
@@ -262,6 +264,78 @@ fn canonicalize_name(name: &str) -> String {
         .to_lowercase()
 }
 
+fn http_proxy() -> Result<String, env::VarError> {
+    env::var("HTTPS_PROXY")
+        .or_else(|_| env::var("https_proxy"))
+        .or_else(|_| env::var("HTTP_PROXY"))
+        .or_else(|_| env::var("http_proxy"))
+}
+
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+fn tls_ca_bundle() -> Option<OsString> {
+    env::var_os("MATURIN_CA_BUNDLE")
+        .or_else(|| env::var_os("REQUESTS_CA_BUNDLE"))
+        .or_else(|| env::var_os("CURL_CA_BUNDLE"))
+}
+
+// Prefer rustls if both native-tls and rustls features are enabled
+#[cfg(all(feature = "native-tls", not(feature = "rustls")))]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    use std::sync::Arc;
+
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    let mut tls_builder = native_tls::TlsConnector::builder();
+    if let Some(ca_bundle) = tls_ca_bundle() {
+        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
+        for cert in rustls_pemfile::certs(&mut reader)? {
+            tls_builder.add_root_certificate(native_tls::Certificate::from_pem(&cert)?);
+        }
+    }
+    builder = builder.tls_connector(Arc::new(tls_builder.build()?));
+    Ok(builder.build())
+}
+
+#[cfg(feature = "rustls")]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    use std::sync::Arc;
+
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    if let Some(ca_bundle) = tls_ca_bundle() {
+        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
+        let certs = rustls_pemfile::certs(&mut reader)?;
+        let mut root_certs = rustls::RootCertStore::empty();
+        root_certs.add_parsable_certificates(&certs);
+        let client_config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_certs)
+            .with_no_client_auth();
+        Ok(builder.tls_config(Arc::new(client_config)).build())
+    } else {
+        Ok(builder.build())
+    }
+}
+
+#[cfg(not(any(feature = "native-tls", feature = "rustls")))]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    Ok(builder.build())
+}
+
 /// Uploads a single wheel to the registry
 #[allow(clippy::result_large_err)]
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
@@ -339,35 +413,9 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 
     form.add_stream("content", &wheel, Some(wheel_name), None);
     let multipart_data = form.prepare().map_err(|e| e.error)?;
-
     let encoded = base64::encode(format!("{}:{}", registry.username, registry.password));
 
-    let http_proxy = env::var("HTTPS_PROXY")
-        .or_else(|_| env::var("https_proxy"))
-        .or_else(|_| env::var("HTTP_PROXY"))
-        .or_else(|_| env::var("http_proxy"));
-
-    #[cfg(not(feature = "native-tls"))]
-    let agent = {
-        let mut builder = ureq::builder();
-        if let Ok(proxy) = http_proxy {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        };
-        builder.build()
-    };
-
-    #[cfg(feature = "native-tls")]
-    let agent = {
-        use std::sync::Arc;
-        let mut builder =
-            ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
-        if let Ok(proxy) = http_proxy {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        };
-        builder.build()
-    };
+    let agent = http_agent()?;
 
     let response = agent
         .post(registry.url.as_str())

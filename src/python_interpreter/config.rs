@@ -198,6 +198,16 @@ impl InterpreterConfig {
                     )
                 }),
             }
+        } else if target.is_emscripten() && matches!(interpreter_kind, InterpreterKind::CPython) {
+            ext_suffix.unwrap_or_else(|| {
+                format!(
+                    ".cpython-{}-{}-{}.{}",
+                    abi_tag,
+                    target.get_python_arch(),
+                    target.get_python_os(),
+                    file_ext
+                )
+            })
         } else {
             ext_suffix.context("missing value for ext_suffix")?
         };

@@ -516,7 +516,7 @@ impl BuildOptions {
             bail!(
                 "The module name must not contain a minus `-` \
                  (Make sure you have set an appropriate [lib] name or \
-                 [package.metadata.maturin] name in your Cargo.toml)"
+                 [tool.maturin] module-name in your pyproject.toml)"
             );
         }
 
@@ -1497,18 +1497,14 @@ mod test {
 
     #[test]
     fn test_get_min_python_minor() {
-        use crate::CargoToml;
-
         // Nothing specified
         let manifest_path = "test-crates/pyo3-pure/Cargo.toml";
-        let cargo_toml = CargoToml::from_path(manifest_path).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_path)
             .exec()
             .unwrap();
         let metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure", &cargo_metadata)
-                .unwrap();
+            Metadata21::from_cargo_toml("test-crates/pyo3-pure", &cargo_metadata).unwrap();
         assert_eq!(get_min_python_minor(&metadata21), None);
     }
 }

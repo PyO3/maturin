@@ -86,6 +86,8 @@ impl GlobPattern {
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
+    // extension module name, accepts setuptools style import name like `foo.bar`
+    module_name: Option<String>,
     include: Option<Vec<GlobPattern>>,
     exclude: Option<Vec<GlobPattern>>,
     bindings: Option<String>,
@@ -168,6 +170,11 @@ impl PyProjectToml {
     #[inline]
     pub fn maturin(&self) -> Option<&ToolMaturin> {
         self.tool.as_ref()?.maturin.as_ref()
+    }
+
+    /// Returns the value of `[tool.maturin.name]` in pyproject.toml
+    pub fn name(&self) -> Option<&str> {
+        self.maturin()?.module_name.as_deref()
     }
 
     /// Returns the value of `[tool.maturin.include]` in pyproject.toml

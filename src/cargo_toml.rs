@@ -102,7 +102,6 @@ struct CargoTomlMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct RemainingCoreMetadata {
-    pub name: Option<String>,
     /// Cargo compile targets
     pub targets: Option<Vec<CargoTarget>>,
     #[serde(flatten)]

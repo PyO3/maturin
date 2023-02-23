@@ -524,7 +524,7 @@ impl BuildOptions {
 
         let mut universal2 = self.universal2;
         if universal2 {
-            eprintln!("⚠️  Warning: `--universal2` is deprecated, use `--target univeral2-apple-darwin` instead");
+            eprintln!("⚠️  Warning: `--universal2` is deprecated, use `--target universal2-apple-darwin` instead");
         } else if target_triple.as_deref() == Some("universal2-apple-darwin") {
             universal2 = true;
             target_triple = None;

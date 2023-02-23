@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * `maturin develop` now looks for a virtualenv `.venv` in the current or any parent directory if no virtual environment is active.
 * Add a new `generate-ci` command to generate CI configuration in [#1456](https://github.com/PyO3/maturin/pull/1456)
-* Deprecate `--univeral2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
+* Deprecate `--universal2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
 * Raise an error when `Cargo.toml` contains removed python package metadata in [#1471](https://github.com/PyO3/maturin/pull/1471)
 * Use `extension_name` instead of `module_name` for CFFI extensions in develop mode in [#1476](https://github.com/PyO3/maturin/pull/1476)
 

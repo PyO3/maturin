@@ -183,6 +183,7 @@ impl ProjectResolver {
                 }
             }
             None => extra_metadata.data.as_ref().map(|data| {
+                eprintln!("⚠️ Warning: specify `data` in Cargo.toml is deprecated, use `data` in [tool.maturin] section in pyproject.toml instead");
                 let data = Path::new(data);
                 if data.is_absolute() {
                     data.to_path_buf()

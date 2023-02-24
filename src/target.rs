@@ -330,12 +330,7 @@ impl Target {
             }
             // Emscripten
             (Os::Emscripten, Arch::Wasm32) => {
-                let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
-                let release = match os_version {
-                    Ok(os_ver) => os_ver,
-                    Err(_) => emcc_version()?,
-                };
-                let release = release.replace(['.', '-'], "_");
+                let release = emscripten_version()?.replace(['.', '-'], "_");
                 format!("emscripten_{release}_wasm32")
             }
             (Os::Wasi, Arch::Wasm32) => {
@@ -781,6 +776,16 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
         Ok((major, minor))
     };
     rustc_target_version().unwrap_or(fallback_version)
+}
+
+/// Emscripten version
+fn emscripten_version() -> Result<String> {
+    let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
+    let release = match os_version {
+        Ok(os_ver) => os_ver,
+        Err(_) => emcc_version()?,
+    };
+    Ok(release)
 }
 
 fn emcc_version() -> Result<String> {

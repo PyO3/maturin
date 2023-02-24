@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.14] - 2023-02-24
+
 * Add support for Emscripten in `generate-ci` command in [#1484](https://github.com/PyO3/maturin/pull/1484)
 * Add support for linking with pyo3 in abi3 debug mode on Windows in [#1487](https://github.com/PyO3/maturin/pull/1487)
 * Use default `ext_suffix` for Emscripten target if not provided in `PYO3_CONFIG_FILE` in [#1491](https://github.com/PyO3/maturin/pull/1491)
+* Deprecate `package.metadata.maturin.data` in favor of `tool.maturin.data` in `pyproject.toml` in [#1492](https://github.com/PyO3/maturin/pull/1492)
 
 ## [0.14.13] - 2023-02-12
 
@@ -819,7 +822,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.13...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.14...HEAD
+[0.14.14]: https://github.com/pyo3/maturin/compare/v0.14.13...v0.14.14
 [0.14.13]: https://github.com/pyo3/maturin/compare/v0.14.12...v0.14.13
 [0.14.12]: https://github.com/pyo3/maturin/compare/v0.14.11...v0.14.12
 [0.14.11]: https://github.com/pyo3/maturin/compare/v0.14.10...v0.14.11

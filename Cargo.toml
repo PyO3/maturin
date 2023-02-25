@@ -55,7 +55,7 @@ itertools = "0.10.5"
 lddtree = "0.3.2"
 cc = "1.0.72"
 dunce = "1.0.2"
-normpath = "1.0.0"
+normpath = "1.1.0"
 pep440 = "0.2.0"
 time = "0.3.17"
 

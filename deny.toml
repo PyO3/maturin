@@ -181,8 +181,6 @@ skip = [
     { name = "ahash", version = "0.3.8" },
     # from cbindgen
     { name = "toml", version = "0.5.11" },
-    # from crossbeam-epoch via trycmd
-    { name = "memoffset", version = "0.6.5" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive

@@ -127,9 +127,10 @@ impl GenerateCI {
         let project_name = pyproject
             .and_then(|project| project.project_name())
             .unwrap_or(&project_layout.extension_name);
+        let sdist = pyproject_toml.is_some();
 
         match self.ci {
-            Provider::GitHub => self.generate_github(project_name, &bridge),
+            Provider::GitHub => self.generate_github(project_name, &bridge, sdist),
         }
     }
 
@@ -137,6 +138,7 @@ impl GenerateCI {
         &self,
         project_name: &str,
         bridge_model: &BridgeModel,
+        sdist: bool,
     ) -> Result<String> {
         let is_abi3 = matches!(bridge_model, BridgeModel::BindingsAbi3(..));
         let is_bin = bridge_model.is_bin();
@@ -385,6 +387,44 @@ jobs:\n",
             conf.push('\n');
         }
 
+        // build sdist
+        if sdist {
+            needs.push("sdist".to_string());
+
+            let maturin_args = self
+                .manifest_path
+                .as_ref()
+                .map(|manifest_path| {
+                    if manifest_path != Path::new("Cargo.toml") {
+                        format!(" --manifest-path {}", manifest_path.display())
+                    } else {
+                        String::new()
+                    }
+                })
+                .unwrap_or_default();
+            conf.push_str(&format!(
+                r#"  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist{maturin_args}
+"#
+            ));
+            conf.push_str(
+                "      - name: Upload sdist
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+",
+            );
+            conf.push('\n');
+        }
+
         conf.push_str(&format!(
             r#"  release:
     name: Release
@@ -443,7 +483,11 @@ mod tests {
     #[test]
     fn test_generate_github() {
         let conf = GenerateCI::default()
-            .generate_github("example", &BridgeModel::Bindings("pyo3".to_string(), 7))
+            .generate_github(
+                "example",
+                &BridgeModel::Bindings("pyo3".to_string(), 7),
+                true,
+            )
             .unwrap()
             .lines()
             .skip(5)
@@ -526,11 +570,26 @@ mod tests {
                       name: wheels
                       path: dist
 
+              sdist:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v3
+                  - name: Build sdist
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      command: sdist
+                      args: --out dist
+                  - name: Upload sdist
+                    uses: actions/upload-artifact@v3
+                    with:
+                      name: wheels
+                      path: dist
+
               release:
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos]
+                needs: [linux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v3
                     with:
@@ -549,7 +608,7 @@ mod tests {
     #[test]
     fn test_generate_github_abi3() {
         let conf = GenerateCI::default()
-            .generate_github("example", &BridgeModel::BindingsAbi3(3, 7))
+            .generate_github("example", &BridgeModel::BindingsAbi3(3, 7), false)
             .unwrap()
             .lines()
             .skip(5)
@@ -660,7 +719,11 @@ mod tests {
             ..Default::default()
         };
         let conf = gen
-            .generate_github("example", &BridgeModel::Bindings("pyo3".to_string(), 7))
+            .generate_github(
+                "example",
+                &BridgeModel::Bindings("pyo3".to_string(), 7),
+                true,
+            )
             .unwrap()
             .lines()
             .skip(5)
@@ -782,11 +845,26 @@ mod tests {
                       pip install pytest
                       pytest
 
+              sdist:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v3
+                  - name: Build sdist
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      command: sdist
+                      args: --out dist
+                  - name: Upload sdist
+                    uses: actions/upload-artifact@v3
+                    with:
+                      name: wheels
+                      path: dist
+
               release:
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos]
+                needs: [linux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v3
                     with:
@@ -805,7 +883,7 @@ mod tests {
     #[test]
     fn test_generate_github_bin_no_binding() {
         let conf = GenerateCI::default()
-            .generate_github("example", &BridgeModel::Bin(None))
+            .generate_github("example", &BridgeModel::Bin(None), true)
             .unwrap()
             .lines()
             .skip(5)
@@ -878,11 +956,26 @@ mod tests {
                       name: wheels
                       path: dist
 
+              sdist:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v3
+                  - name: Build sdist
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      command: sdist
+                      args: --out dist
+                  - name: Upload sdist
+                    uses: actions/upload-artifact@v3
+                    with:
+                      name: wheels
+                      path: dist
+
               release:
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos]
+                needs: [linux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v3
                     with:

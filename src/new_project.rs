@@ -51,7 +51,8 @@ impl<'a> ProjectGenerator<'a> {
             "uniffi" => BridgeModel::UniFfi,
             _ => BridgeModel::Bindings(bindings.clone(), 7),
         };
-        let ci_config = GenerateCI::default().generate_github(&project_name, &bridge_model)?;
+        let ci_config =
+            GenerateCI::default().generate_github(&project_name, &bridge_model, true)?;
 
         Ok(Self {
             env,

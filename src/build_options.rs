@@ -239,7 +239,7 @@ impl BuildOptions {
                             min_python_minor,
                         )?;
                         let host_python = &host_interpreters[0];
-                        println!("🐍 Using host {host_python} for cross-compiling preparation");
+                        eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
                         env::set_var("PYO3_PYTHON", &host_python.executable);
                         // rust-cpython, and legacy pyo3 versions
@@ -328,14 +328,14 @@ impl BuildOptions {
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ");
-                println!("🐍 Found {interpreters_str}");
+                eprintln!("🐍 Found {interpreters_str}");
 
                 Ok(interpreters)
             }
             BridgeModel::Cffi => {
                 let interpreter =
                     find_single_python_interpreter(bridge, interpreter, target, "cffi")?;
-                println!("🐍 Using {interpreter} to generate the cffi bindings");
+                eprintln!("🐍 Using {interpreter} to generate the cffi bindings");
                 Ok(vec![interpreter])
             }
             BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
@@ -354,7 +354,7 @@ impl BuildOptions {
                     if env::var_os("PYO3_CROSS_LIB_DIR").is_some() {
                         // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
                         // when cross compiling, so we fake a python interpreter matching it
-                        println!("⚠️  Cross-compiling is poorly supported");
+                        eprintln!("⚠️  Cross-compiling is poorly supported");
                         Ok(vec![PythonInterpreter {
                             config: InterpreterConfig {
                                 major: *major as usize,
@@ -377,10 +377,10 @@ impl BuildOptions {
                                 .context("Invalid PYO3_CONFIG_FILE")?;
                         Ok(vec![PythonInterpreter::from_config(interpreter_config)])
                     } else if let Some(interp) = interpreters.get(0) {
-                        println!("🐍 Using {interp} to generate to link bindings (With abi3, an interpreter is only required on windows)");
+                        eprintln!("🐍 Using {interp} to generate to link bindings (With abi3, an interpreter is only required on windows)");
                         Ok(interpreters)
                     } else if generate_import_lib {
-                        println!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
+                        eprintln!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
                         // fake a python interpreter
                         Ok(vec![PythonInterpreter {
                             config: InterpreterConfig {
@@ -422,7 +422,7 @@ impl BuildOptions {
                             Ok(interps)
                         }
                     })?;
-                    println!("🐍 Not using a specific python interpreter");
+                    eprintln!("🐍 Not using a specific python interpreter");
                     if self.interpreter.is_empty() {
                         // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
                         // The python interpreter config doesn't matter, as it's not used for anything
@@ -833,7 +833,7 @@ fn get_min_python_minor(metadata21: &Metadata21) -> Option<usize> {
                 .expect("Regex must only match usize");
             Some(min_python_minor)
         } else {
-            println!(
+            eprintln!(
                 "⚠️ Couldn't parse the value of requires-python, \
                     not taking it into account when searching for python interpreter. \
                     Note: Only `>=3.x.y` is currently supported."

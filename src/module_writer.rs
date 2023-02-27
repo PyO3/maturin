@@ -545,11 +545,11 @@ fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result
     let maybe_header = target_dir.join("header.h");
 
     if maybe_header.is_file() {
-        println!("💼 Using the existing header at {}", maybe_header.display());
+        eprintln!("💼 Using the existing header at {}", maybe_header.display());
         Ok(maybe_header)
     } else {
         if crate_dir.join("cbindgen.toml").is_file() {
-            println!(
+            eprintln!(
                 "💼 Using the existing cbindgen.toml configuration. \n\
                  💼 Enforcing the following settings: \n   \
                  - language = \"C\" \n   \
@@ -631,7 +631,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
                 "True" => true,
                 "False" => false,
                 _ => {
-                    println!(
+                    eprintln!(
                         "⚠️ Failed to determine whether python at {:?} is running inside a virtualenv",
                         &python
                     );
@@ -650,7 +650,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
         return handle_cffi_call_result(python, tempdir, &ffi_py, &output);
     }
 
-    println!("⚠️ cffi not found. Trying to install it");
+    eprintln!("⚠️ cffi not found. Trying to install it");
     // Call pip through python to don't do the wrong thing when python and pip
     // are coming from different environments
     let output = call_python(
@@ -672,7 +672,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
             str::from_utf8(&output.stderr)?
         );
     }
-    println!("🎁 Installed cffi");
+    eprintln!("🎁 Installed cffi");
 
     // Try again
     let output = call_python(python, ["-c", &cffi_invocation])?;
@@ -780,7 +780,7 @@ if hasattr({module_name}, "__all__"):
             .rust_module
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {module_name}.pyi");
+            eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -840,7 +840,7 @@ pub fn write_cffi_module(
             .rust_module
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {module_name}.pyi");
+            eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -1011,7 +1011,7 @@ pub fn write_uniffi_module(
             .rust_module
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {module_name}.pyi");
+            eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -1153,7 +1153,7 @@ pub fn write_python_part(
                 .iter()
                 .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
             {
-                println!("📦 Including files matching \"{pattern}\"");
+                eprintln!("📦 Including files matching \"{pattern}\"");
                 for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
                     .expect("No files found for pattern")
                     .filter_map(Result::ok)

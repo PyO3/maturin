@@ -344,7 +344,7 @@ pub fn auditwheel_rs(
         if let Some(highest_policy) = highest_policy {
             // Don't recommend manylinux1 because rust doesn't support it anymore
             if policy.priority < highest_policy.priority && highest_policy.name != "manylinux_2_5" {
-                println!(
+                eprintln!(
                     "📦 Wheel is eligible for a higher priority tag. \
                     You requested {policy} but this wheel is eligible for {highest_policy}",
                 );

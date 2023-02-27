@@ -405,9 +405,9 @@ fn run() -> Result<()> {
                 // We don't know the targeted bindings yet, so we use the most lenient
                 PythonInterpreter::find_all(&target, &BridgeModel::Cffi, None)?
             };
-            println!("🐍 {} python interpreter found:", found.len());
+            eprintln!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
-                println!(" - {interpreter}");
+                eprintln!(" - {interpreter}");
             }
         }
         Opt::Develop {

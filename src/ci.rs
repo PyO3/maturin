@@ -366,7 +366,7 @@ jobs:\n",
           source .venv/bin/activate
           pip install {project_name} --find-links dist --force-reinstall
           pip install pytest
-          {chdir} python -m pytest
+          {chdir}python -m pytest
 "
                     ));
                 } else {

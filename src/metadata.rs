@@ -168,7 +168,7 @@ impl Metadata21 {
                     // if the pyproject.toml specified the license file,
                     // then we won't list it as automatically included
                     if !self.license_files.contains(&license_path) {
-                        println!("📦 Including license file \"{}\"", license_path.display());
+                        eprintln!("📦 Including license file \"{}\"", license_path.display());
                         self.license_files.push(license_path);
                     }
                 }

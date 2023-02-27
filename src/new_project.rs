@@ -167,7 +167,7 @@ pub fn new_project(path: String, options: GenerateProjectOptions) -> Result<()> 
         bail!("destination `{}` already exists", project_path.display());
     }
     generate_project(project_path, options, true)?;
-    println!(
+    eprintln!(
         "  ✨ {} {} {}",
         style("Done!").bold().green(),
         style("New project created").bold(),
@@ -185,7 +185,7 @@ pub fn init_project(path: Option<String>, options: GenerateProjectOptions) -> Re
         bail!("`maturin init` cannot be run on existing projects");
     }
     generate_project(&project_path, options, false)?;
-    println!(
+    eprintln!(
         "  ✨ {} {} {}",
         style("Done!").bold().green(),
         style("Initialized project").bold(),

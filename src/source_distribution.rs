@@ -698,7 +698,7 @@ pub fn source_distribution(
     }
 
     let mut include = |pattern| -> Result<()> {
-        println!("📦 Including files matching \"{pattern}\"");
+        eprintln!("📦 Including files matching \"{pattern}\"");
         for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
             .expect("No files found for pattern")
             .filter_map(Result::ok)
@@ -730,7 +730,7 @@ pub fn source_distribution(
     add_data(&mut writer, build_context.project_layout.data.as_deref())?;
     let source_distribution_path = writer.finish()?;
 
-    println!(
+    eprintln!(
         "📦 Built source distribution to {}",
         source_distribution_path.display()
     );

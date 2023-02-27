@@ -157,7 +157,7 @@ fn get_password(_username: &str) -> String {
 }
 
 fn get_username() -> String {
-    println!("Please enter your username:");
+    eprintln!("Please enter your username:");
     let mut line = String::new();
     io::stdin().read_line(&mut line).unwrap();
     line.trim().to_string()
@@ -205,7 +205,7 @@ fn resolve_pypi_cred(
     if let Some((username, password)) =
         registry_name.and_then(|name| load_pypi_cred_from_config(config, name))
     {
-        println!("🔐 Using credential in pypirc for upload");
+        eprintln!("🔐 Using credential in pypirc for upload");
         return (username, password);
     }
 
@@ -475,7 +475,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
     let registry = complete_registry(publish)?;
 
-    println!("🚀 Uploading {} packages", items.len());
+    eprintln!("🚀 Uploading {} packages", items.len());
 
     for i in items {
         let upload_result = upload(&registry, i);
@@ -490,9 +490,9 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                     .map(|m| m.as_str());
                 match title {
                     Some(title) => {
-                        println!("⛔ {title}");
+                        eprintln!("⛔ {title}");
                     }
-                    None => println!("⛔ Username and/or password are wrong"),
+                    None => eprintln!("⛔ Username and/or password are wrong"),
                 }
 
                 #[cfg(feature = "keyring")]
@@ -503,7 +503,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                         .and_then(|keyring| keyring.delete_password())
                     {
                         Ok(()) => {
-                            println!("🔑 Removed wrong password from keyring")
+                            eprintln!("🔑 Removed wrong password from keyring")
                         }
                         Err(keyring::Error::NoEntry)
                         | Err(keyring::Error::NoStorageAccess(_))
@@ -520,7 +520,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 let filename = i.file_name().unwrap_or(i.as_os_str());
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
-                        println!(
+                        eprintln!(
                             "⚠️ Note: Skipping {filename:?} because it appears to already exist"
                         );
                         continue;
@@ -534,7 +534,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
         }
     }
 
-    println!("✨ Packages uploaded successfully");
+    eprintln!("✨ Packages uploaded successfully");
 
     #[cfg(feature = "keyring")]
     {

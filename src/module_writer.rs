@@ -921,7 +921,7 @@ fn generate_uniffi_bindings(
     cmd.arg(udl);
     debug!("Running {:?}", cmd);
     let mut child = cmd.spawn().context(
-        "Failed to run uniffi-bindgen, did you install it? Try `cargo install uniffi_bindgen`",
+        "Failed to run uniffi-bindgen, did you install it? Try `pip install uniffi-bindgen`",
     )?;
     let exit_status = child.wait().context("Failed to run uniffi-bindgen")?;
     if !exit_status.success() {

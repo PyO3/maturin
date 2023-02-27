@@ -171,6 +171,8 @@ on:
     branches:
       - main
       - master
+    tags:
+      - '*'
   pull_request:
   workflow_dispatch:
 
@@ -453,6 +455,8 @@ mod tests {
                 branches:
                   - main
                   - master
+                tags:
+                  - '*'
               pull_request:
               workflow_dispatch:
 
@@ -557,6 +561,8 @@ mod tests {
                 branches:
                   - main
                   - master
+                tags:
+                  - '*'
               pull_request:
               workflow_dispatch:
 
@@ -666,6 +672,8 @@ mod tests {
                 branches:
                   - main
                   - master
+                tags:
+                  - '*'
               pull_request:
               workflow_dispatch:
 
@@ -809,6 +817,8 @@ mod tests {
                 branches:
                   - main
                   - master
+                tags:
+                  - '*'
               pull_request:
               workflow_dispatch:
 

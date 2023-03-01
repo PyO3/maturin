@@ -289,6 +289,7 @@ jobs:\n",
         with:
           target: {maturin_target}
           args: --release --out dist{maturin_args}
+          sccache: 'true'
 "
             ));
             if matches!(platform, Platform::Linux) {
@@ -520,6 +521,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist --find-interpreter
+                      sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
@@ -543,6 +545,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist --find-interpreter
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -564,6 +567,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist --find-interpreter
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -641,6 +645,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist
+                      sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
@@ -664,6 +669,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -685,6 +691,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -756,6 +763,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist --find-interpreter --zig
+                      sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
@@ -802,6 +810,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist --find-interpreter
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -831,6 +840,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist --find-interpreter
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -913,6 +923,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist
+                      sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
@@ -932,6 +943,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:
@@ -950,6 +962,7 @@ mod tests {
                     with:
                       target: ${{ matrix.target }}
                       args: --release --out dist
+                      sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v3
                     with:

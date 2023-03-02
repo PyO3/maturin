@@ -28,7 +28,7 @@ cargo_metadata = "0.15.3"
 cargo-options = "0.6.0"
 cbindgen = { version = "0.24.2", default-features = false }
 flate2 = "1.0.18"
-goblin = "0.6.0"
+goblin = "0.6.1"
 platform-info = "1.0.0"
 regex = "1.7.0"
 serde = { version = "1.0.141", features = ["derive"] }

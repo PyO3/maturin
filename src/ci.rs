@@ -178,6 +178,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:\n",
             version = env!("CARGO_PKG_VERSION"),
         );
@@ -432,20 +435,31 @@ jobs:\n",
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [{needs}]
-    steps:
+"#,
+            needs = needs.join(", ")
+        ));
+        if platforms.contains(&Platform::Emscripten) {
+            conf.push_str(
+                r#"    permissions:
+      # Used to upload release artifacts
+      contents: write
+"#,
+            );
+        }
+        conf.push_str(
+            r#"    steps:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
-          MATURIN_PYPI_TOKEN: ${{{{ secrets.PYPI_API_TOKEN }}}}
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
           args: --skip-existing *
 "#,
-            needs = needs.join(", ")
-        ));
+        );
         if platforms.contains(&Platform::Emscripten) {
             conf.push_str(
                 "      - uses: actions/download-artifact@v3
@@ -504,6 +518,9 @@ mod tests {
                   - '*'
               pull_request:
               workflow_dispatch:
+
+            permissions:
+              contents: read
 
             jobs:
               linux:
@@ -629,6 +646,9 @@ mod tests {
               pull_request:
               workflow_dispatch:
 
+            permissions:
+              contents: read
+
             jobs:
               linux:
                 runs-on: ubuntu-latest
@@ -746,6 +766,9 @@ mod tests {
                   - '*'
               pull_request:
               workflow_dispatch:
+
+            permissions:
+              contents: read
 
             jobs:
               linux:
@@ -909,6 +932,9 @@ mod tests {
                   - '*'
               pull_request:
               workflow_dispatch:
+
+            permissions:
+              contents: read
 
             jobs:
               linux:

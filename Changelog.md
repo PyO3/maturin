@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for uniffi 0.23 in [#1481](https://github.com/PyO3/maturin/pull/1481)
 * Add support for custom TLS certificate authority bundle in [#1483](https://github.com/PyO3/maturin/pull/1483)
 
+## [0.14.15] - 2023-03-03
+
+* Add sdist and sccache support to `generate-ci` command
+
 ## [0.14.14] - 2023-02-24
 
 * Add support for Emscripten in `generate-ci` command in [#1484](https://github.com/PyO3/maturin/pull/1484)
@@ -833,7 +837,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.14...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.15...HEAD
+[0.14.15]: https://github.com/pyo3/maturin/compare/v0.14.14...v0.14.15
 [0.14.14]: https://github.com/pyo3/maturin/compare/v0.14.13...v0.14.14
 [0.14.13]: https://github.com/pyo3/maturin/compare/v0.14.12...v0.14.13
 [0.14.12]: https://github.com/pyo3/maturin/compare/v0.14.11...v0.14.12

@@ -130,7 +130,7 @@ fn bin_wasi_helper(
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
             .requires_dist
-            .push("wasmtime>=5.0.0,<6.0.0".to_string());
+            .push("wasmtime>=6.0.0,<7.0.0".to_string());
     }
 
     Ok(metadata21)
@@ -280,7 +280,7 @@ impl BuildContext {
                 && self.target.is_linux()
                 && !python_interpreter.support_portable_wheels()
             {
-                println!(
+                eprintln!(
                     "🐍 Skipping auditwheel because {python_interpreter} does not support manylinux/musllinux wheels"
                 );
                 return Ok((Policy::default(), Vec::new()));
@@ -444,12 +444,12 @@ impl BuildContext {
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }
 
-        println!(
+        eprintln!(
             "🖨  Copied external shared libraries to package {} directory:",
             libs_dir.display()
         );
         for lib_path in libs_copied {
-            println!("    {}", lib_path.display());
+            eprintln!("    {}", lib_path.display());
         }
 
         // Currently artifact .so file always resides at ${module_name}/${module_name}.so
@@ -571,7 +571,7 @@ impl BuildContext {
             min_minor,
         )?;
 
-        println!(
+        eprintln!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
             major,
             min_minor,
@@ -652,7 +652,7 @@ impl BuildContext {
                 &platform_tags,
                 external_libs,
             )?;
-            println!(
+            eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
@@ -814,7 +814,7 @@ impl BuildContext {
             );
         }
 
-        println!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
@@ -869,7 +869,7 @@ impl BuildContext {
         };
         let (wheel_path, tag) = self.write_uniffi_wheel(artifact, &platform_tags, external_libs)?;
 
-        println!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
@@ -1006,7 +1006,7 @@ impl BuildContext {
             &platform_tags,
             &ext_libs,
         )?;
-        println!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)

@@ -131,7 +131,7 @@ pub fn develop(
                 String::from_utf8_lossy(&output.stderr).trim(),
             );
         }
-        println!(
+        eprintln!(
             "🛠 Installed {}-{}",
             build_context.metadata21.name, build_context.metadata21.version
         );

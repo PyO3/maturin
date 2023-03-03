@@ -51,7 +51,8 @@ impl<'a> ProjectGenerator<'a> {
             "uniffi" => BridgeModel::UniFfi,
             _ => BridgeModel::Bindings(bindings.clone(), 7),
         };
-        let ci_config = GenerateCI::default().generate_github(&project_name, &bridge_model)?;
+        let ci_config =
+            GenerateCI::default().generate_github(&project_name, &bridge_model, true)?;
 
         Ok(Self {
             env,
@@ -167,7 +168,7 @@ pub fn new_project(path: String, options: GenerateProjectOptions) -> Result<()> 
         bail!("destination `{}` already exists", project_path.display());
     }
     generate_project(project_path, options, true)?;
-    println!(
+    eprintln!(
         "  ✨ {} {} {}",
         style("Done!").bold().green(),
         style("New project created").bold(),
@@ -185,7 +186,7 @@ pub fn init_project(path: Option<String>, options: GenerateProjectOptions) -> Re
         bail!("`maturin init` cannot be run on existing projects");
     }
     generate_project(&project_path, options, false)?;
-    println!(
+    eprintln!(
         "  ✨ {} {} {}",
         style("Done!").bold().green(),
         style("Initialized project").bold(),

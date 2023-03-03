@@ -44,7 +44,7 @@ fn windows_interpreter_no_build(
     // There can be 32-bit installations on a 64-bit machine, but we can't link
     // those for 64-bit targets
     if pointer_width != target_width {
-        println!(
+        eprintln!(
             "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is {target_width}-bit. Skipping."
         );
         return true;

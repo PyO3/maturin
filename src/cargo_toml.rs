@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -36,7 +36,7 @@ impl CargoToml {
             "Can't read Cargo.toml at {}",
             manifest_file.as_ref().display(),
         ))?;
-        let cargo_toml = toml_edit::easy::from_str(&contents).context(format!(
+        let cargo_toml = toml::from_str(&contents).context(format!(
             "Failed to parse Cargo.toml at {}",
             manifest_file.as_ref().display()
         ))?;
@@ -53,8 +53,8 @@ impl CargoToml {
         }
     }
 
-    /// Warn about removed python metadata support in `Cargo.toml`
-    pub fn warn_removed_python_metadata(&self) -> bool {
+    /// Check removed python metadata support in `Cargo.toml`
+    pub fn check_removed_python_metadata(&self) -> Result<()> {
         let mut removed = Vec::new();
         if let Some(CargoTomlMetadata {
             maturin: Some(extra_metadata),
@@ -80,16 +80,14 @@ impl CargoToml {
             }
         }
         if !removed.is_empty() {
-            eprintln!(
-                "⚠️  Warning: the following metadata fields in `package.metadata.maturin` section \
+            bail!(
+                "The following metadata fields in `package.metadata.maturin` section \
                 of Cargo.toml are removed since maturin 0.14.0: {}, \
                 please set them in pyproject.toml as PEP 621 specifies.",
                 removed.join(", ")
             );
-            true
-        } else {
-            false
         }
+        Ok(())
     }
 }
 
@@ -104,12 +102,25 @@ struct CargoTomlMetadata {
 #[serde(rename_all = "kebab-case")]
 pub struct RemainingCoreMetadata {
     pub name: Option<String>,
-    /// The directory with python module, contains `<module_name>/__init__.py`
-    pub python_source: Option<String>,
     /// The directory containing the wheel data
     pub data: Option<String>,
+    /// Cargo compile targets
+    pub targets: Option<Vec<CargoTarget>>,
     #[serde(flatten)]
-    pub other: HashMap<String, toml_edit::easy::Value>,
+    pub other: HashMap<String, toml::Value>,
+}
+
+/// Cargo compile target
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct CargoTarget {
+    /// Name as given in the `Cargo.toml` or generated from the file name
+    pub name: String,
+    /// Kind of target ("bin", "lib")
+    pub kind: Option<String>,
+    // TODO: Add bindings option
+    // Bridge model, which kind of bindings to use
+    // pub bindings: Option<String>,
 }
 
 #[cfg(test)]
@@ -139,11 +150,20 @@ mod test {
             [package.metadata.maturin]
             classifiers = ["Programming Language :: Python"]
             requires-dist = ["flask~=1.1.0", "toml==0.10.0"]
+
+            [[package.metadata.maturin.targets]]
+            name = "pyo3_pure"
+            kind = "lib"
+            bindings = "pyo3"
         "#
         );
 
-        let cargo_toml: Result<CargoToml, _> = toml_edit::easy::from_str(cargo_toml);
+        let cargo_toml: Result<CargoToml, _> = toml::from_str(cargo_toml);
         assert!(cargo_toml.is_ok());
+
+        let maturin = cargo_toml.unwrap().remaining_core_metadata();
+        let targets = maturin.targets.unwrap();
+        assert_eq!("pyo3_pure", targets[0].name);
     }
 
     #[test]
@@ -170,7 +190,7 @@ mod test {
         "#
         );
 
-        let cargo_toml: Result<CargoToml, _> = toml_edit::easy::from_str(cargo_toml);
+        let cargo_toml: Result<CargoToml, _> = toml::from_str(cargo_toml);
         assert!(cargo_toml.is_ok());
     }
 }

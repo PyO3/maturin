@@ -11,6 +11,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::{self, FromStr};
+use tracing::debug;
 
 mod config;
 
@@ -43,9 +44,8 @@ fn windows_interpreter_no_build(
     // There can be 32-bit installations on a 64-bit machine, but we can't link
     // those for 64-bit targets
     if pointer_width != target_width {
-        println!(
-            "👽 {}.{} is installed as {}-bit, while the target is {}-bit. Skipping.",
-            major, minor, pointer_width, target_width
+        eprintln!(
+            "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is {target_width}-bit. Skipping."
         );
         return true;
     }
@@ -141,7 +141,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     }
 
                     let executable = capture.get(6).unwrap().as_str();
-                    let version = format!("-{}.{}-{}", major, minor, pointer_width);
+                    let version = format!("-{major}.{minor}-{pointer_width}");
                     let output = Command::new(executable)
                         .args(["-c", code])
                         .output()
@@ -149,8 +149,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
                     if !output.status.success() || path.trim().is_empty() {
                         eprintln!(
-                            "⚠️  Warning: couldn't determine the path to python for `py {}`",
-                            version
+                            "⚠️  Warning: couldn't determine the path to python for `py {version}`"
                         );
                         continue;
                     }
@@ -205,7 +204,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
     // Fallback to pythonX.Y for Microsoft Store versions
     for minor in min_python_minor..=MAXIMUM_PYTHON_MINOR {
         if !versions_found.contains(&(3, minor)) {
-            let executable = format!("python3.{}.exe", minor);
+            let executable = format!("python3.{minor}.exe");
             if let Some(python_info) = windows_python_info(Path::new(&executable))? {
                 if windows_interpreter_no_build(
                     python_info.major,
@@ -275,8 +274,9 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
+#[clap(rename_all = "lower")]
 pub enum InterpreterKind {
     CPython,
     PyPy,
@@ -310,7 +310,7 @@ impl FromStr for InterpreterKind {
         match s.to_ascii_lowercase().as_str() {
             "cpython" => Ok(InterpreterKind::CPython),
             "pypy" => Ok(InterpreterKind::PyPy),
-            unknown => Err(format!("Unknown interpreter kind '{}'", unknown)),
+            unknown => Err(format!("Unknown interpreter kind '{unknown}'")),
         }
     }
 }
@@ -539,6 +539,11 @@ impl PythonInterpreter {
         )
     }
 
+    /// Is this a debug build of Python for Windows?
+    pub fn is_windows_debug(&self) -> bool {
+        self.ext_suffix.starts_with("_d.") && self.ext_suffix.ends_with(".pyd")
+    }
+
     /// Checks whether the given command is a python interpreter and returns a
     /// [PythonInterpreter] if that is the case
     pub fn check_executable(
@@ -570,7 +575,7 @@ impl PythonInterpreter {
                         );
                         return Ok(None);
                     } else {
-                        eprintln!("{}", stderr);
+                        eprintln!("{stderr}");
                         bail!(err_msg);
                     }
                 }
@@ -586,7 +591,7 @@ impl PythonInterpreter {
                             };
                             // Try py -x.y on Windows
                             let mut metadata_py = tempfile::NamedTempFile::new()?;
-                            write!(metadata_py, "{}", GET_INTERPRETER_METADATA)?;
+                            write!(metadata_py, "{GET_INTERPRETER_METADATA}")?;
                             let mut cmd = Command::new("cmd");
                             cmd.arg("/c")
                                 .arg("py")
@@ -613,6 +618,10 @@ impl PythonInterpreter {
             .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 
         if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
+            debug!(
+                "Skipping outdated python interpreter '{}'",
+                executable.as_ref().display()
+            );
             return Ok(None);
         }
 
@@ -636,6 +645,15 @@ impl PythonInterpreter {
             Some(message.platform.to_lowercase().replace(['-', '.'], "_"))
         };
 
+        let executable = message
+            .executable
+            .map(PathBuf::from)
+            .unwrap_or_else(|| executable.as_ref().to_path_buf());
+        debug!(
+            "Found {} interpreter at {}",
+            interpreter,
+            executable.display()
+        );
         Ok(Some(PythonInterpreter {
             config: InterpreterConfig {
                 major: message.major,
@@ -648,10 +666,7 @@ impl PythonInterpreter {
                 abi_tag: message.abi_tag,
                 pointer_width: None,
             },
-            executable: message
-                .executable
-                .map(PathBuf::from)
-                .unwrap_or_else(|| executable.as_ref().to_path_buf()),
+            executable,
             platform,
             runnable: true,
             implmentation_name: message.implementation_name,
@@ -725,7 +740,7 @@ impl PythonInterpreter {
             find_all_windows(target, min_python_minor)?
         } else {
             let mut executables: Vec<String> = (min_python_minor..=MAXIMUM_PYTHON_MINOR)
-                .map(|minor| format!("python3.{}", minor))
+                .map(|minor| format!("python3.{minor}"))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
             if matches!(bridge, BridgeModel::Cffi)
@@ -733,7 +748,7 @@ impl PythonInterpreter {
                 || bridge.is_bindings("pyo3-ffi")
             {
                 executables.extend(
-                    (min_python_minor..=MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{}", minor)),
+                    (min_python_minor..=MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{minor}")),
                 );
             }
             executables

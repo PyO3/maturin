@@ -85,7 +85,7 @@ jobs:
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features log,upload,human-panic
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features full,native-tls
 
       - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
@@ -152,11 +152,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [
-          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl", manylinux: "2014" },
-          { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf", manylinux: "2014"},
-          { target: "i686-unknown-linux-musl", image_tag: "i686-musl", manylinux: "2010"},
-        ]
+        platform:
+          - target: "aarch64-unknown-linux-musl"
+            image_tag: "aarch64-musl"
+            compatibility: "manylinux2014 musllinux_1_1"
+          - target: "armv7-unknown-linux-musleabihf"
+            image_tag: "armv7-musleabihf"
+            compatibility: "manylinux2014 musllinux_1_1"
+          - target: "i686-unknown-linux-musl"
+            image_tag: "i686-musl"
+            compatibility: "manylinux2010 musllinux_1_1"
+          - target: "arm-unknown-linux-musleabihf"
+            image_tag: "arm-musleabihf"
+            compatibility: "linux"
     container:
       image: docker://ghcr.io/messense/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
@@ -169,7 +177,7 @@ jobs:
           sudo python3 -m pip install -U --pre maturin
           maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
-            --manylinux ${{ matrix.platform.manylinux }} musllinux_1_1 \
+            --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
@@ -193,12 +201,10 @@ jobs:
         platform:
           - target: "powerpc64le-unknown-linux-musl"
             image: "ghcr.io/messense/rust-musl-cross:powerpc64le-musl"
-            manylinux: "2014"
-            musllinux: "musllinux_1_1"
+            compatibility: "manylinux2014 musllinux_1_1"
           - target: "s390x-unknown-linux-gnu"
             image: "ghcr.io/messense/manylinux2014-cross:s390x"
-            manylinux: "2014"
-            musllinux: ""
+            compatibility: "manylinux2014"
     container:
       image: docker://${{ matrix.platform.image }}
     steps:
@@ -213,9 +219,9 @@ jobs:
           sudo python3 -m pip install -U --pre maturin
           maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
-            --manylinux ${{ matrix.platform.manylinux }} ${{ matrix.platform.musllinux }} \
+            --compatibility ${{ matrix.platform.compatibility }} \
             --no-default-features \
-            --features log,upload,human-panic,password-storage
+            --features full,password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
@@ -261,7 +267,7 @@ jobs:
           VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
           echo "env_url=https://pypi.org/project/maturin/$VERSION" >> $GITHUB_OUTPUT
       - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v0.0.11
+        uses: sigstore/gh-action-sigstore-python@v1.2.1
         with:
           inputs: ./*.tar.gz ./*.whl
           upload-signing-artifacts: true
@@ -289,7 +295,7 @@ jobs:
         with:
           name: binaries
       - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v0.0.11
+        uses: sigstore/gh-action-sigstore-python@v1.2.1
         with:
           inputs: ./*.tar.gz ./*.zip ./*.deb
           upload-signing-artifacts: true

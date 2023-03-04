@@ -36,10 +36,22 @@ crate-type = ["cdylib"]
 rand = "0.8.4"
 
 [dependencies.pyo3]
-version = "0.17.3"
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+version = "0.18.0"
 # "abi3-py37" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.7
-features = ["extension-module", "abi3-py37"]
+features = ["abi3-py37"]
+```
+
+Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements
+and enable the `extension-module` feature of pyo3.
+
+```toml
+[build-system]
+requires = ["maturin>=0.14,<0.15"]
+build-backend = "maturin"
+
+[tool.maturin]
+# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+features = ["pyo3/extension-module"]
 ```
 
 ### Use `maturin new`
@@ -47,20 +59,20 @@ features = ["extension-module", "abi3-py37"]
 New projects can also be quickly created using the `maturin new` command:
 
 ```bash
-USAGE:
-    maturin new [FLAGS] [OPTIONS] <path>
+maturin new --help
+Create a new cargo project
 
-FLAGS:
-    -h, --help       Prints help information
-        --mixed      Use mixed Rust/Python project layout
-    -V, --version    Prints version information
+Usage: maturin new [OPTIONS] <PATH>
 
-OPTIONS:
-    -b, --bindings <bindings>    Which kind of bindings to use [possible values: pyo3, rust-cpython, cffi, bin]
-        --name <name>            Set the resulting package name, defaults to the directory name
+Arguments:
+  <PATH>  Project path
 
-ARGS:
-    <path>    Project path
+Options:
+      --name <NAME>          Set the resulting package name, defaults to the directory name
+      --mixed                Use mixed Rust/Python project layout
+      --src                  Use Python first src layout for mixed Rust/Python project
+  -b, --bindings <BINDINGS>  Which kind of bindings to use [possible values: pyo3, rust-cpython, cffi, uniffi, bin]
+  -h, --help                 Print help information
 ```
 
 The above process can be achieved by running `maturin new -b pyo3 guessing_game`
@@ -190,7 +202,7 @@ So let's use maturin to build and install in our current environment.
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % maturin develop
 🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.7
 🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)
-   Compiling pyo3-build-config v0.17.3
+   Compiling pyo3-build-config v0.18.0
    Compiling libc v0.2.119
    Compiling once_cell v1.10.0
    Compiling cfg-if v1.0.0
@@ -211,10 +223,10 @@ So let's use maturin to build and install in our current environment.
    Compiling rand_chacha v0.3.1
    Compiling rand v0.8.5
    Compiling quote v1.0.15
-   Compiling pyo3-ffi v0.17.3
-   Compiling pyo3 v0.17.3
-   Compiling pyo3-macros-backend v0.17.3
-   Compiling pyo3-macros v0.17.3
+   Compiling pyo3-ffi v0.18.0
+   Compiling pyo3 v0.18.0
+   Compiling pyo3-macros-backend v0.18.0
+   Compiling pyo3-macros v0.18.0
    Compiling guessing-game v0.1.0 (/Users/ferris/src/rust/guessing-game)
     Finished dev [unoptimized + debuginfo] target(s) in 13.31s
 ```

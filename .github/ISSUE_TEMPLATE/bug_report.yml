@@ -16,6 +16,13 @@ body:
     validations:
       required: true
   - type: input
+    id: maturin_version
+    attributes:
+      label: Your maturin version (`maturin --version`)
+      placeholder: ex. 0.14.1
+    validations:
+      required: true
+  - type: input
     id: py_version
     attributes:
       label: Your Python version (`python -V`)
@@ -37,6 +44,7 @@ body:
         - "pyo3"
         - "rust-cpython"
         - "cffi"
+        - "uniffi"
         - "bin"
     validations:
       required: false
@@ -58,7 +66,7 @@ body:
     id: reproduce
     attributes:
       label: Steps to Reproduce
-      description: Please list the exact steps required to reproduce your error with all command output and if possible with a repository
+      description: Please list the exact steps required to reproduce your error with all command output and if possible with a repository. Please run maturin with `RUST_LOG=maturin=debug` being set, e.g. `RUST_LOG=maturin=debug maturin build` and share the output, either in a codeblock or as a [gist](https://gist.github.com/)
       placeholder: |
         1.
         2.

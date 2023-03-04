@@ -101,7 +101,8 @@ Options:
           This option is ignored on all non-linux platforms
 
   -i, --interpreter [<INTERPRETER>...]
-          The python versions to build wheels for, given as the names of the interpreters
+          The python versions to build wheels for, given as the executables of interpreters such as
+          `python3.9` or `/usr/bin/python3.8`
 
   -f, --find-interpreter
           Find interpreters from the host machine
@@ -109,7 +110,7 @@ Options:
   -b, --bindings <BINDINGS>
           Which kind of bindings to use
 
-          [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, bin]
+          [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, uniffi, bin]
 
   -o, --out <OUT>
           The directory to store the built wheels in. Defaults to a new "wheels" directory in the
@@ -224,7 +225,7 @@ or providing any Windows Python library files.
 
 ```toml
 [dependencies]
-pyo3 = { version = "0.17.3", features = ["extension-module", "generate-import-lib"] }
+pyo3 = { version = "0.18.0", features = ["extension-module", "generate-import-lib"] }
 ```
 
 It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to 

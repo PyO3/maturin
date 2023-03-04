@@ -107,7 +107,7 @@ fn find_incompliant_symbols(
         if sym.st_type() == STT_FUNC {
             let name = strtab.get_at(sym.st_name).unwrap_or("BAD NAME");
             for symbol_version in symbol_versions {
-                if name.ends_with(&format!("@{}", symbol_version)) {
+                if name.ends_with(&format!("@{symbol_version}")) {
                     symbols.push(name.to_string());
                 }
             }
@@ -184,7 +184,7 @@ fn policy_is_satisfied(
                     .collect();
                 let offending_symbol_versions: Vec<String> = offending_versions
                     .iter()
-                    .map(|v| format!("{}_{}", name, v))
+                    .map(|v| format!("{name}_{v}"))
                     .collect();
                 let offending_symbols = find_incompliant_symbols(elf, &offending_symbol_versions)?;
                 let offender = if offending_symbols.is_empty() {
@@ -242,8 +242,7 @@ fn get_default_platform_policies() -> Vec<Policy> {
             return MUSLLINUX_POLICIES
                 .iter()
                 .filter(|policy| {
-                    policy.name == "linux"
-                        || policy.name == format!("musllinux_{}_{}", major, minor)
+                    policy.name == "linux" || policy.name == format!("musllinux_{major}_{minor}")
                 })
                 .cloned()
                 .collect();
@@ -290,9 +289,7 @@ pub fn auditwheel_rs(
         Some(PlatformTag::Musllinux { x, y }) => MUSLLINUX_POLICIES
             .clone()
             .into_iter()
-            .filter(|policy| {
-                policy.name == "linux" || policy.name == format!("musllinux_{}_{}", x, y)
-            })
+            .filter(|policy| policy.name == "linux" || policy.name == format!("musllinux_{x}_{y}"))
             .map(|mut policy| {
                 policy.fixup_musl_libc_so_name(target.target_arch());
                 policy
@@ -347,10 +344,9 @@ pub fn auditwheel_rs(
         if let Some(highest_policy) = highest_policy {
             // Don't recommend manylinux1 because rust doesn't support it anymore
             if policy.priority < highest_policy.priority && highest_policy.name != "manylinux_2_5" {
-                println!(
+                eprintln!(
                     "📦 Wheel is eligible for a higher priority tag. \
-                    You requested {} but this wheel is eligible for {}",
-                    policy, highest_policy,
+                    You requested {policy} but this wheel is eligible for {highest_policy}",
                 );
             }
         }
@@ -410,7 +406,7 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
             .target(target_triple);
         let compiler = build
             .try_get_compiler()
-            .with_context(|| format!("Failed to get compiler for {}", target_triple))?;
+            .with_context(|| format!("Failed to get compiler for {target_triple}"))?;
         // Only GNU like compilers support `--print-sysroot`
         if !compiler.is_like_gnu() {
             return Ok(PathBuf::from("/"));
@@ -450,7 +446,7 @@ pub fn get_policy_and_libs(
         auditwheel_rs(artifact, target, platform_tag, allow_linking_libpython).with_context(
             || {
                 if let Some(platform_tag) = platform_tag {
-                    format!("Error ensuring {} compliance", platform_tag)
+                    format!("Error ensuring {platform_tag} compliance")
                 } else {
                     "Error checking for manylinux/musllinux compliance".to_string()
                 }
@@ -462,7 +458,7 @@ pub fn get_policy_and_libs(
         let external_libs = find_external_libs(&artifact.path, &policy, sysroot, ld_paths)
             .with_context(|| {
                 if let Some(platform_tag) = platform_tag {
-                    format!("Error repairing wheel for {} compliance", platform_tag)
+                    format!("Error repairing wheel for {platform_tag} compliance")
                 } else {
                     "Error repairing wheel for manylinux/musllinux compliance".to_string()
                 }

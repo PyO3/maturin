@@ -72,28 +72,12 @@ from my_project import my_project
 You can modify `__init__.py` yourself (see above) if you would like to import
 Rust functions from a higher-level namespace.
 
-### Alternate Python source directory (src layout)
-
-Having a directory with `package_name` in the root of the project can
-occasionally cause confusion as Python allows importing local packages and
-modules. A popular way to avoid this is with the `src`-layout, where the Python
-package is nested within a `src` directory. Unfortunately this interferes with
-the structure of a typical Rust project. Fortunately, Python is nor particular
-about the name of the parent source directory. You tell maturin to use a
-different Python source directory in `pyproject.toml` by setting `tool.maturin.python-source`
-or in `Cargo.toml` by setting `package.metadata.maturin.python-source`, for example
+You can specify a different python source directory in `pyproject.toml` by setting `tool.maturin.python-source`, for example
 
 **pyproject.toml**
 
 ```toml
 [tool.maturin]
-python-source = "python"
-```
-
-**Cargo.toml**
-
-```toml
-[package.metadata.maturin]
 python-source = "python"
 ```
 
@@ -109,7 +93,37 @@ my-rust-and-python-project
 ├── pyproject.toml
 ├── README.md
 └── src
-    └── lib.rs
+    └── lib.rs
+```
+
+> **Note**
+>
+> This structure is recommended to avoid [a common `ImportError` pitfall](https://github.com/PyO3/maturin/issues/490)
+
+
+### Alternate Python source directory (src layout)
+
+Having a directory with `package_name` in the root of the project can
+occasionally cause confusion as Python allows importing local packages and
+modules. A popular way to avoid this is with the `src`-layout, where the Python
+package is nested within a `src` directory. Unfortunately this interferes with
+the structure of a typical Rust project. Fortunately, Python is nor particular
+about the name of the parent source directory.
+
+maturin will detect the following src layout automatically:
+
+```
+my-rust-and-python-project
+├── src  # put python code in src folder
+│   └── my_project
+│       ├── __init__.py
+│       └── bar.py
+├── pyproject.toml
+├── README.md
+└── rust # put rust code in rust folder
+    |── Cargo.toml
+    └── src
+        └── lib.rs
 ```
 #### Import Rust as a submodule of your project
 
@@ -117,7 +131,6 @@ If the Python module created by Rust has the same name as the Python package in 
 
 ```toml
 [package.metadata.maturin]
-python-source = "python"
 name = "my_project._my_project"
 ```
 

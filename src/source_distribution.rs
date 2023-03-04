@@ -12,6 +12,8 @@ use std::str;
 use tracing::debug;
 
 const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
+const RUST_SRC_FOLDER: &str = "rust_src";
+
 /// Inheritable workspace fields, see
 /// https://github.com/rust-lang/cargo/blob/13ae438cf079da58272edc71f4d4968043dbd27b/src/cargo/util/toml/mod.rs#L1140-L1158
 const WORKSPACE_INHERITABLE_FIELDS: &[&str] = &[
@@ -63,8 +65,16 @@ fn rewrite_cargo_toml(
     // some_path_dep = { path = "../some_path_dep" }
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
-    for dep_category in &["dependencies", "dev-dependencies", "build-dependencies"] {
+    for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
         if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
+            if dep_category == "dev-dependencies" && !known_path_deps.is_empty() {
+                // Remove dev-dependencies since building from sdist doesn't need them,
+                // Keep it when there are no path dependencies to support building from
+                // sdist with `--locked`/`--frozen`.
+                data.remove(dep_category);
+                rewritten = true;
+                continue;
+            }
             let workspace_deps = workspace_manifest
                 .get("workspace")
                 .and_then(|x| x.get("dependencies"))
@@ -148,10 +158,10 @@ fn rewrite_cargo_toml(
                 }
                 // This is the location of the targeted crate in the source distribution
                 table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{}/{}", local_deps_folder, dep_name))
+                    toml_edit::value(format!("{local_deps_folder}/{dep_name}"))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    toml_edit::value(format!("../{}", dep_name))
+                    toml_edit::value(format!("../{dep_name}"))
                 };
                 if workspace_inherit {
                     // Remove workspace inheritance now that we converted it into a path dependency
@@ -205,16 +215,17 @@ fn rewrite_cargo_toml(
                             let path = Path::new(s.value());
                             if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
                                 if known_path_deps.contains_key(name) {
-                                    new_members
-                                        .push(format!("{}/{}", LOCAL_DEPENDENCIES_FOLDER, name));
+                                    new_members.push(format!("{LOCAL_DEPENDENCIES_FOLDER}/{name}"));
                                 }
                             }
                         }
                     }
                     if !new_members.is_empty() {
                         workspace["members"] = toml_edit::value(new_members);
-                        rewritten = true;
+                    } else {
+                        workspace.remove("members");
                     }
+                    rewritten = true;
                 }
             }
         }
@@ -252,6 +263,38 @@ fn ensure_dep_is_inline_table(dep: &mut toml_edit::Item) {
             *v = toml_edit::Value::InlineTable(tab);
         }
     }
+}
+
+/// When `Cargo.toml` is outside of the directory containing `pyproject.toml`,
+/// we put Rust crate source to `RUST_SRC_FOLDER` and
+/// update `tool.maturin.manifest-path` in `pyproject.toml`.
+fn rewrite_pyproject_toml(pyproject_toml_path: &Path) -> Result<String> {
+    let text = fs::read_to_string(pyproject_toml_path).context(format!(
+        "Can't read pyproject.toml at {}",
+        pyproject_toml_path.display(),
+    ))?;
+    let mut data = text.parse::<toml_edit::Document>().context(format!(
+        "Failed to parse pyproject.toml at {}",
+        pyproject_toml_path.display()
+    ))?;
+    if let Some(tool) = data.get_mut("tool").and_then(|x| x.as_table_mut()) {
+        if let Some(maturin) = tool.get_mut("maturin").and_then(|x| x.as_table_mut()) {
+            if let Some(manifest_path) = maturin.get_mut("manifest-path") {
+                // original: ../$crate/Cargo.toml or ../../$crate/Cargo.toml
+                // rewrite to: $RUST_SRC_FOLDER/$crate/Cargo.toml
+                let path =
+                    Path::new(manifest_path.as_str().context(
+                        "tool.maturin.manifest-path in pyproject.toml must be a string",
+                    )?);
+                let crate_name = path.parent().unwrap().file_name().unwrap();
+                let new_path = Path::new(RUST_SRC_FOLDER)
+                    .join(crate_name)
+                    .join("Cargo.toml");
+                *manifest_path = toml_edit::value(new_path.to_str().unwrap());
+            }
+        }
+    }
+    Ok(data.to_string())
 }
 
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies
@@ -295,7 +338,10 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
+    let abs_manifest_path = manifest_path
+        .normalize()
+        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
+        .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     let cargo_toml_in_subdir = root_crate
@@ -338,25 +384,66 @@ fn add_crate_to_source_distribution(
         })
         .collect();
 
+    let prefix = prefix.as_ref();
+    writer.add_directory(prefix)?;
+
+    let mut cargo_toml_in_rust_src = false;
+
     if root_crate
         && !target_source
             .iter()
             .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
         // Add pyproject.toml to the source distribution
-        // if Cargo.toml is in subdirectory of pyproject.toml directory
         if cargo_toml_in_subdir {
+            // if Cargo.toml is in subdirectory of pyproject.toml directory
             target_source.push((
                 PathBuf::from("pyproject.toml"),
                 pyproject_toml_path.to_path_buf(),
             ));
         } else {
-            bail!(
-                "pyproject.toml was not included by `cargo package`. \
-                     Please make sure pyproject.toml is not excluded or build without `--sdist`"
-            )
+            // if pyproject.toml was not included by `cargo package --list`
+            // (e.g. because it is in a parent directory)
+            // we need to add `cargo package --list` files to a subdirectory
+            // and rewrite `tool.maturin.manifest-path` in pyproject.toml
+            let crate_name = abs_manifest_dir.file_name().unwrap();
+            // check that there isn't already a $RUST_SRC_FOLDER/$crate_name/ folder in python root
+            let rust_src = Path::new(RUST_SRC_FOLDER).join(crate_name);
+            if target_source
+                .iter()
+                .any(|(target, _)| target.starts_with(&rust_src))
+            {
+                bail!(
+                    "Cannot add crate {} to source distribution because there is already a {} folder, consider rename it to avoid conflicts",
+                    crate_name.to_string_lossy(),
+                    rust_src.display(),
+                );
+            }
+            target_source.iter_mut().for_each(|(target, _)| {
+                *target = rust_src.join(&target);
+            });
+            // rewrite `tool.maturin.manifest-path` in pyproject.toml
+            let rewritten_pyproject_toml = rewrite_pyproject_toml(pyproject_toml_path)?;
+            writer.add_bytes(
+                prefix.join("pyproject.toml"),
+                rewritten_pyproject_toml.as_bytes(),
+            )?;
+            cargo_toml_in_rust_src = true;
         }
     }
+
+    let cargo_toml_path = if cargo_toml_in_subdir {
+        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
+        prefix.join(relative_manifest_path)
+    } else if cargo_toml_in_rust_src {
+        let crate_name = abs_manifest_dir.file_name().unwrap();
+        prefix
+            .join(RUST_SRC_FOLDER)
+            .join(crate_name)
+            .join(manifest_path.file_name().unwrap())
+    } else {
+        prefix.join(manifest_path.file_name().unwrap())
+    };
 
     let local_deps_folder = if cargo_toml_in_subdir {
         let level = abs_manifest_dir
@@ -365,6 +452,8 @@ fn add_crate_to_source_distribution(
             .components()
             .count();
         format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
+    } else if cargo_toml_in_rust_src {
+        format!("../../{LOCAL_DEPENDENCIES_FOLDER}")
     } else {
         LOCAL_DEPENDENCIES_FOLDER.to_string()
     };
@@ -376,16 +465,7 @@ fn add_crate_to_source_distribution(
         root_crate,
     )?;
 
-    let prefix = prefix.as_ref();
-    writer.add_directory(prefix)?;
-
-    let cargo_toml = if cargo_toml_in_subdir {
-        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
-        prefix.join(relative_manifest_path)
-    } else {
-        prefix.join(manifest_path.file_name().unwrap())
-    };
-    writer.add_bytes(cargo_toml, rewritten_cargo_toml.as_bytes())?;
+    writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
 
     for (target, source) in target_source {
         writer.add_file(prefix.join(target), source)?;
@@ -405,6 +485,14 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
     while let Some(top) = stack.pop() {
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
+                if matches!(dependency.kind, cargo_metadata::DependencyKind::Development) {
+                    // Skip dev-only dependency
+                    debug!(
+                        "Skipping development only dependency {} ({})",
+                        dependency.name, path
+                    );
+                    continue;
+                }
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
@@ -441,7 +529,13 @@ pub fn source_distribution(
     let manifest_path = &build_context.manifest_path;
     let pyproject_toml_path = build_context
         .pyproject_toml_path
-        .normalize()?
+        .normalize()
+        .with_context(|| {
+            format!(
+                "failed to normalize path `{}`",
+                build_context.pyproject_toml_path.display()
+            )
+        })?
         .into_path_buf();
     let workspace_manifest_path = build_context
         .cargo_metadata
@@ -517,19 +611,33 @@ pub fn source_distribution(
         true,
     )?;
 
-    let abs_manifest_path = manifest_path.normalize()?.into_path_buf();
+    let abs_manifest_path = manifest_path
+        .normalize()
+        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
+        .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
+    let cargo_lock_exists = cargo_lock_path.exists();
+    let workspace_cargo_lock = build_context
+        .cargo_metadata
+        .workspace_root
+        .join("Cargo.lock");
+    let workspace_cargo_lock_exists = workspace_cargo_lock.exists();
     let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
-    if cargo_lock_required || cargo_lock_path.exists() {
+    if cargo_lock_required || cargo_lock_exists || workspace_cargo_lock_exists {
         let project_root = pyproject_toml_path.parent().unwrap();
         let relative_cargo_lock = if cargo_lock_path.starts_with(project_root) {
             cargo_lock_path.strip_prefix(project_root).unwrap()
         } else {
             cargo_lock_path.strip_prefix(abs_manifest_dir).unwrap()
         };
-        writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
+        if cargo_lock_exists {
+            writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
+        } else {
+            // Fallback to workspace Cargo lock file
+            writer.add_file(root_dir.join(relative_cargo_lock), workspace_cargo_lock)?;
+        }
     } else {
         eprintln!(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \
@@ -539,8 +647,20 @@ pub fn source_distribution(
 
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     // Add python source files
-    if let Some(python_source) = build_context.project_layout.python_module.as_ref() {
-        for entry in ignore::Walk::new(python_source) {
+    let mut python_packages = Vec::new();
+    if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
+        python_packages.push(python_module.to_path_buf());
+    }
+    for package in &build_context.project_layout.python_packages {
+        let package_path = build_context.project_layout.python_dir.join(package);
+        if python_packages.iter().any(|p| *p == package_path) {
+            continue;
+        }
+        python_packages.push(package_path);
+    }
+
+    for package in python_packages {
+        for entry in ignore::Walk::new(package) {
             let source = entry?.into_path();
             // Technically, `ignore` crate should handle this,
             // but somehow it doesn't on Alpine Linux running in GitHub Actions,
@@ -578,7 +698,7 @@ pub fn source_distribution(
     }
 
     let mut include = |pattern| -> Result<()> {
-        println!("📦 Including files matching \"{}\"", pattern);
+        eprintln!("📦 Including files matching \"{pattern}\"");
         for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
             .expect("No files found for pattern")
             .filter_map(Result::ok)
@@ -592,16 +712,6 @@ pub fn source_distribution(
         }
         Ok(())
     };
-
-    #[allow(deprecated)]
-    if let Some(include_targets) = pyproject.sdist_include() {
-        eprintln!(
-            "⚠️  Warning: `[tool.maturin.sdist-include]` is deprecated, please use `[tool.maturin.include]`"
-        );
-        for pattern in include_targets {
-            include(pattern.as_str())?;
-        }
-    }
 
     if let Some(glob_patterns) = pyproject.include() {
         for pattern in glob_patterns
@@ -620,7 +730,7 @@ pub fn source_distribution(
     add_data(&mut writer, build_context.project_layout.data.as_deref())?;
     let source_distribution_path = writer.finish()?;
 
-    println!(
+    eprintln!(
         "📦 Built source distribution to {}",
         source_distribution_path.display()
     );

@@ -1,7 +1,7 @@
 use crate::auditwheel::{get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::build_options::CargoOptions;
-use crate::compile::warn_missing_py_init;
+use crate::compile::{warn_missing_py_init, CompileTarget};
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
     write_uniffi_module, write_wasm_launcher, WheelWriter,
@@ -73,9 +73,9 @@ impl BridgeModel {
 impl Display for BridgeModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            BridgeModel::Bin(Some((name, _))) => write!(f, "{} bin", name),
+            BridgeModel::Bin(Some((name, _))) => write!(f, "{name} bin"),
             BridgeModel::Bin(None) => write!(f, "bin"),
-            BridgeModel::Bindings(name, _) => write!(f, "{}", name),
+            BridgeModel::Bindings(name, _) => write!(f, "{name}"),
             BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
@@ -130,7 +130,7 @@ fn bin_wasi_helper(
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
             .requires_dist
-            .push("wasmtime>=2.0.0,<3.0.0".to_string());
+            .push("wasmtime>=6.0.0,<7.0.0".to_string());
     }
 
     Ok(metadata21)
@@ -141,8 +141,8 @@ fn bin_wasi_helper(
 pub struct BuildContext {
     /// The platform, i.e. os and pointer width
     pub target: Target,
-    /// Whether to use cffi or pyo3/rust-cpython
-    pub bridge: BridgeModel,
+    /// List of Cargo targets to compile
+    pub cargo_targets: Vec<CompileTarget>,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
     /// The path to pyproject.toml. Required for the source distribution
@@ -171,6 +171,7 @@ pub struct BuildContext {
     /// Skip checking the linked libraries for manylinux/musllinux compliance
     pub skip_auditwheel: bool,
     /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
+    #[cfg(feature = "zig")]
     pub zig: bool,
     /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
     pub platform_tag: Vec<PlatformTag>,
@@ -201,7 +202,7 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
-        let wheels = match &self.bridge {
+        let wheels = match self.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
             BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
@@ -249,6 +250,12 @@ impl BuildContext {
         Ok(wheels)
     }
 
+    /// Bridge model
+    pub fn bridge(&self) -> &BridgeModel {
+        // FIXME: currently we only allow multiple bin targets so bridges are all the same
+        &self.cargo_targets[0].1
+    }
+
     /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
     pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.out)
@@ -280,9 +287,8 @@ impl BuildContext {
                 && self.target.is_linux()
                 && !python_interpreter.support_portable_wheels()
             {
-                println!(
-                    "🐍 Skipping auditwheel because {} does not support manylinux/musllinux wheels",
-                    python_interpreter
+                eprintln!(
+                    "🐍 Skipping auditwheel because {python_interpreter} does not support manylinux/musllinux wheels"
                 );
                 return Ok((Policy::default(), Vec::new()));
             }
@@ -302,8 +308,8 @@ impl BuildContext {
         others.sort();
 
         // only bin bindings allow linking to libpython, extension modules must not
-        let allow_linking_libpython = self.bridge.is_bin();
-        if self.bridge.is_bin() && !musllinux.is_empty() {
+        let allow_linking_libpython = self.bridge().is_bin();
+        if self.bridge().is_bin() && !musllinux.is_empty() {
             return get_policy_and_libs(
                 artifact,
                 Some(musllinux[0]),
@@ -318,7 +324,7 @@ impl BuildContext {
 
     /// Add library search paths in Cargo target directory rpath when building in editable mode
     fn add_rpath(&self, artifacts: &[&BuildArtifact]) -> Result<()> {
-        if self.editable && self.target.is_linux() {
+        if self.editable && self.target.is_linux() && !artifacts.is_empty() {
             for artifact in artifacts {
                 if artifact.linked_paths.is_empty() {
                     continue;
@@ -355,6 +361,9 @@ impl BuildContext {
         if ext_libs.iter().all(|libs| libs.is_empty()) {
             return Ok(());
         }
+
+        patchelf::verify_patchelf()?;
+
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
         let mut libs_dir = self
@@ -380,10 +389,10 @@ impl BuildContext {
             // Generate a new soname with a short hash
             let short_hash = &hash_file(&lib_path)?[..8];
             let (file_stem, file_ext) = lib.name.split_once('.').unwrap();
-            let new_soname = if !file_stem.ends_with(&format!("-{}", short_hash)) {
-                format!("{}-{}.{}", file_stem, short_hash, file_ext)
+            let new_soname = if !file_stem.ends_with(&format!("-{short_hash}")) {
+                format!("{file_stem}-{short_hash}.{file_ext}")
             } else {
-                format!("{}.{}", file_stem, file_ext)
+                format!("{file_stem}.{file_ext}")
             };
 
             // Copy the original lib to a tmpdir and modify some of its properties
@@ -391,6 +400,12 @@ impl BuildContext {
             let dest_path = temp_dir.path().join(&new_soname);
             fs::copy(&lib_path, &dest_path)?;
             libs_copied.insert(lib_path);
+
+            // fs::copy copies permissions as well, and the original
+            // file may have been read-only
+            let mut perms = fs::metadata(&dest_path)?.permissions();
+            perms.set_readonly(false);
+            fs::set_permissions(&dest_path, perms)?;
 
             patchelf::set_soname(&dest_path, &new_soname)?;
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
@@ -436,12 +451,12 @@ impl BuildContext {
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }
 
-        println!(
+        eprintln!(
             "🖨  Copied external shared libraries to package {} directory:",
             libs_dir.display()
         );
         for lib_path in libs_copied {
-            println!("    {}", lib_path.display());
+            eprintln!("    {}", lib_path.display());
         }
 
         // Currently artifact .so file always resides at ${module_name}/${module_name}.so
@@ -467,7 +482,16 @@ impl BuildContext {
 
     fn excludes(&self, format: Format) -> Result<Option<Override>> {
         if let Some(pyproject) = self.pyproject_toml.as_ref() {
-            let pyproject_dir = self.pyproject_toml_path.normalize()?.into_path_buf();
+            let pyproject_dir = self
+                .pyproject_toml_path
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "failed to normalize path `{}`",
+                        self.pyproject_toml_path.display()
+                    )
+                })?
+                .into_path_buf();
             if let Some(glob_patterns) = &pyproject.exclude() {
                 let mut excludes = OverrideBuilder::new(pyproject_dir.parent().unwrap());
                 for glob in glob_patterns
@@ -493,7 +517,7 @@ impl BuildContext {
         let platform = self
             .target
             .get_platform_tag(platform_tags, self.universal2)?;
-        let tag = format!("cp{}{}-abi3-{}", major, min_minor, platform);
+        let tag = format!("cp{major}{min_minor}-abi3-{platform}");
 
         let mut writer = WheelWriter::new(
             &tag,
@@ -509,7 +533,8 @@ impl BuildContext {
             &self.project_layout,
             &self.module_name,
             &artifact.path,
-            None,
+            self.interpreter.first(),
+            true,
             &self.target,
             self.editable,
             self.pyproject_toml.as_ref(),
@@ -519,7 +544,7 @@ impl BuildContext {
         self.add_pth(&mut writer)?;
         add_data(&mut writer, self.project_layout.data.as_deref())?;
         let wheel_path = writer.finish()?;
-        Ok((wheel_path, format!("cp{}{}", major, min_minor)))
+        Ok((wheel_path, format!("cp{major}{min_minor}")))
     }
 
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
@@ -553,7 +578,7 @@ impl BuildContext {
             min_minor,
         )?;
 
-        println!(
+        eprintln!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
             major,
             min_minor,
@@ -588,6 +613,7 @@ impl BuildContext {
             &self.module_name,
             &artifact.path,
             Some(python_interpreter),
+            false,
             &self.target,
             self.editable,
             self.pyproject_toml.as_ref(),
@@ -633,7 +659,7 @@ impl BuildContext {
                 &platform_tags,
                 external_libs,
             )?;
-            println!(
+            eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
@@ -657,7 +683,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
     ) -> Result<BuildArtifact> {
-        let artifacts = compile(self, python_interpreter, &self.bridge)
+        let artifacts = compile(self, python_interpreter, &self.cargo_targets)
             .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
@@ -749,7 +775,7 @@ impl BuildContext {
             );
         }
 
-        println!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
@@ -804,7 +830,7 @@ impl BuildContext {
         };
         let (wheel_path, tag) = self.write_uniffi_wheel(artifact, &platform_tags, external_libs)?;
 
-        println!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
@@ -817,7 +843,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: &[Vec<Library>],
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = match (&self.bridge, python_interpreter) {
+        let (tag, tags) = match (self.bridge(), python_interpreter) {
             (BridgeModel::Bin(None), _) => self
                 .target
                 .get_universal_tags(platform_tags, self.universal2)?,
@@ -870,16 +896,18 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
         )?;
 
-        if let Some(python_module) = &self.project_layout.python_module {
-            if self.target.is_wasi() {
-                // TODO: Can we have python code and the wasm launchers coexisting
-                // without clashes?
-                bail!("Sorry, adding python code to a wasm binary is currently not supported")
-            }
-            if !self.editable {
-                write_python_part(&mut writer, python_module, self.pyproject_toml.as_ref())
-                    .context("Failed to add the python module to the package")?;
-            }
+        if self.project_layout.python_module.is_some() && self.target.is_wasi() {
+            // TODO: Can we have python code and the wasm launchers coexisting
+            // without clashes?
+            bail!("Sorry, adding python code to a wasm binary is currently not supported")
+        }
+        if !self.editable {
+            write_python_part(
+                &mut writer,
+                &self.project_layout,
+                self.pyproject_toml.as_ref(),
+            )
+            .context("Failed to add the python module to the package")?;
         }
 
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());
@@ -906,7 +934,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifacts = compile(self, python_interpreter, &self.bridge)
+        let artifacts = compile(self, python_interpreter, &self.cargo_targets)
             .context("Failed to build a native library through cargo")?;
         if artifacts.is_empty() {
             bail!("Cargo didn't build a binary")
@@ -939,7 +967,7 @@ impl BuildContext {
             &platform_tags,
             &ext_libs,
         )?;
-        println!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)

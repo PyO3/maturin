@@ -8,21 +8,22 @@ On windows, apparently pip's subprocess handling sets stdout to some windows enc
 even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids encoding errors due to
 maturin's emojis.
 """
+from __future__ import annotations
 
 import os
 import platform
 import shlex
 import shutil
+import struct
 import subprocess
 import sys
-import struct
 from subprocess import SubprocessError
-from typing import Dict
+from typing import Any, Dict, Mapping
 
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore
 
 
 def get_config() -> Dict[str, str]:
@@ -31,12 +32,12 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
-def get_maturin_pep517_args():
+def get_maturin_pep517_args() -> list[str]:
     args = shlex.split(os.getenv("MATURIN_PEP517_ARGS", ""))
     return args
 
 
-def _additional_pep517_args():
+def _additional_pep517_args() -> list[str]:
     # Support building for 32-bit Python on x64 Windows
     if platform.system().lower() == "windows" and platform.machine().lower() == "amd64":
         pointer_width = struct.calcsize("P") * 8
@@ -47,8 +48,11 @@ def _additional_pep517_args():
 
 # noinspection PyUnusedLocal
 def _build_wheel(
-    wheel_directory, config_settings=None, metadata_directory=None, editable=False
-):
+    wheel_directory: str,
+    config_settings: Mapping[str, Any] | None = None,
+    metadata_directory: str | None = None,
+    editable: bool = False,
+) -> str:
     # PEP 517 specifies that only `sys.executable` points to the correct
     # python interpreter
     command = [
@@ -86,12 +90,18 @@ def _build_wheel(
 
 
 # noinspection PyUnusedLocal
-def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
+def build_wheel(
+    wheel_directory: str,
+    config_settings: Mapping[str, Any] | None = None,
+    metadata_directory: str | None = None,
+) -> str:
     return _build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 # noinspection PyUnusedLocal
-def build_sdist(sdist_directory, config_settings=None):
+def build_sdist(
+    sdist_directory: str, config_settings: Mapping[str, Any] | None = None
+) -> str:
     command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
 
     print("Running `{}`".format(" ".join(command)))
@@ -109,7 +119,9 @@ def build_sdist(sdist_directory, config_settings=None):
 
 
 # noinspection PyUnusedLocal
-def get_requires_for_build_wheel(config_settings=None):
+def get_requires_for_build_wheel(
+    config_settings: Mapping[str, Any] | None = None
+) -> list[str]:
     if get_config().get("bindings") == "cffi":
         return ["cffi"]
     else:
@@ -117,7 +129,11 @@ def get_requires_for_build_wheel(config_settings=None):
 
 
 # noinspection PyUnusedLocal
-def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
+def build_editable(
+    wheel_directory: str,
+    config_settings: Mapping[str, Any] | None = None,
+    metadata_directory: str | None = None,
+) -> str:
     return _build_wheel(
         wheel_directory, config_settings, metadata_directory, editable=True
     )
@@ -128,12 +144,16 @@ get_requires_for_build_editable = get_requires_for_build_wheel
 
 
 # noinspection PyUnusedLocal
-def get_requires_for_build_sdist(config_settings=None):
+def get_requires_for_build_sdist(
+    config_settings: Mapping[str, Any] | None = None
+) -> list:
     return []
 
 
 # noinspection PyUnusedLocal
-def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
+def prepare_metadata_for_build_wheel(
+    metadata_directory: str, config_settings: Mapping[str, Any] | None = None
+) -> str:
     print("Checking for Rust toolchain....")
     is_cargo_installed = False
     try:
@@ -171,13 +191,13 @@ def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        output = subprocess.check_output(command)
+        _output = subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f"Error running maturin: {e}\n")
         sys.exit(1)
-    sys.stdout.buffer.write(output)
+    sys.stdout.buffer.write(_output)
     sys.stdout.flush()
-    output = output.decode(errors="replace")
+    output = _output.decode(errors="replace")
     return output.strip().splitlines()[-1]
 
 

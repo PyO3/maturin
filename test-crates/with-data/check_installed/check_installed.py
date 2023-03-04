@@ -12,7 +12,7 @@ venv_root = Path(sys.prefix)
 installed_data = (
     venv_root.joinpath("data_subdir")
     .joinpath("hello.txt")
-    # With the default encoding, python under windows fails to read the file correctly :/
+    # With the default encoding, python under windows fails to read the file correctly
     .read_text(encoding="utf-8")
     .strip()
 )

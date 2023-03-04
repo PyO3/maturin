@@ -57,6 +57,7 @@ pub fn develop(
         bindings,
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,
+        #[cfg(feature = "zig")]
         zig: false,
         universal2: false,
         cargo: CargoOptions {
@@ -67,10 +68,10 @@ pub fn develop(
 
     let build_context = build_options.into_build_context(release, strip, true)?;
 
-    let interpreter = PythonInterpreter::check_executable(&python, &target, &build_context.bridge)?
-        .ok_or_else(|| {
-            anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-        })?;
+    let interpreter =
+        PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
+            || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
+        )?;
 
     // Install dependencies
     if !build_context.metadata21.requires_dist.is_empty() {
@@ -85,8 +86,8 @@ pub fn develop(
             // Remove extra marker to make it installable with pip
             for extra in &extras {
                 pkg = pkg
-                    .replace(&format!(" and extra == '{}'", extra), "")
-                    .replace(&format!("; extra == '{}'", extra), "");
+                    .replace(&format!(" and extra == '{extra}'"), "")
+                    .replace(&format!("; extra == '{extra}'"), "");
             }
             pkg
         }));
@@ -113,7 +114,7 @@ pub fn develop(
             .args(command)
             .arg(dunce::simplified(filename))
             .output()
-            .context(format!("pip install failed with {:?}", python))?;
+            .context(format!("pip install failed with {python:?}"))?;
         if !output.status.success() {
             bail!(
                 "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
@@ -126,13 +127,13 @@ pub fn develop(
         }
         if !output.stderr.is_empty() {
             eprintln!(
-                "⚠️  Warning: pip raised a warning running {:?}:\n{}",
+                "⚠️ Warning: pip raised a warning running {:?}:\n{}",
                 &command,
                 String::from_utf8_lossy(&output.stderr).trim(),
             );
         }
-        println!(
-            "🛠  Installed {}-{}",
+        eprintln!(
+            "🛠 Installed {}-{}",
             build_context.metadata21.name, build_context.metadata21.version
         );
     }

@@ -133,10 +133,7 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
         .collect::<Vec<PathBuf>>();
     sysconfig_paths.dedup();
     if sysconfig_paths.is_empty() {
-        bail!(
-            "Could not find either libpython.so or _sysconfigdata*.py in {}",
-            lib_dir.display()
-        );
+        bail!("Could not find _sysconfigdata*.py in {}", lib_dir.display());
     } else if sysconfig_paths.len() > 1 {
         bail!(
             "Detected multiple possible python versions, please set the PYO3_PYTHON_VERSION \
@@ -155,7 +152,7 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
     let (cpython_version_pat, pypy_version_pat) = if let Some(v) =
         env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap())
     {
-        (format!("python{}", v), format!("pypy{}", v))
+        (format!("python{v}"), format!("pypy{v}"))
     } else {
         ("python3.".into(), "pypy3.".into())
     };

@@ -9,6 +9,7 @@ use std::io::Read;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use tar::Archive;
+use time::OffsetDateTime;
 use zip::ZipArchive;
 
 /// Tries to compile a sample crate (pyo3-pure) for musl,
@@ -171,11 +172,7 @@ pub fn test_source_distribution(
     Ok(())
 }
 
-pub fn check_wheel_files(
-    package: impl AsRef<Path>,
-    expected_files: Vec<&str>,
-    unique_name: &str,
-) -> Result<()> {
+fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<ZipArchive<File>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
     let wheel_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
@@ -184,10 +181,7 @@ pub fn check_wheel_files(
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
-            target_dir: Some(PathBuf::from(format!(
-                "test-crates/targets/{}",
-                unique_name
-            ))),
+            target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
         platform_tag: vec![PlatformTag::Linux],
@@ -202,6 +196,33 @@ pub fn check_wheel_files(
     let (wheel_path, _) = &wheels[0];
 
     let wheel = ZipArchive::new(File::open(wheel_path)?)?;
+    Ok(wheel)
+}
+
+pub fn check_wheel_mtimes(
+    package: impl AsRef<Path>,
+    expected_mtime: Vec<OffsetDateTime>,
+    unique_name: &str,
+) -> Result<()> {
+    let mut wheel = build_wheel_files(package, unique_name)?;
+    let mut mtimes = BTreeSet::<OffsetDateTime>::new();
+
+    for idx in 0..wheel.len() {
+        let mtime = wheel.by_index(idx)?.last_modified().to_time()?;
+        mtimes.insert(mtime);
+    }
+
+    assert_eq!(mtimes, expected_mtime.into_iter().collect::<BTreeSet<_>>());
+
+    Ok(())
+}
+
+pub fn check_wheel_files(
+    package: impl AsRef<Path>,
+    expected_files: Vec<&str>,
+    unique_name: &str,
+) -> Result<()> {
+    let wheel = build_wheel_files(package, unique_name)?;
     let drop_platform_specific_files = |file: &&str| -> bool {
         !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
     };

@@ -14,6 +14,7 @@ use ignore::WalkBuilder;
 use normpath::PathExt as _;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
 #[cfg(target_family = "unix")]
@@ -27,7 +28,7 @@ use std::process::{Command, Output};
 use std::str;
 use tempfile::{tempdir, TempDir};
 use tracing::debug;
-use zip::{self, ZipWriter};
+use zip::{self, DateTime, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
@@ -134,7 +135,7 @@ impl PathWriter {
 
         for (filename, hash, len) in self.record {
             buffer
-                .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())
+                .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())
                 .context(format!(
                     "Failed to write to file at {}",
                     record_file.display()
@@ -234,9 +235,15 @@ impl ModuleWriter for WheelWriter {
         } else {
             zip::CompressionMethod::Deflated
         };
-        let options = zip::write::FileOptions::default()
+
+        let mut options = zip::write::FileOptions::default()
             .unix_permissions(permissions)
             .compression_method(compression_method);
+        let mtime = self.mtime().ok();
+        if let Some(mtime) = mtime {
+            options = options.last_modified_time(mtime);
+        }
+
         self.zip.start_file(target.clone(), options)?;
         self.zip.write_all(bytes)?;
 
@@ -286,15 +293,24 @@ impl WheelWriter {
         project_layout: &ProjectLayout,
         metadata21: &Metadata21,
     ) -> Result<()> {
-        if let Some(python_module) = &project_layout.python_module {
-            let absolute_path = python_module.normalize()?.into_path_buf();
-            if let Some(python_path) = absolute_path.parent().and_then(|p| p.to_str()) {
+        if project_layout.python_module.is_some() || !project_layout.python_packages.is_empty() {
+            let absolute_path = project_layout
+                .python_dir
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "failed to normalize path `{}`",
+                        project_layout.python_dir.display()
+                    )
+                })?
+                .into_path_buf();
+            if let Some(python_path) = absolute_path.to_str() {
                 let name = metadata21.get_distribution_escaped();
-                let target = format!("{}.pth", name);
+                let target = format!("{name}.pth");
                 debug!("Adding {} from {}", target, python_path);
                 self.add_bytes(target, python_path.as_bytes())?;
             } else {
-                println!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
+                eprintln!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
             }
         }
         Ok(())
@@ -309,6 +325,21 @@ impl WheelWriter {
         }
     }
 
+    /// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
+    /// Note that the earliest timestamp a zip file can represent is 1980-01-01
+    fn mtime(&self) -> Result<DateTime> {
+        let epoch: i64 = env::var("SOURCE_DATE_EPOCH")?.parse()?;
+        let dt = time::OffsetDateTime::from_unix_timestamp(epoch)?;
+        let min_dt = time::Date::from_calendar_date(1980, time::Month::January, 1)
+            .unwrap()
+            .midnight()
+            .assume_offset(time::UtcOffset::UTC);
+        let dt = dt.max(min_dt);
+
+        let dt = DateTime::try_from(dt).map_err(|_| anyhow!("Failed to build zip DateTime"))?;
+        Ok(dt)
+    }
+
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
         let compression_method = if cfg!(feature = "faster-tests") {
@@ -316,17 +347,23 @@ impl WheelWriter {
         } else {
             zip::CompressionMethod::Deflated
         };
-        let options = zip::write::FileOptions::default().compression_method(compression_method);
+
+        let mut options = zip::write::FileOptions::default().compression_method(compression_method);
+        let mtime = self.mtime().ok();
+        if let Some(mtime) = mtime {
+            options = options.last_modified_time(mtime);
+        }
+
         let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
         debug!("Adding {}", record_filename);
         self.zip.start_file(&record_filename, options)?;
         for (filename, hash, len) in self.record {
             self.zip
-                .write_all(format!("{},sha256={},{}\n", filename, hash, len).as_bytes())?;
+                .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())?;
         }
         // Write the record for the RECORD file itself
         self.zip
-            .write_all(format!("{},,\n", record_filename).as_bytes())?;
+            .write_all(format!("{record_filename},,\n").as_bytes())?;
 
         self.zip.finish()?;
         Ok(self.wheel_path)
@@ -460,7 +497,7 @@ Root-Is-Purelib: false
     );
 
     for tag in tags {
-        writeln!(wheel_file, "Tag: {}", tag)?;
+        writeln!(wheel_file, "Tag: {tag}")?;
     }
 
     Ok(wheel_file)
@@ -473,7 +510,7 @@ fn entry_points_txt(
 ) -> String {
     entrypoints
         .iter()
-        .fold(format!("[{}]\n", entry_type), |text, (k, v)| {
+        .fold(format!("[{entry_type}]\n"), |text, (k, v)| {
             text + k + "=" + v + "\n"
         })
 }
@@ -508,11 +545,11 @@ fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result
     let maybe_header = target_dir.join("header.h");
 
     if maybe_header.is_file() {
-        println!("💼 Using the existing header at {}", maybe_header.display());
+        eprintln!("💼 Using the existing header at {}", maybe_header.display());
         Ok(maybe_header)
     } else {
         if crate_dir.join("cbindgen.toml").is_file() {
-            println!(
+            eprintln!(
                 "💼 Using the existing cbindgen.toml configuration. \n\
                  💼 Enforcing the following settings: \n   \
                  - language = \"C\" \n   \
@@ -594,7 +631,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
                 "True" => true,
                 "False" => false,
                 _ => {
-                    println!(
+                    eprintln!(
                         "⚠️ Failed to determine whether python at {:?} is running inside a virtualenv",
                         &python
                     );
@@ -613,7 +650,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
         return handle_cffi_call_result(python, tempdir, &ffi_py, &output);
     }
 
-    println!("⚠️ cffi not found. Trying to install it");
+    eprintln!("⚠️ cffi not found. Trying to install it");
     // Call pip through python to don't do the wrong thing when python and pip
     // are coming from different environments
     let output = call_python(
@@ -635,7 +672,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
             str::from_utf8(&output.stderr)?
         );
     }
-    println!("🎁 Installed cffi");
+    eprintln!("🎁 Installed cffi");
 
     // Try again
     let output = call_python(python, ["-c", &cffi_invocation])?;
@@ -675,24 +712,34 @@ pub fn write_bindings_module(
     module_name: &str,
     artifact: &Path,
     python_interpreter: Option<&PythonInterpreter>,
+    is_abi3: bool,
     target: &Target,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
-    let so_filename = match python_interpreter {
-        Some(python_interpreter) => python_interpreter.get_library_name(ext_name),
-        // abi3
-        None => {
-            if target.is_unix() {
-                format!("{base}.abi3.so", base = ext_name)
-            } else {
+    let so_filename = if is_abi3 {
+        if target.is_unix() {
+            format!("{ext_name}.abi3.so")
+        } else {
+            match python_interpreter {
+                Some(python_interpreter) if python_interpreter.is_windows_debug() => {
+                    format!("{ext_name}_d.pyd")
+                }
                 // Apparently there is no tag for abi3 on windows
-                format!("{base}.pyd", base = ext_name)
+                _ => format!("{ext_name}.pyd"),
             }
         }
+    } else {
+        let python_interpreter =
+            python_interpreter.expect("A python interpreter is required for non-abi3 build");
+        python_interpreter.get_library_name(ext_name)
     };
 
+    if !editable {
+        write_python_part(writer, project_layout, pyproject_toml)
+            .context("Failed to add the python module to the package")?;
+    }
     if let Some(python_module) = &project_layout.python_module {
         if editable {
             let target = project_layout.rust_module.join(&so_filename);
@@ -708,9 +755,6 @@ pub fn write_bindings_module(
                 target.display()
             ))?;
         } else {
-            write_python_part(writer, python_module, pyproject_toml)
-                .context("Failed to add the python module to the package")?;
-
             let relative = project_layout
                 .rust_module
                 .strip_prefix(python_module.parent().unwrap())
@@ -728,16 +772,15 @@ pub fn write_bindings_module(
 
 __doc__ = {module_name}.__doc__
 if hasattr({module_name}, "__all__"):
-    __all__ = {module_name}.__all__"#,
-                module_name = module_name
+    __all__ = {module_name}.__all__"#
             )
             .as_bytes(),
         )?;
         let type_stub = project_layout
             .rust_module
-            .join(format!("{}.pyi", module_name));
+            .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {}.pyi", module_name);
+            eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -762,16 +805,15 @@ pub fn write_cffi_module(
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
+    if !editable {
+        write_python_part(writer, project_layout, pyproject_toml)
+            .context("Failed to add the python module to the package")?;
+    }
+
     let module;
-
     if let Some(python_module) = &project_layout.python_module {
-        if !editable {
-            write_python_part(writer, python_module, pyproject_toml)
-                .context("Failed to add the python module to the package")?;
-        }
-
         if editable {
-            let base_path = python_module.join(module_name);
+            let base_path = python_module.join(&project_layout.extension_name);
             fs::create_dir_all(&base_path)?;
             let target = base_path.join("native.so");
             fs::copy(artifact, &target).context(format!(
@@ -796,9 +838,9 @@ pub fn write_cffi_module(
         writer.add_directory(&module)?;
         let type_stub = project_layout
             .rust_module
-            .join(format!("{}.pyi", module_name));
+            .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {}.pyi", module_name);
+            eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -854,40 +896,38 @@ fn generate_uniffi_bindings(
         );
     }
 
+    let mut cmd = Command::new("uniffi-bindgen");
+    cmd.args([
+        "generate",
+        "--no-format",
+        "--language",
+        "python",
+        "--out-dir",
+    ]);
+    cmd.arg(&binding_dir);
+
     let udl = &udls[0];
     let config_file = crate_dir.join("uniffi.toml");
     let mut cdylib_name = None;
-    let config_file = {
-        if config_file.is_file() {
-            let uniffi_toml: UniFfiToml =
-                toml_edit::easy::from_str(&fs::read_to_string(&config_file)?)?;
-            cdylib_name = uniffi_toml
-                .bindings
-                .get("python")
-                .and_then(|py| py.cdylib_name.clone());
-            Some(
-                config_file
-                    .as_path()
-                    .try_into()
-                    .expect("path contains non-utf8"),
-            )
-        } else {
-            None
-        }
-    };
-    uniffi_bindgen::generate_bindings(
-        udl.as_path().try_into().expect("path contains non-utf8"),
-        config_file,
-        vec!["python"],
-        Some(
-            binding_dir
-                .as_path()
-                .try_into()
-                .expect("path contains non-utf8"),
-        ),
-        None,
-        false,
+    if config_file.is_file() {
+        let uniffi_toml: UniFfiToml = toml::from_str(&fs::read_to_string(&config_file)?)?;
+        cdylib_name = uniffi_toml
+            .bindings
+            .get("python")
+            .and_then(|py| py.cdylib_name.clone());
+        cmd.arg("--config");
+        cmd.arg(config_file);
+    }
+    cmd.arg(udl);
+    debug!("Running {:?}", cmd);
+    let mut child = cmd.spawn().context(
+        "Failed to run uniffi-bindgen, did you install it? Try `pip install uniffi-bindgen`",
     )?;
+    let exit_status = child.wait().context("Failed to run uniffi-bindgen")?;
+    if !exit_status.success() {
+        bail!("Command {:?} failed", cmd);
+    }
+
     let py_binding_name = udl.file_stem().unwrap();
     let py_binding = binding_dir.join(py_binding_name).with_extension("py");
     let name = py_binding_name.to_str().unwrap().to_string();
@@ -895,12 +935,12 @@ fn generate_uniffi_bindings(
     // uniffi bindings hardcoded the extension filenames
     let cdylib_name = match cdylib_name {
         Some(name) => name,
-        None => format!("uniffi_{}", name),
+        None => format!("uniffi_{name}"),
     };
     let cdylib = match target_os {
-        Os::Macos => format!("lib{}.dylib", cdylib_name),
-        Os::Windows => format!("{}.dll", cdylib_name),
-        _ => format!("lib{}.so", cdylib_name),
+        Os::Macos => format!("lib{cdylib_name}.dylib"),
+        Os::Windows => format!("{cdylib_name}.dll"),
+        _ => format!("lib{cdylib_name}.so"),
     };
 
     Ok(UniFfiBindings {
@@ -928,18 +968,17 @@ pub fn write_uniffi_module(
         cdylib,
         path: uniffi_binding,
     } = generate_uniffi_bindings(crate_dir, target_dir, target_os)?;
-    let py_init = format!("from .{} import *  # NOQA\n", binding_name);
+    let py_init = format!("from .{binding_name} import *  # NOQA\n");
+
+    if !editable {
+        write_python_part(writer, project_layout, pyproject_toml)
+            .context("Failed to add the python module to the package")?;
+    }
 
     let module;
-
     if let Some(python_module) = &project_layout.python_module {
-        if !editable {
-            write_python_part(writer, python_module, pyproject_toml)
-                .context("Failed to add the python module to the package")?;
-        }
-
         if editable {
-            let base_path = python_module.join(module_name);
+            let base_path = python_module.join(&project_layout.extension_name);
             fs::create_dir_all(&base_path)?;
             let target = base_path.join(&cdylib);
             fs::copy(artifact, &target).context(format!(
@@ -970,9 +1009,9 @@ pub fn write_uniffi_module(
         writer.add_directory(&module)?;
         let type_stub = project_layout
             .rust_module
-            .join(format!("{}.pyi", module_name));
+            .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
-            println!("📖 Found type stub file at {}.pyi", module_name);
+            eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }
@@ -1028,7 +1067,7 @@ import sysconfig
 
 def main():
     # The actual executable
-    program_location = Path(sysconfig.get_path("scripts")).joinpath("{}")
+    program_location = Path(sysconfig.get_path("scripts")).joinpath("{bin_name}")
     # wasmtime-py boilerplate
     engine = Engine()
     store = Store(engine)
@@ -1054,8 +1093,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-    "#,
-        bin_name
+    "#
     );
 
     // We can't use add_file since we want to mark the file as executable
@@ -1069,40 +1107,53 @@ if __name__ == '__main__':
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(
     writer: &mut impl ModuleWriter,
-    python_module: impl AsRef<Path>,
+    project_layout: &ProjectLayout,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
-    let python_module = python_module.as_ref();
-    for absolute in WalkBuilder::new(python_module).hidden(false).build() {
-        let absolute = absolute?.into_path();
-        let relative = absolute
-            .strip_prefix(python_module.parent().unwrap())
-            .unwrap();
-        if absolute.is_dir() {
-            writer.add_directory(relative)?;
-        } else {
-            // Ignore native libraries from develop, if any
-            if let Some(extension) = relative.extension() {
-                if extension.to_string_lossy() == "so" {
-                    debug!("Ignoring native library {}", relative.display());
-                    continue;
+    let python_dir = &project_layout.python_dir;
+    let mut python_packages = Vec::new();
+    if let Some(python_module) = project_layout.python_module.as_ref() {
+        python_packages.push(python_module.to_path_buf());
+    }
+    for package in &project_layout.python_packages {
+        let package_path = python_dir.join(package);
+        if python_packages.iter().any(|p| *p == package_path) {
+            continue;
+        }
+        python_packages.push(package_path);
+    }
+
+    for package in python_packages {
+        for absolute in WalkBuilder::new(package).hidden(false).build() {
+            let absolute = absolute?.into_path();
+            let relative = absolute.strip_prefix(python_dir).unwrap();
+            if absolute.is_dir() {
+                writer.add_directory(relative)?;
+            } else {
+                // Ignore native libraries from develop, if any
+                if let Some(extension) = relative.extension() {
+                    if extension.to_string_lossy() == "so" {
+                        debug!("Ignoring native library {}", relative.display());
+                        continue;
+                    }
                 }
+                writer
+                    .add_file(relative, &absolute)
+                    .context(format!("File to add file from {}", absolute.display()))?;
             }
-            writer
-                .add_file(relative, &absolute)
-                .context(format!("File to add file from {}", absolute.display()))?;
         }
     }
 
     // Include additional files
     if let Some(pyproject) = pyproject_toml {
-        let pyproject_dir = python_module.parent().unwrap();
+        // FIXME: in src-layout pyproject.toml isn't located directly in python dir
+        let pyproject_dir = python_dir;
         if let Some(glob_patterns) = pyproject.include() {
             for pattern in glob_patterns
                 .iter()
                 .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
             {
-                println!("📦 Including files matching \"{}\"", pattern);
+                eprintln!("📦 Including files matching \"{pattern}\"");
                 for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
                     .expect("No files found for pattern")
                     .filter_map(Result::ok)

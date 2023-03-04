@@ -1,3 +1,5 @@
+use crate::ci::GenerateCI;
+use crate::BridgeModel;
 use anyhow::{bail, Context, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
@@ -18,6 +20,7 @@ struct ProjectGenerator<'a> {
     crate_name: String,
     bindings: String,
     layout: ProjectLayout,
+    ci_config: String,
     overwrite: bool,
 }
 
@@ -40,14 +43,24 @@ impl<'a> ProjectGenerator<'a> {
         env.add_template("main.rs", include_str!("templates/main.rs.j2"))?;
         env.add_template("build.rs", include_str!("templates/build.rs.j2"))?;
         env.add_template("__init__.py", include_str!("templates/__init__.py.j2"))?;
-        env.add_template("CI.yml", include_str!("templates/CI.yml.j2"))?;
         env.add_template("example.udl", include_str!("templates/example.udl.j2"))?;
+
+        let bridge_model = match bindings.as_str() {
+            "bin" => BridgeModel::Bin(None),
+            "cffi" => BridgeModel::Cffi,
+            "uniffi" => BridgeModel::UniFfi,
+            _ => BridgeModel::Bindings(bindings.clone(), 7),
+        };
+        let ci_config =
+            GenerateCI::default().generate_github(&project_name, &bridge_model, true)?;
+
         Ok(Self {
             env,
             project_name,
             crate_name,
             bindings,
             layout,
+            ci_config,
             overwrite,
         })
     }
@@ -60,7 +73,7 @@ impl<'a> ProjectGenerator<'a> {
         // CI configuration
         let gh_action_path = project_path.join(".github").join("workflows");
         fs::create_dir_all(&gh_action_path)?;
-        self.write_project_file(&gh_action_path, "CI.yml")?;
+        self.write_content(&gh_action_path, "CI.yml", self.ci_config.as_bytes())?;
 
         let rust_project = match self.layout {
             ProjectLayout::Mixed { src } => {
@@ -114,9 +127,14 @@ impl<'a> ProjectGenerator<'a> {
     }
 
     fn write_project_file(&self, directory: &Path, file: &str) -> Result<()> {
+        let content = self.render_template(file)?;
+        self.write_content(directory, file, content.as_bytes())
+    }
+
+    fn write_content(&self, directory: &Path, file: &str, content: &[u8]) -> Result<()> {
         let path = directory.join(file);
         if self.overwrite || !path.exists() {
-            fs::write(path, self.render_template(file)?)?;
+            fs::write(path, content)?;
         }
         Ok(())
     }
@@ -150,7 +168,7 @@ pub fn new_project(path: String, options: GenerateProjectOptions) -> Result<()> 
         bail!("destination `{}` already exists", project_path.display());
     }
     generate_project(project_path, options, true)?;
-    println!(
+    eprintln!(
         "  ✨ {} {} {}",
         style("Done!").bold().green(),
         style("New project created").bold(),
@@ -168,7 +186,7 @@ pub fn init_project(path: Option<String>, options: GenerateProjectOptions) -> Re
         bail!("`maturin init` cannot be run on existing projects");
     }
     generate_project(&project_path, options, false)?;
-    println!(
+    eprintln!(
         "  ✨ {} {} {}",
         style("Done!").bold().green(),
         style("Initialized project").bold(),
@@ -203,8 +221,9 @@ fn generate_project(
     } else {
         let selection = Select::with_theme(&ColorfulTheme::default())
             .with_prompt(format!(
-                "🤷 {}",
-                style("Which kind of bindings to use?").bold()
+                "🤷 {}\n  📖 {}",
+                style("Which kind of bindings to use?").bold(),
+                style("Documentation: https://maturin.rs/bindings.html").dim()
             ))
             .items(&bindings_items)
             .default(0)

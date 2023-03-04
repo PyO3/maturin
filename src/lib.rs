@@ -5,7 +5,7 @@
 //!
 //! # Cargo features
 //!
-//! Default features: log, upload, rustls, human-panic
+//! Default features: log, upload, rustls
 //!
 //! - log: Configures pretty-env-logger, even though maturin doesn't use logging itself.
 //!
@@ -15,8 +15,6 @@
 //! docker container and which maturin itself manylinux compliant.
 //!
 //! - native-tls: Makes ureq use the platform native tls stack
-//!
-//! - human-panic: Adds https://github.com/rust-clique/human-panic
 //!
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
 //! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
@@ -34,6 +32,7 @@ pub use crate::metadata::{Metadata21, WheelMetadata};
 pub use crate::module_writer::{
     write_dist_info, ModuleWriter, PathWriter, SDistWriter, WheelWriter,
 };
+#[cfg(feature = "scaffolding")]
 pub use crate::new_project::{init_project, new_project, GenerateProjectOptions};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
@@ -46,11 +45,15 @@ mod auditwheel;
 mod build_context;
 mod build_options;
 mod cargo_toml;
+#[cfg(feature = "scaffolding")]
+/// Generate CI configuration
+pub mod ci;
 mod compile;
 mod cross_compile;
 mod develop;
 mod metadata;
 mod module_writer;
+#[cfg(feature = "scaffolding")]
 mod new_project;
 mod project_layout;
 pub mod pyproject_toml;

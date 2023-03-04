@@ -5,7 +5,10 @@ use common::{
 };
 use indoc::indoc;
 use maturin::Target;
+use std::env;
 use std::path::{Path, PathBuf};
+use time::macros::datetime;
+use which::which;
 
 mod common;
 
@@ -23,7 +26,7 @@ fn develop_pyo3_pure() {
 #[ignore]
 fn develop_pyo3_pure_conda() {
     // Only run on GitHub Actions for now
-    if std::env::var("GITHUB_ACTIONS").is_ok() {
+    if env::var("GITHUB_ACTIONS").is_ok() {
         handle_result(develop::test_develop(
             "test-crates/pyo3-pure",
             None,
@@ -105,22 +108,26 @@ fn develop_cffi_mixed() {
 
 #[test]
 fn develop_uniffi_pure() {
-    handle_result(develop::test_develop(
-        "test-crates/uniffi-pure",
-        None,
-        "develop-uniffi-pure",
-        false,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/uniffi-pure",
+            None,
+            "develop-uniffi-pure",
+            false,
+        ));
+    }
 }
 
 #[test]
 fn develop_uniffi_mixed() {
-    handle_result(develop::test_develop(
-        "test-crates/uniffi-mixed",
-        None,
-        "develop-uniffi-mixed",
-        false,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/uniffi-mixed",
+            None,
+            "develop-uniffi-mixed",
+            false,
+        ));
+    }
 }
 
 #[test]
@@ -234,7 +241,7 @@ fn integration_pyo3_mixed_src_layout() {
 #[cfg_attr(target_os = "macos", ignore)] // Don't run it on macOS, too slow
 fn integration_pyo3_pure_conda() {
     // Only run on GitHub Actions for now
-    if std::env::var("GITHUB_ACTIONS").is_ok() {
+    if env::var("GITHUB_ACTIONS").is_ok() {
         handle_result(integration::test_integration_conda(
             "test-crates/pyo3-mixed",
             None,
@@ -266,24 +273,28 @@ fn integration_cffi_mixed() {
 
 #[test]
 fn integration_uniffi_pure() {
-    handle_result(integration::test_integration(
-        "test-crates/uniffi-pure",
-        None,
-        "integration-uniffi-pure",
-        false,
-        None,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(integration::test_integration(
+            "test-crates/uniffi-pure",
+            None,
+            "integration-uniffi-pure",
+            false,
+            None,
+        ));
+    }
 }
 
 #[test]
 fn integration_uniffi_mixed() {
-    handle_result(integration::test_integration(
-        "test-crates/uniffi-mixed",
-        None,
-        "integration-uniffi-mixed",
-        false,
-        None,
-    ));
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(integration::test_integration(
+            "test-crates/uniffi-mixed",
+            None,
+            "integration-uniffi-mixed",
+            false,
+            None,
+        ));
+    }
 }
 
 #[test]
@@ -320,7 +331,7 @@ fn integration_with_data() {
 }
 
 #[test]
-// Sourced from https://pypi.org/project/wasmtime/2.0.0/#files
+// Sourced from https://pypi.org/project/wasmtime/6.0.0/#files
 // update with wasmtime updates
 #[cfg(any(
     all(target_os = "windows", target_arch = "x86_64"),
@@ -350,10 +361,7 @@ fn integration_wasm_hello_world() {
         target.get_python()
     });
     let python_implementation = get_python_implementation(&python).unwrap();
-    let venv_name = format!(
-        "integration-wasm-hello-world-py3-wasm32-wasi-{}",
-        python_implementation
-    );
+    let venv_name = format!("integration-wasm-hello-world-py3-wasm32-wasi-{python_implementation}");
 
     // Make sure we're actually running wasm
     assert!(Path::new("test-crates")
@@ -424,7 +432,7 @@ fn workspace_members_non_local_dep_sdist() {
         license = "MIT"
 
         [dependencies]
-        pyo3 = { version = "0.17.3", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+        pyo3 = { version = "0.18.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
 
         [lib]
         name = "pyo3_pure"
@@ -480,6 +488,7 @@ fn pyo3_mixed_src_layout_sdist() {
             "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/__init__.py",
             "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/__init__.py",
             "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/double.py",
+            "pyo3_mixed_src-2.1.3/src/tests/test_pyo3_mixed.py",
             "pyo3_mixed_src-2.1.3/rust/Cargo.toml",
             "pyo3_mixed_src-2.1.3/rust/Cargo.lock",
             "pyo3_mixed_src-2.1.3/rust/src/lib.rs",
@@ -536,6 +545,22 @@ fn pyo3_mixed_include_exclude_wheel_files() {
 }
 
 #[test]
+fn workspace_sdist() {
+    handle_result(other::test_source_distribution(
+        "test-crates/workspace/py",
+        vec![
+            "py-0.1.0/Cargo.lock",
+            "py-0.1.0/Cargo.toml",
+            "py-0.1.0/PKG-INFO",
+            "py-0.1.0/pyproject.toml",
+            "py-0.1.0/src/main.rs",
+        ],
+        None,
+        "sdist-workspace",
+    ))
+}
+
+#[test]
 fn workspace_with_path_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/workspace_with_path_dep/python",
@@ -544,6 +569,7 @@ fn workspace_with_path_dep_sdist() {
             "workspace_with_path_dep-0.1.0/local_dependencies/generic_lib/src/lib.rs",
             "workspace_with_path_dep-0.1.0/local_dependencies/transitive_lib/Cargo.toml",
             "workspace_with_path_dep-0.1.0/local_dependencies/transitive_lib/src/lib.rs",
+            "workspace_with_path_dep-0.1.0/Cargo.lock",
             "workspace_with_path_dep-0.1.0/Cargo.toml",
             "workspace_with_path_dep-0.1.0/pyproject.toml",
             "workspace_with_path_dep-0.1.0/src/lib.rs",
@@ -562,6 +588,7 @@ fn workspace_inheritance_sdist() {
         vec![
             "workspace_inheritance-0.1.0/local_dependencies/generic_lib/Cargo.toml",
             "workspace_inheritance-0.1.0/local_dependencies/generic_lib/src/lib.rs",
+            "workspace_inheritance-0.1.0/Cargo.lock",
             "workspace_inheritance-0.1.0/Cargo.toml",
             "workspace_inheritance-0.1.0/pyproject.toml",
             "workspace_inheritance-0.1.0/src/lib.rs",
@@ -575,4 +602,14 @@ fn workspace_inheritance_sdist() {
 #[test]
 fn abi3_python_interpreter_args() {
     handle_result(other::abi3_python_interpreter_args());
+}
+
+#[test]
+fn pyo3_source_date_epoch() {
+    env::set_var("SOURCE_DATE_EPOCH", "0");
+    handle_result(other::check_wheel_mtimes(
+        "test-crates/pyo3-mixed-include-exclude",
+        vec![datetime!(1980-01-01 0:00 UTC)],
+        "pyo3_source_date_epoch",
+    ))
 }

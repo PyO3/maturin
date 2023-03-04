@@ -3,6 +3,35 @@
 This guide can help you upgrade code through breaking changes from one maturin version to the next.
 For a detailed list of all changes, see the [CHANGELOG](changelog.md).
 
+## From 0.13.* to 0.14
+
+### Remove support for specifying python package metadata in `Cargo.toml`
+
+maturin 0.14 removed support for specifying python package metadata in `Cargo.toml`,
+Python package metadata should be specified in the `project` section of `pyproject.toml` instead as [PEP 621](https://peps.python.org/pep-0621/) specifies.
+
+### Deprecate `[tool.maturin.sdist-include]`
+
+maturin 0.14 added `[tool.maturin.include]` and `[tool.maturin.exclude]`
+to replace `[tool.maturin.sdist-include]` which was sdist only, the new options
+can be configured to apply to sdist and/or wheel.
+
+### macOS deployment target version defaults what `rustc` supports
+
+If you don't set the `MACOSX_DEPLOYMENT_TARGET` environment variable,
+maturin 0.14 will use the default target version quired from `rustc`, 
+this may cause build issue for projects that depend on C/C++ code,
+usually you can fix it by setting a correct `MACOSX_DEPLOYMENT_TARGET`, for example
+
+```bash
+export MACOSX_DEPLOYMENT_TARGET=10.9
+```
+
+### Deprecate `python-source` option in `Cargo.toml`
+
+maturin 0.14 deprecated the `python-source` option in `Cargo.toml`,
+use `[tool.maturin.python-source]` option in `pyproject.toml` instead.
+
 ## From 0.12.* to 0.13
 
 ### Drop support for Python 3.6

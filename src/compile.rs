@@ -1,6 +1,8 @@
 use crate::build_context::BridgeModel;
 use crate::target::RUST_1_64_0;
-use crate::{BuildContext, PlatformTag, PythonInterpreter, Target};
+#[cfg(feature = "zig")]
+use crate::PlatformTag;
+use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
@@ -10,14 +12,16 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str;
-use tracing::debug;
+use tracing::{debug, trace};
 
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
-const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
+pub(crate) const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
+
+pub(crate) type CompileTarget = (cargo_metadata::Target, BridgeModel);
 
 /// A cargo build artifact
 #[derive(Debug, Clone)]
@@ -35,34 +39,12 @@ pub struct BuildArtifact {
 pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
+    targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
-    let root_pkg = context.cargo_metadata.root_package().unwrap();
-    let mut targets: Vec<_> = root_pkg
-        .targets
-        .iter()
-        .filter(|target| match bindings_crate {
-            BridgeModel::Bin(_) => target.kind.contains(&"bin".to_string()),
-            _ => target.kind.contains(&"cdylib".to_string()),
-        })
-        .collect();
-    if targets.is_empty() && !bindings_crate.is_bin() {
-        // No `crate-type = ["cdylib"]` in `Cargo.toml`
-        // Let's try compile one of the target with `--crate-type cdylib`
-        let lib_target = root_pkg.targets.iter().find(|target| {
-            target
-                .kind
-                .iter()
-                .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
-        });
-        if let Some(target) = lib_target {
-            targets.push(target);
-        }
-    }
     if context.target.is_macos() && context.universal2 {
-        compile_universal2(context, python_interpreter, bindings_crate, &targets)
+        compile_universal2(context, python_interpreter, targets)
     } else {
-        compile_targets(context, python_interpreter, bindings_crate, &targets)
+        compile_targets(context, python_interpreter, targets)
     }
 }
 
@@ -70,35 +52,30 @@ pub fn compile(
 fn compile_universal2(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
-    targets: &[&cargo_metadata::Target],
+    targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
-    let build_type = if bindings_crate.is_bin() {
-        "bin"
-    } else {
-        "cdylib"
-    };
-    debug!("Building an universal2 {}", build_type);
-
     let mut aarch64_context = context.clone();
     aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
 
-    let aarch64_artifacts = compile_targets(
-        &aarch64_context,
-        python_interpreter,
-        bindings_crate,
-        targets,
-    )
-    .context("Failed to build a aarch64 library through cargo")?;
+    let aarch64_artifacts = compile_targets(&aarch64_context, python_interpreter, targets)
+        .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
     x86_64_context.target = Target::from_target_triple(Some("x86_64-apple-darwin".to_string()))?;
 
-    let x86_64_artifacts =
-        compile_targets(&x86_64_context, python_interpreter, bindings_crate, targets)
-            .context("Failed to build a x86_64 library through cargo")?;
+    let x86_64_artifacts = compile_targets(&x86_64_context, python_interpreter, targets)
+        .context("Failed to build a x86_64 library through cargo")?;
 
     let mut universal_artifacts = Vec::with_capacity(targets.len());
-    for (aarch64_artifact, x86_64_artifact) in aarch64_artifacts.iter().zip(x86_64_artifacts) {
+    for (bridge_model, (aarch64_artifact, x86_64_artifact)) in targets
+        .iter()
+        .map(|(_, bridge_model)| bridge_model)
+        .zip(aarch64_artifacts.iter().zip(&x86_64_artifacts))
+    {
+        let build_type = if bridge_model.is_bin() {
+            "bin"
+        } else {
+            "cdylib"
+        };
         let aarch64_artifact = aarch64_artifact.get(build_type).cloned().ok_or_else(|| {
             if build_type == "cdylib" {
                 anyhow!(
@@ -152,15 +129,14 @@ fn compile_universal2(
 fn compile_targets(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
-    targets: &[&cargo_metadata::Target],
+    targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
-    for target in targets {
+    for (target, bridge_model) in targets {
         artifacts.push(compile_target(
             context,
             python_interpreter,
-            bindings_crate,
+            bridge_model,
             target,
         )?);
     }
@@ -170,7 +146,7 @@ fn compile_targets(
 fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bindings_crate: &BridgeModel,
+    bridge_model: &BridgeModel,
     binding_target: &cargo_metadata::Target,
 ) -> Result<HashMap<String, BuildArtifact>> {
     let target = &context.target;
@@ -197,10 +173,15 @@ fn compile_target(
         }
     }
 
-    let mut rust_flags = env::var_os("RUSTFLAGS");
+    let target_triple = target.target_triple();
+
+    let manifest_dir = context.manifest_path.parent().unwrap();
+    let mut rustflags = cargo_config2::Config::load_with_cwd(manifest_dir)?
+        .rustflags(target_triple)?
+        .unwrap_or_default();
 
     // We need to pass --bin / --lib
-    match bindings_crate {
+    match bridge_model {
         BridgeModel::Bin(..) => {
             cargo_rustc.bin.push(binding_target.name.clone());
         }
@@ -212,30 +193,34 @@ fn compile_target(
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
-            if context.target.is_musl_target() {
+            if context.target.is_musl_target()
+                && !rustflags
+                    .flags
+                    .iter()
+                    .any(|f| f == "target-feature=-crt-static")
+            {
                 debug!("Setting `-C target-features=-crt-static` for musl dylib");
-                rust_flags
-                    .get_or_insert_with(Default::default)
-                    .push(" -C target-feature=-crt-static");
+                rustflags.push("-C");
+                rustflags.push("target-feature=-crt-static");
             }
         }
     }
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
-        if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bindings_crate {
+        if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bridge_model {
             // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
             // non-existent library.
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
             let module_name = &context.module_name;
-            let so_filename = match bindings_crate {
-                BridgeModel::BindingsAbi3(..) => format!("{base}.abi3.so", base = module_name),
+            let so_filename = match bridge_model {
+                BridgeModel::BindingsAbi3(..) => format!("{module_name}.abi3.so"),
                 _ => python_interpreter
                     .expect("missing python interpreter for non-abi3 wheel build")
                     .get_library_name(module_name),
             };
             let macos_dylib_install_name =
-                format!("link-args=-Wl,-install_name,@rpath/{}", so_filename);
+                format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
             let mac_args = [
                 "-C".to_string(),
                 "link-arg=-undefined".to_string(),
@@ -248,10 +233,11 @@ fn compile_target(
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
-        let flags = rust_flags.get_or_insert_with(Default::default);
         // Allow user to override these default flags
-        if !flags.to_string_lossy().contains("link-native-libraries") {
-            flags.push(" -Z link-native-libraries=no");
+        if !rustflags.flags.iter().any(|f| f == "link-native-libraries") {
+            debug!("Setting `-Z link-native-libraries=no` for Emscripten");
+            rustflags.push("-Z");
+            rustflags.push("link-native-libraries=no");
         }
         let mut emscripten_args = Vec::new();
         // Allow user to override these default settings
@@ -284,36 +270,56 @@ fn compile_target(
             .extend(["-C".to_string(), "link-arg=-s".to_string()]);
     }
 
-    let target_triple = target.target_triple();
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
-        let mut build = cargo_xwin::Rustc::from(cargo_rustc);
+        #[cfg(feature = "xwin")]
+        {
+            let mut build = cargo_xwin::Rustc::from(cargo_rustc);
 
-        build.target = vec![target_triple.to_string()];
-        build.build_command()?
-    } else {
-        let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
-        if !context.zig {
-            build.disable_zig_linker = true;
+            build.target = vec![target_triple.to_string()];
+            build.build_command()?
+        }
+        #[cfg(not(feature = "xwin"))]
+        {
             if target.user_specified {
-                build.target = vec![target_triple.to_string()];
+                cargo_rustc.target = vec![target_triple.to_string()];
             }
-        } else {
-            build.enable_zig_ar = true;
-            let zig_triple = if target.is_linux() && !target.is_musl_target() {
-                match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
-                    Some(PlatformTag::Manylinux { x, y }) => {
-                        format!("{}.{}.{}", target_triple, x, y)
-                    }
-                    _ => target_triple.to_string(),
+            cargo_rustc.command()
+        }
+    } else {
+        #[cfg(feature = "zig")]
+        {
+            let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
+            if !context.zig {
+                build.disable_zig_linker = true;
+                if target.user_specified {
+                    build.target = vec![target_triple.to_string()];
                 }
             } else {
-                target_triple.to_string()
-            };
-            build.target = vec![zig_triple];
+                build.enable_zig_ar = true;
+                let zig_triple = if target.is_linux() && !target.is_musl_target() {
+                    match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
+                        Some(PlatformTag::Manylinux { x, y }) => {
+                            format!("{target_triple}.{x}.{y}")
+                        }
+                        _ => target_triple.to_string(),
+                    }
+                } else {
+                    target_triple.to_string()
+                };
+                build.target = vec![zig_triple];
+            }
+            build.build_command()?
         }
-        build.build_command()?
+        #[cfg(not(feature = "zig"))]
+        {
+            if target.user_specified {
+                cargo_rustc.target = vec![target_triple.to_string()];
+            }
+            cargo_rustc.command()
+        }
     };
 
+    #[cfg(feature = "zig")]
     if context.zig {
         // Pass zig command to downstream, eg. python3-dll-a
         if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
@@ -335,11 +341,11 @@ fn compile_target(
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
 
-    if let Some(flags) = rust_flags {
-        build_command.env("RUSTFLAGS", flags);
+    if !rustflags.flags.is_empty() {
+        build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
     }
 
-    if let BridgeModel::BindingsAbi3(_, _) = bindings_crate {
+    if let BridgeModel::BindingsAbi3(_, _) = bridge_model {
         let is_pypy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy())
             .unwrap_or(false);
@@ -358,9 +364,9 @@ fn compile_target(
     if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling
         if interpreter.runnable {
-            if bindings_crate.is_bindings("pyo3")
-                || bindings_crate.is_bindings("pyo3-ffi")
-                || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
+            if bridge_model.is_bindings("pyo3")
+                || bridge_model.is_bindings("pyo3-ffi")
+                || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
                     && interpreter.interpreter_kind.is_pypy())
             {
                 build_command
@@ -373,9 +379,9 @@ fn compile_target(
 
             // rust-cpython, and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
-        } else if (bindings_crate.is_bindings("pyo3")
-            || bindings_crate.is_bindings("pyo3-ffi")
-            || (matches!(bindings_crate, BridgeModel::BindingsAbi3(_, _))
+        } else if (bridge_model.is_bindings("pyo3")
+            || bridge_model.is_bindings("pyo3-ffi")
+            || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
                 && interpreter.interpreter_kind.is_pypy()))
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {
@@ -383,9 +389,7 @@ fn compile_target(
             let maturin_target_dir = context.target_dir.join("maturin");
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
-                target.target_triple(),
-                interpreter.major,
-                interpreter.minor
+                target_triple, interpreter.major, interpreter.minor
             ));
             fs::create_dir_all(&maturin_target_dir)?;
             fs::write(&config_file, pyo3_config).with_context(|| {
@@ -406,8 +410,11 @@ fn compile_target(
     if target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
         use crate::target::rustc_macosx_target_version;
 
-        let (major, minor) = rustc_macosx_target_version(target.target_triple());
-        build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{}.{}", major, minor));
+        let (major, minor) = rustc_macosx_target_version(target_triple);
+        build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{major}.{minor}"));
+        eprintln!(
+            "💻 Using `MACOSX_DEPLOYMENT_TARGET={major}.{minor}` for {target_triple} by default"
+        );
     }
 
     debug!("Running {:?}", build_command);
@@ -425,7 +432,7 @@ fn compile_target(
         .expect("Cargo build should have a stdout");
     for message in cargo_metadata::Message::parse_stream(BufReader::new(stream)) {
         let message = message.context("Failed to parse cargo metadata message")?;
-        debug!("cargo message: {:?}", message);
+        trace!("cargo message: {:?}", message);
         match message {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let package_in_metadata = context
@@ -444,8 +451,7 @@ fn compile_target(
                         if should_warn {
                             // This is a spurious error I don't really understand
                             eprintln!(
-                                "⚠️  Warning: The package {} wasn't listed in `cargo metadata`",
-                                package_id
+                                "⚠️  Warning: The package {package_id} wasn't listed in `cargo metadata`"
                             );
                         }
                         continue;
@@ -514,7 +520,7 @@ fn compile_target(
 ///
 /// Currently the check is only run on linux, macOS and Windows
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
-    let py_init = format!("PyInit_{}", module_name);
+    let py_init = format!("PyInit_{module_name}");
     let mut fd = File::open(artifact)?;
     let mut buffer = Vec::new();
     fd.read_to_end(&mut buffer)?;
@@ -573,10 +579,9 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
 
     if !found {
         eprintln!(
-            "⚠️  Warning: Couldn't find the symbol `{}` in the native library. \
+            "⚠️  Warning: Couldn't find the symbol `{py_init}` in the native library. \
              Python will fail to import this module. \
-             If you're using pyo3, check that `#[pymodule]` uses `{}` as module name",
-            py_init, module_name
+             If you're using pyo3, check that `#[pymodule]` uses `{module_name}` as module name"
         )
     }
 

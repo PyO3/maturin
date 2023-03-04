@@ -168,7 +168,7 @@ impl Metadata21 {
                     // if the pyproject.toml specified the license file,
                     // then we won't list it as automatically included
                     if !self.license_files.contains(&license_path) {
-                        println!("📦 Including license file \"{}\"", license_path.display());
+                        eprintln!("📦 Including license file \"{}\"", license_path.display());
                         self.license_files.push(license_path);
                     }
                 }
@@ -180,7 +180,7 @@ impl Metadata21 {
                 for author in authors {
                     match (&author.name, &author.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{} <{}>", name, email));
+                            emails.push(format!("{name} <{email}>"));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -205,7 +205,7 @@ impl Metadata21 {
                 for maintainer in maintainers {
                     match (&maintainer.name, &maintainer.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{} <{}>", name, email));
+                            emails.push(format!("{name} <{email}>"));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -248,9 +248,9 @@ impl Metadata21 {
                             // optional dependency already has environment markers
                             let new_marker =
                                 format!("({}) and extra == '{}'", marker.trim(), extra);
-                            format!("{}; {}", dep, new_marker)
+                            format!("{dep}; {new_marker}")
                         } else {
-                            format!("{}; extra == '{}'", dep, extra)
+                            format!("{dep}; extra == '{extra}'")
                         };
                         self.requires_dist.push(dist);
                     }
@@ -433,7 +433,7 @@ impl Metadata21 {
         // "A string containing a browsable URL for the project and a label for it, separated by a comma."
         // `Project-URL: Bug Tracker, http://bitbucket.org/tarek/distribute/issues/`
         for (key, value) in self.project_url.iter() {
-            fields.push(("Project-URL", format!("{}, {}", key, value)))
+            fields.push(("Project-URL", format!("{key}, {value}")))
         }
 
         // Description shall be last, so we can ignore RFC822 and just put the description
@@ -464,11 +464,11 @@ impl Metadata21 {
         };
 
         for (key, value) in fields {
-            writeln!(out, "{}: {}", key, value)?;
+            writeln!(out, "{key}: {value}")?;
         }
 
         if let Some(body) = body {
-            writeln!(out, "\n{}", body)?;
+            writeln!(out, "\n{body}")?;
         }
 
         Ok(out)
@@ -564,7 +564,7 @@ mod test {
         let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
         fs::write(&manifest_path, &toml_with_path).unwrap();
 
-        let cargo_toml_struct: CargoToml = toml_edit::easy::from_str(&toml_with_path).unwrap();
+        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_path)
             .exec()
@@ -727,7 +727,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_toml() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -778,7 +778,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -802,7 +802,7 @@ mod test {
     fn test_implicit_readme() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -820,7 +820,7 @@ mod test {
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
         let manifest_dir = PathBuf::from("test-crates").join("license-test");
         let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml_edit::easy::from_str(&cargo_toml_str).unwrap();
+        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()

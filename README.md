@@ -2,7 +2,7 @@
 
 _formerly pyo3-pack_
 
-[![Actions Status](https://img.shields.io/github/workflow/status/pyo3/maturin/Test?logo=github&style=flat-square)](https://github.com/PyO3/maturin/actions)
+[![Actions Status](https://img.shields.io/github/actions/workflow/status/PyO3/maturin/test.yml?branch=main&logo=github&style=flat-square)](https://github.com/PyO3/maturin/actions)
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Bors enabled](https://bors.tech/images/badge_small.svg)](https://app.bors.tech/repositories/55651)
 [![Crates.io](https://img.shields.io/crates/v/maturin.svg?logo=rust&style=flat-square)](https://crates.io/crates/maturin)
@@ -32,7 +32,7 @@ There are four main commands:
  * `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
  * `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 
-`pyo3` and `rust-cpython` bindings are automatically detected, for cffi or binaries you need to pass `-b cffi` or `-b bin`.
+`pyo3` and `rust-cpython` bindings are automatically detected. For cffi or binaries, you need to pass `-b cffi` or `-b bin`.
 maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust or milksnake configuration.
 You can even integrate it with testing tools such as [tox](https://tox.readthedocs.io/en/latest/).
 There are examples for the different bindings in the `test-crates` folder.
@@ -114,20 +114,12 @@ my-project
     └── lib.rs
 ```
 
-You can specify a different python source directory in `pyproject.toml` by setting `tool.maturin.python-source`
-or in `Cargo.toml` by setting `package.metadata.maturin.python-source`, for example
+You can specify a different python source directory in `pyproject.toml` by setting `tool.maturin.python-source`, for example
 
 **pyproject.toml**
 
 ```toml
 [tool.maturin]
-python-source = "python"
-```
-
-**Cargo.toml**
-
-```toml
-[package.metadata.maturin]
 python-source = "python"
 ```
 
@@ -147,6 +139,7 @@ my-project
 ```
 
 > **Note**
+>
 > This structure is recommended to avoid [a common `ImportError` pitfall](https://github.com/PyO3/maturin/issues/490)
 
 maturin will add the native extension as a module in your python folder. When using develop, maturin will copy the native library and for cffi also the glue code to your python folder. You should add those files to your gitignore.
@@ -265,9 +258,9 @@ maturin itself is manylinux compliant when compiled for the musl target.
 
 ## Examples
 
-* [ballista](https://github.com/apache/arrow-ballista/tree/master/python) - A Python library that binds to Apache Arrow distributed query engine Ballista
+* [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
 * [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
-* [datafusion](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
+* [datafusion-python](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
 * [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
 * [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
 * [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js

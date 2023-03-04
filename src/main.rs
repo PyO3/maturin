@@ -4,25 +4,29 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
+#[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
-use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::Generator;
+#[cfg(feature = "cli-completion")]
+use clap::CommandFactory;
+use clap::{Parser, Subcommand};
+#[cfg(feature = "scaffolding")]
+use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
-    develop, init_project, new_project, write_dist_info, BridgeModel, BuildOptions, CargoOptions,
-    GenerateProjectOptions, PathWriter, PlatformTag, PythonInterpreter, Target,
+    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, PathWriter, PlatformTag,
+    PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
 use std::env;
-use std::io;
 use std::path::PathBuf;
-use std::str::FromStr;
+use tracing::debug;
 
 #[derive(Debug, Parser)]
 #[command(
     version,
     name = env!("CARGO_PKG_NAME"),
     display_order = 1,
+    after_help = "Visit https://maturin.rs to learn more about maturin."
 )]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
@@ -115,6 +119,7 @@ enum Opt {
         out: Option<PathBuf>,
     },
     /// Create a new cargo project in an existing directory
+    #[cfg(feature = "scaffolding")]
     #[command(name = "init")]
     InitProject {
         /// Project path
@@ -123,6 +128,7 @@ enum Opt {
         options: GenerateProjectOptions,
     },
     /// Create a new cargo project
+    #[cfg(feature = "scaffolding")]
     #[command(name = "new")]
     NewProject {
         /// Project path
@@ -130,6 +136,9 @@ enum Opt {
         #[command(flatten)]
         options: GenerateProjectOptions,
     },
+    #[cfg(feature = "scaffolding")]
+    #[command(name = "generate-ci")]
+    GenerateCI(GenerateCI),
     /// Upload python packages to pypi
     ///
     /// It is mostly similar to `twine upload`, but can only upload python wheels
@@ -149,12 +158,14 @@ enum Opt {
     #[command(subcommand)]
     Pep517(Pep517Command),
     /// Generate shell completions
+    #[cfg(feature = "cli-completion")]
     #[command(name = "completions", hide = true)]
     Completions {
         #[arg(value_name = "SHELL")]
-        shell: Shell,
+        shell: clap_complete_command::Shell,
     },
     /// Zig linker wrapper
+    #[cfg(feature = "zig")]
     #[command(subcommand, hide = true)]
     Zig(Zig),
 }
@@ -197,42 +208,56 @@ enum Pep517Command {
         /// The sdist_directory argument to build_sdist
         #[arg(long = "sdist-directory")]
         sdist_directory: PathBuf,
-        #[arg(
-            short = 'm',
-            long = "manifest-path",
-            default_value = "Cargo.toml",
-            value_name = "PATH"
-        )]
+        #[arg(short = 'm', long = "manifest-path", value_name = "PATH")]
         /// The path to the Cargo.toml
-        manifest_path: PathBuf,
+        manifest_path: Option<PathBuf>,
     },
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-#[allow(clippy::enum_variant_names)]
-enum Shell {
-    Bash,
-    Elvish,
-    Fish,
-    PowerShell,
-    Zsh,
-    Fig,
-}
+fn detect_venv(target: &Target) -> Result<PathBuf> {
+    match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
+        (Some(dir), None) => return Ok(PathBuf::from(dir)),
+        (None, Some(dir)) => return Ok(PathBuf::from(dir)),
+        (Some(_), Some(_)) => {
+            bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
+        }
+        (None, None) => {
+            // No env var, try finding .venv
+        }
+    };
 
-impl FromStr for Shell {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "bash" => Ok(Shell::Bash),
-            "elvish" => Ok(Shell::Elvish),
-            "fish" => Ok(Shell::Fish),
-            "powershell" => Ok(Shell::PowerShell),
-            "zsh" => Ok(Shell::Zsh),
-            "fig" => Ok(Shell::Fig),
-            _ => Err("[valid values: bash, elvish, fish, powershell, zsh, fig]".to_string()),
+    let current_dir = env::current_dir().context("Failed to detect current directory ಠ_ಠ")?;
+    // .venv in the current or any parent directory
+    for dir in current_dir.ancestors() {
+        let dot_venv = dir.join(".venv");
+        if dot_venv.is_dir() {
+            if !dot_venv.join("pyvenv.cfg").is_file() {
+                bail!(
+                    "Expected {} to be a virtual environment, but pyvenv.cfg is missing",
+                    dot_venv.display()
+                );
+            }
+            let python = target.get_venv_python(&dot_venv);
+            if !python.is_file() {
+                bail!(
+                    "Your virtualenv at {} is broken. It contains a pyvenv.cfg but no python at {}",
+                    dot_venv.display(),
+                    python.display()
+                );
+            }
+            debug!("Found a virtualenv named .venv at {}", dot_venv.display());
+            return Ok(dot_venv);
         }
     }
+
+    bail!(
+        "Couldn't find a virtualenv or conda environment, but you need one to use this command. \
+        For maturin to find your virtualenv you need to either set VIRTUAL_ENV (through activate), \
+        set CONDA_PREFIX (through conda activate) or have a virtualenv called .venv in the current \
+        or any parent folder. \
+        See https://virtualenv.pypa.io/en/latest/index.html on how to use virtualenv or \
+        use `maturin build` and `pip install <path/to/wheel>` instead."
+    )
 }
 
 /// Dispatches into the native implementations of the PEP 517 functions
@@ -249,7 +274,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             let context = build_options.into_build_context(true, strip, false)?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
-            let tags = match context.bridge {
+            let tags = match context.bridge() {
                 BridgeModel::Bindings(..) | BridgeModel::Bin(Some(..)) => {
                     vec![context.interpreter[0].get_tag(
                         &context.target,
@@ -261,7 +286,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                     let platform = context
                         .target
                         .get_platform_tag(&[PlatformTag::Linux], context.universal2)?;
-                    vec![format!("cp{}{}-abi3-{}", major, minor, platform)]
+                    vec![format!("cp{major}{minor}-abi3-{platform}")]
                 }
                 BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
                     context
@@ -292,7 +317,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             let build_options = BuildOptions {
                 out: Some(sdist_directory),
                 cargo: CargoOptions {
-                    manifest_path: Some(manifest_path),
+                    manifest_path,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -312,17 +337,20 @@ fn run() -> Result<()> {
     #[cfg(feature = "log")]
     tracing_subscriber::fmt::init();
 
-    // Allow symlink `maturin` to `ar` to invoke `zig ar`
-    // See https://github.com/messense/cargo-zigbuild/issues/52
-    let mut args = env::args();
-    let program_path = PathBuf::from(args.next().expect("no program path"));
-    let program_name = program_path.file_stem().expect("no program name");
-    if program_name.eq_ignore_ascii_case("ar") {
-        let zig = Zig::Ar {
-            args: args.collect(),
-        };
-        zig.execute()?;
-        return Ok(());
+    #[cfg(feature = "zig")]
+    {
+        // Allow symlink `maturin` to `ar` to invoke `zig ar`
+        // See https://github.com/messense/cargo-zigbuild/issues/52
+        let mut args = env::args();
+        let program_path = PathBuf::from(args.next().expect("no program path"));
+        let program_name = program_path.file_stem().expect("no program name");
+        if program_name.eq_ignore_ascii_case("ar") {
+            let zig = Zig::Ar {
+                args: args.collect(),
+            };
+            zig.execute()?;
+            return Ok(());
+        }
     }
 
     let opt = Opt::parse();
@@ -377,9 +405,9 @@ fn run() -> Result<()> {
                 // We don't know the targeted bindings yet, so we use the most lenient
                 PythonInterpreter::find_all(&target, &BridgeModel::Cffi, None)?
             };
-            println!("🐍 {} python interpreter found:", found.len());
+            eprintln!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {
-                println!(" - {}", interpreter);
+                eprintln!(" - {interpreter}");
             }
         }
         Opt::Develop {
@@ -389,22 +417,8 @@ fn run() -> Result<()> {
             extras,
             cargo_options,
         } => {
-            let venv_dir = match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
-                (Some(dir), None) => PathBuf::from(dir),
-                (None, Some(dir)) => PathBuf::from(dir),
-                (Some(_), Some(_)) => {
-                    bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
-                }
-                (None, None) => {
-                    bail!(
-                        "You need to be inside a virtualenv or conda environment to use develop \
-                        (neither VIRTUAL_ENV nor CONDA_PREFIX are set). \
-                        See https://virtualenv.pypa.io/en/latest/index.html on how to use virtualenv or \
-                        use `maturin build` and `pip install <path/to/wheel>` instead."
-                    )
-                }
-            };
-
+            let target = Target::from_target_triple(cargo_options.target.clone())?;
+            let venv_dir = detect_venv(&target)?;
             develop(bindings, cargo_options, &venv_dir, release, strip, extras)?;
         }
         Opt::SDist { manifest_path, out } => {
@@ -422,8 +436,12 @@ fn run() -> Result<()> {
                 .context("Failed to build source distribution, pyproject.toml not found")?;
         }
         Opt::Pep517(subcommand) => pep517(subcommand)?,
+        #[cfg(feature = "scaffolding")]
         Opt::InitProject { path, options } => init_project(path, options)?,
+        #[cfg(feature = "scaffolding")]
         Opt::NewProject { path, options } => new_project(path, options)?,
+        #[cfg(feature = "scaffolding")]
+        Opt::GenerateCI(generate_ci) => generate_ci.execute()?,
         #[cfg(feature = "upload")]
         Opt::Upload { publish, files } => {
             if files.is_empty() {
@@ -433,32 +451,11 @@ fn run() -> Result<()> {
 
             upload_ui(&files, &publish)?
         }
+        #[cfg(feature = "cli-completion")]
         Opt::Completions { shell } => {
-            let mut cmd = Opt::command();
-            match shell {
-                Shell::Fig => {
-                    cmd.set_bin_name(env!("CARGO_BIN_NAME"));
-                    let fig = clap_complete_fig::Fig;
-                    fig.generate(&cmd, &mut io::stdout());
-                }
-                _ => {
-                    let shell = match shell {
-                        Shell::Bash => clap_complete::Shell::Bash,
-                        Shell::Elvish => clap_complete::Shell::Elvish,
-                        Shell::Fish => clap_complete::Shell::Fish,
-                        Shell::PowerShell => clap_complete::Shell::PowerShell,
-                        Shell::Zsh => clap_complete::Shell::Zsh,
-                        Shell::Fig => unreachable!(),
-                    };
-                    clap_complete::generate(
-                        shell,
-                        &mut cmd,
-                        env!("CARGO_BIN_NAME"),
-                        &mut io::stdout(),
-                    )
-                }
-            }
+            shell.generate(&mut Opt::command(), &mut std::io::stdout());
         }
+        #[cfg(feature = "zig")]
         Opt::Zig(subcommand) => {
             subcommand
                 .execute()
@@ -469,16 +466,36 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(debug_assertions))]
+fn setup_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        eprintln!("\n===================================================================");
+        eprintln!("maturin has panicked. This is a bug in maturin. Please report this");
+        eprintln!("at https://github.com/PyO3/maturin/issues/new/choose.");
+        eprintln!("If you can reliably reproduce this panic, include the");
+        eprintln!("reproduction steps and re-run with the RUST_BACKTRACE=1 environment");
+        eprintln!("variable set and include the backtrace in your report.");
+        eprintln!();
+        eprintln!("Platform: {} {}", env::consts::OS, env::consts::ARCH);
+        eprintln!("Version: {}", env!("CARGO_PKG_VERSION"));
+        eprintln!("Args: {}", env::args().collect::<Vec<_>>().join(" "));
+        eprintln!();
+        default_hook(panic_info);
+        // Rust set exit code to 101 when the process panicked,
+        // so here we use the same exit code
+        std::process::exit(101);
+    }));
+}
+
 fn main() {
-    #[cfg(feature = "human-panic")]
-    {
-        human_panic::setup_panic!();
-    }
+    #[cfg(not(debug_assertions))]
+    setup_panic_hook();
 
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");
-        for cause in e.chain().collect::<Vec<_>>().iter() {
-            eprintln!("  Caused by: {}", cause);
+        for cause in e.chain() {
+            eprintln!("  Caused by: {cause}");
         }
         std::process::exit(1);
     }

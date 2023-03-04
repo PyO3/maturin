@@ -86,8 +86,6 @@ impl GlobPattern {
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
-    // TODO(0.15.0): remove deprecated
-    sdist_include: Option<Vec<String>>,
     include: Option<Vec<GlobPattern>>,
     exclude: Option<Vec<GlobPattern>>,
     bindings: Option<String>,
@@ -99,6 +97,8 @@ pub struct ToolMaturin {
     strip: bool,
     /// The directory with python module, contains `<module_name>/__init__.py`
     python_source: Option<PathBuf>,
+    /// Python packages to include
+    python_packages: Option<Vec<String>>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
     data: Option<PathBuf>,
     // Some customizable cargo options
@@ -154,7 +154,7 @@ impl PyProjectToml {
     pub fn new(pyproject_file: impl AsRef<Path>) -> Result<PyProjectToml> {
         let path = pyproject_file.as_ref();
         let contents = fs::read_to_string(path)?;
-        let pyproject: PyProjectToml = toml_edit::easy::from_str(&contents)
+        let pyproject: PyProjectToml = toml::from_str(&contents)
             .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
         Ok(pyproject)
     }
@@ -168,15 +168,6 @@ impl PyProjectToml {
     #[inline]
     pub fn maturin(&self) -> Option<&ToolMaturin> {
         self.tool.as_ref()?.maturin.as_ref()
-    }
-
-    /// Returns the value of `[tool.maturin.sdist-include]` in pyproject.toml
-    #[deprecated(
-        since = "0.14.0",
-        note = "please use `PyProjectToml::include` (<https://github.com/PyO3/maturin/pulls/1255>)"
-    )]
-    pub fn sdist_include(&self) -> Option<&Vec<String>> {
-        self.maturin()?.sdist_include.as_ref()
     }
 
     /// Returns the value of `[tool.maturin.include]` in pyproject.toml
@@ -219,6 +210,12 @@ impl PyProjectToml {
             .and_then(|maturin| maturin.python_source.as_deref())
     }
 
+    /// Returns the value of `[tool.maturin.python-packages]` in pyproject.toml
+    pub fn python_packages(&self) -> Option<&[String]> {
+        self.maturin()
+            .and_then(|maturin| maturin.python_packages.as_deref())
+    }
+
     /// Returns the value of `[tool.maturin.data]` in pyproject.toml
     pub fn data(&self) -> Option<&Path> {
         self.maturin().and_then(|maturin| maturin.data.as_deref())
@@ -242,17 +239,15 @@ impl PyProjectToml {
             .iter()
             .find(|x| x.starts_with(maturin))
         {
-            // Note: Update this once 1.0 is out
-            assert_eq!(env!("CARGO_PKG_VERSION_MAJOR"), "0");
-            let current_minor: usize = env!("CARGO_PKG_VERSION_MINOR").parse().unwrap();
+            let current_major: usize = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
             if requires_maturin == maturin {
                 eprintln!(
                     "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
-                    e.g. `requires = [\"{maturin}>=0.{current},<0.{next}\"]`. \
+                    e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \
                     This will become an error.",
                     maturin = maturin,
-                    current = current_minor,
-                    next = current_minor + 1,
+                    current = current_major,
+                    next = current_major + 1,
                 );
                 return false;
             }
@@ -269,8 +264,7 @@ impl PyProjectToml {
         if self.build_system.build_backend.as_deref() != Some(maturin) {
             eprintln!(
                 "⚠️  Warning: `build-backend` in pyproject.toml is not set to `{maturin}`, \
-                    packaging tools such as pip will not use maturin to build this project.",
-                maturin = maturin
+                    packaging tools such as pip will not use maturin to build this project."
             );
             return false;
         }
@@ -302,6 +296,7 @@ mod tests {
 
             [tool.maturin]
             manylinux = "2010"
+            python-packages = ["foo", "bar"]
             manifest-path = "Cargo.toml"
             profile = "dev"
             features = ["foo", "bar"]
@@ -327,6 +322,10 @@ mod tests {
         assert_eq!(
             maturin.rustc_args,
             Some(vec!["-Z".to_string(), "unstable-options".to_string()])
+        );
+        assert_eq!(
+            maturin.python_packages,
+            Some(vec!["foo".to_string(), "bar".to_string()])
         );
     }
 
@@ -356,17 +355,13 @@ mod tests {
     fn deserialize_include_exclude() {
         let single = r#"include = ["single"]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(single)
-                .unwrap()
-                .include,
+            toml::from_str::<ToolMaturin>(single).unwrap().include,
             Some(vec![GlobPattern::Path("single".to_string())])
         );
 
         let multiple = r#"include = ["one", "two"]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(multiple)
-                .unwrap()
-                .include,
+            toml::from_str::<ToolMaturin>(multiple).unwrap().include,
             Some(vec![
                 GlobPattern::Path("one".to_string()),
                 GlobPattern::Path("two".to_string())
@@ -375,7 +370,7 @@ mod tests {
 
         let single_format = r#"include = [{path = "path", format="sdist"}]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(single_format)
+            toml::from_str::<ToolMaturin>(single_format)
                 .unwrap()
                 .include,
             Some(vec![GlobPattern::WithFormat {
@@ -386,7 +381,7 @@ mod tests {
 
         let multiple_formats = r#"include = [{path = "path", format=["sdist", "wheel"]}]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(multiple_formats)
+            toml::from_str::<ToolMaturin>(multiple_formats)
                 .unwrap()
                 .include,
             Some(vec![GlobPattern::WithFormat {
@@ -397,9 +392,7 @@ mod tests {
 
         let mixed = r#"include = ["one", {path = "two", format="sdist"}, {path = "three", format=["sdist", "wheel"]}]"#;
         assert_eq!(
-            toml_edit::easy::from_str::<ToolMaturin>(mixed)
-                .unwrap()
-                .include,
+            toml::from_str::<ToolMaturin>(mixed).unwrap().include,
             Some(vec![
                 GlobPattern::Path("one".to_string()),
                 GlobPattern::WithFormat {

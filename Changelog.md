@@ -7,7 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* **Breaking Change**: Build with `--no-default-features` by default when bootstrapping from sdist in [#1333](https://github.com/PyO3/maturin/pull/1333)
+* **Breaking Change**: Remove deprecated `sdist-include` option in `pyproject.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
+* **Breaking Change**: Remove deprecated `python-source` option in `Cargo.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
+* **Breaking Change**: Turn `patchelf` version warning into a hard error in [#1335](https://github.com/PyO3/maturin/pull/1335)
+* **Breaking Change**: [`uniffi_bindgen` CLI](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) is required for building `uniffi` bindings wheels in [#1352](https://github.com/PyO3/maturin/pull/1352)
+* Add Cargo compile targets configuration for filtering multiple bin targets in [#1339](https://github.com/PyO3/maturin/pull/1339)
+* Respect `rustflags` settings in cargo configuration file in [#1405](https://github.com/PyO3/maturin/pull/1405)
+* Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
+* Add support for uniffi 0.23 in [#1481](https://github.com/PyO3/maturin/pull/1481)
+* Add support for custom TLS certificate authority bundle in [#1483](https://github.com/PyO3/maturin/pull/1483)
+
+## [0.14.15] - 2023-03-03
+
+* Add sdist and sccache support to `generate-ci` command
+
+## [0.14.14] - 2023-02-24
+
+* Add support for Emscripten in `generate-ci` command in [#1484](https://github.com/PyO3/maturin/pull/1484)
+* Add support for linking with pyo3 in abi3 debug mode on Windows in [#1487](https://github.com/PyO3/maturin/pull/1487)
+* Use default `ext_suffix` for Emscripten target if not provided in `PYO3_CONFIG_FILE` in [#1491](https://github.com/PyO3/maturin/pull/1491)
+* Deprecate `package.metadata.maturin.data` in favor of `tool.maturin.data` in `pyproject.toml` in [#1492](https://github.com/PyO3/maturin/pull/1492)
+
+## [0.14.13] - 2023-02-12
+
+* `maturin develop` now looks for a virtualenv `.venv` in the current or any parent directory if no virtual environment is active.
+* Add a new `generate-ci` command to generate CI configuration in [#1456](https://github.com/PyO3/maturin/pull/1456)
+* Deprecate `--universal2` in favor of `universal2-apple-darwin` target in [#1457](https://github.com/PyO3/maturin/pull/1457)
+* Raise an error when `Cargo.toml` contains removed python package metadata in [#1471](https://github.com/PyO3/maturin/pull/1471)
+* Use `extension_name` instead of `module_name` for CFFI extensions in develop mode in [#1476](https://github.com/PyO3/maturin/pull/1476)
+
+## [0.14.12] - 2023-01-31
+
+* Keep `dev-dependencies` in sdist when there are no path dependencies in [#1441](https://github.com/PyO3/maturin/pull/1441)
+
+## [0.14.11] - 2023-01-31
+
+* Don't package dev-only path dependencies in sdist in [#1435](https://github.com/PyO3/maturin/pull/1435)
+
+## [0.14.10] - 2023-01-13
+
+* Use module name specified by `[package.metadata.maturin]` in [#1409](https://github.com/PyO3/maturin/pull/1409)
+
+## [0.14.9] - 2023-01-10
+
+* Don't pass `MACOSX_DEPLOYMENT_TARGET` when query default value from rustc in [#1395](https://github.com/PyO3/maturin/pull/1395)
+
+## [0.14.8] - 2022-12-31
+
+* Add support for packaging multiple pure Python packages in [#1378](https://github.com/PyO3/maturin/pull/1378)
+* Fallback to sysconfig interpreters for pyo3 bindings in [#1381](https://github.com/PyO3/maturin/pull/1381)
+
+## [0.14.7] - 2022-12-20
+
+* Add workspace lock file to sdist as a fallback in [#1362](https://github.com/PyO3/maturin/pull/1362)
+
+## [0.14.6] - 2022-12-13
+
+* Allow Rust crate to be placed outside of the directory containing `pyproject.toml` in [#1347](https://github.com/PyO3/maturin/pull/1347)
+* Disallow uniffi bin bindings in [#1353](https://github.com/PyO3/maturin/pull/1353)
+* Update bundled Python sysconfigs for Linux and macOS
+
+## [0.14.5] - 2022-12-08
+
+* Support `SOURCE_DATE_EPOCH` when building wheels in [#1334](https://github.com/PyO3/maturin/pull/1334)
+* Fix sdist when all Cargo workspace members are excluded in [#1343](https://github.com/PyO3/maturin/pull/1343)
+
+## [0.14.4] - 2022-12-05
+
+* Expanded architecture support for FreeBSD, NetBSD and OpenBSD in [#1318](https://github.com/PyO3/maturin/pull/1318)
+* Better error message when upload failed with status code 403 in [#1323](https://github.com/PyO3/maturin/pull/1323)
+
+## [0.14.3] - 2022-12-01
+
+* Bump MSRV to 1.62.0 in [#1297](https://github.com/PyO3/maturin/pull/1297)
+* Fix build error when required features of bin target isn't enabled in [#1299](https://github.com/PyO3/maturin/pull/1299)
+* Fix wrong platform tag when building in i386 docker container on x86_64 host in [#1301](https://github.com/PyO3/maturin/pull/1301)
+* Fix wrong platform tag when building in armv7 docker container on aarch64 host in [#1303](https://github.com/PyO3/maturin/pull/1303)
+* Add Solaris operating system support in [#1310](https://github.com/PyO3/maturin/pull/1310)
+* Add armv6 and armv7 target support for FreeBSD in [#1312](https://github.com/PyO3/maturin/pull/1312)
+* Add riscv64 and powerpc target support for FreeBSD in [#1313](https://github.com/PyO3/maturin/pull/1313)
+* Fix powerpc64 and powerpc64le Python wheel platform tag for FreeBSD in [#1313](https://github.com/PyO3/maturin/pull/1313)
+
+## [0.14.2] - 2022-11-24
+
 * Tighten src-layout detection logic in [#1281](https://github.com/PyO3/maturin/pull/1282)
+* Fix generating pep517 sdist for src-layout in [#1288](https://github.com/PyO3/maturin/pull/1288)
+* Deprecate `python-source` option in `Cargo.toml` in favor of the one in `pyproject.toml` in [#1291](https://github.com/PyO3/maturin/pull/1291)
+* Fix auditwheel with read-only libraries in [#1292](https://github.com/PyO3/maturin/pull/1292)
 
 ## [0.14.1] - 2022-11-20
 
@@ -750,7 +837,21 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.15...HEAD
+[0.14.15]: https://github.com/pyo3/maturin/compare/v0.14.14...v0.14.15
+[0.14.14]: https://github.com/pyo3/maturin/compare/v0.14.13...v0.14.14
+[0.14.13]: https://github.com/pyo3/maturin/compare/v0.14.12...v0.14.13
+[0.14.12]: https://github.com/pyo3/maturin/compare/v0.14.11...v0.14.12
+[0.14.11]: https://github.com/pyo3/maturin/compare/v0.14.10...v0.14.11
+[0.14.10]: https://github.com/pyo3/maturin/compare/v0.14.9...v0.14.10
+[0.14.9]: https://github.com/pyo3/maturin/compare/v0.14.8...v0.14.9
+[0.14.8]: https://github.com/pyo3/maturin/compare/v0.14.7...v0.14.8
+[0.14.7]: https://github.com/pyo3/maturin/compare/v0.14.6...v0.14.7
+[0.14.6]: https://github.com/pyo3/maturin/compare/v0.14.5...v0.14.6
+[0.14.5]: https://github.com/pyo3/maturin/compare/v0.14.4...v0.14.5
+[0.14.4]: https://github.com/pyo3/maturin/compare/v0.14.3...v0.14.4
+[0.14.3]: https://github.com/pyo3/maturin/compare/v0.14.2...v0.14.3
+[0.14.2]: https://github.com/pyo3/maturin/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/pyo3/maturin/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pyo3/maturin/compare/v0.13.7...v0.14.0
 [0.13.7]: https://github.com/pyo3/maturin/compare/v0.13.6...v0.13.7

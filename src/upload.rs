@@ -10,9 +10,12 @@ use fs_err::File;
 use multipart::client::lazy::Multipart;
 use regex::Regex;
 use std::env;
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use tracing::debug;
 
 /// An account with a registry, possibly incomplete
 #[derive(Debug, clap::Parser)]
@@ -67,7 +70,7 @@ pub enum UploadError {
     UreqError(#[source] ureq::Error),
     /// The registry returned a "403 Forbidden"
     #[error("Username or password are incorrect")]
-    AuthenticationError,
+    AuthenticationError(String),
     /// Reading the wheel failed
     #[error("IO Error")]
     IoError(#[source] io::Error),
@@ -83,7 +86,7 @@ pub enum UploadError {
     /// TLS error
     #[cfg(feature = "native-tls")]
     #[error("TLS Error")]
-    TlsError(#[source] native_tls_crate::Error),
+    TlsError(#[source] native_tls::Error),
 }
 
 impl From<io::Error> for UploadError {
@@ -99,8 +102,8 @@ impl From<ureq::Error> for UploadError {
 }
 
 #[cfg(feature = "native-tls")]
-impl From<native_tls_crate::Error> for UploadError {
-    fn from(error: native_tls_crate::Error) -> Self {
+impl From<native_tls::Error> for UploadError {
+    fn from(error: native_tls::Error) -> Self {
         UploadError::TlsError(error)
     }
 }
@@ -135,23 +138,26 @@ fn get_password(_username: &str) -> String {
     {
         let service = env!("CARGO_PKG_NAME");
         let keyring = keyring::Entry::new(service, _username);
-        if let Ok(password) = keyring.get_password() {
+        if let Ok(password) = keyring.and_then(|keyring| keyring.get_password()) {
             return password;
         };
     }
 
-    rpassword::prompt_password("Please enter your password: ").unwrap_or_else(|_| {
-        // So we need this fallback for pycharm on windows
-        let mut password = String::new();
-        io::stdin()
-            .read_line(&mut password)
-            .expect("Failed to read line");
-        password.trim().to_string()
-    })
+    dialoguer::Password::new()
+        .with_prompt("Please enter your password")
+        .interact()
+        .unwrap_or_else(|_| {
+            // So we need this fallback for pycharm on windows
+            let mut password = String::new();
+            io::stdin()
+                .read_line(&mut password)
+                .expect("Failed to read line");
+            password.trim().to_string()
+        })
 }
 
 fn get_username() -> String {
-    println!("Please enter your username:");
+    eprintln!("Please enter your username:");
     let mut line = String::new();
     io::stdin().read_line(&mut line).unwrap();
     line.trim().to_string()
@@ -199,7 +205,7 @@ fn resolve_pypi_cred(
     if let Some((username, password)) =
         registry_name.and_then(|name| load_pypi_cred_from_config(config, name))
     {
-        println!("🔐 Using credential in pypirc for upload");
+        eprintln!("🔐 Using credential in pypirc for upload");
         return (username, password);
     }
 
@@ -210,7 +216,6 @@ fn resolve_pypi_cred(
         .clone()
         .or_else(|| env::var("MATURIN_PASSWORD").ok())
         .unwrap_or_else(|| get_password(&username));
-
     (username, password)
 }
 
@@ -256,6 +261,78 @@ fn canonicalize_name(name: &str) -> String {
         .unwrap()
         .replace_all(name, "-")
         .to_lowercase()
+}
+
+fn http_proxy() -> Result<String, env::VarError> {
+    env::var("HTTPS_PROXY")
+        .or_else(|_| env::var("https_proxy"))
+        .or_else(|_| env::var("HTTP_PROXY"))
+        .or_else(|_| env::var("http_proxy"))
+}
+
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+fn tls_ca_bundle() -> Option<OsString> {
+    env::var_os("MATURIN_CA_BUNDLE")
+        .or_else(|| env::var_os("REQUESTS_CA_BUNDLE"))
+        .or_else(|| env::var_os("CURL_CA_BUNDLE"))
+}
+
+// Prefer rustls if both native-tls and rustls features are enabled
+#[cfg(all(feature = "native-tls", not(feature = "rustls")))]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    use std::sync::Arc;
+
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    let mut tls_builder = native_tls::TlsConnector::builder();
+    if let Some(ca_bundle) = tls_ca_bundle() {
+        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
+        for cert in rustls_pemfile::certs(&mut reader)? {
+            tls_builder.add_root_certificate(native_tls::Certificate::from_pem(&cert)?);
+        }
+    }
+    builder = builder.tls_connector(Arc::new(tls_builder.build()?));
+    Ok(builder.build())
+}
+
+#[cfg(feature = "rustls")]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    use std::sync::Arc;
+
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    if let Some(ca_bundle) = tls_ca_bundle() {
+        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
+        let certs = rustls_pemfile::certs(&mut reader)?;
+        let mut root_certs = rustls::RootCertStore::empty();
+        root_certs.add_parsable_certificates(&certs);
+        let client_config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_certs)
+            .with_no_client_auth();
+        Ok(builder.tls_config(Arc::new(client_config)).build())
+    } else {
+        Ok(builder.build())
+    }
+}
+
+#[cfg(not(any(feature = "native-tls", feature = "rustls")))]
+#[allow(clippy::result_large_err)]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    let mut builder = ureq::builder();
+    if let Ok(proxy) = http_proxy() {
+        let proxy = ureq::Proxy::new(proxy)?;
+        builder = builder.proxy(proxy);
+    };
+    Ok(builder.build())
 }
 
 /// Uploads a single wheel to the registry
@@ -335,35 +412,9 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 
     form.add_stream("content", &wheel, Some(wheel_name), None);
     let multipart_data = form.prepare().map_err(|e| e.error)?;
-
     let encoded = base64::encode(format!("{}:{}", registry.username, registry.password));
 
-    let http_proxy = env::var("HTTPS_PROXY")
-        .or_else(|_| env::var("https_proxy"))
-        .or_else(|_| env::var("HTTP_PROXY"))
-        .or_else(|_| env::var("http_proxy"));
-
-    #[cfg(not(feature = "native-tls"))]
-    let agent = {
-        let mut builder = ureq::builder();
-        if let Ok(proxy) = http_proxy {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        };
-        builder.build()
-    };
-
-    #[cfg(feature = "native-tls")]
-    let agent = {
-        use std::sync::Arc;
-        let mut builder =
-            ureq::builder().tls_connector(Arc::new(native_tls_crate::TlsConnector::new()?));
-        if let Ok(proxy) = http_proxy {
-            let proxy = ureq::Proxy::new(proxy)?;
-            builder = builder.proxy(proxy);
-        };
-        builder.build()
-    };
+    let agent = http_agent()?;
 
     let response = agent
         .post(registry.url.as_str())
@@ -378,7 +429,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
             "User-Agent",
             &format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
         )
-        .set("Authorization", &format!("Basic {}", encoded))
+        .set("Authorization", &format!("Basic {encoded}"))
         .send(multipart_data);
 
     match response {
@@ -387,10 +438,10 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
             let err_text = response.into_string().unwrap_or_else(|e| {
                 format!(
                     "The registry should return some text, \
-                    even in case of an error, but didn't ({})",
-                    e
+                    even in case of an error, but didn't ({e})"
                 )
             });
+            debug!("Upload error response: {}", err_text);
             // Detect FileExistsError the way twine does
             // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
             if status == 403 {
@@ -398,7 +449,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
                     // Artifactory (https://jfrog.com/artifactory/)
                     Err(UploadError::FileExistsError(err_text))
                 } else {
-                    Err(UploadError::AuthenticationError)
+                    Err(UploadError::AuthenticationError(err_text))
                 }
             } else {
                 let status_string = status.to_string();
@@ -424,43 +475,53 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
     let registry = complete_registry(publish)?;
 
-    println!("🚀 Uploading {} packages", items.len());
+    eprintln!("🚀 Uploading {} packages", items.len());
 
     for i in items {
         let upload_result = upload(&registry, i);
 
         match upload_result {
             Ok(()) => (),
-            Err(UploadError::AuthenticationError) => {
-                println!("⛔ Username and/or password are wrong");
+            Err(UploadError::AuthenticationError(msg)) => {
+                let title_re = regex::Regex::new(r"<title>(.+?)</title>").unwrap();
+                let title = title_re
+                    .captures(&msg)
+                    .and_then(|c| c.get(1))
+                    .map(|m| m.as_str());
+                match title {
+                    Some(title) => {
+                        eprintln!("⛔ {title}");
+                    }
+                    None => eprintln!("⛔ Username and/or password are wrong"),
+                }
 
                 #[cfg(feature = "keyring")]
                 {
                     // Delete the wrong password from the keyring
                     let old_username = registry.username;
-                    let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &old_username);
-                    match keyring.delete_password() {
+                    match keyring::Entry::new(env!("CARGO_PKG_NAME"), &old_username)
+                        .and_then(|keyring| keyring.delete_password())
+                    {
                         Ok(()) => {
-                            println!("🔑 Removed wrong password from keyring")
+                            eprintln!("🔑 Removed wrong password from keyring")
                         }
                         Err(keyring::Error::NoEntry)
                         | Err(keyring::Error::NoStorageAccess(_))
                         | Err(keyring::Error::PlatformFailure(_)) => {}
                         Err(err) => {
-                            eprintln!("⚠️ Warning: Failed to remove password from keyring: {}", err)
+                            eprintln!("⚠️ Warning: Failed to remove password from keyring: {err}")
                         }
                     }
                 }
 
-                bail!("Username and/or password are wrong");
+                bail!("Username and/or password are possibly wrong");
             }
             Err(err) => {
                 let filename = i.file_name().unwrap_or(i.as_os_str());
                 if let UploadError::FileExistsError(_) = err {
                     if publish.skip_existing {
-                        println!(
-                            "⚠️ Note: Skipping {:?} because it appears to already exist",
-                            filename
+                        eprintln!(
+                            "⚠️ Note: Skipping {filename:?} because it appears to already exist"
                         );
                         continue;
                     }
@@ -468,29 +529,26 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 let filesize = fs::metadata(i)
                     .map(|x| ByteSize(x.len()).to_string())
                     .unwrap_or_else(|e| format!("Failed to get the filesize of {:?}: {}", &i, e));
-                return Err(err)
-                    .context(format!("💥 Failed to upload {:?} ({})", filename, filesize));
+                return Err(err).context(format!("💥 Failed to upload {filename:?} ({filesize})"));
             }
         }
     }
 
-    println!("✨ Packages uploaded successfully");
+    eprintln!("✨ Packages uploaded successfully");
 
     #[cfg(feature = "keyring")]
     {
         // We know the password is correct, so we can save it in the keyring
         let username = registry.username.clone();
-        let keyring = keyring::Entry::new(env!("CARGO_PKG_NAME"), &username);
         let password = registry.password;
-        match keyring.set_password(&password) {
+        match keyring::Entry::new(env!("CARGO_PKG_NAME"), &username)
+            .and_then(|keyring| keyring.set_password(&password))
+        {
             Ok(())
             | Err(keyring::Error::NoStorageAccess(_))
             | Err(keyring::Error::PlatformFailure(_)) => {}
             Err(err) => {
-                eprintln!(
-                    "⚠️ Warning: Failed to store the password in the keyring: {:?}",
-                    err
-                );
+                eprintln!("⚠️ Warning: Failed to store the password in the keyring: {err:?}");
             }
         }
     }

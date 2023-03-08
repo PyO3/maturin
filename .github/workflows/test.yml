@@ -125,7 +125,7 @@ jobs:
           sudo rm -rf /opt/ghc
       - name: Sccache Setup
         # Just for test, come back to upstream after released
-        uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
+        uses: mozilla-actions/sccache-action@v0.0.1
         with:
           version: "v0.4.0-pre.7"
       - uses: actions/checkout@v3
@@ -441,7 +441,7 @@ jobs:
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
+        uses: mozilla-actions/sccache-action@v0.0.1
         with:
           version: "v0.4.0-pre.7"
       - uses: actions/setup-python@v4

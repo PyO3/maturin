@@ -404,6 +404,7 @@ impl BuildContext {
             // fs::copy copies permissions as well, and the original
             // file may have been read-only
             let mut perms = fs::metadata(&dest_path)?.permissions();
+            #[allow(clippy::permissions_set_readonly_false)]
             perms.set_readonly(false);
             fs::set_permissions(&dest_path, perms)?;
 

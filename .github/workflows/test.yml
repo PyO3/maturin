@@ -124,10 +124,9 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: Sccache Setup
-        # Just for test, come back to upstream after released
         uses: mozilla-actions/sccache-action@v0.0.1
         with:
-          version: "v0.4.0-pre.7"
+          version: "v0.4.0-pre.10"
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -443,7 +442,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         uses: mozilla-actions/sccache-action@v0.0.1
         with:
-          version: "v0.4.0-pre.7"
+          version: "v0.4.0-pre.10"
       - uses: actions/setup-python@v4
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:

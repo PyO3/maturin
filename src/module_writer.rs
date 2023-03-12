@@ -709,7 +709,6 @@ fn handle_cffi_call_result(
 pub fn write_bindings_module(
     writer: &mut impl ModuleWriter,
     project_layout: &ProjectLayout,
-    module_name: &str,
     artifact: &Path,
     python_interpreter: Option<&PythonInterpreter>,
     is_abi3: bool,
@@ -762,25 +761,23 @@ pub fn write_bindings_module(
             writer.add_file_with_permissions(relative.join(&so_filename), artifact, 0o755)?;
         }
     } else {
-        let module = PathBuf::from(module_name);
+        let module = PathBuf::from(ext_name);
         writer.add_directory(&module)?;
         // Reexport the shared library as if it were the top level module
         writer.add_bytes(
             &module.join("__init__.py"),
             format!(
-                r#"from .{module_name} import *
+                r#"from .{ext_name} import *
 
-__doc__ = {module_name}.__doc__
-if hasattr({module_name}, "__all__"):
-    __all__ = {module_name}.__all__"#
+__doc__ = {ext_name}.__doc__
+if hasattr({ext_name}, "__all__"):
+    __all__ = {ext_name}.__all__"#
             )
             .as_bytes(),
         )?;
-        let type_stub = project_layout
-            .rust_module
-            .join(format!("{module_name}.pyi"));
+        let type_stub = project_layout.rust_module.join(format!("{ext_name}.pyi"));
         if type_stub.exists() {
-            eprintln!("📖 Found type stub file at {module_name}.pyi");
+            eprintln!("📖 Found type stub file at {ext_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(&module.join("py.typed"), b"")?;
         }

@@ -532,7 +532,6 @@ impl BuildContext {
         write_bindings_module(
             &mut writer,
             &self.project_layout,
-            &self.module_name,
             &artifact.path,
             self.interpreter.first(),
             true,
@@ -611,7 +610,6 @@ impl BuildContext {
         write_bindings_module(
             &mut writer,
             &self.project_layout,
-            &self.module_name,
             &artifact.path,
             Some(python_interpreter),
             false,

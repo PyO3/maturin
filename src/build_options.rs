@@ -512,7 +512,7 @@ impl BuildOptions {
             }),
         )?;
 
-        if !bridge.is_bin() && module_name.contains('-') {
+        if !bridge.is_bin() && project_layout.extension_name.contains('-') {
             bail!(
                 "The module name must not contain a minus `-` \
                  (Make sure you have set an appropriate [lib] name or \

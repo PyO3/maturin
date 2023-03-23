@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.64"
 
 [[bin]]
 name = "maturin"

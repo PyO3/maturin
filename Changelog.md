@@ -14,9 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking Change**: [`uniffi_bindgen` CLI](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) is required for building `uniffi` bindings wheels in [#1352](https://github.com/PyO3/maturin/pull/1352)
 * Add Cargo compile targets configuration for filtering multiple bin targets in [#1339](https://github.com/PyO3/maturin/pull/1339)
 * Respect `rustflags` settings in cargo configuration file in [#1405](https://github.com/PyO3/maturin/pull/1405)
-* Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
 * Add support for uniffi 0.23 in [#1481](https://github.com/PyO3/maturin/pull/1481)
 * Add support for custom TLS certificate authority bundle in [#1483](https://github.com/PyO3/maturin/pull/1483)
+* Bump MSRV to 1.64.0 in [#1528](https://github.com/PyO3/maturin/pull/1528)
 
 ## [0.14.15] - 2023-03-03
 

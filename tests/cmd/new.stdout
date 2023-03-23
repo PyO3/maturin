@@ -11,4 +11,4 @@ Options:
       --src                  Use Python first src layout for mixed Rust/Python project
   -b, --bindings <BINDINGS>  Which kind of bindings to use [possible values: pyo3, rust-cpython,
                              cffi, uniffi, bin]
-  -h, --help                 Print help information
+  -h, --help                 Print help

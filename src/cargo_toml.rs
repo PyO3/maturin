@@ -102,23 +102,8 @@ struct CargoTomlMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct RemainingCoreMetadata {
-    /// Cargo compile targets
-    pub targets: Option<Vec<CargoTarget>>,
     #[serde(flatten)]
     pub other: HashMap<String, toml::Value>,
-}
-
-/// Cargo compile target
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "kebab-case")]
-pub struct CargoTarget {
-    /// Name as given in the `Cargo.toml` or generated from the file name
-    pub name: String,
-    /// Kind of target ("bin", "lib")
-    pub kind: Option<String>,
-    // TODO: Add bindings option
-    // Bridge model, which kind of bindings to use
-    // pub bindings: Option<String>,
 }
 
 #[cfg(test)]
@@ -158,10 +143,6 @@ mod test {
 
         let cargo_toml: Result<CargoToml, _> = toml::from_str(cargo_toml);
         assert!(cargo_toml.is_ok());
-
-        let maturin = cargo_toml.unwrap().remaining_core_metadata();
-        let targets = maturin.targets.unwrap();
-        assert_eq!("pyo3_pure", targets[0].name);
     }
 
     #[test]

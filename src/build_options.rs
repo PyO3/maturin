@@ -664,9 +664,9 @@ impl BuildOptions {
             .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
 
-        let remaining_core_metadata = cargo_toml.remaining_core_metadata();
-        let config_targets = remaining_core_metadata.targets.as_deref();
-        let cargo_targets = filter_cargo_targets(&cargo_metadata, bridge, config_targets)?;
+        let config_targets = pyproject.and_then(|x| x.targets());
+        let cargo_targets =
+            filter_cargo_targets(&cargo_metadata, bridge, config_targets.as_deref())?;
 
         let crate_name = cargo_toml.package.name;
         Ok(BuildContext {
@@ -747,7 +747,7 @@ fn validate_bridge_type(
 fn filter_cargo_targets(
     cargo_metadata: &Metadata,
     bridge: BridgeModel,
-    config_targets: Option<&[crate::cargo_toml::CargoTarget]>,
+    config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
 ) -> Result<Vec<CompileTarget>> {
     let root_pkg = cargo_metadata.root_package().unwrap();
     let resolved_features = cargo_metadata

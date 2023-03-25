@@ -4,3 +4,10 @@ build-backend = "maturin"
 
 [tool.maturin]
 bindings = "bin"
+
+[[tool.maturin.targets]]
+name = "hello-world"
+bindings = "bin"
+
+[[tool.maturin.targets]]
+name = "foo"

@@ -516,7 +516,7 @@ impl BuildOptions {
             bail!(
                 "The module name must not contain a minus `-` \
                  (Make sure you have set an appropriate [lib] name or \
-                 [package.metadata.maturin] name in your Cargo.toml)"
+                 [tool.maturin] module-name in your pyproject.toml)"
             );
         }
 
@@ -664,9 +664,9 @@ impl BuildOptions {
             .clone()
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
 
-        let remaining_core_metadata = cargo_toml.remaining_core_metadata();
-        let config_targets = remaining_core_metadata.targets.as_deref();
-        let cargo_targets = filter_cargo_targets(&cargo_metadata, bridge, config_targets)?;
+        let config_targets = pyproject.and_then(|x| x.targets());
+        let cargo_targets =
+            filter_cargo_targets(&cargo_metadata, bridge, config_targets.as_deref())?;
 
         let crate_name = cargo_toml.package.name;
         Ok(BuildContext {
@@ -747,7 +747,7 @@ fn validate_bridge_type(
 fn filter_cargo_targets(
     cargo_metadata: &Metadata,
     bridge: BridgeModel,
-    config_targets: Option<&[crate::cargo_toml::CargoTarget]>,
+    config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
 ) -> Result<Vec<CompileTarget>> {
     let root_pkg = cargo_metadata.root_package().unwrap();
     let resolved_features = cargo_metadata
@@ -1497,18 +1497,14 @@ mod test {
 
     #[test]
     fn test_get_min_python_minor() {
-        use crate::CargoToml;
-
         // Nothing specified
         let manifest_path = "test-crates/pyo3-pure/Cargo.toml";
-        let cargo_toml = CargoToml::from_path(manifest_path).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_path)
             .exec()
             .unwrap();
         let metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, "test-crates/pyo3-pure", &cargo_metadata)
-                .unwrap();
+            Metadata21::from_cargo_toml("test-crates/pyo3-pure", &cargo_metadata).unwrap();
         assert_eq!(get_min_python_minor(&metadata21), None);
     }
 }

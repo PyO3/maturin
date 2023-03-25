@@ -108,14 +108,12 @@ impl ProjectResolver {
 
         let cargo_metadata = Self::resolve_cargo_metadata(&manifest_file, &cargo_options)?;
 
-        let mut metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, manifest_dir, &cargo_metadata)
-                .context("Failed to parse Cargo.toml into python metadata")?;
+        let mut metadata21 = Metadata21::from_cargo_toml(manifest_dir, &cargo_metadata)
+            .context("Failed to parse Cargo.toml into python metadata")?;
         if let Some(pyproject) = pyproject {
             let pyproject_dir = pyproject_file.parent().unwrap();
             metadata21.merge_pyproject_toml(pyproject_dir, pyproject)?;
         }
-        let extra_metadata = cargo_toml.remaining_core_metadata();
 
         let crate_name = &cargo_toml.package.name;
 
@@ -128,7 +126,7 @@ impl ProjectResolver {
             .unwrap_or(crate_name)
             .to_owned();
 
-        let extension_name = extra_metadata.name.as_ref().unwrap_or(&module_name);
+        let extension_name = pyproject.and_then(|x| x.name()).unwrap_or(&module_name);
 
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)
@@ -168,23 +166,13 @@ impl ProjectResolver {
                 None => project_root.to_path_buf(),
             },
         };
-        let data = match pyproject.and_then(|x| x.data()) {
-            Some(data) => {
-                if data.is_absolute() {
-                    Some(data.to_path_buf())
-                } else {
-                    Some(project_root.join(data))
-                }
+        let data = pyproject.and_then(|x| x.data()).map(|data| {
+            if data.is_absolute() {
+                data.to_path_buf()
+            } else {
+                project_root.join(data)
             }
-            None => extra_metadata.data.as_ref().map(|data| {
-                let data = Path::new(data);
-                if data.is_absolute() {
-                    data.to_path_buf()
-                } else {
-                    manifest_dir.join(data)
-                }
-            }),
-        };
+        });
         let project_layout =
             ProjectLayout::determine(project_root, extension_name, py_root, python_packages, data)?;
         Ok(Self {

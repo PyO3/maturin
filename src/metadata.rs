@@ -1,4 +1,4 @@
-use crate::{CargoToml, PyProjectToml};
+use crate::PyProjectToml;
 use anyhow::{bail, Context, Result};
 use fs_err as fs;
 use regex::Regex;
@@ -281,7 +281,6 @@ impl Metadata21 {
     ///
     /// manifest_path must be the directory, not the file
     pub fn from_cargo_toml(
-        cargo_toml: &CargoToml,
         manifest_path: impl AsRef<Path>,
         cargo_metadata: &cargo_metadata::Metadata,
     ) -> Result<Metadata21> {
@@ -294,8 +293,6 @@ impl Metadata21 {
         } else {
             None
         };
-
-        let extra_metadata = cargo_toml.remaining_core_metadata();
 
         let mut description: Option<String> = None;
         let mut description_content_type: Option<String> = None;
@@ -329,16 +326,7 @@ impl Metadata21 {
                 }
             }
         };
-        let name = extra_metadata
-            .name
-            .map(|name| {
-                if let Some(pos) = name.find('.') {
-                    name.split_at(pos).0.to_string()
-                } else {
-                    name.clone()
-                }
-            })
-            .unwrap_or_else(|| package.name.clone());
+        let name = package.name.clone();
         let mut project_url = HashMap::new();
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
@@ -562,16 +550,14 @@ mod test {
         };
 
         let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
-        fs::write(&manifest_path, &toml_with_path).unwrap();
+        fs::write(&manifest_path, toml_with_path).unwrap();
 
-        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_path)
             .exec()
             .unwrap();
 
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml_struct, crate_path, &cargo_metadata).unwrap();
+        let metadata = Metadata21::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
 
         let actual = metadata.to_file_contents().unwrap();
 
@@ -590,13 +576,6 @@ mod test {
             "cargo_toml name and version string do not match hardcoded values, test will fail",
         );
 
-        if cargo_toml_struct.remaining_core_metadata().name.is_none() {
-            assert_eq!(
-                metadata.get_dist_info_dir(),
-                PathBuf::from("info_project-0.1.0.dist-info"),
-                "Dist info dir differed from expected"
-            );
-        }
         metadata
     }
 
@@ -649,59 +628,6 @@ mod test {
     }
 
     #[test]
-    fn test_metadata_from_cargo_toml_name_override() {
-        let readme = indoc!(
-            r#"
-            Some test package
-            =================
-        "#
-        );
-
-        let cargo_toml = indoc!(
-            r#"
-            [package]
-            authors = ["konstin <konstin@mailbox.org>"]
-            name = "info-project"
-            version = "0.1.0"
-            description = "A test project"
-            homepage = "https://example.org"
-            readme = "REPLACE_README_PATH"
-
-            [lib]
-            crate-type = ["cdylib"]
-            name = "pyo3_pure"
-
-            [package.metadata.maturin]
-            name = "info"
-        "#
-        );
-
-        let expected = indoc!(
-            r#"
-            Metadata-Version: 2.1
-            Name: info
-            Version: 0.1.0
-            Summary: A test project
-            Home-Page: https://example.org
-            Author: konstin <konstin@mailbox.org>
-            Author-email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
-
-            Some test package
-            =================
-        "#
-        );
-
-        let metadata = assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
-
-        assert_eq!(
-            metadata.get_dist_info_dir(),
-            PathBuf::from("info-0.1.0.dist-info"),
-            "Dist info dir differed from expected"
-        );
-    }
-
-    #[test]
     fn test_path_to_content_type() {
         for (filename, expected) in &[
             ("r.md", GFM_CONTENT_TYPE),
@@ -726,14 +652,11 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_toml() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -777,14 +700,11 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -801,14 +721,11 @@ mod test {
     #[test]
     fn test_implicit_readme() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         assert!(metadata.description.unwrap().starts_with("# pyo3-mixed"));
         assert_eq!(
             metadata.description_content_type.unwrap(),
@@ -819,14 +736,11 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
         let manifest_dir = PathBuf::from("test-crates").join("license-test");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)

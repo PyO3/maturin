@@ -81,11 +81,26 @@ impl GlobPattern {
     }
 }
 
+/// Cargo compile target
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct CargoTarget {
+    /// Name as given in the `Cargo.toml` or generated from the file name
+    pub name: String,
+    /// Kind of target ("bin", "lib")
+    pub kind: Option<String>,
+    // TODO: Add bindings option
+    // Bridge model, which kind of bindings to use
+    // pub bindings: Option<String>,
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
+    // extension module name, accepts setuptools style import name like `foo.bar`
+    module_name: Option<String>,
     include: Option<Vec<GlobPattern>>,
     exclude: Option<Vec<GlobPattern>>,
     bindings: Option<String>,
@@ -101,6 +116,8 @@ pub struct ToolMaturin {
     python_packages: Option<Vec<String>>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
     data: Option<PathBuf>,
+    /// Cargo compile targets
+    pub targets: Option<Vec<CargoTarget>>,
     // Some customizable cargo options
     /// Build artifacts with the specified Cargo profile
     pub profile: Option<String>,
@@ -170,6 +187,11 @@ impl PyProjectToml {
         self.tool.as_ref()?.maturin.as_ref()
     }
 
+    /// Returns the value of `[tool.maturin.name]` in pyproject.toml
+    pub fn name(&self) -> Option<&str> {
+        self.maturin()?.module_name.as_deref()
+    }
+
     /// Returns the value of `[tool.maturin.include]` in pyproject.toml
     pub fn include(&self) -> Option<&[GlobPattern]> {
         self.maturin()?.include.as_ref().map(AsRef::as_ref)
@@ -219,6 +241,11 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.data]` in pyproject.toml
     pub fn data(&self) -> Option<&Path> {
         self.maturin().and_then(|maturin| maturin.data.as_deref())
+    }
+
+    /// Returns the value of `[tool.maturin.targets]` in pyproject.toml
+    pub fn targets(&self) -> Option<Vec<CargoTarget>> {
+        self.maturin().and_then(|maturin| maturin.targets.clone())
     }
 
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
@@ -303,6 +330,11 @@ mod tests {
             no-default-features = true
             locked = true
             rustc-args = ["-Z", "unstable-options"]
+
+            [[tool.maturin.targets]]
+            name = "pyo3_pure"
+            kind = "lib"
+            bindings = "pyo3"
             "#,
         )
         .unwrap();
@@ -327,6 +359,8 @@ mod tests {
             maturin.python_packages,
             Some(vec!["foo".to_string(), "bar".to_string()])
         );
+        let targets = maturin.targets.as_ref().unwrap();
+        assert_eq!("pyo3_pure", targets[0].name);
     }
 
     #[test]

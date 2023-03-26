@@ -1,5 +1,8 @@
 env:
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
 build_and_test: &BUILD_AND_TEST
   # only run tasks on pull request or bors related branches
@@ -20,11 +23,6 @@ freebsd_task:
     image_family: freebsd-13-1
   env:
     PATH: $HOME/.cargo/bin:$PATH
-  registry_cache:
-    folder: $HOME/.cargo/registry
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
   target_cache:
     folder: target
     fingerprint_script:
@@ -41,11 +39,6 @@ macos_arm64_task:
     image: ghcr.io/cirruslabs/macos-monterey-xcode
   env:
     PATH: $HOME/.cargo/bin:/opt/homebrew/opt/python@3.10/bin:$PATH
-  registry_cache:
-    folder: $HOME/.cargo/registry
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
   target_cache:
     folder: target
     fingerprint_script:
@@ -63,11 +56,6 @@ linux_aarch64_task:
     memory: 4G
   env:
     PATH: /root/.cargo/bin:$PATH
-  registry_cache:
-    folder: /root/.cargo/registry
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
   target_cache:
     folder: target
     fingerprint_script:

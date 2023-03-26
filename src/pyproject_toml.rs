@@ -187,8 +187,8 @@ impl PyProjectToml {
         self.tool.as_ref()?.maturin.as_ref()
     }
 
-    /// Returns the value of `[tool.maturin.name]` in pyproject.toml
-    pub fn name(&self) -> Option<&str> {
+    /// Returns the value of `[tool.maturin.module-name]` in pyproject.toml
+    pub fn module_name(&self) -> Option<&str> {
         self.maturin()?.module_name.as_deref()
     }
 

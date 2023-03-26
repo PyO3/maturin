@@ -126,7 +126,9 @@ impl ProjectResolver {
             .unwrap_or(crate_name)
             .to_owned();
 
-        let extension_name = pyproject.and_then(|x| x.name()).unwrap_or(&module_name);
+        let extension_name = pyproject
+            .and_then(|x| x.module_name())
+            .unwrap_or(&module_name);
 
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)

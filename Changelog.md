@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.16] - 2023-03-26
+
+* Deprecate `package.metadata.maturin.name` in favor of `tool.maturin.module-name` in `pyproject.toml` in [#1531](https://github.com/PyO3/maturin/pull/1531)
+
 ## [0.14.15] - 2023-03-03
 
 * Add sdist and sccache support to `generate-ci` command
@@ -826,7 +830,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.15...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.16...HEAD
+[0.14.16]: https://github.com/pyo3/maturin/compare/v0.14.15...v0.14.16
 [0.14.15]: https://github.com/pyo3/maturin/compare/v0.14.14...v0.14.15
 [0.14.14]: https://github.com/pyo3/maturin/compare/v0.14.13...v0.14.14
 [0.14.13]: https://github.com/pyo3/maturin/compare/v0.14.12...v0.14.13

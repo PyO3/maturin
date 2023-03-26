@@ -12,6 +12,3 @@ pyo3 = { version = "0.18.0", features = ["extension-module"] }
 [lib]
 name = "pyo3_mixed_py_subdir"
 crate-type = ["cdylib"]
-
-[package.metadata.maturin]
-name = "pyo3_mixed_py_subdir._pyo3_mixed"

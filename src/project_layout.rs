@@ -128,8 +128,15 @@ impl ProjectResolver {
             .unwrap_or(crate_name)
             .to_owned();
 
-        let extension_name = extra_metadata.name.as_ref().unwrap_or(&module_name);
-
+        let extension_name = pyproject
+            .and_then(|x| x.module_name())
+            .or_else(|| {
+                if extra_metadata.name.is_some() {
+                    eprintln!("⚠️ Warning: specify [package.metadata.maturin] name in Cargo.toml is deprecated, use module-name in [tool.maturin] section in pyproject.toml instead");
+                }
+                extra_metadata.name.as_deref()
+            })
+            .unwrap_or(&module_name);
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)
         } else {
@@ -143,7 +150,7 @@ impl ProjectResolver {
             Some(py_src) => project_root.join(py_src),
             None => match extra_metadata.python_source.as_ref() {
                 Some(py_src) => {
-                    println!("⚠️ Warning: specify python-source in Cargo.toml is deprecated, use python-source in [tool.maturin] section in pyproject.toml instead");
+                    eprintln!("⚠️ Warning: specify python-source in Cargo.toml is deprecated, use python-source in [tool.maturin] section in pyproject.toml instead");
                     manifest_dir.join(py_src)
                 }
                 None => match pyproject.and_then(|x| x.project_name()) {

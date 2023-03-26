@@ -514,7 +514,7 @@ impl BuildOptions {
             bail!(
                 "The module name must not contain a minus `-` \
                  (Make sure you have set an appropriate [lib] name or \
-                 [package.metadata.maturin] name in your Cargo.toml)"
+                 [tool.maturin] module-name in your pyproject.toml)"
             );
         }
 

@@ -1,4 +1,4 @@
-# maturin is self bootstraping, however on platforms like alpine linux that aren't
+# maturin is self bootstrapping, however on platforms like alpine linux that aren't
 # manylinux, pip will try installing maturin from the source distribution.
 # That source distribution obviously can't depend on maturin, so we're using
 # the always available setuptools.

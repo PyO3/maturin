@@ -105,11 +105,13 @@ my-rust-and-python-project
 ```
 #### Import Rust as a submodule of your project
 
-If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused. You might also want to discourage end users from using the Rust functions directly by giving it a different name, say '\_my_project'. This can be done by adding `name = <package name>.<rust pymodule name>` to the `[package.metadata.maturin]` in your `Cargo.toml`. For example:
+If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused.
+You might also want to discourage end users from using the Rust functions directly by giving it a different name, say '\_my_project'.
+This can be done by adding `module-name = <package name>.<rust pymodule name>` to the `[tool.maturin]` in your `pyproject.toml`. For example:
 
 ```toml
-[package.metadata.maturin]
-name = "my_project._my_project"
+[tool.maturin]
+module-name = "my_project._my_project"
 ```
 
 You can then import your Rust module inside your Python source as follows:

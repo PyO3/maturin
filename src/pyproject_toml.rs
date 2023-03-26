@@ -86,6 +86,8 @@ impl GlobPattern {
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
+    // extension module name, accepts setuptools style import name like `foo.bar`
+    module_name: Option<String>,
     // TODO(0.15.0): remove deprecated
     sdist_include: Option<Vec<String>>,
     include: Option<Vec<GlobPattern>>,
@@ -170,6 +172,11 @@ impl PyProjectToml {
     #[inline]
     pub fn maturin(&self) -> Option<&ToolMaturin> {
         self.tool.as_ref()?.maturin.as_ref()
+    }
+
+    /// Returns the value of `[tool.maturin.module-name]` in pyproject.toml
+    pub fn module_name(&self) -> Option<&str> {
+        self.maturin()?.module_name.as_deref()
     }
 
     /// Returns the value of `[tool.maturin.sdist-include]` in pyproject.toml

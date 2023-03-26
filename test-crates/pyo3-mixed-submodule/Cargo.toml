@@ -6,9 +6,6 @@ description = "Implements a dummy function combining rust and python"
 readme = "README.md"
 edition = "2021"
 
-[package.metadata.maturin]
-name = "pyo3_mixed_submodule.rust_module.rust"
-
 [dependencies]
 pyo3 = { version = "0.18.0", features = ["extension-module"] }
 

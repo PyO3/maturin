@@ -142,7 +142,7 @@ pub struct BuildContext {
     /// The platform, i.e. os and pointer width
     pub target: Target,
     /// List of Cargo targets to compile
-    pub cargo_targets: Vec<CompileTarget>,
+    pub compile_targets: Vec<CompileTarget>,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
     /// The path to pyproject.toml. Required for the source distribution
@@ -253,7 +253,7 @@ impl BuildContext {
     /// Bridge model
     pub fn bridge(&self) -> &BridgeModel {
         // FIXME: currently we only allow multiple bin targets so bridges are all the same
-        &self.cargo_targets[0].1
+        &self.compile_targets[0].bridge_model
     }
 
     /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
@@ -682,7 +682,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
     ) -> Result<BuildArtifact> {
-        let artifacts = compile(self, python_interpreter, &self.cargo_targets)
+        let artifacts = compile(self, python_interpreter, &self.compile_targets)
             .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
@@ -933,7 +933,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifacts = compile(self, python_interpreter, &self.cargo_targets)
+        let artifacts = compile(self, python_interpreter, &self.compile_targets)
             .context("Failed to build a native library through cargo")?;
         if artifacts.is_empty() {
             bail!("Cargo didn't build a binary")

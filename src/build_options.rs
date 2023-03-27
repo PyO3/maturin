@@ -665,13 +665,13 @@ impl BuildOptions {
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
 
         let config_targets = pyproject.and_then(|x| x.targets());
-        let cargo_targets =
+        let compile_targets =
             filter_cargo_targets(&cargo_metadata, bridge, config_targets.as_deref())?;
 
         let crate_name = cargo_toml.package.name;
         Ok(BuildContext {
             target,
-            cargo_targets,
+            compile_targets,
             project_layout,
             pyproject_toml_path,
             pyproject_toml,
@@ -775,7 +775,10 @@ fn filter_cargo_targets(
             }
             _ => target.kind.contains(&"cdylib".to_string()),
         })
-        .map(|target| (target.clone(), bridge.clone()))
+        .map(|target| CompileTarget {
+            target: target.clone(),
+            bridge_model: bridge.clone(),
+        })
         .collect();
     if targets.is_empty() && !bridge.is_bin() {
         // No `crate-type = ["cdylib"]` in `Cargo.toml`
@@ -787,13 +790,16 @@ fn filter_cargo_targets(
                 .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
         });
         if let Some(target) = lib_target {
-            targets.push((target.clone(), bridge));
+            targets.push(CompileTarget {
+                target: target.clone(),
+                bridge_model: bridge,
+            });
         }
     }
 
     // Filter targets by config_targets
     if let Some(config_targets) = config_targets {
-        targets.retain(|(target, _)| {
+        targets.retain(|CompileTarget { target, .. }| {
             config_targets.iter().any(|config_target| {
                 let name_eq = config_target.name == target.name;
                 match &config_target.kind {
@@ -809,7 +815,7 @@ fn filter_cargo_targets(
         } else {
             let target_names = targets
                 .iter()
-                .map(|(target, _)| target.name.as_str())
+                .map(|CompileTarget { target, .. }| target.name.as_str())
                 .collect::<Vec<_>>();
             eprintln!(
                 "🎯 Found {} Cargo targets in `Cargo.toml`: {}",

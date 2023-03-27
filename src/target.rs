@@ -291,6 +291,7 @@ impl Target {
             }
             // macOS
             (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
+                // FIXME: also needs to read from pyproject.toml
                 let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
                 if universal2 {
                     format!(

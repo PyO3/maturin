@@ -1,6 +1,5 @@
 use crate::cross_compile::is_cross_compiling;
-use crate::python_interpreter::InterpreterKind;
-use crate::{PlatformTag, PythonInterpreter};
+use crate::PlatformTag;
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use platform_info::*;
 use rustc_version::VersionMeta;
@@ -634,30 +633,6 @@ impl Target {
             venv.to_path_buf()
         } else {
             venv.join("bin")
-        }
-    }
-
-    /// Returns the site-packages directory inside a venv e.g.
-    /// {venv_base}/lib/python{x}.{y} on unix or {venv_base}/Lib on window
-    pub fn get_venv_site_package(
-        &self,
-        venv_base: impl AsRef<Path>,
-        interpreter: &PythonInterpreter,
-    ) -> PathBuf {
-        if self.is_unix() {
-            match interpreter.interpreter_kind {
-                InterpreterKind::CPython => {
-                    let python_dir = format!("python{}.{}", interpreter.major, interpreter.minor);
-                    venv_base
-                        .as_ref()
-                        .join("lib")
-                        .join(python_dir)
-                        .join("site-packages")
-                }
-                InterpreterKind::PyPy => venv_base.as_ref().join("site-packages"),
-            }
-        } else {
-            venv_base.as_ref().join("Lib").join("site-packages")
         }
     }
 

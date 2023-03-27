@@ -871,6 +871,26 @@ impl PythonInterpreter {
             self.implmentation_name, self.major, self.minor, pointer_width
         )
     }
+
+    /// Returns the site-packages directory inside a venv e.g.
+    /// {venv_base}/lib/python{x}.{y} on unix or {venv_base}/Lib on window
+    pub fn get_venv_site_package(&self, venv_base: impl AsRef<Path>, target: &Target) -> PathBuf {
+        if target.is_unix() {
+            match self.interpreter_kind {
+                InterpreterKind::CPython => {
+                    let python_dir = format!("python{}.{}", self.major, self.minor);
+                    venv_base
+                        .as_ref()
+                        .join("lib")
+                        .join(python_dir)
+                        .join("site-packages")
+                }
+                InterpreterKind::PyPy => venv_base.as_ref().join("site-packages"),
+            }
+        } else {
+            venv_base.as_ref().join("Lib").join("site-packages")
+        }
+    }
 }
 
 impl fmt::Display for PythonInterpreter {

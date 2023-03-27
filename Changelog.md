@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Add support for custom TLS certificate authority bundle in [#1483](https://github.com/PyO3/maturin/pull/1483)
 * Bump MSRV to 1.64.0 in [#1528](https://github.com/PyO3/maturin/pull/1528)
 * Add wildcards support to publish/upload commands on Windows in [#1534](https://github.com/PyO3/maturin/pull/1534)
+* Add support for configuring macOS deployment target version in `pyproject.toml` in [#1536](https://github.com/PyO3/maturin/pull/1536)
 
 ## [0.14.16] - 2023-03-26
 

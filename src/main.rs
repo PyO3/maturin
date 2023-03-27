@@ -353,7 +353,10 @@ fn run() -> Result<()> {
         }
     }
 
+    #[cfg(not(feature = "wild"))]
     let opt = Opt::parse();
+    #[cfg(feature = "wild")]
+    let opt = Opt::parse_from(wild::args_os());
 
     match opt {
         Opt::Build {

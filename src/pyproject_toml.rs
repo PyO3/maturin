@@ -5,6 +5,7 @@ use anyhow::{format_err, Result};
 use fs_err as fs;
 use pyproject_toml::PyProjectToml as ProjectToml;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The `[tool]` section of a pyproject.toml
@@ -94,6 +95,15 @@ pub struct CargoTarget {
     // pub bindings: Option<String>,
 }
 
+/// Target configuration
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct TargetConfig {
+    /// macOS deployment target version
+    #[serde(alias = "macosx-deployment-target")]
+    pub macos_deployment_target: Option<String>,
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -118,6 +128,9 @@ pub struct ToolMaturin {
     data: Option<PathBuf>,
     /// Cargo compile targets
     pub targets: Option<Vec<CargoTarget>>,
+    /// Target configuration
+    #[serde(default, rename = "target")]
+    pub target_config: HashMap<String, TargetConfig>,
     // Some customizable cargo options
     /// Build artifacts with the specified Cargo profile
     pub profile: Option<String>,
@@ -248,6 +261,12 @@ impl PyProjectToml {
         self.maturin().and_then(|maturin| maturin.targets.clone())
     }
 
+    /// Returns the value of `[tool.maturin.target.<target>]` in pyproject.toml
+    pub fn target_config(&self, target: &str) -> Option<&TargetConfig> {
+        self.maturin()
+            .and_then(|maturin| maturin.target_config.get(target))
+    }
+
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
         self.maturin()?.manifest_path.as_deref()
@@ -335,6 +354,9 @@ mod tests {
             name = "pyo3_pure"
             kind = "lib"
             bindings = "pyo3"
+
+            [tool.maturin.target."x86_64-apple-darwin"]
+            macos-deployment-target = "10.12"
             "#,
         )
         .unwrap();
@@ -361,6 +383,11 @@ mod tests {
         );
         let targets = maturin.targets.as_ref().unwrap();
         assert_eq!("pyo3_pure", targets[0].name);
+        let target_config = pyproject.target_config("x86_64-apple-darwin").unwrap();
+        assert_eq!(
+            target_config.macos_deployment_target.as_deref(),
+            Some("10.12")
+        );
     }
 
     #[test]

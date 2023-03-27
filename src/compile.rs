@@ -21,7 +21,14 @@ const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 pub(crate) const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
 
-pub(crate) type CompileTarget = (cargo_metadata::Target, BridgeModel);
+/// A cargo target to build
+#[derive(Debug, Clone)]
+pub struct CompileTarget {
+    /// The cargo target to build
+    pub target: cargo_metadata::Target,
+    /// The bridge model to use
+    pub bridge_model: BridgeModel,
+}
 
 /// A cargo build artifact
 #[derive(Debug, Clone)]
@@ -68,7 +75,7 @@ fn compile_universal2(
     let mut universal_artifacts = Vec::with_capacity(targets.len());
     for (bridge_model, (aarch64_artifact, x86_64_artifact)) in targets
         .iter()
-        .map(|(_, bridge_model)| bridge_model)
+        .map(|target| &target.bridge_model)
         .zip(aarch64_artifacts.iter().zip(&x86_64_artifacts))
     {
         let build_type = if bridge_model.is_bin() {
@@ -132,13 +139,8 @@ fn compile_targets(
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
-    for (target, bridge_model) in targets {
-        artifacts.push(compile_target(
-            context,
-            python_interpreter,
-            bridge_model,
-            target,
-        )?);
+    for target in targets {
+        artifacts.push(compile_target(context, python_interpreter, target)?);
     }
     Ok(artifacts)
 }
@@ -146,8 +148,7 @@ fn compile_targets(
 fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bridge_model: &BridgeModel,
-    binding_target: &cargo_metadata::Target,
+    compile_target: &CompileTarget,
 ) -> Result<HashMap<String, BuildArtifact>> {
     let target = &context.target;
 
@@ -160,7 +161,8 @@ fn compile_target(
     }
 
     // Add `--crate-type cdylib` if available
-    if binding_target
+    if compile_target
+        .target
         .kind
         .iter()
         .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
@@ -181,9 +183,10 @@ fn compile_target(
         .unwrap_or_default();
 
     // We need to pass --bin / --lib
+    let bridge_model = &compile_target.bridge_model;
     match bridge_model {
         BridgeModel::Bin(..) => {
-            cargo_rustc.bin.push(binding_target.name.clone());
+            cargo_rustc.bin.push(compile_target.target.name.clone());
         }
         BridgeModel::Cffi
         | BridgeModel::UniFfi
@@ -408,13 +411,28 @@ fn compile_target(
 
     // Set default macOS deployment target version
     if target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
-        use crate::target::rustc_macosx_target_version;
+        use crate::build_context::rustc_macosx_target_version;
 
-        let (major, minor) = rustc_macosx_target_version(target_triple);
-        build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{major}.{minor}"));
-        eprintln!(
-            "💻 Using `MACOSX_DEPLOYMENT_TARGET={major}.{minor}` for {target_triple} by default"
-        );
+        let target_config = context
+            .pyproject_toml
+            .as_ref()
+            .and_then(|x| x.target_config(target_triple));
+        let deployment_target = if let Some(deployment_target) = target_config
+            .as_ref()
+            .and_then(|config| config.macos_deployment_target.as_ref())
+        {
+            eprintln!(
+                "💻 Using `MACOSX_DEPLOYMENT_TARGET={deployment_target}` for {target_triple} by configuration"
+            );
+            deployment_target.clone()
+        } else {
+            let (major, minor) = rustc_macosx_target_version(target_triple);
+            eprintln!(
+                "💻 Using `MACOSX_DEPLOYMENT_TARGET={major}.{minor}` for {target_triple} by default"
+            );
+            format!("{major}.{minor}")
+        };
+        build_command.env("MACOSX_DEPLOYMENT_TARGET", deployment_target);
     }
 
     debug!("Running {:?}", build_command);

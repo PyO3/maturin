@@ -1,6 +1,6 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
-use crate::{BridgeModel, Target};
+use crate::{BridgeModel, BuildContext, Target};
 use anyhow::{bail, format_err, Context, Result};
 use regex::Regex;
 use serde::Deserialize;
@@ -438,14 +438,10 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(
-        &self,
-        target: &Target,
-        platform_tags: &[PlatformTag],
-        universal2: bool,
-    ) -> Result<String> {
+    pub fn get_tag(&self, context: &BuildContext, platform_tags: &[PlatformTag]) -> Result<String> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
+        let target = &context.target;
         let use_sysconfig_platform = target.is_windows()
             || (target.is_linux() && platform_tags.iter().any(|tag| !tag.is_portable()))
             || target.is_illumos();
@@ -453,10 +449,10 @@ impl PythonInterpreter {
             if let Some(platform) = self.platform.clone() {
                 platform
             } else {
-                target.get_platform_tag(platform_tags, universal2)?
+                context.get_platform_tag(platform_tags)?
             }
         } else {
-            target.get_platform_tag(platform_tags, universal2)?
+            context.get_platform_tag(platform_tags)?
         };
         let tag = if self.implmentation_name.parse::<InterpreterKind>().is_err() {
             // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston
@@ -870,6 +866,26 @@ impl PythonInterpreter {
             "{}-{}.{}-{}bit",
             self.implmentation_name, self.major, self.minor, pointer_width
         )
+    }
+
+    /// Returns the site-packages directory inside a venv e.g.
+    /// {venv_base}/lib/python{x}.{y} on unix or {venv_base}/Lib on window
+    pub fn get_venv_site_package(&self, venv_base: impl AsRef<Path>, target: &Target) -> PathBuf {
+        if target.is_unix() {
+            match self.interpreter_kind {
+                InterpreterKind::CPython => {
+                    let python_dir = format!("python{}.{}", self.major, self.minor);
+                    venv_base
+                        .as_ref()
+                        .join("lib")
+                        .join(python_dir)
+                        .join("site-packages")
+                }
+                InterpreterKind::PyPy => venv_base.as_ref().join("site-packages"),
+            }
+        } else {
+            venv_base.as_ref().join("Lib").join("site-packages")
+        }
     }
 }
 

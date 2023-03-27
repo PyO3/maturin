@@ -93,7 +93,7 @@ impl PathWriter {
                     anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
                 })?;
 
-        let base_path = target.get_venv_site_package(venv_dir, &interpreter);
+        let base_path = interpreter.get_venv_site_package(venv_dir, target);
 
         Ok(PathWriter {
             base_path,

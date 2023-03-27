@@ -5,6 +5,12 @@ build-backend = "maturin"
 [tool.maturin]
 bindings = "pyo3"
 
+[tool.maturin.target."x86_64-apple-darwin"]
+macos-deployment-target = "10.12"
+
+[tool.maturin.target."aarch64-apple-darwin"]
+macos-deployment-target = "11.0"
+
 [project]
 # The name pyo3_pure instead of pyo3-pure is intentional,
 # it's used as a crate name resolution regression test

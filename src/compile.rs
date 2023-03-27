@@ -411,7 +411,7 @@ fn compile_target(
 
     // Set default macOS deployment target version
     if target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
-        use crate::target::rustc_macosx_target_version;
+        use crate::build_context::rustc_macosx_target_version;
 
         let target_config = context
             .pyproject_toml

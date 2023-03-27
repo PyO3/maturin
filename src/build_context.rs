@@ -9,6 +9,7 @@ use crate::module_writer::{
 use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
+use crate::target::{Arch, Os};
 use crate::{
     compile, pyproject_toml::Format, BuildArtifact, Metadata21, ModuleWriter, PyProjectToml,
     PythonInterpreter, Target,
@@ -19,9 +20,11 @@ use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
 use lddtree::Library;
 use normpath::PathExt;
+use platform_info::*;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -507,6 +510,126 @@ impl BuildContext {
         Ok(None)
     }
 
+    /// Returns the platform part of the tag for the wheel name
+    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+        let target = &self.target;
+        let tag = match (&target.target_os(), &target.target_arch()) {
+            // Windows
+            (Os::Windows, Arch::X86) => "win32".to_string(),
+            (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
+            (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
+            // Linux
+            (Os::Linux, _) => {
+                let arch = target.get_platform_arch()?;
+                let mut platform_tags = platform_tags.to_vec();
+                platform_tags.sort();
+                let mut tags = vec![];
+                for platform_tag in platform_tags {
+                    tags.push(format!("{platform_tag}_{arch}"));
+                    for alias in platform_tag.aliases() {
+                        tags.push(format!("{alias}_{arch}"));
+                    }
+                }
+                tags.join(".")
+            }
+            // macOS
+            (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
+                // FIXME: also needs to read from pyproject.toml
+                let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), self.universal2)?;
+                if self.universal2 {
+                    format!(
+                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2"
+                    )
+                } else if target.target_arch() == Arch::Aarch64 {
+                    format!("macosx_{arm64_major}_{arm64_minor}_arm64")
+                } else {
+                    format!("macosx_{x86_64_major}_{x86_64_minor}_x86_64")
+                }
+            }
+            // FreeBSD
+            (Os::FreeBsd, _)
+            // NetBSD
+            | (Os::NetBsd, _)
+            // OpenBSD
+            | (Os::OpenBsd, _) => {
+                let release = target.get_platform_release()?;
+                format!(
+                    "{}_{}_{}",
+                    target.target_os().to_string().to_ascii_lowercase(),
+                    release,
+                    target.target_arch().machine(),
+                )
+            }
+            // DragonFly
+            (Os::Dragonfly, Arch::X86_64)
+            // Haiku
+            | (Os::Haiku, Arch::X86_64) => {
+                let release = target.get_platform_release()?;
+                format!(
+                    "{}_{}_{}",
+                    target.target_os().to_string().to_ascii_lowercase(),
+                    release.to_ascii_lowercase(),
+                    "x86_64"
+                )
+            }
+            // Emscripten
+            (Os::Emscripten, Arch::Wasm32) => {
+                let release = emscripten_version()?.replace(['.', '-'], "_");
+                format!("emscripten_{release}_wasm32")
+            }
+            (Os::Wasi, Arch::Wasm32) => {
+                "any".to_string()
+            }
+            // osname_release_machine fallback for any POSIX system
+            (_, _) => {
+                let info = PlatformInfo::new()?;
+                let mut release = info.release().replace(['.', '-'], "_");
+                let mut machine = info.machine().replace([' ', '/'], "_");
+
+                let mut os = target.target_os().to_string().to_ascii_lowercase();
+                // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
+                if os.starts_with("sunos") {
+                    // Solaris / Illumos
+                    if let Some((major, other)) = release.split_once('_') {
+                        let major_ver: u64 = major.parse().context("illumos major version is not a number")?;
+                        if major_ver >= 5 {
+                            // SunOS 5 == Solaris 2
+                            os = "solaris".to_string();
+                            release = format!("{}_{}", major_ver - 3, other);
+                            machine = format!("{machine}_64bit");
+                        }
+                    }
+                }
+                format!(
+                    "{os}_{release}_{machine}"
+                )
+            }
+        };
+        Ok(tag)
+    }
+
+    /// Returns the tags for the WHEEL file for cffi wheels
+    pub fn get_py3_tags(&self, platform_tags: &[PlatformTag]) -> Result<Vec<String>> {
+        let tags = vec![format!(
+            "py3-none-{}",
+            self.get_platform_tag(platform_tags)?
+        )];
+        Ok(tags)
+    }
+
+    /// Returns the tags for the platform without python version
+    pub fn get_universal_tags(
+        &self,
+        platform_tags: &[PlatformTag],
+    ) -> Result<(String, Vec<String>)> {
+        let tag = format!(
+            "py3-none-{platform}",
+            platform = self.get_platform_tag(platform_tags)?
+        );
+        let tags = self.get_py3_tags(platform_tags)?;
+        Ok((tag, tags))
+    }
+
     fn write_binding_wheel_abi3(
         &self,
         artifact: BuildArtifact,
@@ -515,9 +638,7 @@ impl BuildContext {
         major: u8,
         min_minor: u8,
     ) -> Result<BuiltWheelMetadata> {
-        let platform = self
-            .target
-            .get_platform_tag(platform_tags, self.universal2)?;
+        let platform = self.get_platform_tag(platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
 
         let mut writer = WheelWriter::new(
@@ -596,7 +717,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
     ) -> Result<BuiltWheelMetadata> {
-        let tag = python_interpreter.get_tag(&self.target, platform_tags, self.universal2)?;
+        let tag = python_interpreter.get_tag(self, platform_tags)?;
 
         let mut writer = WheelWriter::new(
             &tag,
@@ -718,9 +839,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self
-            .target
-            .get_universal_tags(platform_tags, self.universal2)?;
+        let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
         let mut writer = WheelWriter::new(
             &tag,
@@ -786,9 +905,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self
-            .target
-            .get_universal_tags(platform_tags, self.universal2)?;
+        let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
         let mut writer = WheelWriter::new(
             &tag,
@@ -843,12 +960,9 @@ impl BuildContext {
         ext_libs: &[Vec<Library>],
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = match (self.bridge(), python_interpreter) {
-            (BridgeModel::Bin(None), _) => self
-                .target
-                .get_universal_tags(platform_tags, self.universal2)?,
+            (BridgeModel::Bin(None), _) => self.get_universal_tags(platform_tags)?,
             (BridgeModel::Bin(Some(..)), Some(python_interpreter)) => {
-                let tag =
-                    python_interpreter.get_tag(&self.target, platform_tags, self.universal2)?;
+                let tag = python_interpreter.get_tag(self, platform_tags)?;
                 (tag.clone(), vec![tag])
             }
             _ => unreachable!(),
@@ -994,4 +1108,141 @@ pub fn hash_file(path: impl AsRef<Path>) -> Result<String, io::Error> {
     io::copy(&mut file, &mut hasher)?;
     let hex = format!("{:x}", hasher.finalize());
     Ok(hex)
+}
+
+/// Get the default macOS deployment target version
+fn macosx_deployment_target(
+    deploy_target: Option<&str>,
+    universal2: bool,
+) -> Result<((u16, u16), (u16, u16))> {
+    let x86_64_default_rustc = rustc_macosx_target_version("x86_64-apple-darwin");
+    let x86_64_default = if universal2 && x86_64_default_rustc.1 < 9 {
+        (10, 9)
+    } else {
+        x86_64_default_rustc
+    };
+    let arm64_default = rustc_macosx_target_version("aarch64-apple-darwin");
+    let mut x86_64_ver = x86_64_default;
+    let mut arm64_ver = arm64_default;
+    if let Some(deploy_target) = deploy_target {
+        let err_ctx = "MACOSX_DEPLOYMENT_TARGET is invalid";
+        let mut parts = deploy_target.split('.');
+        let major = parts.next().context(err_ctx)?;
+        let major: u16 = major.parse().context(err_ctx)?;
+        let minor = parts.next().context(err_ctx)?;
+        let minor: u16 = minor.parse().context(err_ctx)?;
+        if (major, minor) > x86_64_default {
+            x86_64_ver = (major, minor);
+        }
+        if (major, minor) > arm64_default {
+            arm64_ver = (major, minor);
+        }
+    }
+    Ok((x86_64_ver, arm64_ver))
+}
+
+pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
+    use std::process::Command;
+    use target_lexicon::OperatingSystem;
+
+    let fallback_version = if target == "aarch64-apple-darwin" {
+        (11, 0)
+    } else {
+        (10, 7)
+    };
+
+    let rustc_target_version = || -> Result<(u16, u16)> {
+        let cmd = Command::new("rustc")
+            .arg("-Z")
+            .arg("unstable-options")
+            .arg("--print")
+            .arg("target-spec-json")
+            .arg("--target")
+            .arg(target)
+            .env("RUSTC_BOOTSTRAP", "1")
+            .env_remove("MACOSX_DEPLOYMENT_TARGET")
+            .output()
+            .context("Failed to run rustc to get the target spec")?;
+        let stdout = String::from_utf8(cmd.stdout).context("rustc output is not valid utf-8")?;
+        let spec: serde_json::Value =
+            serde_json::from_str(&stdout).context("rustc output is not valid json")?;
+        let llvm_target = spec
+            .as_object()
+            .context("rustc output is not a json object")?
+            .get("llvm-target")
+            .context("rustc output does not contain llvm-target")?
+            .as_str()
+            .context("llvm-target is not a string")?;
+        let triple = llvm_target.parse::<target_lexicon::Triple>();
+        let (major, minor) = match triple.map(|t| t.operating_system) {
+            Ok(OperatingSystem::MacOSX { major, minor, .. }) => (major, minor),
+            _ => fallback_version,
+        };
+        Ok((major, minor))
+    };
+    rustc_target_version().unwrap_or(fallback_version)
+}
+
+/// Emscripten version
+fn emscripten_version() -> Result<String> {
+    let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
+    let release = match os_version {
+        Ok(os_ver) => os_ver,
+        Err(_) => emcc_version()?,
+    };
+    Ok(release)
+}
+
+fn emcc_version() -> Result<String> {
+    use regex::bytes::Regex;
+    use std::process::Command;
+
+    let emcc = Command::new("emcc")
+        .arg("--version")
+        .output()
+        .context("Failed to run emcc to get the version")?;
+    let pattern = Regex::new(r"^emcc .+? (\d+\.\d+\.\d+).*").unwrap();
+    let caps = pattern
+        .captures(&emcc.stdout)
+        .context("Failed to parse emcc version")?;
+    let version = caps.get(1).context("Failed to parse emcc version")?;
+    Ok(String::from_utf8(version.as_bytes().to_vec())?)
+}
+
+#[cfg(test)]
+mod test {
+    use super::macosx_deployment_target;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_macosx_deployment_target() {
+        assert_eq!(
+            macosx_deployment_target(None, false).unwrap(),
+            ((10, 7), (11, 0))
+        );
+        assert_eq!(
+            macosx_deployment_target(None, true).unwrap(),
+            ((10, 9), (11, 0))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("10.6"), false).unwrap(),
+            ((10, 7), (11, 0))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("10.6"), true).unwrap(),
+            ((10, 9), (11, 0))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("10.9"), false).unwrap(),
+            ((10, 9), (11, 0))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("11.0.0"), false).unwrap(),
+            ((11, 0), (11, 0))
+        );
+        assert_eq!(
+            macosx_deployment_target(Some("11.1"), false).unwrap(),
+            ((11, 1), (11, 1))
+        );
+    }
 }

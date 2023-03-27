@@ -1,6 +1,6 @@
 use crate::cross_compile::is_cross_compiling;
 use crate::PlatformTag;
-use anyhow::{anyhow, bail, format_err, Context, Result};
+use anyhow::{anyhow, bail, format_err, Result};
 use platform_info::*;
 use rustc_version::VersionMeta;
 use serde::Deserialize;
@@ -263,108 +263,8 @@ impl Target {
         Ok(target)
     }
 
-    /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(
-        &self,
-        platform_tags: &[PlatformTag],
-        universal2: bool,
-    ) -> Result<String> {
-        let tag = match (&self.os, &self.arch) {
-            // Windows
-            (Os::Windows, Arch::X86) => "win32".to_string(),
-            (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
-            (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
-            // Linux
-            (Os::Linux, _) => {
-                let arch = self.get_platform_arch()?;
-                let mut platform_tags = platform_tags.to_vec();
-                platform_tags.sort();
-                let mut tags = vec![];
-                for platform_tag in platform_tags {
-                    tags.push(format!("{platform_tag}_{arch}"));
-                    for alias in platform_tag.aliases() {
-                        tags.push(format!("{alias}_{arch}"));
-                    }
-                }
-                tags.join(".")
-            }
-            // macOS
-            (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
-                // FIXME: also needs to read from pyproject.toml
-                let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), universal2)?;
-                if universal2 {
-                    format!(
-                        "macosx_{x86_64_major}_{x86_64_minor}_x86_64.macosx_{arm64_major}_{arm64_minor}_arm64.macosx_{x86_64_major}_{x86_64_minor}_universal2"
-                    )
-                } else if self.arch == Arch::Aarch64 {
-                    format!("macosx_{arm64_major}_{arm64_minor}_arm64")
-                } else {
-                    format!("macosx_{x86_64_major}_{x86_64_minor}_x86_64")
-                }
-            }
-            // FreeBSD
-            (Os::FreeBsd, _)
-            // NetBSD
-            | (Os::NetBsd, _)
-            // OpenBSD
-            | (Os::OpenBsd, _) => {
-                let release = self.get_platform_release()?;
-                format!(
-                    "{}_{}_{}",
-                    self.os.to_string().to_ascii_lowercase(),
-                    release,
-                    self.arch.machine(),
-                )
-            }
-            // DragonFly
-            (Os::Dragonfly, Arch::X86_64)
-            // Haiku
-            | (Os::Haiku, Arch::X86_64) => {
-                let release = self.get_platform_release()?;
-                format!(
-                    "{}_{}_{}",
-                    self.os.to_string().to_ascii_lowercase(),
-                    release.to_ascii_lowercase(),
-                    "x86_64"
-                )
-            }
-            // Emscripten
-            (Os::Emscripten, Arch::Wasm32) => {
-                let release = emscripten_version()?.replace(['.', '-'], "_");
-                format!("emscripten_{release}_wasm32")
-            }
-            (Os::Wasi, Arch::Wasm32) => {
-                "any".to_string()
-            }
-            // osname_release_machine fallback for any POSIX system
-            (_, _) => {
-                let info = PlatformInfo::new()?;
-                let mut release = info.release().replace(['.', '-'], "_");
-                let mut machine = info.machine().replace([' ', '/'], "_");
-
-                let mut os = self.os.to_string().to_ascii_lowercase();
-                // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
-                if os.starts_with("sunos") {
-                    // Solaris / Illumos
-                    if let Some((major, other)) = release.split_once('_') {
-                        let major_ver: u64 = major.parse().context("illumos major version is not a number")?;
-                        if major_ver >= 5 {
-                            // SunOS 5 == Solaris 2
-                            os = "solaris".to_string();
-                            release = format!("{}_{}", major_ver - 3, other);
-                            machine = format!("{machine}_64bit");
-                        }
-                    }
-                }
-                format!(
-                    "{os}_{release}_{machine}"
-                )
-            }
-        };
-        Ok(tag)
-    }
-
-    fn get_platform_arch(&self) -> Result<String> {
+    /// Returns the platform architecture
+    pub fn get_platform_arch(&self) -> Result<String> {
         if self.cross_compiling {
             return Ok(self.arch.to_string());
         }
@@ -389,7 +289,8 @@ impl Target {
         Ok(arch)
     }
 
-    fn get_platform_release(&self) -> Result<String> {
+    /// Returns the platform release
+    pub fn get_platform_release(&self) -> Result<String> {
         let os = self.os.to_string();
         let os_version = env::var(format!("MATURIN_{}_VERSION", os.to_ascii_uppercase()));
         let release = match os_version {
@@ -489,11 +390,13 @@ impl Target {
     }
 
     /// Returns target triple as string
+    #[inline]
     pub fn target_triple(&self) -> &str {
         &self.triple
     }
 
     /// Returns host triple as string
+    #[inline]
     pub fn host_triple(&self) -> &str {
         &self.rustc_version.host
     }
@@ -517,66 +420,79 @@ impl Target {
     }
 
     /// Returns target operating system
+    #[inline]
     pub fn target_os(&self) -> Os {
         self.os
     }
 
     /// Returns target architecture
+    #[inline]
     pub fn target_arch(&self) -> Arch {
         self.arch
     }
 
     /// Returns target environment
+    #[inline]
     pub fn target_env(&self) -> Environment {
         self.env
     }
 
     /// Returns true if the current platform is linux
+    #[inline]
     pub fn is_linux(&self) -> bool {
         self.os == Os::Linux
     }
 
     /// Returns true if the current platform is freebsd
+    #[inline]
     pub fn is_freebsd(&self) -> bool {
         self.os == Os::FreeBsd
     }
 
     /// Returns true if the current platform is mac os
+    #[inline]
     pub fn is_macos(&self) -> bool {
         self.os == Os::Macos
     }
 
     /// Returns true if the current platform is windows
+    #[inline]
     pub fn is_windows(&self) -> bool {
         self.os == Os::Windows
     }
 
     /// Returns true if the current environment is msvc
+    #[inline]
     pub fn is_msvc(&self) -> bool {
         self.env == Environment::Msvc
     }
 
     /// Returns true if the current platform is illumos
+    #[inline]
     pub fn is_illumos(&self) -> bool {
         self.os == Os::Illumos
     }
 
     /// Returns true if the current platform is haiku
+    #[inline]
     pub fn is_haiku(&self) -> bool {
         self.os == Os::Haiku
     }
 
     /// Returns true if the current platform is Emscripten
+    #[inline]
     pub fn is_emscripten(&self) -> bool {
         self.os == Os::Emscripten
     }
 
     /// Returns true if we're building a binary for wasm32-wasi
+    #[inline]
     pub fn is_wasi(&self) -> bool {
         self.os == Os::Wasi
     }
 
     /// Returns true if the current platform's target env is Musl
+    #[inline]
     pub fn is_musl_target(&self) -> bool {
         matches!(
             self.env,
@@ -588,21 +504,9 @@ impl Target {
     }
 
     /// Is cross compiling for this target
+    #[inline]
     pub fn cross_compiling(&self) -> bool {
         self.cross_compiling
-    }
-
-    /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(
-        &self,
-        platform_tags: &[PlatformTag],
-        universal2: bool,
-    ) -> Result<Vec<String>> {
-        let tags = vec![format!(
-            "py3-none-{}",
-            self.get_platform_tag(platform_tags, universal2)?
-        )];
-        Ok(tags)
     }
 
     /// Returns the path to the python executable inside a venv
@@ -623,7 +527,7 @@ impl Target {
             if bin_dir.join("python.exe").exists() {
                 return bin_dir;
             }
-            // Python innstalled via msys2 on Windows might produce a POSIX-like venv
+            // Python installed via msys2 on Windows might produce a POSIX-like venv
             // See https://github.com/PyO3/maturin/issues/1108
             let bin_dir = venv.join("bin");
             if bin_dir.join("python.exe").exists() {
@@ -649,20 +553,6 @@ impl Target {
             PathBuf::from("python3")
         }
     }
-
-    /// Returns the tags for the platform without python version
-    pub fn get_universal_tags(
-        &self,
-        platform_tags: &[PlatformTag],
-        universal2: bool,
-    ) -> Result<(String, Vec<String>)> {
-        let tag = format!(
-            "py3-none-{platform}",
-            platform = self.get_platform_tag(platform_tags, universal2)?
-        );
-        let tags = self.get_py3_tags(platform_tags, universal2)?;
-        Ok((tag, tags))
-    }
 }
 
 fn rustc_version_meta() -> Result<VersionMeta> {
@@ -679,141 +569,4 @@ fn rustc_version_meta() -> Result<VersionMeta> {
         err => anyhow!(err).context("Failed to run rustc to get the host target"),
     })?;
     Ok(meta)
-}
-
-/// Get the default macOS deployment target version
-fn macosx_deployment_target(
-    deploy_target: Option<&str>,
-    universal2: bool,
-) -> Result<((u16, u16), (u16, u16))> {
-    let x86_64_default_rustc = rustc_macosx_target_version("x86_64-apple-darwin");
-    let x86_64_default = if universal2 && x86_64_default_rustc.1 < 9 {
-        (10, 9)
-    } else {
-        x86_64_default_rustc
-    };
-    let arm64_default = rustc_macosx_target_version("aarch64-apple-darwin");
-    let mut x86_64_ver = x86_64_default;
-    let mut arm64_ver = arm64_default;
-    if let Some(deploy_target) = deploy_target {
-        let err_ctx = "MACOSX_DEPLOYMENT_TARGET is invalid";
-        let mut parts = deploy_target.split('.');
-        let major = parts.next().context(err_ctx)?;
-        let major: u16 = major.parse().context(err_ctx)?;
-        let minor = parts.next().context(err_ctx)?;
-        let minor: u16 = minor.parse().context(err_ctx)?;
-        if (major, minor) > x86_64_default {
-            x86_64_ver = (major, minor);
-        }
-        if (major, minor) > arm64_default {
-            arm64_ver = (major, minor);
-        }
-    }
-    Ok((x86_64_ver, arm64_ver))
-}
-
-pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
-    use std::process::Command;
-    use target_lexicon::OperatingSystem;
-
-    let fallback_version = if target == "aarch64-apple-darwin" {
-        (11, 0)
-    } else {
-        (10, 7)
-    };
-
-    let rustc_target_version = || -> Result<(u16, u16)> {
-        let cmd = Command::new("rustc")
-            .arg("-Z")
-            .arg("unstable-options")
-            .arg("--print")
-            .arg("target-spec-json")
-            .arg("--target")
-            .arg(target)
-            .env("RUSTC_BOOTSTRAP", "1")
-            .env_remove("MACOSX_DEPLOYMENT_TARGET")
-            .output()
-            .context("Failed to run rustc to get the target spec")?;
-        let stdout = String::from_utf8(cmd.stdout).context("rustc output is not valid utf-8")?;
-        let spec: serde_json::Value =
-            serde_json::from_str(&stdout).context("rustc output is not valid json")?;
-        let llvm_target = spec
-            .as_object()
-            .context("rustc output is not a json object")?
-            .get("llvm-target")
-            .context("rustc output does not contain llvm-target")?
-            .as_str()
-            .context("llvm-target is not a string")?;
-        let triple = llvm_target.parse::<Triple>();
-        let (major, minor) = match triple.map(|t| t.operating_system) {
-            Ok(OperatingSystem::MacOSX { major, minor, .. }) => (major, minor),
-            _ => fallback_version,
-        };
-        Ok((major, minor))
-    };
-    rustc_target_version().unwrap_or(fallback_version)
-}
-
-/// Emscripten version
-fn emscripten_version() -> Result<String> {
-    let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
-    let release = match os_version {
-        Ok(os_ver) => os_ver,
-        Err(_) => emcc_version()?,
-    };
-    Ok(release)
-}
-
-fn emcc_version() -> Result<String> {
-    use regex::bytes::Regex;
-    use std::process::Command;
-
-    let emcc = Command::new("emcc")
-        .arg("--version")
-        .output()
-        .context("Failed to run emcc to get the version")?;
-    let pattern = Regex::new(r"^emcc .+? (\d+\.\d+\.\d+).*").unwrap();
-    let caps = pattern
-        .captures(&emcc.stdout)
-        .context("Failed to parse emcc version")?;
-    let version = caps.get(1).context("Failed to parse emcc version")?;
-    Ok(String::from_utf8(version.as_bytes().to_vec())?)
-}
-
-#[cfg(test)]
-mod test {
-    use super::macosx_deployment_target;
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn test_macosx_deployment_target() {
-        assert_eq!(
-            macosx_deployment_target(None, false).unwrap(),
-            ((10, 7), (11, 0))
-        );
-        assert_eq!(
-            macosx_deployment_target(None, true).unwrap(),
-            ((10, 9), (11, 0))
-        );
-        assert_eq!(
-            macosx_deployment_target(Some("10.6"), false).unwrap(),
-            ((10, 7), (11, 0))
-        );
-        assert_eq!(
-            macosx_deployment_target(Some("10.6"), true).unwrap(),
-            ((10, 9), (11, 0))
-        );
-        assert_eq!(
-            macosx_deployment_target(Some("10.9"), false).unwrap(),
-            ((10, 9), (11, 0))
-        );
-        assert_eq!(
-            macosx_deployment_target(Some("11.0.0"), false).unwrap(),
-            ((11, 0), (11, 0))
-        );
-        assert_eq!(
-            macosx_deployment_target(Some("11.1"), false).unwrap(),
-            ((11, 1), (11, 1))
-        );
-    }
 }

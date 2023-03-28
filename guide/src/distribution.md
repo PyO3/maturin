@@ -239,3 +239,57 @@ needed for compiling and linking automatically.
 
 **By using this to cross compiling to Windows MSVC targets you are consented to accept the license at [https://go.microsoft.com/fwlink/?LinkId=2086102](https://go.microsoft.com/fwlink/?LinkId=2086102)**.
 (Building on Windows natively does not apply.)
+
+## GitHub Actions
+
+If your project uses GitHub Actions, you can use the `maturin generate-ci` command to generate a GitHub Actions workflow file.
+
+```bash
+mkdir -p .github/workflows
+maturin generate-ci github > .github/workflows/CI.yml
+```
+
+There are some options to customize the generated workflow file:
+
+```
+Generate CI configuration
+
+Usage: maturin generate-ci [OPTIONS] <CI>
+
+Arguments:
+  <CI>
+          CI provider
+
+          Possible values:
+          - github: GitHub
+
+Options:
+  -m, --manifest-path <PATH>
+          Path to Cargo.toml
+
+  -o, --output <PATH>
+          Output path
+
+          [default: -]
+
+      --platform <platform>...
+          Platform support
+
+          [default: linux windows macos]
+
+          Possible values:
+          - all:        All
+          - linux:      Linux
+          - windows:    Windows
+          - macos:      macOS
+          - emscripten: Emscripten
+
+      --pytest
+          Enable pytest
+
+      --zig
+          Use zig to do cross compilation
+
+  -h, --help
+          Print help information (use `-h` for a summary)
+```

@@ -18,6 +18,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::Metadata;
 use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
+use indexmap::IndexMap;
 use lddtree::Library;
 use normpath::PathExt;
 use platform_info::*;
@@ -103,7 +104,7 @@ fn bin_wasi_helper(
         bail!("You can't define entrypoints yourself for a binary project");
     }
 
-    let mut console_scripts = HashMap::new();
+    let mut console_scripts = IndexMap::new();
     for (_, bin_name) in artifacts_and_files {
         let base_name = bin_name
             .strip_suffix(".wasm")

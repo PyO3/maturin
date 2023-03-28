@@ -9,6 +9,7 @@
 - [Project Layout](./project_layout.md)
 - [Bindings](./bindings.md)
 - [Python Metadata](./metadata.md)
+- [Environment Variables](./environment-variables.md)
 - [Local Development](./develop.md)
 - [Distribution](./distribution.md)
 - [Sphinx Integration](./sphinx.md)

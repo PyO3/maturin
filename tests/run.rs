@@ -322,7 +322,7 @@ fn integration_with_data() {
 }
 
 #[test]
-// Sourced from https://pypi.org/project/wasmtime/6.0.0/#files
+// Sourced from https://pypi.org/project/wasmtime/7.0.0/#files
 // update with wasmtime updates
 #[cfg(any(
     all(target_os = "windows", target_arch = "x86_64"),

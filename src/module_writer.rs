@@ -11,6 +11,7 @@ use fs_err as fs;
 use fs_err::File;
 use ignore::overrides::Override;
 use ignore::WalkBuilder;
+use indexmap::IndexMap;
 use normpath::PathExt as _;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -506,7 +507,7 @@ Root-Is-Purelib: false
 /// https://packaging.python.org/specifications/entry-points/
 fn entry_points_txt(
     entry_type: &str,
-    entrypoints: &HashMap<String, String, impl std::hash::BuildHasher>,
+    entrypoints: &IndexMap<String, String, impl std::hash::BuildHasher>,
 ) -> String {
     entrypoints
         .iter()

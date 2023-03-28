@@ -1,6 +1,7 @@
 use crate::PyProjectToml;
 use anyhow::{bail, Context, Result};
 use fs_err as fs;
+use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -53,11 +54,11 @@ pub struct Metadata21 {
     pub obsoletes_dist: Vec<String>,
     pub requires_python: Option<String>,
     pub requires_external: Vec<String>,
-    pub project_url: HashMap<String, String>,
+    pub project_url: IndexMap<String, String>,
     pub provides_extra: Vec<String>,
-    pub scripts: HashMap<String, String>,
-    pub gui_scripts: HashMap<String, String>,
-    pub entry_points: HashMap<String, HashMap<String, String>>,
+    pub scripts: IndexMap<String, String>,
+    pub gui_scripts: IndexMap<String, String>,
+    pub entry_points: IndexMap<String, IndexMap<String, String>>,
 }
 
 const PLAINTEXT_CONTENT_TYPE: &str = "text/plain; charset=UTF-8";
@@ -327,7 +328,7 @@ impl Metadata21 {
             }
         };
         let name = package.name.clone();
-        let mut project_url = HashMap::new();
+        let mut project_url = IndexMap::new();
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }

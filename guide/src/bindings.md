@@ -30,7 +30,7 @@ For example `abi3-py37` will indicate a minimum Python version of 3.7.
 ### Cross Compiling
 
 pyo3 bindings has decent cross compilation support.
-For manylinux support the [manylinux-cross](https://github.com/messense/manylinux-cross) docker images can be used.
+For manylinux support the [manylinux-cross](https://github.com/rust-cross/manylinux-cross) docker images can be used.
 
 > **Note**: Read more about cross compiling in [pyo3's
 > documentation](https://pyo3.rs/latest/building_and_distribution.html#cross-compiling).

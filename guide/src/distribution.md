@@ -202,7 +202,7 @@ other kind of bindings may work but aren't tested regularly.
 
 ##### Use Docker
 
-For manylinux support the [manylinux-cross](https://github.com/messense/manylinux-cross) docker images can be used.
+For manylinux support the [manylinux-cross](https://github.com/rust-cross/manylinux-cross) docker images can be used.
 And [maturin-action](https://github.com/PyO3/maturin-action) makes it easy to do cross compilation on GitHub Actions.
 
 ##### Use Zig

@@ -107,7 +107,7 @@ Having a directory with `package_name` in the root of the project can
 occasionally cause confusion as Python allows importing local packages and
 modules. A popular way to avoid this is with the `src`-layout, where the Python
 package is nested within a `src` directory. Unfortunately this interferes with
-the structure of a typical Rust project. Fortunately, Python is nor particular
+the structure of a typical Rust project. Fortunately, Python is not particular
 about the name of the parent source directory.
 
 maturin will detect the following src layout automatically:

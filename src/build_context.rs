@@ -42,7 +42,7 @@ pub enum BridgeModel {
     /// providing crate, e.g. pyo3, the number is the minimum minor python version
     Bindings(String, usize),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
-    /// for all cpython versions (pypy still needs multiple versions).
+    /// for all cpython versions (pypy & graalpy still need multiple versions).
     /// The numbers are the minimum major and minor version
     BindingsAbi3(u8, u8),
     /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
@@ -234,7 +234,9 @@ impl BuildContext {
                     let interp_names: HashSet<_> = non_abi3_interps
                         .iter()
                         .map(|interp| match interp.interpreter_kind {
-                            InterpreterKind::CPython => interp.implementation_name.to_string(),
+                            InterpreterKind::CPython | InterpreterKind::GraalPy => {
+                                interp.implementation_name.to_string()
+                            }
                             InterpreterKind::PyPy => "PyPy".to_string(),
                         })
                         .collect();

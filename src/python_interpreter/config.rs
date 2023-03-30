@@ -9,6 +9,7 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 const PYPY_ABI_TAG: &str = "pp73";
+const GRAALPY_ABI_TAG: &str = "graalpy230_310_native";
 
 /// Some of the sysconfigdata of Python interpreter we care about
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
@@ -17,7 +18,7 @@ pub struct InterpreterConfig {
     pub major: usize,
     /// Python's minor version
     pub minor: usize,
-    /// cpython or pypy
+    /// cpython, pypy, or graalpy
     #[serde(rename = "interpreter")]
     pub interpreter_kind: InterpreterKind,
     /// For linux and mac, this contains the value of the abiflags, e.g. "m"
@@ -316,6 +317,7 @@ impl InterpreterConfig {
                 }
             }
             InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| PYPY_ABI_TAG.to_string()),
+            InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| GRAALPY_ABI_TAG.to_string()),
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
         let ext_suffix = if target.is_linux() || target.is_macos() {
@@ -347,6 +349,16 @@ impl InterpreterConfig {
                         target.get_python_arch(),
                         target.get_python_os(),
                         target_env,
+                        file_ext,
+                    )
+                }),
+                InterpreterKind::GraalPy => ext_suffix.unwrap_or_else(|| {
+                    // e.g. .graalpy230-310-native-x86_64-linux.so
+                    format!(
+                        ".{}-{}-{}.{}",
+                        abi_tag.replace('_', "-"),
+                        target.get_python_arch(),
+                        target.get_python_os(),
                         file_ext,
                     )
                 }),

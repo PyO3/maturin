@@ -350,10 +350,10 @@ fn compile_target(
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bridge_model {
-        let is_pypy = python_interpreter
-            .map(|p| p.interpreter_kind.is_pypy())
+        let is_pypy_or_graalpy = python_interpreter
+            .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
-        if !is_pypy && !target.is_windows() {
+        if !is_pypy_or_graalpy && !target.is_windows() {
             let pyo3_ver = pyo3_version(&context.cargo_metadata)
                 .context("Failed to get pyo3 version from cargo metadata")?;
             if pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
@@ -389,7 +389,8 @@ fn compile_target(
         } else if (bridge_model.is_bindings("pyo3")
             || bridge_model.is_bindings("pyo3-ffi")
             || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
-                && interpreter.interpreter_kind.is_pypy()))
+                && (interpreter.interpreter_kind.is_pypy()
+                    || interpreter.interpreter_kind.is_graalpy())))
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {
             let pyo3_config = interpreter.pyo3_config_file();

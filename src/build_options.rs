@@ -269,6 +269,8 @@ impl BuildOptions {
                                     Some(InterpreterKind::PyPy)
                                 } else if tag.starts_with("cpython") {
                                     Some(InterpreterKind::CPython)
+                                } else if tag.starts_with("graalpy") {
+                                    Some(InterpreterKind::GraalPy)
                                 } else {
                                     None
                                 }
@@ -1133,6 +1135,11 @@ fn find_interpreter_in_sysconfig(
         let python = interp.display().to_string();
         let (python_impl, python_ver) = if let Some(ver) = python.strip_prefix("pypy") {
             (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
+        } else if let Some(ver) = python.strip_prefix("graalpy") {
+            (
+                InterpreterKind::GraalPy,
+                ver.strip_prefix('-').unwrap_or(ver),
+            )
         } else if let Some(ver) = python.strip_prefix("python") {
             (
                 InterpreterKind::CPython,

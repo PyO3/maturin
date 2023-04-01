@@ -245,8 +245,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-20.04
     env:
-      PYODIDE_VERSION: "0.22.0"
-      PYTHON_VERSION: "3.10.2"
+      PYODIDE_VERSION: "0.23.0"
+      PYTHON_VERSION: "3.11.2"
       NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v3

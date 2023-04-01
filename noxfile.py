@@ -6,7 +6,7 @@ from pathlib import Path
 import nox
 
 
-PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.22.0")
+PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.23.0")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
 

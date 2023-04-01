@@ -181,7 +181,7 @@ The keys are the script names while the values are the path to the function in t
 get_42 = "my_project:DummyClass.get_42"
 ```
 
-You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `project.classifiers`:
+You can also specify [trove classifiers](https://pypi.org/classifiers/) in your `pyproject.toml` under `project.classifiers`:
 
 ```toml
 [project]

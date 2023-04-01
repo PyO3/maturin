@@ -124,7 +124,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.1
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.4.0-pre.10"
       - uses: actions/checkout@v3
@@ -440,7 +440,7 @@ jobs:
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: mozilla-actions/sccache-action@v0.0.1
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.4.0-pre.10"
       - uses: actions/setup-python@v4

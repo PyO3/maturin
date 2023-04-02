@@ -1,13 +1,16 @@
 use crate::PyProjectToml;
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, format_err, Context, Result};
 use fs_err as fs;
 use indexmap::IndexMap;
+use pep440_rs::{Version, VersionSpecifiers};
+use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue, Requirement};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str;
+use std::str::FromStr;
 
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -24,14 +27,14 @@ pub struct WheelMetadata {
 
 /// Python Package Metadata 2.1 as specified in
 /// https://packaging.python.org/specifications/core-metadata/
-#[derive(Serialize, Deserialize, Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct Metadata21 {
     // Mandatory fields
     pub metadata_version: String,
     pub name: String,
-    pub version: String,
+    pub version: Version,
     // Optional fields
     pub platform: Vec<String>,
     pub supported_platform: Vec<String>,
@@ -49,16 +52,52 @@ pub struct Metadata21 {
     // https://peps.python.org/pep-0639/#license-file-multiple-use
     pub license_files: Vec<PathBuf>,
     pub classifiers: Vec<String>,
-    pub requires_dist: Vec<String>,
+    pub requires_dist: Vec<Requirement>,
     pub provides_dist: Vec<String>,
     pub obsoletes_dist: Vec<String>,
-    pub requires_python: Option<String>,
+    pub requires_python: Option<VersionSpecifiers>,
     pub requires_external: Vec<String>,
     pub project_url: IndexMap<String, String>,
     pub provides_extra: Vec<String>,
     pub scripts: IndexMap<String, String>,
     pub gui_scripts: IndexMap<String, String>,
     pub entry_points: IndexMap<String, IndexMap<String, String>>,
+}
+
+impl Metadata21 {
+    /// Initializes with name, version and otherwise the defaults
+    pub fn new(name: String, version: Version) -> Self {
+        Self {
+            metadata_version: "2.1".to_string(),
+            name,
+            version,
+            platform: vec![],
+            supported_platform: vec![],
+            summary: None,
+            description: None,
+            description_content_type: None,
+            keywords: None,
+            home_page: None,
+            download_url: None,
+            author: None,
+            author_email: None,
+            maintainer: None,
+            maintainer_email: None,
+            license: None,
+            license_files: vec![],
+            classifiers: vec![],
+            requires_dist: vec![],
+            provides_dist: vec![],
+            obsoletes_dist: vec![],
+            requires_python: None,
+            requires_external: vec![],
+            project_url: Default::default(),
+            provides_extra: vec![],
+            scripts: Default::default(),
+            gui_scripts: Default::default(),
+            entry_points: Default::default(),
+        }
+    }
 }
 
 const PLAINTEXT_CONTENT_TYPE: &str = "text/plain; charset=UTF-8";
@@ -242,18 +281,23 @@ impl Metadata21 {
             }
 
             if let Some(dependencies) = &project.optional_dependencies {
+                // Transform the extra -> deps map into the PEP 508 style `dep ; extras = ...` style
                 for (extra, deps) in dependencies {
                     self.provides_extra.push(extra.clone());
                     for dep in deps {
-                        let dist = if let Some((dep, marker)) = dep.split_once(';') {
-                            // optional dependency already has environment markers
-                            let new_marker =
-                                format!("({}) and extra == '{}'", marker.trim(), extra);
-                            format!("{dep}; {new_marker}")
+                        let mut dep = dep.clone();
+                        // Keep in sync with `develop()`!
+                        let new_extra = MarkerTree::Expression(MarkerExpression {
+                            l_value: MarkerValue::Extra,
+                            operator: MarkerOperator::Equal,
+                            r_value: MarkerValue::QuotedString(extra.to_string()),
+                        });
+                        if let Some(existing) = dep.marker.take() {
+                            dep.marker = Some(MarkerTree::And(vec![existing, new_extra]));
                         } else {
-                            format!("{dep}; extra == '{extra}'")
-                        };
-                        self.requires_dist.push(dist);
+                            dep.marker = Some(new_extra);
+                        }
+                        self.requires_dist.push(dep);
                     }
                 }
             }
@@ -338,12 +382,18 @@ impl Metadata21 {
             Vec::new()
         };
 
+        let version = Version::from_str(&package.version.to_string()).map_err(|err| {
+            format_err!(
+                "Rust version used in Cargo.toml is not a valid python version: {}. \
+                    Note that rust uses [SemVer](https://semver.org/) while python uses \
+                    [PEP 440](https://peps.python.org/pep-0440/), which have e.g. some differences \
+                    when declaring prereleases.",
+                err
+            )
+        })?;
         let metadata = Metadata21 {
-            metadata_version: "2.1".to_owned(),
-
+            // name, version and metadata_version are added through Metadata21::new()
             // Mapped from cargo metadata
-            name,
-            version: package.version.to_string(),
             summary: package.description.clone(),
             description,
             description_content_type,
@@ -364,7 +414,7 @@ impl Metadata21 {
             license: package.license.clone(),
             license_files,
             project_url,
-            ..Default::default()
+            ..Metadata21::new(name, version)
         };
         Ok(metadata)
     }
@@ -376,7 +426,7 @@ impl Metadata21 {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),
             ("Name", self.name.clone()),
-            ("Version", self.get_pep440_version()),
+            ("Version", self.version.to_string()),
         ];
 
         let mut add_vec = |name, values: &[String]| {
@@ -388,7 +438,14 @@ impl Metadata21 {
         add_vec("Platform", &self.platform);
         add_vec("Supported-Platform", &self.supported_platform);
         add_vec("Classifier", &self.classifiers);
-        add_vec("Requires-Dist", &self.requires_dist);
+        add_vec(
+            "Requires-Dist",
+            &self
+                .requires_dist
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>(),
+        );
         add_vec("Provides-Dist", &self.provides_dist);
         add_vec("Obsoletes-Dist", &self.obsoletes_dist);
         add_vec("Requires-External", &self.requires_external);
@@ -416,7 +473,13 @@ impl Metadata21 {
         add_option("Maintainer", &self.maintainer);
         add_option("Maintainer-email", &self.maintainer_email);
         add_option("License", &self.license.as_deref().map(fold_header));
-        add_option("Requires-Python", &self.requires_python);
+        add_option(
+            "Requires-Python",
+            &self
+                .requires_python
+                .as_ref()
+                .map(|requires_python| requires_python.to_string()),
+        );
         add_option("Description-Content-Type", &self.description_content_type);
         // Project-URL is special
         // "A string containing a browsable URL for the project and a label for it, separated by a comma."
@@ -473,21 +536,7 @@ impl Metadata21 {
     /// Returns the version encoded according to PEP 427, Section "Escaping
     /// and Unicode"
     pub fn get_version_escaped(&self) -> String {
-        self.get_pep440_version().replace('-', "_")
-    }
-
-    /// Returns the version encoded according to PEP 440
-    ///
-    /// See https://github.com/pypa/setuptools/blob/d90cf84e4890036adae403d25c8bb4ee97841bbf/pkg_resources/__init__.py#L1336-L1345
-    pub fn get_pep440_version(&self) -> String {
-        match pep440::Version::parse(&self.version) {
-            Some(ver) => ver.normalize(),
-            None => {
-                let ver = self.version.replace(' ', ".");
-                let re = Regex::new(r"[^A-Za-z0-9.]+").unwrap();
-                re.replace_all(&ver, "-").to_string()
-            }
-        }
+        self.version.to_string().replace('-', "_")
     }
 
     /// Returns the name of the .dist-info directory as defined in the wheel specification
@@ -684,8 +733,9 @@ mod test {
         assert_eq!(
             metadata.requires_dist,
             &[
-                "attrs; extra == 'test'",
-                "boltons; (sys_platform == 'win32') and extra == 'test'"
+                Requirement::from_str("attrs; extra == 'test'",).unwrap(),
+                Requirement::from_str("boltons; (sys_platform == 'win32') and extra == 'test'")
+                    .unwrap(),
             ]
         );
         assert_eq!(metadata.license.as_ref().unwrap(), "MIT");

@@ -5,6 +5,7 @@ use crate::PlatformTag;
 use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
+use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue};
 use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
@@ -84,12 +85,28 @@ pub fn develop(
         args.extend(build_context.metadata21.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
             // Remove extra marker to make it installable with pip
+            // Keep in sync with `Metadata21::merge_pyproject_toml()`!
             for extra in &extras {
-                pkg = pkg
-                    .replace(&format!(" and extra == '{extra}'"), "")
-                    .replace(&format!("; extra == '{extra}'"), "");
+                pkg.marker = pkg.marker.and_then(|marker| -> Option<MarkerTree> {
+                    match marker.clone() {
+                        MarkerTree::Expression(MarkerExpression {
+                            l_value: MarkerValue::Extra,
+                            operator: MarkerOperator::Equal,
+                            r_value: MarkerValue::QuotedString(extra_value),
+                        }) if &extra_value == extra => None,
+                        MarkerTree::And(and) => match &*and {
+                            [existing, MarkerTree::Expression(MarkerExpression {
+                                l_value: MarkerValue::Extra,
+                                operator: MarkerOperator::Equal,
+                                r_value: MarkerValue::QuotedString(extra_value),
+                            })] if extra_value == extra => Some(existing.clone()),
+                            _ => Some(marker),
+                        },
+                        _ => Some(marker),
+                    }
+                });
             }
-            pkg
+            pkg.to_string()
         }));
         let status = Command::new(interpreter.executable)
             .args(&args)

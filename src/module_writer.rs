@@ -1273,13 +1273,14 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
 #[cfg(test)]
 mod tests {
     use ignore::overrides::OverrideBuilder;
+    use pep440_rs::Version;
 
     use super::*;
 
     #[test]
     // The mechanism is the same for wheel_writer
     fn sdist_writer_excludes() -> Result<(), Box<dyn std::error::Error>> {
-        let metadata = Metadata21::default();
+        let metadata = Metadata21::new("dummy".to_string(), Version::from_release(vec![1, 0]));
         let perm = 0o777;
 
         // No excludes

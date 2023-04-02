@@ -21,6 +21,7 @@ use ignore::overrides::{Override, OverrideBuilder};
 use indexmap::IndexMap;
 use lddtree::Library;
 use normpath::PathExt;
+use pep508_rs::Requirement;
 use platform_info::*;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -29,7 +30,6 @@ use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use pep508_rs::Requirement;
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -893,7 +893,8 @@ impl BuildContext {
         if !self
             .metadata21
             .requires_dist
-            .iter().any(|requirement| requirement.name == "cffi")
+            .iter()
+            .any(|requirement| requirement.name == "cffi")
         {
             eprintln!(
                 "⚠️  Warning: missing cffi package dependency, please add it to pyproject.toml. \

@@ -3,6 +3,27 @@
 This guide can help you upgrade code through breaking changes from one maturin version to the next.
 For a detailed list of all changes, see the [CHANGELOG](changelog.md).
 
+## From 0.14.* to 0.15
+
+### Build with `--no-default-features` by default when bootstrapping from sdist
+
+When bootstrapping maturin from sdist, maturin 0.15 will build with `--no-default-features` by default,
+which means that for distro packaging, you might want to set the environment variable `MATURIN_SETUP_ARGS="--features full,rustls"` to enable full features.
+
+### Remove `[tool.maturin.sdist-include]`
+
+Use `[tool.maturin.include]` option instead.
+
+### Remove `[package.metadata.maturin]` from `Cargo.toml`
+
+Package metadata is now specified in `[tool.maturin]` section of `pyproject.toml` instead of `Cargo.toml`.
+Note that the replacement for `package.metadata.maturin.name` is `tool.maturin.module-name`.
+
+### Require `uniffi-bindgen` CLI to building `uniffi` bindings
+
+maturin 0.15 requires `uniffi-bindgen` CLI to build `uniffi` bindings,
+you can install it with `pip install uniffi-bindgen`.
+
 ## From 0.13.* to 0.14
 
 ### Remove support for specifying python package metadata in `Cargo.toml`

@@ -2,6 +2,7 @@ pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
 use crate::{BridgeModel, BuildContext, Target};
 use anyhow::{bail, format_err, Context, Result};
+use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -30,15 +31,18 @@ fn windows_interpreter_no_build(
     target_width: usize,
     pointer_width: usize,
     min_python_minor: usize,
+    requires_python: Option<&VersionSpecifiers>,
 ) -> bool {
-    // Python 2 support has been dropped
-    if major == 2 {
+    // Only python 3 with supported major versions
+    if major != 3 || minor < min_python_minor {
         return true;
     }
 
-    // Ignore python 3.0 - 3.5
-    if major == 3 && minor < min_python_minor {
-        return true;
+    // From requires-python in pyproject.toml
+    if let Some(requires_python) = requires_python {
+        if !requires_python.contains(&Version::from_release(vec![major, minor])) {
+            return true;
+        }
     }
 
     // There can be 32-bit installations on a 64-bit machine, but we can't link
@@ -89,7 +93,11 @@ fn windows_interpreter_no_build(
 /// As well as the version numbers, etc. of the interpreters we also have to find the
 /// pointer width to make sure that the pointer width (32-bit or 64-bit) matches across
 /// platforms.
-fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<String>> {
+fn find_all_windows(
+    target: &Target,
+    min_python_minor: usize,
+    requires_python: Option<&VersionSpecifiers>,
+) -> Result<Vec<String>> {
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
@@ -136,6 +144,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                         target.pointer_width(),
                         pointer_width,
                         min_python_minor,
+                        requires_python,
                     ) {
                         continue;
                     }
@@ -192,6 +201,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     target.pointer_width(),
                     python_info.pointer_width.unwrap(),
                     min_python_minor,
+                    requires_python,
                 ) {
                     continue;
                 }
@@ -212,6 +222,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     target.pointer_width(),
                     python_info.pointer_width.unwrap(),
                     min_python_minor,
+                    requires_python,
                 ) {
                     continue;
                 }
@@ -686,16 +697,18 @@ impl PythonInterpreter {
     /// Find all available python interpreters for a given target
     pub fn find_by_target(
         target: &Target,
-        min_python_minor: Option<usize>,
+        requires_python: Option<&VersionSpecifiers>,
     ) -> Vec<PythonInterpreter> {
         InterpreterConfig::lookup_target(target)
             .into_iter()
-            .filter_map(|config| match min_python_minor {
-                Some(min_python_minor) => {
-                    if config.minor < min_python_minor {
-                        None
-                    } else {
+            .filter_map(|config| match requires_python {
+                Some(requires_python) => {
+                    if requires_python
+                        .contains(&Version::from_release(vec![config.major, config.major]))
+                    {
                         Some(Self::from_config(config))
+                    } else {
+                        None
                     }
                 }
                 None => Some(Self::from_config(config)),
@@ -704,47 +717,49 @@ impl PythonInterpreter {
     }
 
     /// Tries to find all installed python versions using the heuristic for the
-    /// given platform
+    /// given platform.
+    ///
+    /// We have two filters: The optional requires-python from the pyproject.toml and minimum python
+    /// minor either from the bindings (i.e. Cargo.toml `abi3-py{major}{minor}`) or the global
+    /// default minimum minor version
     pub fn find_all(
         target: &Target,
         bridge: &BridgeModel,
-        min_python_minor: Option<usize>,
+        requires_python: Option<&VersionSpecifiers>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = match min_python_minor {
-            Some(requires_python_minor) => match bridge {
-                BridgeModel::Bindings(bridge_name, minor)
-                | BridgeModel::Bin(Some((bridge_name, minor))) => {
-                    // requires-python minor version might be lower than bridge crate required minor version
-                    if requires_python_minor >= *minor {
-                        requires_python_minor
-                    } else {
-                        eprintln!(
-                            "⚠️  Warning: 'requires-python' (3.{}) is lower than the requirement of {} crate (3.{}).",
-                            requires_python_minor, bridge_name, *minor
-                        );
-                        *minor
-                    }
-                }
-                _ => requires_python_minor,
-            },
-            None => match bridge {
-                BridgeModel::Bindings(_, minor) | BridgeModel::Bin(Some((_, minor))) => *minor,
-                _ => MINIMUM_PYTHON_MINOR,
-            },
+        let min_python_minor = match bridge {
+            BridgeModel::Bindings(_, minor) | BridgeModel::Bin(Some((_, minor))) => *minor,
+            _ => MINIMUM_PYTHON_MINOR,
         };
         let executables = if target.is_windows() {
-            find_all_windows(target, min_python_minor)?
+            find_all_windows(target, min_python_minor, requires_python)?
         } else {
             let mut executables: Vec<String> = (min_python_minor..=MAXIMUM_PYTHON_MINOR)
+                .filter(|minor| {
+                    requires_python
+                        .map(|requires_python| {
+                            requires_python.contains(&Version::from_release(vec![3, *minor]))
+                        })
+                        .unwrap_or(true)
+                })
                 .map(|minor| format!("python3.{minor}"))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
-            if matches!(bridge, BridgeModel::Cffi)
+            if *bridge == BridgeModel::Cffi
                 || bridge.is_bindings("pyo3")
                 || bridge.is_bindings("pyo3-ffi")
             {
                 executables.extend(
-                    (min_python_minor..=MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{minor}")),
+                    (min_python_minor..=MAXIMUM_PYPY_MINOR)
+                        .filter(|minor| {
+                            requires_python
+                                .map(|requires_python| {
+                                    requires_python
+                                        .contains(&Version::from_release(vec![3, *minor]))
+                                })
+                                .unwrap_or(true)
+                        })
+                        .map(|minor| format!("pypy3.{minor}")),
                 );
             }
             executables

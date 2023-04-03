@@ -283,10 +283,10 @@ impl PyProjectToml {
             .build_system
             .requires
             .iter()
-            .find(|x| x.starts_with(maturin))
+            .find(|x| x.name == maturin)
         {
             let current_major: usize = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
-            if requires_maturin == maturin {
+            if requires_maturin.version_or_url.is_none() {
                 eprintln!(
                     "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
                     e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \

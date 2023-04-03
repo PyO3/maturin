@@ -1051,7 +1051,8 @@ dependencies = [
  "native-tls",
  "normpath",
  "once_cell",
- "pep440",
+ "pep440_rs",
+ "pep508_rs",
  "platform-info",
  "pretty_assertions",
  "pyproject-toml",
@@ -1353,13 +1354,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e91099d4268b0e11973f036e885d652fb0b21fedcf69738c627f94db6a44f42"
 
 [[package]]
-name = "pep440"
-version = "0.2.0"
+name = "pep440_rs"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8841b00ca6fabc903e8ecd496d9611db402e23f15e3d19b0b587e2ca653abd89"
+checksum = "d0cbf1fd438eeb1b1e42e8390951ec90d1cf87bbe3d3305b28551bca30b7595a"
 dependencies = [
  "lazy_static",
  "regex",
+ "serde",
+ "tracing",
+ "unicode-width",
+]
+
+[[package]]
+name = "pep508_rs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e566191336ac8cf72db45240583769ab9fb75bd87dd9544cd96a9bc7e28585c4"
+dependencies = [
+ "once_cell",
+ "pep440_rs",
+ "regex",
+ "serde",
+ "thiserror",
+ "tracing",
+ "unicode-width",
+ "url",
 ]
 
 [[package]]
@@ -1464,11 +1484,13 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f42b59c8c31880743982eefb884d364e825ea4349a937ed138f23919dd414e6"
+checksum = "71c24ad9fa3f11e0b5f45bf86ea6e1ae4dfef288fb7b077a15b6a19ebc87a37f"
 dependencies = [
  "indexmap",
+ "pep440_rs",
+ "pep508_rs",
  "serde",
  "toml 0.7.3",
 ]
@@ -2130,6 +2152,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
 dependencies = [
  "cfg-if",
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -2310,6 +2333,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

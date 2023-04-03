@@ -21,14 +21,15 @@ use ignore::overrides::{Override, OverrideBuilder};
 use indexmap::IndexMap;
 use lddtree::Library;
 use normpath::PathExt;
+use pep508_rs::Requirement;
 use platform_info::*;
-use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -123,18 +124,16 @@ fn bin_wasi_helper(
         .entry_points
         .insert("console_scripts".to_string(), console_scripts);
 
-    // A real pip version specification parser would be better, but bearing this we use this regex
-    // which tries to find the name wasmtime and then any specification
-    let wasmtime_re = Regex::new("^wasmtime[^a-zA-Z.-_]").unwrap();
+    // Add our wasmtime default version if the user didn't provide one
     if !metadata21
         .requires_dist
         .iter()
-        .any(|requirement| wasmtime_re.is_match(requirement))
+        .any(|requirement| requirement.name == "wasmtime")
     {
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
             .requires_dist
-            .push("wasmtime>=7.0.0,<8.0.0".to_string());
+            .push(Requirement::from_str("wasmtime>=7.0.0,<8.0.0").unwrap());
     }
 
     Ok(metadata21)
@@ -895,7 +894,7 @@ impl BuildContext {
             .metadata21
             .requires_dist
             .iter()
-            .any(|dep| dep.to_ascii_lowercase().starts_with("cffi"))
+            .any(|requirement| requirement.name == "cffi")
         {
             eprintln!(
                 "⚠️  Warning: missing cffi package dependency, please add it to pyproject.toml. \

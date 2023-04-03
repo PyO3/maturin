@@ -48,7 +48,7 @@ rustc_version = "0.4.0"
 semver = "1.0.13"
 target-lexicon = "0.12.0"
 indexmap = "1.9.3"
-pyproject-toml = "0.4.0"
+pyproject-toml = "0.5.1"
 python-pkginfo = "0.5.5"
 textwrap = "0.16.0"
 ignore = "0.4.20"
@@ -57,7 +57,8 @@ lddtree = "0.3.2"
 cc = "1.0.72"
 dunce = "1.0.2"
 normpath = "1.0.0"
-pep440 = "0.2.0"
+pep440_rs = { version = "0.3.3", features = ["serde"] }
+pep508_rs = { version = "0.1.1", features = ["serde"] }
 time = "0.3.17"
 
 # cli

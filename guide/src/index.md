@@ -6,6 +6,8 @@ Please choose from the chapters on the left to jump to individual topics, or con
 
 ## Sponsors
 
+Development of maturin is made possible by the following sponsors:
+
 <div class="sponsors">
   <div>
     <a rel="sponsored" target="_blank" href="https://pydantic.dev">
@@ -27,6 +29,6 @@ Please choose from the chapters on the left to jump to individual topics, or con
   </div>
 </div>
 
-Development of maturin is made possible by many people who kindly sponsor @messense on [GitHub Sponsor](https://github.com/sponsors/messense#sponsors).
+And many more who kindly sponsor @messense on [GitHub Sponsors](https://github.com/sponsors/messense#sponsors).
 
 {{#include ../../README.md}}

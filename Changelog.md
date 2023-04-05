@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix wrong `EXT_SUFFIX` when cross compiling musllinux wheels for Python 3.11 in [#1560](https://github.com/PyO3/maturin/pull/1560)
+
 ## [0.14.16] - 2023-03-26
 
 * Deprecate `package.metadata.maturin.name` in favor of `tool.maturin.module-name` in `pyproject.toml` in [#1531](https://github.com/PyO3/maturin/pull/1531)

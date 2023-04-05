@@ -1089,15 +1089,10 @@ fn find_interpreter_in_sysconfig(
         let ver_minor = ver_minor.parse::<usize>().with_context(|| {
             format!("Invalid python interpreter minor version '{ver_minor}', expect a digit")
         })?;
-        let sysconfig = InterpreterConfig::lookup(
-            target.target_os(),
-            target.target_arch(),
-            python_impl,
-            (ver_major, ver_minor),
-        )
-        .with_context(|| {
-            format!("Failed to find a {python_impl} {ver_major}.{ver_minor} interpreter")
-        })?;
+        let sysconfig = InterpreterConfig::lookup(target, python_impl, (ver_major, ver_minor))
+            .with_context(|| {
+                format!("Failed to find a {python_impl} {ver_major}.{ver_minor} interpreter")
+            })?;
         debug!(
             "Found {} {}.{} in bundled sysconfig",
             sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor,

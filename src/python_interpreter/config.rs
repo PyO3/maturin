@@ -75,16 +75,28 @@ pub struct InterpreterConfig {
 impl InterpreterConfig {
     /// Lookup a wellknown sysconfig for a given Python interpreter
     pub fn lookup(
-        os: Os,
-        arch: Arch,
+        target: &Target,
         python_impl: InterpreterKind,
         python_version: (usize, usize),
-    ) -> Option<&'static Self> {
+    ) -> Option<Self> {
         let (major, minor) = python_version;
-        if let Some(os_sysconfigs) = WELLKNOWN_SYSCONFIG.get(&os) {
-            if let Some(sysconfigs) = os_sysconfigs.get(&arch) {
-                return sysconfigs.iter().find(|s| {
-                    s.interpreter_kind == python_impl && s.major == major && s.minor == minor
+        if let Some(os_sysconfigs) = WELLKNOWN_SYSCONFIG.get(&target.target_os()) {
+            if let Some(sysconfigs) = os_sysconfigs.get(&target.target_arch()) {
+                return sysconfigs.iter().find_map(|s| {
+                    if s.interpreter_kind == python_impl && s.major == major && s.minor == minor {
+                        if python_version >= (3, 11) && target.is_musl_target() {
+                            // See https://github.com/pypa/auditwheel/issues/349
+                            let mut musl_config = s.clone();
+                            musl_config.ext_suffix = s
+                                .ext_suffix
+                                .replace("-gnu", &format!("-{}", target.target_env()));
+                            Some(musl_config)
+                        } else {
+                            Some(s.clone())
+                        }
+                    } else {
+                        None
+                    }
                 });
             }
         }
@@ -255,10 +267,27 @@ mod test {
 
     #[test]
     fn test_pyo3_config_file() {
-        let sysconfig =
-            InterpreterConfig::lookup(Os::Linux, Arch::X86_64, InterpreterKind::CPython, (3, 10))
-                .unwrap();
+        let sysconfig = InterpreterConfig::lookup(
+            &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-310-x86_64-linux-gnu.so");
         let config_file = sysconfig.pyo3_config_file();
         assert_eq!(config_file, "implementation=CPython\nversion=3.10\nshared=true\nabi3=false\nbuild_flags=WITH_THREAD\nsuppress_build_script_link_lines=false\npointer_width=64");
+    }
+
+    #[test]
+    fn test_pyo3_config_file_musl_python_3_11() {
+        let sysconfig = InterpreterConfig::lookup(
+            &Target::from_target_triple(Some("x86_64-unknown-linux-musl".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 11),
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-311-x86_64-linux-musl.so");
+        let config_file = sysconfig.pyo3_config_file();
+        assert_eq!(config_file, "implementation=CPython\nversion=3.11\nshared=true\nabi3=false\nbuild_flags=WITH_THREAD\nsuppress_build_script_link_lines=false\npointer_width=64");
     }
 }

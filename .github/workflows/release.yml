@@ -215,6 +215,9 @@ jobs:
         with:
           targets: ${{ matrix.platform.target }}
       - name: Build wheel
+        env:
+          # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
+          CFLAGS_s390x_unknown_linux_gnu: "-march=z10"
         run: |
           sudo python3 -m pip install -U --pre maturin
           maturin build --release -b bin -o dist \

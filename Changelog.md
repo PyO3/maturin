@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Bump MSRV to 1.64.0 in [#1528](https://github.com/PyO3/maturin/pull/1528)
 * Add wildcards support to publish/upload commands on Windows in [#1534](https://github.com/PyO3/maturin/pull/1534)
 * Add support for configuring macOS deployment target version in `pyproject.toml` in [#1536](https://github.com/PyO3/maturin/pull/1536)
+* Fix wrong `EXT_SUFFIX` when cross compiling musllinux wheels for Python 3.11 in [#1560](https://github.com/PyO3/maturin/pull/1560)
 
 ## [0.14.16] - 2023-03-26
 

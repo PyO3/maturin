@@ -145,9 +145,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-config2"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bd8e990edcbebfd43b4d62cb73d4e17e412a1c66a320a393c1de16ff7aa2137"
+checksum = "7ee1e7a7c5bc8f3389f125fb3da214c86d8e21c2b7259923079e0142ac47ffe4"
 dependencies = [
  "cfg-expr",
  "home",
@@ -195,9 +195,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.16.5"
+version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91857f14adb5098836a45766d7194d7fa1e24cd1a749e233df843a4451b02091"
+checksum = "9c18a78e4c9a550bb5968e39382d667d9cddc5cb4e814960bb1679a4f7be03ab"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -216,9 +216,9 @@ dependencies = [
 
 [[package]]
 name = "cargo_metadata"
-version = "0.15.3"
+version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a1ec454bc3eead8719cb56e15dbbfecdbc14e4b3a3ae4936cc6e31f5fc0d07"
+checksum = "eee4243f1f26fc7a42710e7439c149e2b10b05472f88090acce52632f231a73a"
 dependencies = [
  "camino",
  "cargo-platform",
@@ -265,9 +265,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-expr"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a35b255461940a32985c627ce82900867c61db1659764d3675ea81963f72a4c6"
+checksum = "732ffa2b10f89dd59538349855f3eaf4032e909361ac4917a52fb43cc70fccf0"
 dependencies = [
  "smallvec",
 ]
@@ -718,9 +718,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
+checksum = "c85e1d9ab2eadba7e5040d4e09cbd6d072b76a557ad64e797c2cb9d4da21d7e4"
 dependencies = [
  "cfg-if",
  "libc",
@@ -949,9 +949,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.140"
+version = "0.2.141"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99227334921fae1a979cf0bfdfcc6b3e5ce376ef57e16fb6fb3ea2ed6095f80c"
+checksum = "3304a64d199bb964be99741b7a14d26972741915b3649639149b2479bb46f4b5"
 
 [[package]]
 name = "linux-keyutils"
@@ -1355,9 +1355,9 @@ checksum = "1e91099d4268b0e11973f036e885d652fb0b21fedcf69738c627f94db6a44f42"
 
 [[package]]
 name = "pep440_rs"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0cbf1fd438eeb1b1e42e8390951ec90d1cf87bbe3d3305b28551bca30b7595a"
+checksum = "60da289d74d9a9bceb0b22695f40da57a6489969f9d8790b52f823767a2c8ade"
 dependencies = [
  "lazy_static",
  "regex",
@@ -1368,9 +1368,9 @@ dependencies = [
 
 [[package]]
 name = "pep508_rs"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e566191336ac8cf72db45240583769ab9fb75bd87dd9544cd96a9bc7e28585c4"
+checksum = "14fe98061405d55ce70bd248bd7a42846810d83b244f2bba29a100ee3105dd33"
 dependencies = [
  "once_cell",
  "pep440_rs",
@@ -1466,9 +1466,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.54"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e472a104799c74b514a57226160104aa483546de37e839ec50e3c2e41dd87534"
+checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
 dependencies = [
  "unicode-ident",
 ]

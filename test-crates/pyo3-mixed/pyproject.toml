@@ -13,3 +13,4 @@ dependencies = ["boltons"]
 
 [project.scripts]
 get_42 = "pyo3_mixed:get_42"
+print_cli_args = "pyo3_mixed:print_cli_args"

@@ -8,8 +8,7 @@ build_and_test: &BUILD_AND_TEST
   # only run tasks on pull request or bors related branches
   only_if: $CIRRUS_BRANCH == 'staging' || $CIRRUS_BRANCH == 'trying' || $CIRRUS_PR != ""
   setup_script:
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --default-toolchain stable
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     - rustup target add wasm32-wasi
     - python3 -m pip install --upgrade cffi virtualenv
   build_script:
@@ -29,7 +28,7 @@ freebsd_task:
       - echo $CIRRUS_OS
       - cat Cargo.lock
   install_script:
-    - pkg install -y curl bash python
+    - pkg install -y bash python
     - python3 -m ensurepip
   <<: *BUILD_AND_TEST
 

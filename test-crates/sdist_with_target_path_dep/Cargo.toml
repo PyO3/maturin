@@ -1,0 +1,15 @@
+[package]
+name = "sdist_with_target_path_dep"
+version = "0.1.0"
+authors = ["konstin <konstin@mailbox.org>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Don't use the macros feature, which makes compilation much faster
+pyo3 = { version = "0.18.0", default-features = false, features = ["extension-module"] }
+
+[target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
+some_path_dep = { path = "../some_path_dep" }

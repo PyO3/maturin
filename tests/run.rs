@@ -480,6 +480,48 @@ fn lib_with_path_dep_sdist() {
 }
 
 #[test]
+fn lib_with_target_path_dep() {
+    let cargo_toml = indoc!(
+        r#"
+        [package]
+        name = "sdist_with_target_path_dep"
+        version = "0.1.0"
+        authors = ["konstin <konstin@mailbox.org>"]
+        edition = "2021"
+
+        [lib]
+        crate-type = ["cdylib"]
+
+        [dependencies]
+        # Don't use the macros feature, which makes compilation much faster
+        pyo3 = { version = "0.18.0", default-features = false, features = ["extension-module"] }
+
+        [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
+        some_path_dep = { path = "local_dependencies/some_path_dep" }
+        "#
+    );
+    handle_result(other::test_source_distribution(
+        "test-crates/sdist_with_target_path_dep",
+        vec![
+            "sdist_with_target_path_dep-0.1.0/local_dependencies/some_path_dep/Cargo.toml",
+            "sdist_with_target_path_dep-0.1.0/local_dependencies/some_path_dep/src/lib.rs",
+            "sdist_with_target_path_dep-0.1.0/local_dependencies/transitive_path_dep/Cargo.toml",
+            "sdist_with_target_path_dep-0.1.0/local_dependencies/transitive_path_dep/src/lib.rs",
+            "sdist_with_target_path_dep-0.1.0/Cargo.toml",
+            "sdist_with_target_path_dep-0.1.0/Cargo.lock",
+            "sdist_with_target_path_dep-0.1.0/pyproject.toml",
+            "sdist_with_target_path_dep-0.1.0/src/lib.rs",
+            "sdist_with_target_path_dep-0.1.0/PKG-INFO",
+        ],
+        Some((
+            Path::new("sdist_with_target_path_dep-0.1.0/Cargo.toml"),
+            cargo_toml,
+        )),
+        "sdist-lib-with-target-path-dep",
+    ))
+}
+
+#[test]
 fn pyo3_mixed_src_layout_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-mixed-src/rust",

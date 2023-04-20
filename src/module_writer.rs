@@ -1149,7 +1149,7 @@ pub fn write_python_part(
         if let Some(glob_patterns) = pyproject.include() {
             for pattern in glob_patterns
                 .iter()
-                .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
+                .filter_map(|glob_pattern| glob_pattern.targets(Format::Wheel))
             {
                 eprintln!("📦 Including files matching \"{pattern}\"");
                 for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())

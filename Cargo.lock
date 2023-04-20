@@ -450,9 +450,9 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d997bd5e24a5928dd43e46dc529867e207907fe0b239c3477d924f7f2ca320"
+checksum = "280a9f2d8b3a38871a3c8a46fb80db65e5e5ed97da80c4d08bf27fb63e35e181"
 dependencies = [
  "libc",
 ]
@@ -584,9 +584,9 @@ dependencies = [
 
 [[package]]
 name = "dunce"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bd4b30a6560bbd9b4620f4de34c3f14f60848e58a9b7216801afcb4c7b31c3c"
+checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 
 [[package]]
 name = "either"
@@ -949,9 +949,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.141"
+version = "0.2.142"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3304a64d199bb964be99741b7a14d26972741915b3649639149b2479bb46f4b5"
+checksum = "6a987beff54b60ffa6d51982e1aa1146bc42f19bd26be28b0586f252fccf5317"
 
 [[package]]
 name = "linux-keyutils"
@@ -1354,9 +1354,9 @@ checksum = "1e91099d4268b0e11973f036e885d652fb0b21fedcf69738c627f94db6a44f42"
 
 [[package]]
 name = "pep440_rs"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60da289d74d9a9bceb0b22695f40da57a6489969f9d8790b52f823767a2c8ade"
+checksum = "aac177a025c60a4dd25d638bf33e746d1ead5f7123f6650f35b4394c7ce1a104"
 dependencies = [
  "lazy_static",
  "regex",
@@ -1367,9 +1367,9 @@ dependencies = [
 
 [[package]]
 name = "pep508_rs"
-version = "0.1.2"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14fe98061405d55ce70bd248bd7a42846810d83b244f2bba29a100ee3105dd33"
+checksum = "969679a29dfdc8278a449f75b3dd45edf57e649bd59f7502429c2840751c46d8"
 dependencies = [
  "once_cell",
  "pep440_rs",
@@ -1483,9 +1483,9 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71c24ad9fa3f11e0b5f45bf86ea6e1ae4dfef288fb7b077a15b6a19ebc87a37f"
+checksum = "da59c451f2bb4052f5e2b26a1d0df40155ca089ffd67dfaffe9e4e5580a2044a"
 dependencies = [
  "indexmap",
  "pep440_rs",

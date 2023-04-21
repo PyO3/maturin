@@ -55,10 +55,127 @@ fn rewrite_cargo_toml(
         "Can't read Cargo.toml at {}",
         manifest_path.display(),
     ))?;
-    let mut data = text.parse::<toml_edit::Document>().context(format!(
+    let mut document = text.parse::<toml_edit::Document>().context(format!(
         "Failed to parse Cargo.toml at {}",
         manifest_path.display()
     ))?;
+
+    let workspace_deps = workspace_manifest
+        .get("workspace")
+        .and_then(|x| x.get("dependencies"))
+        .and_then(|x| x.as_table_like());
+
+    let mut rewritten = rewrite_dependencies_path(
+        document.as_table_mut(),
+        workspace_deps,
+        manifest_path,
+        known_path_deps,
+        &local_deps_folder,
+        root_crate,
+    )?;
+    if let Some(target_specs) = document
+        .get_mut("target")
+        .and_then(|x| x.as_table_like_mut())
+    {
+        for target_spec in target_specs
+            .iter_mut()
+            .filter_map(|x| x.1.as_table_like_mut())
+        {
+            rewritten |= rewrite_dependencies_path(
+                target_spec,
+                workspace_deps,
+                manifest_path,
+                known_path_deps,
+                &local_deps_folder,
+                root_crate,
+            )?;
+        }
+    }
+
+    // Update workspace inherited metadata
+    if let Some(package) = document.get_mut("package").and_then(|x| x.as_table_mut()) {
+        let workspace_package = workspace_manifest
+            .get("workspace")
+            .and_then(|x| x.get("package"))
+            .and_then(|x| x.as_table_like());
+        for key in WORKSPACE_INHERITABLE_FIELDS.iter().copied() {
+            let workspace_inherited = package
+                .get(key)
+                .and_then(|x| x.get("workspace"))
+                .and_then(|x| x.as_bool())
+                .unwrap_or_default();
+            if workspace_inherited {
+                if let Some(workspace_value) = workspace_package.and_then(|ws| ws.get(key)) {
+                    package[key] = workspace_value.clone();
+                    rewritten = true;
+                }
+            }
+        }
+    }
+
+    if root_crate {
+        // Update workspace members
+        if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut()) {
+            if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array_mut()) {
+                if known_path_deps.is_empty() {
+                    // Remove workspace members when there isn't any path dep
+                    workspace.remove("members");
+                    if workspace.is_empty() {
+                        // Remove workspace all together if it's empty
+                        document.remove("workspace");
+                    }
+                    rewritten = true;
+                } else {
+                    let mut new_members = toml_edit::Array::new();
+                    for member in members.iter() {
+                        if let toml_edit::Value::String(ref s) = member {
+                            let path = Path::new(s.value());
+                            if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
+                                if known_path_deps.contains_key(name) {
+                                    new_members.push(format!("{LOCAL_DEPENDENCIES_FOLDER}/{name}"));
+                                }
+                            }
+                        }
+                    }
+                    if !new_members.is_empty() {
+                        workspace["members"] = toml_edit::value(new_members);
+                    } else {
+                        workspace.remove("members");
+                    }
+                    rewritten = true;
+                }
+            }
+        }
+    } else {
+        // Update package.workspace
+        // https://rust-lang.github.io/rfcs/1525-cargo-workspace.html#implicit-relations
+        // https://doc.rust-lang.org/cargo/reference/manifest.html#the-workspace-field
+        if let Some(package) = document.get_mut("package").and_then(|x| x.as_table_mut()) {
+            if let Some(workspace) = package.get("workspace").and_then(|x| x.as_str()) {
+                // This is enough to fix https://github.com/PyO3/maturin/issues/838
+                // Other cases can be fixed on demand
+                if workspace == ".." || workspace == "../" {
+                    package.remove("workspace");
+                    rewritten = true;
+                }
+            }
+        }
+    }
+    if rewritten {
+        Ok(document.to_string())
+    } else {
+        Ok(text)
+    }
+}
+
+fn rewrite_dependencies_path(
+    table: &mut dyn toml_edit::TableLike,
+    workspace_deps: Option<&dyn toml_edit::TableLike>,
+    manifest_path: &Path,
+    known_path_deps: &HashMap<String, PathBuf>,
+    local_deps_folder: &str,
+    root_crate: bool,
+) -> Result<bool> {
     let mut rewritten = false;
     //  ˇˇˇˇˇˇˇˇˇˇˇˇ dep_category
     // [dependencies]
@@ -66,19 +183,15 @@ fn rewrite_cargo_toml(
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(table) = data.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
+        if let Some(table) = table.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
             if dep_category == "dev-dependencies" && !known_path_deps.is_empty() {
                 // Remove dev-dependencies since building from sdist doesn't need them,
                 // Keep it when there are no path dependencies to support building from
                 // sdist with `--locked`/`--frozen`.
-                data.remove(dep_category);
+                table.remove(dep_category);
                 rewritten = true;
                 continue;
             }
-            let workspace_deps = workspace_manifest
-                .get("workspace")
-                .and_then(|x| x.get("dependencies"))
-                .and_then(|x| x.as_table_like());
             let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
                 let workspace_inherit = table
@@ -134,11 +247,11 @@ fn rewrite_cargo_toml(
                                     .as_array_mut()
                                     .with_context(|| {
                                         format!(
-                                            "In {}, {} {} has a features value that is not an array",
-                                            manifest_path.display(),
-                                            dep_category,
-                                            dep_name
-                                        )
+                                        "In {}, {} {} has a features value that is not an array",
+                                        manifest_path.display(),
+                                        dep_category,
+                                        dep_name
+                                    )
                                     })?;
                                 existing_features.extend(features);
                             }
@@ -146,12 +259,12 @@ fn rewrite_cargo_toml(
                             rewritten = true;
                         } else {
                             bail!(
-                                "In {}, {} {} is marked as `workspace = true`, but it is found neither in \
+                            "In {}, {} {} is marked as `workspace = true`, but it is found neither in \
                                 the workspace manifest nor in the known path dependencies",
-                                manifest_path.display(),
-                                dep_category,
-                                dep_name
-                            )
+                            manifest_path.display(),
+                            dep_category,
+                            dep_name
+                        )
                         }
                         continue;
                     }
@@ -174,81 +287,7 @@ fn rewrite_cargo_toml(
             }
         }
     }
-
-    // Update workspace inherited metadata
-    if let Some(package) = data.get_mut("package").and_then(|x| x.as_table_mut()) {
-        let workspace_package = workspace_manifest
-            .get("workspace")
-            .and_then(|x| x.get("package"))
-            .and_then(|x| x.as_table_like());
-        for key in WORKSPACE_INHERITABLE_FIELDS.iter().copied() {
-            let workspace_inherited = package
-                .get(key)
-                .and_then(|x| x.get("workspace"))
-                .and_then(|x| x.as_bool())
-                .unwrap_or_default();
-            if workspace_inherited {
-                if let Some(workspace_value) = workspace_package.and_then(|ws| ws.get(key)) {
-                    package[key] = workspace_value.clone();
-                    rewritten = true;
-                }
-            }
-        }
-    }
-
-    if root_crate {
-        // Update workspace members
-        if let Some(workspace) = data.get_mut("workspace").and_then(|x| x.as_table_mut()) {
-            if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array_mut()) {
-                if known_path_deps.is_empty() {
-                    // Remove workspace members when there isn't any path dep
-                    workspace.remove("members");
-                    if workspace.is_empty() {
-                        // Remove workspace all together if it's empty
-                        data.remove("workspace");
-                    }
-                    rewritten = true;
-                } else {
-                    let mut new_members = toml_edit::Array::new();
-                    for member in members.iter() {
-                        if let toml_edit::Value::String(ref s) = member {
-                            let path = Path::new(s.value());
-                            if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
-                                if known_path_deps.contains_key(name) {
-                                    new_members.push(format!("{LOCAL_DEPENDENCIES_FOLDER}/{name}"));
-                                }
-                            }
-                        }
-                    }
-                    if !new_members.is_empty() {
-                        workspace["members"] = toml_edit::value(new_members);
-                    } else {
-                        workspace.remove("members");
-                    }
-                    rewritten = true;
-                }
-            }
-        }
-    } else {
-        // Update package.workspace
-        // https://rust-lang.github.io/rfcs/1525-cargo-workspace.html#implicit-relations
-        // https://doc.rust-lang.org/cargo/reference/manifest.html#the-workspace-field
-        if let Some(package) = data.get_mut("package").and_then(|x| x.as_table_mut()) {
-            if let Some(workspace) = package.get("workspace").and_then(|x| x.as_str()) {
-                // This is enough to fix https://github.com/PyO3/maturin/issues/838
-                // Other cases can be fixed on demand
-                if workspace == ".." || workspace == "../" {
-                    package.remove("workspace");
-                    rewritten = true;
-                }
-            }
-        }
-    }
-    if rewritten {
-        Ok(data.to_string())
-    } else {
-        Ok(text)
-    }
+    Ok(rewritten)
 }
 
 /// Make sure that the dep entry is an inline table

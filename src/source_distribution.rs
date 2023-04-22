@@ -60,8 +60,8 @@ fn rewrite_cargo_toml(
         manifest_path.display()
     ))?;
 
-    let workspace_deps = workspace_manifest
-        .get("workspace")
+    let workspace = workspace_manifest.get("workspace");
+    let workspace_deps = workspace
         .and_then(|x| x.get("dependencies"))
         .and_then(|x| x.as_table_like());
 
@@ -94,8 +94,7 @@ fn rewrite_cargo_toml(
 
     // Update workspace inherited metadata
     if let Some(package) = document.get_mut("package").and_then(|x| x.as_table_mut()) {
-        let workspace_package = workspace_manifest
-            .get("workspace")
+        let workspace_package = workspace
             .and_then(|x| x.get("package"))
             .and_then(|x| x.as_table_like());
         for key in WORKSPACE_INHERITABLE_FIELDS.iter().copied() {
@@ -110,6 +109,12 @@ fn rewrite_cargo_toml(
                     rewritten = true;
                 }
             }
+        }
+
+        // Update resolver if workspace set one
+        if let Some(resolver) = workspace.and_then(|x| x.get("resolver")) {
+            package["resolver"] = resolver.clone();
+            rewritten = true;
         }
     }
 
@@ -434,7 +439,13 @@ fn add_crate_to_source_distribution(
             .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
         // Add pyproject.toml to the source distribution
-        if cargo_toml_in_subdir {
+        // `pyproject.toml` may not be included in `cargo package --list`
+        // (e.g. it's not specified in `include` or is specified in `exclude` by mistake)
+        // we check if it's the same pyproject.toml file in Cargo.toml directory
+        let pyproject_toml_in_manifest_dir =
+            same_file::is_same_file(pyproject_toml_path, abs_manifest_dir.join("pyproject.toml"))
+                .unwrap_or(false);
+        if cargo_toml_in_subdir || pyproject_toml_in_manifest_dir {
             // if Cargo.toml is in subdirectory of pyproject.toml directory
             target_source.push((
                 PathBuf::from("pyproject.toml"),

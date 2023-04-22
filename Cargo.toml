@@ -59,6 +59,7 @@ dunce = "1.0.2"
 normpath = "1.0.0"
 pep440_rs = { version = "0.3.3", features = ["serde"] }
 pep508_rs = { version = "0.1.1", features = ["serde"] }
+same-file = "1.0.6"
 time = "0.3.17"
 
 # cli

@@ -1062,6 +1062,7 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "rustversion",
+ "same-file",
  "semver",
  "serde",
  "serde_json",

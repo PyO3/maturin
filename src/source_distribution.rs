@@ -434,7 +434,13 @@ fn add_crate_to_source_distribution(
             .any(|(target, _)| target == Path::new("pyproject.toml"))
     {
         // Add pyproject.toml to the source distribution
-        if cargo_toml_in_subdir {
+        // `pyproject.toml` may not be included in `cargo package --list`
+        // (e.g. it's not specified in `include` or is specified in `exclude` by mistake)
+        // we check if it's the same pyproject.toml file in Cargo.toml directory
+        let pyproject_toml_in_manifest_dir =
+            same_file::is_same_file(pyproject_toml_path, abs_manifest_dir.join("pyproject.toml"))
+                .unwrap_or(false);
+        if cargo_toml_in_subdir || pyproject_toml_in_manifest_dir {
             // if Cargo.toml is in subdirectory of pyproject.toml directory
             target_source.push((
                 PathBuf::from("pyproject.toml"),

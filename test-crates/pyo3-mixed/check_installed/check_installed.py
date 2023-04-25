@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os.path
 import platform
 import sys
 from pathlib import Path
@@ -25,9 +26,15 @@ python_args = json.loads(python_args)
 # vs
 # {prefix}/Python.framework/Versions/3.10/bin/python3.10
 # on cirrus ci)
-# We also skip windows because cpython resolves while pypy doesn't
-if platform.system() == "Linux":
-    assert rust_args[0] == sys.executable, (rust_args, sys.executable)
+# On windows, cpython resolves while pypy doesn't.
+# On alpine/musl, rust_args is empty
+if len(rust_args) > 0:
+    assert os.path.samefile(rust_args[0], sys.executable), (
+        rust_args,
+        sys.executable,
+        os.path.realpath(rust_args[0]),
+        os.path.realpath(sys.executable),
+    )
 
 # Windows can't decide if it's with or without .exe, FreeBSB just doesn't work for some reason
 if platform.system() in ["Darwin", "Linux"]:

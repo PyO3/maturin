@@ -26,10 +26,11 @@ python_args = json.loads(python_args)
 # vs
 # {prefix}/Python.framework/Versions/3.10/bin/python3.10
 # on cirrus ci)
-# On windows, cpython resolves while pypy doesn't, also the script for cpython is
-# actually as distinct file from the system interpreter
+# On windows, cpython resolves while pypy doesn't.
+# The script for cpython is actually a distinct file from the system interpreter for
+# windows and mac
 # On alpine/musl, rust_args is empty
-if len(rust_args) > 0 and platform.system() != "Windows":
+if len(rust_args) > 0 and platform.system() == "Linux":
     assert os.path.samefile(rust_args[0], sys.executable), (
         rust_args,
         sys.executable,

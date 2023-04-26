@@ -9,11 +9,14 @@ use fs_err as fs;
 use fs_err::File;
 use multipart::client::lazy::Multipart;
 use regex::Regex;
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::env;
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use thiserror::Error;
 use tracing::debug;
 
@@ -196,10 +199,21 @@ fn resolve_pypi_cred(
     opt: &PublishOpt,
     config: &Ini,
     registry_name: Option<&str>,
+    registry_url: &str,
 ) -> (String, String) {
     // API token from environment variable takes priority
     if let Ok(token) = env::var("MATURIN_PYPI_TOKEN") {
         return ("__token__".to_string(), token);
+    }
+
+    // Try to get a token via OIDC exchange
+    match resolve_pypi_token_via_oidc(registry_url) {
+        Ok(Some(token)) => {
+            eprintln!("🔐 Using trusted publisher for upload");
+            return ("__token__".to_string(), token);
+        }
+        Ok(None) => {}
+        Err(e) => eprintln!("⚠️ Warning: Failed to resolve PyPI token via OIDC: {}", e),
     }
 
     if let Some((username, password)) =
@@ -217,6 +231,67 @@ fn resolve_pypi_cred(
         .or_else(|| env::var("MATURIN_PASSWORD").ok())
         .unwrap_or_else(|| get_password(&username));
     (username, password)
+}
+
+#[derive(Debug, Deserialize)]
+struct OidcAudienceResponse {
+    audience: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OidcTokenResponse {
+    value: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct MintTokenResponse {
+    token: String,
+}
+
+/// Trusted Publisher support for GitHub Actions
+fn resolve_pypi_token_via_oidc(registry_url: &str) -> Result<Option<String>> {
+    if env::var_os("GITHUB_ACTIONS").is_none() {
+        return Ok(None);
+    }
+    if let (Ok(req_token), Ok(req_url)) = (
+        env::var("ACTIONS_ID_TOKEN_REQUEST_TOKEN"),
+        env::var("ACTIONS_ID_TOKEN_REQUEST_URL"),
+    ) {
+        let registry_url = url::Url::parse(registry_url)?;
+        let mut audience_url = registry_url.clone();
+        audience_url.set_path("_/oidc/audience");
+        debug!("Requesting OIDC audience from {}", audience_url);
+        let agent = http_agent()?;
+        let audience_res: OidcAudienceResponse = agent
+            .get(audience_url.as_str())
+            .timeout(Duration::from_secs(30))
+            .call()?
+            .into_json()?;
+        let audience = audience_res.audience;
+
+        debug!("Requesting OIDC token for {} from {}", audience, req_url);
+        let request_token_res: OidcTokenResponse = agent
+            .get(&req_url)
+            .query("audience", &audience)
+            .set("Authorization", &format!("bearer {req_token}"))
+            .timeout(Duration::from_secs(30))
+            .call()?
+            .into_json()?;
+        let oidc_token = request_token_res.value;
+
+        let mut mint_token_url = registry_url;
+        mint_token_url.set_path("_/oidc/github/mint-token");
+        debug!("Requesting API token from {}", mint_token_url);
+        let mut mint_token_req = HashMap::new();
+        mint_token_req.insert("token", oidc_token);
+        let mint_token_res = agent
+            .post(mint_token_url.as_str())
+            .timeout(Duration::from_secs(30))
+            .send_json(mint_token_req)?
+            .into_json::<MintTokenResponse>()?;
+        return Ok(Some(mint_token_res.token));
+    }
+    Ok(None)
 }
 
 /// Asks for username and password for a registry account where missing.
@@ -248,7 +323,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
             opt.repository
         );
     };
-    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name);
+    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name, &registry_url);
     let registry = Registry::new(username, password, registry_url);
 
     Ok(registry)

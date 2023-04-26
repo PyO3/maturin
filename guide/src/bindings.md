@@ -91,6 +91,42 @@ directory of a virtual environment) once installed.
 > **Note**: Maturin _does not_ automatically detect `bin` bindings. You _must_
 > specify them via either command line with `-b bin` or in `pyproject.toml`.
 
+### Both binary and library?
+
+Shipping both a binary and library would double the size of your wheel. Consider instead exposing a CLI function in the library and using a Python entrypoint:
+
+```rust
+#[pyfunction]
+fn print_cli_args(py: Python) -> PyResult<()> {
+    // This one includes python and the name of the wrapper script itself, e.g.
+    // `["/home/ferris/.venv/bin/python", "/home/ferris/.venv/bin/print_cli_args", "a", "b", "c"]`
+    println!("{:?}", env::args().collect::<Vec<_>>());
+    // This one includes only the name of the wrapper script itself, e.g.
+    // `["/home/ferris/.venv/bin/print_cli_args", "a", "b", "c"])`
+    println!(
+        "{:?}",
+        py.import("sys")?
+            .getattr("argv")?
+            .extract::<Vec<String>>()?
+    );
+    Ok(())
+}
+
+#[pymodule]
+fn my_module(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_wrapped(wrap_pyfunction!(print_cli_args))?;
+
+    Ok(())
+}
+```
+
+In pyproject.toml:
+
+```toml
+[project.scripts]
+print_cli_args = "my_module:print_cli_args"
+```
+
 ## `uniffi`
 
 uniffi bindings use [uniffi-rs](https://mozilla.github.io/uniffi-rs/) to generate Python `ctypes` bindings

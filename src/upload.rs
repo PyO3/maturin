@@ -262,12 +262,15 @@ fn resolve_pypi_token_via_oidc(registry_url: &str) -> Result<Option<String>> {
         audience_url.set_path("_/oidc/audience");
         debug!("Requesting OIDC audience from {}", audience_url);
         let agent = http_agent()?;
-        let audience_res: OidcAudienceResponse = agent
+        let audience_res = agent
             .get(audience_url.as_str())
             .timeout(Duration::from_secs(30))
-            .call()?
-            .into_json()?;
-        let audience = audience_res.audience;
+            .call()?;
+        if audience_res.status() == 404 {
+            // OIDC is not enabled/supported on this registry
+            return Ok(None);
+        }
+        let audience = audience_res.into_json::<OidcAudienceResponse>()?.audience;
 
         debug!("Requesting OIDC token for {} from {}", audience, req_url);
         let request_token_res: OidcTokenResponse = agent

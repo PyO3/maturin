@@ -181,6 +181,11 @@ skip = [
     { name = "base64", version = "0.13.1" },
     # from cbindgen
     { name = "toml", version = "0.5.11" },
+
+    { name = "windows-sys", version = "0.45.0" },
+    { name = "windows-sys", version = "0.48.0" },
+    { name = "windows-targets", version = "0.48.0" },
+    { name = "windows_x86_64_msvc", version = "0.48.0" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive

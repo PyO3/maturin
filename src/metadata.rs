@@ -4,6 +4,7 @@ use fs_err as fs;
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue, Requirement};
+use pyproject_toml::License;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,16 +181,21 @@ impl Metadata21 {
                 self.requires_python = Some(requires_python.clone());
             }
 
-            if let Some(pyproject_toml::License { file, text }) = &project.license {
-                if file.is_some() && text.is_some() {
-                    bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
-                }
-                if let Some(license_path) = file {
-                    let license_path = pyproject_dir.join(license_path);
-                    self.license_files.push(license_path);
-                }
-                if let Some(license_text) = text {
-                    self.license = Some(license_text.clone());
+            if let Some(license) = &project.license {
+                match license {
+                    // TODO: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
+                    License::String(license_expr) => self.license = Some(license_expr.clone()),
+                    License::Table { file, text } => match (file, text) {
+                        (Some(_), Some(_)) => {
+                            bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
+                        }
+                        (Some(license_path), None) => {
+                            let license_path = pyproject_dir.join(license_path);
+                            self.license_files.push(license_path);
+                        }
+                        (None, Some(license_text)) => self.license = Some(license_text.clone()),
+                        (None, None) => {}
+                    },
                 }
             }
 

@@ -104,6 +104,17 @@ pub struct TargetConfig {
     pub macos_deployment_target: Option<String>,
 }
 
+/// Source distribution generator
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum SdistGenerator {
+    /// Use `cargo package --list`
+    #[default]
+    Cargo,
+    /// Use `git ls-files`
+    Git,
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -120,6 +131,8 @@ pub struct ToolMaturin {
     skip_auditwheel: bool,
     #[serde(default)]
     strip: bool,
+    #[serde(default)]
+    sdist_generator: SdistGenerator,
     /// The directory with python module, contains `<module_name>/__init__.py`
     python_source: Option<PathBuf>,
     /// Python packages to include
@@ -236,6 +249,13 @@ impl PyProjectToml {
     pub fn strip(&self) -> bool {
         self.maturin()
             .map(|maturin| maturin.strip)
+            .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.sdist-generator]` in pyproject.toml
+    pub fn sdist_generator(&self) -> SdistGenerator {
+        self.maturin()
+            .map(|maturin| maturin.sdist_generator)
             .unwrap_or_default()
     }
 

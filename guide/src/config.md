@@ -54,6 +54,9 @@ python-source = "src"
 python-packages = ["foo", "bar"]
 # Strip the library for minimum file size
 strip = true
+# Source distribution generator,
+# supports cargo (default) and git.
+sdist-generator = "cargo"
 ```
 
 The `[tool.maturin.include]` and `[tool.maturin.exclude]` configuration are

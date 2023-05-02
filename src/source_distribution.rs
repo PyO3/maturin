@@ -1,4 +1,5 @@
 use crate::module_writer::{add_data, ModuleWriter};
+use crate::pyproject_toml::SdistGenerator;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
@@ -564,29 +565,52 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
     Ok(path_deps)
 }
 
-/// Creates a source distribution, packing the root crate and all local dependencies
+/// Copies the files of git to a source distribution
 ///
-/// The source distribution format is specified in
-/// [PEP 517 under "build_sdist"](https://www.python.org/dev/peps/pep-0517/#build-sdist)
-/// and in
-/// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
-pub fn source_distribution(
+/// Runs `git ls-files -z` to obtain a list of files to package.
+fn add_git_tracked_files_to_sdist(
+    pyproject_toml_path: &Path,
+    writer: &mut SDistWriter,
+    prefix: impl AsRef<Path>,
+) -> Result<()> {
+    let pyproject_dir = pyproject_toml_path.parent().unwrap();
+    let output = Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(pyproject_dir)
+        .output()
+        .context("Failed to run `git ls-files -z`")?;
+    if !output.status.success() {
+        bail!(
+            "Failed to query file list from git: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+    }
+
+    let prefix = prefix.as_ref();
+    writer.add_directory(prefix)?;
+
+    let file_paths = str::from_utf8(&output.stdout)
+        .context("git printed invalid utf-8 ಠ_ಠ")?
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(Path::new);
+    for source in file_paths {
+        writer.add_file(prefix.join(source), pyproject_dir.join(source))?;
+    }
+    Ok(())
+}
+
+/// Copies the files of a crate to a source distribution, recursively adding path dependencies
+/// and rewriting path entries in Cargo.toml
+fn add_cargo_package_files_to_sdist(
     build_context: &BuildContext,
-    pyproject: &PyProjectToml,
-    excludes: Option<Override>,
-) -> Result<PathBuf> {
-    let metadata21 = &build_context.metadata21;
+    pyproject_toml_path: &Path,
+    writer: &mut SDistWriter,
+    root_dir: &Path,
+) -> Result<()> {
     let manifest_path = &build_context.manifest_path;
-    let pyproject_toml_path = build_context
-        .pyproject_toml_path
-        .normalize()
-        .with_context(|| {
-            format!(
-                "failed to normalize path `{}`",
-                build_context.pyproject_toml_path.display()
-            )
-        })?
-        .into_path_buf();
     let workspace_manifest_path = build_context
         .cargo_metadata
         .workspace_root
@@ -595,13 +619,6 @@ pub fn source_distribution(
         fs::read_to_string(workspace_manifest_path)?.parse()?;
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
-
-    let mut writer = SDistWriter::new(&build_context.out, metadata21, excludes)?;
-    let root_dir = PathBuf::from(format!(
-        "{}-{}",
-        &metadata21.get_distribution_escaped(),
-        &metadata21.get_version_escaped()
-    ));
 
     // Add local path dependencies
     let mut path_dep_workspace_manifests = HashMap::new();
@@ -635,8 +652,8 @@ pub fn source_distribution(
                 &path_dep_workspace_manifests[&path_dep_metadata.workspace_root]
             };
         add_crate_to_source_distribution(
-            &mut writer,
-            &pyproject_toml_path,
+            writer,
+            pyproject_toml_path,
             path_dep,
             path_dep_workspace_manifest,
             &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
@@ -652,11 +669,11 @@ pub fn source_distribution(
 
     // Add the main crate
     add_crate_to_source_distribution(
-        &mut writer,
-        &pyproject_toml_path,
+        writer,
+        pyproject_toml_path,
         manifest_path,
         &workspace_manifest,
-        &root_dir,
+        root_dir,
         &known_path_deps,
         true,
     )?;
@@ -733,6 +750,61 @@ pub fn source_distribution(
         }
     }
 
+    Ok(())
+}
+
+/// Creates a source distribution, packing the root crate and all local dependencies
+///
+/// The source distribution format is specified in
+/// [PEP 517 under "build_sdist"](https://www.python.org/dev/peps/pep-0517/#build-sdist)
+/// and in
+/// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
+pub fn source_distribution(
+    build_context: &BuildContext,
+    pyproject: &PyProjectToml,
+    excludes: Option<Override>,
+) -> Result<PathBuf> {
+    let pyproject_toml_path = build_context
+        .pyproject_toml_path
+        .normalize()
+        .with_context(|| {
+            format!(
+                "failed to normalize path `{}`",
+                build_context.pyproject_toml_path.display()
+            )
+        })?
+        .into_path_buf();
+    let metadata21 = &build_context.metadata21;
+    let mut writer = SDistWriter::new(&build_context.out, metadata21, excludes)?;
+    let root_dir = PathBuf::from(format!(
+        "{}-{}",
+        &metadata21.get_distribution_escaped(),
+        &metadata21.get_version_escaped()
+    ));
+
+    match pyproject.sdist_generator() {
+        SdistGenerator::Cargo => add_cargo_package_files_to_sdist(
+            build_context,
+            &pyproject_toml_path,
+            &mut writer,
+            &root_dir,
+        )?,
+        SdistGenerator::Git => {
+            add_git_tracked_files_to_sdist(&pyproject_toml_path, &mut writer, &root_dir)?
+        }
+    }
+
+    let pyproject_toml_path = build_context
+        .pyproject_toml_path
+        .normalize()
+        .with_context(|| {
+            format!(
+                "failed to normalize path `{}`",
+                build_context.pyproject_toml_path.display()
+            )
+        })?
+        .into_path_buf();
+    let pyproject_dir = pyproject_toml_path.parent().unwrap();
     // Add readme, license
     if let Some(project) = pyproject.project.as_ref() {
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {

@@ -423,7 +423,11 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
                 .context("Failed to read the sysroot path")?
                 .trim()
                 .to_owned();
-            return Ok(PathBuf::from(sysroot));
+            if sysroot.is_empty() {
+                return Ok(PathBuf::from("/"));
+            } else {
+                return Ok(PathBuf::from(sysroot));
+            }
         } else {
             bail!(
                 "Failed to get the sysroot path: {}",

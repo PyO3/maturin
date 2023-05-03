@@ -9,10 +9,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The `[tool]` section of a pyproject.toml
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct Tool {
-    maturin: Option<ToolMaturin>,
+    /// maturin options
+    pub maturin: Option<ToolMaturin>,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -116,29 +117,36 @@ pub enum SdistGenerator {
 }
 
 /// The `[tool.maturin]` section of a pyproject.toml
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
-    // extension module name, accepts setuptools style import name like `foo.bar`
-    module_name: Option<String>,
-    include: Option<Vec<GlobPattern>>,
-    exclude: Option<Vec<GlobPattern>>,
-    bindings: Option<String>,
+    /// Module name, accepts setuptools style import name like `foo.bar`
+    pub module_name: Option<String>,
+    /// Include files matching the given glob pattern(s)
+    pub include: Option<Vec<GlobPattern>>,
+    /// Exclude files matching the given glob pattern(s)
+    pub exclude: Option<Vec<GlobPattern>>,
+    /// Bindings type
+    pub bindings: Option<String>,
+    /// Platform compatibility
     #[serde(alias = "manylinux")]
-    compatibility: Option<PlatformTag>,
+    pub compatibility: Option<PlatformTag>,
+    /// Skip audit wheel
     #[serde(default)]
-    skip_auditwheel: bool,
+    pub skip_auditwheel: bool,
+    /// Strip the final binary
     #[serde(default)]
-    strip: bool,
+    pub strip: bool,
+    /// Source distribution generator
     #[serde(default)]
-    sdist_generator: SdistGenerator,
+    pub sdist_generator: SdistGenerator,
     /// The directory with python module, contains `<module_name>/__init__.py`
-    python_source: Option<PathBuf>,
+    pub python_source: Option<PathBuf>,
     /// Python packages to include
-    python_packages: Option<Vec<String>>,
+    pub python_packages: Option<Vec<String>>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
-    data: Option<PathBuf>,
+    pub data: Option<PathBuf>,
     /// Cargo compile targets
     pub targets: Option<Vec<CargoTarget>>,
     /// Target configuration

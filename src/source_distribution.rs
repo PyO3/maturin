@@ -581,8 +581,9 @@ fn add_git_tracked_files_to_sdist(
         .context("Failed to run `git ls-files -z`")?;
     if !output.status.success() {
         bail!(
-            "Failed to query file list from git: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+            "Failed to query file list from git: {}\n--- Project Path: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
             output.status,
+            pyproject_dir.display(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
         );

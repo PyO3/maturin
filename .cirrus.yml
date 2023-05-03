@@ -28,7 +28,7 @@ freebsd_task:
       - echo $CIRRUS_OS
       - cat Cargo.lock
   install_script:
-    - pkg install -y bash python
+    - pkg install -y bash git python
     - python3 -m ensurepip
   <<: *BUILD_AND_TEST
 

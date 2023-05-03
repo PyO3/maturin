@@ -287,12 +287,14 @@ jobs:
       CARGO_TERM_COLOR: always
     container: alpine:latest
     steps:
-      - uses: actions/checkout@v3
       - name: Install build requirements
         run: |
           set -ex
-          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd
+          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd git
           pip3 install cffi virtualenv
+      - uses: actions/checkout@v3
+      - name: Fix git permissions
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
@@ -485,6 +487,8 @@ jobs:
     container: pyston/pyston:2.3.5
     steps:
       - uses: actions/checkout@v3
+      - name: Fix git permissions
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:

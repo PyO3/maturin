@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use flate2::read::GzDecoder;
+use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
 use maturin::{BuildOptions, CargoOptions, PlatformTag};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
@@ -115,6 +116,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 
 pub fn test_source_distribution(
     package: impl AsRef<Path>,
+    sdist_generator: SdistGenerator,
     expected_files: Vec<&str>,
     expected_cargo_toml: Option<(&Path, &str)>,
     unique_name: &str,
@@ -135,7 +137,22 @@ pub fn test_source_distribution(
         ..Default::default()
     };
 
-    let build_context = build_options.into_build_context(false, false, false)?;
+    let mut build_context = build_options.into_build_context(false, false, false)?;
+
+    // Override the sdist generator for testing
+    let mut pyproject_toml = build_context.pyproject_toml.take().unwrap();
+    let mut tool = pyproject_toml.tool.clone().unwrap_or_default();
+    if let Some(ref mut tool_maturin) = tool.maturin {
+        tool_maturin.sdist_generator = sdist_generator;
+    } else {
+        tool.maturin = Some(ToolMaturin {
+            sdist_generator,
+            ..Default::default()
+        });
+    }
+    pyproject_toml.tool = Some(tool);
+    build_context.pyproject_toml = Some(pyproject_toml);
+
     let (path, _) = build_context
         .build_source_distribution()?
         .context("Failed to build source distribution")?;

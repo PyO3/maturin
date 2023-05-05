@@ -153,7 +153,7 @@ fn compile_target(
     let target = &context.target;
 
     let mut cargo_rustc: cargo_options::Rustc = context.cargo_options.clone().into();
-    cargo_rustc.message_format = vec!["json".to_string()];
+    cargo_rustc.message_format = vec!["json-render-diagnostics".to_string()];
 
     // --release and --profile are conflicting options
     if context.release && cargo_rustc.profile.is_none() {

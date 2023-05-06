@@ -995,6 +995,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
     if !(bridge.is_bindings("pyo3") || bridge.is_bindings("pyo3-ffi")) {
         eprintln!("🔗 Found {bridge} bindings");
+        return Ok(bridge);
     }
 
     for &lib in PYO3_BINDING_CRATES.iter() {

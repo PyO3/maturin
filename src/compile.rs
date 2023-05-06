@@ -6,6 +6,7 @@ use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
+use normpath::PathExt;
 use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
@@ -369,9 +370,12 @@ fn compile_target(
         if interpreter.runnable {
             if bridge_model.is_bindings("pyo3")
                 || bridge_model.is_bindings("pyo3-ffi")
-                || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
-                    && interpreter.interpreter_kind.is_pypy())
+                || matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
             {
+                debug!(
+                    "Setting PYO3_PYTHON to {}",
+                    interpreter.executable.display()
+                );
                 build_command
                     .env("PYO3_PYTHON", &interpreter.executable)
                     .env(
@@ -401,7 +405,8 @@ fn compile_target(
                     config_file.display()
                 )
             })?;
-            build_command.env("PYO3_CONFIG_FILE", config_file);
+            let abs_config_file = config_file.normalize()?.into_path_buf();
+            build_command.env("PYO3_CONFIG_FILE", abs_config_file);
         }
     }
 

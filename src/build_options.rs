@@ -292,7 +292,7 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
-                            implmentation_name: interpreter_kind.to_string().to_ascii_lowercase(),
+                            implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),
                             soabi: soabi.cloned(),
                         });
                     } else {
@@ -360,7 +360,7 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
-                            implmentation_name: "cpython".to_string(),
+                            implementation_name: "cpython".to_string(),
                             soabi: None,
                         }])
                     } else if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
@@ -387,7 +387,7 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
-                            implmentation_name: "cpython".to_string(),
+                            implementation_name: "cpython".to_string(),
                             soabi: None,
                         }])
                     } else {
@@ -427,7 +427,7 @@ impl BuildOptions {
                             executable: PathBuf::new(),
                             platform: None,
                             runnable: false,
-                            implmentation_name: "cpython".to_string(),
+                            implementation_name: "cpython".to_string(),
                             soabi: None,
                         }])
                     } else if target.cross_compiling() {

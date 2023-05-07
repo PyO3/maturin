@@ -364,7 +364,7 @@ pub struct PythonInterpreter {
     /// and it's `executable` is empty
     pub runnable: bool,
     /// Comes from `sys.platform.name`
-    pub implmentation_name: String,
+    pub implementation_name: String,
     /// Comes from sysconfig var `SOABI`
     pub soabi: Option<String>,
 }
@@ -433,7 +433,7 @@ fn fun_with_abiflags(
 impl PythonInterpreter {
     /// Does this interpreter have PEP 384 stable api aka. abi3 support?
     pub fn has_stable_api(&self) -> bool {
-        if self.implmentation_name.parse::<InterpreterKind>().is_err() {
+        if self.implementation_name.parse::<InterpreterKind>().is_err() {
             false
         } else {
             match self.interpreter_kind {
@@ -465,12 +465,12 @@ impl PythonInterpreter {
         } else {
             context.get_platform_tag(platform_tags)?
         };
-        let tag = if self.implmentation_name.parse::<InterpreterKind>().is_err() {
+        let tag = if self.implementation_name.parse::<InterpreterKind>().is_err() {
             // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston
             // See also https://github.com/pypa/packaging/blob/0031046f7fad649580bc3127d1cef9157da0dd79/packaging/tags.py#L234-L261
             format!(
                 "{interpreter}{major}{minor}-{soabi}-{platform}",
-                interpreter = self.implmentation_name,
+                interpreter = self.implementation_name,
                 major = self.major,
                 minor = self.minor,
                 soabi = self
@@ -676,20 +676,20 @@ impl PythonInterpreter {
             executable,
             platform,
             runnable: true,
-            implmentation_name: message.implementation_name,
+            implementation_name: message.implementation_name,
             soabi: message.soabi,
         }))
     }
 
     /// Construct a `PythonInterpreter` from a sysconfig and target
     pub fn from_config(config: InterpreterConfig) -> Self {
-        let implmentation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
+        let implementation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
         PythonInterpreter {
             config,
             executable: PathBuf::new(),
             platform: None,
             runnable: false,
-            implmentation_name,
+            implementation_name,
             soabi: None,
         }
     }
@@ -879,7 +879,7 @@ impl PythonInterpreter {
         let pointer_width = self.pointer_width.unwrap_or(64);
         format!(
             "{}-{}.{}-{}bit",
-            self.implmentation_name, self.major, self.minor, pointer_width
+            self.implementation_name, self.major, self.minor, pointer_width
         )
     }
 

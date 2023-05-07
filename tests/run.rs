@@ -575,6 +575,9 @@ fn pyo3_mixed_include_exclude_sdist() {
 
 #[test]
 fn pyo3_mixed_include_exclude_git_sdist_generator() {
+    if !Path::new(".git").exists() {
+        return;
+    }
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-mixed-include-exclude",
         SdistGenerator::Git,
@@ -659,6 +662,9 @@ fn workspace_with_path_dep_sdist() {
 
 #[test]
 fn workspace_with_path_dep_git_sdist_generator() {
+    if !Path::new(".git").exists() {
+        return;
+    }
     handle_result(other::test_source_distribution(
         "test-crates/workspace_with_path_dep/python",
         SdistGenerator::Git,

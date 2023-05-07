@@ -1,12 +1,6 @@
 name: Test
 
 on:
-  push:
-    branches:
-      # for bors r+
-      - staging
-      # for bors try
-      - trying
   pull_request:
     paths-ignore:
       - "guide/**"
@@ -15,6 +9,7 @@ on:
       - ".cirrus.yml"
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/dependabot.yml"
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -43,28 +38,11 @@ jobs:
             const OS = yaml.load(process.env.OS_MATRIX)
             const PYTHON_VERSIONS = yaml.load(process.env.PYTHON_VERSION)
 
-            if (context.eventName == 'workflow_dispatch') {
-              // Run all of them on workflow dispatch
+            if (context.eventName == 'workflow_dispatch' || context.eventName == 'merge_group') {
+              // Run all of them on workflow dispatch or merge group
               core.setOutput('os', OS)
               core.setOutput('python-version', PYTHON_VERSIONS)
               core.setOutput('fail-fast', 'false')
-            } else if (context.eventName == 'push') {
-              const commitMessage = process.env.COMMIT_MESSAGE.trim()
-              const matches = commitMessage.match(/(Try|Merge) #([0-9]+):/)
-              if (matches) {
-                const prNumber = matches[2]
-                const { data: { labels: labels } } = await github.rest.pulls.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: prNumber
-                })
-                const labelNames = labels.map(label => label.name)
-                if (labelNames.includes('CI-no-fail-fast')) {
-                  core.setOutput('fail-fast', 'false')
-                }
-              }
-              core.setOutput('os', OS)
-              core.setOutput('python-version', PYTHON_VERSIONS)
             } else if (context.eventName == 'pull_request') {
               const { data: { labels: labels } } = await github.rest.pulls.get({
                 owner: context.repo.owner,
@@ -84,13 +62,6 @@ jobs:
               core.setOutput('os', OS.filter(os => !os.startsWith('macos')))
             }
     env:
-      COMMIT_MESSAGE: >
-        ${{
-            ((
-              (startsWith(github.event.head_commit.message, 'Try #') || startsWith(github.event.head_commit.message, 'Merge #')) &&
-              github.event.head_commit.author.username == 'bors[bot]'
-            ) && github.event.head_commit.message) || ''
-          }}
       OS_MATRIX: |
         - ubuntu-latest
         - macos-latest

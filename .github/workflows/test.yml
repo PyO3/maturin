@@ -415,6 +415,9 @@ jobs:
           # Test abi3
           cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
 
+          # --find-interpreter
+          cargo run --target x86_64-unknown-linux-gnu -- build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+
   test-bootstrap:
     name: Test Bootstrap
     runs-on: ${{ matrix.os }}

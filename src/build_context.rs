@@ -234,7 +234,7 @@ impl BuildContext {
                     let interp_names: HashSet<_> = non_abi3_interps
                         .iter()
                         .map(|interp| match interp.interpreter_kind {
-                            InterpreterKind::CPython => interp.implmentation_name.to_string(),
+                            InterpreterKind::CPython => interp.implementation_name.to_string(),
                             InterpreterKind::PyPy => "PyPy".to_string(),
                         })
                         .collect();

@@ -928,3 +928,28 @@ impl fmt::Display for PythonInterpreter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_interpreter_by_target() {
+        let target =
+            Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
+        let pythons = PythonInterpreter::find_by_target(&target, None);
+        assert_eq!(pythons.len(), 10);
+
+        let pythons = PythonInterpreter::find_by_target(
+            &target,
+            Some(&VersionSpecifiers::from_str(">=3.7").unwrap()),
+        );
+        assert_eq!(pythons.len(), 9);
+
+        let pythons = PythonInterpreter::find_by_target(
+            &target,
+            Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
+        );
+        assert_eq!(pythons.len(), 3);
+    }
+}

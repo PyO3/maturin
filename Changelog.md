@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2023-05-07
+
 * **Breaking Change**: Build with `--no-default-features` by default when bootstrapping from sdist in [#1333](https://github.com/PyO3/maturin/pull/1333)
 * **Breaking Change**: Remove deprecated `sdist-include` option in `pyproject.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * **Breaking Change**: Remove deprecated `python-source` option in `Cargo.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
@@ -850,7 +852,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.17...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/pyo3/maturin/compare/v0.14.17...v0.15.0
 [0.14.17]: https://github.com/pyo3/maturin/compare/v0.14.16...v0.14.17
 [0.14.16]: https://github.com/pyo3/maturin/compare/v0.14.15...v0.14.16
 [0.14.15]: https://github.com/pyo3/maturin/compare/v0.14.14...v0.14.15

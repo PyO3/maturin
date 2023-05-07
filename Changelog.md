@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix finding interpreters from bundled sysconfigs in [#1598](https://github.com/PyO3/maturin/pull/1598)
+
 ## [0.15.0] - 2023-05-07
 
 * **Breaking Change**: Build with `--no-default-features` by default when bootstrapping from sdist in [#1333](https://github.com/PyO3/maturin/pull/1333)

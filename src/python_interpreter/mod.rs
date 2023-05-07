@@ -704,7 +704,7 @@ impl PythonInterpreter {
             .filter_map(|config| match requires_python {
                 Some(requires_python) => {
                     if requires_python
-                        .contains(&Version::from_release(vec![config.major, config.major]))
+                        .contains(&Version::from_release(vec![config.major, config.minor]))
                     {
                         Some(Self::from_config(config))
                     } else {

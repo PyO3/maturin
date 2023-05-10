@@ -1,12 +1,6 @@
 name: Lint
 
 on:
-  push:
-    branches:
-      # for bors r+
-      - staging
-      # for bors try
-      - trying
   pull_request:
     paths-ignore:
       - 'sysconfig/**'
@@ -14,6 +8,7 @@ on:
       - '.cirrus.yml'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/dependabot.yml'
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}

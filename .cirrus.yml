@@ -5,7 +5,7 @@ env:
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
 build_and_test: &BUILD_AND_TEST
-  # only run tasks on pull request or bors related branches
+  # only run tasks on pull request or github merge queue branches
   only_if: $CIRRUS_BRANCH =~ 'gh-readonly-queue/.*' || $CIRRUS_PR != ""
   setup_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable

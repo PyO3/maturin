@@ -240,7 +240,8 @@ jobs:
 
   release-pypi:
     permissions:
-      # Used to sign the release's artifacts with sigstore-python.
+      # Used to sign the release's artifacts with sigstore-python
+      # and upload to PyPI using trusted publisher.
       id-token: write
       # Used to upload release artifacts.
       contents: write
@@ -257,13 +258,11 @@ jobs:
           name: wheels
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: '3.10'
       - name: Publish
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           pip install maturin
-          maturin upload -u __token__ --skip-existing *
+          maturin upload --skip-existing *
       - name: Set environment url
         id: set_url
         run: |

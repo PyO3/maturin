@@ -120,6 +120,7 @@ You can specify a different python source directory in `pyproject.toml` by setti
 ```toml
 [tool.maturin]
 python-source = "python"
+module-name = "my_project._lib_name"
 ```
 
 then the project structure would look like this:
@@ -153,7 +154,7 @@ my-project
 ├── my_project
 │   ├── __init__.py
 │   ├── bar.py
-│   └── my_project.cpython-36m-x86_64-linux-gnu.so
+│   └── _lib_name.cpython-36m-x86_64-linux-gnu.so
 ├── README.md
 └── src
     └── lib.rs

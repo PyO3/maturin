@@ -407,6 +407,11 @@ fn invalid_manylinux_does_not_panic() {
 }
 
 #[test]
+fn warn_on_missing_python_source() {
+    handle_result(errors::warn_on_missing_python_source())
+}
+
+#[test]
 #[cfg_attr(not(target_os = "linux"), ignore)]
 fn musl() {
     let ran = handle_result(other::test_musl());

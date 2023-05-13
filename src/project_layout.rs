@@ -119,16 +119,19 @@ impl ProjectResolver {
 
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name
-        let module_name = cargo_toml
-            .lib
-            .as_ref()
-            .and_then(|lib| lib.name.as_ref())
+        // Precedence:
+        //  * Explicitly declared pyproject.toml `tool.maturin.module-name`
+        //  * Cargo.toml `lib.name`
+        //  * pyproject.toml `project.name`
+        //  * Cargo.toml `package.name`
+        let module_name = pyproject
+            .and_then(|x| x.module_name())
+            .or(cargo_toml.lib.as_ref().and_then(|lib| lib.name.as_deref()))
+            .or(pyproject
+                .and_then(|pyproject| pyproject.project.as_ref())
+                .map(|project| project.name.as_str()))
             .unwrap_or(crate_name)
             .to_owned();
-
-        let extension_name = pyproject
-            .and_then(|x| x.module_name())
-            .unwrap_or(&module_name);
 
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)
@@ -176,7 +179,7 @@ impl ProjectResolver {
             }
         });
         let project_layout =
-            ProjectLayout::determine(project_root, extension_name, py_root, python_packages, data)?;
+            ProjectLayout::determine(project_root, &module_name, py_root, python_packages, data)?;
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,

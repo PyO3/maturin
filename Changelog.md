@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+ * When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name`.
+
 ## [0.15.1] - 2023-05-07
 
 * Fix finding interpreters from bundled sysconfigs in [#1598](https://github.com/PyO3/maturin/pull/1598)

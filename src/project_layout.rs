@@ -178,8 +178,15 @@ impl ProjectResolver {
                 project_root.join(data)
             }
         });
-        let project_layout =
-            ProjectLayout::determine(project_root, &module_name, py_root, python_packages, data)?;
+        let custom_python_source = pyproject.and_then(|x| x.python_source()).is_some();
+        let project_layout = ProjectLayout::determine(
+            project_root,
+            &module_name,
+            py_root,
+            python_packages,
+            data,
+            custom_python_source,
+        )?;
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,
@@ -336,15 +343,15 @@ impl ProjectResolver {
 impl ProjectLayout {
     /// Checks whether a python module exists besides Cargo.toml with the right name
     fn determine(
-        project_root: impl AsRef<Path>,
+        project_root: &Path,
         module_name: &str,
         python_root: PathBuf,
         python_packages: Vec<String>,
         data: Option<PathBuf>,
+        custom_python_source: bool,
     ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
         let parts: Vec<&str> = module_name.split('.').collect();
-        let project_root = project_root.as_ref();
         let (python_module, rust_module, extension_name) = if parts.len() > 1 {
             let mut rust_module = python_root.clone();
             rust_module.extend(&parts[0..parts.len() - 1]);
@@ -366,6 +373,7 @@ impl ProjectLayout {
             rust_module = %rust_module.display(),
             python_module = %python_module.display(),
             extension_name = %extension_name,
+            module_name = %module_name,
             "Project layout resolved"
         );
 
@@ -398,6 +406,15 @@ impl ProjectLayout {
                 data,
             })
         } else {
+            if custom_python_source {
+                eprintln!(
+                    "⚠️ Warning: You specified the python source as {}, but the python module at \
+                    {} is missing. No python module will be included.",
+                    python_root.display(),
+                    python_module.display()
+                );
+            }
+
             Ok(ProjectLayout {
                 python_dir: python_root,
                 python_packages,

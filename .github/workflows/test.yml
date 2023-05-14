@@ -261,7 +261,7 @@ jobs:
       - name: Install build requirements
         run: |
           set -ex
-          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd git
+          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd git patchelf
           pip3 install cffi virtualenv
       - uses: actions/checkout@v3
       - name: Fix git permissions

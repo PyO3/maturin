@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
- * When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name`.
+ * When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name` in [#1608](https://github.com/PyO3/maturin/pull/1608)
+ * Fix rewriting `dev-dependencies` in sdist in [#1610](https://github.com/PyO3/maturin/pull/1610)
 
 ## [0.15.1] - 2023-05-07
 

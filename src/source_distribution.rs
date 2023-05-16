@@ -189,18 +189,22 @@ fn rewrite_dependencies_path(
     //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
     // ^^^^^^^^^^^^^ dep_name
     for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(table) = table.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
+        if let Some(dep_table) = table.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
             if dep_category == "dev-dependencies" && !known_path_deps.is_empty() {
                 // Remove dev-dependencies since building from sdist doesn't need them,
                 // Keep it when there are no path dependencies to support building from
                 // sdist with `--locked`/`--frozen`.
-                table.remove(dep_category);
+                table.remove(dep_category).unwrap();
+                debug!(
+                    "Removing `dev-dependencies` from {} all together since there are no path dependencies",
+                    manifest_path.display(),
+                );
                 rewritten = true;
                 continue;
             }
-            let dep_names: Vec<_> = table.iter().map(|(key, _)| key.to_string()).collect();
+            let dep_names: Vec<_> = dep_table.iter().map(|(key, _)| key.to_string()).collect();
             for dep_name in dep_names {
-                let workspace_inherit = table
+                let workspace_inherit = dep_table
                     .get(&dep_name)
                     .and_then(|x| x.get("workspace"))
                     .and_then(|x| x.as_bool())
@@ -208,10 +212,14 @@ fn rewrite_dependencies_path(
 
                 if !workspace_inherit {
                     // There should either be no value for path, or it should be a string
-                    if table.get(&dep_name).and_then(|x| x.get("path")).is_none() {
+                    if dep_table
+                        .get(&dep_name)
+                        .and_then(|x| x.get("path"))
+                        .is_none()
+                    {
                         continue;
                     }
-                    if !table[&dep_name]["path"].is_str() {
+                    if !dep_table[&dep_name]["path"].is_str() {
                         bail!(
                             "In {}, {} {} has a path value that is not a string",
                             manifest_path.display(),
@@ -235,12 +243,14 @@ fn rewrite_dependencies_path(
                         if let Some(workspace_dep) = workspace_deps.and_then(|x| x.get(&dep_name)) {
                             let mut workspace_dep = workspace_dep.clone();
                             // Merge optional and features from the current Cargo.toml
-                            if table[&dep_name].get("optional").is_some() {
+                            if dep_table[&dep_name].get("optional").is_some() {
                                 ensure_dep_is_inline_table(&mut workspace_dep);
-                                workspace_dep["optional"] = table[&dep_name]["optional"].clone();
+                                workspace_dep["optional"] =
+                                    dep_table[&dep_name]["optional"].clone();
                             }
-                            if let Some(features) =
-                                table[&dep_name].get("features").and_then(|x| x.as_array())
+                            if let Some(features) = dep_table[&dep_name]
+                                .get("features")
+                                .and_then(|x| x.as_array())
                             {
                                 ensure_dep_is_inline_table(&mut workspace_dep);
                                 let existing_features = workspace_dep
@@ -261,7 +271,7 @@ fn rewrite_dependencies_path(
                                     })?;
                                 existing_features.extend(features);
                             }
-                            table[&dep_name] = workspace_dep;
+                            dep_table[&dep_name] = workspace_dep;
                             rewritten = true;
                         } else {
                             bail!(
@@ -276,7 +286,7 @@ fn rewrite_dependencies_path(
                     }
                 }
                 // This is the location of the targeted crate in the source distribution
-                table[&dep_name]["path"] = if root_crate {
+                dep_table[&dep_name]["path"] = if root_crate {
                     toml_edit::value(format!("{local_deps_folder}/{dep_name}"))
                 } else {
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
@@ -284,7 +294,7 @@ fn rewrite_dependencies_path(
                 };
                 if workspace_inherit {
                     // Remove workspace inheritance now that we converted it into a path dependency
-                    table[&dep_name]
+                    dep_table[&dep_name]
                         .as_table_like_mut()
                         .unwrap()
                         .remove("workspace");

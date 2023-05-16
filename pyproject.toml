@@ -11,6 +11,8 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = ["tomli>=1.1.0 ; python_version<'3.11'"]
 dynamic = [

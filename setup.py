@@ -72,6 +72,8 @@ setup(
         "Programming Language :: Rust",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
+        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: Apache Software License",
     ],
     install_requires=["tomli>=1.1.0 ; python_version<'3.11'"],
     setup_requires=["setuptools-rust>=1.4.0"],

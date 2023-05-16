@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>", "messense <messense@icloud.com>"]
 name = "maturin"
-version = "0.15.1"
+version = "0.15.2"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
 exclude = ["test-crates/**/*", "sysconfig/*", "test-data/*", "ci/*", "tests/*", "guide/*", ".github/*"]
 homepage = "https://github.com/pyo3/maturin"
@@ -67,7 +67,7 @@ clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
 clap_complete_command = { version = "0.5.1", optional = true }
 
 # cross compile
-cargo-zigbuild = { version = "0.16.7", default-features = false, optional = true }
+cargo-zigbuild = { version = "0.16.8", default-features = false, optional = true }
 cargo-xwin = { version = "0.14.2", default-features = false, optional = true }
 
 # log
@@ -77,7 +77,7 @@ tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional =
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.10.2", default-features = false, optional = true }
 console = { version = "0.15.4", optional = true }
-minijinja = { version = "0.31.0", optional = true }
+minijinja = { version = "0.32.0", optional = true }
 
 # upload
 bytesize = { version = "1.0.1", optional = true }

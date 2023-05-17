@@ -160,6 +160,18 @@ my-project
     └── lib.rs
 ```
 
+When doing this also be sure to set the module name in our code to match the Cargo.toml's `lib.name`
+
+```
+#[pymodule]
+#[pyo3(name="_lib_name")]
+fn my_lib_name(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_class::<MyPythonRustClass>()?;
+    Ok(())
+}
+```
+
+
 ## Python metadata
 
 maturin supports [PEP 621](https://www.python.org/dev/peps/pep-0621/), you can specify python package metadata in `pyproject.toml`.

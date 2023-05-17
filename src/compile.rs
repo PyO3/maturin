@@ -49,7 +49,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
-    if context.target.is_macos() && context.universal2 {
+    if context.universal2 {
         compile_universal2(context, python_interpreter, targets)
     } else {
         compile_targets(context, python_interpreter, targets)

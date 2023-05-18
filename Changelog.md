@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Fix cross compile Apple universal2 wheels on non-macOS platforms by MisLink in [#1613](https://github.com/PyO3/maturin/pull/1613)
+
 ## [0.15.2] - 2023-05-16
 
  * When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name` in [#1608](https://github.com/PyO3/maturin/pull/1608)

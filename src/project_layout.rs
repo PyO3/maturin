@@ -89,8 +89,7 @@ impl ProjectResolver {
 
         let manifest_dir = manifest_file.parent().unwrap();
         let pyproject_toml: Option<PyProjectToml> = if pyproject_file.is_file() {
-            let pyproject =
-                PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
+            let pyproject = PyProjectToml::new(&pyproject_file)?;
             pyproject.warn_missing_maturin_version();
             pyproject.warn_missing_build_backend();
             Some(pyproject)
@@ -244,8 +243,7 @@ impl ProjectResolver {
                 "Found pyproject.toml in working directory at {:?}",
                 pyproject_file
             );
-            let pyproject =
-                PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
+            let pyproject = PyProjectToml::new(&pyproject_file)?;
             if let Some(path) = pyproject.manifest_path() {
                 debug!("Using cargo manifest path from pyproject.toml {:?}", path);
                 return Ok((

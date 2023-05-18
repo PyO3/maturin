@@ -1,9 +1,9 @@
 //! A pyproject.toml as specified in PEP 517
 
 use crate::PlatformTag;
-use anyhow::{format_err, Result};
+use anyhow::{Context, Result};
 use fs_err as fs;
-use pyproject_toml::PyProjectToml as ProjectToml;
+use pyproject_toml::{BuildSystem, Project};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -179,22 +179,16 @@ pub struct ToolMaturin {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
-    #[serde(flatten)]
-    inner: ProjectToml,
+    /// Build-related data
+    pub build_system: BuildSystem,
+    /// Project metadata
+    pub project: Option<Project>,
     /// PEP 518: The `[tool]` table is where any tool related to your Python project, not just build
     /// tools, can have users specify configuration data as long as they use a sub-table within
     /// `[tool]`, e.g. the flit tool would store its configuration in `[tool.flit]`.
     ///
     /// We use it for `[tool.maturin]`
     pub tool: Option<Tool>,
-}
-
-impl std::ops::Deref for PyProjectToml {
-    type Target = ProjectToml;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
 }
 
 impl PyProjectToml {
@@ -205,8 +199,12 @@ impl PyProjectToml {
     pub fn new(pyproject_file: impl AsRef<Path>) -> Result<PyProjectToml> {
         let path = pyproject_file.as_ref();
         let contents = fs::read_to_string(path)?;
-        let pyproject: PyProjectToml = toml::from_str(&contents)
-            .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
+        let pyproject = toml::from_str(&contents).with_context(|| {
+            format!(
+                "pyproject.toml at {} is invalid",
+                pyproject_file.as_ref().display()
+            )
+        })?;
         Ok(pyproject)
     }
 
@@ -355,6 +353,7 @@ mod tests {
         PyProjectToml,
     };
     use fs_err as fs;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
     use std::path::Path;
     use tempfile::TempDir;
@@ -495,6 +494,45 @@ mod tests {
                     format: Formats::Multiple(vec![Format::Sdist, Format::Wheel])
                 }
             ])
+        );
+    }
+
+    #[test]
+    fn test_gh_1615() {
+        let source = indoc!(
+            r#"[build-system]
+            requires = [ "maturin>=0.14", "numpy", "wheel", "patchelf",]
+            build-backend = "maturin"
+            
+            [project]
+            name = "..."
+            license-files = [ "license.txt",]
+            requires-python = ">=3.8"
+            requires-dist = [ "maturin>=0.14", "...",]
+            dependencies = [ "packaging", "...",]
+            zip-safe = false
+            version = "..."
+            readme = "..."
+            description = "..."
+            classifiers = [ "...",]
+        "#
+        );
+        let temp_dir = TempDir::new().unwrap();
+        let pyproject_toml = temp_dir.path().join("pyproject.toml");
+        fs::write(&pyproject_toml, source).unwrap();
+        let outer_error = PyProjectToml::new(&pyproject_toml).unwrap_err();
+        let inner_error = outer_error.source().unwrap();
+
+        assert_eq!(
+            inner_error.to_string(),
+            indoc!(
+                r#"TOML parse error at line 7, column 17
+                  |
+                7 | license-files = [ "license.txt",]
+                  |                 ^^^^^^^^^^^^^^^^^
+                wanted string or table
+                "#
+            )
         );
     }
 }

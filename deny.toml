@@ -181,6 +181,7 @@ skip = [
     { name = "base64", version = "0.13.1" },
     # from cbindgen
     { name = "toml", version = "0.5.11" },
+    { name = "syn" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive

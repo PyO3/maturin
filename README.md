@@ -160,7 +160,7 @@ my-project
     └── lib.rs
 ```
 
-When doing this also be sure to set the module name in your code to match the last part of module-name (don't include the package path):
+When doing this also be sure to set the module name in your code to match the last part of `module-name` (don't include the package path):
 
 ```
 #[pymodule]

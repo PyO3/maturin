@@ -42,7 +42,6 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "--quiet",
         "--target-dir",
         "test-crates/targets/pyo3_no_extension_module",
-        "-i=python",
         "--out",
         "test-crates/targets/pyo3_no_extension_module",
     ];
@@ -107,7 +106,6 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "build",
         "-m",
         "test-crates/pyo3-mixed/Cargo.toml",
-        "-i=python",
         "--compatibility",
         "manylinux_2_99",
         "--target-dir",

@@ -5,7 +5,9 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "rust-lang.rust-analyzer"
+        "ms-python.black-formatter",
+        "rust-lang.rust-analyzer",
+        "charliermarsh.ruff"
       ],
       "settings": {
         "editor.formatOnSave": true

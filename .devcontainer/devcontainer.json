@@ -1,0 +1,15 @@
+{
+  "name": "maturin",
+  "image": "mcr.microsoft.com/devcontainers/rust:bullseye",
+  "postCreateCommand": "bash .devcontainer/post_create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer"
+      ],
+      "settings": {
+        "editor.formatOnSave": true
+      }
+    }
+  }
+}

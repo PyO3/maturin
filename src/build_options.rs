@@ -1057,33 +1057,45 @@ fn find_interpreter(
     target: &Target,
     requires_python: Option<&VersionSpecifiers>,
 ) -> Result<Vec<PythonInterpreter>> {
-    let mut interpreters = Vec::new();
+    let mut found_interpreters = Vec::new();
     if !interpreter.is_empty() {
         let mut missing = Vec::new();
         for interp in interpreter {
             match PythonInterpreter::check_executable(interp.clone(), target, bridge) {
-                Ok(Some(interp)) => interpreters.push(interp),
+                Ok(Some(interp)) => found_interpreters.push(interp),
                 _ => missing.push(interp.clone()),
             }
         }
         if !missing.is_empty() {
             let sysconfig_interps =
                 find_interpreter_in_sysconfig(&missing, target, requires_python)?;
-            interpreters.extend(sysconfig_interps);
+            found_interpreters.extend(sysconfig_interps);
         }
     } else {
-        interpreters = PythonInterpreter::find_all(target, bridge, requires_python)
+        found_interpreters = PythonInterpreter::find_all(target, bridge, requires_python)
             .context("Finding python interpreters failed")?;
     };
 
-    if interpreters.is_empty() {
-        if let Some(requires_python) = requires_python {
-            bail!("Couldn't find any python interpreters with version {}. Please specify at least one with -i", requires_python);
+    if found_interpreters.is_empty() {
+        if interpreter.is_empty() {
+            if let Some(requires_python) = requires_python {
+                bail!("Couldn't find any python interpreters with version {}. Please specify at least one with -i", requires_python);
+            } else {
+                bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+            }
         } else {
-            bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+            let interps_str = interpreter
+                .iter()
+                .map(|path| format!("'{}'", path.display()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!(
+                "Couldn't find any python interpreters from {}.",
+                interps_str
+            );
         }
     }
-    Ok(interpreters)
+    Ok(found_interpreters)
 }
 
 /// Find python interpreters in the host machine
@@ -1141,6 +1153,9 @@ fn find_interpreter_in_sysconfig(
         } else {
             bail!("Unsupported Python interpreter: {}", python);
         };
+        if python_ver.is_empty() {
+            continue;
+        }
         let (ver_major, ver_minor) = python_ver
             .split_once('.')
             .context("Invalid python interpreter version")?;

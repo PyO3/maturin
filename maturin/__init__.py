@@ -32,9 +32,19 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
-def get_maturin_pep517_args() -> list[str]:
-    args = shlex.split(os.getenv("MATURIN_PEP517_ARGS", ""))
-    return args
+def get_maturin_pep517_args(
+    config_settings: Mapping[str, Any] | None = None
+) -> list[str]:
+    build_args = config_settings.get("build-args") if config_settings else None
+    if build_args is None:
+        args = os.getenv("MATURIN_PEP517_ARGS", "")
+        if args:
+            print(
+                f"'MATURIN_PEP517_ARGS' is deprecated, use `--config-settings build-args='{args}'` instead."
+            )
+    else:
+        args = build_args
+    return shlex.split(args)
 
 
 def _additional_pep517_args() -> list[str]:
@@ -68,7 +78,7 @@ def _build_wheel(
     if editable:
         command.append("--editable")
 
-    pep517_args = get_maturin_pep517_args()
+    pep517_args = get_maturin_pep517_args(config_settings)
     if pep517_args:
         command.extend(pep517_args)
 
@@ -185,7 +195,7 @@ def prepare_metadata_for_build_wheel(
         sys.executable,
     ]
     command.extend(_additional_pep517_args())
-    pep517_args = get_maturin_pep517_args()
+    pep517_args = get_maturin_pep517_args(config_settings)
     if pep517_args:
         command.extend(pep517_args)
 

@@ -89,7 +89,7 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')
 ```
 
 ## PEP 660 Editable Installs

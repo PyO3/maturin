@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.2] - 2023-05-16
 
- * When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name` in [#1608](https://github.com/PyO3/maturin/pull/1608)
- * Fix rewriting `dev-dependencies` in sdist in [#1610](https://github.com/PyO3/maturin/pull/1610)
+* When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name` in [#1608](https://github.com/PyO3/maturin/pull/1608)
+* Fix rewriting `dev-dependencies` in sdist in [#1610](https://github.com/PyO3/maturin/pull/1610)
+* Add PEP 517 `config_settings` support in [#1619](https://github.com/PyO3/maturin/pull/1619),
+  deprecate `MATURIN_PEP517_ARGS` in favor of the new `build-args` config setting.
 
 ## [0.15.1] - 2023-05-07
 

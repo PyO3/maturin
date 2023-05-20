@@ -18,12 +18,12 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
-#[cfg(target_family = "unix")]
+#[cfg(unix)]
 use std::fs::OpenOptions;
 use std::io;
 use std::io::{Read, Write};
-#[cfg(target_family = "unix")]
-use std::os::unix::fs::OpenOptionsExt;
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
@@ -1160,7 +1160,12 @@ pub fn write_python_part(
                     if source.is_dir() {
                         writer.add_directory(target)?;
                     } else {
-                        writer.add_file(target, source)?;
+                        let permissions = source.metadata()?.permissions();
+                        #[cfg(unix)]
+                        let mode = permissions.mode();
+                        #[cfg(not(unix))]
+                        let mode = 0o644;
+                        writer.add_file_with_permissions(target, source, mode)?;
                     }
                 }
             }
@@ -1247,15 +1252,24 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
                     .build()
                 {
                     let file = file?;
+                    let permissions = file.metadata()?.permissions();
+                    #[cfg(unix)]
+                    let mode = permissions.mode();
+                    #[cfg(not(unix))]
+                    let mode = 0o644;
                     let relative = file.path().strip_prefix(data.parent().unwrap()).unwrap();
 
                     if file.path_is_symlink() {
                         // Copy the actual file contents, not the link, so that you can create a
                         // data directory by joining different data sources
                         let source = fs::read_link(file.path())?;
-                        writer.add_file(relative, source.parent().unwrap())?;
+                        writer.add_file_with_permissions(
+                            relative,
+                            source.parent().unwrap(),
+                            mode,
+                        )?;
                     } else if file.path().is_file() {
-                        writer.add_file(relative, file.path())?;
+                        writer.add_file_with_permissions(relative, file.path(), mode)?;
                     } else if file.path().is_dir() {
                         writer.add_directory(relative)?;
                     } else {

@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.3] - 2023-05-20
+
 * Fix cross compile Apple universal2 wheels on non-macOS platforms by MisLink in [#1613](https://github.com/PyO3/maturin/pull/1613)
+* Add PEP 517 `config_settings` support in [#1619](https://github.com/PyO3/maturin/pull/1619),
+  deprecate `MATURIN_PEP517_ARGS` in favor of the new `build-args` config setting.
 
 ## [0.15.2] - 2023-05-16
 
 * When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name` in [#1608](https://github.com/PyO3/maturin/pull/1608)
 * Fix rewriting `dev-dependencies` in sdist in [#1610](https://github.com/PyO3/maturin/pull/1610)
-* Add PEP 517 `config_settings` support in [#1619](https://github.com/PyO3/maturin/pull/1619),
-  deprecate `MATURIN_PEP517_ARGS` in favor of the new `build-args` config setting.
 
 ## [0.15.1] - 2023-05-07
 
@@ -865,7 +867,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.15.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v0.15.3...HEAD
+[0.15.3]: https://github.com/pyo3/maturin/compare/v0.15.2...v0.15.3
 [0.15.2]: https://github.com/pyo3/maturin/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/pyo3/maturin/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/pyo3/maturin/compare/v0.14.17...v0.15.0

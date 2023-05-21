@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add support for multiple `--config-settings` in PEP517 backend in [#1624](https://github.com/PyO3/maturin/pull/1624)
+
 ## [0.15.3] - 2023-05-20
 
 * Fix cross compile Apple universal2 wheels on non-macOS platforms by MisLink in [#1613](https://github.com/PyO3/maturin/pull/1613)

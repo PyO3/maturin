@@ -185,11 +185,6 @@ pub struct BuildOptions {
     #[arg(long)]
     pub zig: bool,
 
-    /// Control whether to build universal2 wheel for macOS or not.
-    /// Only applies to macOS targets, do nothing otherwise.
-    #[arg(long)]
-    pub universal2: bool,
-
     /// Cargo build options
     #[command(flatten)]
     pub cargo: CargoOptions,
@@ -510,13 +505,7 @@ impl BuildOptions {
 
         let mut target_triple = self.target.clone();
 
-        let mut universal2 = self.universal2;
-        if universal2 {
-            eprintln!("⚠️  Warning: `--universal2` is deprecated, use `--target universal2-apple-darwin` instead");
-        } else if target_triple.as_deref() == Some("universal2-apple-darwin") {
-            universal2 = true;
-            target_triple = None;
-        }
+        let mut universal2 = target_triple.as_deref() == Some("universal2-apple-darwin");
         // Also try to determine universal2 from ARCHFLAGS environment variable
         if let Ok(arch_flags) = env::var("ARCHFLAGS") {
             let arches: HashSet<&str> = arch_flags
@@ -541,6 +530,9 @@ impl BuildOptions {
                 _ => {}
             }
         };
+        if universal2 {
+            target_triple = None;
+        }
 
         let target = Target::from_target_triple(target_triple)?;
 

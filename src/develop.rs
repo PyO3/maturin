@@ -60,7 +60,6 @@ pub fn develop(
         skip_auditwheel: false,
         #[cfg(feature = "zig")]
         zig: false,
-        universal2: false,
         cargo: CargoOptions {
             target: target_triple,
             ..cargo_options

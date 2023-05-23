@@ -100,7 +100,7 @@ jobs:
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --universal2 --features password-storage
+          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'

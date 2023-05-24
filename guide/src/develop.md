@@ -99,7 +99,7 @@ You need to add `maturin` to `build-system` section of `pyproject.toml` to use i
 
 ```toml
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 ```
 

@@ -44,6 +44,15 @@
       "ext_suffix": ".cpython-311.so",
       "abi_tag": "311",
       "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 12,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-312.so",
+      "abi_tag": "312",
+      "pointer_width": 64
     }
   ],
   "i686": [
@@ -90,6 +99,15 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-311.so",
       "abi_tag": "311",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 12,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-312.so",
+      "abi_tag": "312",
       "pointer_width": 64
     }
   ],
@@ -138,6 +156,15 @@
       "ext_suffix": ".cpython-311.so",
       "abi_tag": "311",
       "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 12,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-312.so",
+      "abi_tag": "312",
+      "pointer_width": 64
     }
   ],
   "armv7l": [
@@ -184,6 +211,15 @@
       "interpreter": "cpython",
       "ext_suffix": ".cpython-311.so",
       "abi_tag": "311",
+      "pointer_width": 64
+    },
+    {
+      "major": 3,
+      "minor": 12,
+      "abiflags": "",
+      "interpreter": "cpython",
+      "ext_suffix": ".cpython-312.so",
+      "abi_tag": "312",
       "pointer_width": 64
     }
   ]

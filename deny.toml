@@ -185,6 +185,7 @@ skip = [
     { name = "syn" },
     { name = "rustix", version = "0.36.7" },
     { name = "linux-raw-sys", version = "0.1.4" },
+    { name = "portable-atomic", version = "0.3.20" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive

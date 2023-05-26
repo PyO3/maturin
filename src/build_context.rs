@@ -591,9 +591,10 @@ impl BuildContext {
             }
             // osname_release_machine fallback for any POSIX system
             (_, _) => {
-                let info = PlatformInfo::new()?;
-                let mut release = info.release().replace(['.', '-'], "_");
-                let mut machine = info.machine().replace([' ', '/'], "_");
+                let info = PlatformInfo::new()
+                    .map_err(|e| anyhow!("Failed to fetch platform information: {e}"))?;
+                let mut release = info.release().to_string_lossy().replace(['.', '-'], "_");
+                let mut machine = info.machine().to_string_lossy().replace([' ', '/'], "_");
 
                 let mut os = target.target_os().to_string().to_ascii_lowercase();
                 // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730

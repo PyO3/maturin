@@ -21,8 +21,8 @@ mod config;
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
 /// Be liberal here to include preview versions
-const MAXIMUM_PYTHON_MINOR: usize = 12;
-const MAXIMUM_PYPY_MINOR: usize = 10;
+pub const MAXIMUM_PYTHON_MINOR: usize = 12;
+pub const MAXIMUM_PYPY_MINOR: usize = 10;
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -944,12 +944,12 @@ mod tests {
             &target,
             Some(&VersionSpecifiers::from_str(">=3.7").unwrap()),
         );
-        assert_eq!(pythons.len(), 9);
+        assert_eq!(pythons.len(), 10);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
         );
-        assert_eq!(pythons.len(), 3);
+        assert_eq!(pythons.len(), 4);
     }
 }

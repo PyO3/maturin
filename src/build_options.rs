@@ -647,6 +647,9 @@ impl BuildOptions {
         let config_targets = pyproject.and_then(|x| x.targets());
         let compile_targets =
             filter_cargo_targets(&cargo_metadata, bridge, config_targets.as_deref())?;
+        if compile_targets.is_empty() {
+            bail!("No Cargo targets to build, please check your bindings configuration in pyproject.toml.");
+        }
 
         let crate_name = cargo_toml.package.name;
         Ok(BuildContext {

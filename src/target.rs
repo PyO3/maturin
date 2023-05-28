@@ -268,7 +268,7 @@ impl Target {
         if self.cross_compiling {
             return Ok(self.arch.to_string());
         }
-        let machine = PlatformInfo::new().map(|info| info.machine().into_owned());
+        let machine = PlatformInfo::new().map(|info| info.machine().to_string_lossy().into_owned());
         let arch = match machine {
             Ok(machine) => {
                 let linux32 = (machine == "x86_64" && self.arch != Arch::X86_64)
@@ -296,8 +296,9 @@ impl Target {
         let release = match os_version {
             Ok(os_ver) => os_ver,
             Err(_) => {
-                let info = PlatformInfo::new()?;
-                info.release().to_string()
+                let info = PlatformInfo::new()
+                    .map_err(|e| anyhow!("Failed to fetch platform information: {e}"))?;
+                info.release().to_string_lossy().into_owned()
             }
         };
         let release = release.replace(['.', '-'], "_");

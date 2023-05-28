@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2023-05-28
+
+* Add more Python 3.12 sysconfigs in [#1629](https://github.com/PyO3/maturin/pull/1629)
+* Fix panicking when no cargo build targets are selected in [#1635](https://github.com/PyO3/maturin/pull/1635)
+
 ## [1.0.0] - 2023-05-23
 
 * Add support for multiple `--config-settings` in PEP517 backend in [#1624](https://github.com/PyO3/maturin/pull/1624)
@@ -873,7 +878,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/pyo3/maturin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/pyo3/maturin/compare/v0.15.3...v1.0.0
 [0.15.3]: https://github.com/pyo3/maturin/compare/v0.15.2...v0.15.3
 [0.15.2]: https://github.com/pyo3/maturin/compare/v0.15.1...v0.15.2

@@ -1101,8 +1101,7 @@ fn find_interpreter_in_host(
     requires_python: Option<&VersionSpecifiers>,
 ) -> Result<Vec<PythonInterpreter>> {
     let interpreters = if !interpreter.is_empty() {
-        PythonInterpreter::check_executables(interpreter, target, bridge)
-            .context("The given list of python interpreters is invalid")?
+        PythonInterpreter::check_executables(interpreter, target, bridge)?
     } else {
         PythonInterpreter::find_all(target, bridge, requires_python)
             .context("Finding python interpreters failed")?

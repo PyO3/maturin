@@ -1080,7 +1080,7 @@ dependencies = [
  "normpath",
  "once_cell",
  "pep440_rs",
- "pep508_rs",
+ "pep508_rs 0.2.1",
  "platform-info",
  "pretty_assertions",
  "pyproject-toml",
@@ -1412,6 +1412,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pep508_rs"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0713d7bb861ca2b7d4c50a38e1f31a4b63a2e2df35ef1e5855cc29e108453e2"
+dependencies = [
+ "once_cell",
+ "pep440_rs",
+ "regex",
+ "serde",
+ "thiserror",
+ "tracing",
+ "unicode-width",
+ "url",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1495,7 +1511,7 @@ checksum = "f04dbbb336bd88583943c7cd973a32fed323578243a7569f40cb0c7da673321b"
 dependencies = [
  "indexmap",
  "pep440_rs",
- "pep508_rs",
+ "pep508_rs 0.1.5",
  "serde",
  "toml 0.7.4",
 ]

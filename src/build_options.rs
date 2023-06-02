@@ -563,6 +563,8 @@ impl BuildOptions {
                     vec![PathBuf::from("python3")]
                 }
             } else {
+                // XXX: False positive clippy warning
+                #[allow(clippy::redundant_clone)]
                 self.interpreter.clone()
             };
             self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?

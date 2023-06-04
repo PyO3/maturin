@@ -1162,9 +1162,8 @@ pub fn write_python_part(
                     if source.is_dir() {
                         writer.add_directory(target)?;
                     } else {
-                        let permissions = source.metadata()?.permissions();
                         #[cfg(unix)]
-                        let mode = permissions.mode();
+                        let mode = source.metadata()?.permissions().mode();
                         #[cfg(not(unix))]
                         let mode = 0o644;
                         writer.add_file_with_permissions(target, source, mode)?;
@@ -1254,9 +1253,8 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
                     .build()
                 {
                     let file = file?;
-                    let permissions = file.metadata()?.permissions();
                     #[cfg(unix)]
-                    let mode = permissions.mode();
+                    let mode = file.metadata()?.permissions().mode();
                     #[cfg(not(unix))]
                     let mode = 0o644;
                     let relative = file.path().strip_prefix(data.parent().unwrap()).unwrap();

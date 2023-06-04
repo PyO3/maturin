@@ -97,7 +97,7 @@ jobs:
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0-pre.10"
+          version: "v0.5.2"
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -418,7 +418,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0-pre.10"
+          version: "v0.5.2"
       - uses: actions/setup-python@v4
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:

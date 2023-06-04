@@ -277,7 +277,6 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
             interpreter_kind: InterpreterKind::CPython,
             abiflags: String::new(),
             ext_suffix: String::new(),
-            abi_tag: None,
             pointer_width: Some(pointer_width),
         }))
     } else {
@@ -349,7 +348,6 @@ struct InterpreterMetadataMessage {
     // comes from `platform.system()`
     system: String,
     soabi: Option<String>,
-    abi_tag: Option<String>,
 }
 
 /// The location and version of an interpreter
@@ -513,14 +511,11 @@ impl PythonInterpreter {
                     // pypy uses its version as part of the ABI, e.g.
                     // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2014_x86_64.whl
                     format!(
-                        "pp{major}{minor}-pypy{major}{minor}_{abi_tag}-{platform}",
+                        "pp{major}{minor}-{abi_tag}-{platform}",
                         major = self.major,
                         minor = self.minor,
-                        // TODO: Proper tag handling for pypy
-                        abi_tag = self
-                            .abi_tag
-                            .clone()
-                            .expect("PyPy's syconfig didn't define an `SOABI` ಠ_ಠ"),
+                        abi_tag = calculate_abi_tag(&self.ext_suffix)
+                            .expect("PyPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
                         platform = platform,
                     )
                 }
@@ -533,10 +528,8 @@ impl PythonInterpreter {
                         "graalpy{major}{minor}-{abi_tag}_{arch}_{os}-{os}_i686",
                         major = self.major,
                         minor = self.minor,
-                        abi_tag = self
-                            .abi_tag
-                            .clone()
-                            .expect("GraalPy's syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ"),
+                        abi_tag = calculate_abi_tag(&self.ext_suffix)
+                            .expect("GraalPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
                         os = target.get_python_os(),
                         arch = target.get_python_arch(),
                     )
@@ -696,7 +689,6 @@ impl PythonInterpreter {
                 ext_suffix: message
                     .ext_suffix
                     .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
-                abi_tag: message.abi_tag,
                 pointer_width: None,
             },
             executable,
@@ -955,6 +947,35 @@ impl fmt::Display for PythonInterpreter {
     }
 }
 
+/// Calculate the ABI tag from EXT_SUFFIX
+fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
+    let parts = ext_suffix.split('.').collect::<Vec<_>>();
+    if parts.len() < 3 {
+        // CPython3.7 and earlier uses ".pyd" on Windows.
+        return None;
+    }
+    let soabi = parts[1];
+    let mut soabi_split = soabi.split('-');
+    let abi = if soabi.starts_with("cpython") {
+        // non-windows
+        format!("cp{}", soabi_split.nth(1).unwrap())
+    } else if soabi.starts_with("cp") {
+        // windows
+        soabi_split.next().unwrap().to_string()
+    } else if soabi.starts_with("pypy") {
+        soabi_split.take(2).collect::<Vec<_>>().join("-")
+    } else if soabi.starts_with("graalpy") {
+        soabi_split.take(3).collect::<Vec<_>>().join("-")
+    } else if !soabi.is_empty() {
+        // pyston, ironpython, others?
+        soabi_split.nth(1).unwrap().to_string()
+    } else {
+        return None;
+    };
+    let abi_tag = abi.replace(['.', '-', ' '], "_");
+    Some(abi_tag)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -977,5 +998,29 @@ mod tests {
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
         );
         assert_eq!(pythons.len(), 4);
+    }
+
+    #[test]
+    fn test_calculate_abi_tag() {
+        let cases = vec![
+            (".cpython-37m-x86_64-linux-gnu.so", Some("cp37m")),
+            (".cpython-310-x86_64-linux-gnu.so", Some("cp310")),
+            (".cpython-310-darwin.so", Some("cp310")),
+            (".cp310-win_amd64.pyd", Some("cp310")),
+            (".cp39-mingw_x86_64.pyd", Some("cp39")),
+            (".cpython-312-wasm32-wasi.so", Some("cp312")),
+            (".cpython-38.so", Some("cp38")),
+            (".pyd", None),
+            (".so", None),
+            (".pypy38-pp73-x86_64-linux-gnu.so", Some("pypy38_pp73")),
+            (
+                ".graalpy-38-native-x86_64-darwin.dylib",
+                Some("graalpy_38_native"),
+            ),
+            (".pyston-23-x86_64-linux-gnu.so", Some("23")),
+        ];
+        for (ext_suffix, expected) in cases {
+            assert_eq!(calculate_abi_tag(ext_suffix).as_deref(), expected);
+        }
     }
 }

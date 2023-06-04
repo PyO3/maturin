@@ -69,7 +69,7 @@ impl InterpreterConfig {
                     target.target_env().to_string().replace("musl", "gnu")
                 }
             }
-            PyPy => "gnu".to_string(),
+            PyPy | GraalPy => "gnu".to_string(),
         };
         match (target.target_os(), python_impl) {
             (Os::Linux, CPython) => {

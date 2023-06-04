@@ -33,7 +33,7 @@ def get_abi_tag():
         abi = "-".join(soabi.split("-")[:3])
         return abi.replace(".", "_").replace("-", "_")
     else:
-        return (sysconfig.get_config_var("SOABI") or "-").split("-")[1] or None,
+        return (sysconfig.get_config_var("SOABI") or "-").split("-")[1]
 
 
 metadata = {
@@ -47,7 +47,7 @@ metadata = {
     "interpreter": platform.python_implementation().lower(),
     "ext_suffix": ext_suffix,
     "soabi": sysconfig.get_config_var("SOABI") or None,
-    "abi_tag": get_abi_tag(),
+    "abi_tag": get_abi_tag() or None,
     "platform": sysconfig.get_platform(),
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),

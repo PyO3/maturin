@@ -291,6 +291,7 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
 pub enum InterpreterKind {
     CPython,
     PyPy,
+    GraalPy,
 }
 
 impl InterpreterKind {
@@ -303,6 +304,11 @@ impl InterpreterKind {
     pub fn is_pypy(&self) -> bool {
         matches!(self, InterpreterKind::PyPy)
     }
+
+    /// Is this a GraalPy interpreter?
+    pub fn is_graalpy(&self) -> bool {
+        matches!(self, InterpreterKind::GraalPy)
+    }
 }
 
 impl fmt::Display for InterpreterKind {
@@ -310,6 +316,7 @@ impl fmt::Display for InterpreterKind {
         match *self {
             InterpreterKind::CPython => write!(f, "CPython"),
             InterpreterKind::PyPy => write!(f, "PyPy"),
+            InterpreterKind::GraalPy => write!(f, "GraalPy"),
         }
     }
 }
@@ -321,6 +328,7 @@ impl FromStr for InterpreterKind {
         match s.to_ascii_lowercase().as_str() {
             "cpython" => Ok(InterpreterKind::CPython),
             "pypy" => Ok(InterpreterKind::PyPy),
+            "graalvm" | "graalpy" => Ok(InterpreterKind::GraalPy),
             unknown => Err(format!("Unknown interpreter kind '{unknown}'")),
         }
     }
@@ -407,8 +415,8 @@ fn fun_with_abiflags(
         );
     }
 
-    if message.interpreter == "pypy" {
-        // pypy does not specify abi flags
+    if message.interpreter == "pypy" || message.interpreter == "graalvm" {
+        // pypy and graalpy do not specify abi flags
         Ok("".to_string())
     } else if message.system == "windows" {
         if matches!(message.abiflags.as_deref(), Some("") | None) {
@@ -438,7 +446,7 @@ impl PythonInterpreter {
         } else {
             match self.interpreter_kind {
                 InterpreterKind::CPython => true,
-                InterpreterKind::PyPy => false,
+                InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
             }
         }
     }
@@ -514,6 +522,23 @@ impl PythonInterpreter {
                             .clone()
                             .expect("PyPy's syconfig didn't define an `SOABI` ಠ_ಠ"),
                         platform = platform,
+                    )
+                }
+                InterpreterKind::GraalPy => {
+                    // GraalPy suffers from pypa/packaging#614, where
+                    // packaging misdetects it as a 32-bit implementation,
+                    // so GraalPy adds the correct platform itself, e.g.
+                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native_x86_64_linux-linux_i686.whl
+                    format!(
+                        "graalpy{major}{minor}-{abi_tag}_{arch}_{os}-{os}_i686",
+                        major = self.major,
+                        minor = self.minor,
+                        abi_tag = self
+                            .abi_tag
+                            .clone()
+                            .expect("GraalPy's syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ"),
+                        os = target.get_python_os(),
+                        arch = target.get_python_arch(),
                     )
                 }
             }
@@ -635,6 +660,7 @@ impl PythonInterpreter {
         let interpreter = match message.interpreter.as_str() {
             "cpython" => InterpreterKind::CPython,
             "pypy" => InterpreterKind::PyPy,
+            "graalvm" | "graalpy" => InterpreterKind::GraalPy,
             other => {
                 bail!("Unsupported interpreter {}", other);
             }
@@ -888,7 +914,7 @@ impl PythonInterpreter {
     pub fn get_venv_site_package(&self, venv_base: impl AsRef<Path>, target: &Target) -> PathBuf {
         if target.is_unix() {
             match self.interpreter_kind {
-                InterpreterKind::CPython => {
+                InterpreterKind::CPython | InterpreterKind::GraalPy => {
                     let python_dir = format!("python{}.{}", self.major, self.minor);
                     venv_base
                         .as_ref()

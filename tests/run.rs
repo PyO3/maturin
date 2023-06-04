@@ -158,8 +158,8 @@ fn integration_pyo3_bin() {
         target.get_python()
     });
     let python_implementation = get_python_implementation(&python).unwrap();
-    if python_implementation == "pypy" {
-        // PyPy doesn't support the 'auto-initialize' feature of pyo3
+    if python_implementation == "pypy" || python_implementation == "graalpy" {
+        // PyPy & GraalPy do not support the 'auto-initialize' feature of pyo3
         return;
     }
 

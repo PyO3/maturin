@@ -8,7 +8,7 @@ specify which bindings to use.
 
 [pyo3](https://github.com/PyO3/pyo3) is Rust bindings for Python,
 including tools for creating native Python extension modules.
-It supports both CPython and PyPy.
+It supports CPython, PyPy, and GraalPy.
 
 maturin automatically detects pyo3 bindings when it's added as a dependency in `Cargo.toml`.
 

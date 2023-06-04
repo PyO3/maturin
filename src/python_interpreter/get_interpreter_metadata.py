@@ -19,6 +19,23 @@ if platform.python_implementation() == "PyPy":
 else:
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
 
+
+def get_abi_tag():
+    # This should probably return the ABI tag based on EXT_SUFFIX in the same
+    # way as pypa/packaging. See https://github.com/pypa/packaging/pull/607.
+    # For simplicity, we just fix it up for GraalPy for now and leave the logic
+    # for the other interpreters untouched, but this should be fixed properly
+    # down the road.
+    if platform.python_implementation() == "GraalVM":
+        ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
+        parts = ext_suffix.split(".")
+        soabi = parts[1]
+        abi = "-".join(soabi.split("-")[:3])
+        return abi.replace(".", "_").replace("-", "_")
+    else:
+        return (sysconfig.get_config_var("SOABI") or "-").split("-")[1]
+
+
 metadata = {
     # sys.implementation.name can differ from platform.python_implementation(), for example
     # Pyston has sys.implementation.name == "pyston" while platform.python_implementation() == cpython
@@ -30,7 +47,7 @@ metadata = {
     "interpreter": platform.python_implementation().lower(),
     "ext_suffix": ext_suffix,
     "soabi": sysconfig.get_config_var("SOABI") or None,
-    "abi_tag": (sysconfig.get_config_var("SOABI") or "-").split("-")[1] or None,
+    "abi_tag": get_abi_tag() or None,
     "platform": sysconfig.get_platform(),
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),

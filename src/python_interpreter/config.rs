@@ -29,10 +29,6 @@ pub struct InterpreterConfig {
     pub abiflags: String,
     /// Suffix to use for extension modules as given by sysconfig.
     pub ext_suffix: String,
-    /// Part of sysconfig's SOABI specifying {major}{minor}{abiflags}
-    ///
-    /// Note that this always `None` on windows
-    pub abi_tag: Option<String>,
     /// Pointer width
     pub pointer_width: Option<usize>,
 }
@@ -78,10 +74,10 @@ impl InterpreterConfig {
                 } else {
                     "".to_string()
                 };
-                let abi_tag = format!("{}{}{}", major, minor, abiflags);
+                let ldversion = format!("{}{}{}", major, minor, abiflags);
                 let ext_suffix = format!(
                     ".cpython-{}-{}-linux-{}.so",
-                    abi_tag, python_arch, target_env
+                    ldversion, python_arch, target_env
                 );
                 Some(Self {
                     major,
@@ -89,23 +85,18 @@ impl InterpreterConfig {
                     interpreter_kind: CPython,
                     abiflags,
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
             (Os::Linux, PyPy) => {
-                let abi_tag = PYPY_ABI_TAG.to_string();
-                let ext_suffix = format!(
-                    ".pypy{}{}-{}-{}-linux-{}.so",
-                    major, minor, abi_tag, python_arch, target_env
-                );
+                let abi_tag = format!("pypy{}{}-{}", major, minor, PYPY_ABI_TAG);
+                let ext_suffix = format!(".{}-{}-linux-{}.so", abi_tag, python_arch, target_env);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: PyPy,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
@@ -115,28 +106,25 @@ impl InterpreterConfig {
                 } else {
                     "".to_string()
                 };
-                let abi_tag = format!("{}{}{}", major, minor, abiflags);
-                let ext_suffix = format!(".cpython-{}-darwin.so", abi_tag);
+                let ldversion = format!("{}{}{}", major, minor, abiflags);
+                let ext_suffix = format!(".cpython-{}-darwin.so", ldversion);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: CPython,
                     abiflags,
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
             (Os::Macos, PyPy) => {
-                let abi_tag = PYPY_ABI_TAG.to_string();
-                let ext_suffix = format!(".pypy{}{}-{}-darwin.so", major, minor, abi_tag);
+                let ext_suffix = format!(".pypy{}{}-{}-darwin.so", major, minor, PYPY_ABI_TAG);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: PyPy,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
@@ -158,7 +146,6 @@ impl InterpreterConfig {
                     interpreter_kind: CPython,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: None,
                     pointer_width: Some(target.pointer_width()),
                 })
             }
@@ -167,15 +154,13 @@ impl InterpreterConfig {
                     // PyPy on Windows only supports x86_64
                     return None;
                 }
-                let abi_tag = PYPY_ABI_TAG.to_string();
-                let ext_suffix = format!(".pypy{}{}-{}-win_amd64.pyd", major, minor, abi_tag);
+                let ext_suffix = format!(".pypy{}{}-{}-win_amd64.pyd", major, minor, PYPY_ABI_TAG);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: PyPy,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
@@ -185,19 +170,16 @@ impl InterpreterConfig {
                 } else {
                     ("".to_string(), format!(".cpython-{}{}.so", major, minor))
                 };
-                let abi_tag = format!("{}{}{}", major, minor, abiflags);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: CPython,
                     abiflags,
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
             (Os::NetBsd, CPython) => {
-                let abi_tag = format!("{}{}", major, minor);
                 let ext_suffix = ".so".to_string();
                 Some(Self {
                     major,
@@ -205,33 +187,30 @@ impl InterpreterConfig {
                     interpreter_kind: CPython,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
             (Os::OpenBsd, CPython) => {
-                let abi_tag = format!("{}{}", major, minor);
-                let ext_suffix = format!(".cpython-{}.so", abi_tag);
+                let ldversion = format!("{}{}", major, minor);
+                let ext_suffix = format!(".cpython-{}.so", ldversion);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: CPython,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
             (Os::Emscripten, CPython) => {
-                let abi_tag = format!("{}{}", major, minor);
-                let ext_suffix = format!(".cpython-{}-{}-emscripten.so", abi_tag, python_arch);
+                let ldversion = format!("{}{}", major, minor);
+                let ext_suffix = format!(".cpython-{}-{}-emscripten.so", ldversion, python_arch);
                 Some(Self {
                     major,
                     minor,
                     interpreter_kind: CPython,
                     abiflags: String::new(),
                     ext_suffix,
-                    abi_tag: Some(abi_tag),
                     pointer_width: Some(target.pointer_width()),
                 })
             }
@@ -382,7 +361,6 @@ impl InterpreterConfig {
             interpreter_kind,
             abiflags: abiflags.unwrap_or_default(),
             ext_suffix,
-            abi_tag: Some(abi_tag),
             pointer_width,
         })
     }
@@ -482,7 +460,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("pp73"));
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-x86_64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
@@ -560,7 +537,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "m");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("37m"));
         assert_eq!(sysconfig.ext_suffix, ".cpython-37m-darwin.so");
 
         // PyPy
@@ -571,7 +547,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("pp73"));
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-darwin.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
@@ -630,7 +605,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "m");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("37m"));
         assert_eq!(sysconfig.ext_suffix, ".so");
 
         let sysconfig = InterpreterConfig::lookup_one(
@@ -640,7 +614,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("310"));
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
@@ -678,7 +651,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("37"));
         assert_eq!(sysconfig.ext_suffix, ".so");
 
         let sysconfig = InterpreterConfig::lookup_one(
@@ -728,7 +700,6 @@ mod test {
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
-        assert_eq!(sysconfig.abi_tag.as_deref(), Some("310"));
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-wasm32-emscripten.so");
     }
 

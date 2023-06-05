@@ -261,8 +261,6 @@ impl BuildOptions {
                             .get("EXT_SUFFIX")
                             .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
                         let soabi = sysconfig_data.get("SOABI");
-                        let abi_tag =
-                            soabi.and_then(|abi| abi.split('-').nth(1).map(ToString::to_string));
                         let interpreter_kind = soabi
                             .and_then(|tag| {
                                 if tag.starts_with("pypy") {
@@ -283,7 +281,6 @@ impl BuildOptions {
                                 interpreter_kind,
                                 abiflags,
                                 ext_suffix: ext_suffix.to_string(),
-                                abi_tag,
                                 pointer_width: None,
                             },
                             executable: PathBuf::new(),
@@ -351,7 +348,6 @@ impl BuildOptions {
                                 interpreter_kind: InterpreterKind::CPython,
                                 abiflags: "".to_string(),
                                 ext_suffix: ".pyd".to_string(),
-                                abi_tag: None,
                                 pointer_width: None,
                             },
                             executable: PathBuf::new(),
@@ -378,7 +374,6 @@ impl BuildOptions {
                                 interpreter_kind: InterpreterKind::CPython,
                                 abiflags: "".to_string(),
                                 ext_suffix: ".pyd".to_string(),
-                                abi_tag: None,
                                 pointer_width: None,
                             },
                             executable: PathBuf::new(),
@@ -418,7 +413,6 @@ impl BuildOptions {
                                 interpreter_kind: InterpreterKind::CPython,
                                 abiflags: "".to_string(),
                                 ext_suffix: "".to_string(),
-                                abi_tag: None,
                                 pointer_width: None,
                             },
                             executable: PathBuf::new(),

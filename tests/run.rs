@@ -383,7 +383,23 @@ fn abi3_without_version() {
 }
 
 #[test]
-#[cfg_attr(not(all(target_os = "linux", target_env = "gnu")), ignore)]
+// Only run this test on platforms that has manylinux support
+#[cfg_attr(
+    not(all(
+        target_os = "linux",
+        target_env = "gnu",
+        any(
+            target_arch = "i686",
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            target_arch = "powerpc64",
+            target_arch = "powerpc64le",
+            target_arch = "s390x",
+            target_arch = "armv7"
+        )
+    )),
+    ignore
+)]
 fn pyo3_no_extension_module() {
     let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
         let target = Target::from_target_triple(None).unwrap();

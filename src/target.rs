@@ -73,6 +73,7 @@ pub enum Arch {
     Mips64el,
     Mipsel,
     Sparc64,
+    LoongArch64,
 }
 
 impl fmt::Display for Arch {
@@ -92,6 +93,7 @@ impl fmt::Display for Arch {
             Arch::Mips64el => write!(f, "mips64el"),
             Arch::Mipsel => write!(f, "mipsel"),
             Arch::Sparc64 => write!(f, "sparc64"),
+            Arch::LoongArch64 => write!(f, "loongarch64"),
         }
     }
 }
@@ -115,6 +117,7 @@ impl Arch {
             Arch::Sparc64 => "sparc64",
             Arch::Wasm32 => "wasm32",
             Arch::S390X => "s390x",
+            Arch::LoongArch64 => "loongarch64",
         }
     }
 }
@@ -136,6 +139,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Mips64el,
             Arch::Mipsel,
             Arch::Sparc64,
+            Arch::LoongArch64,
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
@@ -243,6 +247,7 @@ impl Target {
             Architecture::Mips64(Mips64Architecture::Mips64el) => Arch::Mips64el,
             Architecture::Mips32(Mips32Architecture::Mipsel) => Arch::Mipsel,
             Architecture::Sparc64 => Arch::Sparc64,
+            Architecture::LoongArch64 => Arch::LoongArch64,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -323,6 +328,7 @@ impl Target {
             Arch::Mips64el => "mips64",
             Arch::Mipsel => "mips",
             Arch::Sparc64 => "sparc64",
+            Arch::LoongArch64 => "loongarch64",
         }
     }
 
@@ -366,7 +372,8 @@ impl Target {
             | Arch::Mips64el
             | Arch::Mipsel
             | Arch::Powerpc
-            | Arch::Sparc64 => PlatformTag::Linux,
+            | Arch::Sparc64
+            | Arch::LoongArch64 => PlatformTag::Linux,
         }
     }
 
@@ -380,7 +387,8 @@ impl Target {
             | Arch::S390X
             | Arch::Riscv64
             | Arch::Mips64el
-            | Arch::Sparc64 => 64,
+            | Arch::Sparc64
+            | Arch::LoongArch64 => 64,
             Arch::Armv6L
             | Arch::Armv7L
             | Arch::X86

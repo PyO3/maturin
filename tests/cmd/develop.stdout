@@ -1,7 +1,5 @@
 Install the crate as module in the current virtualenv
 
-Note that this command doesn't create entrypoints
-
 Usage: maturin[EXE] develop [OPTIONS] [ARGS]...
 
 Arguments:

@@ -1,6 +1,6 @@
 use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
 use anyhow::Result;
-use maturin::{develop, CargoOptions};
+use maturin::{develop, CargoOptions, DevelopOptions};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -44,19 +44,19 @@ pub fn test_develop(
     }
 
     let manifest_file = package.join("Cargo.toml");
-    develop(
+    let develop_options = DevelopOptions {
         bindings,
-        CargoOptions {
+        release: false,
+        strip: false,
+        extras: Vec::new(),
+        cargo_options: CargoOptions {
             manifest_path: Some(manifest_file),
             quiet: true,
             target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
-        &venv_dir,
-        false,
-        cfg!(feature = "faster-tests"),
-        vec![],
-    )?;
+    };
+    develop(develop_options, &venv_dir)?;
 
     check_installed(package, &python)?;
     Ok(())

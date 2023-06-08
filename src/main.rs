@@ -12,8 +12,8 @@ use clap::{Parser, Subcommand};
 #[cfg(feature = "scaffolding")]
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
-    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, PathWriter, PlatformTag,
-    PythonInterpreter, Target,
+    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
+    PlatformTag, PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
@@ -73,36 +73,7 @@ enum Opt {
     },
     #[command(name = "develop", alias = "dev")]
     /// Install the crate as module in the current virtualenv
-    ///
-    /// Note that this command doesn't create entrypoints
-    Develop {
-        /// Which kind of bindings to use
-        #[arg(
-            short = 'b',
-            long = "bindings",
-            alias = "binding-crate",
-            value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"]
-        )]
-        bindings: Option<String>,
-        /// Pass --release to cargo
-        #[arg(short = 'r', long)]
-        release: bool,
-        /// Strip the library for minimum file size
-        #[arg(long)]
-        strip: bool,
-        /// Install extra requires aka. optional dependencies
-        ///
-        /// Use as `--extras=extra1,extra2`
-        #[arg(
-            short = 'E',
-            long,
-            value_delimiter = ',',
-            action = clap::ArgAction::Append
-        )]
-        extras: Vec<String>,
-        #[command(flatten)]
-        cargo_options: CargoOptions,
-    },
+    Develop(DevelopOptions),
     /// Build only a source distribution (sdist) without compiling.
     ///
     /// Building a source distribution requires a pyproject.toml with a `[build-system]` table.
@@ -404,16 +375,10 @@ fn run() -> Result<()> {
                 eprintln!(" - {interpreter}");
             }
         }
-        Opt::Develop {
-            bindings,
-            release,
-            strip,
-            extras,
-            cargo_options,
-        } => {
-            let target = Target::from_target_triple(cargo_options.target.clone())?;
+        Opt::Develop(develop_options) => {
+            let target = Target::from_target_triple(develop_options.cargo_options.target.clone())?;
             let venv_dir = detect_venv(&target)?;
-            develop(bindings, cargo_options, &venv_dir, release, strip, extras)?;
+            develop(develop_options, &venv_dir)?;
         }
         Opt::SDist { manifest_path, out } => {
             let build_options = BuildOptions {

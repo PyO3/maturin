@@ -37,6 +37,11 @@ pub struct DevelopOptions {
         action = clap::ArgAction::Append
     )]
     pub extras: Vec<String>,
+    /// Skip installation, only build the extension module inplace
+    ///
+    /// Only works with mixed Rust/Python project layout
+    #[arg(long)]
+    pub skip_install: bool,
     /// `cargo rustc` options
     #[command(flatten)]
     pub cargo_options: CargoOptions,
@@ -53,6 +58,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         release,
         strip,
         extras,
+        skip_install,
         cargo_options,
     } = develop_options;
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
@@ -149,22 +155,23 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     }
 
     let wheels = build_context.build_wheels()?;
-    for (filename, _supported_version) in wheels.iter() {
-        let command = [
-            "-m",
-            "pip",
-            "--disable-pip-version-check",
-            "install",
-            "--no-deps",
-            "--force-reinstall",
-        ];
-        let output = Command::new(&python)
-            .args(command)
-            .arg(dunce::simplified(filename))
-            .output()
-            .context(format!("pip install failed with {python:?}"))?;
-        if !output.status.success() {
-            bail!(
+    if !skip_install {
+        for (filename, _supported_version) in wheels.iter() {
+            let command = [
+                "-m",
+                "pip",
+                "--disable-pip-version-check",
+                "install",
+                "--no-deps",
+                "--force-reinstall",
+            ];
+            let output = Command::new(&python)
+                .args(command)
+                .arg(dunce::simplified(filename))
+                .output()
+                .context(format!("pip install failed with {python:?}"))?;
+            if !output.status.success() {
+                bail!(
                 "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
                 venv_dir.display(),
                 &command,
@@ -172,18 +179,19 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
                 String::from_utf8_lossy(&output.stdout).trim(),
                 String::from_utf8_lossy(&output.stderr).trim(),
             );
-        }
-        if !output.stderr.is_empty() {
+            }
+            if !output.stderr.is_empty() {
+                eprintln!(
+                    "⚠️ Warning: pip raised a warning running {:?}:\n{}",
+                    &command,
+                    String::from_utf8_lossy(&output.stderr).trim(),
+                );
+            }
             eprintln!(
-                "⚠️ Warning: pip raised a warning running {:?}:\n{}",
-                &command,
-                String::from_utf8_lossy(&output.stderr).trim(),
+                "🛠 Installed {}-{}",
+                build_context.metadata21.name, build_context.metadata21.version
             );
         }
-        eprintln!(
-            "🛠 Installed {}-{}",
-            build_context.metadata21.name, build_context.metadata21.version
-        );
     }
 
     Ok(())

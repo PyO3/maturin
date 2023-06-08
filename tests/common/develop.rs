@@ -49,6 +49,7 @@ pub fn test_develop(
         release: false,
         strip: false,
         extras: Vec::new(),
+        skip_install: false,
         cargo_options: CargoOptions {
             manifest_path: Some(manifest_file),
             quiet: true,

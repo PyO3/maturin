@@ -10,19 +10,57 @@ use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
+/// Install the crate as module in the current virtualenv
+#[derive(Debug, clap::Parser)]
+pub struct DevelopOptions {
+    /// Which kind of bindings to use
+    #[arg(
+        short = 'b',
+        long = "bindings",
+        alias = "binding-crate",
+        value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"]
+    )]
+    pub bindings: Option<String>,
+    /// Pass --release to cargo
+    #[arg(short = 'r', long)]
+    pub release: bool,
+    /// Strip the library for minimum file size
+    #[arg(long)]
+    pub strip: bool,
+    /// Install extra requires aka. optional dependencies
+    ///
+    /// Use as `--extras=extra1,extra2`
+    #[arg(
+        short = 'E',
+        long,
+        value_delimiter = ',',
+        action = clap::ArgAction::Append
+    )]
+    pub extras: Vec<String>,
+    /// Skip installation, only build the extension module inplace
+    ///
+    /// Only works with mixed Rust/Python project layout
+    #[arg(long)]
+    pub skip_install: bool,
+    /// `cargo rustc` options
+    #[command(flatten)]
+    pub cargo_options: CargoOptions,
+}
+
 /// Installs a crate by compiling it and copying the shared library to site-packages.
 /// Also adds the dist-info directory to make sure pip and other tools detect the library
 ///
 /// Works only in a virtualenv.
 #[allow(clippy::too_many_arguments)]
-pub fn develop(
-    bindings: Option<String>,
-    cargo_options: CargoOptions,
-    venv_dir: &Path,
-    release: bool,
-    strip: bool,
-    extras: Vec<String>,
-) -> Result<()> {
+pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
+    let DevelopOptions {
+        bindings,
+        release,
+        strip,
+        extras,
+        skip_install,
+        cargo_options,
+    } = develop_options;
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
     let target = Target::from_target_triple(cargo_options.target)?;
     let python = target.get_venv_python(venv_dir);
@@ -117,22 +155,23 @@ pub fn develop(
     }
 
     let wheels = build_context.build_wheels()?;
-    for (filename, _supported_version) in wheels.iter() {
-        let command = [
-            "-m",
-            "pip",
-            "--disable-pip-version-check",
-            "install",
-            "--no-deps",
-            "--force-reinstall",
-        ];
-        let output = Command::new(&python)
-            .args(command)
-            .arg(dunce::simplified(filename))
-            .output()
-            .context(format!("pip install failed with {python:?}"))?;
-        if !output.status.success() {
-            bail!(
+    if !skip_install {
+        for (filename, _supported_version) in wheels.iter() {
+            let command = [
+                "-m",
+                "pip",
+                "--disable-pip-version-check",
+                "install",
+                "--no-deps",
+                "--force-reinstall",
+            ];
+            let output = Command::new(&python)
+                .args(command)
+                .arg(dunce::simplified(filename))
+                .output()
+                .context(format!("pip install failed with {python:?}"))?;
+            if !output.status.success() {
+                bail!(
                 "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
                 venv_dir.display(),
                 &command,
@@ -140,18 +179,19 @@ pub fn develop(
                 String::from_utf8_lossy(&output.stdout).trim(),
                 String::from_utf8_lossy(&output.stderr).trim(),
             );
-        }
-        if !output.stderr.is_empty() {
+            }
+            if !output.stderr.is_empty() {
+                eprintln!(
+                    "⚠️ Warning: pip raised a warning running {:?}:\n{}",
+                    &command,
+                    String::from_utf8_lossy(&output.stderr).trim(),
+                );
+            }
             eprintln!(
-                "⚠️ Warning: pip raised a warning running {:?}:\n{}",
-                &command,
-                String::from_utf8_lossy(&output.stderr).trim(),
+                "🛠 Installed {}-{}",
+                build_context.metadata21.name, build_context.metadata21.version
             );
         }
-        eprintln!(
-            "🛠 Installed {}-{}",
-            build_context.metadata21.name, build_context.metadata21.version
-        );
     }
 
     Ok(())

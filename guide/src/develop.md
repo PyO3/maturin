@@ -29,6 +29,11 @@ Options:
 
           Use as `--extras=extra1,extra2`
 
+      --skip-install
+          Skip installation, only build the extension module inplace
+
+          Only works with mixed Rust/Python project layout
+
   -q, --quiet
           Do not print cargo log messages
 

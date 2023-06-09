@@ -254,8 +254,11 @@ jobs:\n",
 
             // install pyodide-build for emscripten
             if matches!(platform, Platform::Emscripten) {
+                // instal stable pyodide-build
                 conf.push_str("      - run: pip install pyodide-build\n");
                 conf.push_str("      - shell: bash\n        run: echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
+                // get the current python version for the installed pyodide-build
+                conf.push_str("      - shell: bash\n        run: echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV\n");
                 conf.push_str(
                     "      - uses: mymindstorm/setup-emsdk@v12
         with:
@@ -268,7 +271,7 @@ jobs:\n",
             let mut maturin_args = if is_abi3 || (is_bin && !setup_python) {
                 Vec::new()
             } else if matches!(platform, Platform::Emscripten) {
-                vec!["-i".to_string(), "3.10".to_string()]
+                vec!["-i".to_string(), "${{ env.PYTHON_VERSION }}".to_string()]
             } else {
                 vec!["--find-interpreter".to_string()]
             };

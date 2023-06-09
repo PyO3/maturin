@@ -254,7 +254,7 @@ jobs:\n",
 
             // install pyodide-build for emscripten
             if matches!(platform, Platform::Emscripten) {
-                // instal stable pyodide-build
+                // install stable pyodide-build
                 conf.push_str("      - run: pip install pyodide-build\n");
                 conf.push_str("      - shell: bash\n        run: |\n        echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
                 // get the current python version for the installed pyodide-build

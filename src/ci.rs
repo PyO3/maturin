@@ -256,9 +256,9 @@ jobs:\n",
             if matches!(platform, Platform::Emscripten) {
                 // instal stable pyodide-build
                 conf.push_str("      - run: pip install pyodide-build\n");
-                conf.push_str("      - shell: bash\n        run: echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
+                conf.push_str("      - shell: bash\n        run: |\n        echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
                 // get the current python version for the installed pyodide-build
-                conf.push_str("      - shell: bash\n        run: echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV\n");
+                conf.push_str("        echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV\n");
                 conf.push_str(
                     "      - uses: mymindstorm/setup-emsdk@v12
         with:

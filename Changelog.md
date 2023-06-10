@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2023-06-10
+
+* Add basic support for GraalPy in [#1645](https://github.com/PyO3/maturin/pull/1645)
+* Refactor abi tag to use `EXT_SUFFIX` in [#1648](https://github.com/PyO3/maturin/pull/1648)
+* Add Linux loongarch64 architecture support in [#1653](https://github.com/PyO3/maturin/pull/1653)
+* Add `--skip-install` option to `maturin develop` in [#1654](https://github.com/PyO3/maturin/pull/1654)
+
 ## [1.0.1] - 2023-05-28
 
 * Add more Python 3.12 sysconfigs in [#1629](https://github.com/PyO3/maturin/pull/1629)
@@ -878,7 +885,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/pyo3/maturin/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/pyo3/maturin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/pyo3/maturin/compare/v0.15.3...v1.0.0
 [0.15.3]: https://github.com/pyo3/maturin/compare/v0.15.2...v0.15.3

@@ -230,9 +230,9 @@ dependencies = [
 
 [[package]]
 name = "cbindgen"
-version = "0.24.6"
+version = "0.24.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "987cbf881b3fbac73b144b05c73a282638f656070c185bec27173154722a027e"
+checksum = "4b922faaf31122819ec80c4047cc684c6979a087366c069611e33649bf98e18d"
 dependencies = [
  "heck",
  "indexmap",
@@ -1129,9 +1129,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "0.33.0"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "933dc6e6e1f909926a2f6bf72ba8b8d6e38ab4f92778c77ea898001e044a30eb"
+checksum = "75aa91cba87dcad6af3e53bc7adb9c99755eba2d49b6c5f10dbcc79d4727c1bd"
 dependencies = [
  "serde",
 ]

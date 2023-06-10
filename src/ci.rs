@@ -240,31 +240,45 @@ jobs:\n",
                 "    steps:
       - uses: actions/checkout@v3\n",
             );
-            // setup python on demand
-            if setup_python {
-                conf.push_str(
-                    "      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'\n",
-                );
-                if matches!(platform, Platform::Windows) {
-                    conf.push_str("          architecture: ${{ matrix.target }}\n");
-                }
-            }
 
             // install pyodide-build for emscripten
             if matches!(platform, Platform::Emscripten) {
                 // install stable pyodide-build
                 conf.push_str("      - run: pip install pyodide-build\n");
-                conf.push_str("      - shell: bash\n        run: |\n        echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV\n");
                 // get the current python version for the installed pyodide-build
-                conf.push_str("        echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV\n");
+                conf.push_str(
+                    "      - name: Get Emscripten and Python version info
+        shell: bash
+        run: |
+          echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
+          echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV
+          pip uninstall -y pyodide-build\n",
+                );
                 conf.push_str(
                     "      - uses: mymindstorm/setup-emsdk@v12
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache\n",
                 );
+                conf.push_str(
+                    "      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}\n",
+                );
+                // install pyodide-build again in the right Python version
+                conf.push_str("      - run: pip install pyodide-build\n");
+            } else {
+                // setup python on demand
+                if setup_python {
+                    conf.push_str(
+                        "      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'\n",
+                    );
+                    if matches!(platform, Platform::Windows) {
+                        conf.push_str("          architecture: ${{ matrix.target }}\n");
+                    }
+                }
             }
 
             // build wheels

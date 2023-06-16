@@ -72,7 +72,7 @@ impl PublishOpt {
 pub enum UploadError {
     /// Any ureq error
     #[error("Http error")]
-    UreqError(#[source] ureq::Error),
+    UreqError(#[source] Box<ureq::Error>),
     /// The registry returned a "403 Forbidden"
     #[error("Username or password are incorrect")]
     AuthenticationError(String),
@@ -102,7 +102,7 @@ impl From<io::Error> for UploadError {
 
 impl From<ureq::Error> for UploadError {
     fn from(error: ureq::Error) -> Self {
-        UploadError::UreqError(error)
+        UploadError::UreqError(Box::new(error))
     }
 }
 
@@ -547,7 +547,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
                 }
             }
         }
-        Err(err) => Err(UploadError::UreqError(err)),
+        Err(err) => Err(UploadError::UreqError(err.into())),
     }
 }
 

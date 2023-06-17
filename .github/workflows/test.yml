@@ -72,7 +72,6 @@ jobs:
         - '3.9'
         - '3.10'
         - '3.11'
-        - 'pypy3.8'
         - 'pypy3.9'
         - 'pypy3.10'
 
@@ -361,12 +360,12 @@ jobs:
             container: ghcr.io/messense/manylinux2014-cross:s390x
           # PyPy
           - target: aarch64-unknown-linux-gnu
-            abi: pp37-pypy37_pp73
-            python: pypy3.7
+            abi: pp39-pypy39_pp73
+            python: pypy3.9
             container: ghcr.io/messense/manylinux2014-cross:aarch64
           - target: aarch64-unknown-linux-gnu
-            abi: pp38-pypy38_pp73
-            python: pypy3.8
+            abi: pp310-pypy310_pp73
+            python: pypy3.10
             container: ghcr.io/messense/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v3

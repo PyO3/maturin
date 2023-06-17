@@ -195,9 +195,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.16.10"
+version = "0.16.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "065d664a006cb0ede5f2ea22a40e71209c68bdd19a5d6a93d546acb1051a703f"
+checksum = "73de9dc6a393e9cfd6d5f7b151123070c0fe388d56b466690cc7d89dd17be951"
 dependencies = [
  "anyhow",
  "cargo-options",
@@ -210,6 +210,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "shlex",
  "target-lexicon",
  "which",
 ]

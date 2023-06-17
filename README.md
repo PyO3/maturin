@@ -12,7 +12,7 @@ _formerly pyo3-pack_
 Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages.
 
 This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake).
-It supports building wheels for python 3.5+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
+It supports building wheels for python 3.7+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
 
 Check out the [User Guide](https://maturin.rs/)!
 

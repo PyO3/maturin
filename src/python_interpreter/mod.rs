@@ -405,9 +405,9 @@ fn fun_with_abiflags(
         )
     }
 
-    if message.major != 3 || message.minor < 5 {
+    if message.major != 3 || message.minor < 7 {
         bail!(
-            "Only python >= 3.5 is supported, while you're using python {}.{}",
+            "Only python >= 3.7 is supported, while you're using python {}.{}",
             message.major,
             message.minor
         );

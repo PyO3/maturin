@@ -119,7 +119,7 @@ fn ends_with(entry: &DirEntry, pat: &str) -> bool {
 ///
 /// [1]: https://github.com/python/cpython/blob/3.5/Lib/sysconfig.py#L389
 pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
-    let sysconfig_paths = search_lib_dir(lib_dir, target);
+    let sysconfig_paths = search_lib_dir(lib_dir, target)?;
     let sysconfig_name = env::var_os("_PYTHON_SYSCONFIGDATA_NAME");
     let mut sysconfig_paths = sysconfig_paths
         .iter()
@@ -147,7 +147,7 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
 }
 
 /// recursive search for _sysconfigdata, returns all possibilities of sysconfigdata paths
-fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
+fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Result<Vec<PathBuf>> {
     let mut sysconfig_paths = vec![];
     let (cpython_version_pat, pypy_version_pat) = if let Some(v) =
         env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap())
@@ -156,10 +156,10 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
     } else {
         ("python3.".into(), "pypy3.".into())
     };
-    for f in fs::read_dir(path.as_ref()).expect("Path does not exist") {
+    for f in fs::read_dir(path.as_ref())? {
         let sysc = match &f {
             Ok(f) if starts_with(f, "_sysconfigdata") && ends_with(f, "py") => vec![f.path()],
-            Ok(f) if starts_with(f, "build") => search_lib_dir(f.path(), target),
+            Ok(f) if starts_with(f, "build") => search_lib_dir(f.path(), target)?,
             Ok(f) if starts_with(f, "lib.") => {
                 let name = f.file_name();
                 // check if right target os
@@ -173,14 +173,16 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
                 {
                     continue;
                 }
-                search_lib_dir(f.path(), target)
+                search_lib_dir(f.path(), target)?
             }
-            Ok(f) if starts_with(f, &cpython_version_pat) => search_lib_dir(f.path(), target),
+            Ok(f) if starts_with(f, &cpython_version_pat) => search_lib_dir(f.path(), target)?,
             // PyPy 3.7: /opt/python/pp37-pypy37_pp73/lib_pypy/_sysconfigdata__linux_x86_64-linux-gnu.py
-            Ok(f) if starts_with(f, "lib_pypy") => search_lib_dir(f.path(), target),
+            Ok(f) if starts_with(f, "lib_pypy") => search_lib_dir(f.path(), target)?,
             // PyPy 3.8: /opt/python/pp38-pypy38_pp73/lib/pypy3.8/_sysconfigdata__linux_x86_64-linux-gnu.py
-            Ok(f) if starts_with(f, &pypy_version_pat) => search_lib_dir(f.path(), target),
-            Ok(f) if starts_with(f, "lib") && f.path().is_dir() => search_lib_dir(f.path(), target),
+            Ok(f) if starts_with(f, &pypy_version_pat) => search_lib_dir(f.path(), target)?,
+            Ok(f) if starts_with(f, "lib") && f.path().is_dir() => {
+                search_lib_dir(f.path(), target)?
+            }
             _ => continue,
         };
         sysconfig_paths.extend(sysc);
@@ -205,5 +207,5 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Vec<PathBuf> {
             sysconfig_paths = temp;
         }
     }
-    sysconfig_paths
+    Ok(sysconfig_paths)
 }

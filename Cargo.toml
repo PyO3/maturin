@@ -3,7 +3,22 @@ authors = ["konstin <konstin@mailbox.org>", "messense <messense@icloud.com>"]
 name = "maturin"
 version = "1.1.0"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
-exclude = ["test-crates/**/*", "sysconfig/*", "test-data/*", "ci/*", "tests/*", "guide/*", ".github/*"]
+exclude = [
+  "test-crates/**/*",
+  "sysconfig/*",
+  "test-data/*",
+  "ci/*",
+  "tests/*",
+  "guide/*",
+  ".github/*",
+  ".devcontainer/*",
+  "Dockerfile",
+  ".dockerignore",
+  "deny.toml",
+  "noxfile.py",
+  "test-dockerfile.sh",
+  "Code-of-Conduct.md",
+]
 homepage = "https://github.com/pyo3/maturin"
 readme = "README.md"
 repository = "https://github.com/pyo3/maturin"

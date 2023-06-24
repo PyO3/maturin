@@ -410,6 +410,7 @@ jobs:
               - 'pyproject.toml'
               - 'setup.py'
               - 'MANIFEST.in'
+              - 'Cargo.toml'
               - '.github/workflows/test.yml'
       - uses: dtolnay/rust-toolchain@stable
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}

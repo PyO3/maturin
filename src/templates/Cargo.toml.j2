@@ -16,8 +16,8 @@ pyo3 = "0.19.0"
 {% elif bindings == "rust-cpython" -%}
 cpython = "0.7.1"
 {% elif bindings == "uniffi" -%}
-uniffi = "0.23.0"
+uniffi = "0.24.1"
 
 [build-dependencies]
-uniffi = { version = "0.23.0", features = ["build"] }
+uniffi = { version = "0.24.1", features = ["build"] }
 {% endif -%}

@@ -135,7 +135,7 @@ from an interface definition file. uniffi wheels are compatible with all python 
 You need to install [uniffi-bindgen](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) first to build wheels for `uniffi` bindings:
 
 ```bash
-pip install uniffi-bindgen==0.23.0
+pip install uniffi-bindgen==0.24.1
 ```
 
 Note that `uniffi-bindgen` version should be aligned with your Rust `uniffi` dependency version.

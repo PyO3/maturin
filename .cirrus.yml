@@ -45,7 +45,7 @@ macos_arm64_task:
       - cat Cargo.lock
   install_script:
     - brew install python3
-    - python3 -m pip install uniffi-bindgen==0.23.0
+    - python3 -m pip install uniffi-bindgen==0.24.1
   <<: *BUILD_AND_TEST
 
 linux_aarch64_task:
@@ -62,5 +62,5 @@ linux_aarch64_task:
       - echo $CIRRUS_OS
       - cat Cargo.lock
   install_script:
-    - python3 -m pip install uniffi-bindgen==0.23.0
+    - python3 -m pip install uniffi-bindgen==0.24.1
   <<: *BUILD_AND_TEST

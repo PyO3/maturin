@@ -1008,9 +1008,9 @@ checksum = "784462f20dddd9dfdb45de963fa4ad4a288cb10a7889ac5d2c34fb6481c6b213"
 
 [[package]]
 name = "mailparse"
-version = "0.13.8"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cae768a50835557749599277fc59f7c728118724eb34185e8feb633ef266a32"
+checksum = "6b56570f5f8c0047260d1c8b5b331f62eb9c660b9dd4071a8c46f8c7d3f280aa"
 dependencies = [
  "charset",
  "data-encoding",
@@ -1486,9 +1486,9 @@ dependencies = [
 
 [[package]]
 name = "python-pkginfo"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b8cf2d8981a1c967eebacac69c68a54d9786c1b84b813841d0aab2994705608"
+checksum = "e23988cc0f9fbe3c42ae6e399daa7c0273d6013784b744b1742c6e1060611b0e"
 dependencies = [
  "flate2",
  "fs-err",

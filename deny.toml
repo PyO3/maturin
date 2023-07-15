@@ -183,8 +183,6 @@ skip = [
     # from cbindgen
     { name = "toml", version = "0.5.11" },
     { name = "syn" },
-    { name = "rustix", version = "0.36.7" },
-    { name = "linux-raw-sys", version = "0.1.4" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
@@ -192,7 +190,7 @@ skip = [
 # by default infinite
 skip-tree = [
     #{ name = "ansi_term", version = "=0.11.0", depth = 20 },
-    { name = "windows-sys", version = "0.42.0" },
+    { name = "windows-sys", version = "0.45.0" },
 ]
 
 # This section is considered when running `cargo deny check sources`.

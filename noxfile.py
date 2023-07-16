@@ -6,7 +6,7 @@ from pathlib import Path
 import nox
 
 
-PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.23.0")
+PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.23.4")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
 
@@ -34,7 +34,7 @@ def setup_pyodide(session: nox.Session):
         with session.chdir(tests_dir / "node_modules" / "pyodide"):
             session.run(
                 "node",
-                "../prettier/bin-prettier.js",
+                "../prettier/bin/prettier.cjs",
                 "-w",
                 "pyodide.asm.js",
                 external=True,

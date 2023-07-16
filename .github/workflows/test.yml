@@ -214,9 +214,9 @@ jobs:
   test-emscripten:
     name: Test Emscripten
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
-      PYODIDE_VERSION: "0.23.0"
+      PYODIDE_VERSION: "0.23.4"
       PYTHON_VERSION: "3.11.2"
       NODE_VERSION: 18
     steps:

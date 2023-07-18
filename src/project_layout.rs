@@ -387,7 +387,6 @@ impl ProjectLayout {
         };
 
         if python_module.is_dir() {
-
             eprintln!("🍹 Building a mixed python/rust project");
 
             Ok(ProjectLayout {

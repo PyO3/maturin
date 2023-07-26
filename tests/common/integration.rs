@@ -95,7 +95,7 @@ pub fn test_integration(
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
         if test_zig
             && build_context.target.is_linux()
-            && !build_context.target.is_musl_target()
+            && !build_context.target.is_musl_libc()
             && build_context.target.get_minimum_manylinux_tag() != PlatformTag::Linux
         {
             let rustc_ver = rustc_version::version()?;

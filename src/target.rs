@@ -190,6 +190,12 @@ pub struct Target {
     pub(crate) user_specified: bool,
 }
 
+impl fmt::Display for Target {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.triple)
+    }
+}
+
 impl Target {
     /// Uses the given target triple or tries the guess the current target by using the one used
     /// for compilation
@@ -502,7 +508,7 @@ impl Target {
 
     /// Returns true if the current platform's target env is Musl
     #[inline]
-    pub fn is_musl_target(&self) -> bool {
+    pub fn is_musl_libc(&self) -> bool {
         matches!(
             self.env,
             Environment::Musl

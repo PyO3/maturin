@@ -197,7 +197,7 @@ fn compile_target(
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
-            if context.target.is_musl_target()
+            if context.target.is_musl_libc()
                 && !rustflags
                     .flags
                     .iter()
@@ -300,7 +300,7 @@ fn compile_target(
                 }
             } else {
                 build.enable_zig_ar = true;
-                let zig_triple = if target.is_linux() && !target.is_musl_target() {
+                let zig_triple = if target.is_linux() && !target.is_musl_libc() {
                     match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
                         Some(PlatformTag::Manylinux { x, y }) => {
                             format!("{target_triple}.{x}.{y}")

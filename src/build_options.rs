@@ -591,7 +591,7 @@ impl BuildOptions {
                     x.compatibility()
                 })
                 .or(if use_zig {
-                    if target.is_musl_target() {
+                    if target.is_musl_libc() {
                         // Zig bundles musl 1.2
                         Some(PlatformTag::Musllinux { x: 1, y: 2 })
                     } else {
@@ -601,7 +601,7 @@ impl BuildOptions {
                     }
                 } else {
                     // Defaults to musllinux_1_2 for musl target if it's not bin bindings
-                    if target.is_musl_target() && !bridge.is_bin() {
+                    if target.is_musl_libc() && !bridge.is_bin() {
                         Some(PlatformTag::Musllinux { x: 1, y: 2 })
                     } else {
                         None
@@ -619,6 +619,8 @@ impl BuildOptions {
         for platform_tag in &platform_tags {
             if !platform_tag.is_supported() {
                 eprintln!("⚠️  Warning: {platform_tag} is unsupported by the Rust compiler.");
+            } else if platform_tag.is_musllinux() && !target.is_musl_libc() {
+                eprintln!("⚠️  Warning: {target} is not compatible with {platform_tag}.");
             }
         }
 
@@ -686,7 +688,7 @@ fn validate_bridge_type(
     match bridge {
         BridgeModel::Bin(None) => {
             // Only support two different kind of platform tags when compiling to musl target without any binding crates
-            if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_target() {
+            if platform_tags.iter().any(|tag| tag.is_musllinux()) && !target.is_musl_libc() {
                 bail!(
                     "Cannot mix musllinux and manylinux platform tags when compiling to {}",
                     target.target_triple()

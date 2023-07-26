@@ -1155,7 +1155,7 @@ pub fn write_python_part(
             {
                 eprintln!("📦 Including files matching \"{pattern}\"");
                 for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
-                    .expect("No files found for pattern")
+                    .with_context(|| format!("Invalid glob pattern: {pattern}"))?
                     .filter_map(Result::ok)
                 {
                     let target = source.strip_prefix(pyproject_dir)?.to_path_buf();

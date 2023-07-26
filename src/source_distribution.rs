@@ -833,7 +833,7 @@ pub fn source_distribution(
     let mut include = |pattern| -> Result<()> {
         eprintln!("📦 Including files matching \"{pattern}\"");
         for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
-            .expect("No files found for pattern")
+            .with_context(|| format!("Invalid glob pattern: {pattern}"))?
             .filter_map(Result::ok)
         {
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());

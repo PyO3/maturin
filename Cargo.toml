@@ -39,7 +39,7 @@ anyhow = "1.0.63"
 base64 = "0.21.0"
 glob = "0.3.0"
 cargo-config2 = "0.1.4"
-cargo_metadata = "0.15.3"
+cargo_metadata = "0.17.0"
 cargo-options = "0.6.0"
 cbindgen = { version = "0.24.2", default-features = false }
 flate2 = "1.0.18"
@@ -81,7 +81,7 @@ clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
 clap_complete_command = { version = "0.5.1", optional = true }
 
 # cross compile
-cargo-zigbuild = { version = "0.16.11", default-features = false, optional = true }
+cargo-zigbuild = { version = "0.17.0", default-features = false, optional = true }
 cargo-xwin = { version = "0.14.3", default-features = false, optional = true }
 
 # log

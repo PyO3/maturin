@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add basic support for implicit namespaces [#1645](https://github.com/PyO3/maturin/pull/1696)
+
 ## [1.1.0] - 2023-06-10
 
 * Add basic support for GraalPy in [#1645](https://github.com/PyO3/maturin/pull/1645)
@@ -152,7 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Breaking Change**: Remove support for specifying python package metadata in `Cargo.toml` in [#1200](https://github.com/PyO3/maturin/pull/1200).
   Python package metadata should be specified in the `project` section of `pyproject.toml` instead as [PEP 621](https://peps.python.org/pep-0621/) specifies.
-* Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107). 
+* Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107).
   Note that wasmtime currently only support the five most popular platforms and that wasi binaries have restrictions when interacting with the host.
   Usage is by setting `--target wasm32-wasi`.
 * Add support for python first [`src` project layout](https://py-pkgs.org/04-package-structure.html#the-source-layout) in [#1185](https://github.com/PyO3/maturin/pull/1185)

@@ -45,7 +45,7 @@ cbindgen = { version = "0.24.2", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.7.1"
 platform-info = "2.0.2"
-regex = "1.7.0"
+regex = "1.9.1"
 serde = { version = "1.0.141", features = ["derive"] }
 serde_json = "1.0.80"
 sha2 = "0.10.3"

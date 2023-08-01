@@ -1,4 +1,4 @@
-# pyo3-mixed-submodule
+# pyo3-mixed-implicit
 
 A package for testing maturin with a mixed pyo3/python project with an implicit namespace package and Rust submodule.
 
@@ -9,8 +9,8 @@ pip install .
 ```
 
 ```python
-import pyo3_mixed_submodule
-assert pyo3_mixed_submodule.get_42() == 42
+import pyo3_mixed_implicit
+assert pyo3_mixed_implicit.some_rust.get_22() == 22
 ```
 
 ## Testing
@@ -27,4 +27,4 @@ Run it:
 tox
 ```
 
-The tests are in `tests/test_pyo3_mixed_submodule.py`, while the configuration is in tox.ini
+The tests are in `tests/test_pyo3_mixed_implicit.py`, while the configuration is in tox.ini

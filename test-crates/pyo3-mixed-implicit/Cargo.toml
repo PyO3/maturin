@@ -1,6 +1,6 @@
 [package]
-authors = ["konstin <konstin@mailbox.org>"]
-name = "pyo3-mixed-submodule"
+authors = ["Kevin Patterson <kevin.r.patterson@intel.com>"]
+name = "pyo3-mixed-implicit"
 version = "2.1.3"
 description = "Implements a dummy function combining rust and python"
 readme = "README.md"

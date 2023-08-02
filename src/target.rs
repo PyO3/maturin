@@ -71,7 +71,9 @@ pub enum Arch {
     Wasm32,
     Riscv64,
     Mips64el,
+    Mips64,
     Mipsel,
+    Mips,
     Sparc64,
     LoongArch64,
 }
@@ -91,7 +93,9 @@ impl fmt::Display for Arch {
             Arch::Wasm32 => write!(f, "wasm32"),
             Arch::Riscv64 => write!(f, "riscv64"),
             Arch::Mips64el => write!(f, "mips64el"),
+            Arch::Mips64 => write!(f, "mips64"),
             Arch::Mipsel => write!(f, "mipsel"),
+            Arch::Mips => write!(f, "mips"),
             Arch::Sparc64 => write!(f, "sparc64"),
             Arch::LoongArch64 => write!(f, "loongarch64"),
         }
@@ -112,7 +116,7 @@ impl Arch {
             Arch::X86 => "i386",
             Arch::X86_64 => "amd64",
             Arch::Riscv64 => "riscv",
-            Arch::Mips64el | Arch::Mipsel => "mips",
+            Arch::Mips64el | Arch::Mips64 | Arch::Mipsel | Arch::Mips => "mips",
             // sparc64 is unsupported since FreeBSD 13.0
             Arch::Sparc64 => "sparc64",
             Arch::Wasm32 => "wasm32",
@@ -137,7 +141,9 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86_64,
             Arch::Riscv64,
             Arch::Mips64el,
+            Arch::Mips64,
             Arch::Mipsel,
+            Arch::Mips,
             Arch::Sparc64,
             Arch::LoongArch64,
         ],
@@ -250,8 +256,16 @@ impl Target {
             Architecture::S390x => Arch::S390X,
             Architecture::Wasm32 => Arch::Wasm32,
             Architecture::Riscv64(_) => Arch::Riscv64,
-            Architecture::Mips64(Mips64Architecture::Mips64el) => Arch::Mips64el,
-            Architecture::Mips32(Mips32Architecture::Mipsel) => Arch::Mipsel,
+            Architecture::Mips64(mips64_arch) => match mips64_arch {
+                Mips64Architecture::Mips64el => Arch::Mips64el,
+                Mips64Architecture::Mips64 => Arch::Mips64,
+                _ => bail!("The architecture {} is not supported", mips64_arch),
+            },
+            Architecture::Mips32(mips32_arch) => match mips32_arch {
+                Mips32Architecture::Mipsel => Arch::Mipsel,
+                Mips32Architecture::Mips => Arch::Mips,
+                _ => bail!("The architecture {} is not supported", mips32_arch),
+            },
             Architecture::Sparc64 => Arch::Sparc64,
             Architecture::LoongArch64 => Arch::LoongArch64,
             unsupported => bail!("The architecture {} is not supported", unsupported),
@@ -331,8 +345,8 @@ impl Target {
             Arch::Wasm32 => "wasm32",
             Arch::Riscv64 => "riscv64",
             // It's kinda surprising that Python doesn't include the `el` suffix
-            Arch::Mips64el => "mips64",
-            Arch::Mipsel => "mips",
+            Arch::Mips64el | Arch::Mips64 => "mips64",
+            Arch::Mipsel | Arch::Mips => "mips",
             Arch::Sparc64 => "sparc64",
             Arch::LoongArch64 => "loongarch64",
         }
@@ -376,7 +390,9 @@ impl Target {
             | Arch::Wasm32
             | Arch::Riscv64
             | Arch::Mips64el
+            | Arch::Mips64
             | Arch::Mipsel
+            | Arch::Mips
             | Arch::Powerpc
             | Arch::Sparc64
             | Arch::LoongArch64 => PlatformTag::Linux,
@@ -393,6 +409,7 @@ impl Target {
             | Arch::S390X
             | Arch::Riscv64
             | Arch::Mips64el
+            | Arch::Mips64
             | Arch::Sparc64
             | Arch::LoongArch64 => 64,
             Arch::Armv6L
@@ -400,6 +417,7 @@ impl Target {
             | Arch::X86
             | Arch::Wasm32
             | Arch::Mipsel
+            | Arch::Mips
             | Arch::Powerpc => 32,
         }
     }

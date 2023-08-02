@@ -11,7 +11,7 @@ venv-docker/bin/pip install -U pip cffi
 # FIXME: Can we run the tests without activate? Currently hello-world fails because then the binary is not in PATH
 source venv-docker/bin/activate
 
-for test_crate in hello-world cffi-pure cffi-mixed pyo3-pure pyo3-mixed pyo3-mixed-submodule
+for test_crate in hello-world cffi-pure cffi-mixed pyo3-pure pyo3-mixed pyo3-mixed-submodule pyo3-mixed-implicit
 do
   echo "Testing $test_crate"
   docker run -e RUST_BACKTRACE=1 --rm -v "$(pwd):/io" -w /io/test-crates/$test_crate maturin build -i python3.11

@@ -387,12 +387,6 @@ impl ProjectLayout {
         };
 
         if python_module.is_dir() {
-            if !python_module.join("__init__.py").is_file()
-                && !python_module.join("__init__.pyi").is_file()
-            {
-                bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
-            }
-
             eprintln!("🍹 Building a mixed python/rust project");
 
             Ok(ProjectLayout {

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add basic support for implicit namespaces [#1645](https://github.com/PyO3/maturin/pull/1696)
 * Add Linux mips64 and mips architecture support in [#1712](https://github.com/PyO3/maturin/pull/1712)
+* Add `x86_64h-apple-darwin` target support in [#1717](https://github.com/PyO3/maturin/pull/1717)
 
 ## [1.1.0] - 2023-06-10
 

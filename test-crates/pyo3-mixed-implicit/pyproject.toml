@@ -3,7 +3,7 @@ requires = ["maturin>=0.15,<0.16"]
 build-backend = "maturin"
 
 [project]
-name = "pyo3_mixed_implicit.some_rust"
+name = "pyo3_mixed_implicit"
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Rust"
@@ -12,5 +12,5 @@ classifiers = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "pyo3_mixed_implicit.some_rust.rust"
-python-source = "pysrc"
+python-source = "python"
 

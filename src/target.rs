@@ -243,7 +243,7 @@ impl Target {
         };
 
         let arch = match platform.architecture {
-            Architecture::X86_64 => Arch::X86_64,
+            Architecture::X86_64 | Architecture::X86_64h => Arch::X86_64,
             Architecture::X86_32(_) => Arch::X86,
             Architecture::Arm(arm_arch) => match arm_arch {
                 ArmArchitecture::Arm | ArmArchitecture::Armv6 => Arch::Armv6L,

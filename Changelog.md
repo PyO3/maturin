@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2023-08-06
+
 * Add basic support for implicit namespaces [#1645](https://github.com/PyO3/maturin/pull/1696)
 * Add Linux mips64 and mips architecture support in [#1712](https://github.com/PyO3/maturin/pull/1712)
 * Add `x86_64h-apple-darwin` target support in [#1717](https://github.com/PyO3/maturin/pull/1717)
@@ -889,7 +891,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/pyo3/maturin/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pyo3/maturin/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/pyo3/maturin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/pyo3/maturin/compare/v0.15.3...v1.0.0

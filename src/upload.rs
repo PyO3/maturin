@@ -61,6 +61,14 @@ pub struct PublishOpt {
 impl PublishOpt {
     const DEFAULT_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy/";
     const TEST_REPOSITORY_URL: &'static str = "https://test.pypi.org/legacy/";
+
+    /// Set to non interactive mode if we're running on CI
+    pub fn non_interactive_on_ci(&mut self) {
+        if env::var("CI").map(|v| v == "true").unwrap_or_default() {
+            eprintln!("🎛️ Running in non-interactive mode on CI");
+            self.non_interactive = true;
+        }
+    }
 }
 
 /// Error type for different types of errors that can happen when uploading a

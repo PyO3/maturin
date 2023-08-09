@@ -238,7 +238,11 @@ fn compile_target(
         }
     } else if target.is_emscripten() {
         // Allow user to override these default flags
-        if !rustflags.flags.iter().any(|f| f == "link-native-libraries") {
+        if !rustflags
+            .flags
+            .iter()
+            .any(|f| f.contains("link-native-libraries"))
+        {
             debug!("Setting `-Z link-native-libraries=no` for Emscripten");
             rustflags.push("-Z");
             rustflags.push("link-native-libraries=no");

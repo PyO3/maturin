@@ -339,7 +339,7 @@ fn run() -> Result<()> {
         #[cfg(feature = "upload")]
         Opt::Publish {
             build,
-            publish,
+            mut publish,
             debug,
             no_strip,
             no_sdist,
@@ -358,6 +358,7 @@ fn run() -> Result<()> {
             }
 
             let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();
+            publish.non_interactive_on_ci();
 
             upload_ui(&items, &publish)?
         }
@@ -402,11 +403,12 @@ fn run() -> Result<()> {
         #[cfg(feature = "scaffolding")]
         Opt::GenerateCI(generate_ci) => generate_ci.execute()?,
         #[cfg(feature = "upload")]
-        Opt::Upload { publish, files } => {
+        Opt::Upload { mut publish, files } => {
             if files.is_empty() {
                 eprintln!("⚠️  Warning: No files given, exiting.");
                 return Ok(());
             }
+            publish.non_interactive_on_ci();
 
             upload_ui(&files, &publish)?
         }

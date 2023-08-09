@@ -43,5 +43,12 @@ Options:
           Continue uploading files if one already exists. (Only valid when uploading to PyPI. Other
           implementations may not support this.)
 
+      --non-interactive
+          Do not interactively prompt for username/password if the required credentials are missing.
+          
+          Can also be set via MATURIN_NON_INTERACTIVE environment variable.
+          
+          [env: MATURIN_NON_INTERACTIVE=]
+
   -h, --help
           Print help (see a summary with '-h')

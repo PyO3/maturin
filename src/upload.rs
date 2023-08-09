@@ -33,11 +33,7 @@ pub struct PublishOpt {
     /// The URL of the registry where the wheels are uploaded to. This overrides --repository.
     ///
     /// Can also be set via MATURIN_REPOSITORY_URL environment variable.
-    #[arg(
-        long = "repository-url",
-        env = "MATURIN_REPOSITORY_URL",
-        overrides_with = "repository"
-    )]
+    #[arg(long, env = "MATURIN_REPOSITORY_URL", overrides_with = "repository")]
     repository_url: Option<String>,
     /// Username for pypi or your custom registry.
     ///
@@ -53,8 +49,13 @@ pub struct PublishOpt {
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
-    #[arg(long = "skip-existing")]
+    #[arg(long)]
     skip_existing: bool,
+    /// Do not interactively prompt for username/password if the required credentials are missing.
+    ///
+    /// Can also be set via MATURIN_NON_INTERACTIVE environment variable.
+    #[arg(long, env = "MATURIN_NON_INTERACTIVE")]
+    non_interactive: bool,
 }
 
 impl PublishOpt {
@@ -202,17 +203,17 @@ fn resolve_pypi_cred(
     config: &Ini,
     registry_name: Option<&str>,
     registry_url: &str,
-) -> (String, String) {
+) -> Result<(String, String)> {
     // API token from environment variable takes priority
     if let Ok(token) = env::var("MATURIN_PYPI_TOKEN") {
-        return ("__token__".to_string(), token);
+        return Ok(("__token__".to_string(), token));
     }
 
     // Try to get a token via OIDC exchange
     match resolve_pypi_token_via_oidc(registry_url) {
         Ok(Some(token)) => {
             eprintln!("🔐 Using trusted publisher for upload");
-            return ("__token__".to_string(), token);
+            return Ok(("__token__".to_string(), token));
         }
         Ok(None) => {}
         Err(e) => eprintln!("⚠️ Warning: Failed to resolve PyPI token via OIDC: {}", e),
@@ -222,17 +223,20 @@ fn resolve_pypi_cred(
         registry_name.and_then(|name| load_pypi_cred_from_config(config, name))
     {
         eprintln!("🔐 Using credential in pypirc for upload");
-        return (username, password);
+        return Ok((username, password));
     }
 
     // fallback to username and password
+    if opt.non_interactive {
+        bail!("Credentials not found and non-interactive mode is enabled");
+    }
     let username = opt.username.clone().unwrap_or_else(get_username);
     let password = opt
         .password
         .clone()
         .or_else(|| env::var("MATURIN_PASSWORD").ok())
         .unwrap_or_else(|| get_password(&username));
-    (username, password)
+    Ok((username, password))
 }
 
 #[derive(Debug, Deserialize)]
@@ -328,7 +332,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
             opt.repository
         );
     };
-    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name, &registry_url);
+    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name, &registry_url)?;
     let registry = Registry::new(username, password, registry_url);
 
     Ok(registry)

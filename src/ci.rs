@@ -479,7 +479,7 @@ jobs:\n",
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --skip-existing *
+          args: --non-interactive --skip-existing *
 "#,
         );
         if platforms.contains(&Platform::Emscripten) {
@@ -645,7 +645,7 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --skip-existing *
+                      args: --non-interactive --skip-existing *
         "#};
         assert_eq!(conf, expected.trim());
     }
@@ -759,7 +759,7 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --skip-existing *
+                      args: --non-interactive --skip-existing *
         "#};
         assert_eq!(conf, expected.trim());
     }
@@ -936,7 +936,7 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --skip-existing *
+                      args: --non-interactive --skip-existing *
         "#};
         assert_eq!(conf, expected.trim());
     }
@@ -1055,7 +1055,7 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --skip-existing *
+                      args: --non-interactive --skip-existing *
         "#};
         assert_eq!(conf, expected.trim());
     }

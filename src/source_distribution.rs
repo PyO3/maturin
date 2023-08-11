@@ -546,21 +546,19 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
     while let Some(top) = stack.pop() {
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
+                let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
                 if matches!(dependency.kind, cargo_metadata::DependencyKind::Development) {
                     // Skip dev-only dependency
                     debug!(
                         "Skipping development only dependency {} ({})",
-                        dependency.name, path
+                        dep_name, path
                     );
                     continue;
                 }
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
-                path_deps.insert(
-                    dependency.name.clone(),
-                    PathBuf::from(dep_manifest_path.clone()),
-                );
+                path_deps.insert(dep_name.clone(), PathBuf::from(dep_manifest_path.clone()));
                 if let Some(dep_package) = cargo_metadata
                     .packages
                     .iter()

@@ -360,6 +360,8 @@ fn http_proxy() -> Result<String, env::VarError> {
         .or_else(|_| env::var("https_proxy"))
         .or_else(|_| env::var("HTTP_PROXY"))
         .or_else(|_| env::var("http_proxy"))
+        .or_else(|_| env::var("ALL_PROXY"))
+        .or_else(|_| env::var("all_proxy"))
 }
 
 #[cfg(any(feature = "native-tls", feature = "rustls"))]

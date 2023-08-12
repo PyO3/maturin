@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2023-08-14
+
+* Add non-interactive mode to `upload` command in [#1722](https://github.com/PyO3/maturin/pull/1722)
+* Fix `link-native-libraries` check for emscripten target in [#1724](https://github.com/PyO3/maturin/pull/1724)
+* Add support for `ALL_PROXY` to `upload` command in [#1727](https://github.com/PyO3/maturin/pull/1727)
+* Handle renamed Rust dependency in sdist in [#1728](https://github.com/PyO3/maturin/pull/1728)
+* Fix invalid TOML when rewriting workspace inherited dependencies in [#1733](https://github.com/PyO3/maturin/pull/1733)
+
 ## [1.2.0] - 2023-08-06
 
 * Add basic support for implicit namespaces [#1645](https://github.com/PyO3/maturin/pull/1696)
@@ -891,7 +899,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/pyo3/maturin/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/pyo3/maturin/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pyo3/maturin/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/pyo3/maturin/compare/v1.0.0...v1.0.1

@@ -1154,8 +1154,31 @@ fn macosx_deployment_target(
 }
 
 pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     use target_lexicon::OperatingSystem;
+
+    // On rustc 1.71.0+ we can use `rustc --print deployment-target`
+    if let Ok(output) = Command::new("rustc")
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .env_remove("MACOSX_DEPLOYMENT_TARGET")
+        .args(["--target", target])
+        .args(["--print", "deployment-target"])
+        .output()
+    {
+        if output.status.success() {
+            let target_version = std::str::from_utf8(&output.stdout)
+                .unwrap()
+                .split('=')
+                .last()
+                .and_then(|v| v.trim().split_once('.'));
+            if let Some((major, minor)) = target_version {
+                let major: u16 = major.parse().unwrap();
+                let minor: u16 = minor.parse().unwrap();
+                return (major, minor);
+            }
+        }
+    }
 
     let fallback_version = if target == "aarch64-apple-darwin" {
         (11, 0)

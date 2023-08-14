@@ -263,24 +263,26 @@ fn rewrite_dependencies_path(
                                     .as_array_mut()
                                     .with_context(|| {
                                         format!(
-                                        "In {}, {} {} has a features value that is not an array",
-                                        manifest_path.display(),
-                                        dep_category,
-                                        dep_name
-                                    )
+                                            "In {}, {} {} has a features value that is not an array",
+                                            manifest_path.display(),
+                                            dep_category,
+                                            dep_name
+                                        )
                                     })?;
                                 existing_features.extend(features);
                             }
+                            // See https://github.com/toml-rs/toml/issues/594
+                            dep_table.remove(&dep_name);
                             dep_table[&dep_name] = workspace_dep;
                             rewritten = true;
                         } else {
                             bail!(
-                            "In {}, {} {} is marked as `workspace = true`, but it is found neither in \
-                                the workspace manifest nor in the known path dependencies",
-                            manifest_path.display(),
-                            dep_category,
-                            dep_name
-                        )
+                                "In {}, {} {} is marked as `workspace = true`, but it is found neither in \
+                                    the workspace manifest nor in the known path dependencies",
+                                manifest_path.display(),
+                                dep_category,
+                                dep_name
+                            )
                         }
                         continue;
                     }
@@ -292,13 +294,6 @@ fn rewrite_dependencies_path(
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     toml_edit::value(format!("../{dep_name}"))
                 };
-                if workspace_inherit {
-                    // Remove workspace inheritance now that we converted it into a path dependency
-                    dep_table[&dep_name]
-                        .as_table_like_mut()
-                        .unwrap()
-                        .remove("workspace");
-                }
                 rewritten = true;
             }
         }

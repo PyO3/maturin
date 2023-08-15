@@ -45,6 +45,8 @@ Options:
           Password for pypi or your custom registry.
           
           Can also be set via MATURIN_PASSWORD environment variable.
+          
+          [env: MATURIN_PASSWORD]
 
       --skip-existing
           Continue uploading files if one already exists. (Only valid when uploading to PyPI. Other

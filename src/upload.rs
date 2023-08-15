@@ -45,7 +45,7 @@ pub struct PublishOpt {
     /// Password for pypi or your custom registry.
     ///
     /// Can also be set via MATURIN_PASSWORD environment variable.
-    #[arg(short, long)]
+    #[arg(short, long, env = "MATURIN_PASSWORD", hide_env_values = true)]
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
@@ -235,14 +235,13 @@ fn resolve_pypi_cred(
     }
 
     // fallback to username and password
-    if opt.non_interactive {
+    if opt.non_interactive && (opt.username.is_none() || opt.password.is_none()) {
         bail!("Credentials not found and non-interactive mode is enabled");
     }
     let username = opt.username.clone().unwrap_or_else(get_username);
     let password = opt
         .password
         .clone()
-        .or_else(|| env::var("MATURIN_PASSWORD").ok())
         .unwrap_or_else(|| get_password(&username));
     Ok((username, password))
 }

@@ -294,6 +294,13 @@ fn rewrite_dependencies_path(
                     // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
                     toml_edit::value(format!("../{dep_name}"))
                 };
+                if workspace_inherit {
+                    // Remove workspace inheritance now that we converted it into a path dependency
+                    dep_table[&dep_name]
+                        .as_table_like_mut()
+                        .unwrap()
+                        .remove("workspace");
+                }
                 rewritten = true;
             }
         }

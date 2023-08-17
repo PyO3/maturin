@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2023-08-17
+
+* Fix sdist build failure with workspace path dependencies by HerringtonDarkholme in [#1739](https://github.com/PyO3/maturin/pull/1739)
+
 ## [1.2.2] - 2023-08-14
 
 * Fix non interactive mode check when username/password was supplied from cli in #[1737](https://github.com/PyO3/maturin/pull/1737)
@@ -903,7 +907,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/pyo3/maturin/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/pyo3/maturin/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/pyo3/maturin/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/pyo3/maturin/compare/v1.1.0...v1.2.0

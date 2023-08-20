@@ -3,7 +3,7 @@
 use common::{
     develop, errors, get_python_implementation, handle_result, integration, other, test_python_path,
 };
-use indoc::indoc;
+use expect_test::expect;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::Target;
 use std::env;
@@ -464,8 +464,7 @@ fn workspace_cargo_lock() {
 
 #[test]
 fn workspace_members_non_local_dep_sdist() {
-    let cargo_toml = indoc!(
-        r#"
+    let cargo_toml = expect![[r#"
         [package]
         authors = ["konstin <konstin@mailbox.org>"]
         name = "pyo3-pure"
@@ -480,8 +479,7 @@ fn workspace_members_non_local_dep_sdist() {
         [lib]
         name = "pyo3_pure"
         crate-type = ["cdylib"]
-        "#
-    );
+        "#]];
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-pure",
         SdistGenerator::Cargo,
@@ -509,14 +507,14 @@ fn lib_with_path_dep_sdist() {
         "test-crates/sdist_with_path_dep",
         SdistGenerator::Cargo,
         vec![
-            "sdist_with_path_dep-0.1.0/local_dependencies/some_path_dep/Cargo.toml",
-            "sdist_with_path_dep-0.1.0/local_dependencies/some_path_dep/src/lib.rs",
-            "sdist_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/Cargo.toml",
-            "sdist_with_path_dep-0.1.0/local_dependencies/transitive_path_dep/src/lib.rs",
-            "sdist_with_path_dep-0.1.0/Cargo.toml",
-            "sdist_with_path_dep-0.1.0/Cargo.lock",
+            "sdist_with_path_dep-0.1.0/some_path_dep/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/some_path_dep/src/lib.rs",
+            "sdist_with_path_dep-0.1.0/transitive_path_dep/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/transitive_path_dep/src/lib.rs",
+            "sdist_with_path_dep-0.1.0/sdist_with_path_dep/Cargo.lock",
+            "sdist_with_path_dep-0.1.0/sdist_with_path_dep/Cargo.toml",
+            "sdist_with_path_dep-0.1.0/sdist_with_path_dep/src/lib.rs",
             "sdist_with_path_dep-0.1.0/pyproject.toml",
-            "sdist_with_path_dep-0.1.0/src/lib.rs",
             "sdist_with_path_dep-0.1.0/PKG-INFO",
         ],
         None,
@@ -525,9 +523,8 @@ fn lib_with_path_dep_sdist() {
 }
 
 #[test]
-fn lib_with_target_path_dep() {
-    let cargo_toml = indoc!(
-        r#"
+fn lib_with_target_path_dep_sdist() {
+    let cargo_toml = expect![[r#"
         [package]
         name = "sdist_with_target_path_dep"
         version = "0.1.0"
@@ -542,25 +539,24 @@ fn lib_with_target_path_dep() {
         pyo3 = { version = "0.19.0", default-features = false, features = ["extension-module"] }
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
-        some_path_dep = { path = "local_dependencies/some_path_dep" }
-        "#
-    );
+        some_path_dep = { path = "../some_path_dep" }
+    "#]];
     handle_result(other::test_source_distribution(
         "test-crates/sdist_with_target_path_dep",
         SdistGenerator::Cargo,
         vec![
-            "sdist_with_target_path_dep-0.1.0/local_dependencies/some_path_dep/Cargo.toml",
-            "sdist_with_target_path_dep-0.1.0/local_dependencies/some_path_dep/src/lib.rs",
-            "sdist_with_target_path_dep-0.1.0/local_dependencies/transitive_path_dep/Cargo.toml",
-            "sdist_with_target_path_dep-0.1.0/local_dependencies/transitive_path_dep/src/lib.rs",
-            "sdist_with_target_path_dep-0.1.0/Cargo.toml",
-            "sdist_with_target_path_dep-0.1.0/Cargo.lock",
+            "sdist_with_target_path_dep-0.1.0/some_path_dep/Cargo.toml",
+            "sdist_with_target_path_dep-0.1.0/some_path_dep/src/lib.rs",
+            "sdist_with_target_path_dep-0.1.0/transitive_path_dep/Cargo.toml",
+            "sdist_with_target_path_dep-0.1.0/transitive_path_dep/src/lib.rs",
+            "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.lock",
+            "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.toml",
+            "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/src/lib.rs",
             "sdist_with_target_path_dep-0.1.0/pyproject.toml",
-            "sdist_with_target_path_dep-0.1.0/src/lib.rs",
             "sdist_with_target_path_dep-0.1.0/PKG-INFO",
         ],
         Some((
-            Path::new("sdist_with_target_path_dep-0.1.0/Cargo.toml"),
+            Path::new("sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.toml"),
             cargo_toml,
         )),
         "sdist-lib-with-target-path-dep",
@@ -670,11 +666,12 @@ fn workspace_sdist() {
         "test-crates/workspace/py",
         SdistGenerator::Cargo,
         vec![
-            "py-0.1.0/Cargo.lock",
             "py-0.1.0/Cargo.toml",
+            "py-0.1.0/Cargo.lock",
+            "py-0.1.0/py/Cargo.toml",
             "py-0.1.0/PKG-INFO",
             "py-0.1.0/pyproject.toml",
-            "py-0.1.0/src/main.rs",
+            "py-0.1.0/py/src/main.rs",
         ],
         None,
         "sdist-workspace",
@@ -687,11 +684,12 @@ fn workspace_with_path_dep_sdist() {
         "test-crates/workspace_with_path_dep/python",
         SdistGenerator::Cargo,
         vec![
-            "workspace_with_path_dep-0.1.0/local_dependencies/generic_lib/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/local_dependencies/generic_lib/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/local_dependencies/transitive_lib/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/local_dependencies/transitive_lib/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/python/Cargo.lock",
+            "workspace_with_path_dep-0.1.0/generic_lib/Cargo.toml",
+            "workspace_with_path_dep-0.1.0/generic_lib/src/lib.rs",
+            "workspace_with_path_dep-0.1.0/transitive_lib/Cargo.toml",
+            "workspace_with_path_dep-0.1.0/transitive_lib/src/lib.rs",
+            "workspace_with_path_dep-0.1.0/Cargo.toml",
+            "workspace_with_path_dep-0.1.0/Cargo.lock",
             "workspace_with_path_dep-0.1.0/python/Cargo.toml",
             "workspace_with_path_dep-0.1.0/python/src/lib.rs",
             "workspace_with_path_dep-0.1.0/pyproject.toml",
@@ -711,17 +709,9 @@ fn workspace_with_path_dep_git_sdist_generator() {
         "test-crates/workspace_with_path_dep/python",
         SdistGenerator::Git,
         vec![
-            "workspace_with_path_dep-0.1.0/Cargo.lock",
             "workspace_with_path_dep-0.1.0/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/dont_include_in_sdist/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/dont_include_in_sdist/src/main.rs",
-            "workspace_with_path_dep-0.1.0/generic_lib/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/generic_lib/src/lib.rs",
             "workspace_with_path_dep-0.1.0/pyproject.toml",
-            "workspace_with_path_dep-0.1.0/python/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/python/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/transitive_lib/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/transitive_lib/src/lib.rs",
+            "workspace_with_path_dep-0.1.0/src/lib.rs",
             "workspace_with_path_dep-0.1.0/PKG-INFO",
         ],
         None,
@@ -736,12 +726,13 @@ fn workspace_inheritance_sdist() {
         "test-crates/workspace-inheritance/python",
         SdistGenerator::Cargo,
         vec![
-            "workspace_inheritance-0.1.0/local_dependencies/generic_lib/Cargo.toml",
-            "workspace_inheritance-0.1.0/local_dependencies/generic_lib/src/lib.rs",
-            "workspace_inheritance-0.1.0/Cargo.lock",
+            "workspace_inheritance-0.1.0/generic_lib/Cargo.toml",
+            "workspace_inheritance-0.1.0/generic_lib/src/lib.rs",
             "workspace_inheritance-0.1.0/Cargo.toml",
+            "workspace_inheritance-0.1.0/Cargo.lock",
+            "workspace_inheritance-0.1.0/python/Cargo.toml",
+            "workspace_inheritance-0.1.0/python/src/lib.rs",
             "workspace_inheritance-0.1.0/pyproject.toml",
-            "workspace_inheritance-0.1.0/src/lib.rs",
             "workspace_inheritance-0.1.0/PKG-INFO",
         ],
         None,

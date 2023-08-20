@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use expect_test::Expect;
 use flate2::read::GzDecoder;
 use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
 use maturin::{BuildOptions, CargoOptions, PlatformTag};
@@ -118,7 +119,7 @@ pub fn test_source_distribution(
     package: impl AsRef<Path>,
     sdist_generator: SdistGenerator,
     expected_files: Vec<&str>,
-    expected_cargo_toml: Option<(&Path, &str)>,
+    expected_cargo_toml: Option<(&Path, Expect)>,
     unique_name: &str,
 ) -> Result<()> {
     let manifest_path = package.as_ref().join("Cargo.toml");
@@ -176,15 +177,15 @@ pub fn test_source_distribution(
         }
     }
     assert_eq!(
-        files,
-        BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string))
+        BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string)),
+        files
     );
     assert_eq!(file_count, files.len(), "duplicated files found in sdist");
 
     if let Some((cargo_toml_path, expected)) = expected_cargo_toml {
         let cargo_toml = cargo_toml
             .with_context(|| format!("{} not found in sdist", cargo_toml_path.display()))?;
-        assert_eq!(cargo_toml, expected);
+        expected.assert_eq(&cargo_toml.replace("\r\n", "\n"));
     }
     Ok(())
 }

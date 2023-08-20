@@ -514,8 +514,7 @@ jobs:\n",
 mod tests {
     use super::GenerateCI;
     use crate::BridgeModel;
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use expect_test::expect;
 
     #[test]
     fn test_generate_github() {
@@ -530,7 +529,7 @@ mod tests {
             .skip(5)
             .collect::<Vec<_>>()
             .join("\n");
-        let expected = indoc! {r#"
+        let expected = expect![[r#"
             name: CI
 
             on:
@@ -645,9 +644,8 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *
-        "#};
-        assert_eq!(conf, expected.trim());
+                      args: --non-interactive --skip-existing *"#]];
+        expected.assert_eq(&conf);
     }
 
     #[test]
@@ -659,7 +657,7 @@ mod tests {
             .skip(5)
             .collect::<Vec<_>>()
             .join("\n");
-        let expected = indoc! {r#"
+        let expected = expect![[r#"
             name: CI
 
             on:
@@ -759,9 +757,8 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *
-        "#};
-        assert_eq!(conf, expected.trim());
+                      args: --non-interactive --skip-existing *"#]];
+        expected.assert_eq(&conf);
     }
 
     #[test]
@@ -782,7 +779,7 @@ mod tests {
             .skip(5)
             .collect::<Vec<_>>()
             .join("\n");
-        let expected = indoc! {r#"
+        let expected = expect![[r#"
             name: CI
 
             on:
@@ -936,9 +933,8 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *
-        "#};
-        assert_eq!(conf, expected.trim());
+                      args: --non-interactive --skip-existing *"#]];
+        expected.assert_eq(&conf);
     }
 
     #[test]
@@ -950,7 +946,7 @@ mod tests {
             .skip(5)
             .collect::<Vec<_>>()
             .join("\n");
-        let expected = indoc! {r#"
+        let expected = expect![[r#"
             name: CI
 
             on:
@@ -1055,8 +1051,7 @@ mod tests {
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *
-        "#};
-        assert_eq!(conf, expected.trim());
+                      args: --non-interactive --skip-existing *"#]];
+        expected.assert_eq(&conf);
     }
 }

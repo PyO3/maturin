@@ -45,7 +45,24 @@ fn rewrite_cargo_toml(
                     if let toml_edit::Value::String(ref s) = member {
                         let path = Path::new(s.value());
                         if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
-                            if known_path_deps.contains_key(name) {
+                            let is_glob = name.contains('*')
+                                || name.contains('?')
+                                || name.contains('[')
+                                || name.contains(']')
+                                || name.contains('!');
+                            if is_glob {
+                                let pattern = glob::Pattern::new(name).context(format!(
+                                    "Invalid `workspace.members` glob pattern: {} in {}",
+                                    name,
+                                    manifest_path.display()
+                                ))?;
+                                if known_path_deps
+                                    .keys()
+                                    .any(|path_dep| pattern.matches(path_dep))
+                                {
+                                    new_members.push(s.value());
+                                }
+                            } else if known_path_deps.contains_key(name) {
                                 new_members.push(s.value());
                             }
                         }

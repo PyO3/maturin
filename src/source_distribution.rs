@@ -107,14 +107,12 @@ fn rewrite_pyproject_toml(
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
 fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
-    pyproject_toml_path: impl AsRef<Path>,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathBuf>,
     root_crate: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
-    let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
         .args(["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path)
@@ -141,31 +139,13 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let abs_manifest_path = manifest_path
-        .normalize()
-        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
-        .into_path_buf();
-    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
-    let pyproject_dir = pyproject_toml_path.parent().unwrap();
-    let cargo_toml_in_subdir = root_crate
-        && abs_manifest_dir != pyproject_dir
-        && abs_manifest_dir.starts_with(pyproject_dir);
-
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
     let target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
         .map(|relative_to_manifests| {
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
-            if root_crate && cargo_toml_in_subdir {
-                let relative_to_project_root = abs_manifest_dir
-                    .strip_prefix(pyproject_dir)
-                    .unwrap()
-                    .join(relative_to_manifests);
-                (relative_to_project_root, relative_to_cwd)
-            } else {
-                (relative_to_manifests.to_path_buf(), relative_to_cwd)
-            }
+            (relative_to_manifests.to_path_buf(), relative_to_cwd)
         })
         // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
@@ -192,12 +172,7 @@ fn add_crate_to_source_distribution(
     let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
 
-    let cargo_toml_path = if cargo_toml_in_subdir {
-        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
-        prefix.join(relative_manifest_path)
-    } else {
-        prefix.join(manifest_path.file_name().unwrap())
-    };
+    let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
 
     if root_crate {
         let rewritten_cargo_toml = rewrite_cargo_toml(manifest_path, known_path_deps)?;
@@ -302,7 +277,8 @@ fn add_cargo_package_files_to_sdist(
     let workspace_manifest_path = workspace_root.join("Cargo.toml");
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
-    let mut sdist_root = workspace_root.clone().into_std_path_buf();
+    let mut sdist_root =
+        common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path).unwrap();
     for path_dep in known_path_deps.values() {
         if let Some(prefix) = common_path_prefix(&sdist_root, path_dep.parent().unwrap()) {
             sdist_root = prefix;
@@ -310,6 +286,8 @@ fn add_cargo_package_files_to_sdist(
             bail!("Failed to determine common path prefix of path dependencies");
         }
     }
+
+    debug!("Found sdist root: {}", sdist_root.display());
 
     // Add local path dependencies
     for (name, path_dep) in known_path_deps.iter() {
@@ -320,7 +298,6 @@ fn add_cargo_package_files_to_sdist(
             .unwrap();
         add_crate_to_source_distribution(
             writer,
-            pyproject_toml_path,
             path_dep,
             &root_dir.join(relative_path_dep_manifest_dir),
             &known_path_deps,
@@ -341,7 +318,6 @@ fn add_cargo_package_files_to_sdist(
         .unwrap();
     add_crate_to_source_distribution(
         writer,
-        pyproject_toml_path,
         manifest_path,
         root_dir.join(relative_main_crate_manifest_dir),
         &known_path_deps,

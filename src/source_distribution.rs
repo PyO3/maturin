@@ -12,20 +12,30 @@ use std::process::Command;
 use std::str;
 use tracing::debug;
 
+#[derive(Debug, Clone)]
+struct PathDependency {
+    manifest_path: PathBuf,
+    readme: Option<PathBuf>,
+}
+
+fn parse_toml_file(path: &Path, kind: &str) -> Result<(toml_edit::Document, String)> {
+    let text =
+        fs::read_to_string(path).context(format!("Can't read {} at {}", kind, path.display(),))?;
+    let document = text.parse::<toml_edit::Document>().context(format!(
+        "Failed to parse {} at {}",
+        kind,
+        path.display()
+    ))?;
+    Ok((document, text))
+}
+
 /// Rewrite Cargo.toml to only retain path dependencies that are actually used
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, PathBuf>,
+    known_path_deps: &HashMap<String, PathDependency>,
 ) -> Result<String> {
     let manifest_path = manifest_path.as_ref();
-    let text = fs::read_to_string(manifest_path).context(format!(
-        "Can't read Cargo.toml at {}",
-        manifest_path.display(),
-    ))?;
-    let mut document = text.parse::<toml_edit::Document>().context(format!(
-        "Failed to parse Cargo.toml at {}",
-        manifest_path.display()
-    ))?;
+    let (mut document, text) = parse_toml_file(manifest_path, "Cargo.toml")?;
 
     let mut rewritten = false;
     // Update workspace members
@@ -90,14 +100,7 @@ fn rewrite_pyproject_toml(
     pyproject_toml_path: &Path,
     relative_manifest_path: &Path,
 ) -> Result<String> {
-    let text = fs::read_to_string(pyproject_toml_path).context(format!(
-        "Can't read pyproject.toml at {}",
-        pyproject_toml_path.display(),
-    ))?;
-    let mut data = text.parse::<toml_edit::Document>().context(format!(
-        "Failed to parse pyproject.toml at {}",
-        pyproject_toml_path.display()
-    ))?;
+    let (mut data, _) = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
     let tool = data
         .entry("tool")
         .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
@@ -126,7 +129,7 @@ fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, PathBuf>,
+    known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
@@ -206,10 +209,20 @@ fn add_crate_to_source_distribution(
 }
 
 /// Finds all path dependencies of the crate
-fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>> {
+fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
     let root = cargo_metadata
         .root_package()
         .context("Expected the dependency graph to have a root package")?;
+    let pkg_readmes = cargo_metadata
+        .packages
+        .iter()
+        .filter_map(|package| {
+            package
+                .readme
+                .as_ref()
+                .map(|readme| (package.name.clone(), readme.clone().into_std_path_buf()))
+        })
+        .collect::<HashMap<String, PathBuf>>();
     // scan the dependency graph for path dependencies
     let mut path_deps = HashMap::new();
     let mut stack: Vec<&cargo_metadata::Package> = vec![root];
@@ -220,7 +233,13 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
-                path_deps.insert(dep_name.clone(), PathBuf::from(dep_manifest_path.clone()));
+                path_deps.insert(
+                    dep_name.clone(),
+                    PathDependency {
+                        manifest_path: PathBuf::from(dep_manifest_path.clone()),
+                        readme: pkg_readmes.get(dep_name.as_str()).cloned(),
+                    },
+                );
                 if let Some(dep_package) = cargo_metadata
                     .packages
                     .iter()
@@ -289,7 +308,9 @@ fn add_cargo_package_files_to_sdist(
     let mut sdist_root =
         common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path).unwrap();
     for path_dep in known_path_deps.values() {
-        if let Some(prefix) = common_path_prefix(&sdist_root, path_dep.parent().unwrap()) {
+        if let Some(prefix) =
+            common_path_prefix(&sdist_root, path_dep.manifest_path.parent().unwrap())
+        {
             sdist_root = prefix;
         } else {
             bail!("Failed to determine common path prefix of path dependencies");
@@ -300,14 +321,12 @@ fn add_cargo_package_files_to_sdist(
 
     // Add local path dependencies
     for (name, path_dep) in known_path_deps.iter() {
-        let relative_path_dep_manifest_dir = path_dep
-            .parent()
-            .unwrap()
-            .strip_prefix(&sdist_root)
-            .unwrap();
+        let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
+        let relative_path_dep_manifest_dir =
+            path_dep_manifest_dir.strip_prefix(&sdist_root).unwrap();
         add_crate_to_source_distribution(
             writer,
-            path_dep,
+            &path_dep.manifest_path,
             &root_dir.join(relative_path_dep_manifest_dir),
             &known_path_deps,
             false,
@@ -315,11 +334,27 @@ fn add_cargo_package_files_to_sdist(
         .context(format!(
             "Failed to add local dependency {} at {} to the source distribution",
             name,
-            path_dep.display()
+            path_dep.manifest_path.display()
         ))?;
+        // Handle possible relative readme field in Cargo.toml
+        if let Some(readme) = path_dep.readme.as_ref() {
+            let abs_readme = path_dep_manifest_dir
+                .join(readme)
+                .normalize()
+                .with_context(|| format!("failed to normalize path `{}`", readme.display()))?
+                .into_path_buf();
+            let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
+            writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+        }
     }
 
     // Add the main crate
+    let abs_manifest_path = manifest_path
+        .normalize()
+        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
+        .into_path_buf();
+    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
+    let main_crate = build_context.cargo_metadata.root_package().unwrap();
     let relative_main_crate_manifest_dir = manifest_path
         .parent()
         .unwrap()
@@ -332,13 +367,18 @@ fn add_cargo_package_files_to_sdist(
         &known_path_deps,
         true,
     )?;
+    // Handle possible relative readme field in Cargo.toml
+    if let Some(readme) = main_crate.readme.as_ref() {
+        let abs_readme = abs_manifest_dir
+            .join(readme)
+            .normalize()
+            .with_context(|| format!("failed to normalize path `{}`", readme))?
+            .into_path_buf();
+        let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
+        writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+    }
 
     // Add Cargo.lock file and workspace Cargo.toml
-    let abs_manifest_path = manifest_path
-        .normalize()
-        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
-        .into_path_buf();
-    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let manifest_cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
     let workspace_cargo_lock = workspace_root.join("Cargo.lock").into_std_path_buf();
     let (cargo_lock_path, use_workspace_cargo_lock) = if manifest_cargo_lock_path.exists() {
@@ -374,7 +414,13 @@ fn add_cargo_package_files_to_sdist(
                     .to_str()
                     .unwrap()
                     .to_string();
-                deps_to_keep.insert(main_member_name, manifest_path.clone());
+                deps_to_keep.insert(
+                    main_member_name,
+                    PathDependency {
+                        manifest_path: manifest_path.clone(),
+                        readme: None,
+                    },
+                );
                 let workspace_cargo_toml =
                     rewrite_cargo_toml(workspace_manifest_path, &deps_to_keep)?;
                 writer.add_bytes(

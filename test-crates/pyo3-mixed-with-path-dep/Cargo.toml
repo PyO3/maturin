@@ -1,0 +1,14 @@
+[package]
+authors = []
+name = "pyo3-mixed-with-path-dep"
+version = "2.1.3"
+description = "a library using "
+edition = "2021"
+
+[dependencies]
+pyo3 = { version = "0.19.0", features = ["extension-module", "generate-import-lib"] }
+some_path_dep = { path = "../some_path_dep" }
+
+[lib]
+name = "pyo3_mixed_with_path_dep"
+crate-type = ["cdylib"]

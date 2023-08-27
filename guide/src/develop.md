@@ -131,11 +131,68 @@ from maturin import import_hook
 
 # install the import hook with default settings
 import_hook.install()
-# or you can specify bindings
-import_hook.install(bindings="pyo3")
-# and build in release mode instead of the default debug mode
-import_hook.install(release=True)
 
-# now you can start importing your Rust module
+# when a rust package that is installed in editable mode is imported,
+# that package will be automatically recompiled if necessary.
 import pyo3_pure
+
+# when a .rs file is imported a project will be created for it in the
+# maturin build cache and the resulting library will be loaded
+import subpackage.my_rust_script
+```
+
+The maturin project importer and the rust file importer can be used separately
+```python
+from maturin.import_hook import rust_file_importer
+rust_file_importer.install()
+from maturin.import_hook import package_importer
+package_importer.install()
+```
+
+The import hook can be configured to control its behaviour
+```python
+from pathlib import Path
+from maturin import import_hook
+from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
+
+import_hook.install(
+    enable_package_importer=True,
+    enable_rs_file_importer=True,
+    settings=MaturinSettings(
+        release=True,
+        strip=True,
+        # ...
+    ),
+    show_warnings=True,
+    # ...
+)
+
+# custom settings providers can be used to override settings of particular projects
+# or implement custom logic such as loading settings from configuration files
+class CustomSettings(MaturinSettingsProvider):
+    def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
+        return MaturinSettings(
+            release=True,
+            strip=True,
+            # ...
+        )
+
+import_hook.install(
+    enable_package_importer=True,
+    enable_rs_file_importer=True,
+    settings=CustomSettings(),
+    show_warnings=True,
+    # ...
+)
+```
+
+The import hook internals can be examined by configuring the root logger and
+calling `reset_logger` to propagate messages from the `maturin.import_hook` logger
+to the root logger.
+```python
+import logging
+logging.basicConfig(format='%(name)s [%(levelname)s] %(message)s', level=logging.DEBUG)
+from maturin import import_hook
+import_hook.reset_logger()
+import_hook.install()
 ```

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add new import hook with support for many more use cases [#1748](https://github.com/PyO3/maturin/pull/1748)
+
 ## [1.2.3] - 2023-08-17
 
 * Fix sdist build failure with workspace path dependencies by HerringtonDarkholme in [#1739](https://github.com/PyO3/maturin/pull/1739)

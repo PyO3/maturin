@@ -1,13 +1,15 @@
-//! To speed up the tests, they are tests all collected in a single module
+//! To speed up the tests, they are all collected in a single module
 
+use crate::common::import_hook;
 use common::{
     develop, errors, get_python_implementation, handle_result, integration, other, test_python_path,
 };
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::Target;
-use std::env;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 use time::macros::datetime;
 use which::which;
 
@@ -762,4 +764,47 @@ fn pyo3_source_date_epoch() {
         vec![datetime!(1980-01-01 0:00 UTC)],
         "pyo3_source_date_epoch",
     ))
+}
+
+#[test]
+fn import_hook_project_importer() {
+    handle_result(import_hook::test_import_hook(
+        "import_hook_project_importer",
+        &PathBuf::from("tests/import_hook/test_project_importer.py"),
+        vec!["boltons"],
+        BTreeMap::new(),
+        true,
+    ));
+}
+
+#[test]
+fn import_hook_rust_file_importer() {
+    handle_result(import_hook::test_import_hook(
+        "import_hook_rust_file_importer",
+        &PathBuf::from("tests/import_hook/test_rust_file_importer.py"),
+        vec![],
+        BTreeMap::new(),
+        true,
+    ));
+}
+
+#[test]
+fn import_hook_utilities() {
+    let tmpdir = tempfile::tempdir().unwrap();
+    let resolved_packages_path = tmpdir.path().join("resolved.json");
+    fs::write(
+        &resolved_packages_path,
+        import_hook::resolve_all_packages().unwrap(),
+    )
+    .unwrap();
+    handle_result(import_hook::test_import_hook(
+        "import_hook_utilities",
+        &PathBuf::from("tests/import_hook/test_utilities.py"),
+        vec![],
+        BTreeMap::from([(
+            "RESOLVED_PACKAGES_PATH",
+            resolved_packages_path.to_str().unwrap(),
+        )]),
+        true,
+    ));
 }

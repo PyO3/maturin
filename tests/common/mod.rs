@@ -9,6 +9,7 @@ use std::{env, io, str};
 
 pub mod develop;
 pub mod errors;
+pub mod import_hook;
 pub mod integration;
 pub mod other;
 

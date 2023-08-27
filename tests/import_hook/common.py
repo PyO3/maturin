@@ -6,7 +6,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Iterable
 
 from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_info
 
@@ -198,14 +198,22 @@ def is_installed_correctly(
 
 
 def get_project_copy(project_dir: Path, output_path: Path) -> Path:
-    # using shutil.copy instead of the default shutil.copy2 because we want mtimes to be updated on copy
-    project_copy_dir = Path(
-        shutil.copytree(project_dir, output_path, copy_function=shutil.copy)
+    for relative_path in _get_relative_files_tracked_by_git(project_dir):
+        output_file_path = output_path / relative_path
+        output_file_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(project_dir / relative_path, output_file_path)
+    return output_path
+
+
+def _get_relative_files_tracked_by_git(root: Path) -> Iterable[Path]:
+    """this is used to ignore built artifacts to create a clean copy"""
+    output = subprocess.check_output(
+        ["git", "ls-tree", "--name-only", "-z", "-r", "HEAD"], cwd=root
     )
-    assert (
-        next(project_copy_dir.rglob("*.so"), None) is None
-    ), f"project {project_dir.name} is not clean"
-    return project_copy_dir
+    for relative_path_bytes in output.split(b"\x00"):
+        relative_path = Path(os.fsdecode(relative_path_bytes))
+        if (root / relative_path).is_file():
+            yield relative_path
 
 
 def create_project_from_blank_template(

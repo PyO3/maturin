@@ -22,6 +22,24 @@ pub fn test_import_hook(
 
     let (venv_dir, python) = create_virtualenv(virtualenv_name, Some(python)).unwrap();
 
+    println!("installing maturin binary into virtualenv");
+    let status = Command::new("cargo")
+        .args([
+            "build",
+            "--target-dir",
+            venv_dir.join("maturin").as_os_str().to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    if !status.success() {
+        bail!("failed to install maturin");
+    }
+    fs::copy(
+        venv_dir.join("maturin/debug/maturin"),
+        venv_dir.join("bin/maturin"),
+    )
+    .unwrap();
+
     let pytest_args = vec![
         vec!["pytest"],
         vec!["uniffi-bindgen"],

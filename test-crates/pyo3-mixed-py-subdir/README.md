@@ -1,6 +1,6 @@
 # pyo3-mixed
 
-A package for testing maturin with a mixed pyo3/python project.
+A package for testing maturin with a mixed pyo3/python project and a non-default package name.
 
 ## Usage
 
@@ -9,8 +9,8 @@ pip install .
 ```
 
 ```python
-import pyo3_mixed
-assert pyo3_mixed.get_42() == 42
+import pyo3_mixed_py_subdir
+assert pyo3_mixed_py_subdir.get_42() == 42
 ```
 
 ## Testing

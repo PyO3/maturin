@@ -7,7 +7,13 @@ from typing import Tuple, Generator
 
 import pytest
 
-from .common import log, run_python, script_dir, test_crates
+from .common import (
+    log,
+    run_python,
+    script_dir,
+    test_crates,
+    remove_ansii_escape_characters,
+)
 
 """
 These tests ensure the correct functioning of the rust file importer import hook.
@@ -309,6 +315,7 @@ else:
         )
 
         output1, _ = run_python([str(py_path)], workspace)
+        output1 = remove_ansii_escape_characters(output1)
         pattern = (
             'building "my_script"\n'
             'maturin.import_hook \\[WARNING\\] build of "my_script" succeeded with warnings:\n'
@@ -324,6 +331,7 @@ else:
         )
 
         output2, _ = run_python([str(py_path)], workspace)
+        output2 = remove_ansii_escape_characters(output2)
         pattern = (
             'maturin.import_hook \\[WARNING\\] the last build of "my_script" succeeded with warnings:\n'
             ".*"

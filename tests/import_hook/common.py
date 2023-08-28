@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import site
 import subprocess
@@ -238,3 +239,11 @@ def create_project_from_blank_template(
             f"from .{package_name} import *"
         )
     return project_dir
+
+
+def remove_ansii_escape_characters(text: str) -> str:
+    """Remove escape characters (eg used to color terminal output) from the given string
+
+    based on: https://stackoverflow.com/a/14693789
+    """
+    return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", text)

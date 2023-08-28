@@ -18,7 +18,7 @@ class CustomSettingsProvider(MaturinSettingsProvider):
             return MaturinSettings(features=["pyo3/extension-module", "large_number"])
         else:
             print(f"building {module_path} with default settings")
-            return MaturinSettings()
+            return MaturinSettings.default()
 
 
 import_hook.install(settings=CustomSettingsProvider())

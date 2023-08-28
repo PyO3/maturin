@@ -162,6 +162,9 @@ def build_wheel(
     output_dir: Path,
     settings: MaturinSettings,
 ) -> str:
+    if "build" not in settings.supported_commands():
+        msg = f'provided {type(settings).__name__} does not support the "build" command'
+        raise ImportError(msg)
     success, output = _run_maturin(
         [
             "build",
@@ -186,6 +189,11 @@ def develop_build_project(
     args = ["develop", "--manifest-path", str(manifest_path)]
     if skip_install:
         args.append("--skip-install")
+    if "develop" not in settings.supported_commands():
+        msg = (
+            f'provided {type(settings).__name__} does not support the "develop" command'
+        )
+        raise ImportError(msg)
     args.extend(settings.to_args())
     success, output = _run_maturin(args)
     if not success:
@@ -211,7 +219,11 @@ def _run_maturin(args: list[str]) -> Tuple[bool, str]:
         logger.error("maturin output:\n%s", output)
         return False, output
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("maturin output:\n%s", output)
+        logger.debug(
+            "maturin output (has warnings: %r):\n%s",
+            maturin_output_has_warnings(output),
+            output,
+        )
     return True, output
 
 
@@ -242,6 +254,5 @@ def _find_single_file(dir_path: Path, extension: Optional[str]) -> Optional[Path
 
 def maturin_output_has_warnings(output: str) -> bool:
     return (
-        re.search(r"warning: `.*` \((lib|bin)\) generated [0-9]+ warnings?", output)
-        is not None
+        re.search(r"`.*` \((lib|bin)\) generated [0-9]+ warnings?", output) is not None
     )

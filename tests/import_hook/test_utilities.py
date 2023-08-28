@@ -12,13 +12,19 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from maturin.import_hook._building import BuildCache, BuildStatus, LockNotHeldError
+from maturin.import_hook import MaturinSettings
+from maturin.import_hook._building import (
+    BuildCache,
+    BuildStatus,
+    LockNotHeldError,
+)
 from maturin.import_hook._file_lock import AtomicOpenLock, FileLock
 from maturin.import_hook._resolve_project import ProjectResolveError, _resolve_project
 from maturin.import_hook.project_importer import (
     _get_installed_package_mtime,
     _get_project_mtime,
 )
+from maturin.import_hook.settings import MaturinDevelopSettings, MaturinBuildSettings
 
 from .common import log, test_crates
 
@@ -29,6 +35,86 @@ if SAVED_RESOLVED_PACKAGES_PATH is not None:
     if "RESOLVED_PACKAGES_PATH" in os.environ:
         shutil.copy(os.environ["RESOLVED_PACKAGES_PATH"], SAVED_RESOLVED_PACKAGES_PATH)
     os.environ["RESOLVED_PACKAGES_PATH"] = str(SAVED_RESOLVED_PACKAGES_PATH)
+
+
+def test_settings() -> None:
+    assert MaturinSettings().to_args() == []
+    assert MaturinBuildSettings().to_args() == []
+    assert MaturinDevelopSettings().to_args() == []
+
+    settings = MaturinSettings(
+        release=True,
+        strip=True,
+        quiet=True,
+        jobs=1,
+        profile="profile1",
+        features=["feature1", "feature2"],
+        all_features=True,
+        no_default_features=True,
+        target="target1",
+        ignore_rust_version=True,
+        color=True,
+        frozen=True,
+        locked=True,
+        offline=True,
+        config={"key1": "value1", "key2": "value2"},
+        unstable_flags=["unstable1", "unstable2"],
+        verbose=2,
+        rustc_flags=["flag1", "flag2"],
+    )
+    # fmt: off
+    assert settings.to_args() == [
+        '--release',
+        '--strip',
+        '--quiet',
+        '--jobs', '1',
+        '--profile', 'profile1',
+        '--features', 'feature1,feature2',
+        '--all-features',
+        '--no-default-features',
+        '--target', 'target1',
+        '--ignore-rust-version',
+        '--color', 'always',
+        '--frozen',
+        '--locked',
+        '--offline',
+        '--config', 'key1=value1',
+        '--config', 'key2=value2',
+        '-Z', 'unstable1',
+        '-Z', 'unstable2',
+        '-vv',
+        'flag1',
+        'flag2',
+    ]
+    # fmt: on
+
+    build_settings = MaturinBuildSettings(
+        skip_auditwheel=True, zig=True, color=False, rustc_flags=["flag1", "flag2"]
+    )
+    assert build_settings.to_args() == [
+        "--skip-auditwheel",
+        "--zig",
+        "--color",
+        "never",
+        "flag1",
+        "flag2",
+    ]
+
+    develop_settings = MaturinDevelopSettings(
+        extras=["extra1", "extra2"],
+        skip_install=True,
+        color=False,
+        rustc_flags=["flag1", "flag2"],
+    )
+    assert develop_settings.to_args() == [
+        "--extras",
+        "extra1,extra2",
+        "--skip-install",
+        "--color",
+        "never",
+        "flag1",
+        "flag2",
+    ]
 
 
 class TestFileLock:

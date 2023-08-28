@@ -23,6 +23,7 @@ from .common import (
     test_crates,
     uninstall,
     with_underscores,
+    remove_ansii_escape_characters,
 )
 
 """
@@ -679,6 +680,7 @@ else:
         )
 
         output1, _ = run_python_code(self.loader_script)
+        output1 = remove_ansii_escape_characters(output1)
         pattern = (
             'building "test_project"\n'
             'maturin.import_hook \\[WARNING\\] build of "test_project" succeeded with warnings:\n'
@@ -694,6 +696,7 @@ else:
         )
 
         output2, _ = run_python_code(self.loader_script)
+        output2 = remove_ansii_escape_characters(output2)
         pattern = (
             'maturin.import_hook \\[WARNING\\] the last build of "test_project" succeeded with warnings:\n'
             ".*"

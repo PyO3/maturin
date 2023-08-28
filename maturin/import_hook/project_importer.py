@@ -79,7 +79,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         elif isinstance(self._settings, MaturinSettingsProvider):
             return self._settings.get_settings(module_path, source_path)
         else:
-            return MaturinSettings()
+            return MaturinSettings.default()
 
     def find_spec(
         self,

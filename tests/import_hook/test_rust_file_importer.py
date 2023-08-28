@@ -287,7 +287,11 @@ else:
         built, the warnings will be printed again.
         """
         rs_path, py_path = self._create_clean_package(tmp_path / "package")
-        rs_path.write_text(rs_path.read_text().replace("10", "let x = 12; 20"))
+        rs_path.write_text(
+            rs_path.read_text().replace(
+                "10", "#[warn(unused_variables)]{let x = 12;}; 20"
+            )
+        )
 
         output1, _ = run_python([str(py_path)], tmp_path)
         pattern = (

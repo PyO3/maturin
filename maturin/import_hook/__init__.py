@@ -10,7 +10,7 @@ __all__ = ["install", "uninstall", "reset_logger"]
 
 def install(
     *,
-    enable_package_importer: bool = True,
+    enable_project_importer: bool = True,
     enable_rs_file_importer: bool = True,
     settings: Optional[Union[MaturinSettings, MaturinSettingsProvider]] = None,
     build_dir: Optional[Path] = None,
@@ -22,7 +22,7 @@ def install(
 ) -> None:
     """Install import hooks for automatically rebuilding and importing maturin projects or .rs files.
 
-    :param enable_package_importer: enable the hook for automatically rebuilding editable installed maturin projects
+    :param enable_project_importer: enable the hook for automatically rebuilding editable installed maturin projects
 
     :param enable_rs_file_importer: enable the hook for importing .rs files as though they were regular python modules
 
@@ -55,7 +55,7 @@ def install(
             lock_timeout_seconds=lock_timeout_seconds,
             show_warnings=show_warnings,
         )
-    if enable_package_importer:
+    if enable_project_importer:
         project_importer.install(
             settings=settings,
             build_dir=build_dir,

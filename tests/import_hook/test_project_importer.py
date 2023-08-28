@@ -658,7 +658,11 @@ else:
         """
         project_dir = self._create_clean_project(tmp_path / "project", is_mixed)
         lib_path = project_dir / "src/lib.rs"
-        lib_path.write_text(lib_path.read_text().replace("Ok(())", "let x = 12;Ok(())"))
+        lib_path.write_text(
+            lib_path.read_text().replace(
+                "Ok(())", "#[warn(unused_variables)]{let x = 12;}; Ok(())"
+            )
+        )
 
         output1, _ = run_python_code(self.loader_script)
         pattern = (

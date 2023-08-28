@@ -145,18 +145,17 @@ The maturin project importer and the rust file importer can be used separately
 ```python
 from maturin.import_hook import rust_file_importer
 rust_file_importer.install()
-from maturin.import_hook import package_importer
-package_importer.install()
+from maturin.import_hook import project_importer
+project_importer.install()
 ```
 
 The import hook can be configured to control its behaviour
 ```python
-from pathlib import Path
 from maturin import import_hook
-from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
+from maturin.import_hook.settings import MaturinSettings
 
 import_hook.install(
-    enable_package_importer=True,
+    enable_project_importer=True,
     enable_rs_file_importer=True,
     settings=MaturinSettings(
         release=True,
@@ -166,9 +165,15 @@ import_hook.install(
     show_warnings=True,
     # ...
 )
+```
 
-# custom settings providers can be used to override settings of particular projects
-# or implement custom logic such as loading settings from configuration files
+Custom settings providers can be used to override settings of particular projects
+or implement custom logic such as loading settings from configuration files
+```python
+from pathlib import Path
+from maturin import import_hook
+from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
+
 class CustomSettings(MaturinSettingsProvider):
     def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
         return MaturinSettings(
@@ -178,7 +183,7 @@ class CustomSettings(MaturinSettingsProvider):
         )
 
 import_hook.install(
-    enable_package_importer=True,
+    enable_project_importer=True,
     enable_rs_file_importer=True,
     settings=CustomSettings(),
     show_warnings=True,
@@ -186,9 +191,18 @@ import_hook.install(
 )
 ```
 
+Since the import hook is intended for use in development environments and not for
+production environments, it may be a good idea to put the call to `import_hook.install()`
+into `site-packages/sitecustomize.py` of your development virtual environment
+([documentation](https://docs.python.org/3/library/site.html)). This will
+enable the hook for every script run by that interpreter without calling `import_hook.install()`
+in every script, meaning the scripts do not need alteration before deployment.
+
+
 The import hook internals can be examined by configuring the root logger and
 calling `reset_logger` to propagate messages from the `maturin.import_hook` logger
-to the root logger.
+to the root logger. You can also run with the environment variable `RUST_LOG=maturin=debug`
+to get more information from maturin.
 ```python
 import logging
 logging.basicConfig(format='%(name)s [%(levelname)s] %(message)s', level=logging.DEBUG)

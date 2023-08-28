@@ -18,6 +18,12 @@ class MaturinSettings:
     frozen: bool = False
     locked: bool = False
     offline: bool = False
+    verbose: int = 0
+
+    def __post_init__(self) -> None:
+        if self.verbose not in (0, 1, 2):
+            msg = f"invalid verbose value: {self.verbose}"
+            raise ValueError(msg)
 
     def to_args(self) -> List[str]:
         args = []
@@ -43,6 +49,8 @@ class MaturinSettings:
             args.append("--locked")
         if self.offline:
             args.append("--offline")
+        if self.verbose > 0:
+            args.append("-{}".format("v" * self.verbose))
         return args
 
 

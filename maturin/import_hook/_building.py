@@ -84,11 +84,11 @@ class BuildCache:
         except FileNotFoundError:
             return None
 
-    def tmp_project_dir(self, project_path: Path, module_path: str) -> Path:
+    def tmp_project_dir(self, project_path: Path, module_name: str) -> Path:
         if not self._lock.is_locked:
             raise LockNotHeldError
         path_hash = hashlib.sha1(bytes(project_path)).hexdigest()
-        return self._build_dir / "project" / f"{module_path}_{path_hash}"
+        return self._build_dir / "project" / f"{module_name}_{path_hash}"
 
 
 def _get_default_build_dir() -> Path:

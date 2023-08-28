@@ -3,7 +3,9 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Generator
+
+import pytest
 
 from .common import log, run_python, script_dir, test_crates
 
@@ -14,6 +16,9 @@ which provides a clean virtual environment for these tests to use.
 """
 
 MATURIN_BUILD_CACHE = test_crates / "targets/import_hook_file_importer_build_cache"
+# the CI does not have enough space to keep the outputs.
+# When running locally you may set this to False for debugging
+CLEAR_WORKSPACE = True
 
 os.environ["CARGO_TARGET_DIR"] = str(test_crates / "targets/import_hook_file_importer")
 os.environ["MATURIN_BUILD_DIR"] = str(MATURIN_BUILD_CACHE)
@@ -25,18 +30,28 @@ def _clear_build_cache() -> None:
         shutil.rmtree(MATURIN_BUILD_CACHE)
 
 
-def test_absolute_import(tmp_path: Path) -> None:
+@pytest.fixture()
+def workspace(tmp_path: Path) -> Generator[Path, None, None]:
+    try:
+        yield tmp_path
+    finally:
+        if CLEAR_WORKSPACE:
+            log(f"clearing workspace {tmp_path}")
+            shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+def test_absolute_import(workspace: Path) -> None:
     """test imports of the form `import ab.cd.ef`"""
     _clear_build_cache()
 
     helper_path = script_dir / "rust_file_import/absolute_import_helper.py"
 
-    output1, duration1 = run_python([str(helper_path)], cwd=tmp_path)
+    output1, duration1 = run_python([str(helper_path)], cwd=workspace)
     assert "SUCCESS" in output1
     assert "module up to date" not in output1
     assert "creating project for" in output1
 
-    output2, duration2 = run_python([str(helper_path)], cwd=tmp_path)
+    output2, duration2 = run_python([str(helper_path)], cwd=workspace)
     assert "SUCCESS" in output2
     assert "module up to date" in output2
     assert "creating project for" not in output2
@@ -44,7 +59,7 @@ def test_absolute_import(tmp_path: Path) -> None:
     assert duration2 < duration1
 
 
-def test_relative_import(tmp_path: Path) -> None:
+def test_relative_import() -> None:
     """test imports of the form `from .ab import cd`"""
     _clear_build_cache()
 
@@ -65,18 +80,18 @@ def test_relative_import(tmp_path: Path) -> None:
     assert duration2 < duration1
 
 
-def test_top_level_import(tmp_path: Path) -> None:
+def test_top_level_import(workspace: Path) -> None:
     """test imports of the form `import ab`"""
     _clear_build_cache()
 
     helper_path = script_dir / "rust_file_import/packages/top_level_import_helper.py"
 
-    output1, duration1 = run_python([str(helper_path)], cwd=tmp_path)
+    output1, duration1 = run_python([str(helper_path)], cwd=workspace)
     assert "SUCCESS" in output1
     assert "module up to date" not in output1
     assert "creating project for" in output1
 
-    output2, duration2 = run_python([str(helper_path)], cwd=tmp_path)
+    output2, duration2 = run_python([str(helper_path)], cwd=workspace)
     assert "SUCCESS" in output2
     assert "module up to date" in output2
     assert "creating project for" not in output2
@@ -84,13 +99,13 @@ def test_top_level_import(tmp_path: Path) -> None:
     assert duration2 < duration1
 
 
-def test_multiple_imports(tmp_path: Path) -> None:
+def test_multiple_imports(workspace: Path) -> None:
     """test importing the same rs file multiple times by different names in the same session"""
     _clear_build_cache()
 
     helper_path = script_dir / "rust_file_import/multiple_import_helper.py"
 
-    output, _ = run_python([str(helper_path)], cwd=tmp_path)
+    output, _ = run_python([str(helper_path)], cwd=workspace)
     assert "SUCCESS" in output
     assert 'rebuilt and loaded module "packages.subpackage.my_rust_module"' in output
     assert output.count("importing rust file") == 1
@@ -139,18 +154,18 @@ def test_concurrent_import() -> None:
     assert num_waiting == 2
 
 
-def test_rebuild_on_change(tmp_path: Path) -> None:
+def test_rebuild_on_change(workspace: Path) -> None:
     """test that modules are rebuilt if they are edited"""
     _clear_build_cache()
 
-    script_path = tmp_path / "my_script.rs"
+    script_path = workspace / "my_script.rs"
     helper_path = shutil.copy(
-        script_dir / "rust_file_import/rebuild_on_change_helper.py", tmp_path
+        script_dir / "rust_file_import/rebuild_on_change_helper.py", workspace
     )
 
     shutil.copy(script_dir / "rust_file_import/my_script_1.rs", script_path)
 
-    output1, _ = run_python([str(helper_path)], cwd=tmp_path)
+    output1, _ = run_python([str(helper_path)], cwd=workspace)
     assert "get_num = 10" in output1
     assert "failed to import get_other_num" in output1
     assert "SUCCESS" in output1
@@ -160,7 +175,7 @@ def test_rebuild_on_change(tmp_path: Path) -> None:
 
     shutil.copy(script_dir / "rust_file_import/my_script_2.rs", script_path)
 
-    output2, _ = run_python([str(helper_path)], cwd=tmp_path)
+    output2, _ = run_python([str(helper_path)], cwd=workspace)
     assert "get_num = 20" in output2
     assert "get_other_num = 100" in output2
     assert "SUCCESS" in output2
@@ -169,37 +184,37 @@ def test_rebuild_on_change(tmp_path: Path) -> None:
     assert "creating project for" in output2
 
 
-def test_rebuild_on_settings_change(tmp_path: Path) -> None:
+def test_rebuild_on_settings_change(workspace: Path) -> None:
     """test that modules are rebuilt if the settings (eg maturin flags) used by the import hook changes"""
     _clear_build_cache()
 
-    script_path = tmp_path / "my_script.rs"
+    script_path = workspace / "my_script.rs"
     helper_path = shutil.copy(
-        script_dir / "rust_file_import/rebuild_on_settings_change_helper.py", tmp_path
+        script_dir / "rust_file_import/rebuild_on_settings_change_helper.py", workspace
     )
 
     shutil.copy(script_dir / "rust_file_import/my_script_3.rs", script_path)
 
-    output1, _ = run_python([str(helper_path)], cwd=tmp_path)
+    output1, _ = run_python([str(helper_path)], cwd=workspace)
     assert "get_num = 10" in output1
     assert "SUCCESS" in output1
     assert "building my_script with default settings" in output1
     assert "module up to date" not in output1
     assert "creating project for" in output1
 
-    output2, _ = run_python([str(helper_path)], cwd=tmp_path)
+    output2, _ = run_python([str(helper_path)], cwd=workspace)
     assert "get_num = 10" in output2
     assert "SUCCESS" in output2
     assert "module up to date" in output2
 
-    output3, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=tmp_path)
+    output3, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
     assert "building my_script with large_number feature enabled" in output3
     assert "module up to date" not in output3
     assert "creating project for" in output3
     assert "get_num = 100" in output3
     assert "SUCCESS" in output3
 
-    output4, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=tmp_path)
+    output4, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
     assert "building my_script with large_number feature enabled" in output4
     assert "module up to date" in output4
     assert "get_num = 100" in output4
@@ -238,13 +253,13 @@ else:
         py_path.write_text(self.loader_script)
         return rs_path, py_path
 
-    def test_default_rebuild(self, tmp_path: Path) -> None:
+    def test_default_rebuild(self, workspace: Path) -> None:
         """By default, when a module is out of date the import hook logs messages
         before and after rebuilding but hides the underlying details.
         """
-        rs_path, py_path = self._create_clean_package(tmp_path / "package")
+        rs_path, py_path = self._create_clean_package(workspace / "package")
 
-        output, _ = run_python([str(py_path)], tmp_path)
+        output, _ = run_python([str(py_path)], workspace)
         pattern = (
             'building "my_script"\n'
             'rebuilt and loaded module "my_script" in [0-9.]+s\n'
@@ -253,21 +268,21 @@ else:
         )
         assert re.fullmatch(pattern, output, flags=re.MULTILINE) is not None
 
-    def test_default_up_to_date(self, tmp_path: Path) -> None:
+    def test_default_up_to_date(self, workspace: Path) -> None:
         """By default, when the module is up-to-date nothing is printed."""
-        rs_path, py_path = self._create_clean_package(tmp_path / "package")
+        rs_path, py_path = self._create_clean_package(workspace / "package")
 
-        run_python([str(py_path)], tmp_path)  # run once to rebuild
+        run_python([str(py_path)], workspace)  # run once to rebuild
 
-        output, _ = run_python([str(py_path)], tmp_path)
+        output, _ = run_python([str(py_path)], workspace)
         assert output == "get_num 10\nSUCCESS\n"
 
-    def test_default_compile_error(self, tmp_path: Path) -> None:
+    def test_default_compile_error(self, workspace: Path) -> None:
         """If compilation fails then the error message from maturin is printed and an ImportError is raised."""
-        rs_path, py_path = self._create_clean_package(tmp_path / "package")
+        rs_path, py_path = self._create_clean_package(workspace / "package")
 
         rs_path.write_text(rs_path.read_text().replace("10", ""))
-        output, _ = run_python([str(py_path)], tmp_path, quiet=True)
+        output, _ = run_python([str(py_path)], workspace, quiet=True)
         pattern = (
             'building "my_script"\n'
             'maturin\\.import_hook \\[ERROR\\] command ".*" returned non-zero exit status: 1\n'
@@ -281,19 +296,19 @@ else:
         )
         assert re.fullmatch(pattern, output, flags=re.MULTILINE | re.DOTALL) is not None
 
-    def test_default_compile_warning(self, tmp_path: Path) -> None:
+    def test_default_compile_warning(self, workspace: Path) -> None:
         """If compilation succeeds with warnings then the output of maturin is printed.
         If the module is already up to date but warnings were raised when it was first
         built, the warnings will be printed again.
         """
-        rs_path, py_path = self._create_clean_package(tmp_path / "package")
+        rs_path, py_path = self._create_clean_package(workspace / "package")
         rs_path.write_text(
             rs_path.read_text().replace(
                 "10", "#[warn(unused_variables)]{let x = 12;}; 20"
             )
         )
 
-        output1, _ = run_python([str(py_path)], tmp_path)
+        output1, _ = run_python([str(py_path)], workspace)
         pattern = (
             'building "my_script"\n'
             'maturin.import_hook \\[WARNING\\] build of "my_script" succeeded with warnings:\n'
@@ -308,7 +323,7 @@ else:
             re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
         )
 
-        output2, _ = run_python([str(py_path)], tmp_path)
+        output2, _ = run_python([str(py_path)], workspace)
         pattern = (
             'maturin.import_hook \\[WARNING\\] the last build of "my_script" succeeded with warnings:\n'
             ".*"
@@ -321,21 +336,21 @@ else:
             re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
         )
 
-    def test_reset_logger_without_configuring(self, tmp_path: Path) -> None:
+    def test_reset_logger_without_configuring(self, workspace: Path) -> None:
         """If reset_logger is called then by default logging level INFO is not printed
         (because the messages are handled by the root logger).
         """
-        rs_path, py_path = self._create_clean_package(tmp_path / "package")
-        output, _ = run_python([str(py_path), "RESET_LOGGER"], tmp_path)
+        rs_path, py_path = self._create_clean_package(workspace / "package")
+        output, _ = run_python([str(py_path), "RESET_LOGGER"], workspace)
         assert output == "get_num 10\nSUCCESS\n"
 
-    def test_successful_compilation_but_not_valid(self, tmp_path: Path) -> None:
+    def test_successful_compilation_but_not_valid(self, workspace: Path) -> None:
         """If the script compiles but does not import correctly an ImportError is raised."""
-        rs_path, py_path = self._create_clean_package(tmp_path / "package")
+        rs_path, py_path = self._create_clean_package(workspace / "package")
         rs_path.write_text(
             rs_path.read_text().replace("my_script", "my_script_new_name")
         )
-        output, _ = run_python([str(py_path)], tmp_path, quiet=True)
+        output, _ = run_python([str(py_path)], workspace, quiet=True)
         pattern = (
             'building "my_script"\n'
             'rebuilt and loaded module "my_script" in [0-9.]+s\n'

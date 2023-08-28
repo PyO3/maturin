@@ -44,8 +44,8 @@ class TestFileLock:
         return "".join(random.choice(string.ascii_lowercase) for _ in range(size))
 
     @staticmethod
-    def _unlocked_worker(workspace: Path) -> str:
-        path = workspace / "my_file.txt"
+    def _unlocked_worker(work_dir: Path) -> str:
+        path = work_dir / "my_file.txt"
         data = TestFileLock._random_string()
         for _ in range(10):
             path.write_text(data)
@@ -54,9 +54,9 @@ class TestFileLock:
         return "SUCCESS"
 
     @staticmethod
-    def _locked_worker(workspace: Path, use_fallback_lock: bool) -> str:
-        path = workspace / "my_file.txt"
-        lock = TestFileLock._create_lock(workspace / "lock", 10, use_fallback_lock)
+    def _locked_worker(work_dir: Path, use_fallback_lock: bool) -> str:
+        path = work_dir / "my_file.txt"
+        lock = TestFileLock._create_lock(work_dir / "lock", 10, use_fallback_lock)
         data = TestFileLock._random_string()
         for _ in range(10):
             with lock:

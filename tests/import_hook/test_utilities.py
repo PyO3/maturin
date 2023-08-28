@@ -13,17 +13,10 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 from maturin.import_hook import MaturinSettings
-from maturin.import_hook._building import (
-    BuildCache,
-    BuildStatus,
-    LockNotHeldError,
-)
+from maturin.import_hook._building import BuildCache, BuildStatus
 from maturin.import_hook._file_lock import AtomicOpenLock, FileLock
 from maturin.import_hook._resolve_project import ProjectResolveError, _resolve_project
-from maturin.import_hook.project_importer import (
-    _get_installed_package_mtime,
-    _get_project_mtime,
-)
+from maturin.import_hook.project_importer import _get_installed_package_mtime, _get_project_mtime
 from maturin.import_hook.settings import MaturinDevelopSettings, MaturinBuildSettings
 
 from .common import log, test_crates
@@ -389,27 +382,19 @@ def test_resolve_project(project_name: str) -> None:
 
 def test_build_cache(tmp_path: Path) -> None:
     cache = BuildCache(tmp_path / "build", lock_timeout_seconds=1)
-    with pytest.raises(LockNotHeldError):
-        cache.tmp_project_dir(tmp_path / "a", "a")
 
-    with pytest.raises(LockNotHeldError):
-        cache.store_build_status(BuildStatus(1, tmp_path / "source", [], ""))
-
-    with pytest.raises(LockNotHeldError):
-        cache.get_build_status(tmp_path / "source")
-
-    with cache.lock:
-        dir_1 = cache.tmp_project_dir(tmp_path / "my_module", "my_module")
-        dir_2 = cache.tmp_project_dir(tmp_path / "other_place", "my_module")
+    with cache.lock() as locked_cache:
+        dir_1 = locked_cache.tmp_project_dir(tmp_path / "my_module", "my_module")
+        dir_2 = locked_cache.tmp_project_dir(tmp_path / "other_place", "my_module")
         assert dir_1 != dir_2
 
         status1 = BuildStatus(1.2, tmp_path / "source1", [], "")
         status2 = BuildStatus(1.2, tmp_path / "source2", [], "")
-        cache.store_build_status(status1)
-        cache.store_build_status(status2)
-        assert cache.get_build_status(tmp_path / "source1") == status1
-        assert cache.get_build_status(tmp_path / "source2") == status2
-        assert cache.get_build_status(tmp_path / "source3") is None
+        locked_cache.store_build_status(status1)
+        locked_cache.store_build_status(status2)
+        assert locked_cache.get_build_status(tmp_path / "source1") == status1
+        assert locked_cache.get_build_status(tmp_path / "source2") == status2
+        assert locked_cache.get_build_status(tmp_path / "source3") is None
 
 
 def _optional_path_to_str(path: Optional[Path]) -> Optional[str]:

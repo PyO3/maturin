@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Dict, Set
+from typing import Dict, List, Optional, Set
 
 __all__ = [
     "MaturinSettings",
@@ -13,7 +13,7 @@ __all__ = [
 
 @dataclass
 class MaturinSettings:
-    """Settings common to `maturin build` and `maturin develop`"""
+    """Settings common to `maturin build` and `maturin develop`."""
 
     release: bool = False
     strip: bool = False
@@ -40,7 +40,7 @@ class MaturinSettings:
 
     @staticmethod
     def default() -> "MaturinSettings":
-        """MaturinSettings() sets no flags but default() corresponds to some sensible defaults"""
+        """MaturinSettings() sets no flags but default() corresponds to some sensible defaults."""
         return MaturinSettings(
             color=True,
         )
@@ -100,7 +100,7 @@ class MaturinSettings:
 
 @dataclass
 class MaturinBuildSettings(MaturinSettings):
-    """settings for `maturin build`"""
+    """settings for `maturin build`."""
 
     skip_auditwheel: bool = False
     zig: bool = False
@@ -121,7 +121,7 @@ class MaturinBuildSettings(MaturinSettings):
 
 @dataclass
 class MaturinDevelopSettings(MaturinSettings):
-    """settings for `maturin develop`"""
+    """settings for `maturin develop`."""
 
     extras: Optional[List[str]] = None
     skip_install: bool = False

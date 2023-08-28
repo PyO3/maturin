@@ -8,9 +8,10 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 
 from ._file_lock import FileLock
 from ._logging import logger
@@ -46,28 +47,11 @@ class BuildStatus:
             return None
 
 
-class LockNotHeldError(Exception):
-    pass
-
-
-class BuildCache:
-    def __init__(
-        self, build_dir: Optional[Path], lock_timeout_seconds: Optional[float]
-    ) -> None:
-        self._build_dir = (
-            build_dir if build_dir is not None else _get_default_build_dir()
-        )
-        self._lock = FileLock.new(
-            self._build_dir / "lock", timeout_seconds=lock_timeout_seconds
-        )
-
-    @property
-    def lock(self) -> FileLock:
-        return self._lock
+class LockedBuildCache:
+    def __init__(self, build_dir: Path) -> None:
+        self._build_dir = build_dir
 
     def _build_status_path(self, source_path: Path) -> Path:
-        if not self._lock.is_locked:
-            raise LockNotHeldError
         path_hash = hashlib.sha1(bytes(source_path)).hexdigest()
         build_status_dir = self._build_dir / "build_status"
         build_status_dir.mkdir(parents=True, exist_ok=True)
@@ -85,10 +69,25 @@ class BuildCache:
             return None
 
     def tmp_project_dir(self, project_path: Path, module_name: str) -> Path:
-        if not self._lock.is_locked:
-            raise LockNotHeldError
         path_hash = hashlib.sha1(bytes(project_path)).hexdigest()
         return self._build_dir / "project" / f"{module_name}_{path_hash}"
+
+
+class BuildCache:
+    def __init__(
+        self, build_dir: Optional[Path], lock_timeout_seconds: Optional[float]
+    ) -> None:
+        self._build_dir = (
+            build_dir if build_dir is not None else _get_default_build_dir()
+        )
+        self._lock = FileLock.new(
+            self._build_dir / "lock", timeout_seconds=lock_timeout_seconds
+        )
+
+    @contextmanager
+    def lock(self) -> Generator[LockedBuildCache, None, None]:
+        with self._lock:
+            yield LockedBuildCache(self._build_dir)
 
 
 def _get_default_build_dir() -> Path:

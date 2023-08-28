@@ -16,6 +16,7 @@ from typing import Iterable, Optional, Sequence, Set, Tuple, Union
 from maturin.import_hook._building import (
     BuildCache,
     BuildStatus,
+    LockedBuildCache,
     develop_build_project,
     maturin_output_has_warnings,
 )
@@ -170,10 +171,10 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
 
         logger.debug('importing project "%s" as "%s"', project_dir, package_name)
 
-        with self._build_cache.lock:
+        with self._build_cache.lock() as build_cache:
             settings = self._get_settings(package_name, project_dir)
             spec, reason = self._get_spec_for_up_to_date_package(
-                package_name, project_dir, resolved, settings
+                package_name, project_dir, resolved, settings, build_cache
             )
             if spec is not None:
                 return spec, False
@@ -214,7 +215,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
                     build_status = BuildStatus(
                         mtime, project_dir, settings.to_args(), maturin_output
                     )
-                    self._build_cache.store_build_status(build_status)
+                    build_cache.store_build_status(build_status)
 
         return spec, True
 
@@ -224,6 +225,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         project_dir: Path,
         resolved: MaturinProject,
         settings: MaturinSettings,
+        build_cache: LockedBuildCache,
     ) -> Tuple[Optional[ModuleSpec], Optional[str]]:
         """Return a spec for the given module at the given search_dir if it exists and is newer than the source
         code that it is derived from.
@@ -256,7 +258,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         ):
             return None, "package is out of date"
 
-        build_status = self._build_cache.get_build_status(project_dir)
+        build_status = build_cache.get_build_status(project_dir)
         if build_status is None:
             return None, "no build status found"
         if build_status.source_path != project_dir:

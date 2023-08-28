@@ -14,6 +14,7 @@ from typing import Optional, Sequence, Tuple, Union
 from maturin.import_hook._building import (
     BuildCache,
     BuildStatus,
+    LockedBuildCache,
     build_unpacked_wheel,
     generate_project_for_single_rust_file,
     maturin_output_has_warnings,
@@ -100,19 +101,15 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
     ) -> Tuple[Optional[ModuleSpec], bool]:
         logger.debug('importing rust file "%s" as "%s"', file_path, module_path)
 
-        with self._build_cache.lock:
-            output_dir = self._build_cache.tmp_project_dir(file_path, module_name)
+        with self._build_cache.lock() as build_cache:
+            output_dir = build_cache.tmp_project_dir(file_path, module_name)
             logger.debug("output dir: %s", output_dir)
             settings = self._get_settings(module_path, file_path)
             dist_dir = output_dir / "dist"
             package_dir = dist_dir / module_name
 
             spec, reason = self._get_spec_for_up_to_date_extension_module(
-                package_dir,
-                module_path,
-                module_name,
-                file_path,
-                settings,
+                package_dir, module_path, module_name, file_path, settings, build_cache
             )
             if spec is not None:
                 return spec, False
@@ -149,7 +146,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
                 settings.to_args(),
                 maturin_output,
             )
-            self._build_cache.store_build_status(build_status)
+            build_cache.store_build_status(build_status)
             return (
                 _get_spec_for_extension_module(module_path, extension_module_path),
                 True,
@@ -162,6 +159,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         module_name: str,
         source_path: Path,
         settings: MaturinSettings,
+        build_cache: LockedBuildCache,
     ) -> Tuple[Optional[ModuleSpec], Optional[str]]:
         """Return a spec for the given module at the given search_dir if it exists and is newer than the source
         code that it is derived from.
@@ -180,7 +178,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         if extension_module_mtime < source_path.stat().st_mtime:
             return None, "module is out of date"
 
-        build_status = self._build_cache.get_build_status(source_path)
+        build_status = build_cache.get_build_status(source_path)
         if build_status is None:
             return None, "no build status found"
         if build_status.source_path != source_path:

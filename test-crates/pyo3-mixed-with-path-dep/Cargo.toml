@@ -2,7 +2,6 @@
 authors = []
 name = "pyo3-mixed-with-path-dep"
 version = "2.1.3"
-description = "a library using "
 edition = "2021"
 
 [dependencies]

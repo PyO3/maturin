@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Optional, Set, Union
+from typing import Optional, Set
 
 from maturin.import_hook import project_importer, rust_file_importer
 from maturin.import_hook._logging import reset_logger
-from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
+from maturin.import_hook.settings import MaturinSettings
 
 __all__ = ["install", "uninstall", "reset_logger"]
 
@@ -12,7 +12,7 @@ def install(
     *,
     enable_project_importer: bool = True,
     enable_rs_file_importer: bool = True,
-    settings: Optional[Union[MaturinSettings, MaturinSettingsProvider]] = None,
+    settings: Optional[MaturinSettings] = None,
     build_dir: Optional[Path] = None,
     install_new_packages: bool = True,
     force_rebuild: bool = False,
@@ -26,8 +26,7 @@ def install(
 
     :param enable_rs_file_importer: enable the hook for importing .rs files as though they were regular python modules
 
-    :param settings: settings corresponding to flags passed to maturin. Pass MaturinSettings to use the same
-        settings for every project or MaturinSettingsProvider to customize
+    :param settings: settings corresponding to flags passed to maturin.
 
     :param build_dir: where to put the compiled artifacts. defaults to `$MATURIN_BUILD_DIR`,
         `sys.exec_prefix / 'maturin_build_cache'` or

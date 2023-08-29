@@ -204,7 +204,7 @@ def test_rebuild_on_settings_change(workspace: Path) -> None:
     output1, _ = run_python([str(helper_path)], cwd=workspace)
     assert "get_num = 10" in output1
     assert "SUCCESS" in output1
-    assert "building my_script with default settings" in output1
+    assert "building with default settings" in output1
     assert "module up to date" not in output1
     assert "creating project for" in output1
 
@@ -214,14 +214,14 @@ def test_rebuild_on_settings_change(workspace: Path) -> None:
     assert "module up to date" in output2
 
     output3, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
-    assert "building my_script with large_number feature enabled" in output3
+    assert "building with large_number feature enabled" in output3
     assert "module up to date" not in output3
     assert "creating project for" in output3
     assert "get_num = 100" in output3
     assert "SUCCESS" in output3
 
     output4, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
-    assert "building my_script with large_number feature enabled" in output4
+    assert "building with large_number feature enabled" in output4
     assert "module up to date" in output4
     assert "get_num = 100" in output4
     assert "SUCCESS" in output4

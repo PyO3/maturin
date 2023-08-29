@@ -26,7 +26,7 @@ from maturin.import_hook._resolve_project import (
     ProjectResolver,
     is_maybe_maturin_project,
 )
-from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
+from maturin.import_hook.settings import MaturinSettings
 
 __all__ = [
     "MaturinProjectImporter",
@@ -54,7 +54,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
     def __init__(
         self,
         *,
-        settings: Optional[Union[MaturinSettings, MaturinSettingsProvider]] = None,
+        settings: Optional[MaturinSettings] = None,
         build_dir: Optional[Path] = None,
         lock_timeout_seconds: Optional[float] = 120,
         install_new_packages: bool = True,
@@ -74,13 +74,11 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
             else excluded_dir_names
         )
 
-    def _get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
-        if isinstance(self._settings, MaturinSettings):
-            return self._settings
-        elif isinstance(self._settings, MaturinSettingsProvider):
-            return self._settings.get_settings(module_path, source_path)
-        else:
-            return MaturinSettings.default()
+    def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
+        """this method can be overridden in subclasses to customize settings for specific projects"""
+        return (
+            self._settings if self._settings is not None else MaturinSettings.default()
+        )
 
     def find_spec(
         self,
@@ -176,7 +174,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         logger.debug('importing project "%s" as "%s"', project_dir, package_name)
 
         with self._build_cache.lock() as build_cache:
-            settings = self._get_settings(package_name, project_dir)
+            settings = self.get_settings(package_name, project_dir)
             spec, reason = self._get_spec_for_up_to_date_package(
                 package_name, project_dir, resolved, settings, build_cache
             )
@@ -526,7 +524,7 @@ IMPORTER: Optional[MaturinProjectImporter] = None
 
 def install(
     *,
-    settings: Optional[Union[MaturinSettings, MaturinSettingsProvider]] = None,
+    settings: Optional[MaturinSettings] = None,
     build_dir: Optional[Path] = None,
     install_new_packages: bool = True,
     force_rebuild: bool = False,
@@ -536,8 +534,7 @@ def install(
 ) -> MaturinProjectImporter:
     """Install an import hook for automatically rebuilding editable installed maturin projects.
 
-    :param settings: settings corresponding to flags passed to maturin. Pass MaturinSettings to use the same
-        settings for every project or MaturinSettingsProvider to customize
+    :param settings: settings corresponding to flags passed to maturin.
 
     :param build_dir: where to put the compiled artifacts. defaults to `$MATURIN_BUILD_DIR`,
         `sys.exec_prefix / 'maturin_build_cache'` or

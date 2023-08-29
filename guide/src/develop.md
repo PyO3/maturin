@@ -169,30 +169,6 @@ import_hook.install(
 )
 ```
 
-Custom settings providers can be used to override settings of particular projects
-or implement custom logic such as loading settings from configuration files
-```python
-from pathlib import Path
-from maturin import import_hook
-from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
-
-class CustomSettings(MaturinSettingsProvider):
-    def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
-        return MaturinSettings(
-            release=True,
-            strip=True,
-            # ...
-        )
-
-import_hook.install(
-    enable_project_importer=True,
-    enable_rs_file_importer=True,
-    settings=CustomSettings(),
-    show_warnings=True,
-    # ...
-)
-```
-
 Since the import hook is intended for use in development environments and not for
 production environments, it may be a good idea to put the call to `import_hook.install()`
 into `site-packages/sitecustomize.py` of your development virtual environment
@@ -200,6 +176,27 @@ into `site-packages/sitecustomize.py` of your development virtual environment
 enable the hook for every script run by that interpreter without calling `import_hook.install()`
 in every script, meaning the scripts do not need alteration before deployment.
 
+
+### Advanced Usage
+
+The import hook classes can be subclassed to further customize to specific use cases.
+For example settings can be configured per-project or loaded from configuration files.
+```python
+import sys
+from pathlib import Path
+from maturin.import_hook.settings import MaturinSettings
+from maturin.import_hook.project_importer import MaturinProjectImporter
+
+class CustomImporter(MaturinProjectImporter):
+    def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
+        return MaturinSettings(
+            release=True,
+            strip=True,
+            # ...
+        )
+
+sys.meta_path.insert(0, CustomImporter())
+```
 
 The import hook internals can be examined by configuring the root logger and
 calling `reset_logger` to propagate messages from the `maturin.import_hook` logger

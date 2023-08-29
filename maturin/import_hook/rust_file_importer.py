@@ -4,6 +4,7 @@ import importlib.util
 import logging
 import math
 import os
+import shutil
 import sys
 import time
 from importlib.machinery import ExtensionFileLoader, ModuleSpec
@@ -16,12 +17,12 @@ from maturin.import_hook._building import (
     BuildStatus,
     LockedBuildCache,
     build_unpacked_wheel,
-    generate_project_for_single_rust_file,
     maturin_output_has_warnings,
+    run_maturin,
 )
 from maturin.import_hook._logging import logger
-from maturin.import_hook._resolve_project import ProjectResolver
-from maturin.import_hook.settings import MaturinSettings, MaturinSettingsProvider
+from maturin.import_hook._resolve_project import ProjectResolver, find_cargo_manifest
+from maturin.import_hook.settings import MaturinSettings
 
 __all__ = ["MaturinRustFileImporter", "install", "uninstall", "IMPORTER"]
 
@@ -32,7 +33,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
     def __init__(
         self,
         *,
-        settings: Optional[Union[MaturinSettings, MaturinSettingsProvider]] = None,
+        settings: Optional[MaturinSettings] = None,
         build_dir: Optional[Path] = None,
         force_rebuild: bool = False,
         lock_timeout_seconds: Optional[float] = 120,
@@ -44,13 +45,42 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         self._build_cache = BuildCache(build_dir, lock_timeout_seconds)
         self._show_warnings = show_warnings
 
-    def _get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
-        if isinstance(self._settings, MaturinSettings):
-            return self._settings
-        elif isinstance(self._settings, MaturinSettingsProvider):
-            return self._settings.get_settings(module_path, source_path)
-        else:
-            return MaturinSettings.default()
+    def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
+        """this method can be overridden in subclasses to customize settings for specific projects"""
+        return (
+            self._settings if self._settings is not None else MaturinSettings.default()
+        )
+
+    @staticmethod
+    def generate_project_for_single_rust_file(
+        module_path: str,
+        project_dir: Path,
+        rust_file: Path,
+        settings: MaturinSettings,
+    ) -> Path:
+        """this method can be overridden in subclasses to customize project generation"""
+        if project_dir.exists():
+            shutil.rmtree(project_dir)
+
+        success, output = run_maturin(["new", "--bindings", "pyo3", str(project_dir)])
+        if not success:
+            msg = "Failed to generate project for rust file"
+            raise ImportError(msg)
+
+        if settings.features is not None:
+            available_features = [
+                feature for feature in settings.features if "/" not in feature
+            ]
+            cargo_manifest = project_dir / "Cargo.toml"
+            cargo_manifest.write_text(
+                "{}\n[features]\n{}".format(
+                    cargo_manifest.read_text(),
+                    "\n".join(f"{feature} = []" for feature in available_features),
+                )
+            )
+
+        shutil.copy(rust_file, project_dir / "src/lib.rs")
+        return project_dir
 
     def find_spec(
         self,
@@ -104,7 +134,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         with self._build_cache.lock() as build_cache:
             output_dir = build_cache.tmp_project_dir(file_path, module_name)
             logger.debug("output dir: %s", output_dir)
-            settings = self._get_settings(module_path, file_path)
+            settings = self.get_settings(module_path, file_path)
             dist_dir = output_dir / "dist"
             package_dir = dist_dir / module_name
 
@@ -118,12 +148,17 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
             logger.info('building "%s"', module_path)
             logger.debug('creating project for "%s" and compiling', file_path)
             start = time.perf_counter()
-            output_dir = generate_project_for_single_rust_file(
-                output_dir, file_path, settings.features
+            project_dir = self.generate_project_for_single_rust_file(
+                module_path, output_dir / file_path.stem, file_path, settings
             )
-            maturin_output = build_unpacked_wheel(
-                output_dir / "Cargo.toml", dist_dir, settings
-            )
+            manifest_path = find_cargo_manifest(project_dir)
+            if manifest_path is None:
+                msg = (
+                    f"cargo manifest not found in the project generated for {file_path}"
+                )
+                raise ImportError(msg)
+
+            maturin_output = build_unpacked_wheel(manifest_path, dist_dir, settings)
             logger.debug(
                 'compiled "%s" in %.3fs',
                 file_path,
@@ -241,7 +276,7 @@ IMPORTER: Optional[MaturinRustFileImporter] = None
 
 def install(
     *,
-    settings: Optional[Union[MaturinSettings, MaturinSettingsProvider]] = None,
+    settings: Optional[MaturinSettings] = None,
     build_dir: Optional[Path] = None,
     force_rebuild: bool = False,
     lock_timeout_seconds: Optional[float] = 120,
@@ -250,8 +285,7 @@ def install(
     """Install the 'rust file' importer to import .rs files as though
     they were regular python modules.
 
-    :param settings: settings corresponding to flags passed to maturin. Pass MaturinSettings to use the same
-        settings for every project or MaturinSettingsProvider to customize
+    :param settings: settings corresponding to flags passed to maturin.
 
     :param build_dir: where to put the compiled artifacts. defaults to `$MATURIN_BUILD_DIR`,
         `sys.exec_prefix / 'maturin_build_cache'` or

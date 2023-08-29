@@ -548,6 +548,7 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     helper_path = script_dir / "rust_file_import/rebuild_on_settings_change_helper.py"
 
     output1, _ = run_python([str(helper_path)], cwd=workspace)
+    assert "building with default settings" in output1
     assert "get_num = 10" in output1
     assert "SUCCESS" in output1
     assert (
@@ -560,7 +561,7 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     assert 'package up to date: "my_script"' in output2
 
     output3, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
-    assert "building my_script with large_number feature enabled" in output3
+    assert "building with large_number feature enabled" in output3
     assert (
         'package "my_script" will be rebuilt because: '
         "current maturin args do not match the previous build"
@@ -569,7 +570,7 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     assert "SUCCESS" in output3
 
     output4, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
-    assert "building my_script with large_number feature enabled" in output4
+    assert "building with large_number feature enabled" in output4
     assert 'package up to date: "my_script"' in output4
     assert "get_num = 100" in output4
     assert "SUCCESS" in output4

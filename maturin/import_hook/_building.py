@@ -129,36 +129,6 @@ def _get_cache_dir() -> Path:
         return Path("~/.cache").expanduser()
 
 
-def generate_project_for_single_rust_file(
-    build_dir: Path,
-    rust_file: Path,
-    available_features: Optional[list[str]],
-) -> Path:
-    project_dir = build_dir / rust_file.stem
-    if project_dir.exists():
-        shutil.rmtree(project_dir)
-
-    success, output = _run_maturin(["new", "--bindings", "pyo3", str(project_dir)])
-    if not success:
-        msg = "Failed to generate project for rust file"
-        raise ImportError(msg)
-
-    if available_features is not None:
-        available_features = [
-            feature for feature in available_features if "/" not in feature
-        ]
-        cargo_manifest = project_dir / "Cargo.toml"
-        cargo_manifest.write_text(
-            "{}\n[features]\n{}".format(
-                cargo_manifest.read_text(),
-                "\n".join(f"{feature} = []" for feature in available_features),
-            )
-        )
-
-    shutil.copy(rust_file, project_dir / "src/lib.rs")
-    return project_dir
-
-
 def build_wheel(
     manifest_path: Path,
     output_dir: Path,
@@ -167,7 +137,7 @@ def build_wheel(
     if "build" not in settings.supported_commands():
         msg = f'provided {type(settings).__name__} does not support the "build" command'
         raise ImportError(msg)
-    success, output = _run_maturin(
+    success, output = run_maturin(
         [
             "build",
             "--manifest-path",
@@ -194,7 +164,7 @@ def develop_build_project(
             f'provided {type(settings).__name__} does not support the "develop" command'
         )
         raise ImportError(msg)
-    success, output = _run_maturin(
+    success, output = run_maturin(
         ["develop", "--manifest-path", str(manifest_path), *settings.to_args()]
     )
     if not success:
@@ -203,7 +173,7 @@ def develop_build_project(
     return output
 
 
-def _run_maturin(args: list[str]) -> Tuple[bool, str]:
+def run_maturin(args: list[str]) -> Tuple[bool, str]:
     maturin_path = shutil.which("maturin")
     if maturin_path is None:
         msg = "maturin not found in the PATH"

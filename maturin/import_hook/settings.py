@@ -1,13 +1,10 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 __all__ = [
     "MaturinSettings",
     "MaturinBuildSettings",
     "MaturinDevelopSettings",
-    "MaturinSettingsProvider",
 ]
 
 
@@ -139,9 +136,3 @@ class MaturinDevelopSettings(MaturinSettings):
             args.append("--skip-install")
         args.extend(super().to_args())
         return args
-
-
-class MaturinSettingsProvider(ABC):
-    @abstractmethod
-    def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
-        raise NotImplementedError

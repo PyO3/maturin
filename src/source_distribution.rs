@@ -2,7 +2,8 @@ use crate::module_writer::{add_data, ModuleWriter};
 use crate::pyproject_toml::SdistGenerator;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
-use cargo_metadata::Metadata;
+use cargo_metadata::camino::Utf8PathBuf;
+use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
@@ -15,6 +16,7 @@ use tracing::debug;
 #[derive(Debug, Clone)]
 struct PathDependency {
     manifest_path: PathBuf,
+    workspace_root: Utf8PathBuf,
     readme: Option<PathBuf>,
 }
 
@@ -230,13 +232,31 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDepen
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
                 let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
+                if path_deps.contains_key(dep_name) {
+                    continue;
+                }
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
+                // Path dependencies may not be in the same workspace as the root crate,
+                // thus we need to find out its workspace root from `cargo metadata`
+                let path_dep_metadata = MetadataCommand::new()
+                    .manifest_path(&dep_manifest_path)
+                    .verbose(true)
+                    // We don't need to resolve the dependency graph
+                    .no_deps()
+                    .exec()
+                    .with_context(|| {
+                        format!(
+                            "Failed to resolve workspace root for {} at '{}'",
+                            dep_name, dep_manifest_path
+                        )
+                    })?;
                 path_deps.insert(
                     dep_name.clone(),
                     PathDependency {
                         manifest_path: PathBuf::from(dep_manifest_path.clone()),
+                        workspace_root: path_dep_metadata.workspace_root.clone(),
                         readme: pkg_readmes.get(dep_name.as_str()).cloned(),
                     },
                 );
@@ -346,6 +366,17 @@ fn add_cargo_package_files_to_sdist(
             let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
             writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
         }
+        // Handle different workspace manifest
+        if &path_dep.workspace_root != workspace_root {
+            let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
+            let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
+                .strip_prefix(&sdist_root)
+                .unwrap();
+            writer.add_file(
+                root_dir.join(relative_path_dep_workspace_manifest),
+                &path_dep_workspace_manifest,
+            )?;
+        }
     }
 
     // Add the main crate
@@ -418,6 +449,7 @@ fn add_cargo_package_files_to_sdist(
                     main_member_name,
                     PathDependency {
                         manifest_path: manifest_path.clone(),
+                        workspace_root: workspace_root.clone(),
                         readme: None,
                     },
                 );

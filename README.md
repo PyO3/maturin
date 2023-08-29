@@ -271,6 +271,7 @@ maturin itself is manylinux compliant when compiled for the musl target.
 ## Examples
 
 * [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
+* [chardetng-py](https://github.com/john-parton/chardetng-py) - Python binding for the chardetng character encoding detector.
 * [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
 * [datafusion-python](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
 * [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration

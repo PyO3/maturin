@@ -483,19 +483,21 @@ fn workspace_members_non_local_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-pure",
         SdistGenerator::Cargo,
-        vec![
-            "pyo3_pure-0.1.0+abc123de/Cargo.lock",
-            "pyo3_pure-0.1.0+abc123de/Cargo.toml",
-            "pyo3_pure-0.1.0+abc123de/LICENSE",
-            "pyo3_pure-0.1.0+abc123de/PKG-INFO",
-            "pyo3_pure-0.1.0+abc123de/README.md",
-            "pyo3_pure-0.1.0+abc123de/check_installed/check_installed.py",
-            "pyo3_pure-0.1.0+abc123de/pyo3_pure.pyi",
-            "pyo3_pure-0.1.0+abc123de/pyproject.toml",
-            "pyo3_pure-0.1.0+abc123de/src/lib.rs",
-            "pyo3_pure-0.1.0+abc123de/tests/test_pyo3_pure.py",
-            "pyo3_pure-0.1.0+abc123de/tox.ini",
-        ],
+        expect![[r#"
+            {
+                "pyo3_pure-0.1.0+abc123de/Cargo.lock",
+                "pyo3_pure-0.1.0+abc123de/Cargo.toml",
+                "pyo3_pure-0.1.0+abc123de/LICENSE",
+                "pyo3_pure-0.1.0+abc123de/PKG-INFO",
+                "pyo3_pure-0.1.0+abc123de/README.md",
+                "pyo3_pure-0.1.0+abc123de/check_installed/check_installed.py",
+                "pyo3_pure-0.1.0+abc123de/pyo3_pure.pyi",
+                "pyo3_pure-0.1.0+abc123de/pyproject.toml",
+                "pyo3_pure-0.1.0+abc123de/src/lib.rs",
+                "pyo3_pure-0.1.0+abc123de/tests/test_pyo3_pure.py",
+                "pyo3_pure-0.1.0+abc123de/tox.ini",
+            }
+        "#]],
         Some((Path::new("pyo3_pure-0.1.0+abc123de/Cargo.toml"), cargo_toml)),
         "sdist-workspace-members-non-local-dep",
     ))
@@ -506,17 +508,19 @@ fn lib_with_path_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/sdist_with_path_dep",
         SdistGenerator::Cargo,
-        vec![
-            "sdist_with_path_dep-0.1.0/some_path_dep/Cargo.toml",
-            "sdist_with_path_dep-0.1.0/some_path_dep/src/lib.rs",
-            "sdist_with_path_dep-0.1.0/transitive_path_dep/Cargo.toml",
-            "sdist_with_path_dep-0.1.0/transitive_path_dep/src/lib.rs",
-            "sdist_with_path_dep-0.1.0/sdist_with_path_dep/Cargo.lock",
-            "sdist_with_path_dep-0.1.0/sdist_with_path_dep/Cargo.toml",
-            "sdist_with_path_dep-0.1.0/sdist_with_path_dep/src/lib.rs",
-            "sdist_with_path_dep-0.1.0/pyproject.toml",
-            "sdist_with_path_dep-0.1.0/PKG-INFO",
-        ],
+        expect![[r#"
+            {
+                "sdist_with_path_dep-0.1.0/PKG-INFO",
+                "sdist_with_path_dep-0.1.0/pyproject.toml",
+                "sdist_with_path_dep-0.1.0/sdist_with_path_dep/Cargo.lock",
+                "sdist_with_path_dep-0.1.0/sdist_with_path_dep/Cargo.toml",
+                "sdist_with_path_dep-0.1.0/sdist_with_path_dep/src/lib.rs",
+                "sdist_with_path_dep-0.1.0/some_path_dep/Cargo.toml",
+                "sdist_with_path_dep-0.1.0/some_path_dep/src/lib.rs",
+                "sdist_with_path_dep-0.1.0/transitive_path_dep/Cargo.toml",
+                "sdist_with_path_dep-0.1.0/transitive_path_dep/src/lib.rs",
+            }
+        "#]],
         None,
         "sdist-lib-with-path-dep",
     ))
@@ -544,17 +548,19 @@ fn lib_with_target_path_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/sdist_with_target_path_dep",
         SdistGenerator::Cargo,
-        vec![
-            "sdist_with_target_path_dep-0.1.0/some_path_dep/Cargo.toml",
-            "sdist_with_target_path_dep-0.1.0/some_path_dep/src/lib.rs",
-            "sdist_with_target_path_dep-0.1.0/transitive_path_dep/Cargo.toml",
-            "sdist_with_target_path_dep-0.1.0/transitive_path_dep/src/lib.rs",
-            "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.lock",
-            "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.toml",
-            "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/src/lib.rs",
-            "sdist_with_target_path_dep-0.1.0/pyproject.toml",
-            "sdist_with_target_path_dep-0.1.0/PKG-INFO",
-        ],
+        expect![[r#"
+            {
+                "sdist_with_target_path_dep-0.1.0/PKG-INFO",
+                "sdist_with_target_path_dep-0.1.0/pyproject.toml",
+                "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.lock",
+                "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.toml",
+                "sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/src/lib.rs",
+                "sdist_with_target_path_dep-0.1.0/some_path_dep/Cargo.toml",
+                "sdist_with_target_path_dep-0.1.0/some_path_dep/src/lib.rs",
+                "sdist_with_target_path_dep-0.1.0/transitive_path_dep/Cargo.toml",
+                "sdist_with_target_path_dep-0.1.0/transitive_path_dep/src/lib.rs",
+            }
+        "#]],
         Some((
             Path::new("sdist_with_target_path_dep-0.1.0/sdist_with_target_path_dep/Cargo.toml"),
             cargo_toml,
@@ -568,17 +574,19 @@ fn pyo3_mixed_src_layout_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-mixed-src/rust",
         SdistGenerator::Cargo,
-        vec![
-            "pyo3_mixed_src-2.1.3/pyproject.toml",
-            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/__init__.py",
-            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/__init__.py",
-            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/double.py",
-            "pyo3_mixed_src-2.1.3/src/tests/test_pyo3_mixed.py",
-            "pyo3_mixed_src-2.1.3/rust/Cargo.toml",
-            "pyo3_mixed_src-2.1.3/rust/Cargo.lock",
-            "pyo3_mixed_src-2.1.3/rust/src/lib.rs",
-            "pyo3_mixed_src-2.1.3/PKG-INFO",
-        ],
+        expect![[r#"
+            {
+                "pyo3_mixed_src-2.1.3/PKG-INFO",
+                "pyo3_mixed_src-2.1.3/pyproject.toml",
+                "pyo3_mixed_src-2.1.3/rust/Cargo.lock",
+                "pyo3_mixed_src-2.1.3/rust/Cargo.toml",
+                "pyo3_mixed_src-2.1.3/rust/src/lib.rs",
+                "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/__init__.py",
+                "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/__init__.py",
+                "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/double.py",
+                "pyo3_mixed_src-2.1.3/src/tests/test_pyo3_mixed.py",
+            }
+        "#]],
         None,
         "sdist-pyo3-mixed-src-layout",
     ))
@@ -589,23 +597,22 @@ fn pyo3_mixed_include_exclude_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-mixed-include-exclude",
         SdistGenerator::Cargo,
-        vec![
-            // "pyo3_mixed_include_exclude-2.1.3/.gitignore", // excluded
-            "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
-            "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
-            "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
-            "pyo3_mixed_include_exclude-2.1.3/README.md",
-            "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
-            // "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/exclude_this_file, excluded
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/include_this_file", // included
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",
-            "pyo3_mixed_include_exclude-2.1.3/pyproject.toml",
-            "pyo3_mixed_include_exclude-2.1.3/src/lib.rs",
-            // "pyo3_mixed_include_exclude-2.1.3/tests/test_pyo3_mixed_include_exclude.py", excluded
-            "pyo3_mixed_include_exclude-2.1.3/tox.ini",
-        ],
+        expect![[r#"
+            {
+                "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
+                "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
+                "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
+                "pyo3_mixed_include_exclude-2.1.3/README.md",
+                "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/include_this_file",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyproject.toml",
+                "pyo3_mixed_include_exclude-2.1.3/src/lib.rs",
+                "pyo3_mixed_include_exclude-2.1.3/tox.ini",
+            }
+        "#]],
         None,
         "sdist-pyo3-mixed-include-exclude",
     ))
@@ -619,23 +626,22 @@ fn pyo3_mixed_include_exclude_git_sdist_generator() {
     handle_result(other::test_source_distribution(
         "test-crates/pyo3-mixed-include-exclude",
         SdistGenerator::Git,
-        vec![
-            // "pyo3_mixed_include_exclude-2.1.3/.gitignore", // excluded
-            "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
-            "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
-            "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
-            "pyo3_mixed_include_exclude-2.1.3/README.md",
-            "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
-            // "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/exclude_this_file, excluded
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/include_this_file", // included
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
-            "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",
-            "pyo3_mixed_include_exclude-2.1.3/pyproject.toml",
-            "pyo3_mixed_include_exclude-2.1.3/src/lib.rs",
-            // "pyo3_mixed_include_exclude-2.1.3/tests/test_pyo3_mixed_include_exclude.py", excluded
-            "pyo3_mixed_include_exclude-2.1.3/tox.ini",
-        ],
+        expect![[r#"
+            {
+                "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
+                "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
+                "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
+                "pyo3_mixed_include_exclude-2.1.3/README.md",
+                "pyo3_mixed_include_exclude-2.1.3/check_installed/check_installed.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/__init__.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/include_this_file",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/__init__.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyo3_mixed_include_exclude/python_module/double.py",
+                "pyo3_mixed_include_exclude-2.1.3/pyproject.toml",
+                "pyo3_mixed_include_exclude-2.1.3/src/lib.rs",
+                "pyo3_mixed_include_exclude-2.1.3/tox.ini",
+            }
+        "#]],
         None,
         "sdist-pyo3-mixed-include-exclude-git",
     ))
@@ -665,14 +671,16 @@ fn workspace_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/workspace/py",
         SdistGenerator::Cargo,
-        vec![
-            "py-0.1.0/Cargo.toml",
-            "py-0.1.0/Cargo.lock",
-            "py-0.1.0/py/Cargo.toml",
-            "py-0.1.0/PKG-INFO",
-            "py-0.1.0/pyproject.toml",
-            "py-0.1.0/py/src/main.rs",
-        ],
+        expect![[r#"
+            {
+                "py-0.1.0/Cargo.lock",
+                "py-0.1.0/Cargo.toml",
+                "py-0.1.0/PKG-INFO",
+                "py-0.1.0/py/Cargo.toml",
+                "py-0.1.0/py/src/main.rs",
+                "py-0.1.0/pyproject.toml",
+            }
+        "#]],
         None,
         "sdist-workspace",
     ))
@@ -683,18 +691,20 @@ fn workspace_with_path_dep_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/workspace_with_path_dep/python",
         SdistGenerator::Cargo,
-        vec![
-            "workspace_with_path_dep-0.1.0/generic_lib/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/generic_lib/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/transitive_lib/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/transitive_lib/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/Cargo.lock",
-            "workspace_with_path_dep-0.1.0/python/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/python/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/pyproject.toml",
-            "workspace_with_path_dep-0.1.0/PKG-INFO",
-        ],
+        expect![[r#"
+            {
+                "workspace_with_path_dep-0.1.0/Cargo.lock",
+                "workspace_with_path_dep-0.1.0/Cargo.toml",
+                "workspace_with_path_dep-0.1.0/PKG-INFO",
+                "workspace_with_path_dep-0.1.0/generic_lib/Cargo.toml",
+                "workspace_with_path_dep-0.1.0/generic_lib/src/lib.rs",
+                "workspace_with_path_dep-0.1.0/pyproject.toml",
+                "workspace_with_path_dep-0.1.0/python/Cargo.toml",
+                "workspace_with_path_dep-0.1.0/python/src/lib.rs",
+                "workspace_with_path_dep-0.1.0/transitive_lib/Cargo.toml",
+                "workspace_with_path_dep-0.1.0/transitive_lib/src/lib.rs",
+            }
+        "#]],
         None,
         "sdist-workspace-with-path-dep",
     ))
@@ -708,12 +718,14 @@ fn workspace_with_path_dep_git_sdist_generator() {
     handle_result(other::test_source_distribution(
         "test-crates/workspace_with_path_dep/python",
         SdistGenerator::Git,
-        vec![
-            "workspace_with_path_dep-0.1.0/Cargo.toml",
-            "workspace_with_path_dep-0.1.0/pyproject.toml",
-            "workspace_with_path_dep-0.1.0/src/lib.rs",
-            "workspace_with_path_dep-0.1.0/PKG-INFO",
-        ],
+        expect![[r#"
+            {
+                "workspace_with_path_dep-0.1.0/Cargo.toml",
+                "workspace_with_path_dep-0.1.0/PKG-INFO",
+                "workspace_with_path_dep-0.1.0/pyproject.toml",
+                "workspace_with_path_dep-0.1.0/src/lib.rs",
+            }
+        "#]],
         None,
         "sdist-workspace-with-path-dep-git",
     ))
@@ -725,16 +737,18 @@ fn workspace_inheritance_sdist() {
     handle_result(other::test_source_distribution(
         "test-crates/workspace-inheritance/python",
         SdistGenerator::Cargo,
-        vec![
-            "workspace_inheritance-0.1.0/generic_lib/Cargo.toml",
-            "workspace_inheritance-0.1.0/generic_lib/src/lib.rs",
-            "workspace_inheritance-0.1.0/Cargo.toml",
-            "workspace_inheritance-0.1.0/Cargo.lock",
-            "workspace_inheritance-0.1.0/python/Cargo.toml",
-            "workspace_inheritance-0.1.0/python/src/lib.rs",
-            "workspace_inheritance-0.1.0/pyproject.toml",
-            "workspace_inheritance-0.1.0/PKG-INFO",
-        ],
+        expect![[r#"
+            {
+                "workspace_inheritance-0.1.0/Cargo.lock",
+                "workspace_inheritance-0.1.0/Cargo.toml",
+                "workspace_inheritance-0.1.0/PKG-INFO",
+                "workspace_inheritance-0.1.0/generic_lib/Cargo.toml",
+                "workspace_inheritance-0.1.0/generic_lib/src/lib.rs",
+                "workspace_inheritance-0.1.0/pyproject.toml",
+                "workspace_inheritance-0.1.0/python/Cargo.toml",
+                "workspace_inheritance-0.1.0/python/src/lib.rs",
+            }
+        "#]],
         None,
         "sdist-workspace-inheritance",
     ))

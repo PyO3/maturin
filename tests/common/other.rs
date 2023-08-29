@@ -8,7 +8,6 @@ use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::Read;
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use time::OffsetDateTime;
@@ -118,7 +117,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 pub fn test_source_distribution(
     package: impl AsRef<Path>,
     sdist_generator: SdistGenerator,
-    expected_files: Vec<&str>,
+    expected_files: Expect,
     expected_cargo_toml: Option<(&Path, Expect)>,
     unique_name: &str,
 ) -> Result<()> {
@@ -176,10 +175,7 @@ pub fn test_source_distribution(
             }
         }
     }
-    assert_eq!(
-        BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string)),
-        files
-    );
+    expected_files.assert_debug_eq(&files);
     assert_eq!(file_count, files.len(), "duplicated files found in sdist");
 
     if let Some((cargo_toml_path, expected)) = expected_cargo_toml {

@@ -150,7 +150,11 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         resolved = self._resolver.resolve(project_dir)
         if resolved is None:
             return None, False
-        logger.debug("module name %s", resolved.module_full_name)
+        logger.debug(
+            'resolved package "%s", module "%s"',
+            resolved.package_name,
+            resolved.module_full_name,
+        )
         if package_name != resolved.package_name:
             logger.debug(
                 'package name "%s" of project does not match "%s". Not importing',
@@ -185,7 +189,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
             logger.info('building "%s"', package_name)
             start = time.perf_counter()
             maturin_output = develop_build_project(
-                resolved.cargo_manifest_path, settings, skip_install=False
+                resolved.cargo_manifest_path, settings
             )
             _fix_direct_url(project_dir, package_name)
             logger.debug(
@@ -227,7 +231,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         settings: MaturinSettings,
         build_cache: LockedBuildCache,
     ) -> Tuple[Optional[ModuleSpec], Optional[str]]:
-        """Return a spec for the given module at the given search_dir if it exists and is newer than the source
+        """Return a spec for the package if it exists and is newer than the source
         code that it is derived from.
         """
         logger.debug('checking whether the package "%s" is up to date', package_name)
@@ -337,7 +341,9 @@ def _find_maturin_project_above(path: Path) -> Optional[Path]:
     return None
 
 
-def _load_dist_info(path: Path, package_name: str) -> Tuple[Optional[Path], bool]:
+def _load_dist_info(
+    path: Path, package_name: str, *, require_project_target: bool = True
+) -> Tuple[Optional[Path], bool]:
     dist_info_path = next(path.glob(f"{package_name}-*.dist-info"), None)
     if dist_info_path is None:
         return None, False
@@ -354,8 +360,8 @@ def _load_dist_info(path: Path, package_name: str) -> Tuple[Optional[Path], bool
         prefix = "file://"
         if not url.startswith(prefix):
             return None, is_editable
-        linked_path = Path(url[len(prefix) :])
-        if is_maybe_maturin_project(linked_path):
+        linked_path = Path(urllib.parse.unquote(url[len(prefix) :]))
+        if not require_project_target or is_maybe_maturin_project(linked_path):
             return linked_path, is_editable
         else:
             return None, is_editable
@@ -447,7 +453,9 @@ def _get_project_mtime(
         return max(
             path.stat().st_mtime
             for path in _get_files_in_dirs(
-                [project_dir, *all_path_dependencies], excluded_dir_names, excluded_dirs
+                itertools.chain((project_dir,), all_path_dependencies),
+                excluded_dir_names,
+                excluded_dirs,
             )
         )
     except (FileNotFoundError, ValueError):

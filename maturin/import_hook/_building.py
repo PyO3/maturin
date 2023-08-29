@@ -13,13 +13,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 
-from ._file_lock import FileLock
-from ._logging import logger
-from .settings import MaturinSettings
+from maturin.import_hook._file_lock import FileLock
+from maturin.import_hook._logging import logger
+from maturin.import_hook.settings import MaturinSettings
 
 
 @dataclass
 class BuildStatus:
+    """Information about the build of a project triggered by the import hook.
+
+    Used to decide whether a project needs to be rebuilt.
+    """
+
     build_mtime: float
     source_path: Path
     maturin_args: List[str]
@@ -92,17 +97,15 @@ class BuildCache:
 
 def _get_default_build_dir() -> Path:
     build_dir = os.environ.get("MATURIN_BUILD_DIR", None)
-    if build_dir and os.access(sys.exec_prefix, os.W_OK):
-        return Path(build_dir)
+    if build_dir:
+        shared_build_dir = Path(build_dir)
     elif os.access(sys.exec_prefix, os.W_OK):
         return Path(sys.exec_prefix) / "maturin_build_cache"
     else:
-        version_string = sys.version.split()[0]
-        interpreter_hash = hashlib.sha1(sys.exec_prefix.encode()).hexdigest()
-        return (
-            _get_cache_dir()
-            / f"maturin_build_cache/{version_string}_{interpreter_hash}"
-        )
+        shared_build_dir = _get_cache_dir() / "maturin_build_cache"
+    version_string = sys.version.split()[0]
+    interpreter_hash = hashlib.sha1(sys.exec_prefix.encode()).hexdigest()
+    return shared_build_dir / f"{version_string}_{interpreter_hash}"
 
 
 def _get_cache_dir() -> Path:
@@ -169,6 +172,8 @@ def build_wheel(
             "build",
             "--manifest-path",
             str(manifest_path),
+            "--interpreter",
+            sys.executable,
             "--out",
             str(output_dir),
             *settings.to_args(),
@@ -183,18 +188,15 @@ def build_wheel(
 def develop_build_project(
     manifest_path: Path,
     settings: MaturinSettings,
-    skip_install: bool,
 ) -> str:
-    args = ["develop", "--manifest-path", str(manifest_path)]
-    if skip_install:
-        args.append("--skip-install")
     if "develop" not in settings.supported_commands():
         msg = (
             f'provided {type(settings).__name__} does not support the "develop" command'
         )
         raise ImportError(msg)
-    args.extend(settings.to_args())
-    success, output = _run_maturin(args)
+    success, output = _run_maturin(
+        ["develop", "--manifest-path", str(manifest_path), *settings.to_args()]
+    )
     if not success:
         msg = "Failed to build package with maturin"
         raise ImportError(msg)
@@ -208,7 +210,7 @@ def _run_maturin(args: list[str]) -> Tuple[bool, str]:
         raise ImportError(msg)
     logger.debug('using maturin at: "%s"', maturin_path)
 
-    command: List[str] = [maturin_path, *args]
+    command = [maturin_path, *args]
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = result.stdout.decode()
     if result.returncode != 0:

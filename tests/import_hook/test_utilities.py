@@ -16,9 +16,12 @@ from maturin.import_hook import MaturinSettings
 from maturin.import_hook._building import BuildCache, BuildStatus
 from maturin.import_hook._file_lock import AtomicOpenLock, FileLock
 from maturin.import_hook._resolve_project import ProjectResolveError, _resolve_project
-from maturin.import_hook.project_importer import _get_installed_package_mtime, _get_project_mtime
+from maturin.import_hook.project_importer import (
+    _get_installed_package_mtime,
+    _get_project_mtime,
+    _load_dist_info,
+)
 from maturin.import_hook.settings import MaturinDevelopSettings, MaturinBuildSettings
-
 from .common import log, test_crates
 
 # set this to be able to run these tests without going through run.rs each time
@@ -388,13 +391,31 @@ def test_build_cache(tmp_path: Path) -> None:
         dir_2 = locked_cache.tmp_project_dir(tmp_path / "other_place", "my_module")
         assert dir_1 != dir_2
 
-        status1 = BuildStatus(1.2, tmp_path / "source1", [], "")
-        status2 = BuildStatus(1.2, tmp_path / "source2", [], "")
+        status1 = BuildStatus(1.2, tmp_path / "source1", ["arg1"], "output1")
+        status2 = BuildStatus(1.2, tmp_path / "source2", ["arg2"], "output2")
         locked_cache.store_build_status(status1)
         locked_cache.store_build_status(status2)
         assert locked_cache.get_build_status(tmp_path / "source1") == status1
         assert locked_cache.get_build_status(tmp_path / "source2") == status2
         assert locked_cache.get_build_status(tmp_path / "source3") is None
+
+        status1b = BuildStatus(1.3, tmp_path / "source1", ["arg1b"], "output1b")
+        locked_cache.store_build_status(status1b)
+        assert locked_cache.get_build_status(tmp_path / "source1") == status1b
+
+
+def test_load_dist_info(tmp_path: Path) -> None:
+    dist_info = tmp_path / "package_foo-1.0.0.dist-info"
+    dist_info.mkdir(parents=True)
+    (dist_info / "direct_url.json").write_text(
+        '{"dir_info": {"editable": true}, "url": "file:///tmp/some%20directory/foo"}'
+    )
+
+    linked_path, is_editable = _load_dist_info(
+        tmp_path, "package_foo", require_project_target=False
+    )
+    assert linked_path == Path("/tmp/some directory/foo")
+    assert is_editable
 
 
 def _optional_path_to_str(path: Optional[Path]) -> Optional[str]:

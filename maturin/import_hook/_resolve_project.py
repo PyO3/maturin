@@ -30,7 +30,7 @@ def is_maybe_maturin_project(project_dir: Path) -> bool:
 
 class ProjectResolver:
     def __init__(self) -> None:
-        self._resolved_project_cache: Dict[Path, MaturinProject] = {}
+        self._resolved_project_cache: Dict[Path, Optional[MaturinProject]] = {}
 
     def resolve(self, project_dir: Path) -> Optional["MaturinProject"]:
         if project_dir not in self._resolved_project_cache:
@@ -39,8 +39,7 @@ class ProjectResolver:
                 resolved = _resolve_project(project_dir)
             except ProjectResolveError as e:
                 logger.info('failed to resolve project "%s": %s', project_dir, e)
-            else:
-                self._resolved_project_cache[project_dir] = resolved
+            self._resolved_project_cache[project_dir] = resolved
         else:
             resolved = self._resolved_project_cache[project_dir]
         return resolved
@@ -190,7 +189,7 @@ def _resolve_module_name(
     module_name = cargo.get("lib", {}).get("name", None)
     if module_name is not None:
         return module_name
-    module_name = pyproject.get("project", {}).get("name")
+    module_name = pyproject.get("project", {}).get("name", None)
     if module_name is not None:
         return module_name
     return cargo.get("package", {}).get("name", None)
@@ -223,10 +222,10 @@ def _resolve_py_root(project_dir: Path, pyproject: Dict[str, Any]) -> Path:
         pyproject.get("tool", {}).get("maturin", {}).get("python-packages", [])
     )
 
-    import_name = project_name.replace("-", "_")
+    package_name = project_name.replace("-", "_")
     python_src_found = any(
         (project_dir / p / "__init__.py").is_file()
-        for p in itertools.chain((f"src/{import_name}/",), python_packages)
+        for p in itertools.chain((f"src/{package_name}/",), python_packages)
     )
     if rust_cargo_toml_found and python_src_found:
         return project_dir / "src"

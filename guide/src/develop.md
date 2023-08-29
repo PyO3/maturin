@@ -123,8 +123,8 @@ Then Python source code changes will take effect immediately.
 Starting from v0.12.4, the [Python maturin package](https://pypi.org/project/maturin/) provides
 a Python import hook to allow quickly build and load a Rust module into Python.
 
-It supports pure Rust and mixed Rust/Python project layout as well as a
-standalone `.rs` file.
+It supports importing editable-installed pure Rust and mixed Rust/Python project
+layouts as well as importing standalone `.rs` files.
 
 ```python
 from maturin import import_hook
@@ -137,7 +137,9 @@ import_hook.install()
 import pyo3_pure
 
 # when a .rs file is imported a project will be created for it in the
-# maturin build cache and the resulting library will be loaded
+# maturin build cache and the resulting library will be loaded.
+#
+# assuming subpackage/my_rust_script.rs defines a pyo3 module:
 import subpackage.my_rust_script
 ```
 

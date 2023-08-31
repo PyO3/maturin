@@ -1150,7 +1150,12 @@ fn find_interpreter_in_sysconfig(
             // Eg: -i 3.9 without interpreter kind, assume it's CPython
             (InterpreterKind::CPython, &*python)
         } else {
-            bail!("Unsupported Python interpreter: {}", python);
+            // if interpreter not known
+            if std::path::Path::new(&python).is_file() {
+                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.8' or 'pypy3.9') when cross-compiling, got path to interpreter: {}", python);
+            } else {
+                bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
+            }
         };
         if python_ver.is_empty() {
             continue;

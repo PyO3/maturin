@@ -503,29 +503,27 @@ impl BuildOptions {
 
         let mut universal2 = target_triple.as_deref() == Some("universal2-apple-darwin");
         // Also try to determine universal2 from ARCHFLAGS environment variable
-        if let Ok(arch_flags) = env::var("ARCHFLAGS") {
-            let arches: HashSet<&str> = arch_flags
-                .split("-arch")
-                .filter_map(|x| {
-                    let x = x.trim();
-                    if x.is_empty() {
-                        None
-                    } else {
-                        Some(x)
-                    }
-                })
-                .collect();
-            match (arches.contains("x86_64"), arches.contains("arm64")) {
-                (true, true) => universal2 = true,
-                (true, false) if target_triple.is_none() => {
-                    target_triple = Some("x86_64-apple-darwin".to_string())
+        if target_triple.is_none() {
+            if let Ok(arch_flags) = env::var("ARCHFLAGS") {
+                let arches: HashSet<&str> = arch_flags
+                    .split("-arch")
+                    .filter_map(|x| {
+                        let x = x.trim();
+                        if x.is_empty() {
+                            None
+                        } else {
+                            Some(x)
+                        }
+                    })
+                    .collect();
+                match (arches.contains("x86_64"), arches.contains("arm64")) {
+                    (true, true) => universal2 = true,
+                    (true, false) => target_triple = Some("x86_64-apple-darwin".to_string()),
+                    (false, true) => target_triple = Some("aarch64-apple-darwin".to_string()),
+                    (false, false) => {}
                 }
-                (false, true) if target_triple.is_none() => {
-                    target_triple = Some("aarch64-apple-darwin".to_string())
-                }
-                _ => {}
-            }
-        };
+            };
+        }
         if universal2 {
             target_triple = None;
         }

@@ -546,7 +546,7 @@ fn add_cargo_package_files_to_sdist(
 pub fn source_distribution(
     build_context: &BuildContext,
     pyproject: &PyProjectToml,
-    excludes: Option<Override>,
+    excludes: Override,
 ) -> Result<PathBuf> {
     let pyproject_toml_path = build_context
         .pyproject_toml_path

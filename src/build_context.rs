@@ -486,30 +486,33 @@ impl BuildContext {
         Ok(())
     }
 
-    fn excludes(&self, format: Format) -> Result<Option<Override>> {
+    fn excludes(&self, format: Format) -> Result<Override> {
+        let project_dir = match self.pyproject_toml_path.normalize() {
+            Ok(pyproject_toml_path) => pyproject_toml_path.into_path_buf(),
+            Err(_) => self.manifest_path.normalize()?.into_path_buf(),
+        };
+        let mut excludes = OverrideBuilder::new(project_dir.parent().unwrap());
         if let Some(pyproject) = self.pyproject_toml.as_ref() {
-            let pyproject_dir = self
-                .pyproject_toml_path
-                .normalize()
-                .with_context(|| {
-                    format!(
-                        "failed to normalize path `{}`",
-                        self.pyproject_toml_path.display()
-                    )
-                })?
-                .into_path_buf();
             if let Some(glob_patterns) = &pyproject.exclude() {
-                let mut excludes = OverrideBuilder::new(pyproject_dir.parent().unwrap());
                 for glob in glob_patterns
                     .iter()
                     .filter_map(|glob_pattern| glob_pattern.targets(format))
                 {
                     excludes.add(glob)?;
                 }
-                return Ok(Some(excludes.build()?));
             }
         }
-        Ok(None)
+        // Ignore sdist output files so that we don't include them in the sdist
+        if matches!(format, Format::Sdist) {
+            let glob_pattern = format!(
+                "{}{}{}-*.tar.gz",
+                self.out.display(),
+                std::path::MAIN_SEPARATOR,
+                &self.metadata21.get_distribution_escaped(),
+            );
+            excludes.add(&glob_pattern)?;
+        }
+        Ok(excludes.build()?)
     }
 
     /// Returns the platform part of the tag for the wheel name

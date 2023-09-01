@@ -210,7 +210,7 @@ pub struct WheelWriter {
     record: Vec<(String, String, usize)>,
     record_file: PathBuf,
     wheel_path: PathBuf,
-    excludes: Option<Override>,
+    excludes: Override,
 }
 
 impl ModuleWriter for WheelWriter {
@@ -266,7 +266,7 @@ impl WheelWriter {
         wheel_dir: &Path,
         metadata21: &Metadata21,
         tags: &[String],
-        excludes: Option<Override>,
+        excludes: Override,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
@@ -321,11 +321,7 @@ impl WheelWriter {
 
     /// Returns `true` if the given path should be excluded
     fn exclude(&self, path: impl AsRef<Path>) -> bool {
-        if let Some(excludes) = &self.excludes {
-            excludes.matched(path.as_ref(), false).is_whitelist()
-        } else {
-            false
-        }
+        self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
     /// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
@@ -375,10 +371,10 @@ impl WheelWriter {
 
 /// Creates a .tar.gz archive containing the source distribution
 pub struct SDistWriter {
-    tar: tar::Builder<GzEncoder<File>>,
+    tar: tar::Builder<GzEncoder<Vec<u8>>>,
     path: PathBuf,
     files: HashSet<PathBuf>,
-    excludes: Option<Override>,
+    excludes: Override,
 }
 
 impl ModuleWriter for SDistWriter {
@@ -423,13 +419,6 @@ impl ModuleWriter for SDistWriter {
             return Ok(());
         }
         let target = target.as_ref();
-        if source == self.path {
-            eprintln!(
-                "⚠️  Warning: Attempting to include the sdist output tarball {} into itself! Check 'cargo package --list' output.",
-                source.display()
-            );
-            return Ok(());
-        }
         if self.files.contains(target) {
             // Ignore duplicate files
             return Ok(());
@@ -453,16 +442,19 @@ impl SDistWriter {
     pub fn new(
         wheel_dir: impl AsRef<Path>,
         metadata21: &Metadata21,
-        excludes: Option<Override>,
+        excludes: Override,
     ) -> Result<Self, io::Error> {
-        let path = wheel_dir.as_ref().join(format!(
-            "{}-{}.tar.gz",
-            &metadata21.get_distribution_escaped(),
-            &metadata21.get_version_escaped()
-        ));
+        let path = wheel_dir
+            .as_ref()
+            .normalize()?
+            .join(format!(
+                "{}-{}.tar.gz",
+                &metadata21.get_distribution_escaped(),
+                &metadata21.get_version_escaped()
+            ))
+            .into_path_buf();
 
-        let tar_gz = File::create(&path)?;
-        let enc = GzEncoder::new(tar_gz, Compression::default());
+        let enc = GzEncoder::new(Vec::new(), Compression::default());
         let tar = tar::Builder::new(enc);
 
         Ok(Self {
@@ -475,16 +467,13 @@ impl SDistWriter {
 
     /// Returns `true` if the given path should be excluded
     fn exclude(&self, path: impl AsRef<Path>) -> bool {
-        if let Some(excludes) = &self.excludes {
-            excludes.matched(path.as_ref(), false).is_whitelist()
-        } else {
-            false
-        }
+        self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
     /// Finished the .tar.gz archive
-    pub fn finish(mut self) -> Result<PathBuf, io::Error> {
-        self.tar.finish()?;
+    pub fn finish(self) -> Result<PathBuf, io::Error> {
+        let archive = self.tar.into_inner()?;
+        fs::write(&self.path, archive.finish()?)?;
         Ok(self.path)
     }
 }
@@ -1299,7 +1288,7 @@ mod tests {
 
         // No excludes
         let tmp_dir = TempDir::new()?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, None)?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty())?;
         assert!(writer.files.is_empty());
         writer.add_bytes_with_permissions("test", &[], perm)?;
         assert_eq!(writer.files.len(), 1);
@@ -1311,7 +1300,7 @@ mod tests {
         let mut excludes = OverrideBuilder::new(&tmp_dir);
         excludes.add("test*")?;
         excludes.add("!test2")?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Some(excludes.build()?))?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?)?;
         writer.add_bytes_with_permissions("test1", &[], perm)?;
         writer.add_bytes_with_permissions("test3", &[], perm)?;
         assert!(writer.files.is_empty());

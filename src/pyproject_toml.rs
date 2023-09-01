@@ -350,6 +350,7 @@ mod tests {
         pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
         PyProjectToml,
     };
+    use expect_test::expect;
     use fs_err as fs;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -521,16 +522,13 @@ mod tests {
         let outer_error = PyProjectToml::new(&pyproject_toml).unwrap_err();
         let inner_error = outer_error.source().unwrap();
 
-        assert_eq!(
-            inner_error.to_string(),
-            indoc!(
-                r#"TOML parse error at line 7, column 17
-                  |
-                7 | license-files = [ "license.txt",]
-                  |                 ^^^^^^^^^^^^^^^^^
-                wanted string or table
-                "#
-            )
-        );
+        let expected = expect![[r#"
+            TOML parse error at line 7, column 17
+              |
+            7 | license-files = [ "license.txt",]
+              |                 ^^^^^^^^^^^^^^^^^
+            wanted string or table
+        "#]];
+        expected.assert_eq(&inner_error.to_string());
     }
 }

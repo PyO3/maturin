@@ -12,345 +12,125 @@ use std::process::Command;
 use std::str;
 use tracing::debug;
 
-const LOCAL_DEPENDENCIES_FOLDER: &str = "local_dependencies";
-const RUST_SRC_FOLDER: &str = "rust_src";
+/// Path dependency information.
+/// It may be in a different workspace than the root crate.
+///
+/// ```toml
+/// [dependencies]
+/// foo = { path = "path/to/foo" }
+/// ```
+#[derive(Debug, Clone)]
+struct PathDependency {
+    /// `Cargo.toml` path of the path dependency
+    manifest_path: PathBuf,
+    /// workspace root of the path dependency
+    workspace_root: PathBuf,
+    /// readme path of the path dependency
+    readme: Option<PathBuf>,
+}
 
-/// Inheritable workspace fields, see
-/// https://github.com/rust-lang/cargo/blob/13ae438cf079da58272edc71f4d4968043dbd27b/src/cargo/util/toml/mod.rs#L1140-L1158
-const WORKSPACE_INHERITABLE_FIELDS: &[&str] = &[
-    "version",
-    "authors",
-    "description",
-    "homepage",
-    "documentation",
-    "readme",
-    "keywords",
-    "categories",
-    "license",
-    "license-file",
-    "repository",
-    "publish",
-    "edition",
-    "badges",
-    "exclude",
-    "include",
-    "rust-version",
-];
+fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::Document> {
+    let text = fs::read_to_string(path)?;
+    let document = text.parse::<toml_edit::Document>().context(format!(
+        "Failed to parse {} at {}",
+        kind,
+        path.display()
+    ))?;
+    Ok(document)
+}
 
-/// We need cargo to load the local dependencies from the location where we put them in the source
-/// distribution. Since there is no cargo-backed way to replace dependencies
-/// (see https://github.com/rust-lang/cargo/issues/9170), we do a simple
-/// Cargo.toml rewrite ourselves.
-/// A big chunk of that comes from cargo edit, and esp.
-/// https://github.com/killercup/cargo-edit/blob/2a08f0311bcb61690d71d39cb9e55e69b256c8e1/src/manifest.rs
-/// This method is rather frail, but unfortunately I don't know a better solution.
+/// Rewrite Cargo.toml to only retain path dependencies that are actually used
+///
+/// We only want to add path dependencies that are actually used
+/// to reduce the size of the source distribution.
 fn rewrite_cargo_toml(
     manifest_path: impl AsRef<Path>,
-    workspace_manifest: &toml_edit::Document,
-    known_path_deps: &HashMap<String, PathBuf>,
-    local_deps_folder: String,
-    root_crate: bool,
+    known_path_deps: &HashMap<String, PathDependency>,
 ) -> Result<String> {
     let manifest_path = manifest_path.as_ref();
-    let text = fs::read_to_string(manifest_path).context(format!(
-        "Can't read Cargo.toml at {}",
-        manifest_path.display(),
-    ))?;
-    let mut document = text.parse::<toml_edit::Document>().context(format!(
-        "Failed to parse Cargo.toml at {}",
-        manifest_path.display()
-    ))?;
+    let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
 
-    let workspace = workspace_manifest.get("workspace");
-    let workspace_deps = workspace
-        .and_then(|x| x.get("dependencies"))
-        .and_then(|x| x.as_table_like());
-
-    let mut rewritten = rewrite_dependencies_path(
-        document.as_table_mut(),
-        workspace_deps,
-        manifest_path,
-        known_path_deps,
-        &local_deps_folder,
-        root_crate,
-    )?;
-    if let Some(target_specs) = document
-        .get_mut("target")
-        .and_then(|x| x.as_table_like_mut())
-    {
-        for target_spec in target_specs
-            .iter_mut()
-            .filter_map(|x| x.1.as_table_like_mut())
-        {
-            rewritten |= rewrite_dependencies_path(
-                target_spec,
-                workspace_deps,
-                manifest_path,
-                known_path_deps,
-                &local_deps_folder,
-                root_crate,
-            )?;
-        }
-    }
-
-    // Update workspace inherited metadata
-    if let Some(package) = document.get_mut("package").and_then(|x| x.as_table_mut()) {
-        let workspace_package = workspace
-            .and_then(|x| x.get("package"))
-            .and_then(|x| x.as_table_like());
-        for key in WORKSPACE_INHERITABLE_FIELDS.iter().copied() {
-            let workspace_inherited = package
-                .get(key)
-                .and_then(|x| x.get("workspace"))
-                .and_then(|x| x.as_bool())
-                .unwrap_or_default();
-            if workspace_inherited {
-                if let Some(workspace_value) = workspace_package.and_then(|ws| ws.get(key)) {
-                    package[key] = workspace_value.clone();
-                    rewritten = true;
+    // Update workspace members
+    if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut()) {
+        if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array()) {
+            if known_path_deps.is_empty() {
+                // Remove workspace members when there isn't any path dep
+                workspace.remove("members");
+                if workspace.is_empty() {
+                    // Remove workspace all together if it's empty
+                    document.remove("workspace");
                 }
-            }
-        }
-
-        // Update resolver if workspace set one
-        if let Some(resolver) = workspace.and_then(|x| x.get("resolver")) {
-            package["resolver"] = resolver.clone();
-            rewritten = true;
-        }
-    }
-
-    if root_crate {
-        // Update workspace members
-        if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut()) {
-            if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array_mut()) {
-                if known_path_deps.is_empty() {
-                    // Remove workspace members when there isn't any path dep
-                    workspace.remove("members");
-                    if workspace.is_empty() {
-                        // Remove workspace all together if it's empty
-                        document.remove("workspace");
-                    }
-                    rewritten = true;
-                } else {
-                    let mut new_members = toml_edit::Array::new();
-                    for member in members.iter() {
-                        if let toml_edit::Value::String(ref s) = member {
-                            let path = Path::new(s.value());
-                            if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
-                                if known_path_deps.contains_key(name) {
-                                    new_members.push(format!("{LOCAL_DEPENDENCIES_FOLDER}/{name}"));
+            } else {
+                let mut new_members = toml_edit::Array::new();
+                for member in members {
+                    if let toml_edit::Value::String(ref s) = member {
+                        let path = Path::new(s.value());
+                        if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
+                            // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
+                            let is_glob_pattern = name.contains(['*', '?', '[', ']']);
+                            if is_glob_pattern {
+                                let pattern = glob::Pattern::new(name).context(format!(
+                                    "Invalid `workspace.members` glob pattern: {} in {}",
+                                    name,
+                                    manifest_path.display()
+                                ))?;
+                                if known_path_deps
+                                    .keys()
+                                    .any(|path_dep| pattern.matches(path_dep))
+                                {
+                                    new_members.push(s.value());
                                 }
+                            } else if known_path_deps.contains_key(name) {
+                                new_members.push(s.value());
                             }
                         }
                     }
-                    if !new_members.is_empty() {
-                        workspace["members"] = toml_edit::value(new_members);
-                    } else {
-                        workspace.remove("members");
-                    }
-                    rewritten = true;
                 }
-            }
-        }
-    } else {
-        // Update package.workspace
-        // https://rust-lang.github.io/rfcs/1525-cargo-workspace.html#implicit-relations
-        // https://doc.rust-lang.org/cargo/reference/manifest.html#the-workspace-field
-        if let Some(package) = document.get_mut("package").and_then(|x| x.as_table_mut()) {
-            if let Some(workspace) = package.get("workspace").and_then(|x| x.as_str()) {
-                // This is enough to fix https://github.com/PyO3/maturin/issues/838
-                // Other cases can be fixed on demand
-                if workspace == ".." || workspace == "../" {
-                    package.remove("workspace");
-                    rewritten = true;
-                }
-            }
-        }
-    }
-    if rewritten {
-        Ok(document.to_string())
-    } else {
-        Ok(text)
-    }
-}
-
-fn rewrite_dependencies_path(
-    table: &mut dyn toml_edit::TableLike,
-    workspace_deps: Option<&dyn toml_edit::TableLike>,
-    manifest_path: &Path,
-    known_path_deps: &HashMap<String, PathBuf>,
-    local_deps_folder: &str,
-    root_crate: bool,
-) -> Result<bool> {
-    let mut rewritten = false;
-    //  ˇˇˇˇˇˇˇˇˇˇˇˇ dep_category
-    // [dependencies]
-    // some_path_dep = { path = "../some_path_dep" }
-    //                          ^^^^^^^^^^^^^^^^^^ table[&dep_name]["path"]
-    // ^^^^^^^^^^^^^ dep_name
-    for dep_category in ["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(dep_table) = table.get_mut(dep_category).and_then(|x| x.as_table_mut()) {
-            if dep_category == "dev-dependencies" && !known_path_deps.is_empty() {
-                // Remove dev-dependencies since building from sdist doesn't need them,
-                // Keep it when there are no path dependencies to support building from
-                // sdist with `--locked`/`--frozen`.
-                table.remove(dep_category).unwrap();
-                debug!(
-                    "Removing `dev-dependencies` from {} all together since there are no path dependencies",
-                    manifest_path.display(),
-                );
-                rewritten = true;
-                continue;
-            }
-            let dep_names: Vec<_> = dep_table.iter().map(|(key, _)| key.to_string()).collect();
-            for dep_name in dep_names {
-                let workspace_inherit = dep_table
-                    .get(&dep_name)
-                    .and_then(|x| x.get("workspace"))
-                    .and_then(|x| x.as_bool())
-                    .unwrap_or_default();
-
-                if !workspace_inherit {
-                    // There should either be no value for path, or it should be a string
-                    if dep_table
-                        .get(&dep_name)
-                        .and_then(|x| x.get("path"))
-                        .is_none()
-                    {
-                        continue;
-                    }
-                    if !dep_table[&dep_name]["path"].is_str() {
-                        bail!(
-                            "In {}, {} {} has a path value that is not a string",
-                            manifest_path.display(),
-                            dep_category,
-                            dep_name
-                        )
-                    }
-                    if !known_path_deps.contains_key(&dep_name) {
-                        bail!(
-                            "cargo metadata does not know about the path for {}.{} present in {}, \
-                            which should never happen ಠ_ಠ",
-                            dep_category,
-                            dep_name,
-                            manifest_path.display()
-                        );
-                    }
+                if !new_members.is_empty() {
+                    workspace["members"] = toml_edit::value(new_members);
                 } else {
-                    // If a workspace inherited dependency isn't a path dep,
-                    // we need to replace `workspace = true` with its full requirement spec.
-                    if !known_path_deps.contains_key(&dep_name) {
-                        if let Some(workspace_dep) = workspace_deps.and_then(|x| x.get(&dep_name)) {
-                            let mut workspace_dep = workspace_dep.clone();
-                            // Merge optional and features from the current Cargo.toml
-                            if dep_table[&dep_name].get("optional").is_some() {
-                                ensure_dep_is_inline_table(&mut workspace_dep);
-                                workspace_dep["optional"] =
-                                    dep_table[&dep_name]["optional"].clone();
-                            }
-                            if let Some(features) = dep_table[&dep_name]
-                                .get("features")
-                                .and_then(|x| x.as_array())
-                            {
-                                ensure_dep_is_inline_table(&mut workspace_dep);
-                                let existing_features = workspace_dep
-                                    .as_table_like_mut()
-                                    .unwrap()
-                                    .entry("features")
-                                    .or_insert_with(|| {
-                                        toml_edit::Item::Value(toml_edit::Array::new().into())
-                                    })
-                                    .as_array_mut()
-                                    .with_context(|| {
-                                        format!(
-                                            "In {}, {} {} has a features value that is not an array",
-                                            manifest_path.display(),
-                                            dep_category,
-                                            dep_name
-                                        )
-                                    })?;
-                                existing_features.extend(features);
-                            }
-                            // See https://github.com/toml-rs/toml/issues/594
-                            dep_table.remove(&dep_name);
-                            dep_table[&dep_name] = workspace_dep;
-                            rewritten = true;
-                        } else {
-                            bail!(
-                                "In {}, {} {} is marked as `workspace = true`, but it is found neither in \
-                                    the workspace manifest nor in the known path dependencies",
-                                manifest_path.display(),
-                                dep_category,
-                                dep_name
-                            )
-                        }
-                        continue;
-                    }
+                    workspace.remove("members");
                 }
-                // This is the location of the targeted crate in the source distribution
-                dep_table[&dep_name]["path"] = if root_crate {
-                    toml_edit::value(format!("{local_deps_folder}/{dep_name}"))
-                } else {
-                    // Cargo.toml contains relative paths, and we're already in LOCAL_DEPENDENCIES_FOLDER
-                    toml_edit::value(format!("../{dep_name}"))
-                };
-                if workspace_inherit {
-                    // Remove workspace inheritance now that we converted it into a path dependency
-                    dep_table[&dep_name]
-                        .as_table_like_mut()
-                        .unwrap()
-                        .remove("workspace");
-                }
-                rewritten = true;
             }
         }
     }
-    Ok(rewritten)
+    Ok(document.to_string())
 }
 
-/// Make sure that the dep entry is an inline table
-/// e.g. in the form of `{ version = "..." }`
-/// so that we can add entries for `optional` and `features`
-fn ensure_dep_is_inline_table(dep: &mut toml_edit::Item) {
-    if let Some(v) = dep.as_value_mut() {
-        if v.is_str() {
-            let val = std::mem::replace(v, toml_edit::Value::from(false));
-            let mut tab = toml_edit::InlineTable::new();
-            tab.insert("version", val);
-            *v = toml_edit::Value::InlineTable(tab);
-        }
-    }
-}
+/// When `pyproject.toml` is inside the Cargo workspace root,
+/// we need to update `tool.maturin.manifest-path` in `pyproject.toml`.
+fn rewrite_pyproject_toml(
+    pyproject_toml_path: &Path,
+    relative_manifest_path: &Path,
+) -> Result<String> {
+    let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
+    let tool = data
+        .entry("tool")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_like_mut()
+        .with_context(|| {
+            format!(
+                "`[tool]` must be a table in {}",
+                pyproject_toml_path.display()
+            )
+        })?;
+    let maturin = tool
+        .entry("maturin")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_like_mut()
+        .with_context(|| {
+            format!(
+                "`[tool.maturin]` must be a table in {}",
+                pyproject_toml_path.display()
+            )
+        })?;
 
-/// When `Cargo.toml` is outside of the directory containing `pyproject.toml`,
-/// we put Rust crate source to `RUST_SRC_FOLDER` and
-/// update `tool.maturin.manifest-path` in `pyproject.toml`.
-fn rewrite_pyproject_toml(pyproject_toml_path: &Path) -> Result<String> {
-    let text = fs::read_to_string(pyproject_toml_path).context(format!(
-        "Can't read pyproject.toml at {}",
-        pyproject_toml_path.display(),
-    ))?;
-    let mut data = text.parse::<toml_edit::Document>().context(format!(
-        "Failed to parse pyproject.toml at {}",
-        pyproject_toml_path.display()
-    ))?;
-    if let Some(tool) = data.get_mut("tool").and_then(|x| x.as_table_mut()) {
-        if let Some(maturin) = tool.get_mut("maturin").and_then(|x| x.as_table_mut()) {
-            if let Some(manifest_path) = maturin.get_mut("manifest-path") {
-                // original: ../$crate/Cargo.toml or ../../$crate/Cargo.toml
-                // rewrite to: $RUST_SRC_FOLDER/$crate/Cargo.toml
-                let path =
-                    Path::new(manifest_path.as_str().context(
-                        "tool.maturin.manifest-path in pyproject.toml must be a string",
-                    )?);
-                let crate_name = path.parent().unwrap().file_name().unwrap();
-                let new_path = Path::new(RUST_SRC_FOLDER)
-                    .join(crate_name)
-                    .join("Cargo.toml");
-                *manifest_path = toml_edit::value(new_path.to_str().unwrap());
-            }
-        }
-    }
+    maturin.remove("manifest-path");
+    maturin.insert(
+        "manifest-path",
+        toml_edit::value(relative_manifest_path.to_str().unwrap()),
+    );
+
     Ok(data.to_string())
 }
 
@@ -360,15 +140,12 @@ fn rewrite_pyproject_toml(pyproject_toml_path: &Path) -> Result<String> {
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
 fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
-    pyproject_toml_path: impl AsRef<Path>,
     manifest_path: impl AsRef<Path>,
-    workspace_manifest: &toml_edit::Document,
     prefix: impl AsRef<Path>,
-    known_path_deps: &HashMap<String, PathBuf>,
+    known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
-    let pyproject_toml_path = pyproject_toml_path.as_ref();
     let output = Command::new("cargo")
         .args(["package", "--list", "--allow-dirty", "--manifest-path"])
         .arg(manifest_path)
@@ -395,31 +172,13 @@ fn add_crate_to_source_distribution(
         .map(Path::new)
         .collect();
 
-    let abs_manifest_path = manifest_path
-        .normalize()
-        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
-        .into_path_buf();
-    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
-    let pyproject_dir = pyproject_toml_path.parent().unwrap();
-    let cargo_toml_in_subdir = root_crate
-        && abs_manifest_dir != pyproject_dir
-        && abs_manifest_dir.starts_with(pyproject_dir);
-
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
-    let mut target_source: Vec<(PathBuf, PathBuf)> = file_list
+    let target_source: Vec<(PathBuf, PathBuf)> = file_list
         .iter()
         .map(|relative_to_manifests| {
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
-            if root_crate && cargo_toml_in_subdir {
-                let relative_to_project_root = abs_manifest_dir
-                    .strip_prefix(pyproject_dir)
-                    .unwrap()
-                    .join(relative_to_manifests);
-                (relative_to_project_root, relative_to_cwd)
-            } else {
-                (relative_to_manifests.to_path_buf(), relative_to_cwd)
-            }
+            (relative_to_manifests.to_path_buf(), relative_to_cwd)
         })
         // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
@@ -427,6 +186,10 @@ fn add_crate_to_source_distribution(
             // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
             // and https://github.com/PyO3/maturin/issues/449
             if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+                false
+            } else if root_crate && target == Path::new("pyproject.toml") {
+                // pyproject.toml is handled separately because it has be to put in the root dir
+                // of source distribution
                 false
             } else if matches!(target.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so") {
                 // Technically, `cargo package --list` should handle this,
@@ -444,91 +207,14 @@ fn add_crate_to_source_distribution(
     let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
 
-    let mut cargo_toml_in_rust_src = false;
+    let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
 
-    if root_crate
-        && !target_source
-            .iter()
-            .any(|(target, _)| target == Path::new("pyproject.toml"))
-    {
-        // Add pyproject.toml to the source distribution
-        // `pyproject.toml` may not be included in `cargo package --list`
-        // (e.g. it's not specified in `include` or is specified in `exclude` by mistake)
-        // we check if it's the same pyproject.toml file in Cargo.toml directory
-        let pyproject_toml_in_manifest_dir =
-            same_file::is_same_file(pyproject_toml_path, abs_manifest_dir.join("pyproject.toml"))
-                .unwrap_or(false);
-        if cargo_toml_in_subdir || pyproject_toml_in_manifest_dir {
-            // if Cargo.toml is in subdirectory of pyproject.toml directory
-            target_source.push((
-                PathBuf::from("pyproject.toml"),
-                pyproject_toml_path.to_path_buf(),
-            ));
-        } else {
-            // if pyproject.toml was not included by `cargo package --list`
-            // (e.g. because it is in a parent directory)
-            // we need to add `cargo package --list` files to a subdirectory
-            // and rewrite `tool.maturin.manifest-path` in pyproject.toml
-            let crate_name = abs_manifest_dir.file_name().unwrap();
-            // check that there isn't already a $RUST_SRC_FOLDER/$crate_name/ folder in python root
-            let rust_src = Path::new(RUST_SRC_FOLDER).join(crate_name);
-            if target_source
-                .iter()
-                .any(|(target, _)| target.starts_with(&rust_src))
-            {
-                bail!(
-                    "Cannot add crate {} to source distribution because there is already a {} folder, consider rename it to avoid conflicts",
-                    crate_name.to_string_lossy(),
-                    rust_src.display(),
-                );
-            }
-            target_source.iter_mut().for_each(|(target, _)| {
-                *target = rust_src.join(&target);
-            });
-            // rewrite `tool.maturin.manifest-path` in pyproject.toml
-            let rewritten_pyproject_toml = rewrite_pyproject_toml(pyproject_toml_path)?;
-            writer.add_bytes(
-                prefix.join("pyproject.toml"),
-                rewritten_pyproject_toml.as_bytes(),
-            )?;
-            cargo_toml_in_rust_src = true;
-        }
+    if root_crate {
+        let rewritten_cargo_toml = rewrite_cargo_toml(manifest_path, known_path_deps)?;
+        writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
+    } else {
+        writer.add_file(cargo_toml_path, manifest_path)?;
     }
-
-    let cargo_toml_path = if cargo_toml_in_subdir {
-        let relative_manifest_path = abs_manifest_path.strip_prefix(pyproject_dir).unwrap();
-        prefix.join(relative_manifest_path)
-    } else if cargo_toml_in_rust_src {
-        let crate_name = abs_manifest_dir.file_name().unwrap();
-        prefix
-            .join(RUST_SRC_FOLDER)
-            .join(crate_name)
-            .join(manifest_path.file_name().unwrap())
-    } else {
-        prefix.join(manifest_path.file_name().unwrap())
-    };
-
-    let local_deps_folder = if cargo_toml_in_subdir {
-        let level = abs_manifest_dir
-            .strip_prefix(pyproject_dir)
-            .unwrap()
-            .components()
-            .count();
-        format!("{}{}", "../".repeat(level), LOCAL_DEPENDENCIES_FOLDER)
-    } else if cargo_toml_in_rust_src {
-        format!("../../{LOCAL_DEPENDENCIES_FOLDER}")
-    } else {
-        LOCAL_DEPENDENCIES_FOLDER.to_string()
-    };
-    let rewritten_cargo_toml = rewrite_cargo_toml(
-        manifest_path,
-        workspace_manifest,
-        known_path_deps,
-        local_deps_folder,
-        root_crate,
-    )?;
-
-    writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
 
     for (target, source) in target_source {
         writer.add_file(prefix.join(target), source)?;
@@ -538,10 +224,20 @@ fn add_crate_to_source_distribution(
 }
 
 /// Finds all path dependencies of the crate
-fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>> {
+fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
     let root = cargo_metadata
         .root_package()
         .context("Expected the dependency graph to have a root package")?;
+    let pkg_readmes = cargo_metadata
+        .packages
+        .iter()
+        .filter_map(|package| {
+            package
+                .readme
+                .as_ref()
+                .map(|readme| (package.name.clone(), readme.clone().into_std_path_buf()))
+        })
+        .collect::<HashMap<String, PathBuf>>();
     // scan the dependency graph for path dependencies
     let mut path_deps = HashMap::new();
     let mut stack: Vec<&cargo_metadata::Package> = vec![root];
@@ -549,18 +245,37 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathBuf>>
         for dependency in &top.dependencies {
             if let Some(path) = &dependency.path {
                 let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
-                if matches!(dependency.kind, cargo_metadata::DependencyKind::Development) {
-                    // Skip dev-only dependency
-                    debug!(
-                        "Skipping development only dependency {} ({})",
-                        dep_name, path
-                    );
+                if path_deps.contains_key(dep_name) {
                     continue;
                 }
                 // we search for the respective package by `manifest_path`, there seems
                 // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
-                path_deps.insert(dep_name.clone(), PathBuf::from(dep_manifest_path.clone()));
+                // Path dependencies may not be in the same workspace as the root crate,
+                // thus we need to find out its workspace root from `cargo metadata`
+                let path_dep_metadata = MetadataCommand::new()
+                    .manifest_path(&dep_manifest_path)
+                    .verbose(true)
+                    // We don't need to resolve the dependency graph
+                    .no_deps()
+                    .exec()
+                    .with_context(|| {
+                        format!(
+                            "Failed to resolve workspace root for {} at '{}'",
+                            dep_name, dep_manifest_path
+                        )
+                    })?;
+                path_deps.insert(
+                    dep_name.clone(),
+                    PathDependency {
+                        manifest_path: PathBuf::from(dep_manifest_path.clone()),
+                        workspace_root: path_dep_metadata
+                            .workspace_root
+                            .clone()
+                            .into_std_path_buf(),
+                        readme: pkg_readmes.get(dep_name.as_str()).cloned(),
+                    },
+                );
                 if let Some(dep_package) = cargo_metadata
                     .packages
                     .iter()
@@ -622,100 +337,143 @@ fn add_cargo_package_files_to_sdist(
     root_dir: &Path,
 ) -> Result<()> {
     let manifest_path = &build_context.manifest_path;
-    let workspace_manifest_path = build_context
-        .cargo_metadata
-        .workspace_root
-        .join("Cargo.toml");
-    let workspace_manifest: toml_edit::Document =
-        fs::read_to_string(workspace_manifest_path)?.parse()?;
+    let workspace_root = &build_context.cargo_metadata.workspace_root;
+    let workspace_manifest_path = workspace_root.join("Cargo.toml");
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+    let mut sdist_root =
+        common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path).unwrap();
+    for path_dep in known_path_deps.values() {
+        if let Some(prefix) =
+            common_path_prefix(&sdist_root, path_dep.manifest_path.parent().unwrap())
+        {
+            sdist_root = prefix;
+        } else {
+            bail!("Failed to determine common path prefix of path dependencies");
+        }
+    }
+
+    debug!("Found sdist root: {}", sdist_root.display());
 
     // Add local path dependencies
-    let mut path_dep_workspace_manifests = HashMap::new();
     for (name, path_dep) in known_path_deps.iter() {
-        // Path dependencies may not be in the same workspace as the root crate,
-        // thus we need to find out its workspace root from `cargo metadata`
-        let path_dep_metadata = MetadataCommand::new()
-            .manifest_path(path_dep)
-            .verbose(true)
-            // We don't need to resolve the dependency graph
-            .no_deps()
-            .exec()
-            .with_context(|| {
-                format!(
-                    "Cargo metadata failed for {} at '{}'",
-                    name,
-                    path_dep.display()
-                )
-            })?;
-        let path_dep_workspace_manifest =
-            if path_dep_metadata.workspace_root == build_context.cargo_metadata.workspace_root {
-                &workspace_manifest
-            } else {
-                if !path_dep_workspace_manifests.contains_key(&path_dep_metadata.workspace_root) {
-                    let manifest: toml_edit::Document =
-                        fs::read_to_string(path_dep_metadata.workspace_root.join("Cargo.toml"))?
-                            .parse()?;
-                    path_dep_workspace_manifests
-                        .insert(path_dep_metadata.workspace_root.clone(), manifest);
-                }
-                &path_dep_workspace_manifests[&path_dep_metadata.workspace_root]
-            };
+        let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
+        let relative_path_dep_manifest_dir =
+            path_dep_manifest_dir.strip_prefix(&sdist_root).unwrap();
         add_crate_to_source_distribution(
             writer,
-            pyproject_toml_path,
-            path_dep,
-            path_dep_workspace_manifest,
-            &root_dir.join(LOCAL_DEPENDENCIES_FOLDER).join(name),
+            &path_dep.manifest_path,
+            &root_dir.join(relative_path_dep_manifest_dir),
             &known_path_deps,
             false,
         )
         .context(format!(
             "Failed to add local dependency {} at {} to the source distribution",
             name,
-            path_dep.display()
+            path_dep.manifest_path.display()
         ))?;
+        // Handle possible relative readme field in Cargo.toml
+        if let Some(readme) = path_dep.readme.as_ref() {
+            let abs_readme = path_dep_manifest_dir
+                .join(readme)
+                .normalize()
+                .with_context(|| format!("failed to normalize path `{}`", readme.display()))?
+                .into_path_buf();
+            let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
+            writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+        }
+        // Handle different workspace manifest
+        if &path_dep.workspace_root != workspace_root {
+            let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
+            let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
+                .strip_prefix(&sdist_root)
+                .unwrap();
+            writer.add_file(
+                root_dir.join(relative_path_dep_workspace_manifest),
+                &path_dep_workspace_manifest,
+            )?;
+        }
     }
 
     // Add the main crate
-    add_crate_to_source_distribution(
-        writer,
-        pyproject_toml_path,
-        manifest_path,
-        &workspace_manifest,
-        root_dir,
-        &known_path_deps,
-        true,
-    )?;
-
     let abs_manifest_path = manifest_path
         .normalize()
         .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
         .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
-    let cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
-    let cargo_lock_exists = cargo_lock_path.exists();
-    let workspace_cargo_lock = build_context
-        .cargo_metadata
-        .workspace_root
-        .join("Cargo.lock");
-    let workspace_cargo_lock_exists = workspace_cargo_lock.exists();
+    let main_crate = build_context.cargo_metadata.root_package().unwrap();
+    let relative_main_crate_manifest_dir = manifest_path
+        .parent()
+        .unwrap()
+        .strip_prefix(&sdist_root)
+        .unwrap();
+    add_crate_to_source_distribution(
+        writer,
+        manifest_path,
+        root_dir.join(relative_main_crate_manifest_dir),
+        &known_path_deps,
+        true,
+    )?;
+    // Handle possible relative readme field in Cargo.toml
+    if let Some(readme) = main_crate.readme.as_ref() {
+        let abs_readme = abs_manifest_dir
+            .join(readme)
+            .normalize()
+            .with_context(|| format!("failed to normalize path `{}`", readme))?
+            .into_path_buf();
+        let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
+        writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+    }
+
+    // Add Cargo.lock file and workspace Cargo.toml
+    let manifest_cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
+    let workspace_cargo_lock = workspace_root.join("Cargo.lock").into_std_path_buf();
+    let (cargo_lock_path, use_workspace_cargo_lock) = if manifest_cargo_lock_path.exists() {
+        (Some(manifest_cargo_lock_path.clone()), false)
+    } else if workspace_cargo_lock.exists() {
+        (Some(workspace_cargo_lock), true)
+    } else {
+        (None, false)
+    };
     let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
-    if cargo_lock_required || cargo_lock_exists || workspace_cargo_lock_exists {
-        let project_root = pyproject_toml_path.parent().unwrap();
-        let relative_cargo_lock = if cargo_lock_path.starts_with(project_root) {
-            cargo_lock_path.strip_prefix(project_root).unwrap()
-        } else {
-            cargo_lock_path.strip_prefix(abs_manifest_dir).unwrap()
-        };
-        if cargo_lock_exists {
-            writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
-        } else {
-            // Fallback to workspace Cargo lock file
-            writer.add_file(root_dir.join(relative_cargo_lock), workspace_cargo_lock)?;
+    if let Some(cargo_lock_path) = cargo_lock_path {
+        let pyproject_root = pyproject_toml_path.parent().unwrap();
+        let project_root =
+            if pyproject_root == sdist_root || pyproject_root.starts_with(&sdist_root) {
+                &sdist_root
+            } else {
+                assert!(sdist_root.starts_with(pyproject_root));
+                pyproject_root
+            };
+        let relative_cargo_lock = cargo_lock_path.strip_prefix(project_root).unwrap();
+        writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
+        if use_workspace_cargo_lock {
+            let relative_workspace_cargo_toml = relative_cargo_lock.with_file_name("Cargo.toml");
+            let mut deps_to_keep = known_path_deps.clone();
+            // Also need to the main Python binding crate
+            let main_member_name = abs_manifest_dir
+                .strip_prefix(&sdist_root)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+            deps_to_keep.insert(
+                main_member_name,
+                PathDependency {
+                    manifest_path: manifest_path.clone(),
+                    workspace_root: workspace_root.clone().into_std_path_buf(),
+                    readme: None,
+                },
+            );
+            let workspace_cargo_toml = rewrite_cargo_toml(workspace_manifest_path, &deps_to_keep)?;
+            writer.add_bytes(
+                root_dir.join(relative_workspace_cargo_toml),
+                workspace_cargo_toml.as_bytes(),
+            )?;
         }
+    } else if cargo_lock_required {
+        bail!("Cargo.lock is required by `--locked`/`--frozen` but it's not found.");
     } else {
         eprintln!(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \
@@ -723,7 +481,22 @@ fn add_cargo_package_files_to_sdist(
         );
     }
 
+    // Add pyproject.toml
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
+    if pyproject_dir != sdist_root {
+        // rewrite `tool.maturin.manifest-path` in pyproject.toml
+        let rewritten_pyproject_toml = rewrite_pyproject_toml(
+            pyproject_toml_path,
+            &relative_main_crate_manifest_dir.join("Cargo.toml"),
+        )?;
+        writer.add_bytes(
+            root_dir.join("pyproject.toml"),
+            rewritten_pyproject_toml.as_bytes(),
+        )?;
+    } else {
+        writer.add_file(root_dir.join("pyproject.toml"), pyproject_toml_path)?;
+    }
+
     // Add python source files
     let mut python_packages = Vec::new();
     if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
@@ -869,4 +642,35 @@ pub fn source_distribution(
     );
 
     Ok(source_distribution_path)
+}
+
+/// Find the common prefix, if any, between two paths
+///
+/// Taken from https://docs.rs/common-path/1.0.0/src/common_path/lib.rs.html#84-109
+/// License: MIT/Apache 2.0
+fn common_path_prefix<P, Q>(one: P, two: Q) -> Option<PathBuf>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    let one = one.as_ref();
+    let two = two.as_ref();
+    let one = one.components();
+    let two = two.components();
+    let mut final_path = PathBuf::new();
+    let mut found = false;
+    let paths = one.zip(two);
+    for (l, r) in paths {
+        if l == r {
+            final_path.push(l.as_os_str());
+            found = true;
+        } else {
+            break;
+        }
+    }
+    if found {
+        Some(final_path)
+    } else {
+        None
+    }
 }

@@ -551,10 +551,10 @@ impl BuildOptions {
                 if cfg!(test) {
                     match env::var_os("MATURIN_TEST_PYTHON") {
                         Some(python) => vec![python.into()],
-                        None => vec![PathBuf::from("python3")],
+                        None => vec![target.get_python()],
                     }
                 } else {
-                    vec![PathBuf::from("python3")]
+                    vec![target.get_python()]
                 }
             } else {
                 // XXX: False positive clippy warning

@@ -742,7 +742,7 @@ fn filter_cargo_targets(
         .iter()
         .filter(|target| match bridge {
             BridgeModel::Bin(_) => {
-                let is_bin = target.kind.contains(&"bin".to_string());
+                let is_bin = target.is_bin();
                 if target.required_features.is_empty() {
                     is_bin
                 } else {

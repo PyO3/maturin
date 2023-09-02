@@ -864,28 +864,69 @@ struct UniFfiBindings {
     path: PathBuf,
 }
 
+fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
+    let manifest_path = crate_dir.join("Cargo.toml");
+    let cargo_metadata = cargo_metadata::MetadataCommand::new()
+        .manifest_path(&manifest_path)
+        // We don't need to resolve the dependency graph
+        .no_deps()
+        .verbose(true)
+        .exec()?;
+    let root_pkg = cargo_metadata.root_package().unwrap();
+    let has_uniffi_bindgen_target = root_pkg
+        .targets
+        .iter()
+        .any(|target| target.name == "uniffi-bindgen" && target.is_bin());
+    let command = if has_uniffi_bindgen_target {
+        let mut command = Command::new("cargo");
+        command.args(["run", "--bin", "uniffi-bindgen", "--manifest-path"]);
+        command.arg(manifest_path);
+        command
+    } else {
+        Command::new("uniffi-bindgen")
+    };
+    Ok(command)
+}
+
 fn generate_uniffi_bindings(
     crate_dir: &Path,
     target_dir: &Path,
     target_os: Os,
+    artifact: &Path,
 ) -> Result<UniFfiBindings> {
-    let binding_dir = target_dir.join("maturin").join("uniffi");
+    // `binding_dir` must use absolute path because we chdir to `crate_dir`
+    // when running uniffi-bindgen
+    let binding_dir = target_dir
+        .normalize()?
+        .join("maturin")
+        .join("uniffi")
+        .into_path_buf();
     fs::create_dir_all(&binding_dir)?;
 
     let pattern = crate_dir.join("src").join("*.udl");
     let udls = glob::glob(pattern.to_str().unwrap())?
         .map(|p| p.unwrap())
         .collect::<Vec<_>>();
-    if udls.is_empty() {
-        bail!("No UDL files found in {}", crate_dir.join("src").display());
+    let is_library = if udls.is_empty() {
+        true
     } else if udls.len() > 1 {
         bail!(
             "Multiple UDL files found in {}",
             crate_dir.join("src").display()
         );
+    } else {
+        false
+    };
+
+    // Disallow library mode without UDL files for now
+    // Should be removed in https://github.com/PyO3/maturin/pull/1729
+    // once uniffi release a new version
+    if is_library {
+        bail!("No UDL files found in {}", crate_dir.join("src").display());
     }
 
-    let mut cmd = Command::new("uniffi-bindgen");
+    let mut cmd = uniffi_bindgen_command(crate_dir)?;
+    cmd.current_dir(crate_dir);
     cmd.args([
         "generate",
         "--no-format",
@@ -895,7 +936,6 @@ fn generate_uniffi_bindings(
     ]);
     cmd.arg(&binding_dir);
 
-    let udl = &udls[0];
     let config_file = crate_dir.join("uniffi.toml");
     let mut cdylib_name = None;
     if config_file.is_file() {
@@ -904,10 +944,25 @@ fn generate_uniffi_bindings(
             .bindings
             .get("python")
             .and_then(|py| py.cdylib_name.clone());
-        cmd.arg("--config");
-        cmd.arg(config_file);
+        if !is_library {
+            cmd.arg("--config");
+            cmd.arg(config_file);
+        }
     }
-    cmd.arg(udl);
+
+    let py_binding_name = if is_library {
+        cmd.arg("--library");
+        cmd.arg(artifact);
+        let file_stem = artifact.file_stem().unwrap().to_str().unwrap();
+        file_stem
+            .strip_prefix("lib")
+            .unwrap_or(file_stem)
+            .to_string()
+    } else {
+        let udl = &udls[0];
+        cmd.arg(udl);
+        udl.file_stem().unwrap().to_str().unwrap().to_string()
+    };
     debug!("Running {:?}", cmd);
     let mut child = cmd.spawn().context(
         "Failed to run uniffi-bindgen, did you install it? Try `pip install uniffi-bindgen`",
@@ -917,14 +972,11 @@ fn generate_uniffi_bindings(
         bail!("Command {:?} failed", cmd);
     }
 
-    let py_binding_name = udl.file_stem().unwrap();
-    let py_binding = binding_dir.join(py_binding_name).with_extension("py");
-    let name = py_binding_name.to_str().unwrap().to_string();
-
+    let py_binding = binding_dir.join(&py_binding_name).with_extension("py");
     // uniffi bindings hardcoded the extension filenames
     let cdylib_name = match cdylib_name {
         Some(name) => name,
-        None => format!("uniffi_{name}"),
+        None => format!("uniffi_{py_binding_name}"),
     };
     let cdylib = match target_os {
         Os::Macos => format!("lib{cdylib_name}.dylib"),
@@ -933,7 +985,7 @@ fn generate_uniffi_bindings(
     };
 
     Ok(UniFfiBindings {
-        name,
+        name: py_binding_name,
         cdylib,
         path: py_binding,
     })
@@ -956,7 +1008,7 @@ pub fn write_uniffi_module(
         name: binding_name,
         cdylib,
         path: uniffi_binding,
-    } = generate_uniffi_bindings(crate_dir, target_dir, target_os)?;
+    } = generate_uniffi_bindings(crate_dir, target_dir, target_os, artifact)?;
     let py_init = format!("from .{binding_name} import *  # NOQA\n");
 
     if !editable {

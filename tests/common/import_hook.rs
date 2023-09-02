@@ -22,7 +22,10 @@ pub fn test_import_hook(
 
     let (venv_dir, python) = create_virtualenv(virtualenv_name, Some(python)).unwrap();
 
-    let pip_install_args = vec![vec!["pytest", "uniffi-bindgen", "cffi"], vec!["-e", "."]];
+    println!("installing maturin binary into virtualenv");
+    fs::copy(env!("CARGO_BIN_EXE_maturin"), venv_dir.join("bin/maturin")).unwrap();
+
+    let pip_install_args = vec![vec!["pytest", "uniffi-bindgen", "cffi"]];
     let extras: Vec<Vec<&str>> = extra_packages.into_iter().map(|name| vec![name]).collect();
     for args in pip_install_args.iter().chain(&extras) {
         if verbose {
@@ -31,10 +34,6 @@ pub fn test_import_hook(
         let status = Command::new(&python)
             .args(["-m", "pip", "install", "--disable-pip-version-check"])
             .args(args)
-            .env(
-                "MATURIN_SETUP_ARGS",
-                env::var("MATURIN_SETUP_ARGS").unwrap_or_else(|_| "--features full".to_string()),
-            )
             .status()
             .unwrap();
         if !status.success() {
@@ -45,6 +44,13 @@ pub fn test_import_hook(
     let path = env::var_os("PATH").unwrap();
     let mut paths = env::split_paths(&path).collect::<Vec<_>>();
     paths.insert(0, venv_dir.join("bin"));
+    paths.insert(
+        0,
+        Path::new(env!("CARGO_BIN_EXE_maturin"))
+            .parent()
+            .unwrap()
+            .to_path_buf(),
+    );
     let path = env::join_paths(paths).unwrap();
 
     let output = Command::new(&python)

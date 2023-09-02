@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import itertools
 from pathlib import Path
 from typing import List, Optional, Tuple, Iterable
 
@@ -17,7 +18,6 @@ verbose = True
 script_dir = Path(__file__).resolve().parent
 maturin_dir = script_dir.parent.parent
 test_crates = maturin_dir / "test-crates"
-
 
 IMPORT_HOOK_HEADER = """
 import logging
@@ -66,7 +66,9 @@ def run_python(
 
     env = os.environ
     if python_path is not None:
-        env["PYTHONPATH"] = ":".join(str(p) for p in python_path)
+        env["PYTHONPATH"] = os.pathsep.join(str(p) for p in itertools.chain(python_path, [maturin_dir]))
+    else:
+        env["PYTHONPATH"] = str(maturin_dir)
 
     cmd = [sys.executable, *args]
     try:

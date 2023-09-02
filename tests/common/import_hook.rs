@@ -22,23 +22,19 @@ pub fn test_import_hook(
 
     let (venv_dir, python) = create_virtualenv(virtualenv_name, Some(python)).unwrap();
 
-    println!("installing maturin binary into virtualenv");
-    fs::copy(env!("CARGO_BIN_EXE_maturin"), venv_dir.join("bin/maturin")).unwrap();
-
-    let pytest_args = vec![
-        vec!["pytest"],
-        vec!["uniffi-bindgen"],
-        vec!["cffi"],
-        vec!["-e", "."],
-    ];
+    let pip_install_args = vec![vec!["pytest", "uniffi-bindgen", "cffi"], vec!["-e", "."]];
     let extras: Vec<Vec<&str>> = extra_packages.into_iter().map(|name| vec![name]).collect();
-    for args in pytest_args.iter().chain(&extras) {
+    for args in pip_install_args.iter().chain(&extras) {
         if verbose {
             println!("installing {:?}", &args);
         }
         let status = Command::new(&python)
             .args(["-m", "pip", "install", "--disable-pip-version-check"])
             .args(args)
+            .env(
+                "MATURIN_SETUP_ARGS",
+                env::var("MATURIN_SETUP_ARGS").unwrap_or_else(|_| "--features full".to_string()),
+            )
             .status()
             .unwrap();
         if !status.success() {
@@ -82,6 +78,10 @@ pub fn resolve_all_packages() -> Result<String> {
         let path = path?.path();
         if path.join("pyproject.toml").exists() {
             let project_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+            if project_name == "lib_with_path_dep" {
+                // Skip lib_with_path_dep because it's used to test `--locked`
+                continue;
+            }
             resolved_packages.insert(project_name, resolve_package(&path).unwrap_or(Value::Null));
         }
     }

@@ -66,7 +66,9 @@ def run_python(
 
     env = os.environ
     if python_path is not None:
-        env["PYTHONPATH"] = os.pathsep.join(str(p) for p in itertools.chain(python_path, [maturin_dir]))
+        env["PYTHONPATH"] = os.pathsep.join(
+            str(p) for p in itertools.chain(python_path, [maturin_dir])
+        )
     else:
         env["PYTHONPATH"] = str(maturin_dir)
 

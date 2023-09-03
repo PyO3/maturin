@@ -22,9 +22,6 @@ pub fn test_import_hook(
 
     let (venv_dir, python) = create_virtualenv(virtualenv_name, Some(python)).unwrap();
 
-    println!("installing maturin binary into virtualenv");
-    fs::copy(env!("CARGO_BIN_EXE_maturin"), venv_dir.join("bin/maturin")).unwrap();
-
     let pip_install_args = vec![vec!["pytest", "uniffi-bindgen", "cffi"]];
     let extras: Vec<Vec<&str>> = extra_packages.into_iter().map(|name| vec![name]).collect();
     for args in pip_install_args.iter().chain(&extras) {

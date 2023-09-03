@@ -4,7 +4,7 @@ about: Suggest an idea for this project
 labels: [enhancement]
 ---
 
-<!-- 
+<!--
 Thank you for sharing your idea!
 
 Please describe your idea in depth. If you're not sure what to write, imagine the following:

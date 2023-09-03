@@ -21,12 +21,17 @@ The tests are intended to be run as part of the tests in `run.rs`
 which provides a clean virtual environment for these tests to use.
 """
 
-MATURIN_BUILD_CACHE = test_crates / "targets/import_hook_file_importer_build_cache"
+MATURIN_TEST_NAME = os.environ["MATURIN_TEST_NAME"]
+MATURIN_BUILD_CACHE = (
+    test_crates / f"targets/import_hook_file_importer_build_cache_{MATURIN_TEST_NAME}"
+)
 # the CI does not have enough space to keep the outputs.
 # When running locally you may set this to False for debugging
 CLEAR_WORKSPACE = True
 
-os.environ["CARGO_TARGET_DIR"] = str(test_crates / "targets/import_hook_file_importer")
+os.environ["CARGO_TARGET_DIR"] = str(
+    test_crates / f"targets/import_hook_file_importer_{MATURIN_TEST_NAME}"
+)
 os.environ["MATURIN_BUILD_DIR"] = str(MATURIN_BUILD_CACHE)
 
 

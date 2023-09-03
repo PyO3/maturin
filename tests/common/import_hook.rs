@@ -1,18 +1,18 @@
 use crate::common::{create_virtualenv, test_python_path};
 use anyhow::{bail, Result};
 use maturin::{BuildOptions, CargoOptions, Target};
+use regex::RegexBuilder;
 use serde_json;
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::{env, fs, str};
+use std::{env, fs, str, thread};
 
-pub fn test_import_hook(
+pub fn test_import_hook<'a>(
     virtualenv_name: &str,
-    test_script_path: &Path,
-    extra_packages: Vec<&str>,
-    extra_envs: BTreeMap<&str, &str>,
+    test_specifier: &str,
+    extra_packages: &[&str],
+    extra_envs: &[(&str, &str)],
     verbose: bool,
 ) -> Result<()> {
     let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
@@ -23,7 +23,7 @@ pub fn test_import_hook(
     let (venv_dir, python) = create_virtualenv(virtualenv_name, Some(python)).unwrap();
 
     let pip_install_args = vec![vec!["pytest", "uniffi-bindgen", "cffi"]];
-    let extras: Vec<Vec<&str>> = extra_packages.into_iter().map(|name| vec![name]).collect();
+    let extras: Vec<Vec<&str>> = extra_packages.into_iter().map(|name| vec![*name]).collect();
     for args in pip_install_args.iter().chain(&extras) {
         if verbose {
             println!("installing {:?}", &args);
@@ -51,10 +51,10 @@ pub fn test_import_hook(
     let path = env::join_paths(paths).unwrap();
 
     let output = Command::new(&python)
-        .args(["-m", "pytest", test_script_path.to_str().unwrap()])
+        .args(["-m", "pytest", test_specifier])
         .env("PATH", path)
         .env("VIRTUAL_ENV", venv_dir)
-        .envs(extra_envs)
+        .envs(extra_envs.iter().cloned())
         .output()
         .unwrap();
 
@@ -73,6 +73,60 @@ pub fn test_import_hook(
         )
     }
     Ok(())
+}
+
+pub fn test_import_hook_parallel(
+    virtualenv_name: &str,
+    module: &Path,
+    extra_packages: &[&str],
+    extra_envs: &[(&str, &str)],
+    verbose: bool,
+) -> Result<()> {
+    let functions = get_top_level_tests(module).unwrap();
+
+    thread::scope(|s| {
+        let mut handles = vec![];
+        for function_name in &functions {
+            let test_specifier = format!("{}::{}", module.to_str().unwrap(), function_name);
+            let virtualenv_name = format!("{virtualenv_name}_{function_name}");
+            let mut extra_envs_this_test = extra_envs.to_vec();
+            extra_envs_this_test.push(("MATURIN_TEST_NAME", function_name));
+            let handle = s.spawn(move || {
+                test_import_hook(
+                    &virtualenv_name,
+                    &test_specifier,
+                    &extra_packages,
+                    &extra_envs_this_test,
+                    verbose,
+                )
+                .unwrap()
+            });
+            handles.push(handle);
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    });
+    Ok(())
+}
+
+fn get_top_level_tests(module: &Path) -> Result<Vec<String>> {
+    let source = String::from_utf8(fs::read(module)?)?;
+    let function_pattern = RegexBuilder::new("^def (test_[^(]+)[(]")
+        .multi_line(true)
+        .build()?;
+    let class_pattern = RegexBuilder::new("^class (Test[^:]+):")
+        .multi_line(true)
+        .build()?;
+    let mut top_level_tests = vec![];
+    for pattern in [function_pattern, class_pattern] {
+        top_level_tests.extend(
+            pattern
+                .captures_iter(&source)
+                .map(|c| c.get(1).unwrap().as_str().to_owned()),
+        )
+    }
+    Ok(top_level_tests)
 }
 
 pub fn resolve_all_packages() -> Result<String> {

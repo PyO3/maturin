@@ -197,7 +197,7 @@ def _resolve_module_name(
 
 def _get_immediate_path_dependencies(
     project_dir: Path, cargo: Dict[str, Any]
-) -> list[Path]:
+) -> List[Path]:
     path_dependencies = []
     for dependency in cargo.get("dependencies", {}).values():
         if isinstance(dependency, dict):

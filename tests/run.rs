@@ -3,14 +3,13 @@
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use indoc::indoc;
+use expect_test::expect;
 use time::macros::datetime;
 use which::which;
 
 use common::{
     develop, errors, get_python_implementation, handle_result, integration, other, test_python_path,
 };
-use expect_test::expect;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::Target;
 

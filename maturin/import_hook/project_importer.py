@@ -11,7 +11,7 @@ import urllib.parse
 from importlib.machinery import ModuleSpec, PathFinder
 from pathlib import Path
 from types import ModuleType
-from typing import Iterable, Optional, Sequence, Set, Tuple, Union
+from typing import Iterable, Optional, Sequence, Set, Tuple, Union, List
 
 from maturin.import_hook._building import (
     BuildCache,
@@ -439,7 +439,7 @@ def _get_installed_package_mtime(
 
 def _get_project_mtime(
     project_dir: Path,
-    all_path_dependencies: list[Path],
+    all_path_dependencies: List[Path],
     installed_package_root: Path,
     excluded_dir_names: Set[str],
 ) -> Optional[float]:
@@ -463,7 +463,7 @@ def _get_project_mtime(
 
 def _package_is_up_to_date(
     project_dir: Path,
-    all_path_dependencies: list[Path],
+    all_path_dependencies: List[Path],
     installed_package_root: Path,
     installed_package_mtime: float,
     excluded_dir_names: Set[str],

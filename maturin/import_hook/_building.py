@@ -192,7 +192,7 @@ def develop_build_project(
     return output
 
 
-def run_maturin(args: list[str]) -> Tuple[bool, str]:
+def run_maturin(args: List[str]) -> Tuple[bool, str]:
     maturin_path = shutil.which("maturin")
     if maturin_path is None:
         msg = "maturin not found in the PATH"

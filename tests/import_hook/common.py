@@ -40,7 +40,7 @@ def with_underscores(project_name: str) -> str:
     return project_name.replace("-", "_")
 
 
-def all_test_crate_names() -> list[str]:
+def all_test_crate_names() -> List[str]:
     return sorted(
         p.name
         for p in test_crates.iterdir()
@@ -50,7 +50,7 @@ def all_test_crate_names() -> list[str]:
     )
 
 
-def mixed_test_crate_names() -> list[str]:
+def mixed_test_crate_names() -> List[str]:
     return [name for name in all_test_crate_names() if "mixed" in name]
 
 
@@ -115,7 +115,7 @@ def run_python_code(
     *,
     args: Optional[List[str]] = None,
     cwd: Optional[Path] = None,
-    python_path: Optional[list[Path]] = None,
+    python_path: Optional[List[Path]] = None,
     quiet: bool = False,
     expect_error: bool = False,
 ) -> Tuple[str, float]:

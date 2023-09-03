@@ -1,3 +1,4 @@
+import itertools
 import os
 import re
 import shutil
@@ -6,9 +7,8 @@ import subprocess
 import sys
 import tempfile
 import time
-import itertools
 from pathlib import Path
-from typing import List, Optional, Tuple, Iterable
+from typing import Iterable, List, Optional, Tuple
 
 from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_info
 
@@ -211,7 +211,7 @@ def get_project_copy(project_dir: Path, output_path: Path) -> Path:
 
 
 def _get_relative_files_tracked_by_git(root: Path) -> Iterable[Path]:
-    """this is used to ignore built artifacts to create a clean copy"""
+    """This is used to ignore built artifacts to create a clean copy."""
     output = subprocess.check_output(
         ["git", "ls-tree", "--name-only", "-z", "-r", "HEAD"], cwd=root
     )
@@ -246,7 +246,7 @@ def create_project_from_blank_template(
 
 
 def remove_ansii_escape_characters(text: str) -> str:
-    """Remove escape characters (eg used to color terminal output) from the given string
+    """Remove escape characters (eg used to color terminal output) from the given string.
 
     based on: https://stackoverflow.com/a/14693789
     """

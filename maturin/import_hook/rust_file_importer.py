@@ -46,7 +46,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         self._show_warnings = show_warnings
 
     def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
-        """this method can be overridden in subclasses to customize settings for specific projects"""
+        """This method can be overridden in subclasses to customize settings for specific projects."""
         return (
             self._settings if self._settings is not None else MaturinSettings.default()
         )
@@ -58,7 +58,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         rust_file: Path,
         settings: MaturinSettings,
     ) -> Path:
-        """this method can be overridden in subclasses to customize project generation"""
+        """This method can be overridden in subclasses to customize project generation."""
         if project_dir.exists():
             shutil.rmtree(project_dir)
 

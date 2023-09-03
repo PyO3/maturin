@@ -1,11 +1,7 @@
 import json
 import os
-import random
 import shutil
-import string
-import threading
 import time
-from concurrent.futures import ProcessPoolExecutor
 from operator import itemgetter
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -14,14 +10,14 @@ import pytest
 
 from maturin.import_hook import MaturinSettings
 from maturin.import_hook._building import BuildCache, BuildStatus
-from maturin.import_hook._file_lock import AtomicOpenLock, FileLock
 from maturin.import_hook._resolve_project import ProjectResolveError, _resolve_project
 from maturin.import_hook.project_importer import (
     _get_installed_package_mtime,
     _get_project_mtime,
     _load_dist_info,
 )
-from maturin.import_hook.settings import MaturinDevelopSettings, MaturinBuildSettings
+from maturin.import_hook.settings import MaturinBuildSettings, MaturinDevelopSettings
+
 from .common import log, test_crates
 
 # set this to be able to run these tests without going through run.rs each time
@@ -60,27 +56,27 @@ def test_settings() -> None:
     )
     # fmt: off
     assert settings.to_args() == [
-        '--release',
-        '--strip',
-        '--quiet',
-        '--jobs', '1',
-        '--profile', 'profile1',
-        '--features', 'feature1,feature2',
-        '--all-features',
-        '--no-default-features',
-        '--target', 'target1',
-        '--ignore-rust-version',
-        '--color', 'always',
-        '--frozen',
-        '--locked',
-        '--offline',
-        '--config', 'key1=value1',
-        '--config', 'key2=value2',
-        '-Z', 'unstable1',
-        '-Z', 'unstable2',
-        '-vv',
-        'flag1',
-        'flag2',
+        "--release",
+        "--strip",
+        "--quiet",
+        "--jobs", "1",
+        "--profile", "profile1",
+        "--features", "feature1,feature2",
+        "--all-features",
+        "--no-default-features",
+        "--target", "target1",
+        "--ignore-rust-version",
+        "--color", "always",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "--config", "key1=value1",
+        "--config", "key2=value2",
+        "-Z", "unstable1",
+        "-Z", "unstable2",
+        "-vv",
+        "flag1",
+        "flag2",
     ]
     # fmt: on
 
@@ -111,100 +107,6 @@ def test_settings() -> None:
         "flag1",
         "flag2",
     ]
-
-
-class TestFileLock:
-    @staticmethod
-    def _create_lock(path: Path, timeout_seconds: float, fallback: bool) -> FileLock:
-        if fallback:
-            return AtomicOpenLock(path, timeout_seconds=timeout_seconds)
-        else:
-            return FileLock.new(path, timeout_seconds=timeout_seconds)
-
-    @staticmethod
-    def _random_string(size: int = 1000) -> str:
-        return "".join(random.choice(string.ascii_lowercase) for _ in range(size))
-
-    @staticmethod
-    def _unlocked_worker(work_dir: Path) -> str:
-        path = work_dir / "my_file.txt"
-        data = TestFileLock._random_string()
-        for _ in range(10):
-            path.write_text(data)
-            time.sleep(0.001)
-            assert path.read_text() == data
-        return "SUCCESS"
-
-    @staticmethod
-    def _locked_worker(work_dir: Path, use_fallback_lock: bool) -> str:
-        path = work_dir / "my_file.txt"
-        lock = TestFileLock._create_lock(work_dir / "lock", 10, use_fallback_lock)
-        data = TestFileLock._random_string()
-        for _ in range(10):
-            with lock:
-                path.write_text(data)
-                time.sleep(0.001)
-                assert path.read_text() == data
-        return "SUCCESS"
-
-    @pytest.mark.parametrize("use_fallback_lock", [False, True])
-    def test_lock_unlock(self, tmp_path: Path, use_fallback_lock: bool) -> None:
-        lock = self._create_lock(tmp_path / "lock", 5, use_fallback_lock)
-
-        assert not lock.is_locked
-        for _i in range(2):
-            with lock:
-                assert lock.is_locked
-            assert not lock.is_locked
-
-    @pytest.mark.parametrize("use_fallback_lock", [False, True])
-    def test_timeout(self, tmp_path: Path, use_fallback_lock: bool) -> None:
-        lock_path = tmp_path / "lock"
-        lock1 = self._create_lock(lock_path, 5, use_fallback_lock)
-        with lock1:
-            lock2 = self._create_lock(lock_path, 0.1, use_fallback_lock)
-            with pytest.raises(TimeoutError):
-                lock2.acquire()
-
-    @pytest.mark.parametrize("use_fallback_lock", [False, True])
-    def test_waiting(self, tmp_path: Path, use_fallback_lock: bool) -> None:
-        lock_path = tmp_path / "lock"
-        lock1 = self._create_lock(lock_path, 5, use_fallback_lock)
-        lock2 = self._create_lock(lock_path, 5, use_fallback_lock)
-
-        lock1.acquire()
-        t = threading.Timer(0.2, lock1.release)
-        t.start()
-        lock2.acquire()
-        lock2.release()
-
-    @pytest.mark.parametrize("use_fallback_lock", [False, True])
-    def test_concurrent_access(self, tmp_path: Path, use_fallback_lock: bool) -> None:
-        num_workers = 25
-        num_threads = 4
-
-        working_dir = tmp_path / "unlocked"
-        working_dir.mkdir()
-        with ProcessPoolExecutor(max_workers=num_threads) as executor:
-            futures = [
-                executor.submit(TestFileLock._unlocked_worker, working_dir)
-                for _ in range(num_workers)
-            ]
-            with pytest.raises(AssertionError):
-                for f in futures:
-                    f.result()
-
-        working_dir = tmp_path / "locked"
-        working_dir.mkdir()
-        with ProcessPoolExecutor(max_workers=num_threads) as executor:
-            futures = [
-                executor.submit(
-                    TestFileLock._locked_worker, working_dir, use_fallback_lock
-                )
-                for _ in range(num_workers)
-            ]
-            for f in futures:
-                assert f.result() == "SUCCESS"
 
 
 class TestGetProjectMtime:

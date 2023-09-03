@@ -75,7 +75,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         )
 
     def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
-        """this method can be overridden in subclasses to customize settings for specific projects"""
+        """This method can be overridden in subclasses to customize settings for specific projects."""
         return (
             self._settings if self._settings is not None else MaturinSettings.default()
         )

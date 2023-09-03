@@ -17,13 +17,13 @@ from .common import (
     is_installed_correctly,
     log,
     mixed_test_crate_names,
+    remove_ansii_escape_characters,
     run_python,
     run_python_code,
     script_dir,
     test_crates,
     uninstall,
     with_underscores,
-    remove_ansii_escape_characters,
 )
 
 """

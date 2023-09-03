@@ -3,16 +3,16 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Tuple, Generator
+from typing import Generator, Tuple
 
 import pytest
 
 from .common import (
     log,
+    remove_ansii_escape_characters,
     run_python,
     script_dir,
     test_crates,
-    remove_ansii_escape_characters,
 )
 
 """
@@ -52,7 +52,7 @@ def workspace(tmp_path: Path) -> Generator[Path, None, None]:
 
 
 def test_absolute_import(workspace: Path) -> None:
-    """test imports of the form `import ab.cd.ef`"""
+    """Test imports of the form `import ab.cd.ef`."""
     _clear_build_cache()
 
     helper_path = script_dir / "rust_file_import/absolute_import_helper.py"
@@ -71,7 +71,7 @@ def test_absolute_import(workspace: Path) -> None:
 
 
 def test_relative_import() -> None:
-    """test imports of the form `from .ab import cd`"""
+    """Test imports of the form `from .ab import cd`."""
     _clear_build_cache()
 
     output1, duration1 = run_python(
@@ -92,7 +92,7 @@ def test_relative_import() -> None:
 
 
 def test_top_level_import(workspace: Path) -> None:
-    """test imports of the form `import ab`"""
+    """Test imports of the form `import ab`."""
     _clear_build_cache()
 
     helper_path = script_dir / "rust_file_import/packages/top_level_import_helper.py"
@@ -111,7 +111,7 @@ def test_top_level_import(workspace: Path) -> None:
 
 
 def test_multiple_imports(workspace: Path) -> None:
-    """test importing the same rs file multiple times by different names in the same session"""
+    """Test importing the same rs file multiple times by different names in the same session."""
     _clear_build_cache()
 
     helper_path = script_dir / "rust_file_import/multiple_import_helper.py"
@@ -123,7 +123,7 @@ def test_multiple_imports(workspace: Path) -> None:
 
 
 def test_concurrent_import() -> None:
-    """test multiple processes attempting to import the same modules at the same time"""
+    """Test multiple processes attempting to import the same modules at the same time."""
     _clear_build_cache()
     args = {
         "args": ["rust_file_import/concurrent_import_helper.py"],
@@ -166,7 +166,7 @@ def test_concurrent_import() -> None:
 
 
 def test_rebuild_on_change(workspace: Path) -> None:
-    """test that modules are rebuilt if they are edited"""
+    """Test that modules are rebuilt if they are edited."""
     _clear_build_cache()
 
     script_path = workspace / "my_script.rs"
@@ -196,7 +196,7 @@ def test_rebuild_on_change(workspace: Path) -> None:
 
 
 def test_rebuild_on_settings_change(workspace: Path) -> None:
-    """test that modules are rebuilt if the settings (eg maturin flags) used by the import hook changes"""
+    """Test that modules are rebuilt if the settings (eg maturin flags) used by the import hook changes."""
     _clear_build_cache()
 
     script_path = workspace / "my_script.rs"

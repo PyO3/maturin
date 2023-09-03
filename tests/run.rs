@@ -774,8 +774,8 @@ fn import_hook_project_importer() {
     handle_result(import_hook::test_import_hook(
         "import_hook_project_importer",
         "tests/import_hook/test_project_importer.py",
-        &vec!["boltons"],
-        &vec![("MATURIN_TEST_NAME", "ALL")],
+        &["boltons"],
+        &[("MATURIN_TEST_NAME", "ALL")],
         true,
     ));
 }
@@ -785,8 +785,8 @@ fn import_hook_project_importer_parallel() {
     handle_result(import_hook::test_import_hook_parallel(
         "import_hook_project_importer",
         &PathBuf::from("tests/import_hook/test_project_importer.py"),
-        &vec!["boltons"],
-        &vec![],
+        &["boltons"],
+        &[],
         true,
     ));
 }
@@ -797,8 +797,8 @@ fn import_hook_rust_file_importer() {
     handle_result(import_hook::test_import_hook(
         "import_hook_rust_file_importer",
         "tests/import_hook/test_rust_file_importer.py",
-        &vec![],
-        &vec![("MATURIN_TEST_NAME", "ALL")],
+        &[],
+        &[("MATURIN_TEST_NAME", "ALL")],
         true,
     ));
 }
@@ -808,8 +808,8 @@ fn import_hook_rust_file_importer_parallel() {
     handle_result(import_hook::test_import_hook_parallel(
         "import_hook_rust_file_importer",
         &PathBuf::from("tests/import_hook/test_rust_file_importer.py"),
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         true,
     ));
 }
@@ -826,8 +826,8 @@ fn import_hook_utilities() {
     handle_result(import_hook::test_import_hook(
         "import_hook_utilities",
         "tests/import_hook/test_utilities.py",
-        &vec![],
-        &vec![(
+        &[],
+        &[(
             "RESOLVED_PACKAGES_PATH",
             resolved_packages_path.to_str().unwrap(),
         )],

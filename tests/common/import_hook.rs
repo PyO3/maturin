@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs, str, thread};
 
-pub fn test_import_hook<'a>(
+pub fn test_import_hook(
     virtualenv_name: &str,
     test_specifier: &str,
     extra_packages: &[&str],
@@ -29,7 +29,13 @@ pub fn test_import_hook<'a>(
             println!("installing {package_name}");
         }
         let status = Command::new(&python)
-            .args(["-m", "pip", "install", "--disable-pip-version-check", package_name])
+            .args([
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                package_name,
+            ])
             .status()
             .unwrap();
         if !status.success() {
@@ -94,7 +100,7 @@ pub fn test_import_hook_parallel(
                 test_import_hook(
                     &virtualenv_name,
                     &test_specifier,
-                    &extra_packages,
+                    extra_packages,
                     &extra_envs_this_test,
                     verbose,
                 )

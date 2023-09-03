@@ -4,9 +4,10 @@ import os
 import sys
 from pathlib import Path
 import sysconfig
+from typing import Optional
 
 
-def get_maturin_path() -> Path | None:
+def get_maturin_path() -> Optional[Path]:
     SCRIPT_NAME = "maturin"
 
     def script_dir(scheme: str) -> str:

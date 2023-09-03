@@ -503,29 +503,27 @@ impl BuildOptions {
 
         let mut universal2 = target_triple.as_deref() == Some("universal2-apple-darwin");
         // Also try to determine universal2 from ARCHFLAGS environment variable
-        if let Ok(arch_flags) = env::var("ARCHFLAGS") {
-            let arches: HashSet<&str> = arch_flags
-                .split("-arch")
-                .filter_map(|x| {
-                    let x = x.trim();
-                    if x.is_empty() {
-                        None
-                    } else {
-                        Some(x)
-                    }
-                })
-                .collect();
-            match (arches.contains("x86_64"), arches.contains("arm64")) {
-                (true, true) => universal2 = true,
-                (true, false) if target_triple.is_none() => {
-                    target_triple = Some("x86_64-apple-darwin".to_string())
+        if target_triple.is_none() {
+            if let Ok(arch_flags) = env::var("ARCHFLAGS") {
+                let arches: HashSet<&str> = arch_flags
+                    .split("-arch")
+                    .filter_map(|x| {
+                        let x = x.trim();
+                        if x.is_empty() {
+                            None
+                        } else {
+                            Some(x)
+                        }
+                    })
+                    .collect();
+                match (arches.contains("x86_64"), arches.contains("arm64")) {
+                    (true, true) => universal2 = true,
+                    (true, false) => target_triple = Some("x86_64-apple-darwin".to_string()),
+                    (false, true) => target_triple = Some("aarch64-apple-darwin".to_string()),
+                    (false, false) => {}
                 }
-                (false, true) if target_triple.is_none() => {
-                    target_triple = Some("aarch64-apple-darwin".to_string())
-                }
-                _ => {}
-            }
-        };
+            };
+        }
         if universal2 {
             target_triple = None;
         }
@@ -553,10 +551,10 @@ impl BuildOptions {
                 if cfg!(test) {
                     match env::var_os("MATURIN_TEST_PYTHON") {
                         Some(python) => vec![python.into()],
-                        None => vec![PathBuf::from("python3")],
+                        None => vec![target.get_python()],
                     }
                 } else {
-                    vec![PathBuf::from("python3")]
+                    vec![target.get_python()]
                 }
             } else {
                 // XXX: False positive clippy warning
@@ -744,7 +742,7 @@ fn filter_cargo_targets(
         .iter()
         .filter(|target| match bridge {
             BridgeModel::Bin(_) => {
-                let is_bin = target.kind.contains(&"bin".to_string());
+                let is_bin = target.is_bin();
                 if target.required_features.is_empty() {
                     is_bin
                 } else {
@@ -1150,7 +1148,12 @@ fn find_interpreter_in_sysconfig(
             // Eg: -i 3.9 without interpreter kind, assume it's CPython
             (InterpreterKind::CPython, &*python)
         } else {
-            bail!("Unsupported Python interpreter: {}", python);
+            // if interpreter not known
+            if std::path::Path::new(&python).is_file() {
+                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.8' or 'pypy3.9') when cross-compiling, got path to interpreter: {}", python);
+            } else {
+                bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
+            }
         };
         if python_ver.is_empty() {
             continue;

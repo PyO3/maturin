@@ -388,6 +388,7 @@ suppress_build_script_link_lines=false"#,
 #[cfg(test)]
 mod test {
     use super::*;
+    use expect_test::expect;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -712,7 +713,15 @@ mod test {
         )
         .unwrap();
         let config_file = sysconfig.pyo3_config_file();
-        assert_eq!(config_file, "implementation=CPython\nversion=3.10\nshared=true\nabi3=false\nbuild_flags=WITH_THREAD\nsuppress_build_script_link_lines=false\npointer_width=64");
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.10
+            shared=true
+            abi3=false
+            build_flags=WITH_THREAD
+            suppress_build_script_link_lines=false
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
     }
 
     #[test]
@@ -725,6 +734,14 @@ mod test {
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-311-x86_64-linux-musl.so");
         let config_file = sysconfig.pyo3_config_file();
-        assert_eq!(config_file, "implementation=CPython\nversion=3.11\nshared=true\nabi3=false\nbuild_flags=WITH_THREAD\nsuppress_build_script_link_lines=false\npointer_width=64");
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.11
+            shared=true
+            abi3=false
+            build_flags=WITH_THREAD
+            suppress_build_script_link_lines=false
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
     }
 }

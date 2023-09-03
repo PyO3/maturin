@@ -1,6 +1,3 @@
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
-
-[tool.maturin]
-manifest-path = "python/Cargo.toml"

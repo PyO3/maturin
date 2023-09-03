@@ -210,7 +210,7 @@ pub struct WheelWriter {
     record: Vec<(String, String, usize)>,
     record_file: PathBuf,
     wheel_path: PathBuf,
-    excludes: Option<Override>,
+    excludes: Override,
 }
 
 impl ModuleWriter for WheelWriter {
@@ -266,7 +266,7 @@ impl WheelWriter {
         wheel_dir: &Path,
         metadata21: &Metadata21,
         tags: &[String],
-        excludes: Option<Override>,
+        excludes: Override,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
@@ -321,11 +321,7 @@ impl WheelWriter {
 
     /// Returns `true` if the given path should be excluded
     fn exclude(&self, path: impl AsRef<Path>) -> bool {
-        if let Some(excludes) = &self.excludes {
-            excludes.matched(path.as_ref(), false).is_whitelist()
-        } else {
-            false
-        }
+        self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
     /// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
@@ -375,10 +371,10 @@ impl WheelWriter {
 
 /// Creates a .tar.gz archive containing the source distribution
 pub struct SDistWriter {
-    tar: tar::Builder<GzEncoder<File>>,
+    tar: tar::Builder<GzEncoder<Vec<u8>>>,
     path: PathBuf,
     files: HashSet<PathBuf>,
-    excludes: Option<Override>,
+    excludes: Override,
 }
 
 impl ModuleWriter for SDistWriter {
@@ -423,13 +419,6 @@ impl ModuleWriter for SDistWriter {
             return Ok(());
         }
         let target = target.as_ref();
-        if source == self.path {
-            eprintln!(
-                "⚠️  Warning: Attempting to include the sdist output tarball {} into itself! Check 'cargo package --list' output.",
-                source.display()
-            );
-            return Ok(());
-        }
         if self.files.contains(target) {
             // Ignore duplicate files
             return Ok(());
@@ -453,16 +442,19 @@ impl SDistWriter {
     pub fn new(
         wheel_dir: impl AsRef<Path>,
         metadata21: &Metadata21,
-        excludes: Option<Override>,
+        excludes: Override,
     ) -> Result<Self, io::Error> {
-        let path = wheel_dir.as_ref().join(format!(
-            "{}-{}.tar.gz",
-            &metadata21.get_distribution_escaped(),
-            &metadata21.get_version_escaped()
-        ));
+        let path = wheel_dir
+            .as_ref()
+            .normalize()?
+            .join(format!(
+                "{}-{}.tar.gz",
+                &metadata21.get_distribution_escaped(),
+                &metadata21.get_version_escaped()
+            ))
+            .into_path_buf();
 
-        let tar_gz = File::create(&path)?;
-        let enc = GzEncoder::new(tar_gz, Compression::default());
+        let enc = GzEncoder::new(Vec::new(), Compression::default());
         let tar = tar::Builder::new(enc);
 
         Ok(Self {
@@ -475,16 +467,13 @@ impl SDistWriter {
 
     /// Returns `true` if the given path should be excluded
     fn exclude(&self, path: impl AsRef<Path>) -> bool {
-        if let Some(excludes) = &self.excludes {
-            excludes.matched(path.as_ref(), false).is_whitelist()
-        } else {
-            false
-        }
+        self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
     /// Finished the .tar.gz archive
-    pub fn finish(mut self) -> Result<PathBuf, io::Error> {
-        self.tar.finish()?;
+    pub fn finish(self) -> Result<PathBuf, io::Error> {
+        let archive = self.tar.into_inner()?;
+        fs::write(&self.path, archive.finish()?)?;
         Ok(self.path)
     }
 }
@@ -875,28 +864,69 @@ struct UniFfiBindings {
     path: PathBuf,
 }
 
+fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
+    let manifest_path = crate_dir.join("Cargo.toml");
+    let cargo_metadata = cargo_metadata::MetadataCommand::new()
+        .manifest_path(&manifest_path)
+        // We don't need to resolve the dependency graph
+        .no_deps()
+        .verbose(true)
+        .exec()?;
+    let root_pkg = cargo_metadata.root_package().unwrap();
+    let has_uniffi_bindgen_target = root_pkg
+        .targets
+        .iter()
+        .any(|target| target.name == "uniffi-bindgen" && target.is_bin());
+    let command = if has_uniffi_bindgen_target {
+        let mut command = Command::new("cargo");
+        command.args(["run", "--bin", "uniffi-bindgen", "--manifest-path"]);
+        command.arg(manifest_path);
+        command
+    } else {
+        Command::new("uniffi-bindgen")
+    };
+    Ok(command)
+}
+
 fn generate_uniffi_bindings(
     crate_dir: &Path,
     target_dir: &Path,
     target_os: Os,
+    artifact: &Path,
 ) -> Result<UniFfiBindings> {
-    let binding_dir = target_dir.join("maturin").join("uniffi");
+    // `binding_dir` must use absolute path because we chdir to `crate_dir`
+    // when running uniffi-bindgen
+    let binding_dir = target_dir
+        .normalize()?
+        .join("maturin")
+        .join("uniffi")
+        .into_path_buf();
     fs::create_dir_all(&binding_dir)?;
 
     let pattern = crate_dir.join("src").join("*.udl");
     let udls = glob::glob(pattern.to_str().unwrap())?
         .map(|p| p.unwrap())
         .collect::<Vec<_>>();
-    if udls.is_empty() {
-        bail!("No UDL files found in {}", crate_dir.join("src").display());
+    let is_library = if udls.is_empty() {
+        true
     } else if udls.len() > 1 {
         bail!(
             "Multiple UDL files found in {}",
             crate_dir.join("src").display()
         );
+    } else {
+        false
+    };
+
+    // Disallow library mode without UDL files for now
+    // Should be removed in https://github.com/PyO3/maturin/pull/1729
+    // once uniffi release a new version
+    if is_library {
+        bail!("No UDL files found in {}", crate_dir.join("src").display());
     }
 
-    let mut cmd = Command::new("uniffi-bindgen");
+    let mut cmd = uniffi_bindgen_command(crate_dir)?;
+    cmd.current_dir(crate_dir);
     cmd.args([
         "generate",
         "--no-format",
@@ -906,7 +936,6 @@ fn generate_uniffi_bindings(
     ]);
     cmd.arg(&binding_dir);
 
-    let udl = &udls[0];
     let config_file = crate_dir.join("uniffi.toml");
     let mut cdylib_name = None;
     if config_file.is_file() {
@@ -915,10 +944,25 @@ fn generate_uniffi_bindings(
             .bindings
             .get("python")
             .and_then(|py| py.cdylib_name.clone());
-        cmd.arg("--config");
-        cmd.arg(config_file);
+        if !is_library {
+            cmd.arg("--config");
+            cmd.arg(config_file);
+        }
     }
-    cmd.arg(udl);
+
+    let py_binding_name = if is_library {
+        cmd.arg("--library");
+        cmd.arg(artifact);
+        let file_stem = artifact.file_stem().unwrap().to_str().unwrap();
+        file_stem
+            .strip_prefix("lib")
+            .unwrap_or(file_stem)
+            .to_string()
+    } else {
+        let udl = &udls[0];
+        cmd.arg(udl);
+        udl.file_stem().unwrap().to_str().unwrap().to_string()
+    };
     debug!("Running {:?}", cmd);
     let mut child = cmd.spawn().context(
         "Failed to run uniffi-bindgen, did you install it? Try `pip install uniffi-bindgen`",
@@ -928,14 +972,11 @@ fn generate_uniffi_bindings(
         bail!("Command {:?} failed", cmd);
     }
 
-    let py_binding_name = udl.file_stem().unwrap();
-    let py_binding = binding_dir.join(py_binding_name).with_extension("py");
-    let name = py_binding_name.to_str().unwrap().to_string();
-
+    let py_binding = binding_dir.join(&py_binding_name).with_extension("py");
     // uniffi bindings hardcoded the extension filenames
     let cdylib_name = match cdylib_name {
         Some(name) => name,
-        None => format!("uniffi_{name}"),
+        None => format!("uniffi_{py_binding_name}"),
     };
     let cdylib = match target_os {
         Os::Macos => format!("lib{cdylib_name}.dylib"),
@@ -944,7 +985,7 @@ fn generate_uniffi_bindings(
     };
 
     Ok(UniFfiBindings {
-        name,
+        name: py_binding_name,
         cdylib,
         path: py_binding,
     })
@@ -967,7 +1008,7 @@ pub fn write_uniffi_module(
         name: binding_name,
         cdylib,
         path: uniffi_binding,
-    } = generate_uniffi_bindings(crate_dir, target_dir, target_os)?;
+    } = generate_uniffi_bindings(crate_dir, target_dir, target_os, artifact)?;
     let py_init = format!("from .{binding_name} import *  # NOQA\n");
 
     if !editable {
@@ -1299,7 +1340,7 @@ mod tests {
 
         // No excludes
         let tmp_dir = TempDir::new()?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, None)?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty())?;
         assert!(writer.files.is_empty());
         writer.add_bytes_with_permissions("test", &[], perm)?;
         assert_eq!(writer.files.len(), 1);
@@ -1311,7 +1352,7 @@ mod tests {
         let mut excludes = OverrideBuilder::new(&tmp_dir);
         excludes.add("test*")?;
         excludes.add("!test2")?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Some(excludes.build()?))?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?)?;
         writer.add_bytes_with_permissions("test1", &[], perm)?;
         writer.add_bytes_with_permissions("test3", &[], perm)?;
         assert!(writer.files.is_empty());

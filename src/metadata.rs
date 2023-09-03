@@ -582,13 +582,14 @@ fn fold_header(text: &str) -> String {
 mod test {
     use super::*;
     use cargo_metadata::MetadataCommand;
+    use expect_test::{expect, Expect};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     fn assert_metadata_from_cargo_toml(
         readme: &str,
         cargo_toml: &str,
-        expected: &str,
+        expected: Expect,
     ) -> Metadata21 {
         let crate_dir = tempfile::tempdir().unwrap();
         let crate_path = crate_dir.path();
@@ -617,13 +618,7 @@ mod test {
 
         let actual = metadata.to_file_contents().unwrap();
 
-        assert_eq!(
-            actual.trim(),
-            expected.trim(),
-            "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
-            expected,
-            actual
-        );
+        expected.assert_eq(&actual);
 
         // get_dist_info_dir test checks against hard-coded values - check that they are as expected in the source first
         assert!(
@@ -662,8 +657,7 @@ mod test {
         "#
         );
 
-        let expected = indoc!(
-            r#"
+        let expected = expect![[r#"
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
@@ -677,8 +671,8 @@ mod test {
             # Some test package
 
             This is the readme for a test package
-        "#
-        );
+
+        "#]];
 
         assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
     }

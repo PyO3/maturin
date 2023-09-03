@@ -22,19 +22,18 @@ pub fn test_import_hook<'a>(
 
     let (venv_dir, python) = create_virtualenv(virtualenv_name, Some(python)).unwrap();
 
-    let pip_install_args = vec![vec!["pytest", "uniffi-bindgen", "cffi"]];
-    let extras: Vec<Vec<&str>> = extra_packages.into_iter().map(|name| vec![*name]).collect();
-    for args in pip_install_args.iter().chain(&extras) {
+    let mut packages_to_install = vec!["pytest", "uniffi-bindgen", "cffi", "filelock"];
+    packages_to_install.extend(extra_packages);
+    for package_name in packages_to_install {
         if verbose {
-            println!("installing {:?}", &args);
+            println!("installing {package_name}");
         }
         let status = Command::new(&python)
-            .args(["-m", "pip", "install", "--disable-pip-version-check"])
-            .args(args)
+            .args(["-m", "pip", "install", "--disable-pip-version-check", package_name])
             .status()
             .unwrap();
         if !status.success() {
-            bail!("failed to install: {:?}", &args);
+            bail!("failed to install: {package_name}");
         }
     }
 

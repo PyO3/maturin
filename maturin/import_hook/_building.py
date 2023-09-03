@@ -13,9 +13,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 
-from maturin.import_hook._file_lock import FileLock
 from maturin.import_hook._logging import logger
 from maturin.import_hook.settings import MaturinSettings
+
+try:
+    import filelock
+except ImportError:
+    msg = (
+        "could not find 'filelock' package. "
+        "Try installing maturin with the import-hook extra: pip install maturin[import-hook]"
+    )
+    raise ImportError(msg) from None
 
 
 @dataclass
@@ -85,14 +93,25 @@ class BuildCache:
         self._build_dir = (
             build_dir if build_dir is not None else _get_default_build_dir()
         )
-        self._lock = FileLock.new(
-            self._build_dir / "lock", timeout_seconds=lock_timeout_seconds
+        self._lock = filelock.FileLock(
+            self._build_dir / "lock", timeout=lock_timeout_seconds
         )
 
     @contextmanager
     def lock(self) -> Generator[LockedBuildCache, None, None]:
-        with self._lock:
+        with _acquire_lock(self._lock):
             yield LockedBuildCache(self._build_dir)
+
+
+@contextmanager
+def _acquire_lock(lock: filelock.FileLock) -> Generator[None, None, None]:
+    try:
+        with lock.acquire(blocking=False):
+            yield
+    except filelock.Timeout:
+        logger.info("waiting on lock %s", lock.lock_file)
+        with lock.acquire():
+            yield
 
 
 def _get_default_build_dir() -> Path:

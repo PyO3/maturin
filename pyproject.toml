@@ -28,6 +28,9 @@ zig = [
 patchelf = [
     "patchelf",
 ]
+import-hook = [
+    "filelock"
+]
 
 [project.urls]
 "Source Code" = "https://github.com/PyO3/maturin"

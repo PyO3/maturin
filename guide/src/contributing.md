@@ -55,9 +55,10 @@ Ready to contribute? Here's how to setup maturin for local development.
 6. make sure your changes are well formatted and pass the linting checks by
    installing [pre-commit](https://pre-commit.com/) and running
    ```bash
-   $ pre-commit run --all
+   $ pre-commit run --hook-stage manual --all
    ```
-   running `pre-commit install` will enable running the checks automatically before every commit.
+   running `pre-commit install` will enable running the checks automatically before every commit
+   (except for the slow checks: `cargo check` and `cargo clippy` which are only run manually).
    You can also look at `.pre-commit-config.yaml` and run the individual checks yourself if you prefer.
 7. Commit your changes and push your branch to GitHub:
    ```bash

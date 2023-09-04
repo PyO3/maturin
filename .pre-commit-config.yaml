@@ -1,32 +1,36 @@
+# run all hooks with:
+# pre-commit run --hook-stage manual --all
 repos:
   - repo: local
     hooks:
-      # rustup component add rustfmt
-      - id: cargo-fmt
+      - id: cargo-fmt  # rustup component add rustfmt
         name: cargo fmt
         entry: cargo fmt --all --
         language: system
         types: [rust]
         pass_filenames: false
+
+      - id: cargo-deny  # cargo install --locked cargo-deny
+        name: cargo deny
+        entry: cargo deny --all-features check --
+        language: system
+        pass_filenames: false
+
       - id: cargo-check
         name: cargo check
         entry: cargo check --all-features --all-targets --
         language: system
         pass_filenames: false
         types: [rust]
-      # cargo install --locked cargo-deny
-      - id: cargo-deny
-        name: cargo deny
-        entry: cargo deny --all-features check --
-        language: system
-        pass_filenames: false
-      # rustup component add clippy
-      - id: cargo-clippy
+        stages: [manual]  # because it's slow
+
+      - id: cargo-clippy  # rustup component add clippy
         name: cargo clippy
         entry: cargo clippy --tests --all-features -- -D warnings
         language: system
         pass_filenames: false
         types: [rust]
+        stages: [manual]  # because it's slow
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v2.3.0
     hooks:

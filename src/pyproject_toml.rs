@@ -502,7 +502,7 @@ mod tests {
             r#"[build-system]
             requires = [ "maturin>=0.14", "numpy", "wheel", "patchelf",]
             build-backend = "maturin"
-            
+
             [project]
             name = "..."
             license-files = [ "license.txt",]

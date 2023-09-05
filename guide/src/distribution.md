@@ -52,7 +52,7 @@ The [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action 
 maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper platform tag.
 
 * If your system's glibc is too new, it will assign the `linux` tag.
-* If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf), 
+* If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf),
   it can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
 
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
@@ -65,7 +65,7 @@ docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --release  # or other m
 ```
 
 Note that this image is very basic and only contains python, maturin and stable Rust. If you need additional tools, you can run commands inside the manylinux container.
-See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example 
+See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example
 or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode/blob/b226ea0f2b2f4f474eff47349703d57d2ea4801b/.github/workflows/publish.yml) for a real world setup.
 
 
@@ -216,17 +216,17 @@ maturin build --release --target aarch64-unknown-linux-gnu --zig
 #### Cross-compile to Windows
 
 Pyo3 0.16.5 added an experimental feature `generate-import-lib` enables the user to cross compile
-extension modules for Windows targets without setting the `PYO3_CROSS_LIB_DIR` environment variable 
-or providing any Windows Python library files. 
+extension modules for Windows targets without setting the `PYO3_CROSS_LIB_DIR` environment variable
+or providing any Windows Python library files.
 
 ```toml
 [dependencies]
 pyo3 = { version = "0.19.0", features = ["extension-module", "generate-import-lib"] }
 ```
 
-It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to 
-generate import libraries for the Python DLL for MinGW-w64 and MSVC compile targets. 
-Note: MSVC targets require LLVM binutils or MSVC build tools to be available on the host system. 
+It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to
+generate import libraries for the Python DLL for MinGW-w64 and MSVC compile targets.
+Note: MSVC targets require LLVM binutils or MSVC build tools to be available on the host system.
 More specifically, `python3-dll-a` requires `llvm-dlltool` or `lib.exe` executable to be present in `PATH` when targeting `*-pc-windows-msvc`.
 
 maturin integrates [`cargo-xwin`](https://github.com/messense/cargo-xwin) to enable MSVC targets cross compilation support,

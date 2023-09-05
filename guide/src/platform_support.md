@@ -43,5 +43,5 @@ PyPy 3.6 and later also works, as does GraalPy 23.0 and later.
 `manylinux2014` and  its newer versions as well as `musllinux_1_1` and its newer versions
 are supported.
 
-Since Rust and the manylinux project drop support for old manylinux/musllinux versions sometimes, 
+Since Rust and the manylinux project drop support for old manylinux/musllinux versions sometimes,
 after maturin 1.0 manylinux version bumps will be minor versions rather than major versions.

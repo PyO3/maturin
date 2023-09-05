@@ -7,6 +7,7 @@ use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
 use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue};
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -42,9 +43,32 @@ pub struct DevelopOptions {
     /// Only works with mixed Rust/Python project layout
     #[arg(long)]
     pub skip_install: bool,
+    /// Use a specific pip installation instead of the default one.
+    ///
+    /// This can be used to supply the path to a pip executable when the
+    /// current virtualenv does not provide one.
+    #[arg(long)]
+    pub pip_path: Option<PathBuf>,
     /// `cargo rustc` options
     #[command(flatten)]
     pub cargo_options: CargoOptions,
+}
+
+fn make_pip_command(python_path: &Path, pip_path: Option<&Path>) -> Command {
+    match pip_path {
+        Some(pip_path) => {
+            let mut cmd = Command::new(pip_path);
+            cmd.arg("--python")
+                .arg(python_path)
+                .arg("--disable-pip-version-check");
+            cmd
+        }
+        None => {
+            let mut cmd = Command::new(python_path);
+            cmd.arg("-m").arg("pip").arg("--disable-pip-version-check");
+            cmd
+        }
+    }
 }
 
 /// Installs a crate by compiling it and copying the shared library to site-packages.
@@ -59,6 +83,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         strip,
         extras,
         skip_install,
+        pip_path,
         cargo_options,
     } = develop_options;
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
@@ -113,12 +138,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     // Install dependencies
     if !build_context.metadata21.requires_dist.is_empty() {
-        let mut args = vec![
-            "-m".to_string(),
-            "pip".to_string(),
-            "install".to_string(),
-            "--disable-pip-version-check".to_string(),
-        ];
+        let mut args = vec!["install".to_string()];
         args.extend(build_context.metadata21.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
             // Remove extra marker to make it installable with pip
@@ -145,7 +165,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             }
             pkg.to_string()
         }));
-        let status = Command::new(interpreter.executable)
+        let status = make_pip_command(&interpreter.executable, pip_path.as_deref())
             .args(&args)
             .status()
             .context("Failed to run pip install")?;
@@ -157,24 +177,21 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let wheels = build_context.build_wheels()?;
     if !skip_install {
         for (filename, _supported_version) in wheels.iter() {
-            let command = [
-                "-m",
-                "pip",
-                "--disable-pip-version-check",
-                "install",
-                "--no-deps",
-                "--force-reinstall",
-            ];
-            let output = Command::new(&python)
-                .args(command)
+            let mut pip_cmd = make_pip_command(&python, pip_path.as_deref());
+            let output = pip_cmd
+                .args(["install", "--no-deps", "--force-reinstall"])
                 .arg(dunce::simplified(filename))
                 .output()
-                .context(format!("pip install failed with {python:?}"))?;
+                .context(format!(
+                    "pip install failed (ran {:?} with {:?})",
+                    pip_cmd.get_program(),
+                    &pip_cmd.get_args().collect::<Vec<_>>(),
+                ))?;
             if !output.status.success() {
                 bail!(
                 "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
                 venv_dir.display(),
-                &command,
+                &pip_cmd.get_args().collect::<Vec<_>>(),
                 output.status,
                 String::from_utf8_lossy(&output.stdout).trim(),
                 String::from_utf8_lossy(&output.stderr).trim(),
@@ -183,7 +200,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             if !output.stderr.is_empty() {
                 eprintln!(
                     "⚠️ Warning: pip raised a warning running {:?}:\n{}",
-                    &command,
+                    &pip_cmd.get_args().collect::<Vec<_>>(),
                     String::from_utf8_lossy(&output.stderr).trim(),
                 );
             }

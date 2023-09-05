@@ -1,5 +1,11 @@
 # run all hooks with:
 # pre-commit run --hook-stage manual --all
+ci:
+  skip:
+    # pre-commit.ci doesn't have Rust installed
+    - cargo-fmt
+    - cargo-deny
+
 repos:
   - repo: local
     hooks:

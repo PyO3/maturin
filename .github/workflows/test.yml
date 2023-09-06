@@ -98,7 +98,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.5.3"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-activate-base: "false"
@@ -221,7 +221,7 @@ jobs:
       PYTHON_VERSION: "3.11.2"
       NODE_VERSION: 18
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         id: setup-python
         with:
@@ -264,7 +264,7 @@ jobs:
           set -ex
           apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd git patchelf
           pip3 install cffi virtualenv
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Fix git permissions
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - name: Cache cargo build
@@ -292,7 +292,7 @@ jobs:
         manylinux: ["manylinux_2_24"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
       # Caching
@@ -314,7 +314,7 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -369,7 +369,7 @@ jobs:
             python: pypy3.10
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
@@ -401,7 +401,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-13, windows-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -447,7 +447,7 @@ jobs:
     name: Test MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.64.0
       # Caching
       - name: Cache cargo build
@@ -462,7 +462,7 @@ jobs:
     runs-on: ubuntu-latest
     container: pyston/pyston:2.3.5
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Fix git permissions
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: dtolnay/rust-toolchain@stable
@@ -496,7 +496,7 @@ jobs:
             apt-packages: gcc-arm-linux-gnueabi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install packages
         run: |
           sudo apt-get update

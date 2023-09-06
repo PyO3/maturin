@@ -577,6 +577,7 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
     ) -> Result<Option<PythonInterpreter>> {
         let output = Command::new(executable.as_ref())
+            .env("PYTHONNOUSERSITE", "1")
             .args(["-c", GET_INTERPRETER_METADATA])
             .output();
 
@@ -621,7 +622,8 @@ impl PythonInterpreter {
                             cmd.arg("/c")
                                 .arg("py")
                                 .arg(format!("-{}-{}", ver, target.pointer_width()))
-                                .arg(metadata_py.path());
+                                .arg(metadata_py.path())
+                                .env("PYTHONNOUSERSITE", "1");
                             let output = cmd.output();
                             match output {
                                 Ok(output) if output.status.success() => output,

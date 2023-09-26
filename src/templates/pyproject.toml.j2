@@ -12,7 +12,8 @@ classifiers = [
 ]
 {% if bindings == "cffi" -%}
 dependencies = ["cffi"]
-{%- endif %}
+{% endif -%}
+dynamic = ["version"]
 
 {% if bindings in ["bin", "cffi", "pyo3", "rust-cpython"] or mixed_non_src -%}
 [tool.maturin]

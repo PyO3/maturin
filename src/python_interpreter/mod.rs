@@ -520,18 +520,15 @@ impl PythonInterpreter {
                     )
                 }
                 InterpreterKind::GraalPy => {
-                    // GraalPy suffers from pypa/packaging#614, where
-                    // packaging misdetects it as a 32-bit implementation,
-                    // so GraalPy adds the correct platform itself, e.g.
-                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native_x86_64_linux-linux_i686.whl
+                    // GraalPy like PyPy uses its version as part of the ABI
+                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native_manylinux2014_x86_64.whl
                     format!(
-                        "graalpy{major}{minor}-{abi_tag}_{arch}_{os}-{os}_i686",
+                        "graalpy{major}{minor}-{abi_tag}_{platform}",
                         major = self.major,
                         minor = self.minor,
                         abi_tag = calculate_abi_tag(&self.ext_suffix)
                             .expect("GraalPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
-                        os = target.get_python_os(),
-                        arch = target.get_python_arch(),
+                        platform = platform,
                     )
                 }
             }
@@ -577,6 +574,7 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
     ) -> Result<Option<PythonInterpreter>> {
         let output = Command::new(executable.as_ref())
+            .env("PYTHONNOUSERSITE", "1")
             .args(["-c", GET_INTERPRETER_METADATA])
             .output();
 
@@ -621,7 +619,8 @@ impl PythonInterpreter {
                             cmd.arg("/c")
                                 .arg("py")
                                 .arg(format!("-{}-{}", ver, target.pointer_width()))
-                                .arg(metadata_py.path());
+                                .arg(metadata_py.path())
+                                .env("PYTHONNOUSERSITE", "1");
                             let output = cmd.output();
                             match output {
                                 Ok(output) if output.status.success() => output,

@@ -13,4 +13,3 @@ classifiers = [
 features = ["pyo3/extension-module"]
 module-name = "pyo3_mixed_implicit.some_rust.rust"
 python-source = "python"
-

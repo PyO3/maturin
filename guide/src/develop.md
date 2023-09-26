@@ -34,6 +34,12 @@ Options:
 
           Only works with mixed Rust/Python project layout
 
+       --pip-path <PIP_PATH>
+           Use a specific pip installation instead of the default one.
+
+           This can be used to supply the path to a pip executable when the current virtualenv does
+           not provide one.
+
   -q, --quiet
           Do not print cargo log messages
 

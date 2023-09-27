@@ -1153,7 +1153,21 @@ fn macosx_deployment_target(
             arm64_ver = (major, minor);
         }
     }
-    Ok((x86_64_ver, arm64_ver))
+    Ok((
+        python_macosx_target_version(x86_64_ver),
+        python_macosx_target_version(arm64_ver),
+    ))
+}
+
+#[inline]
+fn python_macosx_target_version(version: (u16, u16)) -> (u16, u16) {
+    let (major, minor) = version;
+    if major >= 11 {
+        // pip only supports (major, 0) for macOS 11+
+        (major, 0)
+    } else {
+        (major, minor)
+    }
 }
 
 pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
@@ -1280,7 +1294,7 @@ mod test {
         );
         assert_eq!(
             macosx_deployment_target(Some("11.1"), false).unwrap(),
-            ((11, 1), (11, 1))
+            ((11, 0), (11, 0))
         );
     }
 }

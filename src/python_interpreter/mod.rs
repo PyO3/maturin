@@ -150,15 +150,20 @@ fn find_all_windows(
                     }
 
                     let executable = capture.get(6).unwrap().as_str();
-                    let version = format!("-{major}.{minor}-{pointer_width}");
-                    let output = Command::new(executable)
-                        .args(["-c", code])
-                        .output()
-                        .unwrap();
+                    let output = Command::new(executable).args(["-c", code]).output();
+                    let output = match output {
+                        Ok(output) => output,
+                        Err(err) => {
+                            eprintln!(
+                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                            );
+                            continue;
+                        }
+                    };
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
                     if !output.status.success() || path.trim().is_empty() {
                         eprintln!(
-                            "⚠️  Warning: couldn't determine the path to python for `py {version}`"
+                            "⚠️  Warning: couldn't determine the path to python for `{executable}`"
                         );
                         continue;
                     }

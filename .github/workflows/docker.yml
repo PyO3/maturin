@@ -29,7 +29,7 @@ jobs:
       - name: Setup QEMU
         if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
         uses: dbhi/qus/action@main
-      - uses: docker/setup-buildx-action@v2
+      - uses: docker/setup-buildx-action@v3
         if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
       - uses: docker/metadata-action@v4
         if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}

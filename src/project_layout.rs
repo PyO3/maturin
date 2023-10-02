@@ -90,7 +90,7 @@ impl ProjectResolver {
         let manifest_dir = manifest_file.parent().unwrap();
         let pyproject_toml: Option<PyProjectToml> = if pyproject_file.is_file() {
             let pyproject = PyProjectToml::new(&pyproject_file)?;
-            pyproject.warn_missing_maturin_version();
+            pyproject.warn_bad_maturin_version();
             pyproject.warn_missing_build_backend();
             Some(pyproject)
         } else {

@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-* Warning about incorrect maturin version pyproject.toml `[build-system] requires`
+## [1.3.0] - 2023-10-02
+
+* Refactor Cargo sdist generator to avoid rewriting local dependencies in [#1741](https://github.com/PyO3/maturin/pull/1741)
+* Added `--pip-path` argument to `develop` command in [#1753](https://github.com/PyO3/maturin/pull/1753)
+* Ignore sdist output files when building sdist in [#1756](https://github.com/PyO3/maturin/pull/1756)
+* Use `python.exe` by default in `build` command on Windows in [#1757](https://github.com/PyO3/maturin/pull/1757)
+* Don't require `uniffi-bindgen` to be installed for uniffi bindings in [#1762](https://github.com/PyO3/maturin/pull/1762)
+* Fix platform tag for graalpy in [#1773](https://github.com/PyO3/maturin/pull/1773)
+* Always set minor version to 0 when major version >= 11 for macOS in [#1778](https://github.com/PyO3/maturin/pull/1778)
+* Warning about incorrect maturin version pyproject.toml `[build-system] requires` in [#1793](https://github.com/PyO3/maturin/pull/1793)
 
 ## [1.2.3] - 2023-08-17
 
@@ -909,7 +918,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.2.3...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/pyo3/maturin/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/pyo3/maturin/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/pyo3/maturin/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/pyo3/maturin/compare/v1.2.0...v1.2.1

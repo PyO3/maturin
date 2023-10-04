@@ -50,7 +50,7 @@ pub enum AuditWheelError {
     /// libraries with blacked-list symbols.
     #[error("Your library is not {0} compliant because it depends on black-listed symbols: {1:?}")]
     BlackListedSymbolsError(Policy, Vec<String>),
-    /// The elf file isn't manylinux/musllinux compaible. Contains unsupported architecture
+    /// The elf file isn't manylinux/musllinux compatible. Contains unsupported architecture
     #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
     UnsupportedArchitecture(Policy, String),
     /// This platform tag isn't defined by auditwheel yet

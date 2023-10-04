@@ -1,12 +1,12 @@
 # x86_64 base
 FROM quay.io/pypa/manylinux2014_x86_64 as base-amd64
 # x86_64 builder
-FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:x86_64-musl as builder-amd64
+FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:x86_64-musl as builder-amd64
 
 # aarch64 base
 FROM quay.io/pypa/manylinux2014_aarch64 as base-arm64
 # aarch64 cross compile builder
-FROM --platform=$BUILDPLATFORM messense/rust-musl-cross:aarch64-musl as builder-arm64
+FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:aarch64-musl as builder-arm64
 
 ARG TARGETARCH
 FROM builder-$TARGETARCH as builder

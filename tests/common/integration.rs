@@ -3,7 +3,7 @@ use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
-use maturin::{BuildOptions, PythonInterpreter};
+use maturin::{BuildOptions, PlatformTag, PythonInterpreter};
 use std::env;
 use std::path::Path;
 use std::process::Command;
@@ -93,14 +93,19 @@ pub fn test_integration(
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
-        if test_zig && build_context.target.is_linux() && !build_context.target.is_musl_target() {
+        if test_zig
+            && build_context.target.is_linux()
+            && !build_context.target.is_musl_libc()
+            && build_context.target.get_minimum_manylinux_tag() != PlatformTag::Linux
+        {
             let rustc_ver = rustc_version::version()?;
+            let python_arch = build_context.target.get_python_arch();
             let file_suffix = if rustc_ver >= semver::Version::new(1, 64, 0) {
-                "manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+                format!("manylinux_2_17_{python_arch}.manylinux2014_{python_arch}.whl")
             } else {
-                "manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+                format!("manylinux_2_12_{python_arch}.manylinux2010_{python_arch}.whl")
             };
-            assert!(filename.to_string_lossy().ends_with(file_suffix))
+            assert!(filename.to_string_lossy().ends_with(&file_suffix))
         }
         let mut venv_name = if supported_version == "py3" {
             format!("{unique_name}-py3")

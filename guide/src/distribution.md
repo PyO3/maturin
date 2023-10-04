@@ -6,7 +6,7 @@ Maturin supports building through `pyproject.toml`. To use it, create a `pyproje
 
 ```toml
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 ```
 
@@ -22,7 +22,7 @@ For a non-manylinux build with cffi bindings you could use the following:
 
 ```toml
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
@@ -52,7 +52,7 @@ The [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action 
 maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper platform tag.
 
 * If your system's glibc is too new, it will assign the `linux` tag.
-* If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf), 
+* If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf),
   it can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
 
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
@@ -65,7 +65,7 @@ docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --release  # or other m
 ```
 
 Note that this image is very basic and only contains python, maturin and stable Rust. If you need additional tools, you can run commands inside the manylinux container.
-See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example 
+See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example
 or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode/blob/b226ea0f2b2f4f474eff47349703d57d2ea4801b/.github/workflows/publish.yml) for a real world setup.
 
 
@@ -125,10 +125,6 @@ Options:
           Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
 
           Make sure you installed zig with `pip install maturin[zig]`
-
-      --universal2
-          Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets,
-          do nothing otherwise
 
   -q, --quiet
           Do not print cargo log messages
@@ -190,7 +186,7 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')
 ```
 
 ### Cross Compiling
@@ -202,7 +198,7 @@ other kind of bindings may work but aren't tested regularly.
 
 ##### Use Docker
 
-For manylinux support the [manylinux-cross](https://github.com/messense/manylinux-cross) docker images can be used.
+For manylinux support the [manylinux-cross](https://github.com/rust-cross/manylinux-cross) docker images can be used.
 And [maturin-action](https://github.com/PyO3/maturin-action) makes it easy to do cross compilation on GitHub Actions.
 
 ##### Use Zig
@@ -220,17 +216,17 @@ maturin build --release --target aarch64-unknown-linux-gnu --zig
 #### Cross-compile to Windows
 
 Pyo3 0.16.5 added an experimental feature `generate-import-lib` enables the user to cross compile
-extension modules for Windows targets without setting the `PYO3_CROSS_LIB_DIR` environment variable 
-or providing any Windows Python library files. 
+extension modules for Windows targets without setting the `PYO3_CROSS_LIB_DIR` environment variable
+or providing any Windows Python library files.
 
 ```toml
 [dependencies]
-pyo3 = { version = "0.18.0", features = ["extension-module", "generate-import-lib"] }
+pyo3 = { version = "0.19.0", features = ["extension-module", "generate-import-lib"] }
 ```
 
-It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to 
-generate import libraries for the Python DLL for MinGW-w64 and MSVC compile targets. 
-Note: MSVC targets require LLVM binutils or MSVC build tools to be available on the host system. 
+It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to
+generate import libraries for the Python DLL for MinGW-w64 and MSVC compile targets.
+Note: MSVC targets require LLVM binutils or MSVC build tools to be available on the host system.
 More specifically, `python3-dll-a` requires `llvm-dlltool` or `lib.exe` executable to be present in `PATH` when targeting `*-pc-windows-msvc`.
 
 maturin integrates [`cargo-xwin`](https://github.com/messense/cargo-xwin) to enable MSVC targets cross compilation support,
@@ -239,3 +235,57 @@ needed for compiling and linking automatically.
 
 **By using this to cross compiling to Windows MSVC targets you are consented to accept the license at [https://go.microsoft.com/fwlink/?LinkId=2086102](https://go.microsoft.com/fwlink/?LinkId=2086102)**.
 (Building on Windows natively does not apply.)
+
+## GitHub Actions
+
+If your project uses GitHub Actions, you can use the `maturin generate-ci` command to generate a GitHub Actions workflow file.
+
+```bash
+mkdir -p .github/workflows
+maturin generate-ci github > .github/workflows/CI.yml
+```
+
+There are some options to customize the generated workflow file:
+
+```
+Generate CI configuration
+
+Usage: maturin generate-ci [OPTIONS] <CI>
+
+Arguments:
+  <CI>
+          CI provider
+
+          Possible values:
+          - github: GitHub
+
+Options:
+  -m, --manifest-path <PATH>
+          Path to Cargo.toml
+
+  -o, --output <PATH>
+          Output path
+
+          [default: -]
+
+      --platform <platform>...
+          Platform support
+
+          [default: linux windows macos]
+
+          Possible values:
+          - all:        All
+          - linux:      Linux
+          - windows:    Windows
+          - macos:      macOS
+          - emscripten: Emscripten
+
+      --pytest
+          Enable pytest
+
+      --zig
+          Use zig to do cross compilation
+
+  -h, --help
+          Print help information (use `-h` for a summary)
+```

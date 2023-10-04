@@ -6,6 +6,7 @@ use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
+use normpath::PathExt;
 use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
@@ -21,7 +22,14 @@ const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 pub(crate) const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
 
-pub(crate) type CompileTarget = (cargo_metadata::Target, BridgeModel);
+/// A cargo target to build
+#[derive(Debug, Clone)]
+pub struct CompileTarget {
+    /// The cargo target to build
+    pub target: cargo_metadata::Target,
+    /// The bridge model to use
+    pub bridge_model: BridgeModel,
+}
 
 /// A cargo build artifact
 #[derive(Debug, Clone)]
@@ -41,7 +49,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
-    if context.target.is_macos() && context.universal2 {
+    if context.universal2 {
         compile_universal2(context, python_interpreter, targets)
     } else {
         compile_targets(context, python_interpreter, targets)
@@ -68,7 +76,7 @@ fn compile_universal2(
     let mut universal_artifacts = Vec::with_capacity(targets.len());
     for (bridge_model, (aarch64_artifact, x86_64_artifact)) in targets
         .iter()
-        .map(|(_, bridge_model)| bridge_model)
+        .map(|target| &target.bridge_model)
         .zip(aarch64_artifacts.iter().zip(&x86_64_artifacts))
     {
         let build_type = if bridge_model.is_bin() {
@@ -132,13 +140,8 @@ fn compile_targets(
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
-    for (target, bridge_model) in targets {
-        artifacts.push(compile_target(
-            context,
-            python_interpreter,
-            bridge_model,
-            target,
-        )?);
+    for target in targets {
+        artifacts.push(compile_target(context, python_interpreter, target)?);
     }
     Ok(artifacts)
 }
@@ -146,13 +149,12 @@ fn compile_targets(
 fn compile_target(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    bridge_model: &BridgeModel,
-    binding_target: &cargo_metadata::Target,
+    compile_target: &CompileTarget,
 ) -> Result<HashMap<String, BuildArtifact>> {
     let target = &context.target;
 
     let mut cargo_rustc: cargo_options::Rustc = context.cargo_options.clone().into();
-    cargo_rustc.message_format = vec!["json".to_string()];
+    cargo_rustc.message_format = vec!["json-render-diagnostics".to_string()];
 
     // --release and --profile are conflicting options
     if context.release && cargo_rustc.profile.is_none() {
@@ -160,7 +162,8 @@ fn compile_target(
     }
 
     // Add `--crate-type cdylib` if available
-    if binding_target
+    if compile_target
+        .target
         .kind
         .iter()
         .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
@@ -181,9 +184,10 @@ fn compile_target(
         .unwrap_or_default();
 
     // We need to pass --bin / --lib
+    let bridge_model = &compile_target.bridge_model;
     match bridge_model {
         BridgeModel::Bin(..) => {
-            cargo_rustc.bin.push(binding_target.name.clone());
+            cargo_rustc.bin.push(compile_target.target.name.clone());
         }
         BridgeModel::Cffi
         | BridgeModel::UniFfi
@@ -193,7 +197,7 @@ fn compile_target(
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
-            if context.target.is_musl_target()
+            if context.target.is_musl_libc()
                 && !rustflags
                     .flags
                     .iter()
@@ -234,7 +238,11 @@ fn compile_target(
         }
     } else if target.is_emscripten() {
         // Allow user to override these default flags
-        if !rustflags.flags.iter().any(|f| f == "link-native-libraries") {
+        if !rustflags
+            .flags
+            .iter()
+            .any(|f| f.contains("link-native-libraries"))
+        {
             debug!("Setting `-Z link-native-libraries=no` for Emscripten");
             rustflags.push("-Z");
             rustflags.push("link-native-libraries=no");
@@ -296,7 +304,7 @@ fn compile_target(
                 }
             } else {
                 build.enable_zig_ar = true;
-                let zig_triple = if target.is_linux() && !target.is_musl_target() {
+                let zig_triple = if target.is_linux() && !target.is_musl_libc() {
                     match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
                         Some(PlatformTag::Manylinux { x, y }) => {
                             format!("{target_triple}.{x}.{y}")
@@ -346,10 +354,10 @@ fn compile_target(
     }
 
     if let BridgeModel::BindingsAbi3(_, _) = bridge_model {
-        let is_pypy = python_interpreter
-            .map(|p| p.interpreter_kind.is_pypy())
+        let is_pypy_or_graalpy = python_interpreter
+            .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
-        if !is_pypy && !target.is_windows() {
+        if !is_pypy_or_graalpy && !target.is_windows() {
             let pyo3_ver = pyo3_version(&context.cargo_metadata)
                 .context("Failed to get pyo3 version from cargo metadata")?;
             if pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
@@ -366,9 +374,12 @@ fn compile_target(
         if interpreter.runnable {
             if bridge_model.is_bindings("pyo3")
                 || bridge_model.is_bindings("pyo3-ffi")
-                || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
-                    && interpreter.interpreter_kind.is_pypy())
+                || matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
             {
+                debug!(
+                    "Setting PYO3_PYTHON to {}",
+                    interpreter.executable.display()
+                );
                 build_command
                     .env("PYO3_PYTHON", &interpreter.executable)
                     .env(
@@ -382,7 +393,8 @@ fn compile_target(
         } else if (bridge_model.is_bindings("pyo3")
             || bridge_model.is_bindings("pyo3-ffi")
             || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
-                && interpreter.interpreter_kind.is_pypy()))
+                && (interpreter.interpreter_kind.is_pypy()
+                    || interpreter.interpreter_kind.is_graalpy())))
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {
             let pyo3_config = interpreter.pyo3_config_file();
@@ -398,7 +410,8 @@ fn compile_target(
                     config_file.display()
                 )
             })?;
-            build_command.env("PYO3_CONFIG_FILE", config_file);
+            let abs_config_file = config_file.normalize()?.into_path_buf();
+            build_command.env("PYO3_CONFIG_FILE", abs_config_file);
         }
     }
 
@@ -408,13 +421,28 @@ fn compile_target(
 
     // Set default macOS deployment target version
     if target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
-        use crate::target::rustc_macosx_target_version;
+        use crate::build_context::rustc_macosx_target_version;
 
-        let (major, minor) = rustc_macosx_target_version(target_triple);
-        build_command.env("MACOSX_DEPLOYMENT_TARGET", format!("{major}.{minor}"));
-        eprintln!(
-            "💻 Using `MACOSX_DEPLOYMENT_TARGET={major}.{minor}` for {target_triple} by default"
-        );
+        let target_config = context
+            .pyproject_toml
+            .as_ref()
+            .and_then(|x| x.target_config(target_triple));
+        let deployment_target = if let Some(deployment_target) = target_config
+            .as_ref()
+            .and_then(|config| config.macos_deployment_target.as_ref())
+        {
+            eprintln!(
+                "💻 Using `MACOSX_DEPLOYMENT_TARGET={deployment_target}` for {target_triple} by configuration"
+            );
+            deployment_target.clone()
+        } else {
+            let (major, minor) = rustc_macosx_target_version(target_triple);
+            eprintln!(
+                "💻 Using `MACOSX_DEPLOYMENT_TARGET={major}.{minor}` for {target_triple} by default"
+            );
+            format!("{major}.{minor}")
+        };
+        build_command.env("MACOSX_DEPLOYMENT_TARGET", deployment_target);
     }
 
     debug!("Running {:?}", build_command);

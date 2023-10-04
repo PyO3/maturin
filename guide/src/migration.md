@@ -3,6 +3,27 @@
 This guide can help you upgrade code through breaking changes from one maturin version to the next.
 For a detailed list of all changes, see the [CHANGELOG](changelog.md).
 
+## From 0.14.* to 0.15
+
+### Build with `--no-default-features` by default when bootstrapping from sdist
+
+When bootstrapping maturin from sdist, maturin 0.15 will build with `--no-default-features` by default,
+which means that for distro packaging, you might want to set the environment variable `MATURIN_SETUP_ARGS="--features full,rustls"` to enable full features.
+
+### Remove `[tool.maturin.sdist-include]`
+
+Use `[tool.maturin.include]` option instead.
+
+### Remove `[package.metadata.maturin]` from `Cargo.toml`
+
+Package metadata is now specified in `[tool.maturin]` section of `pyproject.toml` instead of `Cargo.toml`.
+Note that the replacement for `package.metadata.maturin.name` is `tool.maturin.module-name`.
+
+### Require `uniffi-bindgen` CLI to building `uniffi` bindings
+
+maturin 0.15 requires `uniffi-bindgen` CLI to build `uniffi` bindings,
+you can install it with `pip install uniffi-bindgen`.
+
 ## From 0.13.* to 0.14
 
 ### Remove support for specifying python package metadata in `Cargo.toml`
@@ -19,7 +40,7 @@ can be configured to apply to sdist and/or wheel.
 ### macOS deployment target version defaults what `rustc` supports
 
 If you don't set the `MACOSX_DEPLOYMENT_TARGET` environment variable,
-maturin 0.14 will use the default target version quired from `rustc`, 
+maturin 0.14 will use the default target version quired from `rustc`,
 this may cause build issue for projects that depend on C/C++ code,
 usually you can fix it by setting a correct `MACOSX_DEPLOYMENT_TARGET`, for example
 
@@ -43,7 +64,7 @@ maturin 0.13 has dropped support for Python 3.6, to support Python 3.6 you can u
 maturin 0.13 added most of the `cargo rustc` options so you can just use them directly,
 for example `--cargo-extra-args="--no-default-features"` becomes `--no-default-features`.
 
-To pass extra arguments to rustc, add them after `--`, 
+To pass extra arguments to rustc, add them after `--`,
 for example use `maturin build -- -Clink-arg=-s` instead of `--rustc-extra-args="-Clink-arg=-s"`.
 
 ### Source distributions are not built by default

@@ -18,7 +18,7 @@ import struct
 import subprocess
 import sys
 from subprocess import SubprocessError
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Mapping, List, Optional
 
 try:
     import tomllib
@@ -32,12 +32,25 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
-def get_maturin_pep517_args() -> list[str]:
-    args = shlex.split(os.getenv("MATURIN_PEP517_ARGS", ""))
+def get_maturin_pep517_args(
+    config_settings: Optional[Mapping[str, Any]] = None
+) -> List[str]:
+    build_args = config_settings.get("build-args") if config_settings else None
+    if build_args is None:
+        env_args = os.getenv("MATURIN_PEP517_ARGS", "")
+        if env_args:
+            print(
+                f"'MATURIN_PEP517_ARGS' is deprecated, use `--config-settings build-args='{env_args}'` instead."
+            )
+        args = shlex.split(env_args)
+    elif isinstance(build_args, str):
+        args = shlex.split(build_args)
+    else:
+        args = build_args
     return args
 
 
-def _additional_pep517_args() -> list[str]:
+def _additional_pep517_args() -> List[str]:
     # Support building for 32-bit Python on x64 Windows
     if platform.system().lower() == "windows" and platform.machine().lower() == "amd64":
         pointer_width = struct.calcsize("P") * 8
@@ -49,8 +62,8 @@ def _additional_pep517_args() -> list[str]:
 # noinspection PyUnusedLocal
 def _build_wheel(
     wheel_directory: str,
-    config_settings: Mapping[str, Any] | None = None,
-    metadata_directory: str | None = None,
+    config_settings: Optional[Mapping[str, Any]] = None,
+    metadata_directory: Optional[str] = None,
     editable: bool = False,
 ) -> str:
     # PEP 517 specifies that only `sys.executable` points to the correct
@@ -68,7 +81,7 @@ def _build_wheel(
     if editable:
         command.append("--editable")
 
-    pep517_args = get_maturin_pep517_args()
+    pep517_args = get_maturin_pep517_args(config_settings)
     if pep517_args:
         command.extend(pep517_args)
 
@@ -92,15 +105,15 @@ def _build_wheel(
 # noinspection PyUnusedLocal
 def build_wheel(
     wheel_directory: str,
-    config_settings: Mapping[str, Any] | None = None,
-    metadata_directory: str | None = None,
+    config_settings: Optional[Mapping[str, Any]] = None,
+    metadata_directory: Optional[str] = None,
 ) -> str:
     return _build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 # noinspection PyUnusedLocal
 def build_sdist(
-    sdist_directory: str, config_settings: Mapping[str, Any] | None = None
+    sdist_directory: str, config_settings: Optional[Mapping[str, Any]] = None
 ) -> str:
     command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
 
@@ -120,8 +133,8 @@ def build_sdist(
 
 # noinspection PyUnusedLocal
 def get_requires_for_build_wheel(
-    config_settings: Mapping[str, Any] | None = None
-) -> list[str]:
+    config_settings: Optional[Mapping[str, Any]] = None
+) -> List[str]:
     if get_config().get("bindings") == "cffi":
         return ["cffi"]
     else:
@@ -131,8 +144,8 @@ def get_requires_for_build_wheel(
 # noinspection PyUnusedLocal
 def build_editable(
     wheel_directory: str,
-    config_settings: Mapping[str, Any] | None = None,
-    metadata_directory: str | None = None,
+    config_settings: Optional[Mapping[str, Any]] = None,
+    metadata_directory: Optional[str] = None,
 ) -> str:
     return _build_wheel(
         wheel_directory, config_settings, metadata_directory, editable=True
@@ -145,14 +158,14 @@ get_requires_for_build_editable = get_requires_for_build_wheel
 
 # noinspection PyUnusedLocal
 def get_requires_for_build_sdist(
-    config_settings: Mapping[str, Any] | None = None
-) -> list:
+    config_settings: Optional[Mapping[str, Any]] = None
+) -> List[str]:
     return []
 
 
 # noinspection PyUnusedLocal
 def prepare_metadata_for_build_wheel(
-    metadata_directory: str, config_settings: Mapping[str, Any] | None = None
+    metadata_directory: str, config_settings: Optional[Mapping[str, Any]] = None
 ) -> str:
     print("Checking for Rust toolchain....")
     is_cargo_installed = False
@@ -185,7 +198,7 @@ def prepare_metadata_for_build_wheel(
         sys.executable,
     ]
     command.extend(_additional_pep517_args())
-    pep517_args = get_maturin_pep517_args()
+    pep517_args = get_maturin_pep517_args(config_settings)
     if pep517_args:
         command.extend(pep517_args)
 

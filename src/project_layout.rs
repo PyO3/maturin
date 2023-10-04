@@ -89,9 +89,8 @@ impl ProjectResolver {
 
         let manifest_dir = manifest_file.parent().unwrap();
         let pyproject_toml: Option<PyProjectToml> = if pyproject_file.is_file() {
-            let pyproject =
-                PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
-            pyproject.warn_missing_maturin_version();
+            let pyproject = PyProjectToml::new(&pyproject_file)?;
+            pyproject.warn_bad_maturin_version();
             pyproject.warn_missing_build_backend();
             Some(pyproject)
         } else {
@@ -108,27 +107,30 @@ impl ProjectResolver {
 
         let cargo_metadata = Self::resolve_cargo_metadata(&manifest_file, &cargo_options)?;
 
-        let mut metadata21 =
-            Metadata21::from_cargo_toml(&cargo_toml, manifest_dir, &cargo_metadata)
-                .context("Failed to parse Cargo.toml into python metadata")?;
+        let mut metadata21 = Metadata21::from_cargo_toml(manifest_dir, &cargo_metadata)
+            .context("Failed to parse Cargo.toml into python metadata")?;
         if let Some(pyproject) = pyproject {
             let pyproject_dir = pyproject_file.parent().unwrap();
             metadata21.merge_pyproject_toml(pyproject_dir, pyproject)?;
         }
-        let extra_metadata = cargo_toml.remaining_core_metadata();
 
         let crate_name = &cargo_toml.package.name;
 
         // If the package name contains minuses, you must declare a module with
         // underscores as lib name
-        let module_name = cargo_toml
-            .lib
-            .as_ref()
-            .and_then(|lib| lib.name.as_ref())
+        // Precedence:
+        //  * Explicitly declared pyproject.toml `tool.maturin.module-name`
+        //  * Cargo.toml `lib.name`
+        //  * pyproject.toml `project.name`
+        //  * Cargo.toml `package.name`
+        let module_name = pyproject
+            .and_then(|x| x.module_name())
+            .or(cargo_toml.lib.as_ref().and_then(|lib| lib.name.as_deref()))
+            .or(pyproject
+                .and_then(|pyproject| pyproject.project.as_ref())
+                .map(|project| project.name.as_str()))
             .unwrap_or(crate_name)
             .to_owned();
-
-        let extension_name = extra_metadata.name.as_ref().unwrap_or(&module_name);
 
         let project_root = if pyproject_file.is_file() {
             pyproject_file.parent().unwrap_or(manifest_dir)
@@ -168,25 +170,22 @@ impl ProjectResolver {
                 None => project_root.to_path_buf(),
             },
         };
-        let data = match pyproject.and_then(|x| x.data()) {
-            Some(data) => {
-                if data.is_absolute() {
-                    Some(data.to_path_buf())
-                } else {
-                    Some(project_root.join(data))
-                }
+        let data = pyproject.and_then(|x| x.data()).map(|data| {
+            if data.is_absolute() {
+                data.to_path_buf()
+            } else {
+                project_root.join(data)
             }
-            None => extra_metadata.data.as_ref().map(|data| {
-                let data = Path::new(data);
-                if data.is_absolute() {
-                    data.to_path_buf()
-                } else {
-                    manifest_dir.join(data)
-                }
-            }),
-        };
-        let project_layout =
-            ProjectLayout::determine(project_root, extension_name, py_root, python_packages, data)?;
+        });
+        let custom_python_source = pyproject.and_then(|x| x.python_source()).is_some();
+        let project_layout = ProjectLayout::determine(
+            project_root,
+            &module_name,
+            py_root,
+            python_packages,
+            data,
+            custom_python_source,
+        )?;
         Ok(Self {
             project_layout,
             cargo_toml_path: manifest_file,
@@ -244,8 +243,7 @@ impl ProjectResolver {
                 "Found pyproject.toml in working directory at {:?}",
                 pyproject_file
             );
-            let pyproject =
-                PyProjectToml::new(&pyproject_file).context("pyproject.toml is invalid")?;
+            let pyproject = PyProjectToml::new(&pyproject_file)?;
             if let Some(path) = pyproject.manifest_path() {
                 debug!("Using cargo manifest path from pyproject.toml {:?}", path);
                 return Ok((
@@ -343,15 +341,15 @@ impl ProjectResolver {
 impl ProjectLayout {
     /// Checks whether a python module exists besides Cargo.toml with the right name
     fn determine(
-        project_root: impl AsRef<Path>,
+        project_root: &Path,
         module_name: &str,
         python_root: PathBuf,
         python_packages: Vec<String>,
         data: Option<PathBuf>,
+        custom_python_source: bool,
     ) -> Result<ProjectLayout> {
         // A dot in the module name means the extension module goes into the module folder specified by the path
         let parts: Vec<&str> = module_name.split('.').collect();
-        let project_root = project_root.as_ref();
         let (python_module, rust_module, extension_name) = if parts.len() > 1 {
             let mut rust_module = python_root.clone();
             rust_module.extend(&parts[0..parts.len() - 1]);
@@ -373,6 +371,7 @@ impl ProjectLayout {
             rust_module = %rust_module.display(),
             python_module = %python_module.display(),
             extension_name = %extension_name,
+            module_name = %module_name,
             "Project layout resolved"
         );
 
@@ -388,12 +387,6 @@ impl ProjectLayout {
         };
 
         if python_module.is_dir() {
-            if !python_module.join("__init__.py").is_file()
-                && !python_module.join("__init__.pyi").is_file()
-            {
-                bail!("Found a directory with the module name ({}) next to Cargo.toml, which indicates a mixed python/rust project, but the directory didn't contain an __init__.py file.", module_name)
-            }
-
             eprintln!("🍹 Building a mixed python/rust project");
 
             Ok(ProjectLayout {
@@ -405,6 +398,15 @@ impl ProjectLayout {
                 data,
             })
         } else {
+            if custom_python_source {
+                eprintln!(
+                    "⚠️ Warning: You specified the python source as {}, but the python module at \
+                    {} is missing. No python module will be included.",
+                    python_root.display(),
+                    python_module.display()
+                );
+            }
+
             Ok(ProjectLayout {
                 python_dir: python_root,
                 python_packages,

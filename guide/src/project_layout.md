@@ -107,7 +107,7 @@ Having a directory with `package_name` in the root of the project can
 occasionally cause confusion as Python allows importing local packages and
 modules. A popular way to avoid this is with the `src`-layout, where the Python
 package is nested within a `src` directory. Unfortunately this interferes with
-the structure of a typical Rust project. Fortunately, Python is nor particular
+the structure of a typical Rust project. Fortunately, Python is not particular
 about the name of the parent source directory.
 
 maturin will detect the following src layout automatically:
@@ -127,11 +127,13 @@ my-rust-and-python-project
 ```
 #### Import Rust as a submodule of your project
 
-If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused. You might also want to discourage end users from using the Rust functions directly by giving it a different name, say '\_my_project'. This can be done by adding `name = <package name>.<rust pymodule name>` to the `[package.metadata.maturin]` in your `Cargo.toml`. For example:
+If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused.
+You might also want to discourage end users from using the Rust functions directly by giving it a different name, say '\_my_project'.
+This can be done by adding `module-name = <package name>.<rust pymodule name>` to the `[tool.maturin]` in your `pyproject.toml`. For example:
 
 ```toml
-[package.metadata.maturin]
-name = "my_project._my_project"
+[tool.maturin]
+module-name = "my_project._my_project"
 ```
 
 You can then import your Rust module inside your Python source as follows:

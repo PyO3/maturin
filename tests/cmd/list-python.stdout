@@ -4,4 +4,4 @@ Usage: maturin[EXE] list-python [OPTIONS]
 
 Options:
       --target <TARGET>  
-  -h, --help             Print help information
+  -h, --help             Print help

@@ -1,12 +1,14 @@
 env:
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
 build_and_test: &BUILD_AND_TEST
-  # only run tasks on pull request or bors related branches
-  only_if: $CIRRUS_BRANCH == 'staging' || $CIRRUS_BRANCH == 'trying' || $CIRRUS_PR != ""
+  # only run tasks on pull request or github merge queue branches
+  only_if: $CIRRUS_BRANCH =~ 'gh-readonly-queue/.*' || $CIRRUS_PR != ""
   setup_script:
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --default-toolchain stable
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     - rustup target add wasm32-wasi
     - python3 -m pip install --upgrade cffi virtualenv
   build_script:
@@ -20,32 +22,22 @@ freebsd_task:
     image_family: freebsd-13-1
   env:
     PATH: $HOME/.cargo/bin:$PATH
-  registry_cache:
-    folder: $HOME/.cargo/registry
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
   target_cache:
     folder: target
     fingerprint_script:
       - echo $CIRRUS_OS
       - cat Cargo.lock
   install_script:
-    - pkg install -y curl bash python
+    - pkg install -y bash git python
     - python3 -m ensurepip
   <<: *BUILD_AND_TEST
 
 macos_arm64_task:
   name: Test (arm64 macOS)
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-monterey-xcode
+    image: ghcr.io/cirruslabs/macos-monterey-xcode:latest
   env:
     PATH: $HOME/.cargo/bin:/opt/homebrew/opt/python@3.10/bin:$PATH
-  registry_cache:
-    folder: $HOME/.cargo/registry
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
   target_cache:
     folder: target
     fingerprint_script:
@@ -53,7 +45,7 @@ macos_arm64_task:
       - cat Cargo.lock
   install_script:
     - brew install python3
-    - python3 -m pip install uniffi-bindgen==0.23.0
+    - python3 -m pip install uniffi-bindgen==0.24.1
   <<: *BUILD_AND_TEST
 
 linux_aarch64_task:
@@ -64,16 +56,11 @@ linux_aarch64_task:
     memory: 4G
   env:
     PATH: /root/.cargo/bin:$PATH
-  registry_cache:
-    folder: /root/.cargo/registry
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
   target_cache:
     folder: target
     fingerprint_script:
       - echo $CIRRUS_OS
       - cat Cargo.lock
   install_script:
-    - python3 -m pip install uniffi-bindgen==0.23.0
+    - python3 -m pip install uniffi-bindgen==0.24.1
   <<: *BUILD_AND_TEST

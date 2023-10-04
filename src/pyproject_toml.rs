@@ -1,17 +1,22 @@
 //! A pyproject.toml as specified in PEP 517
 
 use crate::PlatformTag;
-use anyhow::{format_err, Result};
+use anyhow::{Context, Result};
 use fs_err as fs;
-use pyproject_toml::PyProjectToml as ProjectToml;
+use pep440_rs::Version;
+use pep508_rs::VersionOrUrl;
+use pyproject_toml::{BuildSystem, Project};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// The `[tool]` section of a pyproject.toml
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct Tool {
-    maturin: Option<ToolMaturin>,
+    /// maturin options
+    pub maturin: Option<ToolMaturin>,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -81,26 +86,75 @@ impl GlobPattern {
     }
 }
 
-/// The `[tool.maturin]` section of a pyproject.toml
+/// Cargo compile target
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct CargoTarget {
+    /// Name as given in the `Cargo.toml` or generated from the file name
+    pub name: String,
+    /// Kind of target ("bin", "lib")
+    pub kind: Option<String>,
+    // TODO: Add bindings option
+    // Bridge model, which kind of bindings to use
+    // pub bindings: Option<String>,
+}
+
+/// Target configuration
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct TargetConfig {
+    /// macOS deployment target version
+    #[serde(alias = "macosx-deployment-target")]
+    pub macos_deployment_target: Option<String>,
+}
+
+/// Source distribution generator
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum SdistGenerator {
+    /// Use `cargo package --list`
+    #[default]
+    Cargo,
+    /// Use `git ls-files`
+    Git,
+}
+
+/// The `[tool.maturin]` section of a pyproject.toml
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolMaturin {
     // maturin specific options
-    include: Option<Vec<GlobPattern>>,
-    exclude: Option<Vec<GlobPattern>>,
-    bindings: Option<String>,
+    /// Module name, accepts setuptools style import name like `foo.bar`
+    pub module_name: Option<String>,
+    /// Include files matching the given glob pattern(s)
+    pub include: Option<Vec<GlobPattern>>,
+    /// Exclude files matching the given glob pattern(s)
+    pub exclude: Option<Vec<GlobPattern>>,
+    /// Bindings type
+    pub bindings: Option<String>,
+    /// Platform compatibility
     #[serde(alias = "manylinux")]
-    compatibility: Option<PlatformTag>,
+    pub compatibility: Option<PlatformTag>,
+    /// Skip audit wheel
     #[serde(default)]
-    skip_auditwheel: bool,
+    pub skip_auditwheel: bool,
+    /// Strip the final binary
     #[serde(default)]
-    strip: bool,
+    pub strip: bool,
+    /// Source distribution generator
+    #[serde(default)]
+    pub sdist_generator: SdistGenerator,
     /// The directory with python module, contains `<module_name>/__init__.py`
-    python_source: Option<PathBuf>,
+    pub python_source: Option<PathBuf>,
     /// Python packages to include
-    python_packages: Option<Vec<String>>,
+    pub python_packages: Option<Vec<String>>,
     /// Path to the wheel directory, defaults to `<module_name>.data`
-    data: Option<PathBuf>,
+    pub data: Option<PathBuf>,
+    /// Cargo compile targets
+    pub targets: Option<Vec<CargoTarget>>,
+    /// Target configuration
+    #[serde(default, rename = "target")]
+    pub target_config: HashMap<String, TargetConfig>,
     // Some customizable cargo options
     /// Build artifacts with the specified Cargo profile
     pub profile: Option<String>,
@@ -128,22 +182,16 @@ pub struct ToolMaturin {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
-    #[serde(flatten)]
-    inner: ProjectToml,
+    /// Build-related data
+    pub build_system: BuildSystem,
+    /// Project metadata
+    pub project: Option<Project>,
     /// PEP 518: The `[tool]` table is where any tool related to your Python project, not just build
     /// tools, can have users specify configuration data as long as they use a sub-table within
     /// `[tool]`, e.g. the flit tool would store its configuration in `[tool.flit]`.
     ///
     /// We use it for `[tool.maturin]`
     pub tool: Option<Tool>,
-}
-
-impl std::ops::Deref for PyProjectToml {
-    type Target = ProjectToml;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
 }
 
 impl PyProjectToml {
@@ -154,8 +202,12 @@ impl PyProjectToml {
     pub fn new(pyproject_file: impl AsRef<Path>) -> Result<PyProjectToml> {
         let path = pyproject_file.as_ref();
         let contents = fs::read_to_string(path)?;
-        let pyproject: PyProjectToml = toml::from_str(&contents)
-            .map_err(|err| format_err!("pyproject.toml is not PEP 517 compliant: {}", err))?;
+        let pyproject = toml::from_str(&contents).with_context(|| {
+            format!(
+                "pyproject.toml at {} is invalid",
+                pyproject_file.as_ref().display()
+            )
+        })?;
         Ok(pyproject)
     }
 
@@ -168,6 +220,11 @@ impl PyProjectToml {
     #[inline]
     pub fn maturin(&self) -> Option<&ToolMaturin> {
         self.tool.as_ref()?.maturin.as_ref()
+    }
+
+    /// Returns the value of `[tool.maturin.module-name]` in pyproject.toml
+    pub fn module_name(&self) -> Option<&str> {
+        self.maturin()?.module_name.as_deref()
     }
 
     /// Returns the value of `[tool.maturin.include]` in pyproject.toml
@@ -204,6 +261,13 @@ impl PyProjectToml {
             .unwrap_or_default()
     }
 
+    /// Returns the value of `[tool.maturin.sdist-generator]` in pyproject.toml
+    pub fn sdist_generator(&self) -> SdistGenerator {
+        self.maturin()
+            .map(|maturin| maturin.sdist_generator)
+            .unwrap_or_default()
+    }
+
     /// Returns the value of `[tool.maturin.python-source]` in pyproject.toml
     pub fn python_source(&self) -> Option<&Path> {
         self.maturin()
@@ -221,35 +285,68 @@ impl PyProjectToml {
         self.maturin().and_then(|maturin| maturin.data.as_deref())
     }
 
+    /// Returns the value of `[tool.maturin.targets]` in pyproject.toml
+    pub fn targets(&self) -> Option<Vec<CargoTarget>> {
+        self.maturin().and_then(|maturin| maturin.targets.clone())
+    }
+
+    /// Returns the value of `[tool.maturin.target.<target>]` in pyproject.toml
+    pub fn target_config(&self, target: &str) -> Option<&TargetConfig> {
+        self.maturin()
+            .and_then(|maturin| maturin.target_config.get(target))
+    }
+
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
         self.maturin()?.manifest_path.as_deref()
     }
 
+    /// Warn about `build-system.requires` mismatching expectations.
+    ///
     /// Having a pyproject.toml without a version constraint is a bad idea
     /// because at some point we'll have to do breaking changes and then source
-    /// distributions would break
+    /// distributions would break.
     ///
-    /// Returns true if the pyproject.toml has the constraint
-    pub fn warn_missing_maturin_version(&self) -> bool {
+    /// The second problem we check for is the current maturin version not matching the constraint.
+    ///
+    /// Returns false if a warning was emitted.
+    pub fn warn_bad_maturin_version(&self) -> bool {
         let maturin = env!("CARGO_PKG_NAME");
-        if let Some(requires_maturin) = self
+        let current_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<usize>().unwrap();
+        let self_version = Version::from_str(env!("CARGO_PKG_VERSION")).unwrap();
+        let requires_maturin = self
             .build_system
             .requires
             .iter()
-            .find(|x| x.starts_with(maturin))
-        {
-            let current_major: usize = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
-            if requires_maturin == maturin {
-                eprintln!(
-                    "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
-                    e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \
-                    This will become an error.",
-                    maturin = maturin,
-                    current = current_major,
-                    next = current_major + 1,
-                );
-                return false;
+            .find(|x| x.name == maturin);
+        if let Some(requires_maturin) = requires_maturin {
+            match requires_maturin.version_or_url.as_ref() {
+                Some(VersionOrUrl::VersionSpecifier(version_specifier)) => {
+                    if !version_specifier.contains(&self_version) {
+                        eprintln!(
+                            "⚠️  Warning: You specified {requires_maturin} in pyproject.toml under \
+                            `build-system.requires`, but the current {maturin} version is {version}",
+                            requires_maturin = requires_maturin,
+                            maturin = maturin,
+                            version = self_version,
+                        );
+                        return false;
+                    }
+                }
+                Some(VersionOrUrl::Url(_)) => {
+                    // We can't check this
+                }
+                None => {
+                    eprintln!(
+                        "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
+                        e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \
+                        This will become an error.",
+                        maturin = maturin,
+                        current = current_major,
+                        next = current_major + 1,
+                    );
+                    return false;
+                }
             }
         }
         true
@@ -278,7 +375,9 @@ mod tests {
         pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
         PyProjectToml,
     };
+    use expect_test::expect;
     use fs_err as fs;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
     use std::path::Path;
     use tempfile::TempDir;
@@ -303,6 +402,14 @@ mod tests {
             no-default-features = true
             locked = true
             rustc-args = ["-Z", "unstable-options"]
+
+            [[tool.maturin.targets]]
+            name = "pyo3_pure"
+            kind = "lib"
+            bindings = "pyo3"
+
+            [tool.maturin.target."x86_64-apple-darwin"]
+            macos-deployment-target = "10.12"
             "#,
         )
         .unwrap();
@@ -327,12 +434,19 @@ mod tests {
             maturin.python_packages,
             Some(vec!["foo".to_string(), "bar".to_string()])
         );
+        let targets = maturin.targets.as_ref().unwrap();
+        assert_eq!("pyo3_pure", targets[0].name);
+        let target_config = pyproject.target_config("x86_64-apple-darwin").unwrap();
+        assert_eq!(
+            target_config.macos_deployment_target.as_deref(),
+            Some("10.12")
+        );
     }
 
     #[test]
     fn test_warn_missing_maturin_version() {
         let with_constraint = PyProjectToml::new("test-crates/pyo3-pure/pyproject.toml").unwrap();
-        assert!(with_constraint.warn_missing_maturin_version());
+        assert!(with_constraint.warn_bad_maturin_version());
         let without_constraint_dir = TempDir::new().unwrap();
         let pyproject_file = without_constraint_dir.path().join("pyproject.toml");
 
@@ -348,7 +462,27 @@ mod tests {
         )
         .unwrap();
         let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
-        assert!(!without_constraint.warn_missing_maturin_version());
+        assert!(!without_constraint.warn_bad_maturin_version());
+    }
+
+    #[test]
+    fn test_warn_incorrect_maturin_version() {
+        let without_constraint_dir = TempDir::new().unwrap();
+        let pyproject_file = without_constraint_dir.path().join("pyproject.toml");
+
+        fs::write(
+            &pyproject_file,
+            r#"[build-system]
+            requires = ["maturin==0.0.1"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            manylinux = "2010"
+            "#,
+        )
+        .unwrap();
+        let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
+        assert!(!without_constraint.warn_bad_maturin_version());
     }
 
     #[test]
@@ -405,5 +539,41 @@ mod tests {
                 }
             ])
         );
+    }
+
+    #[test]
+    fn test_gh_1615() {
+        let source = indoc!(
+            r#"[build-system]
+            requires = [ "maturin>=0.14", "numpy", "wheel", "patchelf",]
+            build-backend = "maturin"
+
+            [project]
+            name = "..."
+            license-files = [ "license.txt",]
+            requires-python = ">=3.8"
+            requires-dist = [ "maturin>=0.14", "...",]
+            dependencies = [ "packaging", "...",]
+            zip-safe = false
+            version = "..."
+            readme = "..."
+            description = "..."
+            classifiers = [ "...",]
+        "#
+        );
+        let temp_dir = TempDir::new().unwrap();
+        let pyproject_toml = temp_dir.path().join("pyproject.toml");
+        fs::write(&pyproject_toml, source).unwrap();
+        let outer_error = PyProjectToml::new(&pyproject_toml).unwrap_err();
+        let inner_error = outer_error.source().unwrap();
+
+        let expected = expect![[r#"
+            TOML parse error at line 7, column 17
+              |
+            7 | license-files = [ "license.txt",]
+              |                 ^^^^^^^^^^^^^^^^^
+            wanted string or table
+        "#]];
+        expected.assert_eq(&inner_error.to_string());
     }
 }

@@ -6,5 +6,6 @@ src = "src"
 title = "Maturin User Guide"
 
 [output.html]
+additional-css = ["tweak.css"]
 git-repository-url = "https://github.com/PyO3/maturin/tree/main/guide"
 edit-url-template = "https://github.com/PyO3/maturin/edit/main/guide/{path}"

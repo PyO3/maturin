@@ -12,8 +12,8 @@ use clap::{Parser, Subcommand};
 #[cfg(feature = "scaffolding")]
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
-    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, PathWriter, PlatformTag,
-    PythonInterpreter, Target,
+    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
+    PlatformTag, PythonInterpreter, Target,
 };
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
@@ -73,36 +73,7 @@ enum Opt {
     },
     #[command(name = "develop", alias = "dev")]
     /// Install the crate as module in the current virtualenv
-    ///
-    /// Note that this command doesn't create entrypoints
-    Develop {
-        /// Which kind of bindings to use
-        #[arg(
-            short = 'b',
-            long = "bindings",
-            alias = "binding-crate",
-            value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"]
-        )]
-        bindings: Option<String>,
-        /// Pass --release to cargo
-        #[arg(short = 'r', long)]
-        release: bool,
-        /// Strip the library for minimum file size
-        #[arg(long)]
-        strip: bool,
-        /// Install extra requires aka. optional dependencies
-        ///
-        /// Use as `--extras=extra1,extra2`
-        #[arg(
-            short = 'E',
-            long,
-            value_delimiter = ',',
-            action = clap::ArgAction::Append
-        )]
-        extras: Vec<String>,
-        #[command(flatten)]
-        cargo_options: CargoOptions,
-    },
+    Develop(DevelopOptions),
     /// Build only a source distribution (sdist) without compiling.
     ///
     /// Building a source distribution requires a pyproject.toml with a `[build-system]` table.
@@ -276,23 +247,14 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge() {
                 BridgeModel::Bindings(..) | BridgeModel::Bin(Some(..)) => {
-                    vec![context.interpreter[0].get_tag(
-                        &context.target,
-                        &[PlatformTag::Linux],
-                        context.universal2,
-                    )?]
+                    vec![context.interpreter[0].get_tag(&context, &[PlatformTag::Linux])?]
                 }
                 BridgeModel::BindingsAbi3(major, minor) => {
-                    let platform = context
-                        .target
-                        .get_platform_tag(&[PlatformTag::Linux], context.universal2)?;
+                    let platform = context.get_platform_tag(&[PlatformTag::Linux])?;
                     vec![format!("cp{major}{minor}-abi3-{platform}")]
                 }
                 BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
-                    context
-                        .target
-                        .get_universal_tags(&[PlatformTag::Linux], context.universal2)?
-                        .1
+                    context.get_universal_tags(&[PlatformTag::Linux])?.1
                 }
             };
 
@@ -353,7 +315,10 @@ fn run() -> Result<()> {
         }
     }
 
+    #[cfg(not(feature = "wild"))]
     let opt = Opt::parse();
+    #[cfg(feature = "wild")]
+    let opt = Opt::parse_from(wild::args_os());
 
     match opt {
         Opt::Build {
@@ -374,7 +339,7 @@ fn run() -> Result<()> {
         #[cfg(feature = "upload")]
         Opt::Publish {
             build,
-            publish,
+            mut publish,
             debug,
             no_strip,
             no_sdist,
@@ -393,6 +358,7 @@ fn run() -> Result<()> {
             }
 
             let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();
+            publish.non_interactive_on_ci();
 
             upload_ui(&items, &publish)?
         }
@@ -410,16 +376,10 @@ fn run() -> Result<()> {
                 eprintln!(" - {interpreter}");
             }
         }
-        Opt::Develop {
-            bindings,
-            release,
-            strip,
-            extras,
-            cargo_options,
-        } => {
-            let target = Target::from_target_triple(cargo_options.target.clone())?;
+        Opt::Develop(develop_options) => {
+            let target = Target::from_target_triple(develop_options.cargo_options.target.clone())?;
             let venv_dir = detect_venv(&target)?;
-            develop(bindings, cargo_options, &venv_dir, release, strip, extras)?;
+            develop(develop_options, &venv_dir)?;
         }
         Opt::SDist { manifest_path, out } => {
             let build_options = BuildOptions {
@@ -443,11 +403,12 @@ fn run() -> Result<()> {
         #[cfg(feature = "scaffolding")]
         Opt::GenerateCI(generate_ci) => generate_ci.execute()?,
         #[cfg(feature = "upload")]
-        Opt::Upload { publish, files } => {
+        Opt::Upload { mut publish, files } => {
             if files.is_empty() {
                 eprintln!("⚠️  Warning: No files given, exiting.");
                 return Ok(());
             }
+            publish.non_interactive_on_ci();
 
             upload_ui(&files, &publish)?
         }

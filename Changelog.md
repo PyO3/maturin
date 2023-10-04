@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2023-10-02
+
+* Refactor Cargo sdist generator to avoid rewriting local dependencies in [#1741](https://github.com/PyO3/maturin/pull/1741)
+* Added `--pip-path` argument to `develop` command in [#1753](https://github.com/PyO3/maturin/pull/1753)
+* Ignore sdist output files when building sdist in [#1756](https://github.com/PyO3/maturin/pull/1756)
+* Use `python.exe` by default in `build` command on Windows in [#1757](https://github.com/PyO3/maturin/pull/1757)
+* Don't require `uniffi-bindgen` to be installed for uniffi bindings in [#1762](https://github.com/PyO3/maturin/pull/1762)
+* Fix platform tag for graalpy in [#1773](https://github.com/PyO3/maturin/pull/1773)
+* Always set minor version to 0 when major version >= 11 for macOS in [#1778](https://github.com/PyO3/maturin/pull/1778)
+* Warning about incorrect maturin version pyproject.toml `[build-system] requires` in [#1793](https://github.com/PyO3/maturin/pull/1793)
+
+## [1.2.3] - 2023-08-17
+
+* Fix sdist build failure with workspace path dependencies by HerringtonDarkholme in [#1739](https://github.com/PyO3/maturin/pull/1739)
+
+## [1.2.2] - 2023-08-14
+
+* Fix non interactive mode check when username/password was supplied from cli in #[1737](https://github.com/PyO3/maturin/pull/1737)
+
+## [1.2.1] - 2023-08-14
+
+* Add non-interactive mode to `upload` command in [#1722](https://github.com/PyO3/maturin/pull/1722)
+* Fix `link-native-libraries` check for emscripten target in [#1724](https://github.com/PyO3/maturin/pull/1724)
+* Add support for `ALL_PROXY` to `upload` command in [#1727](https://github.com/PyO3/maturin/pull/1727)
+* Handle renamed Rust dependency in sdist in [#1728](https://github.com/PyO3/maturin/pull/1728)
+* Fix invalid TOML when rewriting workspace inherited dependencies in [#1733](https://github.com/PyO3/maturin/pull/1733)
+
+## [1.2.0] - 2023-08-06
+
+* Add basic support for implicit namespaces [#1645](https://github.com/PyO3/maturin/pull/1696)
+* Add Linux mips64 and mips architecture support in [#1712](https://github.com/PyO3/maturin/pull/1712)
+* Add `x86_64h-apple-darwin` target support in [#1717](https://github.com/PyO3/maturin/pull/1717)
+
+## [1.1.0] - 2023-06-10
+
+* Add basic support for GraalPy in [#1645](https://github.com/PyO3/maturin/pull/1645)
+* Refactor abi tag to use `EXT_SUFFIX` in [#1648](https://github.com/PyO3/maturin/pull/1648)
+* Add Linux loongarch64 architecture support in [#1653](https://github.com/PyO3/maturin/pull/1653)
+* Add `--skip-install` option to `maturin develop` in [#1654](https://github.com/PyO3/maturin/pull/1654)
+
+## [1.0.1] - 2023-05-28
+
+* Add more Python 3.12 sysconfigs in [#1629](https://github.com/PyO3/maturin/pull/1629)
+* Fix panicking when no cargo build targets are selected in [#1635](https://github.com/PyO3/maturin/pull/1635)
+
+## [1.0.0] - 2023-05-23
+
+* Add support for multiple `--config-settings` in PEP517 backend in [#1624](https://github.com/PyO3/maturin/pull/1624)
+* Remove deprecated `--universal2` cli option in [#1620](https://github.com/PyO3/maturin/pull/1620),
+  use `--target universal2-apple-darwin` instead.
+
+## [0.15.3] - 2023-05-20
+
+* Fix cross compile Apple universal2 wheels on non-macOS platforms by MisLink in [#1613](https://github.com/PyO3/maturin/pull/1613)
+* Add PEP 517 `config_settings` support in [#1619](https://github.com/PyO3/maturin/pull/1619),
+  deprecate `MATURIN_PEP517_ARGS` in favor of the new `build-args` config setting.
+
+## [0.15.2] - 2023-05-16
+
+* When determining the python module name, use pyproject.toml `project.name` over Cargo.toml `package.name` in [#1608](https://github.com/PyO3/maturin/pull/1608)
+* Fix rewriting `dev-dependencies` in sdist in [#1610](https://github.com/PyO3/maturin/pull/1610)
+
+## [0.15.1] - 2023-05-07
+
+* Fix finding interpreters from bundled sysconfigs in [#1598](https://github.com/PyO3/maturin/pull/1598)
+
+## [0.15.0] - 2023-05-07
+
 * **Breaking Change**: Build with `--no-default-features` by default when bootstrapping from sdist in [#1333](https://github.com/PyO3/maturin/pull/1333)
 * **Breaking Change**: Remove deprecated `sdist-include` option in `pyproject.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
 * **Breaking Change**: Remove deprecated `python-source` option in `Cargo.toml` in [#1335](https://github.com/PyO3/maturin/pull/1335)
@@ -14,9 +82,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Breaking Change**: [`uniffi_bindgen` CLI](https://mozilla.github.io/uniffi-rs/tutorial/Prerequisites.html#the-uniffi-bindgen-cli-tool) is required for building `uniffi` bindings wheels in [#1352](https://github.com/PyO3/maturin/pull/1352)
 * Add Cargo compile targets configuration for filtering multiple bin targets in [#1339](https://github.com/PyO3/maturin/pull/1339)
 * Respect `rustflags` settings in cargo configuration file in [#1405](https://github.com/PyO3/maturin/pull/1405)
-* Bump MSRV to 1.63.0 in [#1407](https://github.com/PyO3/maturin/pull/1407)
 * Add support for uniffi 0.23 in [#1481](https://github.com/PyO3/maturin/pull/1481)
 * Add support for custom TLS certificate authority bundle in [#1483](https://github.com/PyO3/maturin/pull/1483)
+* Bump MSRV to 1.64.0 in [#1528](https://github.com/PyO3/maturin/pull/1528)
+* Add wildcards support to publish/upload commands on Windows in [#1534](https://github.com/PyO3/maturin/pull/1534)
+* Add support for configuring macOS deployment target version in `pyproject.toml` in [#1536](https://github.com/PyO3/maturin/pull/1536)
+* Rewrite platform specific dependencies in `Cargo.toml` by viccie30 in [#1572](https://github.com/PyO3/maturin/pull/1572)
+* Add trusted publisher support in [#1578](https://github.com/PyO3/maturin/pull/1578)
+* Add new `git` source distribution generator in [#1587](https://github.com/PyO3/maturin/pull/1587)
+
+## [0.14.17] - 2023-04-06
+
+* Fix wrong `EXT_SUFFIX` when cross compiling musllinux wheels for Python 3.11 in [#1560](https://github.com/PyO3/maturin/pull/1560)
+
+## [0.14.16] - 2023-03-26
+
+* Deprecate `package.metadata.maturin.name` in favor of `tool.maturin.module-name` in `pyproject.toml` in [#1531](https://github.com/PyO3/maturin/pull/1531)
 
 ## [0.14.15] - 2023-03-03
 
@@ -104,7 +185,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Breaking Change**: Remove support for specifying python package metadata in `Cargo.toml` in [#1200](https://github.com/PyO3/maturin/pull/1200).
   Python package metadata should be specified in the `project` section of `pyproject.toml` instead as [PEP 621](https://peps.python.org/pep-0621/) specifies.
-* Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107). 
+* Initial support for shipping bin targets as wasm32-wasi binaries that are run through wasmtime in [#1107](https://github.com/PyO3/maturin/pull/1107).
   Note that wasmtime currently only support the five most popular platforms and that wasi binaries have restrictions when interacting with the host.
   Usage is by setting `--target wasm32-wasi`.
 * Add support for python first [`src` project layout](https://py-pkgs.org/04-package-structure.html#the-source-layout) in [#1185](https://github.com/PyO3/maturin/pull/1185)
@@ -837,7 +918,21 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v0.14.15...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/pyo3/maturin/compare/v1.2.3...v1.3.0
+[1.2.3]: https://github.com/pyo3/maturin/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/pyo3/maturin/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/pyo3/maturin/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/pyo3/maturin/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/pyo3/maturin/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/pyo3/maturin/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/pyo3/maturin/compare/v0.15.3...v1.0.0
+[0.15.3]: https://github.com/pyo3/maturin/compare/v0.15.2...v0.15.3
+[0.15.2]: https://github.com/pyo3/maturin/compare/v0.15.1...v0.15.2
+[0.15.1]: https://github.com/pyo3/maturin/compare/v0.15.0...v0.15.1
+[0.15.0]: https://github.com/pyo3/maturin/compare/v0.14.17...v0.15.0
+[0.14.17]: https://github.com/pyo3/maturin/compare/v0.14.16...v0.14.17
+[0.14.16]: https://github.com/pyo3/maturin/compare/v0.14.15...v0.14.16
 [0.14.15]: https://github.com/pyo3/maturin/compare/v0.14.14...v0.14.15
 [0.14.14]: https://github.com/pyo3/maturin/compare/v0.14.13...v0.14.14
 [0.14.13]: https://github.com/pyo3/maturin/compare/v0.14.12...v0.14.13

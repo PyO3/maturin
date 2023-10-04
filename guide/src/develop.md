@@ -29,6 +29,17 @@ Options:
 
           Use as `--extras=extra1,extra2`
 
+      --skip-install
+          Skip installation, only build the extension module inplace
+
+          Only works with mixed Rust/Python project layout
+
+       --pip-path <PIP_PATH>
+           Use a specific pip installation instead of the default one.
+
+           This can be used to supply the path to a pip executable when the current virtualenv does
+           not provide one.
+
   -q, --quiet
           Do not print cargo log messages
 
@@ -89,7 +100,7 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')
 ```
 
 ## PEP 660 Editable Installs
@@ -99,7 +110,7 @@ You need to add `maturin` to `build-system` section of `pyproject.toml` to use i
 
 ```toml
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 ```
 

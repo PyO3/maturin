@@ -30,7 +30,6 @@ metadata = {
     "interpreter": platform.python_implementation().lower(),
     "ext_suffix": ext_suffix,
     "soabi": sysconfig.get_config_var("SOABI") or None,
-    "abi_tag": (sysconfig.get_config_var("SOABI") or "-").split("-")[1] or None,
     "platform": sysconfig.get_platform(),
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),

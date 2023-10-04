@@ -1,7 +1,5 @@
 Install the crate as module in the current virtualenv
 
-Note that this command doesn't create entrypoints
-
 Usage: maturin[EXE] develop [OPTIONS] [ARGS]...
 
 Arguments:
@@ -24,6 +22,17 @@ Options:
           Install extra requires aka. optional dependencies
           
           Use as `--extras=extra1,extra2`
+
+      --skip-install
+          Skip installation, only build the extension module inplace
+          
+          Only works with mixed Rust/Python project layout
+
+      --pip-path <PIP_PATH>
+          Use a specific pip installation instead of the default one.
+          
+          This can be used to supply the path to a pip executable when the current virtualenv does
+          not provide one.
 
   -q, --quiet
           Do not print cargo log messages
@@ -85,4 +94,4 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')

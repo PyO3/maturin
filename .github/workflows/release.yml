@@ -17,7 +17,7 @@ jobs:
       name: crates.io
       url: ${{ steps.set_url.outputs.env_url }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
@@ -59,7 +59,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -100,7 +100,7 @@ jobs:
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --universal2 --features password-storage
+          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
@@ -171,7 +171,7 @@ jobs:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build wheel
         run: |
           sudo python3 -m pip install -U --pre maturin
@@ -208,13 +208,16 @@ jobs:
     container:
       image: docker://${{ matrix.platform.image }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # powerpc64le-unknown-linux-musl doesn't have official std library release
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.platform.target == 's390x-unknown-linux-gnu'
         with:
           targets: ${{ matrix.platform.target }}
       - name: Build wheel
+        env:
+          # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
+          CFLAGS_s390x_unknown_linux_gnu: "-march=z10"
         run: |
           sudo python3 -m pip install -U --pre maturin
           maturin build --release -b bin -o dist \
@@ -237,7 +240,8 @@ jobs:
 
   release-pypi:
     permissions:
-      # Used to sign the release's artifacts with sigstore-python.
+      # Used to sign the release's artifacts with sigstore-python
+      # and upload to PyPI using trusted publisher.
       id-token: write
       # Used to upload release artifacts.
       contents: write
@@ -254,20 +258,18 @@ jobs:
           name: wheels
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: '3.10'
       - name: Publish
-        env:
-          MATURIN_PASSWORD: ${{ secrets.MATURIN_PASSWORD }}
         run: |
           pip install maturin
-          maturin upload -u __token__ --skip-existing *
+          maturin upload --skip-existing *
       - name: Set environment url
         id: set_url
         run: |
           VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
           echo "env_url=https://pypi.org/project/maturin/$VERSION" >> $GITHUB_OUTPUT
       - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v1.2.1
+        uses: sigstore/gh-action-sigstore-python@v2.1.0
         with:
           inputs: ./*.tar.gz ./*.whl
           upload-signing-artifacts: true
@@ -295,7 +297,7 @@ jobs:
         with:
           name: binaries
       - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v1.2.1
+        uses: sigstore/gh-action-sigstore-python@v2.1.0
         with:
           inputs: ./*.tar.gz ./*.zip ./*.deb
           upload-signing-artifacts: true

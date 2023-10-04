@@ -46,22 +46,31 @@ Ready to contribute? Here's how to setup maturin for local development.
    $ git checkout -b branch-name
    ```
    Now you can make your changes locally.
-5. When you're done making changes, format your changes with `cargo fmt`, then
-   lint with `cargo clippy` and test them with `cargo test`:
+5. When you're done making changes, ensure the tests pass by running
    ```bash
-   $ cargo fmt
-   $ cargo clippy
    $ cargo test
    ```
    Note that in order to run tests you need to install `virtualenv` and
    `cffi` (`pip3 install cffi virtualenv`).
-6. Commit your changes and push your branch to GitHub:
+6. make sure your changes are well formatted and pass the linting checks by
+   installing [pre-commit](https://pre-commit.com/) and running
+   ```bash
+   $ pre-commit run --hook-stage manual --all
+   ```
+   running `pre-commit install` will enable running the checks automatically before every commit
+   (except for the slow checks: `cargo check` and `cargo clippy` which are only run manually).
+   You can also look at `.pre-commit-config.yaml` and run the individual checks yourself if you prefer.
+7. Commit your changes and push your branch to GitHub:
    ```bash
    $ git add .
    $ git Commit
    $ git push origin branch-name
    ```
-7. Submit a pull request through the [GitHub website](https://github.com/PyO3/maturin/pulls).
+8. Submit a pull request through the [GitHub website](https://github.com/PyO3/maturin/pulls).
+
+We provide a pre-configured [dev container](https://containers.dev/) that could be used in [Github Codespaces](https://github.com/features/codespaces), [VSCode](https://code.visualstudio.com/), [JetBrains](https://www.jetbrains.com/remote-development/gateway/), [JuptyerLab](https://jupyterlab.readthedocs.io/en/stable/).
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/pyo3/maturin?quickstart=1&machine=standardLinux32gb)
 
 ## Pull Request Guidelines
 
@@ -80,7 +89,7 @@ The `sysconfig` folder contains the output of `python -m sysconfig` for differen
 
 You need to install `cffi` and `virtualenv` (`pip install cffi virtualenv`) to run the tests.
 
-You can set the `MATURIN_TEST_PYTHON` environment variable to run the tests against a specific Python version, 
+You can set the `MATURIN_TEST_PYTHON` environment variable to run the tests against a specific Python version,
 for example `MATURIN_TEST_PYTHON=python3.11 cargo test` will run the tests against Python 3.11.
 
 There are some optional hacks that can speed up the tests (over 80s to 17s on my machine).

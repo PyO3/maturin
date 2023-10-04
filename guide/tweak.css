@@ -1,0 +1,17 @@
+.sponsors {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.sponsors>div {
+  text-align: center;
+  width: 33%;
+  padding-bottom: 20px;
+}
+
+.sponsors span {
+  display: block;
+}

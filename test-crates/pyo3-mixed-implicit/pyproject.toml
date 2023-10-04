@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyo3_mixed_implicit"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Rust"
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "pyo3_mixed_implicit.some_rust.rust"
+python-source = "python"

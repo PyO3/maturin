@@ -8,6 +8,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from contextvars import ContextVar
 from importlib import abc
 from importlib.machinery import ModuleSpec
 from types import ModuleType
@@ -17,6 +18,11 @@ try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore
+
+
+# Track if we have already built the package, so we can avoid infinite
+# recursion.
+_ALREADY_BUILT = ContextVar("_ALREADY_BUILT", default=False)
 
 
 class Importer(abc.MetaPathFinder):
@@ -34,6 +40,10 @@ class Importer(abc.MetaPathFinder):
     ) -> ModuleSpec | None:
         if fullname in sys.modules:
             return None
+        if _ALREADY_BUILT.get():
+            # At this point we'll just import normally.
+            return None
+
         mod_parts = fullname.split(".")
         module_name = mod_parts[-1]
 
@@ -74,7 +84,13 @@ class Loader(abc.Loader):
         self.fullname = fullname
 
     def load_module(self, fullname: str) -> ModuleType:
-        return importlib.import_module(self.fullname)
+        # By the time we're loading, the package should've already been built
+        # by the previous step of finding the spec.
+        old_value = _ALREADY_BUILT.set(True)
+        try:
+            return importlib.import_module(self.fullname)
+        finally:
+            _ALREADY_BUILT.reset(old_value)
 
 
 def _is_cargo_project(cargo_toml: pathlib.Path, module_name: str) -> bool:
@@ -150,7 +166,7 @@ def install(bindings: str | None = None, release: bool = False) -> Importer | No
     if _have_importer():
         return None
     importer = Importer(bindings=bindings, release=release)
-    sys.meta_path.append(importer)
+    sys.meta_path.insert(0, importer)
     return importer
 
 

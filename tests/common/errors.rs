@@ -3,6 +3,9 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use maturin::BuildOptions;
 use pretty_assertions::assert_eq;
+use std::path::Path;
+use std::process::Command;
+use std::str;
 
 pub fn abi3_without_version() -> Result<()> {
     // The first argument is ignored by clap
@@ -39,7 +42,6 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "--quiet",
         "--target-dir",
         "test-crates/targets/pyo3_no_extension_module",
-        "-i=python",
         "--out",
         "test-crates/targets/pyo3_no_extension_module",
     ];
@@ -104,7 +106,6 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "build",
         "-m",
         "test-crates/pyo3-mixed/Cargo.toml",
-        "-i=python",
         "--compatibility",
         "manylinux_2_99",
         "--target-dir",
@@ -127,5 +128,30 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         bail!("Should have errored");
     }
 
+    Ok(())
+}
+
+/// The user set `python-source` in pyproject.toml, but there is no python module in there
+pub fn warn_on_missing_python_source() -> Result<()> {
+    let output = Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .arg("build")
+        .arg("-m")
+        .arg(
+            Path::new("test-crates")
+                .join("wrong-python-source")
+                .join("Cargo.toml"),
+        )
+        .output()
+        .unwrap();
+    if !output.status.success() {
+        bail!(
+            "Failed to run: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
+    assert!(str::from_utf8(&output.stderr)?.contains("Warning: You specified the python source as"));
     Ok(())
 }

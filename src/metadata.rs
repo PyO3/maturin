@@ -1,12 +1,17 @@
-use crate::{CargoToml, PyProjectToml};
-use anyhow::{bail, Context, Result};
+use crate::PyProjectToml;
+use anyhow::{bail, format_err, Context, Result};
 use fs_err as fs;
+use indexmap::IndexMap;
+use pep440_rs::{Version, VersionSpecifiers};
+use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue, Requirement};
+use pyproject_toml::License;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str;
+use std::str::FromStr;
 
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -23,14 +28,14 @@ pub struct WheelMetadata {
 
 /// Python Package Metadata 2.1 as specified in
 /// https://packaging.python.org/specifications/core-metadata/
-#[derive(Serialize, Deserialize, Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct Metadata21 {
     // Mandatory fields
     pub metadata_version: String,
     pub name: String,
-    pub version: String,
+    pub version: Version,
     // Optional fields
     pub platform: Vec<String>,
     pub supported_platform: Vec<String>,
@@ -48,16 +53,52 @@ pub struct Metadata21 {
     // https://peps.python.org/pep-0639/#license-file-multiple-use
     pub license_files: Vec<PathBuf>,
     pub classifiers: Vec<String>,
-    pub requires_dist: Vec<String>,
+    pub requires_dist: Vec<Requirement>,
     pub provides_dist: Vec<String>,
     pub obsoletes_dist: Vec<String>,
-    pub requires_python: Option<String>,
+    pub requires_python: Option<VersionSpecifiers>,
     pub requires_external: Vec<String>,
-    pub project_url: HashMap<String, String>,
+    pub project_url: IndexMap<String, String>,
     pub provides_extra: Vec<String>,
-    pub scripts: HashMap<String, String>,
-    pub gui_scripts: HashMap<String, String>,
-    pub entry_points: HashMap<String, HashMap<String, String>>,
+    pub scripts: IndexMap<String, String>,
+    pub gui_scripts: IndexMap<String, String>,
+    pub entry_points: IndexMap<String, IndexMap<String, String>>,
+}
+
+impl Metadata21 {
+    /// Initializes with name, version and otherwise the defaults
+    pub fn new(name: String, version: Version) -> Self {
+        Self {
+            metadata_version: "2.1".to_string(),
+            name,
+            version,
+            platform: vec![],
+            supported_platform: vec![],
+            summary: None,
+            description: None,
+            description_content_type: None,
+            keywords: None,
+            home_page: None,
+            download_url: None,
+            author: None,
+            author_email: None,
+            maintainer: None,
+            maintainer_email: None,
+            license: None,
+            license_files: vec![],
+            classifiers: vec![],
+            requires_dist: vec![],
+            provides_dist: vec![],
+            obsoletes_dist: vec![],
+            requires_python: None,
+            requires_external: vec![],
+            project_url: Default::default(),
+            provides_extra: vec![],
+            scripts: Default::default(),
+            gui_scripts: Default::default(),
+            entry_points: Default::default(),
+        }
+    }
 }
 
 const PLAINTEXT_CONTENT_TYPE: &str = "text/plain; charset=UTF-8";
@@ -140,16 +181,21 @@ impl Metadata21 {
                 self.requires_python = Some(requires_python.clone());
             }
 
-            if let Some(pyproject_toml::License { file, text }) = &project.license {
-                if file.is_some() && text.is_some() {
-                    bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
-                }
-                if let Some(license_path) = file {
-                    let license_path = pyproject_dir.join(license_path);
-                    self.license_files.push(license_path);
-                }
-                if let Some(license_text) = text {
-                    self.license = Some(license_text.clone());
+            if let Some(license) = &project.license {
+                match license {
+                    // TODO: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
+                    License::String(license_expr) => self.license = Some(license_expr.clone()),
+                    License::Table { file, text } => match (file, text) {
+                        (Some(_), Some(_)) => {
+                            bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
+                        }
+                        (Some(license_path), None) => {
+                            let license_path = pyproject_dir.join(license_path);
+                            self.license_files.push(license_path);
+                        }
+                        (None, Some(license_text)) => self.license = Some(license_text.clone()),
+                        (None, None) => {}
+                    },
                 }
             }
 
@@ -241,18 +287,23 @@ impl Metadata21 {
             }
 
             if let Some(dependencies) = &project.optional_dependencies {
+                // Transform the extra -> deps map into the PEP 508 style `dep ; extras = ...` style
                 for (extra, deps) in dependencies {
                     self.provides_extra.push(extra.clone());
                     for dep in deps {
-                        let dist = if let Some((dep, marker)) = dep.split_once(';') {
-                            // optional dependency already has environment markers
-                            let new_marker =
-                                format!("({}) and extra == '{}'", marker.trim(), extra);
-                            format!("{dep}; {new_marker}")
+                        let mut dep = dep.clone();
+                        // Keep in sync with `develop()`!
+                        let new_extra = MarkerTree::Expression(MarkerExpression {
+                            l_value: MarkerValue::Extra,
+                            operator: MarkerOperator::Equal,
+                            r_value: MarkerValue::QuotedString(extra.to_string()),
+                        });
+                        if let Some(existing) = dep.marker.take() {
+                            dep.marker = Some(MarkerTree::And(vec![existing, new_extra]));
                         } else {
-                            format!("{dep}; extra == '{extra}'")
-                        };
-                        self.requires_dist.push(dist);
+                            dep.marker = Some(new_extra);
+                        }
+                        self.requires_dist.push(dep);
                     }
                 }
             }
@@ -281,7 +332,6 @@ impl Metadata21 {
     ///
     /// manifest_path must be the directory, not the file
     pub fn from_cargo_toml(
-        cargo_toml: &CargoToml,
         manifest_path: impl AsRef<Path>,
         cargo_metadata: &cargo_metadata::Metadata,
     ) -> Result<Metadata21> {
@@ -294,8 +344,6 @@ impl Metadata21 {
         } else {
             None
         };
-
-        let extra_metadata = cargo_toml.remaining_core_metadata();
 
         let mut description: Option<String> = None;
         let mut description_content_type: Option<String> = None;
@@ -329,17 +377,8 @@ impl Metadata21 {
                 }
             }
         };
-        let name = extra_metadata
-            .name
-            .map(|name| {
-                if let Some(pos) = name.find('.') {
-                    name.split_at(pos).0.to_string()
-                } else {
-                    name.clone()
-                }
-            })
-            .unwrap_or_else(|| package.name.clone());
-        let mut project_url = HashMap::new();
+        let name = package.name.clone();
+        let mut project_url = IndexMap::new();
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
@@ -349,12 +388,18 @@ impl Metadata21 {
             Vec::new()
         };
 
+        let version = Version::from_str(&package.version.to_string()).map_err(|err| {
+            format_err!(
+                "Rust version used in Cargo.toml is not a valid python version: {}. \
+                    Note that rust uses [SemVer](https://semver.org/) while python uses \
+                    [PEP 440](https://peps.python.org/pep-0440/), which have e.g. some differences \
+                    when declaring prereleases.",
+                err
+            )
+        })?;
         let metadata = Metadata21 {
-            metadata_version: "2.1".to_owned(),
-
+            // name, version and metadata_version are added through Metadata21::new()
             // Mapped from cargo metadata
-            name,
-            version: package.version.to_string(),
             summary: package.description.clone(),
             description,
             description_content_type,
@@ -375,7 +420,7 @@ impl Metadata21 {
             license: package.license.clone(),
             license_files,
             project_url,
-            ..Default::default()
+            ..Metadata21::new(name, version)
         };
         Ok(metadata)
     }
@@ -387,7 +432,7 @@ impl Metadata21 {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),
             ("Name", self.name.clone()),
-            ("Version", self.get_pep440_version()),
+            ("Version", self.version.to_string()),
         ];
 
         let mut add_vec = |name, values: &[String]| {
@@ -399,7 +444,14 @@ impl Metadata21 {
         add_vec("Platform", &self.platform);
         add_vec("Supported-Platform", &self.supported_platform);
         add_vec("Classifier", &self.classifiers);
-        add_vec("Requires-Dist", &self.requires_dist);
+        add_vec(
+            "Requires-Dist",
+            &self
+                .requires_dist
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>(),
+        );
         add_vec("Provides-Dist", &self.provides_dist);
         add_vec("Obsoletes-Dist", &self.obsoletes_dist);
         add_vec("Requires-External", &self.requires_external);
@@ -427,7 +479,13 @@ impl Metadata21 {
         add_option("Maintainer", &self.maintainer);
         add_option("Maintainer-email", &self.maintainer_email);
         add_option("License", &self.license.as_deref().map(fold_header));
-        add_option("Requires-Python", &self.requires_python);
+        add_option(
+            "Requires-Python",
+            &self
+                .requires_python
+                .as_ref()
+                .map(|requires_python| requires_python.to_string()),
+        );
         add_option("Description-Content-Type", &self.description_content_type);
         // Project-URL is special
         // "A string containing a browsable URL for the project and a label for it, separated by a comma."
@@ -484,21 +542,7 @@ impl Metadata21 {
     /// Returns the version encoded according to PEP 427, Section "Escaping
     /// and Unicode"
     pub fn get_version_escaped(&self) -> String {
-        self.get_pep440_version().replace('-', "_")
-    }
-
-    /// Returns the version encoded according to PEP 440
-    ///
-    /// See https://github.com/pypa/setuptools/blob/d90cf84e4890036adae403d25c8bb4ee97841bbf/pkg_resources/__init__.py#L1336-L1345
-    pub fn get_pep440_version(&self) -> String {
-        match pep440::Version::parse(&self.version) {
-            Some(ver) => ver.normalize(),
-            None => {
-                let ver = self.version.replace(' ', ".");
-                let re = Regex::new(r"[^A-Za-z0-9.]+").unwrap();
-                re.replace_all(&ver, "-").to_string()
-            }
-        }
+        self.version.to_string().replace('-', "_")
     }
 
     /// Returns the name of the .dist-info directory as defined in the wheel specification
@@ -538,13 +582,14 @@ fn fold_header(text: &str) -> String {
 mod test {
     use super::*;
     use cargo_metadata::MetadataCommand;
+    use expect_test::{expect, Expect};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     fn assert_metadata_from_cargo_toml(
         readme: &str,
         cargo_toml: &str,
-        expected: &str,
+        expected: Expect,
     ) -> Metadata21 {
         let crate_dir = tempfile::tempdir().unwrap();
         let crate_path = crate_dir.path();
@@ -562,26 +607,18 @@ mod test {
         };
 
         let toml_with_path = cargo_toml.replace("REPLACE_README_PATH", &readme_path);
-        fs::write(&manifest_path, &toml_with_path).unwrap();
+        fs::write(&manifest_path, toml_with_path).unwrap();
 
-        let cargo_toml_struct: CargoToml = toml::from_str(&toml_with_path).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_path)
             .exec()
             .unwrap();
 
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml_struct, crate_path, &cargo_metadata).unwrap();
+        let metadata = Metadata21::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
 
         let actual = metadata.to_file_contents().unwrap();
 
-        assert_eq!(
-            actual.trim(),
-            expected.trim(),
-            "Actual metadata differed from expected\nEXPECTED:\n{}\n\nGOT:\n{}",
-            expected,
-            actual
-        );
+        expected.assert_eq(&actual);
 
         // get_dist_info_dir test checks against hard-coded values - check that they are as expected in the source first
         assert!(
@@ -590,13 +627,6 @@ mod test {
             "cargo_toml name and version string do not match hardcoded values, test will fail",
         );
 
-        if cargo_toml_struct.remaining_core_metadata().name.is_none() {
-            assert_eq!(
-                metadata.get_dist_info_dir(),
-                PathBuf::from("info_project-0.1.0.dist-info"),
-                "Dist info dir differed from expected"
-            );
-        }
         metadata
     }
 
@@ -627,8 +657,7 @@ mod test {
         "#
         );
 
-        let expected = indoc!(
-            r#"
+        let expected = expect![[r#"
             Metadata-Version: 2.1
             Name: info-project
             Version: 0.1.0
@@ -642,63 +671,10 @@ mod test {
             # Some test package
 
             This is the readme for a test package
-        "#
-        );
+
+        "#]];
 
         assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
-    }
-
-    #[test]
-    fn test_metadata_from_cargo_toml_name_override() {
-        let readme = indoc!(
-            r#"
-            Some test package
-            =================
-        "#
-        );
-
-        let cargo_toml = indoc!(
-            r#"
-            [package]
-            authors = ["konstin <konstin@mailbox.org>"]
-            name = "info-project"
-            version = "0.1.0"
-            description = "A test project"
-            homepage = "https://example.org"
-            readme = "REPLACE_README_PATH"
-
-            [lib]
-            crate-type = ["cdylib"]
-            name = "pyo3_pure"
-
-            [package.metadata.maturin]
-            name = "info"
-        "#
-        );
-
-        let expected = indoc!(
-            r#"
-            Metadata-Version: 2.1
-            Name: info
-            Version: 0.1.0
-            Summary: A test project
-            Home-Page: https://example.org
-            Author: konstin <konstin@mailbox.org>
-            Author-email: konstin <konstin@mailbox.org>
-            Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
-
-            Some test package
-            =================
-        "#
-        );
-
-        let metadata = assert_metadata_from_cargo_toml(readme, cargo_toml, expected);
-
-        assert_eq!(
-            metadata.get_dist_info_dir(),
-            PathBuf::from("info-0.1.0.dist-info"),
-            "Dist info dir differed from expected"
-        );
     }
 
     #[test]
@@ -726,14 +702,11 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_toml() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -760,8 +733,9 @@ mod test {
         assert_eq!(
             metadata.requires_dist,
             &[
-                "attrs; extra == 'test'",
-                "boltons; (sys_platform == 'win32') and extra == 'test'"
+                Requirement::from_str("attrs; extra == 'test'",).unwrap(),
+                Requirement::from_str("boltons; (sys_platform == 'win32') and extra == 'test'")
+                    .unwrap(),
             ]
         );
         assert_eq!(metadata.license.as_ref().unwrap(), "MIT");
@@ -777,14 +751,11 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -801,14 +772,11 @@ mod test {
     #[test]
     fn test_implicit_readme() {
         let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         assert!(metadata.description.unwrap().starts_with("# pyo3-mixed"));
         assert_eq!(
             metadata.description_content_type.unwrap(),
@@ -819,14 +787,11 @@ mod test {
     #[test]
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
         let manifest_dir = PathBuf::from("test-crates").join("license-test");
-        let cargo_toml_str = fs_err::read_to_string(manifest_dir.join("Cargo.toml")).unwrap();
-        let cargo_toml: CargoToml = toml::from_str(&cargo_toml_str).unwrap();
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata =
-            Metadata21::from_cargo_toml(&cargo_toml, &manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata21::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)

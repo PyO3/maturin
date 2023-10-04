@@ -1,12 +1,6 @@
 name: Test
 
 on:
-  push:
-    branches:
-      # for bors r+
-      - staging
-      # for bors try
-      - trying
   pull_request:
     paths-ignore:
       - "guide/**"
@@ -15,6 +9,7 @@ on:
       - ".cirrus.yml"
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/dependabot.yml"
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -43,28 +38,11 @@ jobs:
             const OS = yaml.load(process.env.OS_MATRIX)
             const PYTHON_VERSIONS = yaml.load(process.env.PYTHON_VERSION)
 
-            if (context.eventName == 'workflow_dispatch') {
-              // Run all of them on workflow dispatch
+            if (context.eventName == 'workflow_dispatch' || context.eventName == 'merge_group') {
+              // Run all of them on workflow dispatch or merge group
               core.setOutput('os', OS)
               core.setOutput('python-version', PYTHON_VERSIONS)
               core.setOutput('fail-fast', 'false')
-            } else if (context.eventName == 'push') {
-              const commitMessage = process.env.COMMIT_MESSAGE.trim()
-              const matches = commitMessage.match(/(Try|Merge) #([0-9]+):/)
-              if (matches) {
-                const prNumber = matches[2]
-                const { data: { labels: labels } } = await github.rest.pulls.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: prNumber
-                })
-                const labelNames = labels.map(label => label.name)
-                if (labelNames.includes('CI-no-fail-fast')) {
-                  core.setOutput('fail-fast', 'false')
-                }
-              }
-              core.setOutput('os', OS)
-              core.setOutput('python-version', PYTHON_VERSIONS)
             } else if (context.eventName == 'pull_request') {
               const { data: { labels: labels } } = await github.rest.pulls.get({
                 owner: context.repo.owner,
@@ -84,16 +62,9 @@ jobs:
               core.setOutput('os', OS.filter(os => !os.startsWith('macos')))
             }
     env:
-      COMMIT_MESSAGE: >
-        ${{
-            ((
-              (startsWith(github.event.head_commit.message, 'Try #') || startsWith(github.event.head_commit.message, 'Merge #')) &&
-              github.event.head_commit.author.username == 'bors[bot]'
-            ) && github.event.head_commit.message) || ''
-          }}
       OS_MATRIX: |
         - ubuntu-latest
-        - macos-latest
+        - macos-13
         - windows-latest
       PYTHON_VERSION: |
         - '3.12-dev'
@@ -102,8 +73,8 @@ jobs:
         - '3.9'
         - '3.10'
         - '3.11'
-        - 'pypy3.8'
         - 'pypy3.9'
+        - 'pypy3.10'
 
   test:
     name: Test
@@ -125,15 +96,15 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: Sccache Setup
-        # Just for test, come back to upstream after released
-        uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0-pre.7"
-      - uses: actions/checkout@v3
+          version: "v0.5.3"
+      - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-activate-base: "false"
           activate-environment: ""
+          miniconda-version: "latest"
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -149,18 +120,18 @@ jobs:
         if: ${{ !contains(matrix.python-version, 'pypy') }}
         run: pip install cffi
       - name: Install python packages
-        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.23.0
-      - uses: dtolnay/rust-toolchain@beta
+        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.24.1
+      - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
           targets: wasm32-wasi # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install aarch64-apple-darwin Rust target
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         run: rustup target add aarch64-apple-darwin
       - name: Setup Xcode env
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         shell: bash
         run: |
           set -ex
@@ -174,7 +145,7 @@ jobs:
       # Install gnu-tar because BSD tar is buggy
       # https://github.com/actions/cache/issues/403
       - name: Install GNU tar (macOS)
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         run: |
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
@@ -253,13 +224,13 @@ jobs:
   test-emscripten:
     name: Test Emscripten
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
-      PYODIDE_VERSION: "0.22.0"
-      PYTHON_VERSION: "3.10.2"
+      PYODIDE_VERSION: "0.23.4"
+      PYTHON_VERSION: "3.11.2"
       NODE_VERSION: 18
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         id: setup-python
         with:
@@ -297,12 +268,14 @@ jobs:
       CARGO_TERM_COLOR: always
     container: alpine:latest
     steps:
-      - uses: actions/checkout@v3
       - name: Install build requirements
         run: |
           set -ex
-          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd
+          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd git patchelf
           pip3 install cffi virtualenv
+      - uses: actions/checkout@v4
+      - name: Fix git permissions
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
@@ -328,8 +301,8 @@ jobs:
         manylinux: ["manylinux_2_24"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@beta
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         id: rustup
       # Caching
       - name: Cache cargo build
@@ -350,19 +323,19 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v2
+      - uses: docker/setup-buildx-action@v3
       - name: Build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: false
@@ -386,27 +359,27 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             abi: cp37-cp37m
             python: python3.7
-            container: ghcr.io/messense/manylinux2014-cross:aarch64
+            container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
           - target: armv7-unknown-linux-gnueabihf
             abi: cp39-cp39
             python: python3.9
-            container: ghcr.io/messense/manylinux2014-cross:armv7
+            container: ghcr.io/rust-cross/manylinux2014-cross:armv7
           - target: s390x-unknown-linux-gnu
             abi: cp310-cp310
             python: python3.10
-            container: ghcr.io/messense/manylinux2014-cross:s390x
+            container: ghcr.io/rust-cross/manylinux2014-cross:s390x
           # PyPy
           - target: aarch64-unknown-linux-gnu
-            abi: pp37-pypy37_pp73
-            python: pypy3.7
-            container: ghcr.io/messense/manylinux2014-cross:aarch64
+            abi: pp39-pypy39_pp73
+            python: pypy3.9
+            container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
           - target: aarch64-unknown-linux-gnu
-            abi: pp38-pypy38_pp73
-            python: pypy3.8
-            container: ghcr.io/messense/manylinux2014-cross:aarch64
+            abi: pp310-pypy310_pp73
+            python: pypy3.10
+            container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@beta
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
       - name: Build wheels
@@ -423,6 +396,9 @@ jobs:
           # Test abi3
           cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
 
+          # --find-interpreter
+          cargo run --target x86_64-unknown-linux-gnu -- build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+
   test-bootstrap:
     name: Test Bootstrap
     runs-on: ${{ matrix.os }}
@@ -432,9 +408,9 @@ jobs:
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-13, windows-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -444,15 +420,16 @@ jobs:
               - 'pyproject.toml'
               - 'setup.py'
               - 'MANIFEST.in'
+              - 'Cargo.toml'
               - '.github/workflows/test.yml'
-      - uses: dtolnay/rust-toolchain@beta
+      - uses: dtolnay/rust-toolchain@stable
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: Xuanwo/sccache-action@c94e27bef21ab3fb4a5152c8a878c53262b4abb0
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
-          version: "v0.4.0-pre.7"
+          version: "v0.5.3"
       - uses: actions/setup-python@v4
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:
@@ -479,8 +456,8 @@ jobs:
     name: Test MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@1.63.0
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.64.0
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
@@ -494,8 +471,10 @@ jobs:
     runs-on: ubuntu-latest
     container: pyston/pyston:2.3.5
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@beta
+      - uses: actions/checkout@v4
+      - name: Fix git permissions
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
+      - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
           targets: wasm32-wasi
@@ -526,12 +505,12 @@ jobs:
             apt-packages: gcc-arm-linux-gnueabi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install packages
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.platform.apt-packages }}
-      - uses: dtolnay/rust-toolchain@beta
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
       - name: Cache cargo build

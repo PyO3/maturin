@@ -56,10 +56,6 @@ Options:
           
           Make sure you installed zig with `pip install maturin[zig]`
 
-      --universal2
-          Control whether to build universal2 wheel for macOS or not. Only applies to macOS targets,
-          do nothing otherwise
-
   -q, --quiet
           Do not print cargo log messages
 
@@ -120,4 +116,4 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')

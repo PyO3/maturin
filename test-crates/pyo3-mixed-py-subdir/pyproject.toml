@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -14,4 +14,5 @@ requires-python = ">=3.6"
 get_42 = "pyo3_mixed_py_subdir:get_42"
 
 [tool.maturin]
+module-name = "pyo3_mixed_py_subdir._pyo3_mixed"
 python-source = "python"

@@ -2,18 +2,17 @@
 
 _formerly pyo3-pack_
 
-[![Actions Status](https://img.shields.io/github/actions/workflow/status/PyO3/maturin/test.yml?branch=main&logo=github&style=flat-square)](https://github.com/PyO3/maturin/actions)
-[![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
-[![Bors enabled](https://bors.tech/images/badge_small.svg)](https://app.bors.tech/repositories/55651)
+[![Maturin User Guide](https://img.shields.io/badge/user-guide-brightgreen?logo=readthedocs&style=flat-square)](https://maturin.rs)
 [![Crates.io](https://img.shields.io/crates/v/maturin.svg?logo=rust&style=flat-square)](https://crates.io/crates/maturin)
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?logo=python&style=flat-square)](https://pypi.org/project/maturin)
-[![Maturin User Guide](https://img.shields.io/badge/user-guide-brightgreen?logo=readthedocs&style=flat-square)](https://maturin.rs)
+[![Actions Status](https://img.shields.io/github/actions/workflow/status/PyO3/maturin/test.yml?branch=main&logo=github&style=flat-square)](https://github.com/PyO3/maturin/actions)
+[![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?logo=gitter&style=flat-square)](https://gitter.im/PyO3/Lobby)
 
 Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages.
 
 This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake).
-It supports building wheels for python 3.5+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy support.
+It supports building wheels for python 3.7+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
 
 Check out the [User Guide](https://maturin.rs/)!
 
@@ -121,6 +120,7 @@ You can specify a different python source directory in `pyproject.toml` by setti
 ```toml
 [tool.maturin]
 python-source = "python"
+module-name = "my_project._lib_name"
 ```
 
 then the project structure would look like this:
@@ -154,11 +154,23 @@ my-project
 ├── my_project
 │   ├── __init__.py
 │   ├── bar.py
-│   └── my_project.cpython-36m-x86_64-linux-gnu.so
+│   └── _lib_name.cpython-36m-x86_64-linux-gnu.so
 ├── README.md
 └── src
     └── lib.rs
 ```
+
+When doing this also be sure to set the module name in your code to match the last part of `module-name` (don't include the package path):
+
+```
+#[pymodule]
+#[pyo3(name="_lib_name")]
+fn my_lib_name(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_class::<MyPythonRustClass>()?;
+    Ok(())
+}
+```
+
 
 ## Python metadata
 
@@ -181,7 +193,7 @@ The keys are the script names while the values are the path to the function in t
 get_42 = "my_project:DummyClass.get_42"
 ```
 
-You can also specify [trove classifiers](https://pypi.org/classifiers/) in your Cargo.toml under `project.classifiers`:
+You can also specify [trove classifiers](https://pypi.org/classifiers/) in your `pyproject.toml` under `project.classifiers`:
 
 ```toml
 [project]
@@ -195,7 +207,7 @@ maturin supports building through `pyproject.toml`. To use it, create a `pyproje
 
 ```toml
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 ```
 
@@ -211,7 +223,7 @@ For a non-manylinux build with cffi bindings you could use the following:
 
 ```toml
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
@@ -259,9 +271,11 @@ maturin itself is manylinux compliant when compiled for the musl target.
 ## Examples
 
 * [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
+* [chardetng-py](https://github.com/john-parton/chardetng-py) - Python binding for the chardetng character encoding detector.
 * [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
 * [datafusion-python](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
 * [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
+* [opendal](https://github.com/apache/incubator-opendal/tree/main/bindings/python) - OpenDAL Python Binding to access data freely
 * [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
 * [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js
 * [pydantic-core](https://github.com/pydantic/pydantic-core) - Core validation logic for pydantic written in Rust

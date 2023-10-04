@@ -10,6 +10,7 @@
 # for maturin itself use `maturin sdist`.
 
 import os
+import shlex
 
 try:
     import tomllib
@@ -47,7 +48,7 @@ with open("Cargo.toml", "rb") as fp:
 # `MATURIN_SETUP_ARGS` env var can be used to pass customized arguments to cargo.
 cargo_args = ["--no-default-features"]
 if os.getenv("MATURIN_SETUP_ARGS"):
-    cargo_args = os.getenv("MATURIN_SETUP_ARGS").split()
+    cargo_args = shlex.split(os.getenv("MATURIN_SETUP_ARGS", ""))
 
 setup(
     name="maturin",

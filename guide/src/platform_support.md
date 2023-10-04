@@ -36,12 +36,12 @@ supported by [manylinux](https://github.com/pypa/manylinux).
 CPython 3.7 to 3.10 are supported and tested on CI, though the entire 3.x series should work.
 This will be changed as new python versions are released and others have their end of life.
 
-PyPy 3.6 and later also works.
+PyPy 3.6 and later also works, as does GraalPy 23.0 and later.
 
 ## Manylinux/Musllinux
 
 `manylinux2014` and  its newer versions as well as `musllinux_1_1` and its newer versions
 are supported.
 
-Since Rust and the manylinux project drop support for old manylinux/musllinux versions sometimes, 
+Since Rust and the manylinux project drop support for old manylinux/musllinux versions sometimes,
 after maturin 1.0 manylinux version bumps will be minor versions rather than major versions.

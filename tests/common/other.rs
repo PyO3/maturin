@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use expect_test::Expect;
 use flate2::read::GzDecoder;
+use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
 use maturin::{BuildOptions, CargoOptions, PlatformTag};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::Read;
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use time::OffsetDateTime;
@@ -115,8 +116,9 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 
 pub fn test_source_distribution(
     package: impl AsRef<Path>,
-    expected_files: Vec<&str>,
-    expected_cargo_toml: Option<(&Path, &str)>,
+    sdist_generator: SdistGenerator,
+    expected_files: Expect,
+    expected_cargo_toml: Option<(&Path, Expect)>,
     unique_name: &str,
 ) -> Result<()> {
     let manifest_path = package.as_ref().join("Cargo.toml");
@@ -135,7 +137,22 @@ pub fn test_source_distribution(
         ..Default::default()
     };
 
-    let build_context = build_options.into_build_context(false, false, false)?;
+    let mut build_context = build_options.into_build_context(false, false, false)?;
+
+    // Override the sdist generator for testing
+    let mut pyproject_toml = build_context.pyproject_toml.take().unwrap();
+    let mut tool = pyproject_toml.tool.clone().unwrap_or_default();
+    if let Some(ref mut tool_maturin) = tool.maturin {
+        tool_maturin.sdist_generator = sdist_generator;
+    } else {
+        tool.maturin = Some(ToolMaturin {
+            sdist_generator,
+            ..Default::default()
+        });
+    }
+    pyproject_toml.tool = Some(tool);
+    build_context.pyproject_toml = Some(pyproject_toml);
+
     let (path, _) = build_context
         .build_source_distribution()?
         .context("Failed to build source distribution")?;
@@ -158,16 +175,13 @@ pub fn test_source_distribution(
             }
         }
     }
-    assert_eq!(
-        files,
-        BTreeSet::from_iter(expected_files.into_iter().map(ToString::to_string))
-    );
+    expected_files.assert_debug_eq(&files);
     assert_eq!(file_count, files.len(), "duplicated files found in sdist");
 
     if let Some((cargo_toml_path, expected)) = expected_cargo_toml {
         let cargo_toml = cargo_toml
             .with_context(|| format!("{} not found in sdist", cargo_toml_path.display()))?;
-        assert_eq!(cargo_toml, expected);
+        expected.assert_eq(&cargo_toml.replace("\r\n", "\n"));
     }
     Ok(())
 }

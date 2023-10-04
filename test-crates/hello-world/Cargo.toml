@@ -8,10 +8,3 @@ readme = "../../README.md"
 default-run = "hello-world"
 
 [dependencies]
-
-[[package.metadata.maturin.targets]]
-name = "hello-world"
-bindings = "bin"
-
-[[package.metadata.maturin.targets]]
-name = "foo"

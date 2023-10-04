@@ -3,17 +3,22 @@
 
 use crate::build_context::hash_file;
 use anyhow::{bail, Context, Result};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use bytesize::ByteSize;
 use configparser::ini::Ini;
 use fs_err as fs;
 use fs_err::File;
 use multipart::client::lazy::Multipart;
 use regex::Regex;
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::env;
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use thiserror::Error;
 use tracing::debug;
 
@@ -28,11 +33,7 @@ pub struct PublishOpt {
     /// The URL of the registry where the wheels are uploaded to. This overrides --repository.
     ///
     /// Can also be set via MATURIN_REPOSITORY_URL environment variable.
-    #[arg(
-        long = "repository-url",
-        env = "MATURIN_REPOSITORY_URL",
-        overrides_with = "repository"
-    )]
+    #[arg(long, env = "MATURIN_REPOSITORY_URL", overrides_with = "repository")]
     repository_url: Option<String>,
     /// Username for pypi or your custom registry.
     ///
@@ -44,17 +45,30 @@ pub struct PublishOpt {
     /// Password for pypi or your custom registry.
     ///
     /// Can also be set via MATURIN_PASSWORD environment variable.
-    #[arg(short, long)]
+    #[arg(short, long, env = "MATURIN_PASSWORD", hide_env_values = true)]
     password: Option<String>,
     /// Continue uploading files if one already exists.
     /// (Only valid when uploading to PyPI. Other implementations may not support this.)
-    #[arg(long = "skip-existing")]
+    #[arg(long)]
     skip_existing: bool,
+    /// Do not interactively prompt for username/password if the required credentials are missing.
+    ///
+    /// Can also be set via MATURIN_NON_INTERACTIVE environment variable.
+    #[arg(long, env = "MATURIN_NON_INTERACTIVE")]
+    non_interactive: bool,
 }
 
 impl PublishOpt {
     const DEFAULT_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy/";
     const TEST_REPOSITORY_URL: &'static str = "https://test.pypi.org/legacy/";
+
+    /// Set to non interactive mode if we're running on CI
+    pub fn non_interactive_on_ci(&mut self) {
+        if !self.non_interactive && env::var("CI").map(|v| v == "true").unwrap_or_default() {
+            eprintln!("🎛️ Running in non-interactive mode on CI");
+            self.non_interactive = true;
+        }
+    }
 }
 
 /// Error type for different types of errors that can happen when uploading a
@@ -67,7 +81,7 @@ impl PublishOpt {
 pub enum UploadError {
     /// Any ureq error
     #[error("Http error")]
-    UreqError(#[source] ureq::Error),
+    UreqError(#[source] Box<ureq::Error>),
     /// The registry returned a "403 Forbidden"
     #[error("Username or password are incorrect")]
     AuthenticationError(String),
@@ -97,7 +111,7 @@ impl From<io::Error> for UploadError {
 
 impl From<ureq::Error> for UploadError {
     fn from(error: ureq::Error) -> Self {
-        UploadError::UreqError(error)
+        UploadError::UreqError(Box::new(error))
     }
 }
 
@@ -196,27 +210,104 @@ fn resolve_pypi_cred(
     opt: &PublishOpt,
     config: &Ini,
     registry_name: Option<&str>,
-) -> (String, String) {
+    registry_url: &str,
+) -> Result<(String, String)> {
     // API token from environment variable takes priority
     if let Ok(token) = env::var("MATURIN_PYPI_TOKEN") {
-        return ("__token__".to_string(), token);
+        return Ok(("__token__".to_string(), token));
+    }
+
+    // Try to get a token via OIDC exchange
+    match resolve_pypi_token_via_oidc(registry_url) {
+        Ok(Some(token)) => {
+            eprintln!("🔐 Using trusted publisher for upload");
+            return Ok(("__token__".to_string(), token));
+        }
+        Ok(None) => {}
+        Err(e) => eprintln!("⚠️ Warning: Failed to resolve PyPI token via OIDC: {}", e),
     }
 
     if let Some((username, password)) =
         registry_name.and_then(|name| load_pypi_cred_from_config(config, name))
     {
         eprintln!("🔐 Using credential in pypirc for upload");
-        return (username, password);
+        return Ok((username, password));
     }
 
     // fallback to username and password
+    if opt.non_interactive && (opt.username.is_none() || opt.password.is_none()) {
+        bail!("Credentials not found and non-interactive mode is enabled");
+    }
     let username = opt.username.clone().unwrap_or_else(get_username);
     let password = opt
         .password
         .clone()
-        .or_else(|| env::var("MATURIN_PASSWORD").ok())
         .unwrap_or_else(|| get_password(&username));
-    (username, password)
+    Ok((username, password))
+}
+
+#[derive(Debug, Deserialize)]
+struct OidcAudienceResponse {
+    audience: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OidcTokenResponse {
+    value: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct MintTokenResponse {
+    token: String,
+}
+
+/// Trusted Publisher support for GitHub Actions
+fn resolve_pypi_token_via_oidc(registry_url: &str) -> Result<Option<String>> {
+    if env::var_os("GITHUB_ACTIONS").is_none() {
+        return Ok(None);
+    }
+    if let (Ok(req_token), Ok(req_url)) = (
+        env::var("ACTIONS_ID_TOKEN_REQUEST_TOKEN"),
+        env::var("ACTIONS_ID_TOKEN_REQUEST_URL"),
+    ) {
+        let registry_url = url::Url::parse(registry_url)?;
+        let mut audience_url = registry_url.clone();
+        audience_url.set_path("_/oidc/audience");
+        debug!("Requesting OIDC audience from {}", audience_url);
+        let agent = http_agent()?;
+        let audience_res = agent
+            .get(audience_url.as_str())
+            .timeout(Duration::from_secs(30))
+            .call()?;
+        if audience_res.status() == 404 {
+            // OIDC is not enabled/supported on this registry
+            return Ok(None);
+        }
+        let audience = audience_res.into_json::<OidcAudienceResponse>()?.audience;
+
+        debug!("Requesting OIDC token for {} from {}", audience, req_url);
+        let request_token_res: OidcTokenResponse = agent
+            .get(&req_url)
+            .query("audience", &audience)
+            .set("Authorization", &format!("bearer {req_token}"))
+            .timeout(Duration::from_secs(30))
+            .call()?
+            .into_json()?;
+        let oidc_token = request_token_res.value;
+
+        let mut mint_token_url = registry_url;
+        mint_token_url.set_path("_/oidc/github/mint-token");
+        debug!("Requesting API token from {}", mint_token_url);
+        let mut mint_token_req = HashMap::new();
+        mint_token_req.insert("token", oidc_token);
+        let mint_token_res = agent
+            .post(mint_token_url.as_str())
+            .timeout(Duration::from_secs(30))
+            .send_json(mint_token_req)?
+            .into_json::<MintTokenResponse>()?;
+        return Ok(Some(mint_token_res.token));
+    }
+    Ok(None)
 }
 
 /// Asks for username and password for a registry account where missing.
@@ -248,7 +339,7 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
             opt.repository
         );
     };
-    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name);
+    let (username, password) = resolve_pypi_cred(opt, &pypirc, registry_name, &registry_url)?;
     let registry = Registry::new(username, password, registry_url);
 
     Ok(registry)
@@ -268,6 +359,8 @@ fn http_proxy() -> Result<String, env::VarError> {
         .or_else(|_| env::var("https_proxy"))
         .or_else(|_| env::var("HTTP_PROXY"))
         .or_else(|_| env::var("http_proxy"))
+        .or_else(|_| env::var("ALL_PROXY"))
+        .or_else(|_| env::var("all_proxy"))
 }
 
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
@@ -412,7 +505,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 
     form.add_stream("content", &wheel, Some(wheel_name), None);
     let multipart_data = form.prepare().map_err(|e| e.error)?;
-    let encoded = base64::encode(format!("{}:{}", registry.username, registry.password));
+    let encoded = STANDARD.encode(format!("{}:{}", registry.username, registry.password));
 
     let agent = http_agent()?;
 
@@ -467,7 +560,7 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
                 }
             }
         }
-        Err(err) => Err(UploadError::UreqError(err)),
+        Err(err) => Err(UploadError::UreqError(err.into())),
     }
 }
 

@@ -1,6 +1,13 @@
 [build-system]
-requires = ["maturin>=0.14,<0.15"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
 bindings = "bin"
+
+[[tool.maturin.targets]]
+name = "hello-world"
+bindings = "bin"
+
+[[tool.maturin.targets]]
+name = "foo"

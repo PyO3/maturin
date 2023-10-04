@@ -1,7 +1,8 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
-use crate::{BridgeModel, Target};
+use crate::{BridgeModel, BuildContext, Target};
 use anyhow::{bail, format_err, Context, Result};
+use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -20,8 +21,8 @@ mod config;
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
 /// Be liberal here to include preview versions
-const MAXIMUM_PYTHON_MINOR: usize = 12;
-const MAXIMUM_PYPY_MINOR: usize = 10;
+pub const MAXIMUM_PYTHON_MINOR: usize = 12;
+pub const MAXIMUM_PYPY_MINOR: usize = 10;
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -30,15 +31,18 @@ fn windows_interpreter_no_build(
     target_width: usize,
     pointer_width: usize,
     min_python_minor: usize,
+    requires_python: Option<&VersionSpecifiers>,
 ) -> bool {
-    // Python 2 support has been dropped
-    if major == 2 {
+    // Only python 3 with supported major versions
+    if major != 3 || minor < min_python_minor {
         return true;
     }
 
-    // Ignore python 3.0 - 3.5
-    if major == 3 && minor < min_python_minor {
-        return true;
+    // From requires-python in pyproject.toml
+    if let Some(requires_python) = requires_python {
+        if !requires_python.contains(&Version::from_release(vec![major, minor])) {
+            return true;
+        }
     }
 
     // There can be 32-bit installations on a 64-bit machine, but we can't link
@@ -89,7 +93,11 @@ fn windows_interpreter_no_build(
 /// As well as the version numbers, etc. of the interpreters we also have to find the
 /// pointer width to make sure that the pointer width (32-bit or 64-bit) matches across
 /// platforms.
-fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<String>> {
+fn find_all_windows(
+    target: &Target,
+    min_python_minor: usize,
+    requires_python: Option<&VersionSpecifiers>,
+) -> Result<Vec<String>> {
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
@@ -136,20 +144,26 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                         target.pointer_width(),
                         pointer_width,
                         min_python_minor,
+                        requires_python,
                     ) {
                         continue;
                     }
 
                     let executable = capture.get(6).unwrap().as_str();
-                    let version = format!("-{major}.{minor}-{pointer_width}");
-                    let output = Command::new(executable)
-                        .args(["-c", code])
-                        .output()
-                        .unwrap();
+                    let output = Command::new(executable).args(["-c", code]).output();
+                    let output = match output {
+                        Ok(output) => output,
+                        Err(err) => {
+                            eprintln!(
+                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                            );
+                            continue;
+                        }
+                    };
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
                     if !output.status.success() || path.trim().is_empty() {
                         eprintln!(
-                            "⚠️  Warning: couldn't determine the path to python for `py {version}`"
+                            "⚠️  Warning: couldn't determine the path to python for `{executable}`"
                         );
                         continue;
                     }
@@ -192,6 +206,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     target.pointer_width(),
                     python_info.pointer_width.unwrap(),
                     min_python_minor,
+                    requires_python,
                 ) {
                     continue;
                 }
@@ -212,6 +227,7 @@ fn find_all_windows(target: &Target, min_python_minor: usize) -> Result<Vec<Stri
                     target.pointer_width(),
                     python_info.pointer_width.unwrap(),
                     min_python_minor,
+                    requires_python,
                 ) {
                     continue;
                 }
@@ -266,7 +282,6 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
             interpreter_kind: InterpreterKind::CPython,
             abiflags: String::new(),
             ext_suffix: String::new(),
-            abi_tag: None,
             pointer_width: Some(pointer_width),
         }))
     } else {
@@ -280,6 +295,7 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
 pub enum InterpreterKind {
     CPython,
     PyPy,
+    GraalPy,
 }
 
 impl InterpreterKind {
@@ -292,6 +308,11 @@ impl InterpreterKind {
     pub fn is_pypy(&self) -> bool {
         matches!(self, InterpreterKind::PyPy)
     }
+
+    /// Is this a GraalPy interpreter?
+    pub fn is_graalpy(&self) -> bool {
+        matches!(self, InterpreterKind::GraalPy)
+    }
 }
 
 impl fmt::Display for InterpreterKind {
@@ -299,6 +320,7 @@ impl fmt::Display for InterpreterKind {
         match *self {
             InterpreterKind::CPython => write!(f, "CPython"),
             InterpreterKind::PyPy => write!(f, "PyPy"),
+            InterpreterKind::GraalPy => write!(f, "GraalPy"),
         }
     }
 }
@@ -310,6 +332,7 @@ impl FromStr for InterpreterKind {
         match s.to_ascii_lowercase().as_str() {
             "cpython" => Ok(InterpreterKind::CPython),
             "pypy" => Ok(InterpreterKind::PyPy),
+            "graalvm" | "graalpy" => Ok(InterpreterKind::GraalPy),
             unknown => Err(format!("Unknown interpreter kind '{unknown}'")),
         }
     }
@@ -330,7 +353,6 @@ struct InterpreterMetadataMessage {
     // comes from `platform.system()`
     system: String,
     soabi: Option<String>,
-    abi_tag: Option<String>,
 }
 
 /// The location and version of an interpreter
@@ -353,7 +375,7 @@ pub struct PythonInterpreter {
     /// and it's `executable` is empty
     pub runnable: bool,
     /// Comes from `sys.platform.name`
-    pub implmentation_name: String,
+    pub implementation_name: String,
     /// Comes from sysconfig var `SOABI`
     pub soabi: Option<String>,
 }
@@ -388,16 +410,16 @@ fn fun_with_abiflags(
         )
     }
 
-    if message.major != 3 || message.minor < 5 {
+    if message.major != 3 || message.minor < 7 {
         bail!(
-            "Only python >= 3.5 is supported, while you're using python {}.{}",
+            "Only python >= 3.7 is supported, while you're using python {}.{}",
             message.major,
             message.minor
         );
     }
 
-    if message.interpreter == "pypy" {
-        // pypy does not specify abi flags
+    if message.interpreter == "pypy" || message.interpreter == "graalvm" {
+        // pypy and graalpy do not specify abi flags
         Ok("".to_string())
     } else if message.system == "windows" {
         if matches!(message.abiflags.as_deref(), Some("") | None) {
@@ -422,12 +444,12 @@ fn fun_with_abiflags(
 impl PythonInterpreter {
     /// Does this interpreter have PEP 384 stable api aka. abi3 support?
     pub fn has_stable_api(&self) -> bool {
-        if self.implmentation_name.parse::<InterpreterKind>().is_err() {
+        if self.implementation_name.parse::<InterpreterKind>().is_err() {
             false
         } else {
             match self.interpreter_kind {
                 InterpreterKind::CPython => true,
-                InterpreterKind::PyPy => false,
+                InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
             }
         }
     }
@@ -438,14 +460,10 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(
-        &self,
-        target: &Target,
-        platform_tags: &[PlatformTag],
-        universal2: bool,
-    ) -> Result<String> {
+    pub fn get_tag(&self, context: &BuildContext, platform_tags: &[PlatformTag]) -> Result<String> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
+        let target = &context.target;
         let use_sysconfig_platform = target.is_windows()
             || (target.is_linux() && platform_tags.iter().any(|tag| !tag.is_portable()))
             || target.is_illumos();
@@ -453,17 +471,17 @@ impl PythonInterpreter {
             if let Some(platform) = self.platform.clone() {
                 platform
             } else {
-                target.get_platform_tag(platform_tags, universal2)?
+                context.get_platform_tag(platform_tags)?
             }
         } else {
-            target.get_platform_tag(platform_tags, universal2)?
+            context.get_platform_tag(platform_tags)?
         };
-        let tag = if self.implmentation_name.parse::<InterpreterKind>().is_err() {
+        let tag = if self.implementation_name.parse::<InterpreterKind>().is_err() {
             // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston
             // See also https://github.com/pypa/packaging/blob/0031046f7fad649580bc3127d1cef9157da0dd79/packaging/tags.py#L234-L261
             format!(
                 "{interpreter}{major}{minor}-{soabi}-{platform}",
-                interpreter = self.implmentation_name,
+                interpreter = self.implementation_name,
                 major = self.major,
                 minor = self.minor,
                 soabi = self
@@ -498,14 +516,23 @@ impl PythonInterpreter {
                     // pypy uses its version as part of the ABI, e.g.
                     // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2014_x86_64.whl
                     format!(
-                        "pp{major}{minor}-pypy{major}{minor}_{abi_tag}-{platform}",
+                        "pp{major}{minor}-{abi_tag}-{platform}",
                         major = self.major,
                         minor = self.minor,
-                        // TODO: Proper tag handling for pypy
-                        abi_tag = self
-                            .abi_tag
-                            .clone()
-                            .expect("PyPy's syconfig didn't define an `SOABI` ಠ_ಠ"),
+                        abi_tag = calculate_abi_tag(&self.ext_suffix)
+                            .expect("PyPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
+                        platform = platform,
+                    )
+                }
+                InterpreterKind::GraalPy => {
+                    // GraalPy like PyPy uses its version as part of the ABI
+                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native_manylinux2014_x86_64.whl
+                    format!(
+                        "graalpy{major}{minor}-{abi_tag}_{platform}",
+                        major = self.major,
+                        minor = self.minor,
+                        abi_tag = calculate_abi_tag(&self.ext_suffix)
+                            .expect("GraalPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
                         platform = platform,
                     )
                 }
@@ -552,6 +579,7 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
     ) -> Result<Option<PythonInterpreter>> {
         let output = Command::new(executable.as_ref())
+            .env("PYTHONNOUSERSITE", "1")
             .args(["-c", GET_INTERPRETER_METADATA])
             .output();
 
@@ -596,7 +624,8 @@ impl PythonInterpreter {
                             cmd.arg("/c")
                                 .arg("py")
                                 .arg(format!("-{}-{}", ver, target.pointer_width()))
-                                .arg(metadata_py.path());
+                                .arg(metadata_py.path())
+                                .env("PYTHONNOUSERSITE", "1");
                             let output = cmd.output();
                             match output {
                                 Ok(output) if output.status.success() => output,
@@ -628,6 +657,7 @@ impl PythonInterpreter {
         let interpreter = match message.interpreter.as_str() {
             "cpython" => InterpreterKind::CPython,
             "pypy" => InterpreterKind::PyPy,
+            "graalvm" | "graalpy" => InterpreterKind::GraalPy,
             other => {
                 bail!("Unsupported interpreter {}", other);
             }
@@ -663,26 +693,25 @@ impl PythonInterpreter {
                 ext_suffix: message
                     .ext_suffix
                     .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
-                abi_tag: message.abi_tag,
                 pointer_width: None,
             },
             executable,
             platform,
             runnable: true,
-            implmentation_name: message.implementation_name,
+            implementation_name: message.implementation_name,
             soabi: message.soabi,
         }))
     }
 
     /// Construct a `PythonInterpreter` from a sysconfig and target
     pub fn from_config(config: InterpreterConfig) -> Self {
-        let implmentation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
+        let implementation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
         PythonInterpreter {
             config,
             executable: PathBuf::new(),
             platform: None,
             runnable: false,
-            implmentation_name,
+            implementation_name,
             soabi: None,
         }
     }
@@ -690,16 +719,18 @@ impl PythonInterpreter {
     /// Find all available python interpreters for a given target
     pub fn find_by_target(
         target: &Target,
-        min_python_minor: Option<usize>,
+        requires_python: Option<&VersionSpecifiers>,
     ) -> Vec<PythonInterpreter> {
         InterpreterConfig::lookup_target(target)
             .into_iter()
-            .filter_map(|config| match min_python_minor {
-                Some(min_python_minor) => {
-                    if config.minor < min_python_minor {
-                        None
-                    } else {
+            .filter_map(|config| match requires_python {
+                Some(requires_python) => {
+                    if requires_python
+                        .contains(&Version::from_release(vec![config.major, config.minor]))
+                    {
                         Some(Self::from_config(config))
+                    } else {
+                        None
                     }
                 }
                 None => Some(Self::from_config(config)),
@@ -708,47 +739,49 @@ impl PythonInterpreter {
     }
 
     /// Tries to find all installed python versions using the heuristic for the
-    /// given platform
+    /// given platform.
+    ///
+    /// We have two filters: The optional requires-python from the pyproject.toml and minimum python
+    /// minor either from the bindings (i.e. Cargo.toml `abi3-py{major}{minor}`) or the global
+    /// default minimum minor version
     pub fn find_all(
         target: &Target,
         bridge: &BridgeModel,
-        min_python_minor: Option<usize>,
+        requires_python: Option<&VersionSpecifiers>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = match min_python_minor {
-            Some(requires_python_minor) => match bridge {
-                BridgeModel::Bindings(bridge_name, minor)
-                | BridgeModel::Bin(Some((bridge_name, minor))) => {
-                    // requires-python minor version might be lower than bridge crate required minor version
-                    if requires_python_minor >= *minor {
-                        requires_python_minor
-                    } else {
-                        eprintln!(
-                            "⚠️  Warning: 'requires-python' (3.{}) is lower than the requirement of {} crate (3.{}).",
-                            requires_python_minor, bridge_name, *minor
-                        );
-                        *minor
-                    }
-                }
-                _ => requires_python_minor,
-            },
-            None => match bridge {
-                BridgeModel::Bindings(_, minor) | BridgeModel::Bin(Some((_, minor))) => *minor,
-                _ => MINIMUM_PYTHON_MINOR,
-            },
+        let min_python_minor = match bridge {
+            BridgeModel::Bindings(_, minor) | BridgeModel::Bin(Some((_, minor))) => *minor,
+            _ => MINIMUM_PYTHON_MINOR,
         };
         let executables = if target.is_windows() {
-            find_all_windows(target, min_python_minor)?
+            find_all_windows(target, min_python_minor, requires_python)?
         } else {
             let mut executables: Vec<String> = (min_python_minor..=MAXIMUM_PYTHON_MINOR)
+                .filter(|minor| {
+                    requires_python
+                        .map(|requires_python| {
+                            requires_python.contains(&Version::from_release(vec![3, *minor]))
+                        })
+                        .unwrap_or(true)
+                })
                 .map(|minor| format!("python3.{minor}"))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
-            if matches!(bridge, BridgeModel::Cffi)
+            if *bridge == BridgeModel::Cffi
                 || bridge.is_bindings("pyo3")
                 || bridge.is_bindings("pyo3-ffi")
             {
                 executables.extend(
-                    (min_python_minor..=MAXIMUM_PYPY_MINOR).map(|minor| format!("pypy3.{minor}")),
+                    (min_python_minor..=MAXIMUM_PYPY_MINOR)
+                        .filter(|minor| {
+                            requires_python
+                                .map(|requires_python| {
+                                    requires_python
+                                        .contains(&Version::from_release(vec![3, *minor]))
+                                })
+                                .unwrap_or(true)
+                        })
+                        .map(|minor| format!("pypy3.{minor}")),
                 );
             }
             executables
@@ -868,8 +901,28 @@ impl PythonInterpreter {
         let pointer_width = self.pointer_width.unwrap_or(64);
         format!(
             "{}-{}.{}-{}bit",
-            self.implmentation_name, self.major, self.minor, pointer_width
+            self.implementation_name, self.major, self.minor, pointer_width
         )
+    }
+
+    /// Returns the site-packages directory inside a venv e.g.
+    /// {venv_base}/lib/python{x}.{y} on unix or {venv_base}/Lib on window
+    pub fn get_venv_site_package(&self, venv_base: impl AsRef<Path>, target: &Target) -> PathBuf {
+        if target.is_unix() {
+            match self.interpreter_kind {
+                InterpreterKind::CPython | InterpreterKind::GraalPy => {
+                    let python_dir = format!("python{}.{}", self.major, self.minor);
+                    venv_base
+                        .as_ref()
+                        .join("lib")
+                        .join(python_dir)
+                        .join("site-packages")
+                }
+                InterpreterKind::PyPy => venv_base.as_ref().join("site-packages"),
+            }
+        } else {
+            venv_base.as_ref().join("Lib").join("site-packages")
+        }
     }
 }
 
@@ -894,6 +947,84 @@ impl fmt::Display for PythonInterpreter {
                 self.config.minor,
                 self.config.abiflags,
             )
+        }
+    }
+}
+
+/// Calculate the ABI tag from EXT_SUFFIX
+fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
+    let parts = ext_suffix.split('.').collect::<Vec<_>>();
+    if parts.len() < 3 {
+        // CPython3.7 and earlier uses ".pyd" on Windows.
+        return None;
+    }
+    let soabi = parts[1];
+    let mut soabi_split = soabi.split('-');
+    let abi = if soabi.starts_with("cpython") {
+        // non-windows
+        format!("cp{}", soabi_split.nth(1).unwrap())
+    } else if soabi.starts_with("cp") {
+        // windows
+        soabi_split.next().unwrap().to_string()
+    } else if soabi.starts_with("pypy") {
+        soabi_split.take(2).collect::<Vec<_>>().join("-")
+    } else if soabi.starts_with("graalpy") {
+        soabi_split.take(3).collect::<Vec<_>>().join("-")
+    } else if !soabi.is_empty() {
+        // pyston, ironpython, others?
+        soabi_split.nth(1).unwrap().to_string()
+    } else {
+        return None;
+    };
+    let abi_tag = abi.replace(['.', '-', ' '], "_");
+    Some(abi_tag)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_interpreter_by_target() {
+        let target =
+            Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
+        let pythons = PythonInterpreter::find_by_target(&target, None);
+        assert_eq!(pythons.len(), 10);
+
+        let pythons = PythonInterpreter::find_by_target(
+            &target,
+            Some(&VersionSpecifiers::from_str(">=3.7").unwrap()),
+        );
+        assert_eq!(pythons.len(), 10);
+
+        let pythons = PythonInterpreter::find_by_target(
+            &target,
+            Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
+        );
+        assert_eq!(pythons.len(), 4);
+    }
+
+    #[test]
+    fn test_calculate_abi_tag() {
+        let cases = vec![
+            (".cpython-37m-x86_64-linux-gnu.so", Some("cp37m")),
+            (".cpython-310-x86_64-linux-gnu.so", Some("cp310")),
+            (".cpython-310-darwin.so", Some("cp310")),
+            (".cp310-win_amd64.pyd", Some("cp310")),
+            (".cp39-mingw_x86_64.pyd", Some("cp39")),
+            (".cpython-312-wasm32-wasi.so", Some("cp312")),
+            (".cpython-38.so", Some("cp38")),
+            (".pyd", None),
+            (".so", None),
+            (".pypy38-pp73-x86_64-linux-gnu.so", Some("pypy38_pp73")),
+            (
+                ".graalpy-38-native-x86_64-darwin.dylib",
+                Some("graalpy_38_native"),
+            ),
+            (".pyston-23-x86_64-linux-gnu.so", Some("23")),
+        ];
+        for (ext_suffix, expected) in cases {
+            assert_eq!(calculate_abi_tag(ext_suffix).as_deref(), expected);
         }
     }
 }

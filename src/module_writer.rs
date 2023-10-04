@@ -872,11 +872,14 @@ fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
         .no_deps()
         .verbose(true)
         .exec()?;
-    let root_pkg = cargo_metadata.root_package().unwrap();
+    let root_pkg = cargo_metadata.root_package();
     let has_uniffi_bindgen_target = root_pkg
-        .targets
-        .iter()
-        .any(|target| target.name == "uniffi-bindgen" && target.is_bin());
+        .map(|pkg| {
+            pkg.targets
+                .iter()
+                .any(|target| target.name == "uniffi-bindgen" && target.is_bin())
+        })
+        .unwrap_or(false);
     let command = if has_uniffi_bindgen_target {
         let mut command = Command::new("cargo");
         command.args(["run", "--bin", "uniffi-bindgen", "--manifest-path"]);

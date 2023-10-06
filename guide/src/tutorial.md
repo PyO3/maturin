@@ -36,8 +36,8 @@ crate-type = ["cdylib"]
 rand = "0.8.4"
 
 [dependencies.pyo3]
-version = "0.18.0"
-# "abi3-py37" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.7
+version = "0.19.0"
+# "abi3-py38" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.8
 features = ["abi3-py37"]
 ```
 
@@ -76,7 +76,7 @@ Options:
 ```
 
 The above process can be achieved by running `maturin new -b pyo3 guessing_game`
-then edit `Cargo.toml` to add `abi3-py37` feature.
+then edit `Cargo.toml` to add `abi3-py38` feature.
 
 ## Install and configure maturin (in a virtual environment)
 
@@ -88,7 +88,7 @@ ferris@rustbox [~/src/rust/guessing-game] % python3 -m venv .venv
 ferris@rustbox [~/src/rust/guessing-game] % source .venv/bin/activate
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % pip install -U pip maturin
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % pip freeze
-maturin==0.14.0
+maturin==1.3.0
 tomli==2.0.1
 ```
 
@@ -200,7 +200,7 @@ So let's use maturin to build and install in our current environment.
 
 ```shell
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % maturin develop
-🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.7
+🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.8
 🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)
    Compiling pyo3-build-config v0.18.0
    Compiling libc v0.2.119
@@ -276,10 +276,10 @@ wheels compatible with a wide range of Linux distros.
 
 ```shell
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % maturin build
-🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.7
+🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.8
 🐍 Not using a specific python interpreter (With abi3, an interpreter is only required on windows)
     Finished dev [unoptimized + debuginfo] target(s) in 7.32s
-📦 Built wheel for abi3 Python ≥ 3.7 to /Users/ferris/src/rust/guessing-game/target/wheels/guessing_game-0.1.0-cp37-abi3-macosx_10_7_x86_64.whl
+📦 Built wheel for abi3 Python ≥ 3.8 to /Users/ferris/src/rust/guessing-game/target/wheels/guessing_game-0.1.0-cp37-abi3-macosx_10_7_x86_64.whl
 ```
 
 maturin can even publish wheels directly to [PyPI](https://pypi.org) with

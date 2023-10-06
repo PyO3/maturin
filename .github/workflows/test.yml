@@ -67,7 +67,6 @@ jobs:
         - macos-13
         - windows-latest
       PYTHON_VERSION: |
-        - '3.7'
         - '3.8'
         - '3.9'
         - '3.10'
@@ -357,8 +356,8 @@ jobs:
         platform:
           # CPython
           - target: aarch64-unknown-linux-gnu
-            abi: cp37-cp37m
-            python: python3.7
+            abi: cp38-cp38
+            python: python3.8
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
           - target: armv7-unknown-linux-gnueabihf
             abi: cp39-cp39

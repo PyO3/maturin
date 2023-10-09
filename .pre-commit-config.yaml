@@ -38,7 +38,7 @@ repos:
         types: [rust]
         stages: [manual]  # because it's slow
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: check-yaml
       - id: check-toml
@@ -60,7 +60,7 @@ repos:
     hooks:
       - id: black
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.0.291
+    rev: v0.0.292
     hooks:
       - id: ruff
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -70,6 +70,6 @@ repos:
         entry: mypy maturin/
         pass_filenames: false
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.5
+    rev: v2.2.6
     hooks:
     - id: codespell

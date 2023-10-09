@@ -289,3 +289,13 @@ Options:
   -h, --help
           Print help information (use `-h` for a summary)
 ```
+
+### Using PyPI's trusted publishing
+
+By default, the workflow provided by `generate-ci` will publish the release artifacts to PyPI using API token authentication. However, maturin also supports [trusted publishing (OpenID Connect)](https://docs.pypi.org/trusted-publishers/).
+
+To enable it, modify the `release` action in the generated GitHub workflow file:
+- remove `MATURIN_PYPI_TOKEN` from the `env` section to make maturin use trusted publishing
+- add `id-token: write` to the action's `permissions` (see [Configuring OpenID Connect in PyPI](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-pypi) from GitHub's documentation).
+
+Make sure to follow the steps listed in [PyPI's documentation](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) to set up your GitHub repository as a trusted publisher in the PyPI project settings before attempting to run the workflow.

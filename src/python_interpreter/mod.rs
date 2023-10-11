@@ -526,9 +526,9 @@ impl PythonInterpreter {
                 }
                 InterpreterKind::GraalPy => {
                     // GraalPy like PyPy uses its version as part of the ABI
-                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native_manylinux2014_x86_64.whl
+                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native-manylinux2014_x86_64.whl
                     format!(
-                        "graalpy{major}{minor}-{abi_tag}_{platform}",
+                        "graalpy{major}{minor}-{abi_tag}-{platform}",
                         major = self.major,
                         minor = self.minor,
                         abi_tag = calculate_abi_tag(&self.ext_suffix)

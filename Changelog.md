@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 * Add unittest skeleton to mixed Python/Rust projects
+* Preserve trailing whitespace in new project files
 
 ## [1.3.0] - 2023-10-02
 

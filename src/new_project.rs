@@ -33,6 +33,7 @@ impl<'a> ProjectGenerator<'a> {
     ) -> Result<Self> {
         let crate_name = project_name.replace('-', "_");
         let mut env = Environment::new();
+        env.set_keep_trailing_newline(true);
         env.add_template(".gitignore", include_str!("templates/.gitignore.j2"))?;
         env.add_template("Cargo.toml", include_str!("templates/Cargo.toml.j2"))?;
         env.add_template(

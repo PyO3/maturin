@@ -13,6 +13,12 @@ classifiers = [
 {% if bindings == "cffi" -%}
 dependencies = ["cffi"]
 {% endif -%}
+{% if mixed_non_src -%}
+[project.optional-dependencies]
+tests = [
+    "pytest",
+]
+{% endif -%}
 dynamic = ["version"]
 
 {% if bindings in ["bin", "cffi", "pyo3", "rust-cpython"] or mixed_non_src -%}

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Add unittest skeleton to mixed Python/Rust projects
+
 ## [1.3.0] - 2023-10-02
 
 * Refactor Cargo sdist generator to avoid rewriting local dependencies in [#1741](https://github.com/PyO3/maturin/pull/1741)

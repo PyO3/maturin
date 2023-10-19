@@ -64,7 +64,8 @@ fn rewrite_cargo_toml(
                 let mut new_members = toml_edit::Array::new();
                 for member in members {
                     if let toml_edit::Value::String(ref s) = member {
-                        let path = Path::new(s.value());
+                        let member_path = s.value();
+                        let path = Path::new(member_path);
                         if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
                             // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
                             let is_glob_pattern = name.contains(['*', '?', '[', ']']);
@@ -78,11 +79,13 @@ fn rewrite_cargo_toml(
                                     .keys()
                                     .any(|path_dep| pattern.matches(path_dep))
                                 {
-                                    new_members.push(s.value());
+                                    new_members.push(member_path);
                                 }
-                            } else if known_path_deps.contains_key(name) {
-                                new_members.push(s.value());
+                            } else if known_path_deps.contains_key(member_path) {
+                                new_members.push(member_path);
                             }
+                        } else if known_path_deps.contains_key(member_path) {
+                            new_members.push(member_path);
                         }
                     }
                 }

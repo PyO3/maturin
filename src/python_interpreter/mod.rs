@@ -989,19 +989,19 @@ mod tests {
         let target =
             Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
         let pythons = PythonInterpreter::find_by_target(&target, None);
-        assert_eq!(pythons.len(), 10);
+        assert_eq!(pythons.len(), 11);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.7").unwrap()),
         );
-        assert_eq!(pythons.len(), 10);
+        assert_eq!(pythons.len(), 11);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
         );
-        assert_eq!(pythons.len(), 4);
+        assert_eq!(pythons.len(), 5);
     }
 
     #[test]

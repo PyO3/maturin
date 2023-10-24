@@ -13,6 +13,7 @@ from .common import (
     run_python,
     script_dir,
     test_crates,
+    handle_worker_process_error,
 )
 
 """
@@ -136,9 +137,14 @@ def test_concurrent_import() -> None:
         p2 = pool.apply_async(run_python, kwds=args)
         p3 = pool.apply_async(run_python, kwds=args)
 
-        output_1, duration_1 = p1.get()
-        output_2, duration_2 = p2.get()
-        output_3, duration_3 = p3.get()
+        with handle_worker_process_error():
+            output_1, duration_1 = p1.get()
+
+        with handle_worker_process_error():
+            output_2, duration_2 = p2.get()
+
+        with handle_worker_process_error():
+            output_3, duration_3 = p3.get()
 
     log("output 1")
     log(output_1)

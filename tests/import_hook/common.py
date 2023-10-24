@@ -7,8 +7,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple, Generator
 
 from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_info
 
@@ -251,3 +252,22 @@ def remove_ansii_escape_characters(text: str) -> str:
     based on: https://stackoverflow.com/a/14693789
     """
     return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", text)
+
+
+@contextmanager
+def handle_worker_process_error() -> Generator[None, None, None]:
+    """For some reason, catching and printing the exception output inside the
+    worker process does not appear in the pytest output, so catch and print in the main process
+    """
+    try:
+        yield
+    except subprocess.CalledProcessError as e:
+        stdout = None if e.stdout is None else e.stdout.decode()
+        stderr = None if e.stderr is None else e.stderr.decode()
+        print("Error in worker process")
+        print("-" * 50)
+        print(f"Stdout:\n{stdout}")
+        print("-" * 50)
+        print(f"Stderr:\n{stderr}")
+        print("-" * 50)
+        raise

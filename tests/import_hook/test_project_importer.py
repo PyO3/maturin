@@ -24,6 +24,7 @@ from .common import (
     test_crates,
     uninstall,
     with_underscores,
+    handle_worker_process_error,
 )
 
 """
@@ -396,9 +397,14 @@ print('SUCCESS')
         p2 = pool.apply_async(run_python_code, kwds=args)
         p3 = pool.apply_async(run_python_code, kwds=args)
 
-        output_1, duration_1 = p1.get()
-        output_2, duration_2 = p2.get()
-        output_3, duration_3 = p3.get()
+        with handle_worker_process_error():
+            output_1, duration_1 = p1.get()
+
+        with handle_worker_process_error():
+            output_2, duration_2 = p2.get()
+
+        with handle_worker_process_error():
+            output_3, duration_3 = p3.get()
 
     log("output 1")
     log(output_1)

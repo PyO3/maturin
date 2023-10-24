@@ -106,10 +106,11 @@ pub fn test_import_hook_parallel(
                 )
                 .unwrap()
             });
-            handles.push(handle);
+            handles.push((function_name, handle));
         }
-        for handle in handles {
+        for (function_name, handle) in handles {
             handle.join().unwrap();
+            println!("test {function_name}: passed")
         }
     });
     Ok(())

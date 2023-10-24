@@ -33,6 +33,7 @@ impl<'a> ProjectGenerator<'a> {
     ) -> Result<Self> {
         let crate_name = project_name.replace('-', "_");
         let mut env = Environment::new();
+        env.set_keep_trailing_newline(true);
         env.add_template(".gitignore", include_str!("templates/.gitignore.j2"))?;
         env.add_template("Cargo.toml", include_str!("templates/Cargo.toml.j2"))?;
         env.add_template(
@@ -43,6 +44,7 @@ impl<'a> ProjectGenerator<'a> {
         env.add_template("main.rs", include_str!("templates/main.rs.j2"))?;
         env.add_template("build.rs", include_str!("templates/build.rs.j2"))?;
         env.add_template("__init__.py", include_str!("templates/__init__.py.j2"))?;
+        env.add_template("test_all.py", include_str!("templates/test_all.py.j2"))?;
         env.add_template("example.udl", include_str!("templates/example.udl.j2"))?;
 
         let bridge_model = match bindings.as_str() {
@@ -85,6 +87,10 @@ impl<'a> ProjectGenerator<'a> {
                 let python_project = python_dir.join(&self.crate_name);
                 fs::create_dir_all(&python_project)?;
                 self.write_project_file(&python_project, "__init__.py")?;
+
+                let test_dir = python_dir.join("tests");
+                fs::create_dir_all(&test_dir)?;
+                self.write_project_file(&test_dir, "test_all.py")?;
 
                 if src {
                     project_path.join("rust")

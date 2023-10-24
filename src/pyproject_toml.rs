@@ -3,10 +3,13 @@
 use crate::PlatformTag;
 use anyhow::{Context, Result};
 use fs_err as fs;
+use pep440_rs::Version;
+use pep508_rs::VersionOrUrl;
 use pyproject_toml::{BuildSystem, Project};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// The `[tool]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -298,30 +301,52 @@ impl PyProjectToml {
         self.maturin()?.manifest_path.as_deref()
     }
 
+    /// Warn about `build-system.requires` mismatching expectations.
+    ///
     /// Having a pyproject.toml without a version constraint is a bad idea
     /// because at some point we'll have to do breaking changes and then source
-    /// distributions would break
+    /// distributions would break.
     ///
-    /// Returns true if the pyproject.toml has the constraint
-    pub fn warn_missing_maturin_version(&self) -> bool {
+    /// The second problem we check for is the current maturin version not matching the constraint.
+    ///
+    /// Returns false if a warning was emitted.
+    pub fn warn_bad_maturin_version(&self) -> bool {
         let maturin = env!("CARGO_PKG_NAME");
-        if let Some(requires_maturin) = self
+        let current_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<usize>().unwrap();
+        let self_version = Version::from_str(env!("CARGO_PKG_VERSION")).unwrap();
+        let requires_maturin = self
             .build_system
             .requires
             .iter()
-            .find(|x| x.name == maturin)
-        {
-            let current_major: usize = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
-            if requires_maturin.version_or_url.is_none() {
-                eprintln!(
-                    "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
-                    e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \
-                    This will become an error.",
-                    maturin = maturin,
-                    current = current_major,
-                    next = current_major + 1,
-                );
-                return false;
+            .find(|x| x.name == maturin);
+        if let Some(requires_maturin) = requires_maturin {
+            match requires_maturin.version_or_url.as_ref() {
+                Some(VersionOrUrl::VersionSpecifier(version_specifier)) => {
+                    if !version_specifier.contains(&self_version) {
+                        eprintln!(
+                            "⚠️  Warning: You specified {requires_maturin} in pyproject.toml under \
+                            `build-system.requires`, but the current {maturin} version is {version}",
+                            requires_maturin = requires_maturin,
+                            maturin = maturin,
+                            version = self_version,
+                        );
+                        return false;
+                    }
+                }
+                Some(VersionOrUrl::Url(_)) => {
+                    // We can't check this
+                }
+                None => {
+                    eprintln!(
+                        "⚠️  Warning: Please use {maturin} in pyproject.toml with a version constraint, \
+                        e.g. `requires = [\"{maturin}>={current}.0,<{next}.0\"]`. \
+                        This will become an error.",
+                        maturin = maturin,
+                        current = current_major,
+                        next = current_major + 1,
+                    );
+                    return false;
+                }
             }
         }
         true
@@ -421,7 +446,7 @@ mod tests {
     #[test]
     fn test_warn_missing_maturin_version() {
         let with_constraint = PyProjectToml::new("test-crates/pyo3-pure/pyproject.toml").unwrap();
-        assert!(with_constraint.warn_missing_maturin_version());
+        assert!(with_constraint.warn_bad_maturin_version());
         let without_constraint_dir = TempDir::new().unwrap();
         let pyproject_file = without_constraint_dir.path().join("pyproject.toml");
 
@@ -437,7 +462,27 @@ mod tests {
         )
         .unwrap();
         let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
-        assert!(!without_constraint.warn_missing_maturin_version());
+        assert!(!without_constraint.warn_bad_maturin_version());
+    }
+
+    #[test]
+    fn test_warn_incorrect_maturin_version() {
+        let without_constraint_dir = TempDir::new().unwrap();
+        let pyproject_file = without_constraint_dir.path().join("pyproject.toml");
+
+        fs::write(
+            &pyproject_file,
+            r#"[build-system]
+            requires = ["maturin==0.0.1"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            manylinux = "2010"
+            "#,
+        )
+        .unwrap();
+        let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
+        assert!(!without_constraint.warn_bad_maturin_version());
     }
 
     #[test]

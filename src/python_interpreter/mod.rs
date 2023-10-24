@@ -21,7 +21,7 @@ mod config;
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
 /// Be liberal here to include preview versions
-pub const MAXIMUM_PYTHON_MINOR: usize = 12;
+pub const MAXIMUM_PYTHON_MINOR: usize = 13;
 pub const MAXIMUM_PYPY_MINOR: usize = 10;
 
 /// Identifies conditions where we do not want to build wheels
@@ -150,15 +150,20 @@ fn find_all_windows(
                     }
 
                     let executable = capture.get(6).unwrap().as_str();
-                    let version = format!("-{major}.{minor}-{pointer_width}");
-                    let output = Command::new(executable)
-                        .args(["-c", code])
-                        .output()
-                        .unwrap();
+                    let output = Command::new(executable).args(["-c", code]).output();
+                    let output = match output {
+                        Ok(output) => output,
+                        Err(err) => {
+                            eprintln!(
+                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                            );
+                            continue;
+                        }
+                    };
                     let path = str::from_utf8(&output.stdout).unwrap().trim();
                     if !output.status.success() || path.trim().is_empty() {
                         eprintln!(
-                            "⚠️  Warning: couldn't determine the path to python for `py {version}`"
+                            "⚠️  Warning: couldn't determine the path to python for `{executable}`"
                         );
                         continue;
                     }
@@ -521,9 +526,9 @@ impl PythonInterpreter {
                 }
                 InterpreterKind::GraalPy => {
                     // GraalPy like PyPy uses its version as part of the ABI
-                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native_manylinux2014_x86_64.whl
+                    // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native-manylinux2014_x86_64.whl
                     format!(
-                        "graalpy{major}{minor}-{abi_tag}_{platform}",
+                        "graalpy{major}{minor}-{abi_tag}-{platform}",
                         major = self.major,
                         minor = self.minor,
                         abi_tag = calculate_abi_tag(&self.ext_suffix)
@@ -984,19 +989,19 @@ mod tests {
         let target =
             Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
         let pythons = PythonInterpreter::find_by_target(&target, None);
-        assert_eq!(pythons.len(), 10);
+        assert_eq!(pythons.len(), 11);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.7").unwrap()),
         );
-        assert_eq!(pythons.len(), 10);
+        assert_eq!(pythons.len(), 11);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
         );
-        assert_eq!(pythons.len(), 4);
+        assert_eq!(pythons.len(), 5);
     }
 
     #[test]

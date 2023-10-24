@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-* Add unittest skeleton to mixed Python/Rust projects
-* Preserve trailing whitespace in new project files
+## [1.3.1] - 2023-10-24
+
+* Use external `uniffi-bindgen` if no root package is configured in [#1797](https://github.com/PyO3/maturin/pull/1797)
+* Fix wheel filename for GraalPy in [#1802](https://github.com/PyO3/maturin/pull/1802)
+* Add unittest skeleton to mixed Python/Rust projects in [#1807](https://github.com/PyO3/maturin/pull/1807)
+* Preserve trailing whitespace in new project files in [#1808](https://github.com/PyO3/maturin/pull/1808)
+* Fix missing `workspace.members` in sdist in [#1811](https://github.com/PyO3/maturin/pull/1811)
+* Don't set `MACOSX_DEPLOYMENT_TARGET` for editable builds by default in [#1815](https://github.com/PyO3/maturin/pull/1815)
 
 ## [1.3.0] - 2023-10-02
 
@@ -921,7 +927,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/pyo3/maturin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pyo3/maturin/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/pyo3/maturin/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/pyo3/maturin/compare/v1.2.1...v1.2.2

@@ -37,45 +37,6 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --tests --all-features -- -D warnings
 
-  black:
-    name: Black
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      - uses: psf/black@23.9.1
-
-  ruff:
-    name: Ruff
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      - run: pip install ruff
-      - run: ruff .
-
-  mypy:
-    name: Mypy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      - run: pip install mypy
-      - run: mypy maturin
-
-  spellcheck:
-    name: Spellcheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: codespell-project/actions-codespell@master
-
   cargo-deny:
     name: Cargo deny
     runs-on: ubuntu-latest

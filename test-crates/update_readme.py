@@ -13,24 +13,16 @@ FILES = [
 
 
 def main():
-    root = Path(
-        subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"], text=True
-        ).strip()
-    )
+    root = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
 
     for path in FILES:
         content = root.joinpath(path).read_text()
 
-        matcher = re.compile(
-            r"```\nUsage: maturin (\w+) (.*?)```", re.MULTILINE | re.DOTALL
-        )
+        matcher = re.compile(r"```\nUsage: maturin (\w+) (.*?)```", re.MULTILINE | re.DOTALL)
 
         replaces = {}
         for command, old in matcher.findall(content):
-            command_output = subprocess.check_output(
-                ["cargo", "run", "--", command.lower(), "--help"], text=True
-            )
+            command_output = subprocess.check_output(["cargo", "run", "--", command.lower(), "--help"], text=True)
             new = "Usage:" + command_output.strip().split("Usage:")[1] + "\n"
             # Remove trailing whitespace
             new = re.sub(" +\n", "\n", new)

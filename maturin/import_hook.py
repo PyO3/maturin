@@ -71,9 +71,7 @@ class Importer(abc.MetaPathFinder):
 
         return None
 
-    def _build_and_load(
-        self, fullname: str, cargo_toml: pathlib.Path
-    ) -> ModuleSpec | None:
+    def _build_and_load(self, fullname: str, cargo_toml: pathlib.Path) -> ModuleSpec | None:
         build_module(cargo_toml, bindings=self.bindings)
         loader = Loader(fullname)
         return importlib.util.spec_from_loader(fullname, loader)
@@ -98,10 +96,7 @@ def _is_cargo_project(cargo_toml: pathlib.Path, module_name: str) -> bool:
         with open(cargo_toml, "rb") as f:
             cargo = tomllib.load(f)
             package_name = cargo.get("package", {}).get("name")
-            if (
-                package_name == module_name
-                or package_name.replace("-", "_") == module_name
-            ):
+            if package_name == module_name or package_name.replace("-", "_") == module_name:
                 return True
     return False
 
@@ -115,9 +110,7 @@ def generate_project(rust_file: pathlib.Path, bindings: str = "pyo3") -> pathlib
     command: list[str] = ["maturin", "new", "-b", bindings, str(project_dir)]
     result = subprocess.run(command, stdout=subprocess.PIPE)
     if result.returncode != 0:
-        sys.stderr.write(
-            f"Error: command {command} returned non-zero exit status {result.returncode}\n"
-        )
+        sys.stderr.write(f"Error: command {command} returned non-zero exit status {result.returncode}\n")
         raise ImportError("Failed to generate cargo project")
 
     with open(rust_file) as f:
@@ -128,9 +121,7 @@ def generate_project(rust_file: pathlib.Path, bindings: str = "pyo3") -> pathlib
     return project_dir
 
 
-def build_module(
-    manifest_path: pathlib.Path, bindings: str | None = None, release: bool = False
-) -> None:
+def build_module(manifest_path: pathlib.Path, bindings: str | None = None, release: bool = False) -> None:
     command = ["maturin", "develop", "-m", str(manifest_path)]
     if bindings:
         command.append("-b")
@@ -141,9 +132,7 @@ def build_module(
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
-        sys.stderr.write(
-            f"Error: command {command} returned non-zero exit status {result.returncode}\n"
-        )
+        sys.stderr.write(f"Error: command {command} returned non-zero exit status {result.returncode}\n")
         raise ImportError("Failed to build module with maturin")
 
 

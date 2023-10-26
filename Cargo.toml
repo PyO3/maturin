@@ -41,7 +41,7 @@ glob = "0.3.0"
 cargo-config2 = "0.1.9"
 cargo_metadata = "0.18.0"
 cargo-options = "0.6.0"
-cbindgen = { version = "0.25.0", default-features = false }
+cbindgen = { version = "0.26.0", default-features = false }
 flate2 = "1.0.18"
 goblin = "0.7.1"
 platform-info = "2.0.2"
@@ -88,7 +88,7 @@ tracing = "0.1.36"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional = true }
 
 # project scaffolding, maturin new/init/generate-ci
-dialoguer = { version = "0.10.2", default-features = false, optional = true }
+dialoguer = { version = "0.11.0", default-features = false, optional = true }
 console = { version = "0.15.4", optional = true }
 minijinja = { version = "1.0.7", optional = true }
 
@@ -99,7 +99,7 @@ dirs = { version = "5.0.0", optional = true }
 multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
 ureq = { version = "2.7.0", features = ["gzip", "json", "socks-proxy"], default-features = false, optional = true }
 native-tls = { version = "0.2.8", optional = true }
-rustls = { version = "0.21.2", optional = true }
+rustls = { version = "0.21.8", optional = true }
 rustls-pemfile = { version = "1.0.1", optional = true }
 keyring = { version = "2.0.0", default-features = false, features = ["linux-no-secret-service"], optional = true }
 wild = { version = "2.1.0", optional = true }

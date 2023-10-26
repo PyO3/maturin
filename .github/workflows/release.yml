@@ -165,6 +165,12 @@ jobs:
           - target: "arm-unknown-linux-musleabihf"
             image_tag: "arm-musleabihf"
             compatibility: "linux"
+          - target: "powerpc64le-unknown-linux-musl"
+            image_tag: "powerpc64le-musl"
+            compatibility: "manylinux2014 musllinux_1_1"
+          - target: "s390x-unknown-linux-gnu"
+            image_tag: "s390x"
+            compatibility: "manylinux2014"
     container:
       image: docker://ghcr.io/messense/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
@@ -172,46 +178,9 @@ jobs:
         CARGO_HOME: /root/.cargo
     steps:
       - uses: actions/checkout@v4
-      - name: Build wheel
-        run: |
-          sudo python3 -m pip install -U --pre maturin
-          maturin build --release -b bin -o dist \
-            --target ${{ matrix.platform.target }} \
-            --compatibility ${{ matrix.platform.compatibility }} \
-            --features password-storage
-      - name: Archive binary
-        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
-      - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: dist
-      - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: binaries
-          path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
-
-  build-no-rustls:
-    name: Build ${{ matrix.platform.target }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: "powerpc64le-unknown-linux-musl"
-            image: "ghcr.io/messense/rust-musl-cross:powerpc64le-musl"
-            compatibility: "manylinux2014 musllinux_1_1"
-          - target: "s390x-unknown-linux-gnu"
-            image: "ghcr.io/messense/manylinux2014-cross:s390x"
-            compatibility: "manylinux2014"
-    container:
-      image: docker://${{ matrix.platform.image }}
-    steps:
-      - uses: actions/checkout@v4
       # powerpc64le-unknown-linux-musl doesn't have official std library release
       - uses: dtolnay/rust-toolchain@stable
-        if: matrix.platform.target == 's390x-unknown-linux-gnu'
+        if: matrix.platform.target != 'powerpc64le-unknown-linux-musl'
         with:
           targets: ${{ matrix.platform.target }}
       - name: Build wheel
@@ -223,8 +192,7 @@ jobs:
           maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --compatibility ${{ matrix.platform.compatibility }} \
-            --no-default-features \
-            --features full,password-storage
+            --features password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
@@ -251,7 +219,7 @@ jobs:
       name: PyPI
       url: ${{ steps.set_url.outputs.env_url }}
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ build, build-musl, build-no-rustls ]
+    needs: [ build, build-musl ]
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -291,7 +259,7 @@ jobs:
     name: Publish to GitHub releases
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ build, build-musl, build-no-rustls ]
+    needs: [ build, build-musl ]
     steps:
       - uses: actions/download-artifact@v3
         with:

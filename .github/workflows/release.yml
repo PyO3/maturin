@@ -154,25 +154,25 @@ jobs:
       matrix:
         platform:
           - target: "aarch64-unknown-linux-musl"
-            image_tag: "aarch64-musl"
+            image: "rust-musl-cross:aarch64-musl"
             compatibility: "manylinux2014 musllinux_1_1"
           - target: "armv7-unknown-linux-musleabihf"
-            image_tag: "armv7-musleabihf"
+            image: "rust-musl-cross:armv7-musleabihf"
             compatibility: "manylinux2014 musllinux_1_1"
           - target: "i686-unknown-linux-musl"
-            image_tag: "i686-musl"
+            image: "rust-musl-cross:i686-musl"
             compatibility: "manylinux2010 musllinux_1_1"
           - target: "arm-unknown-linux-musleabihf"
-            image_tag: "arm-musleabihf"
+            image: "rust-musl-cross:arm-musleabihf"
             compatibility: "linux"
           - target: "powerpc64le-unknown-linux-musl"
-            image_tag: "powerpc64le-musl"
+            image: "rust-musl-cross:powerpc64le-musl"
             compatibility: "manylinux2014 musllinux_1_1"
           - target: "s390x-unknown-linux-gnu"
-            image_tag: "s390x-musl"
+            image: "manylinux2014-cross:s390x"
             compatibility: "manylinux2014"
     container:
-      image: docker://ghcr.io/rust-cross/rust-musl-cross:${{ matrix.platform.image_tag }}
+      image: docker://ghcr.io/rust-cross/${{ matrix.platform.image }}
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo

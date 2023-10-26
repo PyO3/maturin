@@ -169,10 +169,10 @@ jobs:
             image_tag: "powerpc64le-musl"
             compatibility: "manylinux2014 musllinux_1_1"
           - target: "s390x-unknown-linux-gnu"
-            image_tag: "s390x"
+            image_tag: "s390x-musl"
             compatibility: "manylinux2014"
     container:
-      image: docker://ghcr.io/messense/rust-musl-cross:${{ matrix.platform.image_tag }}
+      image: docker://ghcr.io/rust-cross/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo

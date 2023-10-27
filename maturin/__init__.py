@@ -36,8 +36,6 @@ def get_maturin_pep517_args(config_settings: Optional[Mapping[str, Any]] = None)
     build_args = config_settings.get("build-args") if config_settings else None
     if build_args is None:
         env_args = os.getenv("MATURIN_PEP517_ARGS", "")
-        if env_args:
-            print(f"'MATURIN_PEP517_ARGS' is deprecated, use `--config-settings build-args='{env_args}'` instead.")
         args = shlex.split(env_args)
     elif isinstance(build_args, str):
         args = shlex.split(build_args)

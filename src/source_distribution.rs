@@ -456,7 +456,7 @@ fn add_cargo_package_files_to_sdist(
             let mut deps_to_keep = known_path_deps.clone();
             // Also need to the main Python binding crate
             let main_member_name = abs_manifest_dir
-                .strip_prefix(&sdist_root)
+                .file_name()
                 .unwrap()
                 .to_str()
                 .unwrap()

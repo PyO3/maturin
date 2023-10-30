@@ -130,6 +130,16 @@ fn develop_uniffi_pure() {
 }
 
 #[test]
+fn develop_uniffi_pure_proc_macro() {
+    handle_result(develop::test_develop(
+        "test-crates/uniffi-pure-proc-macro",
+        None,
+        "develop-uniffi-pure-proc-macro",
+        false,
+    ));
+}
+
+#[test]
 fn develop_uniffi_mixed() {
     if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
         handle_result(develop::test_develop(
@@ -304,6 +314,17 @@ fn integration_uniffi_pure() {
             None,
         ));
     }
+}
+
+#[test]
+fn integration_uniffi_pure_proc_macro() {
+    handle_result(integration::test_integration(
+        "test-crates/uniffi-pure-proc-macro",
+        None,
+        "integration-uniffi-pure-proc-macro",
+        false,
+        None,
+    ));
 }
 
 #[test]

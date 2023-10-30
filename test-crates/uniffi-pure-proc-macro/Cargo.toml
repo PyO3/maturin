@@ -1,16 +1,20 @@
 [package]
-name = "uniffi-pure"
+name = "uniffi-pure-proc-macro"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "uniffi_pure"
+name = "uniffi_pure_proc_macro"
 crate-type = ["cdylib"]
 
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+
 [dependencies]
-uniffi = "0.25.0"
+uniffi = { version = "0.25.0", features = ["cli"] }
 
 [build-dependencies]
 uniffi = { version = "0.25.0", features = ["build"] }

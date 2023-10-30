@@ -9,6 +9,10 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "monthly"
+    groups:
+      crates-io:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -488,10 +488,10 @@ fn workspace_members_beneath_pyproject_sdist() {
     let cargo_toml = expect![[r#"
         [workspace]
         resolver = "2"
-        members = ["pyo3-mixed-workspace", "pyo3-mixed-workspace-py"]
+        members = ["pyo3-mixed-workspace", "python/pyo3-mixed-workspace-py"]
         "#]];
     handle_result(other::test_source_distribution(
-        "test-crates/pyo3-mixed-workspace/rust/pyo3-mixed-workspace-py",
+        "test-crates/pyo3-mixed-workspace/rust/python/pyo3-mixed-workspace-py",
         SdistGenerator::Cargo,
         expect![[r#"
             {
@@ -499,10 +499,10 @@ fn workspace_members_beneath_pyproject_sdist() {
                 "pyo3_mixed_workspace-2.1.3/pyproject.toml",
                 "pyo3_mixed_workspace-2.1.3/rust/Cargo.lock",
                 "pyo3_mixed_workspace-2.1.3/rust/Cargo.toml",
-                "pyo3_mixed_workspace-2.1.3/rust/pyo3-mixed-workspace-py/Cargo.toml",
-                "pyo3_mixed_workspace-2.1.3/rust/pyo3-mixed-workspace-py/src/lib.rs",
                 "pyo3_mixed_workspace-2.1.3/rust/pyo3-mixed-workspace/Cargo.toml",
                 "pyo3_mixed_workspace-2.1.3/rust/pyo3-mixed-workspace/src/lib.rs",
+                "pyo3_mixed_workspace-2.1.3/rust/python/pyo3-mixed-workspace-py/Cargo.toml",
+                "pyo3_mixed_workspace-2.1.3/rust/python/pyo3-mixed-workspace-py/src/lib.rs",
                 "pyo3_mixed_workspace-2.1.3/src/pyo3_mixed_workspace/__init__.py",
                 "pyo3_mixed_workspace-2.1.3/src/pyo3_mixed_workspace/python_module/__init__.py",
                 "pyo3_mixed_workspace-2.1.3/src/pyo3_mixed_workspace/python_module/double.py",

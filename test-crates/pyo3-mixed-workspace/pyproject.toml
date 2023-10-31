@@ -16,4 +16,4 @@ get_42 = "pyo3_mixed_workspace:get_42"
 [tool.maturin]
 python-packages = ["pyo3_mixed_workspace", "tests"]
 module-name = "pyo3_mixed_workspace.pyo3_mixed_workspace_py"
-manifest-path = "rust/pyo3-mixed-workspace-py/Cargo.toml"
+manifest-path = "rust/python/pyo3-mixed-workspace-py/Cargo.toml"

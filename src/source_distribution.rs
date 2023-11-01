@@ -6,6 +6,7 @@ use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
+use path_slash::PathExt as _;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -458,7 +459,7 @@ fn add_cargo_package_files_to_sdist(
             let main_member_name = abs_manifest_dir
                 .strip_prefix(workspace_root)
                 .unwrap()
-                .to_str()
+                .to_slash()
                 .unwrap()
                 .to_string();
             deps_to_keep.insert(

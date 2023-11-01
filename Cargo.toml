@@ -71,6 +71,7 @@ lddtree = "0.3.3"
 cc = "1.0.72"
 dunce = "1.0.2"
 normpath = "1.0.0"
+path-slash = "0.2.1"
 pep440_rs = { version = "0.3.6", features = ["serde"] }
 pep508_rs = { version = "0.2.1", features = ["serde"] }
 time = "0.3.17"

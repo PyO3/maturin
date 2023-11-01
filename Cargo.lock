@@ -1090,6 +1090,7 @@ dependencies = [
  "native-tls",
  "normpath",
  "once_cell",
+ "path-slash",
  "pep440_rs",
  "pep508_rs",
  "platform-info",

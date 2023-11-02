@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyo3-mixed-workspace"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Rust"
+]
+requires-python = ">=3.7"
+
+[project.scripts]
+get_42 = "pyo3_mixed_workspace:get_42"
+
+[tool.maturin]
+python-packages = ["pyo3_mixed_workspace", "tests"]
+module-name = "pyo3_mixed_workspace.pyo3_mixed_workspace_py"
+manifest-path = "rust/python/pyo3-mixed-workspace-py/Cargo.toml"

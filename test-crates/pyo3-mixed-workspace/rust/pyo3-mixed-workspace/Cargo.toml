@@ -1,0 +1,7 @@
+[package]
+name = "pyo3-mixed-workspace"
+version = "2.1.3"
+description = "Implements a dummy function combining rust and python"
+edition = "2021"
+
+[dependencies]

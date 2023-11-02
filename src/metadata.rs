@@ -828,4 +828,43 @@ mod test {
         assert_eq!(metadata.license_files[2], manifest_dir.join("NOTICE.md"));
         assert_eq!(metadata.license_files[3], manifest_dir.join("AUTHORS.txt"));
     }
+
+    #[test]
+    fn test_escape_email_with_display_name_without_special_characters() {
+        let display_name = "Foo Bar !#$%&'*+-/=?^_`{|}~ 123";
+        let email = "foobar-123@example.com";
+        let result = escape_email_with_display_name(display_name, email);
+        assert_eq!(
+            result,
+            "Foo Bar !#$%&'*+-/=?^_`{|}~ 123 <foobar-123@example.com>"
+        );
+    }
+
+    #[test]
+    fn test_escape_email_with_display_name_with_special_characters() {
+        let tests = [
+            ("Foo ( Bar", "\"Foo ( Bar\""),
+            ("Foo ) Bar", "\"Foo ) Bar\""),
+            ("Foo < Bar", "\"Foo < Bar\""),
+            ("Foo > Bar", "\"Foo > Bar\""),
+            ("Foo @ Bar", "\"Foo @ Bar\""),
+            ("Foo , Bar", "\"Foo , Bar\""),
+            ("Foo ; Bar", "\"Foo ; Bar\""),
+            ("Foo : Bar", "\"Foo : Bar\""),
+            ("Foo \\ Bar", "\"Foo \\\\ Bar\""),
+            ("Foo \" Bar", "\"Foo \\\" Bar\""),
+            ("Foo . Bar", "\"Foo . Bar\""),
+            ("Foo [ Bar", "\"Foo [ Bar\""),
+            ("Foo ] Bar", "\"Foo ] Bar\""),
+            ("Foo ) Bar", "\"Foo ) Bar\""),
+            ("Foo ) Bar", "\"Foo ) Bar\""),
+            ("Foo, Bar", "\"Foo, Bar\""),
+        ];
+        for (display_name, expected_name) in tests {
+            let email = "foobar-123@example.com";
+            let result = escape_email_with_display_name(display_name, email);
+            let expected = format!("{expected_name} <{email}>");
+            assert_eq!(result, expected);
+        }
+    }
 }

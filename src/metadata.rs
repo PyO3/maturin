@@ -226,7 +226,7 @@ impl Metadata21 {
                 for author in authors {
                     match (&author.name, &author.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{name} <{email}>"));
+                            emails.push(format_email_with_display_name(name, email));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -251,7 +251,7 @@ impl Metadata21 {
                 for maintainer in maintainers {
                     match (&maintainer.name, &maintainer.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{name} <{email}>"));
+                            emails.push(format_email_with_display_name(name, email));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -553,6 +553,23 @@ impl Metadata21 {
             &self.get_version_escaped()
         ))
     }
+}
+
+/// Escape email addresses with display name if necessary
+/// according to RFC 822 Section 3.3. "specials".
+fn format_email_with_display_name(display_name: &str, email: &str) -> String {
+    if display_name.chars().any(|c| {
+        matches!(
+            c,
+            '(' | ')' | '<' | '>' | '@' | ',' | ';' | ':' | '\\' | '"' | '.' | '[' | ']'
+        )
+    }) {
+        return format!(
+            "\"{}\" <{email}>",
+            display_name.replace('\\', "\\\\").replace('\"', "\\\"")
+        );
+    }
+    format!("{display_name} <{email}>")
 }
 
 /// Fold long header field according to RFC 5322 section 2.2.3

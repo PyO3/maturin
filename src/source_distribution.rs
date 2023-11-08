@@ -148,6 +148,7 @@ fn add_crate_to_source_distribution(
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
+    skip_cargo_toml: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
     let output = Command::new("cargo")
@@ -216,7 +217,7 @@ fn add_crate_to_source_distribution(
     if root_crate {
         let rewritten_cargo_toml = rewrite_cargo_toml(manifest_path, known_path_deps)?;
         writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
-    } else {
+    } else if !skip_cargo_toml {
         writer.add_file(cargo_toml_path, manifest_path)?;
     }
 
@@ -345,6 +346,10 @@ fn add_cargo_package_files_to_sdist(
     let workspace_manifest_path = workspace_root.join("Cargo.toml");
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+    debug!(
+        "Found path dependencies: {:?}",
+        known_path_deps.keys().collect::<Vec<_>>()
+    );
     let mut sdist_root =
         common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path).unwrap();
     for path_dep in known_path_deps.values() {
@@ -361,21 +366,31 @@ fn add_cargo_package_files_to_sdist(
 
     // Add local path dependencies
     for (name, path_dep) in known_path_deps.iter() {
+        debug!(
+            "Adding path dependency: {} at {}",
+            name,
+            path_dep.manifest_path.display()
+        );
         let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
         let relative_path_dep_manifest_dir =
             path_dep_manifest_dir.strip_prefix(&sdist_root).unwrap();
+        // we may need to rewrite workspace Cargo.toml later so don't add it to sdist yet
+        let skip_cargo_toml = workspace_manifest_path == path_dep.manifest_path;
         add_crate_to_source_distribution(
             writer,
             &path_dep.manifest_path,
             &root_dir.join(relative_path_dep_manifest_dir),
             &known_path_deps,
             false,
+            skip_cargo_toml,
         )
-        .context(format!(
-            "Failed to add local dependency {} at {} to the source distribution",
-            name,
-            path_dep.manifest_path.display()
-        ))?;
+        .with_context(|| {
+            format!(
+                "Failed to add local dependency {} at {} to the source distribution",
+                name,
+                path_dep.manifest_path.display()
+            )
+        })?;
         // Handle possible relative readme field in Cargo.toml
         if let Some(readme) = path_dep.readme.as_ref() {
             let abs_readme = path_dep_manifest_dir
@@ -417,6 +432,7 @@ fn add_cargo_package_files_to_sdist(
         root_dir.join(relative_main_crate_manifest_dir),
         &known_path_deps,
         true,
+        false,
     )?;
     // Handle possible relative readme field in Cargo.toml
     if let Some(readme) = main_crate.readme.as_ref() {

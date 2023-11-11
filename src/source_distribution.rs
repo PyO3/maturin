@@ -49,6 +49,7 @@ fn rewrite_cargo_toml(
     known_path_deps: &HashMap<String, PathDependency>,
 ) -> Result<String> {
     let manifest_path = manifest_path.as_ref();
+    debug!("Rewriting Cargo.toml at {}", manifest_path.display());
     let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
 
     // Update workspace members
@@ -66,23 +67,24 @@ fn rewrite_cargo_toml(
                 for member in members {
                     if let toml_edit::Value::String(ref s) = member {
                         let member_path = s.value();
-                        let path = Path::new(member_path);
-                        if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
-                            // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
-                            let is_glob_pattern = name.contains(['*', '?', '[', ']']);
-                            if is_glob_pattern {
-                                let pattern = glob::Pattern::new(name).context(format!(
+                        // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
+                        let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);
+                        if is_glob_pattern {
+                            let pattern = glob::Pattern::new(member_path).with_context(|| {
+                                format!(
                                     "Invalid `workspace.members` glob pattern: {} in {}",
-                                    name,
+                                    member_path,
                                     manifest_path.display()
-                                ))?;
-                                if known_path_deps
-                                    .keys()
-                                    .any(|path_dep| pattern.matches(path_dep))
-                                {
-                                    new_members.push(member_path);
-                                }
-                            } else if known_path_deps.contains_key(member_path) {
+                                )
+                            })?;
+                            if known_path_deps.values().any(|path_dep| {
+                                let relative_path = path_dep
+                                    .manifest_path
+                                    .strip_prefix(&path_dep.workspace_root)
+                                    .unwrap();
+                                let relative_path_str = relative_path.to_str().unwrap();
+                                pattern.matches(relative_path_str)
+                            }) {
                                 new_members.push(member_path);
                             }
                         } else if known_path_deps.contains_key(member_path) {

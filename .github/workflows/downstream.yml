@@ -1,0 +1,38 @@
+on:
+  workflow_call:
+    inputs:
+      repository:
+        required: true
+        type: string
+      manifest-dir:
+        required: true
+        type: string
+
+jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.5.3"
+      - name: Build maturin
+        env:
+          RUST_BACKTRACE: "1"
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+        run: cargo build
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          submodules: 'recursive'
+          path: downstream
+      - name: maturin sdist
+        working-directory: downstream
+        run: |
+          ../target/debug/maturin sdist --manifest-path ${{ inputs.manifest-dir }}/Cargo.toml -o target/sdist
+      - name: Build from sdist
+        working-directory: downstream
+        run: |
+          ../target/debug/maturin build --manifest-path ${{ inputs.manifest-dir }}/Cargo.toml

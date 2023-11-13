@@ -493,6 +493,27 @@ jobs:
           # unset GITHUB_ACTIONS env var to disable zig and conda related tests
           env -u GITHUB_ACTIONS cargo nextest run --features password-storage
 
+  test-downstream:
+    name: Test downstream - ${{ matrix.downstream.repository }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'sdist') && github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/downstream.yml
+    with:
+      repository: ${{ matrix.downstream.repository }}
+      manifest-dir: ${{ matrix.downstream.manifest-dir }}
+    strategy:
+      matrix:
+        downstream:
+          - repository: "pola-rs/polars"
+            manifest-dir: "py-polars"
+          - repository: "astral-sh/ruff"
+            manifest-dir: "crates/ruff_cli"
+          - repository: "crate-ci/typos"
+            manifest-dir: "crates/typos-cli"
+          - repository: "ast-grep/ast-grep"
+            manifest-dir: "crates/pyo3"
+          - repository: "oxigraph/oxigraph"
+            manifest-dir: "python"
+
   check:
     name: Check ${{ matrix.platform.target }}
     if: github.event_name != 'pull_request'
@@ -528,6 +549,7 @@ jobs:
       - test-bootstrap
       - test-msrv
       - test-pyston
+      - test-downstream
       - check
     if: always()
     runs-on: ubuntu-latest

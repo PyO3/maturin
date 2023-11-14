@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2023-11-14
+
+* Add support for uniffi library mode in [#1729](https://github.com/PyO3/maturin/pull/1729)
+* Un-deprecate `MATURIN_PEP517_ARGS` env var in [#1820](https://github.com/PyO3/maturin/pull/1820)
+* Fix missing member in Cargo.toml for sdist of nested workspace layout in [#1828](https://github.com/PyO3/maturin/pull/1828)
+* Escape display name in email addresses of wheel metadata in [#1832](https://github.com/PyO3/maturin/pull/1832)
+* Fix rewriting workspace Cargo.toml in sdist in [#1841](https://github.com/PyO3/maturin/pull/1841)
+* Fix glob workspace members matching in sdist in [#1846](https://github.com/PyO3/maturin/pull/1846)
+
 ## [1.3.1] - 2023-10-24
 
 * Use external `uniffi-bindgen` if no root package is configured in [#1797](https://github.com/PyO3/maturin/pull/1797)
@@ -927,7 +936,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/pyo3/maturin/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/pyo3/maturin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pyo3/maturin/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/pyo3/maturin/compare/v1.2.2...v1.2.3

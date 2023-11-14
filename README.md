@@ -175,7 +175,7 @@ fn my_lib_name(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
 ## Python metadata
 
 maturin supports [PEP 621](https://www.python.org/dev/peps/pep-0621/), you can specify python package metadata in `pyproject.toml`.
-maturin merges metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` take precedence over `Cargo.toml`.
+maturin merges metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
 
 To specify python dependencies, add a list `dependencies` in a `[project]` section in the `pyproject.toml`. This list is equivalent to `install_requires` in setuptools:
 
@@ -185,7 +185,7 @@ name = "my-project"
 dependencies = ["flask~=1.1.0", "toml==0.10.0"]
 ```
 
-Pip allows adding so called console scripts, which are shell commands that execute some function in you program. You can add console scripts in a section `[project.scripts]`.
+Pip allows adding so called console scripts, which are shell commands that execute some function in your program. You can add console scripts in a section `[project.scripts]`.
 The keys are the script names while the values are the path to the function in the format `some.module.path:class.function`, where the `class` part is optional. The function is called with no arguments. Example:
 
 ```toml

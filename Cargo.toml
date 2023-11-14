@@ -26,7 +26,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
 categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
 edition = "2021"
-rust-version = "1.64"
+rust-version = "1.67"
 
 [[bin]]
 name = "maturin"
@@ -51,8 +51,8 @@ serde_json = "1.0.80"
 sha2 = "0.10.3"
 tar = "0.4.38"
 tempfile = "3.2.0"
-toml = "0.7.0"
-toml_edit = "0.19.1"
+toml = "0.8.8"
+toml_edit = "0.21.0"
 zip = { version = "0.6.1", default-features = false, features = ["bzip2", "deflate", "time"] }
 thiserror = "1.0.37"
 fs-err = "2.5.0"
@@ -61,8 +61,8 @@ once_cell = "1.7.2"
 rustc_version = "0.4.0"
 semver = "1.0.13"
 target-lexicon = "0.12.8"
-indexmap = "1.9.3"
-pyproject-toml = "0.6.1"
+indexmap = "2.0.2"
+pyproject-toml = "0.8.1"
 python-pkginfo = "0.6.0"
 textwrap = "0.16.0"
 ignore = "0.4.20"
@@ -82,7 +82,7 @@ clap_complete_command = { version = "0.5.1", optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.17.5", default-features = false, optional = true }
-cargo-xwin = { version = "0.14.7", default-features = false, optional = true }
+cargo-xwin = { version = "0.15.0", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"

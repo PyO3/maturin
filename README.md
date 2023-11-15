@@ -162,7 +162,7 @@ my-project
 
 When doing this also be sure to set the module name in your code to match the last part of `module-name` (don't include the package path):
 
-```
+```rust
 #[pymodule]
 #[pyo3(name="_lib_name")]
 fn my_lib_name(_py: Python<'_>, m: &PyModule) -> PyResult<()> {

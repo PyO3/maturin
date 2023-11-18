@@ -6,10 +6,10 @@
 
 ### PyPI
 
-maturin is published as Python binary wheel to PyPI, you can install it using pip:
+maturin is published as Python binary wheel to PyPI, you can install it using [pipx](https://pypa.github.io/pipx/):
 
 ```bash
-pip install maturin
+pipx install maturin
 ```
 
 There are some extra dependencies for certain scenarios:
@@ -17,7 +17,11 @@ There are some extra dependencies for certain scenarios:
 * `zig`: use zig as linker for easier cross compiling and manylinux compliance.
 * `patchelf`: repair wheels that links other shared libraries.
 
-For example, to install patchelf dependencies: `pip install maturin[patchelf]`.
+For example, to install patchelf dependencies: `pipx install maturin[patchelf]`.
+
+> **Note**
+>
+> `pip install maturin` should also work if you don't want to use pipx.
 
 ### Homebrew
 

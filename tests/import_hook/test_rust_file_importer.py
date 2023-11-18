@@ -23,16 +23,12 @@ which provides a clean virtual environment for these tests to use.
 """
 
 MATURIN_TEST_NAME = os.environ["MATURIN_TEST_NAME"]
-MATURIN_BUILD_CACHE = (
-    test_crates / f"targets/import_hook_file_importer_build_cache_{MATURIN_TEST_NAME}"
-)
+MATURIN_BUILD_CACHE = test_crates / f"targets/import_hook_file_importer_build_cache_{MATURIN_TEST_NAME}"
 # the CI does not have enough space to keep the outputs.
 # When running locally you may set this to False for debugging
 CLEAR_WORKSPACE = True
 
-os.environ["CARGO_TARGET_DIR"] = str(
-    test_crates / f"targets/import_hook_file_importer_{MATURIN_TEST_NAME}"
-)
+os.environ["CARGO_TARGET_DIR"] = str(test_crates / f"targets/import_hook_file_importer_{MATURIN_TEST_NAME}")
 os.environ["MATURIN_BUILD_DIR"] = str(MATURIN_BUILD_CACHE)
 
 
@@ -75,16 +71,12 @@ def test_relative_import() -> None:
     """Test imports of the form `from .ab import cd`."""
     _clear_build_cache()
 
-    output1, duration1 = run_python(
-        ["-m", "rust_file_import.relative_import_helper"], cwd=script_dir
-    )
+    output1, duration1 = run_python(["-m", "rust_file_import.relative_import_helper"], cwd=script_dir)
     assert "SUCCESS" in output1
     assert "module up to date" not in output1
     assert "creating project for" in output1
 
-    output2, duration2 = run_python(
-        ["-m", "rust_file_import.relative_import_helper"], cwd=script_dir
-    )
+    output2, duration2 = run_python(["-m", "rust_file_import.relative_import_helper"], cwd=script_dir)
     assert "SUCCESS" in output2
     assert "module up to date" in output2
     assert "creating project for" not in output2
@@ -176,9 +168,7 @@ def test_rebuild_on_change(workspace: Path) -> None:
     _clear_build_cache()
 
     script_path = workspace / "my_script.rs"
-    helper_path = shutil.copy(
-        script_dir / "rust_file_import/rebuild_on_change_helper.py", workspace
-    )
+    helper_path = shutil.copy(script_dir / "rust_file_import/rebuild_on_change_helper.py", workspace)
 
     shutil.copy(script_dir / "rust_file_import/my_script_1.rs", script_path)
 
@@ -206,9 +196,7 @@ def test_rebuild_on_settings_change(workspace: Path) -> None:
     _clear_build_cache()
 
     script_path = workspace / "my_script.rs"
-    helper_path = shutil.copy(
-        script_dir / "rust_file_import/rebuild_on_settings_change_helper.py", workspace
-    )
+    helper_path = shutil.copy(script_dir / "rust_file_import/rebuild_on_settings_change_helper.py", workspace)
 
     shutil.copy(script_dir / "rust_file_import/my_script_3.rs", script_path)
 
@@ -277,12 +265,7 @@ else:
         rs_path, py_path = self._create_clean_package(workspace / "package")
 
         output, _ = run_python([str(py_path)], workspace)
-        pattern = (
-            'building "my_script"\n'
-            'rebuilt and loaded module "my_script" in [0-9.]+s\n'
-            "get_num 10\n"
-            "SUCCESS\n"
-        )
+        pattern = 'building "my_script"\nrebuilt and loaded module "my_script" in [0-9.]+s\nget_num 10\nSUCCESS\n'
         assert re.fullmatch(pattern, output, flags=re.MULTILINE) is not None
 
     def test_default_up_to_date(self, workspace: Path) -> None:
@@ -319,11 +302,7 @@ else:
         built, the warnings will be printed again.
         """
         rs_path, py_path = self._create_clean_package(workspace / "package")
-        rs_path.write_text(
-            rs_path.read_text().replace(
-                "10", "#[warn(unused_variables)]{let x = 12;}; 20"
-            )
-        )
+        rs_path.write_text(rs_path.read_text().replace("10", "#[warn(unused_variables)]{let x = 12;}; 20"))
 
         output1, _ = run_python([str(py_path)], workspace)
         output1 = remove_ansii_escape_characters(output1)
@@ -337,9 +316,7 @@ else:
             "get_num 20\n"
             "SUCCESS\n"
         )
-        assert (
-            re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
-        )
+        assert re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
 
         output2, _ = run_python([str(py_path)], workspace)
         output2 = remove_ansii_escape_characters(output2)
@@ -351,9 +328,7 @@ else:
             "get_num 20\n"
             "SUCCESS\n"
         )
-        assert (
-            re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
-        )
+        assert re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
 
     def test_reset_logger_without_configuring(self, workspace: Path) -> None:
         """If reset_logger is called then by default logging level INFO is not printed
@@ -366,9 +341,7 @@ else:
     def test_successful_compilation_but_not_valid(self, workspace: Path) -> None:
         """If the script compiles but does not import correctly an ImportError is raised."""
         rs_path, py_path = self._create_clean_package(workspace / "package")
-        rs_path.write_text(
-            rs_path.read_text().replace("my_script", "my_script_new_name")
-        )
+        rs_path.write_text(rs_path.read_text().replace("my_script", "my_script_new_name"))
         output, _ = run_python([str(py_path)], workspace, quiet=True)
         pattern = (
             'building "my_script"\n'

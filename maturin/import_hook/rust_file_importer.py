@@ -47,9 +47,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
 
     def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
         """This method can be overridden in subclasses to customize settings for specific projects."""
-        return (
-            self._settings if self._settings is not None else MaturinSettings.default()
-        )
+        return self._settings if self._settings is not None else MaturinSettings.default()
 
     @staticmethod
     def generate_project_for_single_rust_file(
@@ -68,9 +66,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
             raise ImportError(msg)
 
         if settings.features is not None:
-            available_features = [
-                feature for feature in settings.features if "/" not in feature
-            ]
+            available_features = [feature for feature in settings.features if "/" not in feature]
             cargo_manifest = project_dir / "Cargo.toml"
             cargo_manifest.write_text(
                 "{}\n[features]\n{}".format(
@@ -110,18 +106,14 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
         for search_path in search_paths:
             single_rust_file_path = search_path / f"{module_name}.rs"
             if single_rust_file_path.is_file():
-                spec, rebuilt = self._import_rust_file(
-                    fullname, module_name, single_rust_file_path
-                )
+                spec, rebuilt = self._import_rust_file(fullname, module_name, single_rust_file_path)
                 if spec is not None:
                     break
 
         if spec is not None:
             duration = time.perf_counter() - start
             if rebuilt:
-                logger.info(
-                    'rebuilt and loaded module "%s" in %.3fs', fullname, duration
-                )
+                logger.info('rebuilt and loaded module "%s" in %.3fs', fullname, duration)
             else:
                 logger.debug('loaded module "%s" in %.3fs', fullname, duration)
         return spec
@@ -153,9 +145,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
             )
             manifest_path = find_cargo_manifest(project_dir)
             if manifest_path is None:
-                msg = (
-                    f"cargo manifest not found in the project generated for {file_path}"
-                )
+                msg = f"cargo manifest not found in the project generated for {file_path}"
                 raise ImportError(msg)
 
             maturin_output = build_unpacked_wheel(manifest_path, dist_dir, settings)
@@ -167,13 +157,9 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
 
             if self._show_warnings and maturin_output_has_warnings(maturin_output):
                 self._log_build_warnings(module_path, maturin_output, is_fresh=True)
-            extension_module_path = _find_extension_module(
-                dist_dir / module_name, module_name, require=True
-            )
+            extension_module_path = _find_extension_module(dist_dir / module_name, module_name, require=True)
             if extension_module_path is None:
-                logger.error(
-                    'cannot find extension module for "%s" after rebuild', module_path
-                )
+                logger.error('cannot find extension module for "%s" after rebuild', module_path)
                 return None, True
             build_status = BuildStatus(
                 extension_module_path.stat().st_mtime,
@@ -203,9 +189,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
 
         if self._force_rebuild:
             return None, "forcing rebuild"
-        extension_module_path = _find_extension_module(
-            search_dir, module_name, require=False
-        )
+        extension_module_path = _find_extension_module(search_dir, module_name, require=False)
         if extension_module_path is None:
             return None, "already built module not found"
 
@@ -229,18 +213,12 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
 
         logger.debug('module up to date: "%s" (%s)', module_path, spec.origin)
 
-        if self._show_warnings and maturin_output_has_warnings(
-            build_status.maturin_output
-        ):
-            self._log_build_warnings(
-                module_path, build_status.maturin_output, is_fresh=False
-            )
+        if self._show_warnings and maturin_output_has_warnings(build_status.maturin_output):
+            self._log_build_warnings(module_path, build_status.maturin_output, is_fresh=False)
 
         return spec, None
 
-    def _log_build_warnings(
-        self, module_path: str, maturin_output: str, is_fresh: bool
-    ) -> None:
+    def _log_build_warnings(self, module_path: str, maturin_output: str, is_fresh: bool) -> None:
         prefix = "" if is_fresh else "the last "
         message = '%sbuild of "%s" succeeded with warnings:\n%s'
         if self._show_warnings:
@@ -249,9 +227,7 @@ class MaturinRustFileImporter(importlib.abc.MetaPathFinder):
             logger.debug(message, prefix, module_path, maturin_output)
 
 
-def _find_extension_module(
-    dir_path: Path, module_name: str, *, require: bool = False
-) -> Optional[Path]:
+def _find_extension_module(dir_path: Path, module_name: str, *, require: bool = False) -> Optional[Path]:
     # the suffixes include the platform tag and file extension eg '.cpython-311-x86_64-linux-gnu.so'
     for suffix in importlib.machinery.EXTENSION_SUFFIXES:
         extension_path = dir_path / f"{module_name}{suffix}"
@@ -263,12 +239,8 @@ def _find_extension_module(
     return None
 
 
-def _get_spec_for_extension_module(
-    module_path: str, extension_module_path: Path
-) -> Optional[ModuleSpec]:
-    return importlib.util.spec_from_loader(
-        module_path, ExtensionFileLoader(module_path, str(extension_module_path))
-    )
+def _get_spec_for_extension_module(module_path: str, extension_module_path: Path) -> Optional[ModuleSpec]:
+    return importlib.util.spec_from_loader(module_path, ExtensionFileLoader(module_path, str(extension_module_path)))
 
 
 IMPORTER: Optional[MaturinRustFileImporter] = None

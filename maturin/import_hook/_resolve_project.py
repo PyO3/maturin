@@ -23,9 +23,7 @@ def find_cargo_manifest(project_dir: Path) -> Optional[Path]:
 
 def is_maybe_maturin_project(project_dir: Path) -> bool:
     """note: this function does not check if this really is a maturin project for simplicity."""
-    return (project_dir / "pyproject.toml").exists() and find_cargo_manifest(
-        project_dir
-    ) is not None
+    return (project_dir / "pyproject.toml").exists() and find_cargo_manifest(project_dir) is not None
 
 
 class ProjectResolver:
@@ -78,9 +76,7 @@ class MaturinProject:
     @property
     def all_path_dependencies(self) -> List[Path]:
         if self._all_path_dependencies is None:
-            self._all_path_dependencies = _find_all_path_dependencies(
-                self.immediate_path_dependencies
-            )
+            self._all_path_dependencies = _find_all_path_dependencies(self.immediate_path_dependencies)
         return self._all_path_dependencies
 
 
@@ -134,9 +130,7 @@ def _resolve_project(project_dir: Path) -> MaturinProject:
 
     extension_module_dir: Optional[Path]
     python_module: Optional[Path]
-    python_module, extension_module_dir, extension_module_name = _resolve_rust_module(
-        python_dir, module_full_name
-    )
+    python_module, extension_module_dir, extension_module_name = _resolve_rust_module(python_dir, module_full_name)
     immediate_path_dependencies = _get_immediate_path_dependencies(project_dir, cargo)
 
     if not python_module.exists():
@@ -171,9 +165,7 @@ def _resolve_rust_module(python_dir: Path, module_name: str) -> Tuple[Path, Path
     return python_module, extension_module_dir, extension_module_name
 
 
-def _resolve_module_name(
-    pyproject: Dict[str, Any], cargo: Dict[str, Any]
-) -> Optional[str]:
+def _resolve_module_name(pyproject: Dict[str, Any], cargo: Dict[str, Any]) -> Optional[str]:
     """This follows the same logic as project_layout.rs (ProjectResolver::resolve).
 
     Precedence:
@@ -195,9 +187,7 @@ def _resolve_module_name(
     return cargo.get("package", {}).get("name", None)
 
 
-def _get_immediate_path_dependencies(
-    project_dir: Path, cargo: Dict[str, Any]
-) -> List[Path]:
+def _get_immediate_path_dependencies(project_dir: Path, cargo: Dict[str, Any]) -> List[Path]:
     path_dependencies = []
     for dependency in cargo.get("dependencies", {}).values():
         if isinstance(dependency, dict):
@@ -218,14 +208,11 @@ def _resolve_py_root(project_dir: Path, pyproject: Dict[str, Any]) -> Path:
 
     rust_cargo_toml_found = (project_dir / "rust/Cargo.toml").exists()
 
-    python_packages = (
-        pyproject.get("tool", {}).get("maturin", {}).get("python-packages", [])
-    )
+    python_packages = pyproject.get("tool", {}).get("maturin", {}).get("python-packages", [])
 
     package_name = project_name.replace("-", "_")
     python_src_found = any(
-        (project_dir / p / "__init__.py").is_file()
-        for p in itertools.chain((f"src/{package_name}/",), python_packages)
+        (project_dir / p / "__init__.py").is_file() for p in itertools.chain((f"src/{package_name}/",), python_packages)
     )
     if rust_cargo_toml_found and python_src_found:
         return project_dir / "src"

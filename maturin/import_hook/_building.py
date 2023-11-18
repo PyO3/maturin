@@ -87,15 +87,9 @@ class LockedBuildCache:
 
 
 class BuildCache:
-    def __init__(
-        self, build_dir: Optional[Path], lock_timeout_seconds: Optional[float]
-    ) -> None:
-        self._build_dir = (
-            build_dir if build_dir is not None else _get_default_build_dir()
-        )
-        self._lock = filelock.FileLock(
-            self._build_dir / "lock", timeout=lock_timeout_seconds
-        )
+    def __init__(self, build_dir: Optional[Path], lock_timeout_seconds: Optional[float]) -> None:
+        self._build_dir = build_dir if build_dir is not None else _get_default_build_dir()
+        self._lock = filelock.FileLock(self._build_dir / "lock", timeout=lock_timeout_seconds)
 
     @contextmanager
     def lock(self) -> Generator[LockedBuildCache, None, None]:
@@ -133,16 +127,10 @@ def _get_cache_dir() -> Path:
             return Path("~/Library/Caches").expanduser()
         else:
             xdg_cache_dir = os.environ.get("XDG_CACHE_HOME", None)
-            return (
-                Path(xdg_cache_dir) if xdg_cache_dir else Path("~/.cache").expanduser()
-            )
+            return Path(xdg_cache_dir) if xdg_cache_dir else Path("~/.cache").expanduser()
     elif platform.platform().lower() == "windows":
         local_app_data = os.environ.get("LOCALAPPDATA", None)
-        return (
-            Path(local_app_data)
-            if local_app_data
-            else Path(r"~\AppData\Local").expanduser()
-        )
+        return Path(local_app_data) if local_app_data else Path(r"~\AppData\Local").expanduser()
     else:
         logger.warning("unknown OS. defaulting to ~/.cache as the cache directory")
         return Path("~/.cache").expanduser()
@@ -179,13 +167,9 @@ def develop_build_project(
     settings: MaturinSettings,
 ) -> str:
     if "develop" not in settings.supported_commands():
-        msg = (
-            f'provided {type(settings).__name__} does not support the "develop" command'
-        )
+        msg = f'provided {type(settings).__name__} does not support the "develop" command'
         raise ImportError(msg)
-    success, output = run_maturin(
-        ["develop", "--manifest-path", str(manifest_path), *settings.to_args()]
-    )
+    success, output = run_maturin(["develop", "--manifest-path", str(manifest_path), *settings.to_args()])
     if not success:
         msg = "Failed to build package with maturin"
         raise ImportError(msg)
@@ -203,9 +187,7 @@ def run_maturin(args: List[str]) -> Tuple[bool, str]:
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = result.stdout.decode()
     if result.returncode != 0:
-        logger.error(
-            f'command "{subprocess.list2cmdline(command)}" returned non-zero exit status: {result.returncode}'
-        )
+        logger.error(f'command "{subprocess.list2cmdline(command)}" returned non-zero exit status: {result.returncode}')
         logger.error("maturin output:\n%s", output)
         return False, output
     if logger.isEnabledFor(logging.DEBUG):
@@ -217,9 +199,7 @@ def run_maturin(args: List[str]) -> Tuple[bool, str]:
     return True, output
 
 
-def build_unpacked_wheel(
-    manifest_path: Path, output_dir: Path, settings: MaturinSettings
-) -> str:
+def build_unpacked_wheel(manifest_path: Path, output_dir: Path, settings: MaturinSettings) -> str:
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output = build_wheel(manifest_path, output_dir, settings)
@@ -234,15 +214,11 @@ def build_unpacked_wheel(
 
 def _find_single_file(dir_path: Path, extension: Optional[str]) -> Optional[Path]:
     if dir_path.exists():
-        candidate_files = [
-            p for p in dir_path.iterdir() if extension is None or p.suffix == extension
-        ]
+        candidate_files = [p for p in dir_path.iterdir() if extension is None or p.suffix == extension]
     else:
         candidate_files = []
     return candidate_files[0] if len(candidate_files) == 1 else None
 
 
 def maturin_output_has_warnings(output: str) -> bool:
-    return (
-        re.search(r"`.*` \((lib|bin)\) generated [0-9]+ warnings?", output) is not None
-    )
+    return re.search(r"`.*` \((lib|bin)\) generated [0-9]+ warnings?", output) is not None

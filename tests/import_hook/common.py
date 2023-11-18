@@ -45,8 +45,7 @@ def all_test_crate_names() -> List[str]:
     return sorted(
         p.name
         for p in test_crates.iterdir()
-        if (p / "check_installed/check_installed.py").exists()
-        and (p / "pyproject.toml").exists()
+        if (p / "check_installed/check_installed.py").exists() and (p / "pyproject.toml").exists()
         if p.name not in EXCLUDED_PROJECTS
     )
 
@@ -67,9 +66,7 @@ def run_python(
 
     env = os.environ
     if python_path is not None:
-        env["PYTHONPATH"] = os.pathsep.join(
-            str(p) for p in itertools.chain(python_path, [maturin_dir])
-        )
+        env["PYTHONPATH"] = os.pathsep.join(str(p) for p in itertools.chain(python_path, [maturin_dir]))
     else:
         env["PYTHONPATH"] = str(maturin_dir)
 
@@ -145,9 +142,7 @@ def log(message: str) -> None:
 
 def uninstall(project_name: str) -> None:
     log(f"uninstalling {project_name}")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "uninstall", "-y", project_name]
-    )
+    subprocess.check_call([sys.executable, "-m", "pip", "uninstall", "-y", project_name])
 
 
 def install_editable(project_dir: Path) -> None:
@@ -167,14 +162,10 @@ def install_non_editable(project_dir: Path) -> None:
 
 def _is_installed_as_pth(project_name: str) -> bool:
     package_name = with_underscores(project_name)
-    return any(
-        (Path(path) / f"{package_name}.pth").exists() for path in site.getsitepackages()
-    )
+    return any((Path(path) / f"{package_name}.pth").exists() for path in site.getsitepackages())
 
 
-def _is_installed_editable_with_direct_url(
-    project_name: str, project_dir: Path
-) -> bool:
+def _is_installed_editable_with_direct_url(project_name: str, project_dir: Path) -> bool:
     package_name = with_underscores(project_name)
     for path in site.getsitepackages():
         linked_path, is_editable = _load_dist_info(Path(path), package_name)
@@ -183,19 +174,13 @@ def _is_installed_editable_with_direct_url(
                 log(f'project "{project_name}" is installed but not in editable mode')
             return is_editable
         else:
-            log(
-                f'found linked path "{linked_path}" for project "{project_name}". Expected "{project_dir}"'
-            )
+            log(f'found linked path "{linked_path}" for project "{project_name}". Expected "{project_dir}"')
     return False
 
 
-def is_installed_correctly(
-    project_name: str, project_dir: Path, is_mixed: bool
-) -> bool:
+def is_installed_correctly(project_name: str, project_dir: Path, is_mixed: bool) -> bool:
     installed_as_pth = _is_installed_as_pth(project_name)
-    installed_editable_with_direct_url = _is_installed_editable_with_direct_url(
-        project_name, project_dir
-    )
+    installed_editable_with_direct_url = _is_installed_editable_with_direct_url(project_name, project_dir)
     log(
         f"checking if {project_name} is installed correctly. "
         f"{is_mixed=}, {installed_as_pth=} {installed_editable_with_direct_url=}"
@@ -213,18 +198,14 @@ def get_project_copy(project_dir: Path, output_path: Path) -> Path:
 
 def _get_relative_files_tracked_by_git(root: Path) -> Iterable[Path]:
     """This is used to ignore built artifacts to create a clean copy."""
-    output = subprocess.check_output(
-        ["git", "ls-tree", "--name-only", "-z", "-r", "HEAD"], cwd=root
-    )
+    output = subprocess.check_output(["git", "ls-tree", "--name-only", "-z", "-r", "HEAD"], cwd=root)
     for relative_path_bytes in output.split(b"\x00"):
         relative_path = Path(os.fsdecode(relative_path_bytes))
         if (root / relative_path).is_file():
             yield relative_path
 
 
-def create_project_from_blank_template(
-    project_name: str, output_path: Path, *, mixed: bool
-) -> Path:
+def create_project_from_blank_template(project_name: str, output_path: Path, *, mixed: bool) -> Path:
     project_dir = get_project_copy(script_dir / "blank-project", output_path)
     project_name = project_name.replace("_", "-")
     package_name = project_name.replace("-", "_")
@@ -233,16 +214,10 @@ def create_project_from_blank_template(
         project_dir / "Cargo.toml",
         project_dir / "src/lib.rs",
     ]:
-        path.write_text(
-            path.read_text()
-            .replace("blank-project", project_name)
-            .replace("blank_project", package_name)
-        )
+        path.write_text(path.read_text().replace("blank-project", project_name).replace("blank_project", package_name))
     if mixed:
         (project_dir / package_name).mkdir()
-        (project_dir / package_name / "__init__.py").write_text(
-            f"from .{package_name} import *"
-        )
+        (project_dir / package_name / "__init__.py").write_text(f"from .{package_name} import *")
     return project_dir
 
 

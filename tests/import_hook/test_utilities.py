@@ -80,9 +80,7 @@ def test_settings() -> None:
     ]
     # fmt: on
 
-    build_settings = MaturinBuildSettings(
-        skip_auditwheel=True, zig=True, color=False, rustc_flags=["flag1", "flag2"]
-    )
+    build_settings = MaturinBuildSettings(skip_auditwheel=True, zig=True, color=False, rustc_flags=["flag1", "flag2"])
     assert build_settings.to_args() == [
         "--skip-auditwheel",
         "--zig",
@@ -118,9 +116,7 @@ class TestGetProjectMtime:
 
     def test_missing_path_dep(self, tmp_path: Path) -> None:
         (tmp_path / "extension").touch()
-        project_mtime = _get_project_mtime(
-            tmp_path, [tmp_path / "missing"], tmp_path / "extension", set()
-        )
+        project_mtime = _get_project_mtime(tmp_path, [tmp_path / "missing"], tmp_path / "extension", set())
         assert project_mtime is None
 
     def test_simple(self, tmp_path: Path) -> None:
@@ -129,9 +125,7 @@ class TestGetProjectMtime:
         (src_dir / "source_file.rs").touch()
         _small_sleep()
         (tmp_path / "extension_module").touch()
-        project_mtime = _get_project_mtime(
-            tmp_path, [], tmp_path / "extension_module", set()
-        )
+        project_mtime = _get_project_mtime(tmp_path, [], tmp_path / "extension_module", set())
         assert project_mtime == (tmp_path / "extension_module").stat().st_mtime
 
         (tmp_path / "extension_module").unlink()
@@ -140,14 +134,10 @@ class TestGetProjectMtime:
 
         # if the extension module is a directory then it should be excluded from the project mtime
         # calculation as it may contain pycache files that are generated after installation
-        project_mtime = _get_project_mtime(
-            tmp_path, [], tmp_path / "extension_module", set()
-        )
+        project_mtime = _get_project_mtime(tmp_path, [], tmp_path / "extension_module", set())
         assert project_mtime == (src_dir / "source_file.rs").stat().st_mtime
 
-        project_mtime = _get_project_mtime(
-            tmp_path, [], tmp_path / "extension_module", {"src"}
-        )
+        project_mtime = _get_project_mtime(tmp_path, [], tmp_path / "extension_module", {"src"})
         assert project_mtime is None
 
     def test_simple_path_dep(self, tmp_path: Path) -> None:
@@ -163,15 +153,11 @@ class TestGetProjectMtime:
         _small_sleep()
         (project_b / "source").touch()
 
-        project_mtime = _get_project_mtime(
-            project_a, [project_b], extension_module, set()
-        )
+        project_mtime = _get_project_mtime(project_a, [project_b], extension_module, set())
         assert project_mtime == (project_b / "source").stat().st_mtime
 
         extension_module.touch()
-        project_mtime = _get_project_mtime(
-            project_a, [project_b], extension_module, set()
-        )
+        project_mtime = _get_project_mtime(project_a, [project_b], extension_module, set())
         assert project_mtime == (project_a / "extension").stat().st_mtime
 
     def test_extension_module_dir_with_some_newer(self, tmp_path: Path) -> None:
@@ -213,14 +199,9 @@ class TestGetProjectMtime:
         extension_mtime = _get_installed_package_mtime(extension_path, set())
         assert extension_mtime == extension_path.stat().st_mtime
         project_mtime = _get_project_mtime(tmp_path, [], extension_path, set())
-        assert (
-            project_mtime
-            == (mixed_src_dir / "__pycache__/some_cache.pyc").stat().st_mtime
-        )
+        assert project_mtime == (mixed_src_dir / "__pycache__/some_cache.pyc").stat().st_mtime
 
-        project_mtime = _get_project_mtime(
-            tmp_path, [], extension_path, {"__pycache__"}
-        )
+        project_mtime = _get_project_mtime(tmp_path, [], extension_path, {"__pycache__"})
         assert project_mtime == extension_path.stat().st_mtime
 
     def test_extension_outside_project_source(self, tmp_path: Path) -> None:
@@ -274,9 +255,7 @@ def test_resolve_project(project_name: str) -> None:
             "cargo_manifest_path": _optional_path_to_str(resolved.cargo_manifest_path),
             "python_dir": _optional_path_to_str(resolved.python_dir),
             "python_module": _optional_path_to_str(resolved.python_module),
-            "extension_module_dir": _optional_path_to_str(
-                resolved.extension_module_dir
-            ),
+            "extension_module_dir": _optional_path_to_str(resolved.extension_module_dir),
             "module_full_name": resolved.module_full_name,
         }
     log("calculated:")
@@ -313,9 +292,7 @@ def test_load_dist_info(tmp_path: Path) -> None:
         '{"dir_info": {"editable": true}, "url": "file:///tmp/some%20directory/foo"}'
     )
 
-    linked_path, is_editable = _load_dist_info(
-        tmp_path, "package_foo", require_project_target=False
-    )
+    linked_path, is_editable = _load_dist_info(tmp_path, "package_foo", require_project_target=False)
     assert linked_path == Path("/tmp/some directory/foo")
     assert is_editable
 

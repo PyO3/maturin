@@ -68,17 +68,11 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         self._install_new_packages = install_new_packages
         self._force_rebuild = force_rebuild
         self._show_warnings = show_warnings
-        self._excluded_dir_names = (
-            DEFAULT_EXCLUDED_DIR_NAMES
-            if excluded_dir_names is None
-            else excluded_dir_names
-        )
+        self._excluded_dir_names = DEFAULT_EXCLUDED_DIR_NAMES if excluded_dir_names is None else excluded_dir_names
 
     def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
         """This method can be overridden in subclasses to customize settings for specific projects."""
-        return (
-            self._settings if self._settings is not None else MaturinSettings.default()
-        )
+        return self._settings if self._settings is not None else MaturinSettings.default()
 
     def find_spec(
         self,
@@ -111,8 +105,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
                 logger.debug('found project linked by dist-info: "%s"', project_dir)
                 if not is_editable and not self._install_new_packages:
                     logger.debug(
-                        "package not installed in editable-mode "
-                        "and install_new_packages=False. not rebuilding"
+                        "package not installed in editable-mode " "and install_new_packages=False. not rebuilding"
                     )
                 else:
                     spec, rebuilt = self._rebuild_project(package_name, project_dir)
@@ -133,9 +126,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         if spec is not None:
             duration = time.perf_counter() - start
             if rebuilt:
-                logger.info(
-                    'rebuilt and loaded package "%s" in %.3fs', package_name, duration
-                )
+                logger.info('rebuilt and loaded package "%s" in %.3fs', package_name, duration)
             else:
                 logger.debug('loaded package "%s" in %.3fs', package_name, duration)
         return spec
@@ -161,12 +152,9 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
             )
             return None, False
 
-        if not self._install_new_packages and not _is_editable_installed_package(
-            project_dir, package_name
-        ):
+        if not self._install_new_packages and not _is_editable_installed_package(project_dir, package_name):
             logger.debug(
-                'package "%s" is not already installed and '
-                "install_new_packages=False. Not importing",
+                'package "%s" is not already installed and ' "install_new_packages=False. Not importing",
                 package_name,
             )
             return None, False
@@ -180,15 +168,11 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
             )
             if spec is not None:
                 return spec, False
-            logger.debug(
-                'package "%s" will be rebuilt because: %s', package_name, reason
-            )
+            logger.debug('package "%s" will be rebuilt because: %s', package_name, reason)
 
             logger.info('building "%s"', package_name)
             start = time.perf_counter()
-            maturin_output = develop_build_project(
-                resolved.cargo_manifest_path, settings
-            )
+            maturin_output = develop_build_project(resolved.cargo_manifest_path, settings)
             _fix_direct_url(project_dir, package_name)
             logger.debug(
                 'compiled project "%s" in %.3fs',
@@ -208,15 +192,11 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
             if installed_package_root is None:
                 logger.error("could not get installed package root")
             else:
-                mtime = _get_installed_package_mtime(
-                    installed_package_root, self._excluded_dir_names
-                )
+                mtime = _get_installed_package_mtime(installed_package_root, self._excluded_dir_names)
                 if mtime is None:
                     logger.error("could not get installed package mtime")
                 else:
-                    build_status = BuildStatus(
-                        mtime, project_dir, settings.to_args(), maturin_output
-                    )
+                    build_status = BuildStatus(mtime, project_dir, settings.to_args(), maturin_output)
                     build_cache.store_build_status(build_status)
 
         return spec, True
@@ -245,9 +225,7 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
         if installed_package_root is None:
             return None, "could not find installed package root"
 
-        installed_package_mtime = _get_installed_package_mtime(
-            installed_package_root, self._excluded_dir_names
-        )
+        installed_package_mtime = _get_installed_package_mtime(installed_package_root, self._excluded_dir_names)
         if installed_package_mtime is None:
             return None, "could not get installed package mtime"
 
@@ -272,18 +250,12 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
 
         logger.debug('package up to date: "%s" ("%s")', package_name, spec.origin)
 
-        if self._show_warnings and maturin_output_has_warnings(
-            build_status.maturin_output
-        ):
-            self._log_build_warnings(
-                package_name, build_status.maturin_output, is_fresh=False
-            )
+        if self._show_warnings and maturin_output_has_warnings(build_status.maturin_output):
+            self._log_build_warnings(package_name, build_status.maturin_output, is_fresh=False)
 
         return spec, None
 
-    def _log_build_warnings(
-        self, module_path: str, maturin_output: str, is_fresh: bool
-    ) -> None:
+    def _log_build_warnings(self, module_path: str, maturin_output: str, is_fresh: bool) -> None:
         prefix = "" if is_fresh else "the last "
         message = '%sbuild of "%s" succeeded with warnings:\n%s'
         if self._show_warnings:
@@ -392,9 +364,7 @@ def _fix_direct_url(project_dir: Path, package_name: str) -> None:
                 return
 
 
-def _find_installed_package_root(
-    resolved: MaturinProject, package_spec: ModuleSpec
-) -> Optional[Path]:
+def _find_installed_package_root(resolved: MaturinProject, package_spec: ModuleSpec) -> Optional[Path]:
     """Find the root of the files that change each time the project is rebuilt:
     - for mixed projects: the root directory or file of the extension module inside the source tree
     - for pure projects: the root directory of the installed package.
@@ -404,9 +374,7 @@ def _find_installed_package_root(
             resolved.extension_module_dir, resolved.module_name, require=False
         )
         if installed_package_root is None:
-            logger.debug(
-                'no extension module found in "%s"', resolved.extension_module_dir
-            )
+            logger.debug('no extension module found in "%s"', resolved.extension_module_dir)
         return installed_package_root
     elif package_spec.origin is not None:
         return Path(package_spec.origin).parent
@@ -415,16 +383,12 @@ def _find_installed_package_root(
         return None
 
 
-def _get_installed_package_mtime(
-    installed_package_root: Path, excluded_dir_names: Set[str]
-) -> Optional[float]:
+def _get_installed_package_mtime(installed_package_root: Path, excluded_dir_names: Set[str]) -> Optional[float]:
     if installed_package_root.is_dir():
         try:
             return min(
                 path.stat().st_mtime
-                for path in _get_files_in_dirs(
-                    (installed_package_root,), excluded_dir_names, set()
-                )
+                for path in _get_files_in_dirs((installed_package_root,), excluded_dir_names, set())
             )
         except ValueError:
             logger.debug('no installed files found in "%s"', installed_package_root)
@@ -468,9 +432,7 @@ def _package_is_up_to_date(
     installed_package_mtime: float,
     excluded_dir_names: Set[str],
 ) -> bool:
-    project_mtime = _get_project_mtime(
-        project_dir, all_path_dependencies, installed_package_root, excluded_dir_names
-    )
+    project_mtime = _get_project_mtime(project_dir, all_path_dependencies, installed_package_root, excluded_dir_names)
     if project_mtime is None:
         return False
 
@@ -483,9 +445,7 @@ def _package_is_up_to_date(
     return installed_package_mtime >= project_mtime
 
 
-def _find_extension_module(
-    dir_path: Path, module_name: str, *, require: bool = False
-) -> Optional[Path]:
+def _find_extension_module(dir_path: Path, module_name: str, *, require: bool = False) -> Optional[Path]:
     if (dir_path / module_name / "__init__.py").exists():
         return dir_path / module_name
 
@@ -508,13 +468,8 @@ def _get_files_in_dirs(
     for dir_path in dir_paths:
         for path in dir_path.iterdir():
             if path.is_dir():
-                if (
-                    path.name not in excluded_dir_names
-                    and path not in excluded_dir_paths
-                ):
-                    yield from _get_files_in_dirs(
-                        (path,), excluded_dir_names, excluded_dir_paths
-                    )
+                if path.name not in excluded_dir_names and path not in excluded_dir_paths:
+                    yield from _get_files_in_dirs((path,), excluded_dir_names, excluded_dir_paths)
             else:
                 yield path
 

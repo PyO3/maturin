@@ -34,17 +34,12 @@ which provides a clean virtual environment for these tests to use.
 """
 
 MATURIN_TEST_NAME = os.environ["MATURIN_TEST_NAME"]
-MATURIN_BUILD_CACHE = (
-    test_crates
-    / f"targets/import_hook_project_importer_build_cache_{MATURIN_TEST_NAME}"
-)
+MATURIN_BUILD_CACHE = test_crates / f"targets/import_hook_project_importer_build_cache_{MATURIN_TEST_NAME}"
 # the CI does not have enough space to keep the outputs.
 # When running locally you may set this to False for debugging
 CLEAR_WORKSPACE = True
 
-os.environ["CARGO_TARGET_DIR"] = str(
-    test_crates / f"targets/import_hook_project_importer_{MATURIN_TEST_NAME}"
-)
+os.environ["CARGO_TARGET_DIR"] = str(test_crates / f"targets/import_hook_project_importer_{MATURIN_TEST_NAME}")
 os.environ["MATURIN_BUILD_DIR"] = str(MATURIN_BUILD_CACHE)
 
 
@@ -86,9 +81,7 @@ def test_install_from_script_inside(workspace: Path, project_name: str) -> None:
 
     check_installed_dir = project_dir / "check_installed"
     check_installed_path = check_installed_dir / "check_installed.py"
-    check_installed_path.write_text(
-        f"{IMPORT_HOOK_HEADER}\n\n{check_installed_path.read_text()}"
-    )
+    check_installed_path.write_text(f"{IMPORT_HOOK_HEADER}\n\n{check_installed_path.read_text()}")
 
     empty_dir = workspace / "empty"
     empty_dir.mkdir()
@@ -135,9 +128,7 @@ project_importer.install(install_new_packages=False)
     empty_dir = workspace / "empty"
     empty_dir.mkdir()
 
-    output1, _ = run_python(
-        [str(check_installed_path)], cwd=empty_dir, expect_error=True, quiet=True
-    )
+    output1, _ = run_python([str(check_installed_path)], cwd=empty_dir, expect_error=True, quiet=True)
     assert (
         f'package "{with_underscores(project_name)}" is not already '
         f"installed and install_new_packages=False. Not importing"
@@ -149,10 +140,7 @@ project_importer.install(install_new_packages=False)
 
     output2, _ = run_python([str(check_installed_path)], cwd=empty_dir)
     assert "SUCCESS" in output2
-    assert (
-        f'package "{with_underscores(project_name)}" will be rebuilt because: no build status found'
-        in output2
-    )
+    assert f'package "{with_underscores(project_name)}" will be rebuilt because: no build status found' in output2
     assert _rebuilt_message(project_name) in output2
 
     output3, _ = run_python([str(check_installed_path)], cwd=empty_dir)
@@ -162,9 +150,7 @@ project_importer.install(install_new_packages=False)
 
 
 @pytest.mark.parametrize("project_name", ["pyo3-mixed", "pyo3-pure"])
-def test_do_not_rebuild_if_installed_non_editable(
-    workspace: Path, project_name: str
-) -> None:
+def test_do_not_rebuild_if_installed_non_editable(workspace: Path, project_name: str) -> None:
     """This test ensures that if a maturin project is installed in non-editable
     mode then the import hook will not rebuild it or re-install it in editable mode.
     """
@@ -198,20 +184,14 @@ import_hook.install(install_new_packages=install_new_packages)
     assert "SUCCESS" in output1
     assert "install_new_packages=False" in output1
     assert f'found project linked by dist-info: "{project_dir}"' in output1
-    assert (
-        "package not installed in editable-mode and install_new_packages=False. not rebuilding"
-        in output1
-    )
+    assert "package not installed in editable-mode and install_new_packages=False. not rebuilding" in output1
 
     # when inside the project, will detect the project above
     output2, _ = run_python(["check_installed.py"], cwd=check_installed_dir)
     assert "SUCCESS" in output2
     assert "install_new_packages=False" in output2
     assert "found project above the search path:" in output2
-    assert (
-        "package not installed in editable-mode and install_new_packages=False. not rebuilding"
-        in output2
-    )
+    assert "package not installed in editable-mode and install_new_packages=False. not rebuilding" in output2
 
     output3, _ = run_python(
         ["check_installed.py", "INSTALL_NEW"],
@@ -233,9 +213,7 @@ import_hook.install(install_new_packages=install_new_packages)
     # path dependencies tested separately
     sorted(set(all_test_crate_names()) - {"pyo3-mixed-with-path-dep"}),
 )
-def test_import_editable_installed_rebuild(
-    workspace: Path, project_name: str, initially_mixed: bool
-) -> None:
+def test_import_editable_installed_rebuild(workspace: Path, project_name: str, initially_mixed: bool) -> None:
     """This test ensures that an editable installed project is rebuilt when necessary if the import
     hook is active. This applies to mixed projects (which are installed as .pth files into
     site-packages when installed in editable mode) as well as pure projects (which are copied to site-packages
@@ -247,13 +225,9 @@ def test_import_editable_installed_rebuild(
     _clear_build_cache()
     uninstall(project_name)
 
-    check_installed = (
-        test_crates / project_name / "check_installed/check_installed.py"
-    ).read_text()
+    check_installed = (test_crates / project_name / "check_installed/check_installed.py").read_text()
 
-    project_dir = create_project_from_blank_template(
-        project_name, workspace / project_name, mixed=initially_mixed
-    )
+    project_dir = create_project_from_blank_template(project_name, workspace / project_name, mixed=initially_mixed)
 
     log(f"installing blank project as {project_name}")
 
@@ -262,11 +236,7 @@ def test_import_editable_installed_rebuild(
 
     # without the import hook the installation test is expected to fail because the project should not be installed yet
     output0, _ = run_python_code(check_installed, quiet=True, expect_error=True)
-    assert (
-        "AttributeError" in output0
-        or "ImportError" in output0
-        or "ModuleNotFoundError" in output0
-    )
+    assert "AttributeError" in output0 or "ImportError" in output0 or "ModuleNotFoundError" in output0
 
     check_installed = f"{IMPORT_HOOK_HEADER}\n\n{check_installed}"
 
@@ -296,9 +266,7 @@ def test_import_editable_installed_rebuild(
     # path dependencies tested separately
     sorted(set(mixed_test_crate_names()) - {"pyo3-mixed-with-path-dep"}),
 )
-def test_import_editable_installed_mixed_missing(
-    workspace: Path, project_name: str
-) -> None:
+def test_import_editable_installed_mixed_missing(workspace: Path, project_name: str) -> None:
     """This test ensures that editable installed mixed projects are rebuilt if they are imported
     and their artifacts are missing.
 
@@ -312,18 +280,14 @@ def test_import_editable_installed_mixed_missing(
 
     # making a copy because editable installation may write files into the project directory
     project_dir = get_project_copy(test_crates / project_name, workspace / project_name)
-    project_backup_dir = get_project_copy(
-        test_crates / project_name, workspace / f"backup_{project_name}"
-    )
+    project_backup_dir = get_project_copy(test_crates / project_name, workspace / f"backup_{project_name}")
 
     install_editable(project_dir)
     assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
     check_installed = test_crates / project_name / "check_installed/check_installed.py"
 
-    log(
-        "checking that check_installed works without the import hook right after installing"
-    )
+    log("checking that check_installed works without the import hook right after installing")
     output0, _ = run_python_code(check_installed.read_text())
     assert "SUCCESS" in output0
 
@@ -378,9 +342,7 @@ print('SUCCESS')
 
     check_installed_with_hook = f"{IMPORT_HOOK_HEADER}\n\n{check_installed}"
 
-    project_dir = create_project_from_blank_template(
-        project_name, workspace / project_name, mixed=initially_mixed
-    )
+    project_dir = create_project_from_blank_template(project_name, workspace / project_name, mixed=initially_mixed)
 
     log(f"initially mixed: {initially_mixed}, mixed: {mixed}")
     log(f"installing blank project as {project_name}")
@@ -446,12 +408,8 @@ def test_import_multiple_projects(workspace: Path) -> None:
     uninstall("pyo3-mixed")
     uninstall("pyo3-pure")
 
-    mixed_dir = create_project_from_blank_template(
-        "pyo3-mixed", workspace / "pyo3-mixed", mixed=True
-    )
-    pure_dir = create_project_from_blank_template(
-        "pyo3-pure", workspace / "pyo3-pure", mixed=False
-    )
+    mixed_dir = create_project_from_blank_template("pyo3-mixed", workspace / "pyo3-mixed", mixed=True)
+    pure_dir = create_project_from_blank_template("pyo3-pure", workspace / "pyo3-pure", mixed=False)
 
     install_editable(mixed_dir)
     assert is_installed_correctly("pyo3-mixed", mixed_dir, True)
@@ -499,9 +457,7 @@ def test_rebuild_on_change_to_path_dependency(workspace: Path) -> None:
 
     project_dir = get_project_copy(test_crates / project_name, workspace / project_name)
     get_project_copy(test_crates / "some_path_dep", workspace / "some_path_dep")
-    transitive_dep_dir = get_project_copy(
-        test_crates / "transitive_path_dep", workspace / "transitive_path_dep"
-    )
+    transitive_dep_dir = get_project_copy(test_crates / "transitive_path_dep", workspace / "transitive_path_dep")
 
     install_editable(project_dir)
     assert is_installed_correctly(project_name, project_dir, True)
@@ -522,9 +478,7 @@ print('21 is half 63:', pyo3_mixed_with_path_dep.is_half(21, 63))
     assert "21 is half 63: False" in output1
 
     transitive_dep_lib = transitive_dep_dir / "src/lib.rs"
-    transitive_dep_lib.write_text(
-        transitive_dep_lib.read_text().replace("x + y == sum", "x + x + y == sum")
-    )
+    transitive_dep_lib.write_text(transitive_dep_lib.read_text().replace("x + y == sum", "x + x + y == sum"))
 
     output2, duration2 = run_python_code(check_installed)
     assert "21 is half 42: False" in output2
@@ -541,16 +495,10 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     _clear_build_cache()
     uninstall("my-script")
 
-    project_dir = create_project_from_blank_template(
-        "my-script", workspace / "my-script", mixed=is_mixed
-    )
-    shutil.copy(
-        script_dir / "rust_file_import/my_script_3.rs", project_dir / "src/lib.rs"
-    )
+    project_dir = create_project_from_blank_template("my-script", workspace / "my-script", mixed=is_mixed)
+    shutil.copy(script_dir / "rust_file_import/my_script_3.rs", project_dir / "src/lib.rs")
     manifest_path = project_dir / "Cargo.toml"
-    manifest_path.write_text(
-        f"{manifest_path.read_text()}\n[features]\nlarge_number = []\n"
-    )
+    manifest_path.write_text(f"{manifest_path.read_text()}\n[features]\nlarge_number = []\n")
 
     install_editable(project_dir)
     assert is_installed_correctly("my-script", project_dir, is_mixed)
@@ -561,9 +509,7 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     assert "building with default settings" in output1
     assert "get_num = 10" in output1
     assert "SUCCESS" in output1
-    assert (
-        'package "my_script" will be rebuilt because: no build status found' in output1
-    )
+    assert 'package "my_script" will be rebuilt because: no build status found' in output1
 
     output2, _ = run_python([str(helper_path)], cwd=workspace)
     assert "get_num = 10" in output2
@@ -573,8 +519,7 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     output3, _ = run_python([str(helper_path), "LARGE_NUMBER"], cwd=workspace)
     assert "building with large_number feature enabled" in output3
     assert (
-        'package "my_script" will be rebuilt because: '
-        "current maturin args do not match the previous build"
+        'package "my_script" will be rebuilt because: current maturin args do not match the previous build'
     ) in output3
     assert "get_num = 100" in output3
     assert "SUCCESS" in output3
@@ -612,18 +557,12 @@ else:
     def _create_clean_project(tmp_dir: Path, is_mixed: bool) -> Path:
         _clear_build_cache()
         uninstall("test-project")
-        project_dir = create_project_from_blank_template(
-            "test-project", tmp_dir / "test-project", mixed=is_mixed
-        )
+        project_dir = create_project_from_blank_template("test-project", tmp_dir / "test-project", mixed=is_mixed)
         install_editable(project_dir)
         assert is_installed_correctly("test-project", project_dir, is_mixed)
 
         lib_path = project_dir / "src/lib.rs"
-        lib_src = (
-            lib_path.read_text()
-            .replace("_m:", "m:")
-            .replace("Ok(())", 'm.add("value", 10)?;Ok(())')
-        )
+        lib_src = lib_path.read_text().replace("_m:", "m:").replace("Ok(())", 'm.add("value", 10)?;Ok(())')
         lib_path.write_text(lib_src)
 
         return project_dir
@@ -684,11 +623,7 @@ else:
         """
         project_dir = self._create_clean_project(workspace / "project", is_mixed)
         lib_path = project_dir / "src/lib.rs"
-        lib_path.write_text(
-            lib_path.read_text().replace(
-                "Ok(())", "#[warn(unused_variables)]{let x = 12;}; Ok(())"
-            )
-        )
+        lib_path.write_text(lib_path.read_text().replace("Ok(())", "#[warn(unused_variables)]{let x = 12;}; Ok(())"))
 
         output1, _ = run_python_code(self.loader_script)
         output1 = remove_ansii_escape_characters(output1)
@@ -702,9 +637,7 @@ else:
             "value 10\n"
             "SUCCESS\n"
         )
-        assert (
-            re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
-        )
+        assert re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
 
         output2, _ = run_python_code(self.loader_script)
         output2 = remove_ansii_escape_characters(output2)
@@ -716,14 +649,10 @@ else:
             "value 10\n"
             "SUCCESS\n"
         )
-        assert (
-            re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
-        )
+        assert re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
 
     @pytest.mark.parametrize("is_mixed", [False, True])
-    def test_reset_logger_without_configuring(
-        self, workspace: Path, is_mixed: bool
-    ) -> None:
+    def test_reset_logger_without_configuring(self, workspace: Path, is_mixed: bool) -> None:
         """If reset_logger is called then by default logging level INFO is not printed
         (because the messages are handled by the root logger).
         """
@@ -732,15 +661,11 @@ else:
         assert output == "value 10\nSUCCESS\n"
 
     @pytest.mark.parametrize("is_mixed", [False, True])
-    def test_successful_compilation_but_not_valid(
-        self, workspace: Path, is_mixed: bool
-    ) -> None:
+    def test_successful_compilation_but_not_valid(self, workspace: Path, is_mixed: bool) -> None:
         """If the project compiles but does not import correctly an ImportError is raised."""
         project_dir = self._create_clean_project(workspace / "project", is_mixed)
         lib_path = project_dir / "src/lib.rs"
-        lib_path.write_text(
-            lib_path.read_text().replace("test_project", "test_project_new_name")
-        )
+        lib_path.write_text(lib_path.read_text().replace("test_project", "test_project_new_name"))
 
         output, _ = run_python_code(self.loader_script, quiet=True)
         pattern = (

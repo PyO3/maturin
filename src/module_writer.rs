@@ -921,13 +921,6 @@ fn generate_uniffi_bindings(
         false
     };
 
-    // Disallow library mode without UDL files for now
-    // Should be removed in https://github.com/PyO3/maturin/pull/1729
-    // once uniffi release a new version
-    if is_library {
-        bail!("No UDL files found in {}", crate_dir.join("src").display());
-    }
-
     let mut cmd = uniffi_bindgen_command(crate_dir)?;
     cmd.current_dir(crate_dir);
     cmd.args([

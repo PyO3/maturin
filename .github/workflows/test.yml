@@ -25,7 +25,7 @@ jobs:
       python-version: ${{ steps.generate-matrix.outputs.python-version }}
       fail-fast: ${{ steps.generate-matrix.outputs.fail-fast }}
     steps:
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 16
       - run: npm install js-yaml
@@ -119,7 +119,7 @@ jobs:
         if: ${{ !contains(matrix.python-version, 'pypy') }}
         run: pip install cffi
       - name: Install python packages
-        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.24.1
+        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.25.0
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
@@ -234,7 +234,7 @@ jobs:
         id: setup-python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
       - uses: dtolnay/rust-toolchain@nightly
@@ -251,7 +251,7 @@ jobs:
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Run tests
@@ -456,7 +456,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.64.0
+      - uses: dtolnay/rust-toolchain@1.67.0
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
@@ -493,6 +493,27 @@ jobs:
           # unset GITHUB_ACTIONS env var to disable zig and conda related tests
           env -u GITHUB_ACTIONS cargo nextest run --features password-storage
 
+  test-downstream:
+    name: Test downstream - ${{ matrix.downstream.repository }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'sdist') && github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/downstream.yml
+    with:
+      repository: ${{ matrix.downstream.repository }}
+      manifest-dir: ${{ matrix.downstream.manifest-dir }}
+    strategy:
+      matrix:
+        downstream:
+          - repository: "pola-rs/polars"
+            manifest-dir: "py-polars"
+          - repository: "astral-sh/ruff"
+            manifest-dir: "crates/ruff_cli"
+          - repository: "crate-ci/typos"
+            manifest-dir: "crates/typos-cli"
+          - repository: "ast-grep/ast-grep"
+            manifest-dir: "crates/pyo3"
+          - repository: "oxigraph/oxigraph"
+            manifest-dir: "python"
+
   check:
     name: Check ${{ matrix.platform.target }}
     if: github.event_name != 'pull_request'
@@ -528,6 +549,7 @@ jobs:
       - test-bootstrap
       - test-msrv
       - test-pyston
+      - test-downstream
       - check
     if: always()
     runs-on: ubuntu-latest

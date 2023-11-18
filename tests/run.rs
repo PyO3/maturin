@@ -134,6 +134,16 @@ fn develop_uniffi_pure() {
 }
 
 #[test]
+fn develop_uniffi_pure_proc_macro() {
+    handle_result(develop::test_develop(
+        "test-crates/uniffi-pure-proc-macro",
+        None,
+        "develop-uniffi-pure-proc-macro",
+        false,
+    ));
+}
+
+#[test]
 fn develop_uniffi_mixed() {
     if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
         handle_result(develop::test_develop(
@@ -311,6 +321,17 @@ fn integration_uniffi_pure() {
 }
 
 #[test]
+fn integration_uniffi_pure_proc_macro() {
+    handle_result(integration::test_integration(
+        "test-crates/uniffi-pure-proc-macro",
+        None,
+        "integration-uniffi-pure-proc-macro",
+        false,
+        None,
+    ));
+}
+
+#[test]
 fn integration_uniffi_mixed() {
     if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
         handle_result(integration::test_integration(
@@ -464,6 +485,40 @@ fn musl() {
 #[test]
 fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
+}
+
+#[test]
+fn workspace_members_beneath_pyproject_sdist() {
+    let cargo_toml = expect![[r#"
+        [workspace]
+        resolver = "2"
+        members = ["pyo3-mixed-workspace", "python/pyo3-mixed-workspace-py"]
+        "#]];
+    handle_result(other::test_source_distribution(
+        "test-crates/pyo3-mixed-workspace/rust/python/pyo3-mixed-workspace-py",
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "pyo3_mixed_workspace-2.1.3/PKG-INFO",
+                "pyo3_mixed_workspace-2.1.3/pyproject.toml",
+                "pyo3_mixed_workspace-2.1.3/rust/Cargo.lock",
+                "pyo3_mixed_workspace-2.1.3/rust/Cargo.toml",
+                "pyo3_mixed_workspace-2.1.3/rust/pyo3-mixed-workspace/Cargo.toml",
+                "pyo3_mixed_workspace-2.1.3/rust/pyo3-mixed-workspace/src/lib.rs",
+                "pyo3_mixed_workspace-2.1.3/rust/python/pyo3-mixed-workspace-py/Cargo.toml",
+                "pyo3_mixed_workspace-2.1.3/rust/python/pyo3-mixed-workspace-py/src/lib.rs",
+                "pyo3_mixed_workspace-2.1.3/src/pyo3_mixed_workspace/__init__.py",
+                "pyo3_mixed_workspace-2.1.3/src/pyo3_mixed_workspace/python_module/__init__.py",
+                "pyo3_mixed_workspace-2.1.3/src/pyo3_mixed_workspace/python_module/double.py",
+                "pyo3_mixed_workspace-2.1.3/src/tests/test_pyo3_mixed.py",
+            }
+        "#]],
+        Some((
+            Path::new("pyo3_mixed_workspace-2.1.3/rust/Cargo.toml"),
+            cargo_toml,
+        )),
+        "sdist-workspace-members-beneath_pyproject",
+    ))
 }
 
 #[test]

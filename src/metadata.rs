@@ -226,7 +226,7 @@ impl Metadata21 {
                 for author in authors {
                     match (&author.name, &author.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{name} <{email}>"));
+                            emails.push(escape_email_with_display_name(name, email));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -251,7 +251,7 @@ impl Metadata21 {
                 for maintainer in maintainers {
                     match (&maintainer.name, &maintainer.email) {
                         (Some(name), Some(email)) => {
-                            emails.push(format!("{name} <{email}>"));
+                            emails.push(escape_email_with_display_name(name, email));
                         }
                         (Some(name), None) => {
                             names.push(name.as_str());
@@ -555,6 +555,23 @@ impl Metadata21 {
     }
 }
 
+/// Escape email addresses with display name if necessary
+/// according to RFC 822 Section 3.3. "specials".
+fn escape_email_with_display_name(display_name: &str, email: &str) -> String {
+    if display_name.chars().any(|c| {
+        matches!(
+            c,
+            '(' | ')' | '<' | '>' | '@' | ',' | ';' | ':' | '\\' | '"' | '.' | '[' | ']'
+        )
+    }) {
+        return format!(
+            "\"{}\" <{email}>",
+            display_name.replace('\\', "\\\\").replace('\"', "\\\"")
+        );
+    }
+    format!("{display_name} <{email}>")
+}
+
 /// Fold long header field according to RFC 5322 section 2.2.3
 /// https://datatracker.ietf.org/doc/html/rfc5322#section-2.2.3
 fn fold_header(text: &str) -> String {
@@ -810,5 +827,44 @@ mod test {
         assert_eq!(metadata.license_files[1], manifest_dir.join("LICENSE"));
         assert_eq!(metadata.license_files[2], manifest_dir.join("NOTICE.md"));
         assert_eq!(metadata.license_files[3], manifest_dir.join("AUTHORS.txt"));
+    }
+
+    #[test]
+    fn test_escape_email_with_display_name_without_special_characters() {
+        let display_name = "Foo Bar !#$%&'*+-/=?^_`{|}~ 123";
+        let email = "foobar-123@example.com";
+        let result = escape_email_with_display_name(display_name, email);
+        assert_eq!(
+            result,
+            "Foo Bar !#$%&'*+-/=?^_`{|}~ 123 <foobar-123@example.com>"
+        );
+    }
+
+    #[test]
+    fn test_escape_email_with_display_name_with_special_characters() {
+        let tests = [
+            ("Foo ( Bar", "\"Foo ( Bar\""),
+            ("Foo ) Bar", "\"Foo ) Bar\""),
+            ("Foo < Bar", "\"Foo < Bar\""),
+            ("Foo > Bar", "\"Foo > Bar\""),
+            ("Foo @ Bar", "\"Foo @ Bar\""),
+            ("Foo , Bar", "\"Foo , Bar\""),
+            ("Foo ; Bar", "\"Foo ; Bar\""),
+            ("Foo : Bar", "\"Foo : Bar\""),
+            ("Foo \\ Bar", "\"Foo \\\\ Bar\""),
+            ("Foo \" Bar", "\"Foo \\\" Bar\""),
+            ("Foo . Bar", "\"Foo . Bar\""),
+            ("Foo [ Bar", "\"Foo [ Bar\""),
+            ("Foo ] Bar", "\"Foo ] Bar\""),
+            ("Foo ) Bar", "\"Foo ) Bar\""),
+            ("Foo ) Bar", "\"Foo ) Bar\""),
+            ("Foo, Bar", "\"Foo, Bar\""),
+        ];
+        for (display_name, expected_name) in tests {
+            let email = "foobar-123@example.com";
+            let result = escape_email_with_display_name(display_name, email);
+            let expected = format!("{expected_name} <{email}>");
+            assert_eq!(result, expected);
+        }
     }
 }

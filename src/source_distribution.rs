@@ -6,6 +6,7 @@ use cargo_metadata::{Metadata, MetadataCommand};
 use fs_err as fs;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
+use path_slash::PathExt as _;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -48,6 +49,7 @@ fn rewrite_cargo_toml(
     known_path_deps: &HashMap<String, PathDependency>,
 ) -> Result<String> {
     let manifest_path = manifest_path.as_ref();
+    debug!("Rewriting Cargo.toml at {}", manifest_path.display());
     let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
 
     // Update workspace members
@@ -65,23 +67,24 @@ fn rewrite_cargo_toml(
                 for member in members {
                     if let toml_edit::Value::String(ref s) = member {
                         let member_path = s.value();
-                        let path = Path::new(member_path);
-                        if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
-                            // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
-                            let is_glob_pattern = name.contains(['*', '?', '[', ']']);
-                            if is_glob_pattern {
-                                let pattern = glob::Pattern::new(name).context(format!(
+                        // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
+                        let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);
+                        if is_glob_pattern {
+                            let pattern = glob::Pattern::new(member_path).with_context(|| {
+                                format!(
                                     "Invalid `workspace.members` glob pattern: {} in {}",
-                                    name,
+                                    member_path,
                                     manifest_path.display()
-                                ))?;
-                                if known_path_deps
-                                    .keys()
-                                    .any(|path_dep| pattern.matches(path_dep))
-                                {
-                                    new_members.push(member_path);
-                                }
-                            } else if known_path_deps.contains_key(member_path) {
+                                )
+                            })?;
+                            if known_path_deps.values().any(|path_dep| {
+                                let relative_path = path_dep
+                                    .manifest_path
+                                    .strip_prefix(&path_dep.workspace_root)
+                                    .unwrap();
+                                let relative_path_str = relative_path.to_str().unwrap();
+                                pattern.matches(relative_path_str)
+                            }) {
                                 new_members.push(member_path);
                             }
                         } else if known_path_deps.contains_key(member_path) {
@@ -147,6 +150,7 @@ fn add_crate_to_source_distribution(
     prefix: impl AsRef<Path>,
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
+    skip_cargo_toml: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
     let output = Command::new("cargo")
@@ -215,7 +219,7 @@ fn add_crate_to_source_distribution(
     if root_crate {
         let rewritten_cargo_toml = rewrite_cargo_toml(manifest_path, known_path_deps)?;
         writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
-    } else {
+    } else if !skip_cargo_toml {
         writer.add_file(cargo_toml_path, manifest_path)?;
     }
 
@@ -344,6 +348,10 @@ fn add_cargo_package_files_to_sdist(
     let workspace_manifest_path = workspace_root.join("Cargo.toml");
 
     let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+    debug!(
+        "Found path dependencies: {:?}",
+        known_path_deps.keys().collect::<Vec<_>>()
+    );
     let mut sdist_root =
         common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path).unwrap();
     for path_dep in known_path_deps.values() {
@@ -360,21 +368,31 @@ fn add_cargo_package_files_to_sdist(
 
     // Add local path dependencies
     for (name, path_dep) in known_path_deps.iter() {
+        debug!(
+            "Adding path dependency: {} at {}",
+            name,
+            path_dep.manifest_path.display()
+        );
         let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
         let relative_path_dep_manifest_dir =
             path_dep_manifest_dir.strip_prefix(&sdist_root).unwrap();
+        // we may need to rewrite workspace Cargo.toml later so don't add it to sdist yet
+        let skip_cargo_toml = workspace_manifest_path == path_dep.manifest_path;
         add_crate_to_source_distribution(
             writer,
             &path_dep.manifest_path,
             &root_dir.join(relative_path_dep_manifest_dir),
             &known_path_deps,
             false,
+            skip_cargo_toml,
         )
-        .context(format!(
-            "Failed to add local dependency {} at {} to the source distribution",
-            name,
-            path_dep.manifest_path.display()
-        ))?;
+        .with_context(|| {
+            format!(
+                "Failed to add local dependency {} at {} to the source distribution",
+                name,
+                path_dep.manifest_path.display()
+            )
+        })?;
         // Handle possible relative readme field in Cargo.toml
         if let Some(readme) = path_dep.readme.as_ref() {
             let abs_readme = path_dep_manifest_dir
@@ -416,6 +434,7 @@ fn add_cargo_package_files_to_sdist(
         root_dir.join(relative_main_crate_manifest_dir),
         &known_path_deps,
         true,
+        false,
     )?;
     // Handle possible relative readme field in Cargo.toml
     if let Some(readme) = main_crate.readme.as_ref() {
@@ -456,9 +475,9 @@ fn add_cargo_package_files_to_sdist(
             let mut deps_to_keep = known_path_deps.clone();
             // Also need to the main Python binding crate
             let main_member_name = abs_manifest_dir
-                .strip_prefix(&sdist_root)
+                .strip_prefix(workspace_root)
                 .unwrap()
-                .to_str()
+                .to_slash()
                 .unwrap()
                 .to_string();
             deps_to_keep.insert(

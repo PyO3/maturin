@@ -32,16 +32,10 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
-def get_maturin_pep517_args(
-    config_settings: Optional[Mapping[str, Any]] = None
-) -> List[str]:
+def get_maturin_pep517_args(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
     build_args = config_settings.get("build-args") if config_settings else None
     if build_args is None:
         env_args = os.getenv("MATURIN_PEP517_ARGS", "")
-        if env_args:
-            print(
-                f"'MATURIN_PEP517_ARGS' is deprecated, use `--config-settings build-args='{env_args}'` instead."
-            )
         args = shlex.split(env_args)
     elif isinstance(build_args, str):
         args = shlex.split(build_args)
@@ -91,9 +85,7 @@ def _build_wheel(
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
-        sys.stderr.write(
-            f"Error: command {command} returned non-zero exit status {result.returncode}\n"
-        )
+        sys.stderr.write(f"Error: command {command} returned non-zero exit status {result.returncode}\n")
         sys.exit(1)
     output = result.stdout.decode(errors="replace")
     wheel_path = output.strip().splitlines()[-1]
@@ -112,9 +104,7 @@ def build_wheel(
 
 
 # noinspection PyUnusedLocal
-def build_sdist(
-    sdist_directory: str, config_settings: Optional[Mapping[str, Any]] = None
-) -> str:
+def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any]] = None) -> str:
     command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
 
     print("Running `{}`".format(" ".join(command)))
@@ -123,18 +113,14 @@ def build_sdist(
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
-        sys.stderr.write(
-            f"Error: command {command} returned non-zero exit status {result.returncode}\n"
-        )
+        sys.stderr.write(f"Error: command {command} returned non-zero exit status {result.returncode}\n")
         sys.exit(1)
     output = result.stdout.decode(errors="replace")
     return output.strip().splitlines()[-1]
 
 
 # noinspection PyUnusedLocal
-def get_requires_for_build_wheel(
-    config_settings: Optional[Mapping[str, Any]] = None
-) -> List[str]:
+def get_requires_for_build_wheel(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
     if get_config().get("bindings") == "cffi":
         return ["cffi"]
     else:
@@ -147,9 +133,7 @@ def build_editable(
     config_settings: Optional[Mapping[str, Any]] = None,
     metadata_directory: Optional[str] = None,
 ) -> str:
-    return _build_wheel(
-        wheel_directory, config_settings, metadata_directory, editable=True
-    )
+    return _build_wheel(wheel_directory, config_settings, metadata_directory, editable=True)
 
 
 # Requirements to build an editable are the same as for a wheel
@@ -157,9 +141,7 @@ get_requires_for_build_editable = get_requires_for_build_wheel
 
 
 # noinspection PyUnusedLocal
-def get_requires_for_build_sdist(
-    config_settings: Optional[Mapping[str, Any]] = None
-) -> List[str]:
+def get_requires_for_build_sdist(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
     return []
 
 
@@ -170,9 +152,7 @@ def prepare_metadata_for_build_wheel(
     print("Checking for Rust toolchain....")
     is_cargo_installed = False
     try:
-        output = subprocess.check_output(["cargo", "--version"]).decode(
-            "utf-8", "ignore"
-        )
+        output = subprocess.check_output(["cargo", "--version"]).decode("utf-8", "ignore")
         if "cargo" in output:
             is_cargo_installed = True
     except (FileNotFoundError, SubprocessError):

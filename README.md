@@ -18,11 +18,15 @@ Check out the [User Guide](https://maturin.rs/)!
 
 ## Usage
 
-You can either download binaries from the [latest release](https://github.com/PyO3/maturin/releases/latest) or install it with pip:
+You can either download binaries from the [latest release](https://github.com/PyO3/maturin/releases/latest) or install it with [pipx](https://pypa.github.io/pipx/):
 
 ```shell
-pip install maturin
+pipx install maturin
 ```
+
+> **Note**
+>
+> `pip install maturin` should also work if you don't want to use pipx.
 
 There are four main commands:
 

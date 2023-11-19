@@ -354,15 +354,6 @@ fn canonicalize_name(name: &str) -> String {
         .to_lowercase()
 }
 
-fn http_proxy() -> Result<String, env::VarError> {
-    env::var("HTTPS_PROXY")
-        .or_else(|_| env::var("https_proxy"))
-        .or_else(|_| env::var("HTTP_PROXY"))
-        .or_else(|_| env::var("http_proxy"))
-        .or_else(|_| env::var("ALL_PROXY"))
-        .or_else(|_| env::var("all_proxy"))
-}
-
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
 fn tls_ca_bundle() -> Option<OsString> {
     env::var_os("MATURIN_CA_BUNDLE")
@@ -376,11 +367,7 @@ fn tls_ca_bundle() -> Option<OsString> {
 fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
-    let mut builder = ureq::builder();
-    if let Ok(proxy) = http_proxy() {
-        let proxy = ureq::Proxy::new(proxy)?;
-        builder = builder.proxy(proxy);
-    };
+    let builder = ureq::builder().try_proxy_from_env(true);
     let mut tls_builder = native_tls::TlsConnector::builder();
     if let Some(ca_bundle) = tls_ca_bundle() {
         let mut reader = io::BufReader::new(File::open(ca_bundle)?);
@@ -397,11 +384,7 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
-    let mut builder = ureq::builder();
-    if let Ok(proxy) = http_proxy() {
-        let proxy = ureq::Proxy::new(proxy)?;
-        builder = builder.proxy(proxy);
-    };
+    let builder = ureq::builder().try_proxy_from_env(true);
     if let Some(ca_bundle) = tls_ca_bundle() {
         let mut reader = io::BufReader::new(File::open(ca_bundle)?);
         let certs = rustls_pemfile::certs(&mut reader)?;
@@ -420,11 +403,7 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 #[cfg(not(any(feature = "native-tls", feature = "rustls")))]
 #[allow(clippy::result_large_err)]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
-    let mut builder = ureq::builder();
-    if let Ok(proxy) = http_proxy() {
-        let proxy = ureq::Proxy::new(proxy)?;
-        builder = builder.proxy(proxy);
-    };
+    let builder = ureq::builder().try_proxy_from_env(true);
     Ok(builder.build())
 }
 

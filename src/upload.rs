@@ -367,7 +367,7 @@ fn tls_ca_bundle() -> Option<OsString> {
 fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
-    let builder = ureq::builder().try_proxy_from_env(true);
+    let mut builder = ureq::builder().try_proxy_from_env(true);
     let mut tls_builder = native_tls::TlsConnector::builder();
     if let Some(ca_bundle) = tls_ca_bundle() {
         let mut reader = io::BufReader::new(File::open(ca_bundle)?);

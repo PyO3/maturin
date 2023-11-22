@@ -8,6 +8,7 @@ use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTH
 use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, Node};
+use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -47,35 +48,45 @@ pub struct CargoOptions {
     pub quiet: bool,
 
     /// Number of parallel jobs, defaults to # of CPUs
-    #[arg(short = 'j', long, value_name = "N")]
+    #[arg(short = 'j', long, value_name = "N", help_heading = heading::COMPILATION_OPTIONS)]
     pub jobs: Option<usize>,
 
     /// Build artifacts with the specified Cargo profile
-    #[arg(long, value_name = "PROFILE-NAME")]
+    #[arg(long, value_name = "PROFILE-NAME", help_heading = heading::COMPILATION_OPTIONS)]
     pub profile: Option<String>,
 
     /// Space or comma separated list of features to activate
-    #[arg(short = 'F', long, action = clap::ArgAction::Append)]
+    #[arg(
+        short = 'F',
+        long,
+        action = clap::ArgAction::Append,
+        help_heading = heading::FEATURE_SELECTION,
+    )]
     pub features: Vec<String>,
 
     /// Activate all available features
-    #[arg(long)]
+    #[arg(long, help_heading = heading::FEATURE_SELECTION)]
     pub all_features: bool,
 
     /// Do not activate the `default` feature
-    #[arg(long)]
+    #[arg(long, help_heading = heading::FEATURE_SELECTION)]
     pub no_default_features: bool,
 
     /// Build for the target triple
-    #[arg(long, value_name = "TRIPLE", env = "CARGO_BUILD_TARGET")]
+    #[arg(
+        long,
+        value_name = "TRIPLE",
+        env = "CARGO_BUILD_TARGET",
+        help_heading = heading::COMPILATION_OPTIONS,
+    )]
     pub target: Option<String>,
 
     /// Directory for all generated artifacts
-    #[arg(long, value_name = "DIRECTORY")]
+    #[arg(long, value_name = "DIRECTORY", help_heading = heading::COMPILATION_OPTIONS)]
     pub target_dir: Option<PathBuf>,
 
     /// Path to Cargo.toml
-    #[arg(short = 'm', long, value_name = "PATH")]
+    #[arg(short = 'm', long, value_name = "PATH", help_heading = heading::MANIFEST_OPTIONS)]
     pub manifest_path: Option<PathBuf>,
 
     /// Ignore `rust-version` specification in packages
@@ -91,15 +102,15 @@ pub struct CargoOptions {
     pub color: Option<String>,
 
     /// Require Cargo.lock and cache are up to date
-    #[arg(long)]
+    #[arg(long, help_heading = heading::MANIFEST_OPTIONS)]
     pub frozen: bool,
 
     /// Require Cargo.lock is up to date
-    #[arg(long)]
+    #[arg(long, help_heading = heading::MANIFEST_OPTIONS)]
     pub locked: bool,
 
     /// Run without accessing the network
-    #[arg(long)]
+    #[arg(long, help_heading = heading::MANIFEST_OPTIONS)]
     pub offline: bool,
 
     /// Override a configuration value (unstable)
@@ -115,7 +126,8 @@ pub struct CargoOptions {
         long,
         value_name = "FMTS",
         value_delimiter = ',',
-        require_equals = true
+        require_equals = true,
+        help_heading = heading::COMPILATION_OPTIONS,
     )]
     pub timings: Option<Vec<String>>,
 

@@ -317,6 +317,10 @@ impl ProjectResolver {
         debug!("Resolving cargo metadata from {:?}", manifest_path);
         let cargo_metadata_extra_args = extract_cargo_metadata_args(cargo_options)?;
         let result = MetadataCommand::new()
+            // Force resolving metadata using cargo instead of instead of $CARGO env var
+            // to avoid getting wrong file path like target directory, for example `cross` would
+            // output paths in docker while we want paths on host.
+            .cargo_path("cargo")
             .manifest_path(manifest_path)
             .verbose(true)
             .other_options(cargo_metadata_extra_args)

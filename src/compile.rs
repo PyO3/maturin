@@ -447,6 +447,10 @@ fn compile_target(
 
     debug!("Running {:?}", build_command);
 
+    let using_cross = build_command
+        .get_program()
+        .to_string_lossy()
+        .starts_with("cross");
     let mut cargo_build = build_command
         .spawn()
         .context("Failed to run `cargo rustc`")?;
@@ -494,8 +498,18 @@ fn compile_target(
                         .into_iter()
                         .zip(artifact.filenames);
                     for (crate_type, filename) in tuples {
+                        let path = if using_cross && filename.starts_with("/target") {
+                            // Convert cross target path in docker back to path on host
+                            context
+                                .cargo_metadata
+                                .target_directory
+                                .join(filename.strip_prefix("/target").unwrap())
+                                .into_std_path_buf()
+                        } else {
+                            filename.into()
+                        };
                         let artifact = BuildArtifact {
-                            path: filename.into(),
+                            path,
                             linked_paths: Vec::new(),
                         };
                         artifacts.insert(crate_type, artifact);

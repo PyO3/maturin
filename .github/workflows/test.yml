@@ -99,7 +99,7 @@ jobs:
         with:
           version: "v0.5.3"
       - uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-activate-base: "false"
           activate-environment: ""

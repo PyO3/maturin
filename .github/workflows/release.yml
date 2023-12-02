@@ -180,7 +180,11 @@ jobs:
       - uses: actions/checkout@v4
       # powerpc64le-unknown-linux-musl doesn't have official std library release
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
-        if: matrix.platform.target != 'powerpc64le-unknown-linux-musl'
+        if: matrix.platform.target != 'powerpc64le-unknown-linux-musl' && matrix.platform.target != 's390x-unknown-linux-gnu'
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.platform.target == 's390x-unknown-linux-gnu'
+        with:
+          targets: ${{ matrix.platform.target }}
       - name: Build wheel
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79

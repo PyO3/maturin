@@ -179,10 +179,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # powerpc64le-unknown-linux-musl doesn't have official std library release
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
         if: matrix.platform.target != 'powerpc64le-unknown-linux-musl'
-        with:
-          targets: ${{ matrix.platform.target }}
       - name: Build wheel
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79

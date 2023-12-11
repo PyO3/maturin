@@ -191,6 +191,9 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
     match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
         (Some(dir), None) => return Ok(PathBuf::from(dir)),
         (None, Some(dir)) => return Ok(PathBuf::from(dir)),
+        (Some(venv), Some(conda)) if venv == conda => {
+            return Ok(PathBuf::from(venv))
+        }
         (Some(_), Some(_)) => {
             bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
         }

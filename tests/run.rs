@@ -529,7 +529,7 @@ fn workspace_members_non_local_dep_sdist() {
         license = "MIT"
 
         [dependencies]
-        pyo3 = { version = "0.19.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+        pyo3 = { version = "0.20.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
 
         [lib]
         name = "pyo3_pure"
@@ -595,7 +595,7 @@ fn lib_with_target_path_dep_sdist() {
 
         [dependencies]
         # Don't use the macros feature, which makes compilation much faster
-        pyo3 = { version = "0.19.0", default-features = false, features = ["extension-module"] }
+        pyo3 = { version = "0.20.0", default-features = false, features = ["extension-module"] }
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }

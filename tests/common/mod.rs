@@ -99,6 +99,15 @@ pub fn get_python_implementation(python_interp: &Path) -> Result<String> {
     Ok(python_impl)
 }
 
+/// Get the current tested Python implementation
+pub fn test_python_implementation() -> Result<String> {
+    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
+        let target = Target::from_target_triple(None).unwrap();
+        target.get_python()
+    });
+    get_python_implementation(&python)
+}
+
 /// Create virtualenv
 pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(PathBuf, PathBuf)> {
     let interp = python_interp.or_else(|| test_python_path().map(PathBuf::from));

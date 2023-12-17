@@ -270,8 +270,8 @@ jobs:
       - name: Install build requirements
         run: |
           set -ex
-          apk add cargo python3-dev libffi-dev py3-pip curl bash tar zstd git patchelf
-          pip3 install cffi virtualenv
+          apk add cargo python3-dev libffi-dev py3-pip curl \
+            bash tar zstd git patchelf py3-cffi py3-virtualenv
       - uses: actions/checkout@v4
       - name: Fix git permissions
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
@@ -300,7 +300,7 @@ jobs:
         manylinux: ["manylinux_2_24"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
       # Caching

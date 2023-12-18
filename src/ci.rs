@@ -324,13 +324,13 @@ jobs:\n",
             }
             // upload wheels
             let artifact_name = if matches!(platform, Platform::Emscripten) {
-                "wasm-wheels"
+                String::from("wasm-wheels")
             } else {
-                "wheels"
+                format!("wheels-{platform}-${{{{ matrix.target }}}}")
             };
             conf.push_str(&format!(
                 "      - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: {artifact_name}
           path: dist
@@ -442,9 +442,9 @@ jobs:\n",
             ));
             conf.push_str(
                 "      - name: Upload sdist
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-sdist
           path: dist
 ",
             );
@@ -470,29 +470,23 @@ jobs:\n",
         }
         conf.push_str(
             r#"    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: wheels
+      - uses: actions/download-artifact@v4
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing *
+          args: --non-interactive --skip-existing wheels-*/*
 "#,
         );
         if platforms.contains(&Platform::Emscripten) {
             conf.push_str(
-                "      - uses: actions/download-artifact@v3
-        with:
-          name: wasm-wheels
-          path: wasm
-      - name: Upload to GitHub Release
+                "      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            wasm/*.whl
+            wasm-wheels/*.whl
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
 ",
             );
@@ -564,9 +558,9 @@ mod tests {
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-linux-${{ matrix.target }}
                       path: dist
 
               windows:
@@ -587,9 +581,9 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-windows-${{ matrix.target }}
                       path: dist
 
               macos:
@@ -609,9 +603,9 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-macos-${{ matrix.target }}
                       path: dist
 
               sdist:
@@ -624,9 +618,9 @@ mod tests {
                       command: sdist
                       args: --out dist
                   - name: Upload sdist
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-sdist
                       path: dist
 
               release:
@@ -635,16 +629,14 @@ mod tests {
                 if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, windows, macos, sdist]
                 steps:
-                  - uses: actions/download-artifact@v3
-                    with:
-                      name: wheels
+                  - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *"#]];
+                      args: --non-interactive --skip-existing wheels-*/*"#]];
         expected.assert_eq(&conf);
     }
 
@@ -692,9 +684,9 @@ mod tests {
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-linux-${{ matrix.target }}
                       path: dist
 
               windows:
@@ -715,9 +707,9 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-windows-${{ matrix.target }}
                       path: dist
 
               macos:
@@ -737,9 +729,9 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-macos-${{ matrix.target }}
                       path: dist
 
               release:
@@ -748,16 +740,14 @@ mod tests {
                 if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, windows, macos]
                 steps:
-                  - uses: actions/download-artifact@v3
-                    with:
-                      name: wheels
+                  - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *"#]];
+                      args: --non-interactive --skip-existing wheels-*/*"#]];
         expected.assert_eq(&conf);
     }
 
@@ -814,9 +804,9 @@ mod tests {
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-linux-${{ matrix.target }}
                       path: dist
                   - name: pytest
                     if: ${{ startsWith(matrix.target, 'x86_64') }}
@@ -860,9 +850,9 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-windows-${{ matrix.target }}
                       path: dist
                   - name: pytest
                     if: ${{ !startsWith(matrix.target, 'aarch64') }}
@@ -890,9 +880,9 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-macos-${{ matrix.target }}
                       path: dist
                   - name: pytest
                     if: ${{ !startsWith(matrix.target, 'aarch64') }}
@@ -913,9 +903,9 @@ mod tests {
                       command: sdist
                       args: --out dist
                   - name: Upload sdist
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-sdist
                       path: dist
 
               release:
@@ -924,16 +914,14 @@ mod tests {
                 if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, windows, macos, sdist]
                 steps:
-                  - uses: actions/download-artifact@v3
-                    with:
-                      name: wheels
+                  - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *"#]];
+                      args: --non-interactive --skip-existing wheels-*/*"#]];
         expected.assert_eq(&conf);
     }
 
@@ -978,9 +966,9 @@ mod tests {
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-linux-${{ matrix.target }}
                       path: dist
 
               windows:
@@ -997,9 +985,9 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-windows-${{ matrix.target }}
                       path: dist
 
               macos:
@@ -1016,9 +1004,9 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-macos-${{ matrix.target }}
                       path: dist
 
               sdist:
@@ -1031,9 +1019,9 @@ mod tests {
                       command: sdist
                       args: --out dist
                   - name: Upload sdist
-                    uses: actions/upload-artifact@v3
+                    uses: actions/upload-artifact@v4
                     with:
-                      name: wheels
+                      name: wheels-sdist
                       path: dist
 
               release:
@@ -1042,16 +1030,14 @@ mod tests {
                 if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, windows, macos, sdist]
                 steps:
-                  - uses: actions/download-artifact@v3
-                    with:
-                      name: wheels
+                  - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
                     with:
                       command: upload
-                      args: --non-interactive --skip-existing *"#]];
+                      args: --non-interactive --skip-existing wheels-*/*"#]];
         expected.assert_eq(&conf);
     }
 }

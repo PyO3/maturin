@@ -211,6 +211,9 @@ impl Metadata21 {
                     glob::glob(&escaped_manifest_path.join(pattern).to_string_lossy())?
                         .filter_map(Result::ok)
                 {
+                    if !license_path.is_file() {
+                        continue;
+                    }
                     // if the pyproject.toml specified the license file,
                     // then we won't list it as automatically included
                     if !self.license_files.contains(&license_path) {

@@ -316,6 +316,16 @@ impl BuildOptions {
                         }
                         interpreters =
                             find_interpreter_in_sysconfig(interpreter, target, requires_python)?;
+                        if interpreters.is_empty() {
+                            bail!(
+                                "Couldn't find any python interpreters from '{}'. Please check that both major and minor python version have been specified in -i/--interpreter.",
+                                interpreter
+                                    .iter()
+                                    .map(|p| p.display().to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            );
+                        }
                     }
                 } else if binding_name.starts_with("pyo3") {
                     // Only pyo3/pyo3-ffi bindings supports bundled sysconfig interpreters

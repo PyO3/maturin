@@ -14,3 +14,16 @@ handle_result(import_hook::test_import_hook(
     true,
 ));
 ```
+
+## Debugging The Import Hook
+- if an individual package is failing to import for some reason
+  - configure the logging level to get more information from the import hook.
+  - create a script that calls `maturin.import_hook.install()` and run the script in a debugger and step into the import hook source code
+- to debug the rust implementation of resolving projects, create and run a test like so. Run the test in a debugger or add print statements.
+
+```rust
+#[test]
+fn test_resolve_package() {
+    debug_print_resolved_package(&Path::new("test-crates/pyo3-mixed-workspace"));
+}
+```

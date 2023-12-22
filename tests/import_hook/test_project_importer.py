@@ -33,6 +33,7 @@ The tests are intended to be run as part of the tests in `run.rs`
 which provides a clean virtual environment for these tests to use.
 """
 
+# when running in parallel this environment variable is set to the name of the function being tested by the runner.
 MATURIN_TEST_NAME = os.environ["MATURIN_TEST_NAME"]
 MATURIN_BUILD_CACHE = test_crates / f"targets/import_hook_project_importer_build_cache_{MATURIN_TEST_NAME}"
 # the CI does not have enough space to keep the outputs.

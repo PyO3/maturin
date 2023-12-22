@@ -1,17 +1,12 @@
 //! To speed up the tests, they are all collected in a single module
 
+use common::{develop, errors, handle_result, integration, other, test_python_implementation};
+use expect_test::expect;
+use maturin::pyproject_toml::SdistGenerator;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
-
-use expect_test::expect;
 use time::macros::datetime;
 use which::which;
-
-use common::{
-    develop, errors, get_python_implementation, handle_result, integration, other, test_python_path,
-};
-use maturin::pyproject_toml::SdistGenerator;
-use maturin::Target;
 
 use crate::common::import_hook;
 
@@ -103,6 +98,11 @@ fn develop_pyo3_mixed_src_layout() {
 
 #[test]
 fn develop_cffi_pure() {
+    let python_implementation = test_python_implementation().unwrap();
+    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy on Windows hangs on cffi test sometimes
+        return;
+    }
     handle_result(develop::test_develop(
         "test-crates/cffi-pure",
         None,
@@ -113,6 +113,11 @@ fn develop_cffi_pure() {
 
 #[test]
 fn develop_cffi_mixed() {
+    let python_implementation = test_python_implementation().unwrap();
+    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy on Windows hangs on cffi test sometimes
+        return;
+    }
     handle_result(develop::test_develop(
         "test-crates/cffi-mixed",
         None,
@@ -177,11 +182,7 @@ fn develop_pyo3_ffi_pure() {
 
 #[test]
 fn integration_pyo3_bin() {
-    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
-        let target = Target::from_target_triple(None).unwrap();
-        target.get_python()
-    });
-    let python_implementation = get_python_implementation(&python).unwrap();
+    let python_implementation = test_python_implementation().unwrap();
     if python_implementation == "pypy" || python_implementation == "graalpy" {
         // PyPy & GraalPy do not support the 'auto-initialize' feature of pyo3
         return;
@@ -287,6 +288,11 @@ fn integration_pyo3_pure_conda() {
 
 #[test]
 fn integration_cffi_pure() {
+    let python_implementation = test_python_implementation().unwrap();
+    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy on Windows hangs on cffi test sometimes
+        return;
+    }
     handle_result(integration::test_integration(
         "test-crates/cffi-pure",
         None,
@@ -298,6 +304,11 @@ fn integration_cffi_pure() {
 
 #[test]
 fn integration_cffi_mixed() {
+    let python_implementation = test_python_implementation().unwrap();
+    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy on Windows hangs on cffi test sometimes
+        return;
+    }
     handle_result(integration::test_integration(
         "test-crates/cffi-mixed",
         None,
@@ -403,11 +414,7 @@ fn integration_wasm_hello_world() {
         Some("wasm32-wasi"),
     ));
 
-    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
-        let target = Target::from_target_triple(None).unwrap();
-        target.get_python()
-    });
-    let python_implementation = get_python_implementation(&python).unwrap();
+    let python_implementation = test_python_implementation().unwrap();
     let venv_name = format!("integration-wasm-hello-world-py3-wasm32-wasi-{python_implementation}");
 
     // Make sure we're actually running wasm
@@ -447,11 +454,7 @@ fn abi3_without_version() {
     ignore
 )]
 fn pyo3_no_extension_module() {
-    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
-        let target = Target::from_target_triple(None).unwrap();
-        target.get_python()
-    });
-    let python_implementation = get_python_implementation(&python).unwrap();
+    let python_implementation = test_python_implementation().unwrap();
     if python_implementation == "cpython" {
         handle_result(errors::pyo3_no_extension_module())
     }
@@ -533,7 +536,7 @@ fn workspace_members_non_local_dep_sdist() {
         license = "MIT"
 
         [dependencies]
-        pyo3 = { version = "0.19.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+        pyo3 = { version = "0.20.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
 
         [lib]
         name = "pyo3_pure"
@@ -599,7 +602,7 @@ fn lib_with_target_path_dep_sdist() {
 
         [dependencies]
         # Don't use the macros feature, which makes compilation much faster
-        pyo3 = { version = "0.19.0", default-features = false, features = ["extension-module"] }
+        pyo3 = { version = "0.20.0", default-features = false, features = ["extension-module"] }
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }

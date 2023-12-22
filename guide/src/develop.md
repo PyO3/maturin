@@ -18,9 +18,6 @@ Options:
 
           [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, uniffi, bin]
 
-  -r, --release
-          Pass --release to cargo
-
       --strip
           Strip the library for minimum file size
 
@@ -34,40 +31,14 @@ Options:
 
           Only works with mixed Rust/Python project layout
 
-       --pip-path <PIP_PATH>
-           Use a specific pip installation instead of the default one.
+      --pip-path <PIP_PATH>
+          Use a specific pip installation instead of the default one.
 
-           This can be used to supply the path to a pip executable when the current virtualenv does
-           not provide one.
+          This can be used to supply the path to a pip executable when the current virtualenv does
+          not provide one.
 
   -q, --quiet
           Do not print cargo log messages
-
-  -j, --jobs <N>
-          Number of parallel jobs, defaults to # of CPUs
-
-      --profile <PROFILE-NAME>
-          Build artifacts with the specified Cargo profile
-
-  -F, --features <FEATURES>
-          Space or comma separated list of features to activate
-
-      --all-features
-          Activate all available features
-
-      --no-default-features
-          Do not activate the `default` feature
-
-      --target <TRIPLE>
-          Build for the target triple
-
-          [env: CARGO_BUILD_TARGET=]
-
-      --target-dir <DIRECTORY>
-          Directory for all generated artifacts
-
-  -m, --manifest-path <PATH>
-          Path to Cargo.toml
 
       --ignore-rust-version
           Ignore `rust-version` specification in packages
@@ -78,6 +49,53 @@ Options:
       --color <WHEN>
           Coloring: auto, always, never
 
+      --config <KEY=VALUE>
+          Override a configuration value (unstable)
+
+  -Z <FLAG>
+          Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
+
+      --future-incompat-report
+          Outputs a future incompatibility report at the end of the build (unstable)
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Compilation Options:
+  -r, --release
+          Pass --release to cargo
+
+  -j, --jobs <N>
+          Number of parallel jobs, defaults to # of CPUs
+
+      --profile <PROFILE-NAME>
+          Build artifacts with the specified Cargo profile
+
+      --target <TRIPLE>
+          Build for the target triple
+
+          [env: CARGO_BUILD_TARGET=]
+
+      --target-dir <DIRECTORY>
+          Directory for all generated artifacts
+
+      --timings=<FMTS>
+          Timing output formats (unstable) (comma separated): html, json
+
+Feature Selection:
+  -F, --features <FEATURES>
+          Space or comma separated list of features to activate
+
+      --all-features
+          Activate all available features
+
+      --no-default-features
+          Do not activate the `default` feature
+
+Manifest Options:
+  -m, --manifest-path <PATH>
+          Path to Cargo.toml
+
       --frozen
           Require Cargo.lock and cache are up to date
 
@@ -86,21 +104,6 @@ Options:
 
       --offline
           Run without accessing the network
-
-      --config <KEY=VALUE>
-          Override a configuration value (unstable)
-
-  -Z <FLAG>
-          Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
-
-      --timings=<FMTS>
-          Timing output formats (unstable) (comma separated): html, json
-
-      --future-incompat-report
-          Outputs a future incompatibility report at the end of the build (unstable)
-
-  -h, --help
-          Print help (see a summary with '-h')
 ```
 
 ## PEP 660 Editable Installs

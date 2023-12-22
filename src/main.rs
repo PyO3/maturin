@@ -4,6 +4,7 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
+use cargo_options::heading;
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 #[cfg(feature = "cli-completion")]
@@ -26,7 +27,8 @@ use tracing::debug;
     version,
     name = env!("CARGO_PKG_NAME"),
     display_order = 1,
-    after_help = "Visit https://maturin.rs to learn more about maturin."
+    after_help = "Visit https://maturin.rs to learn more about maturin.",
+    styles = cargo_options::styles(),
 )]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
@@ -36,7 +38,7 @@ enum Opt {
     /// Build the crate into python packages
     Build {
         /// Build artifacts in release mode, with optimizations
-        #[arg(short = 'r', long)]
+        #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS)]
         release: bool,
         /// Strip the library for minimum file size
         #[arg(long)]
@@ -189,6 +191,7 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
     match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
         (Some(dir), None) => return Ok(PathBuf::from(dir)),
         (None, Some(dir)) => return Ok(PathBuf::from(dir)),
+        (Some(venv), Some(conda)) if venv == conda => return Ok(PathBuf::from(venv)),
         (Some(_), Some(_)) => {
             bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
         }

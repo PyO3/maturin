@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Add new import hook with support for many more use cases [#1748](https://github.com/PyO3/maturin/pull/1748)
 
+## [1.4.0] - 2023-12-02
+
+* Bump MSRV to 1.67.0 in [#1847](https://github.com/PyO3/maturin/pull/1847)
+* Add support for cross compiling with `cross` in [#1865](https://github.com/PyO3/maturin/pull/1865)
+
 ## [1.3.2] - 2023-11-14
 
 * Add support for uniffi library mode in [#1729](https://github.com/PyO3/maturin/pull/1729)
@@ -938,7 +943,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/pyo3/maturin/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/pyo3/maturin/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/pyo3/maturin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pyo3/maturin/compare/v1.2.3...v1.3.0

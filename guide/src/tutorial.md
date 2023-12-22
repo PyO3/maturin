@@ -36,9 +36,9 @@ crate-type = ["cdylib"]
 rand = "0.8.4"
 
 [dependencies.pyo3]
-version = "0.19.0"
+version = "0.20.0"
 # "abi3-py38" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.8
-features = ["abi3-py37"]
+features = ["abi3-py38"]
 ```
 
 Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements

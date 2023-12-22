@@ -5,6 +5,7 @@ use crate::PlatformTag;
 use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::{anyhow, bail, Context, Result};
+use cargo_options::heading;
 use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue};
 use std::path::Path;
 use std::path::PathBuf;
@@ -23,7 +24,7 @@ pub struct DevelopOptions {
     )]
     pub bindings: Option<String>,
     /// Pass --release to cargo
-    #[arg(short = 'r', long)]
+    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS,)]
     pub release: bool,
     /// Strip the library for minimum file size
     #[arg(long)]

@@ -151,20 +151,30 @@ pub fn resolve_all_packages() -> Result<String> {
     Ok(serde_json::to_string(&Value::Object(resolved_packages))?)
 }
 
-fn resolve_package(project_root: &Path) -> Result<Value> {
-    let manifest_path = if project_root.join("Cargo.toml").exists() {
-        project_root.join("Cargo.toml")
-    } else {
-        project_root.join("rust").join("Cargo.toml")
-    };
+struct TemporaryChdir {
+    old_dir: PathBuf,
+}
 
-    let build_options = BuildOptions {
-        cargo: CargoOptions {
-            manifest_path: Some(manifest_path.to_owned()),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+impl TemporaryChdir {
+    pub fn chdir(new_cwd: &Path) -> std::io::Result<Self> {
+        let old_dir = env::current_dir()?;
+        match env::set_current_dir(new_cwd) {
+            Ok(()) => Ok(Self { old_dir }),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl Drop for TemporaryChdir {
+    fn drop(&mut self) {
+        env::set_current_dir(&self.old_dir).unwrap();
+    }
+}
+
+fn resolve_package(project_root: &Path) -> Result<Value> {
+    let _cwd = TemporaryChdir::chdir(project_root)?;
+
+    let build_options: BuildOptions = Default::default();
     let build_context = build_options.into_build_context(false, false, false)?;
     let extension_module_dir = if build_context.project_layout.python_module.is_some() {
         Some(build_context.project_layout.rust_module)
@@ -179,4 +189,9 @@ fn resolve_package(project_root: &Path) -> Result<Value> {
         "module_full_name": build_context.module_name,
         "extension_module_dir": extension_module_dir,
     }))
+}
+
+pub fn debug_print_resolved_package(package_path: &Path) {
+    let resolved = resolve_package(package_path).unwrap_or(Value::Null);
+    println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
 }

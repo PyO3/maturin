@@ -12,6 +12,14 @@ except ModuleNotFoundError:
 
 
 def find_cargo_manifest(project_dir: Path) -> Optional[Path]:
+    pyproject_path = project_dir / "pyproject.toml"
+    if pyproject_path.exists():
+        with pyproject_path.open("rb") as f:
+            pyproject = tomllib.load(f)
+        relative_manifest_path = pyproject.get("tool", {}).get("maturin", {}).get("manifest-path", None)
+        if relative_manifest_path is not None:
+            return project_dir / relative_manifest_path
+
     manifest_path = project_dir / "Cargo.toml"
     if manifest_path.exists():
         return manifest_path

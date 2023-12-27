@@ -94,15 +94,15 @@ def _find_all_path_dependencies(immediate_path_dependencies: List[Path]) -> List
     all_path_dependencies = set()
     to_search = immediate_path_dependencies.copy()
     while to_search:
-        project_dir = to_search.pop()
-        if project_dir in all_path_dependencies:
+        dependency_project_dir = to_search.pop()
+        if dependency_project_dir in all_path_dependencies:
             continue
-        all_path_dependencies.add(project_dir)
-        manifest_path = project_dir / "Cargo.toml"
+        all_path_dependencies.add(dependency_project_dir)
+        manifest_path = dependency_project_dir / "Cargo.toml"
         if manifest_path.exists():
             with manifest_path.open("rb") as f:
                 cargo = tomllib.load(f)
-            to_search.extend(_get_immediate_path_dependencies(project_dir, cargo))
+            to_search.extend(_get_immediate_path_dependencies(dependency_project_dir, cargo))
     return sorted(all_path_dependencies)
 
 
@@ -139,7 +139,7 @@ def _resolve_project(project_dir: Path) -> MaturinProject:
     extension_module_dir: Optional[Path]
     python_module: Optional[Path]
     python_module, extension_module_dir, extension_module_name = _resolve_rust_module(python_dir, module_full_name)
-    immediate_path_dependencies = _get_immediate_path_dependencies(project_dir, cargo)
+    immediate_path_dependencies = _get_immediate_path_dependencies(manifest_path.parent, cargo)
 
     if not python_module.exists():
         extension_module_dir = None
@@ -195,13 +195,13 @@ def _resolve_module_name(pyproject: Dict[str, Any], cargo: Dict[str, Any]) -> Op
     return cargo.get("package", {}).get("name", None)
 
 
-def _get_immediate_path_dependencies(project_dir: Path, cargo: Dict[str, Any]) -> List[Path]:
+def _get_immediate_path_dependencies(manifest_dir_path: Path, cargo: Dict[str, Any]) -> List[Path]:
     path_dependencies = []
     for dependency in cargo.get("dependencies", {}).values():
         if isinstance(dependency, dict):
             relative_path = dependency.get("path", None)
             if relative_path is not None:
-                path_dependencies.append((project_dir / relative_path).resolve())
+                path_dependencies.append((manifest_dir_path / relative_path).resolve())
     return path_dependencies
 
 

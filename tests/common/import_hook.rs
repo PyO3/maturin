@@ -1,6 +1,6 @@
 use crate::common::{create_virtualenv, test_python_path};
 use anyhow::{bail, Result};
-use maturin::{BuildOptions, CargoOptions, Target};
+use maturin::{BuildOptions, Target};
 use regex::RegexBuilder;
 use serde_json;
 use serde_json::{json, Value};

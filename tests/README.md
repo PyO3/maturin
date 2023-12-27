@@ -4,12 +4,15 @@
   keeping them may speed up running the tests again, but you may also remove them once the tests have finished.
 - the import hook tests cannot easily be run outside the test runner.
 - to run a single import hook test, modify the test runner in `run.rs` to specify a single test instead of a whole module. For example:
+- set `CLEAR_WORKSPACE=False` if you want to inspect the output after a test has run
+- include "debugpy" in the list of packages if you want to use a debugger such as vscode to place breakpoints and debug:
+    - `import debugpy; debugpy.listen(5678); debugpy.wait_for_client(); debugpy.breakpoint()`
 
 ```rust
 handle_result(import_hook::test_import_hook(
     "import_hook_rust_file_importer",
     "tests/import_hook/test_rust_file_importer.py::test_multiple_imports",  // <--
-    &[],
+    &["boltons", "debugpy"], // <--
     &[("MATURIN_TEST_NAME", "ALL")],
     true,
 ));

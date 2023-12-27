@@ -407,6 +407,7 @@ def _get_project_mtime(
     installed_package_root: Path,
     excluded_dir_names: Set[str],
 ) -> Optional[float]:
+    """get the mtime of the last modified file of the given project or any of its local dependencies"""
     excluded_dirs = set()
     if installed_package_root.is_dir():
         excluded_dirs.add(installed_package_root)
@@ -420,8 +421,11 @@ def _get_project_mtime(
                 excluded_dirs,
             )
         )
-    except (FileNotFoundError, ValueError):
-        logger.debug("error getting project mtime")
+    except FileNotFoundError as e:
+        logger.debug("error getting project mtime: %r (%s)", e, e.filename)
+        return None
+    except ValueError as e:
+        logger.debug("error getting project mtime: %r", e)
         return None
 
 

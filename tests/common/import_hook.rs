@@ -191,6 +191,7 @@ fn resolve_package(project_root: &Path) -> Result<Value> {
     }))
 }
 
+#[allow(unused)]
 pub fn debug_print_resolved_package(package_path: &Path) {
     let resolved = resolve_package(package_path).unwrap_or(Value::Null);
     println!("{}", serde_json::to_string_pretty(&resolved).unwrap());

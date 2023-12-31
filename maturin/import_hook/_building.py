@@ -100,12 +100,20 @@ class BuildCache:
 @contextmanager
 def _acquire_lock(lock: filelock.FileLock) -> Generator[None, None, None]:
     try:
-        with lock.acquire(blocking=False):
-            yield
+        try:
+            with lock.acquire(blocking=False):
+                yield
+        except filelock.Timeout:
+            logger.info("waiting on lock %s", lock.lock_file)
+            with lock.acquire():
+                yield
     except filelock.Timeout:
-        logger.info("waiting on lock %s", lock.lock_file)
-        with lock.acquire():
-            yield
+        raise TimeoutError(
+            f'Acquiring lock "{lock.lock_file}" timed out after {lock.timeout} seconds. '
+            f"If the project is still compiling and needs more time you can increase the "
+            f"timeout using the lock_timeout_seconds argument to import_hook.install() "
+            f"(or set to None to wait indefinitely)"
+        ) from None
 
 
 def _get_default_build_dir() -> Path:

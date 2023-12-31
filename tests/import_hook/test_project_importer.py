@@ -342,8 +342,9 @@ print('SUCCESS')
 
     # increase default timeout as under heavy load on a weak machine
     # the workers may be waiting on the locks for a long time.
-    assert "import_hook.install()" in IMPORT_HOOK_HEADER
-    header = IMPORT_HOOK_HEADER.replace("import_hook.install()", "import_hook.install(lock_timeout_seconds=5 * 60)")
+    original_call = "import_hook.install()"
+    assert original_call in IMPORT_HOOK_HEADER
+    header = IMPORT_HOOK_HEADER.replace(original_call, "import_hook.install(lock_timeout_seconds=10 * 60)")
     check_installed_with_hook = f"{header}\n\n{check_installed}"
 
     project_dir = create_project_from_blank_template(project_name, workspace / project_name, mixed=initially_mixed)

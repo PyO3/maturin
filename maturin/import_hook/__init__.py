@@ -41,7 +41,8 @@ def install(
         and so whether the extension module needs to be rebuilt
 
     :param lock_timeout_seconds: a lock is required to prevent projects from being built concurrently.
-        If the lock is not released before this timeout is reached the import hook stops waiting and aborts
+        If the lock is not released before this timeout is reached the import hook stops waiting and aborts.
+        A value of None means that the import hook will wait for the lock indefinitely.
 
     :param show_warnings: whether to show compilation warnings
 

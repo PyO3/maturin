@@ -383,7 +383,7 @@ impl BuildOptions {
                             InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
                                 .context("Invalid PYO3_CONFIG_FILE")?;
                         Ok(vec![PythonInterpreter::from_config(interpreter_config)])
-                    } else if let Some(interp) = interpreters.get(0) {
+                    } else if let Some(interp) = interpreters.first() {
                         eprintln!("🐍 Using {interp} to generate to link bindings (With abi3, an interpreter is only required on windows)");
                         Ok(interpreters)
                     } else if generate_import_lib {

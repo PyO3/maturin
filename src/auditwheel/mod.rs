@@ -7,5 +7,5 @@ mod repair;
 
 pub use audit::*;
 pub use platform_tag::PlatformTag;
-pub use policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
+pub use policy::Policy;
 pub use repair::find_external_libs;

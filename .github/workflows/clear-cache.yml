@@ -10,26 +10,10 @@ jobs:
   clear-cache:
     name: Clean Cache
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Clear cache
-        uses: actions/github-script@v7
-        with:
-          script: |
-            while (true) {
-              const caches = await github.rest.actions.getActionsCacheList({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              })
-              if (caches.data.actions_caches.length === 0) {
-                break
-              }
-              for (const cache of caches.data.actions_caches) {
-                console.log('Deleting ' + cache.key)
-                github.rest.actions.deleteActionsCacheById({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  cache_id: cache.id,
-                })
-              }
-            }
-            console.log("Clear cache completed")
+        run: |
+          gh cache delete --all --repo "$GITHUB_REPOSITORY"
+          echo "cache cleared"

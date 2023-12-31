@@ -360,7 +360,7 @@ print('SUCCESS')
 
     args = {"python_script": check_installed_with_hook, "quiet": True}
 
-    outputs = run_concurrent_python(3, args)
+    outputs = run_concurrent_python(3, run_python_code, args)
 
     num_compilations = 0
     num_up_to_date = 0

@@ -10,7 +10,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Any
+from typing import Iterable, List, Optional, Tuple, Callable, Any, Dict
 
 from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_info
 
@@ -237,12 +237,14 @@ class PythonProcessOutput:
     success: bool
 
 
-def run_concurrent_python(num: int, args: dict[str, Any]) -> list[PythonProcessOutput]:
-    outputs: list[PythonProcessOutput] = []
+def run_concurrent_python(
+    num: int, func: Callable[..., Tuple[str, float]], args: Dict[str, Any]
+) -> List[PythonProcessOutput]:
+    outputs: List[PythonProcessOutput] = []
     with multiprocessing.Pool(processes=num) as pool:
         processes = []
         for i in range(num):
-            processes.append(pool.apply_async(run_python, kwds=args))
+            processes.append(pool.apply_async(func, kwds=args))
 
         for i, proc in enumerate(processes):
             try:

@@ -123,7 +123,7 @@ def test_concurrent_import() -> None:
         "quiet": True,
     }
 
-    outputs = run_concurrent_python(3, args)
+    outputs = run_concurrent_python(3, run_python, args)
 
     assert all(o.success for o in outputs)
 

@@ -1,4 +1,5 @@
 import itertools
+import multiprocessing
 import os
 import re
 import shutil
@@ -7,9 +8,9 @@ import subprocess
 import sys
 import tempfile
 import time
-from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Generator
+from typing import Iterable, List, Optional, Tuple, Any
 
 from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_info
 
@@ -229,20 +230,37 @@ def remove_ansii_escape_characters(text: str) -> str:
     return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", text)
 
 
-@contextmanager
-def handle_worker_process_error() -> Generator[None, None, None]:
-    """For some reason, catching and printing the exception output inside the
-    worker process does not appear in the pytest output, so catch and print in the main process
-    """
-    try:
-        yield
-    except subprocess.CalledProcessError as e:
-        stdout = None if e.stdout is None else e.stdout.decode()
-        stderr = None if e.stderr is None else e.stderr.decode()
-        print("Error in worker process")
-        print("-" * 50)
-        print(f"Stdout:\n{stdout}")
-        print("-" * 50)
-        print(f"Stderr:\n{stderr}")
-        print("-" * 50)
-        raise
+@dataclass
+class PythonProcessOutput:
+    output: str
+    duration: Optional[float]
+    success: bool
+
+
+def run_concurrent_python(num: int, args: dict[str, Any]) -> list[PythonProcessOutput]:
+    outputs: list[PythonProcessOutput] = []
+    with multiprocessing.Pool(processes=num) as pool:
+        processes = []
+        for i in range(num):
+            processes.append(pool.apply_async(run_python, kwds=args))
+
+        for i, proc in enumerate(processes):
+            try:
+                output, duration = proc.get()
+            except subprocess.CalledProcessError as e:
+                stdout = "None" if e.stdout is None else e.stdout.decode()
+                stderr = "None" if e.stderr is None else e.stderr.decode()
+                output = "\n".join(["-" * 50, "Stdout:", stdout, "Stderr:", stderr, "-" * 50])
+                success = False
+                duration = None
+            else:
+                success = True
+            outputs.append(PythonProcessOutput(output, duration, success))
+
+        for i, o in enumerate(outputs):
+            log(f"# Subprocess {i}")
+            log(f"success: {o.success}")
+            log(f"duration: {o.duration}")
+            log(f"output:\n{o.output}")
+
+    return outputs

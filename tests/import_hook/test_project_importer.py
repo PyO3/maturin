@@ -1,4 +1,3 @@
-import multiprocessing
 import os
 import re
 import shutil
@@ -24,7 +23,7 @@ from .common import (
     test_crates,
     uninstall,
     with_underscores,
-    handle_worker_process_error,
+    run_concurrent_python,
 )
 
 """
@@ -341,7 +340,11 @@ print('SUCCESS')
     _clear_build_cache()
     uninstall(project_name)
 
-    check_installed_with_hook = f"{IMPORT_HOOK_HEADER}\n\n{check_installed}"
+    # increase default timeout as under heavy load on a weak machine
+    # the workers may be waiting on the locks for a long time.
+    assert "import_hook.install()" in IMPORT_HOOK_HEADER
+    header = IMPORT_HOOK_HEADER.replace("import_hook.install()", "import_hook.install(lock_timeout_seconds=5 * 60)")
+    check_installed_with_hook = f"{header}\n\n{check_installed}"
 
     project_dir = create_project_from_blank_template(project_name, workspace / project_name, mixed=initially_mixed)
 
@@ -355,40 +358,22 @@ print('SUCCESS')
     get_project_copy(test_crates / project_name, project_dir)
 
     args = {"python_script": check_installed_with_hook, "quiet": True}
-    with multiprocessing.Pool(processes=3) as pool:
-        p1 = pool.apply_async(run_python_code, kwds=args)
-        p2 = pool.apply_async(run_python_code, kwds=args)
-        p3 = pool.apply_async(run_python_code, kwds=args)
 
-        with handle_worker_process_error():
-            output_1, duration_1 = p1.get()
-
-        with handle_worker_process_error():
-            output_2, duration_2 = p2.get()
-
-        with handle_worker_process_error():
-            output_3, duration_3 = p3.get()
-
-    log("output 1")
-    log(output_1)
-    log("output 2")
-    log(output_2)
-    log("output 3")
-    log(output_3)
+    outputs = run_concurrent_python(3, args)
 
     num_compilations = 0
     num_up_to_date = 0
     num_waiting = 0
-    for output in [output_1, output_2, output_3]:
-        assert "SUCCESS" in output
+    for output in outputs:
+        assert "SUCCESS" in output.output
 
-        if "waiting on lock" in output:
+        if "waiting on lock" in output.output:
             num_waiting += 1
 
-        if _up_to_date_message(project_name) in output:
+        if _up_to_date_message(project_name) in output.output:
             num_up_to_date += 1
 
-        if _rebuilt_message(project_name) in output:
+        if _rebuilt_message(project_name) in output.output:
             num_compilations += 1
 
     assert num_compilations == 1

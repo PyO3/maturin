@@ -1,4 +1,3 @@
-import multiprocessing
 import os
 import re
 import shutil
@@ -13,7 +12,7 @@ from .common import (
     run_python,
     script_dir,
     test_crates,
-    handle_worker_process_error,
+    run_concurrent_python,
 )
 
 """
@@ -124,38 +123,21 @@ def test_concurrent_import() -> None:
         "quiet": True,
     }
 
-    with multiprocessing.Pool(processes=3) as pool:
-        p1 = pool.apply_async(run_python, kwds=args)
-        p2 = pool.apply_async(run_python, kwds=args)
-        p3 = pool.apply_async(run_python, kwds=args)
+    outputs = run_concurrent_python(3, args)
 
-        with handle_worker_process_error():
-            output_1, duration_1 = p1.get()
-
-        with handle_worker_process_error():
-            output_2, duration_2 = p2.get()
-
-        with handle_worker_process_error():
-            output_3, duration_3 = p3.get()
-
-    log("output 1")
-    log(output_1)
-    log("output 2")
-    log(output_2)
-    log("output 3")
-    log(output_3)
+    assert all(o.success for o in outputs)
 
     num_compilations = 0
     num_up_to_date = 0
     num_waiting = 0
-    for output in [output_1, output_2, output_3]:
-        assert "SUCCESS" in output
-        assert "importing rust file" in output
-        if "waiting on lock" in output:
+    for output in outputs:
+        assert "SUCCESS" in output.output
+        assert "importing rust file" in output.output
+        if "waiting on lock" in output.output:
             num_waiting += 1
-        if "creating project for" in output:
+        if "creating project for" in output.output:
             num_compilations += 1
-        if "module up to date" in output:
+        if "module up to date" in output.output:
             num_up_to_date += 1
 
     assert num_compilations == 1

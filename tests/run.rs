@@ -831,50 +831,46 @@ fn pyo3_source_date_epoch() {
     ))
 }
 
-#[ignore]
 #[test]
 fn import_hook_project_importer() {
-    handle_result(import_hook::test_import_hook(
-        "import_hook_project_importer",
-        "tests/import_hook/test_project_importer.py",
-        &["boltons"],
-        &[("MATURIN_TEST_NAME", "ALL")],
-        true,
-    ));
+    if env::var("CIRRUS_CI").is_ok() {
+        handle_result(import_hook::test_import_hook(
+            "import_hook_project_importer",
+            "tests/import_hook/test_project_importer.py",
+            &["boltons"],
+            &[("MATURIN_TEST_NAME", "ALL")],
+            true,
+        ));
+    } else {
+        handle_result(import_hook::test_import_hook_parallel(
+            "import_hook_project_importer",
+            &PathBuf::from("tests/import_hook/test_project_importer.py"),
+            &["boltons"],
+            &[],
+            true,
+        ));
+    }
 }
 
-#[test]
-fn import_hook_project_importer_parallel() {
-    handle_result(import_hook::test_import_hook_parallel(
-        "import_hook_project_importer",
-        &PathBuf::from("tests/import_hook/test_project_importer.py"),
-        &["boltons"],
-        &[],
-        true,
-    ));
-}
-
-#[ignore]
 #[test]
 fn import_hook_rust_file_importer() {
-    handle_result(import_hook::test_import_hook(
-        "import_hook_rust_file_importer",
-        "tests/import_hook/test_rust_file_importer.py",
-        &[],
-        &[("MATURIN_TEST_NAME", "ALL")],
-        true,
-    ));
-}
-
-#[test]
-fn import_hook_rust_file_importer_parallel() {
-    handle_result(import_hook::test_import_hook_parallel(
-        "import_hook_rust_file_importer",
-        &PathBuf::from("tests/import_hook/test_rust_file_importer.py"),
-        &[],
-        &[],
-        true,
-    ));
+    if env::var("CIRRUS_CI").is_ok() {
+        handle_result(import_hook::test_import_hook(
+            "import_hook_rust_file_importer",
+            "tests/import_hook/test_rust_file_importer.py",
+            &[],
+            &[("MATURIN_TEST_NAME", "ALL")],
+            true,
+        ));
+    } else {
+        handle_result(import_hook::test_import_hook_parallel(
+            "import_hook_rust_file_importer",
+            &PathBuf::from("tests/import_hook/test_rust_file_importer.py"),
+            &[],
+            &[],
+            true,
+        ));
+    }
 }
 
 #[test]

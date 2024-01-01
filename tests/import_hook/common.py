@@ -100,6 +100,8 @@ def run_python(
             raise
     duration = time.perf_counter() - start
 
+    output = output.replace("\r\n", "\n")
+
     if verbose and not quiet:
         print("-" * 40)
         print(subprocess.list2cmdline(cmd))

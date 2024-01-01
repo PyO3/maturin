@@ -300,7 +300,7 @@ jobs:
         manylinux: ["manylinux_2_24"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
       # Caching

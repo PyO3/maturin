@@ -24,6 +24,7 @@ from .common import (
     uninstall,
     with_underscores,
     run_concurrent_python,
+    check_match,
 )
 
 """
@@ -568,7 +569,7 @@ else:
             "value 10\n"
             "SUCCESS\n"
         )
-        assert re.fullmatch(pattern, output, flags=re.MULTILINE) is not None
+        check_match(output, pattern, flags=re.MULTILINE)
 
     @pytest.mark.parametrize("is_mixed", [False, True])
     def test_default_up_to_date(self, workspace: Path, is_mixed: bool) -> None:
@@ -600,7 +601,7 @@ else:
             ".*"
             "caught ImportError: Failed to build package with maturin\n"
         )
-        assert re.fullmatch(pattern, output, flags=re.MULTILINE | re.DOTALL) is not None
+        check_match(output, pattern, flags=re.MULTILINE | re.DOTALL)
 
     @pytest.mark.parametrize("is_mixed", [False, True])
     def test_default_compile_warning(self, workspace: Path, is_mixed: bool) -> None:
@@ -624,7 +625,7 @@ else:
             "value 10\n"
             "SUCCESS\n"
         )
-        assert re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
+        check_match(output1, pattern, flags=re.MULTILINE | re.DOTALL)
 
         output2, _ = run_python_code(self.loader_script)
         output2 = remove_ansii_escape_characters(output2)
@@ -636,7 +637,7 @@ else:
             "value 10\n"
             "SUCCESS\n"
         )
-        assert re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
+        check_match(output2, pattern, flags=re.MULTILINE | re.DOTALL)
 
     @pytest.mark.parametrize("is_mixed", [False, True])
     def test_reset_logger_without_configuring(self, workspace: Path, is_mixed: bool) -> None:
@@ -660,7 +661,7 @@ else:
             'rebuilt and loaded package "test_project" in [0-9.]+s\n'
             "caught ImportError: dynamic module does not define module export function \\(PyInit_test_project\\)\n"
         )
-        assert re.fullmatch(pattern, output, flags=re.MULTILINE) is not None
+        check_match(output, pattern, flags=re.MULTILINE)
 
 
 def _up_to_date_message(project_name: str) -> str:

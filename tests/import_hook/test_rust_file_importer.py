@@ -13,6 +13,7 @@ from .common import (
     script_dir,
     test_crates,
     run_concurrent_python,
+    check_match,
 )
 
 """
@@ -248,7 +249,7 @@ else:
 
         output, _ = run_python([str(py_path)], workspace)
         pattern = 'building "my_script"\nrebuilt and loaded module "my_script" in [0-9.]+s\nget_num 10\nSUCCESS\n'
-        assert re.fullmatch(pattern, output, flags=re.MULTILINE) is not None
+        check_match(output, pattern, flags=re.MULTILINE)
 
     def test_default_up_to_date(self, workspace: Path) -> None:
         """By default, when the module is up-to-date nothing is printed."""
@@ -276,7 +277,7 @@ else:
             ".*"
             "caught ImportError: Failed to build wheel with maturin\n"
         )
-        assert re.fullmatch(pattern, output, flags=re.MULTILINE | re.DOTALL) is not None
+        check_match(output, pattern, flags=re.MULTILINE | re.DOTALL)
 
     def test_default_compile_warning(self, workspace: Path) -> None:
         """If compilation succeeds with warnings then the output of maturin is printed.
@@ -298,7 +299,7 @@ else:
             "get_num 20\n"
             "SUCCESS\n"
         )
-        assert re.fullmatch(pattern, output1, flags=re.MULTILINE | re.DOTALL) is not None
+        check_match(output1, pattern, flags=re.MULTILINE | re.DOTALL)
 
         output2, _ = run_python([str(py_path)], workspace)
         output2 = remove_ansii_escape_characters(output2)
@@ -310,7 +311,7 @@ else:
             "get_num 20\n"
             "SUCCESS\n"
         )
-        assert re.fullmatch(pattern, output2, flags=re.MULTILINE | re.DOTALL) is not None
+        check_match(output2, pattern, flags=re.MULTILINE | re.DOTALL)
 
     def test_reset_logger_without_configuring(self, workspace: Path) -> None:
         """If reset_logger is called then by default logging level INFO is not printed
@@ -330,4 +331,4 @@ else:
             'rebuilt and loaded module "my_script" in [0-9.]+s\n'
             "caught ImportError: dynamic module does not define module export function \\(PyInit_my_script\\)\n"
         )
-        assert re.fullmatch(pattern, output, flags=re.MULTILINE) is not None
+        check_match(output, pattern, flags=re.MULTILINE)

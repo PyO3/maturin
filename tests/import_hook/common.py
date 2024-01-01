@@ -232,6 +232,12 @@ def remove_ansii_escape_characters(text: str) -> str:
     return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", text)
 
 
+def check_match(text: str, pattern: str, *, flags: int = 0) -> None:
+    assert (
+        re.fullmatch(pattern, text, flags=flags) is not None
+    ), f'text does not match pattern:\npattern: "{pattern}"\ntext:\n{text}'
+
+
 @dataclass
 class PythonProcessOutput:
     output: str

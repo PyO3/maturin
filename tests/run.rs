@@ -834,19 +834,21 @@ fn pyo3_source_date_epoch() {
 #[test]
 fn import_hook_project_importer() {
     if env::var("CIRRUS_CI").is_ok() {
-        handle_result(import_hook::test_import_hook(
-            "import_hook_project_importer",
-            "tests/import_hook/test_project_importer.py",
-            &["boltons"],
-            &[("MATURIN_TEST_NAME", "ALL")],
-            true,
-        ));
-    } else {
+        // skip
+    } else if env::var("GITHUB_ACTIONS").is_ok() {
         handle_result(import_hook::test_import_hook_parallel(
             "import_hook_project_importer",
             &PathBuf::from("tests/import_hook/test_project_importer.py"),
             &["boltons"],
             &[],
+            true,
+        ));
+    } else {
+        handle_result(import_hook::test_import_hook(
+            "import_hook_project_importer",
+            "tests/import_hook/test_project_importer.py",
+            &["boltons"],
+            &[("MATURIN_TEST_NAME", "ALL")],
             true,
         ));
     }
@@ -855,19 +857,21 @@ fn import_hook_project_importer() {
 #[test]
 fn import_hook_rust_file_importer() {
     if env::var("CIRRUS_CI").is_ok() {
-        handle_result(import_hook::test_import_hook(
-            "import_hook_rust_file_importer",
-            "tests/import_hook/test_rust_file_importer.py",
-            &[],
-            &[("MATURIN_TEST_NAME", "ALL")],
-            true,
-        ));
-    } else {
+        // skip
+    } else if env::var("GITHUB_ACTIONS").is_ok() {
         handle_result(import_hook::test_import_hook_parallel(
             "import_hook_rust_file_importer",
             &PathBuf::from("tests/import_hook/test_rust_file_importer.py"),
             &[],
             &[],
+            true,
+        ));
+    } else {
+        handle_result(import_hook::test_import_hook(
+            "import_hook_rust_file_importer",
+            "tests/import_hook/test_rust_file_importer.py",
+            &[],
+            &[("MATURIN_TEST_NAME", "ALL")],
             true,
         ));
     }

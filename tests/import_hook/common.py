@@ -145,7 +145,7 @@ def log(message: str) -> None:
 
 def uninstall(project_name: str) -> None:
     log(f"uninstalling {project_name}")
-    subprocess.check_call([sys.executable, "-m", "pip", "uninstall", "-y", project_name])
+    subprocess.check_call([sys.executable, "-m", "pip", "uninstall", "--disable-pip-version-check", "-y", project_name])
 
 
 def install_editable(project_dir: Path) -> None:
@@ -160,7 +160,7 @@ def install_editable(project_dir: Path) -> None:
 
 def install_non_editable(project_dir: Path) -> None:
     log(f"installing {project_dir.name} in non-editable mode")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", str(project_dir)])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", str(project_dir)])
 
 
 def _is_installed_as_pth(project_name: str) -> bool:

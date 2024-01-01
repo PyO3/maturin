@@ -1,4 +1,5 @@
 import os
+import platform
 import re
 import shutil
 from pathlib import Path
@@ -656,10 +657,18 @@ else:
         lib_path.write_text(lib_path.read_text().replace("test_project", "test_project_new_name"))
 
         output, _ = run_python_code(self.loader_script, quiet=True)
+
+        if platform.python_implementation() == "CPython":
+            error_message = "dynamic module does not define module export function \\(PyInit_test_project\\)"
+        elif platform.python_implementation() == "PyPy":
+            error_message = "function _cffi_pypyinit_test_project or PyInit_test_project not found in library .*"
+        else:
+            raise NotImplementedError(platform.python_implementation())
+
         pattern = (
             'building "test_project"\n'
             'rebuilt and loaded package "test_project" in [0-9.]+s\n'
-            "caught ImportError: dynamic module does not define module export function \\(PyInit_test_project\\)\n"
+            f"caught ImportError: {error_message}\n"
         )
         check_match(output, pattern, flags=re.MULTILINE)
 

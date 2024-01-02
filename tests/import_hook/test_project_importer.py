@@ -14,7 +14,7 @@ from .common import (
     get_project_copy,
     install_editable,
     install_non_editable,
-    is_installed_correctly,
+    is_editable_installed_correctly,
     log,
     mixed_test_crate_names,
     remove_ansii_escape_characters,
@@ -93,7 +93,7 @@ def test_install_from_script_inside(workspace: Path, project_name: str) -> None:
     assert _rebuilt_message(project_name) in output1
     assert _up_to_date_message(project_name) not in output1
 
-    assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
+    assert is_editable_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
     output2, duration2 = run_python([str(check_installed_path)], cwd=empty_dir)
     assert "SUCCESS" in output2
@@ -102,7 +102,7 @@ def test_install_from_script_inside(workspace: Path, project_name: str) -> None:
 
     assert duration2 < duration1
 
-    assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
+    assert is_editable_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
 
 @pytest.mark.parametrize("project_name", ["pyo3-mixed", "pyo3-pure"])
@@ -138,7 +138,7 @@ project_importer.install(install_new_packages=False)
     assert "SUCCESS" not in output1
 
     install_editable(project_dir)
-    assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
+    assert is_editable_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
     output2, _ = run_python([str(check_installed_path)], cwd=empty_dir)
     assert "SUCCESS" in output2
@@ -234,7 +234,7 @@ def test_import_editable_installed_rebuild(workspace: Path, project_name: str, i
     log(f"installing blank project as {project_name}")
 
     install_editable(project_dir)
-    assert is_installed_correctly(project_name, project_dir, initially_mixed)
+    assert is_editable_installed_correctly(project_name, project_dir, initially_mixed)
 
     # without the import hook the installation test is expected to fail because the project should not be installed yet
     output0, _ = run_python_code(check_installed, quiet=True, expect_error=True)
@@ -251,7 +251,7 @@ def test_import_editable_installed_rebuild(workspace: Path, project_name: str, i
     assert _rebuilt_message(project_name) in output1
     assert _up_to_date_message(project_name) not in output1
 
-    assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
+    assert is_editable_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
     output2, duration2 = run_python_code(check_installed)
     assert "SUCCESS" in output2
@@ -260,7 +260,7 @@ def test_import_editable_installed_rebuild(workspace: Path, project_name: str, i
 
     assert duration2 < duration1
 
-    assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
+    assert is_editable_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
 
 @pytest.mark.parametrize(
@@ -285,7 +285,7 @@ def test_import_editable_installed_mixed_missing(workspace: Path, project_name: 
     project_backup_dir = get_project_copy(test_crates / project_name, workspace / f"backup_{project_name}")
 
     install_editable(project_dir)
-    assert is_installed_correctly(project_name, project_dir, "mixed" in project_name)
+    assert is_editable_installed_correctly(project_name, project_dir, "mixed" in project_name)
 
     check_installed = test_crates / project_name / "check_installed/check_installed.py"
 
@@ -312,7 +312,7 @@ def test_import_editable_installed_mixed_missing(workspace: Path, project_name: 
 
     assert duration2 < duration1
 
-    assert is_installed_correctly(project_name, project_dir, True)
+    assert is_editable_installed_correctly(project_name, project_dir, True)
 
 
 @pytest.mark.parametrize("mixed", [False, True])
@@ -355,7 +355,7 @@ print('SUCCESS')
     log(f"installing blank project as {project_name}")
 
     install_editable(project_dir)
-    assert is_installed_correctly(project_name, project_dir, initially_mixed)
+    assert is_editable_installed_correctly(project_name, project_dir, initially_mixed)
 
     shutil.rmtree(project_dir)
     get_project_copy(test_crates / project_name, project_dir)
@@ -383,7 +383,7 @@ print('SUCCESS')
     assert num_up_to_date == 2
     assert num_waiting == 2
 
-    assert is_installed_correctly(project_name, project_dir, mixed)
+    assert is_editable_installed_correctly(project_name, project_dir, mixed)
 
 
 def test_import_multiple_projects(workspace: Path) -> None:
@@ -401,9 +401,9 @@ def test_import_multiple_projects(workspace: Path) -> None:
     pure_dir = create_project_from_blank_template("pyo3-pure", workspace / "pyo3-pure", mixed=False)
 
     install_editable(mixed_dir)
-    assert is_installed_correctly("pyo3-mixed", mixed_dir, True)
+    assert is_editable_installed_correctly("pyo3-mixed", mixed_dir, True)
     install_editable(pure_dir)
-    assert is_installed_correctly("pyo3-pure", pure_dir, False)
+    assert is_editable_installed_correctly("pyo3-pure", pure_dir, False)
 
     shutil.rmtree(mixed_dir)
     shutil.rmtree(pure_dir)
@@ -432,8 +432,8 @@ def test_import_multiple_projects(workspace: Path) -> None:
 
     assert duration2 < duration1
 
-    assert is_installed_correctly("pyo3-mixed", mixed_dir, True)
-    assert is_installed_correctly("pyo3-pure", pure_dir, False)
+    assert is_editable_installed_correctly("pyo3-mixed", mixed_dir, True)
+    assert is_editable_installed_correctly("pyo3-pure", pure_dir, False)
 
 
 def test_rebuild_on_change_to_path_dependency(workspace: Path) -> None:
@@ -449,7 +449,7 @@ def test_rebuild_on_change_to_path_dependency(workspace: Path) -> None:
     transitive_dep_dir = get_project_copy(test_crates / "transitive_path_dep", workspace / "transitive_path_dep")
 
     install_editable(project_dir)
-    assert is_installed_correctly(project_name, project_dir, True)
+    assert is_editable_installed_correctly(project_name, project_dir, True)
 
     check_installed = f"""
 {IMPORT_HOOK_HEADER}
@@ -473,7 +473,7 @@ print('21 is half 63:', pyo3_mixed_with_path_dep.is_half(21, 63))
     assert "21 is half 42: False" in output2
     assert "21 is half 63: True" in output2
 
-    assert is_installed_correctly(project_name, project_dir, True)
+    assert is_editable_installed_correctly(project_name, project_dir, True)
 
 
 @pytest.mark.parametrize("is_mixed", [False, True])
@@ -490,7 +490,7 @@ def test_rebuild_on_settings_change(workspace: Path, is_mixed: bool) -> None:
     manifest_path.write_text(f"{manifest_path.read_text()}\n[features]\nlarge_number = []\n")
 
     install_editable(project_dir)
-    assert is_installed_correctly("my-script", project_dir, is_mixed)
+    assert is_editable_installed_correctly("my-script", project_dir, is_mixed)
 
     helper_path = script_dir / "rust_file_import/rebuild_on_settings_change_helper.py"
 
@@ -548,7 +548,7 @@ else:
         uninstall("test-project")
         project_dir = create_project_from_blank_template("test-project", tmp_dir / "test-project", mixed=is_mixed)
         install_editable(project_dir)
-        assert is_installed_correctly("test-project", project_dir, is_mixed)
+        assert is_editable_installed_correctly("test-project", project_dir, is_mixed)
 
         lib_path = project_dir / "src/lib.rs"
         lib_src = lib_path.read_text().replace("_m:", "m:").replace("Ok(())", 'm.add("value", 10)?;Ok(())')

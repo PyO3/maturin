@@ -16,7 +16,6 @@ from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_inf
 
 verbose = True
 
-
 script_dir = Path(__file__).resolve().parent
 maturin_dir = script_dir.parent.parent
 test_crates = maturin_dir / "test-crates"
@@ -29,7 +28,6 @@ from maturin import import_hook
 import_hook.reset_logger()
 import_hook.install()
 """
-
 
 EXCLUDED_PROJECTS = {
     "hello-world",  # not imported as a python module (subprocess only)
@@ -88,16 +86,18 @@ def run_python(
             message = "\n".join(
                 [
                     "-" * 40,
-                    "ERROR:",
+                    "Called Process Error:",
                     subprocess.list2cmdline(cmd),
-                    "",
+                    "Output:",
                     output,
                     "-" * 40,
                 ]
             )
-            print(message, file=sys.stderr)
+            print(message)
         if not expect_error:
-            raise
+            # re-raising the CalledProcessError would cause
+            # unnecessary output since we are already printing it above
+            raise RuntimeError("run_python failed") from None
     duration = time.perf_counter() - start
 
     output = output.replace("\r\n", "\n")
@@ -176,18 +176,26 @@ def _is_installed_editable_with_direct_url(project_name: str, project_dir: Path)
             if not is_editable:
                 log(f'project "{project_name}" is installed but not in editable mode')
             return is_editable
-        else:
+        elif linked_path is not None:
             log(f'found linked path "{linked_path}" for project "{project_name}". Expected "{project_dir}"')
+            return False
     return False
 
 
-def is_installed_correctly(project_name: str, project_dir: Path, is_mixed: bool) -> bool:
+def is_editable_installed_correctly(project_name: str, project_dir: Path, is_mixed: bool) -> bool:
+    log(f"checking if {project_name} is installed correctly.")
     installed_as_pth = _is_installed_as_pth(project_name)
     installed_editable_with_direct_url = _is_installed_editable_with_direct_url(project_name, project_dir)
-    log(
-        f"checking if {project_name} is installed correctly. "
-        f"{is_mixed=}, {installed_as_pth=} {installed_editable_with_direct_url=}"
+    log(f"{is_mixed=}, {installed_as_pth=} {installed_editable_with_direct_url=}")
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "pip", "show", "--disable-pip-version-check", "-f", project_name],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
     )
+    output = "None" if proc.stdout is None else proc.stdout.decode()
+    log(f"pip output (returned {proc.returncode}):\n{output}")
     return installed_editable_with_direct_url and (installed_as_pth == is_mixed)
 
 

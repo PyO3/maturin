@@ -4,10 +4,12 @@ import itertools
 import json
 import logging
 import math
+import os
 import site
 import sys
 import time
 import urllib.parse
+import urllib.request
 from importlib.machinery import ModuleSpec, PathFinder
 from pathlib import Path
 from types import ModuleType
@@ -330,11 +332,19 @@ def _load_dist_info(
         prefix = "file://"
         if not url.startswith(prefix):
             return None, is_editable
-        linked_path = Path(urllib.parse.unquote(url[len(prefix) :]))
+        linked_path = _uri_to_path(url)
         if not require_project_target or is_maybe_maturin_project(linked_path):
             return linked_path, is_editable
         else:
             return None, is_editable
+
+
+def _uri_to_path(uri: str) -> Path:
+    """based on https://stackoverflow.com/a/61922504"""
+    parsed = urllib.parse.urlparse(uri)
+    host = "{0}{0}{netloc}{0}".format(os.path.sep, netloc=parsed.netloc)
+    path = urllib.request.url2pathname(urllib.parse.unquote(parsed.path))
+    return Path(os.path.normpath(os.path.join(host, path)))
 
 
 def _fix_direct_url(project_dir: Path, package_name: str) -> None:
@@ -352,7 +362,7 @@ def _fix_direct_url(project_dir: Path, package_name: str) -> None:
                 direct_url = json.load(f)
         except OSError:
             continue
-        url = f"file://{urllib.parse.quote(str(project_dir))}"
+        url = project_dir.as_uri()
         if direct_url.get("url") != url:
             logger.debug("fixing direct_url.json for package %s", package_name)
             logger.debug('"%s" -> "%s"', direct_url.get("url"), url)

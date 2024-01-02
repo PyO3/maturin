@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 import shutil
 import time
 from operator import itemgetter
@@ -15,6 +16,7 @@ from maturin.import_hook.project_importer import (
     _get_installed_package_mtime,
     _get_project_mtime,
     _load_dist_info,
+    _uri_to_path,
 )
 from maturin.import_hook.settings import MaturinBuildSettings, MaturinDevelopSettings
 
@@ -283,6 +285,13 @@ def test_build_cache(tmp_path: Path) -> None:
         status1b = BuildStatus(1.3, tmp_path / "source1", ["arg1b"], "output1b")
         locked_cache.store_build_status(status1b)
         assert locked_cache.get_build_status(tmp_path / "source1") == status1b
+
+
+def test_uri_to_path() -> None:
+    if platform.platform().lower() == "windows":
+        assert _uri_to_path("file:///C:/abc/d%20e%20f") == Path(r"C:\abc\d e f")
+    else:
+        assert _uri_to_path("file:///abc/d%20e%20f") == Path("/abc/d e f")
 
 
 def test_load_dist_info(tmp_path: Path) -> None:

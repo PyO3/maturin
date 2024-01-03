@@ -45,7 +45,10 @@ pub fn test_import_hook(
 
     let path = env::var_os("PATH").unwrap();
     let mut paths = env::split_paths(&path).collect::<Vec<_>>();
-    paths.insert(0, venv_dir.join("bin"));
+    paths.insert(
+        0,
+        venv_dir.join(if cfg!(windows) { "Scripts" } else { "bin" }),
+    );
     paths.insert(
         0,
         Path::new(env!("CARGO_BIN_EXE_maturin"))

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import platform
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, Callable, Any, Dict
@@ -244,6 +245,15 @@ def check_match(text: str, pattern: str, *, flags: int = 0) -> None:
     assert (
         re.fullmatch(pattern, text, flags=flags) is not None
     ), f'text does not match pattern:\npattern: "{pattern}"\ntext:\n{text}'
+
+
+def missing_entrypoint_error_message_pattern(name: str) -> str:
+    if platform.python_implementation() == "CPython":
+        return f"dynamic module does not define module export function \\(PyInit_{name}\\)"
+    elif platform.python_implementation() == "PyPy":
+        return f"function _cffi_pypyinit_{name} or PyInit_{name} not found in library .*"
+    else:
+        raise NotImplementedError(platform.python_implementation())
 
 
 @dataclass

@@ -1,5 +1,4 @@
 import os
-import platform
 import re
 import shutil
 from pathlib import Path
@@ -26,6 +25,7 @@ from .common import (
     with_underscores,
     run_concurrent_python,
     check_match,
+    missing_entrypoint_error_message_pattern,
 )
 
 """
@@ -203,10 +203,8 @@ import_hook.install(install_new_packages=install_new_packages)
     )
     assert "SUCCESS" not in output3
     assert "install_new_packages=True" in output3
-    assert (
-        f"ImportError: dynamic module does not define module "
-        f"export function (PyInit_{with_underscores(project_name)})"
-    ) in output3
+    pattern = f"ImportError: {missing_entrypoint_error_message_pattern(with_underscores(project_name))}"
+    assert re.search(pattern, output3) is not None
 
 
 @pytest.mark.parametrize("initially_mixed", [False, True])
@@ -657,18 +655,10 @@ else:
         lib_path.write_text(lib_path.read_text().replace("test_project", "test_project_new_name"))
 
         output, _ = run_python_code(self.loader_script, quiet=True)
-
-        if platform.python_implementation() == "CPython":
-            error_message = "dynamic module does not define module export function \\(PyInit_test_project\\)"
-        elif platform.python_implementation() == "PyPy":
-            error_message = "function _cffi_pypyinit_test_project or PyInit_test_project not found in library .*"
-        else:
-            raise NotImplementedError(platform.python_implementation())
-
         pattern = (
             'building "test_project"\n'
             'rebuilt and loaded package "test_project" in [0-9.]+s\n'
-            f"caught ImportError: {error_message}\n"
+            f"caught ImportError: {missing_entrypoint_error_message_pattern('test_project')}\n"
         )
         check_match(output, pattern, flags=re.MULTILINE)
 

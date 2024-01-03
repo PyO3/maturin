@@ -14,6 +14,7 @@ from .common import (
     test_crates,
     run_concurrent_python,
     check_match,
+    missing_entrypoint_error_message_pattern,
 )
 
 """
@@ -329,6 +330,6 @@ else:
         pattern = (
             'building "my_script"\n'
             'rebuilt and loaded module "my_script" in [0-9.]+s\n'
-            "caught ImportError: dynamic module does not define module export function \\(PyInit_my_script\\)\n"
+            f"caught ImportError: {missing_entrypoint_error_message_pattern('my_script')}\n"
         )
         check_match(output, pattern, flags=re.MULTILINE)

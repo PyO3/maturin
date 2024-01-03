@@ -288,7 +288,7 @@ def test_build_cache(tmp_path: Path) -> None:
 
 
 def test_uri_to_path() -> None:
-    if platform.platform().lower() == "windows":
+    if platform.system() == "Windows":
         assert _uri_to_path("file:///C:/abc/d%20e%20f") == Path(r"C:\abc\d e f")
     else:
         assert _uri_to_path("file:///abc/d%20e%20f") == Path("/abc/d e f")

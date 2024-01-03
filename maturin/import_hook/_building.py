@@ -130,17 +130,17 @@ def _get_default_build_dir() -> Path:
 
 
 def _get_cache_dir() -> Path:
-    if os.name == "posix":
-        if sys.platform == "darwin":
-            return Path("~/Library/Caches").expanduser()
-        else:
-            xdg_cache_dir = os.environ.get("XDG_CACHE_HOME", None)
-            return Path(xdg_cache_dir) if xdg_cache_dir else Path("~/.cache").expanduser()
-    elif platform.platform().lower() == "windows":
+    os_name = platform.system()
+    if os_name == "Linux":
+        xdg_cache_dir = os.environ.get("XDG_CACHE_HOME", None)
+        return Path(xdg_cache_dir) if xdg_cache_dir else Path("~/.cache").expanduser()
+    elif os_name == "Darwin":
+        return Path("~/Library/Caches").expanduser()
+    elif os_name == "Windows":
         local_app_data = os.environ.get("LOCALAPPDATA", None)
         return Path(local_app_data) if local_app_data else Path(r"~\AppData\Local").expanduser()
     else:
-        logger.warning("unknown OS. defaulting to ~/.cache as the cache directory")
+        logger.warning("unknown OS: %s. defaulting to ~/.cache as the cache directory", os_name)
         return Path("~/.cache").expanduser()
 
 

@@ -297,12 +297,17 @@ def test_uri_to_path() -> None:
 def test_load_dist_info(tmp_path: Path) -> None:
     dist_info = tmp_path / "package_foo-1.0.0.dist-info"
     dist_info.mkdir(parents=True)
-    (dist_info / "direct_url.json").write_text(
-        '{"dir_info": {"editable": true}, "url": "file:///tmp/some%20directory/foo"}'
-    )
+    if platform.system() == "Windows":
+        uri = "file:///C:/some%20directory/foo"
+        path = Path(r"C:\some directory\foo")
+    else:
+        uri = "file:///tmp/some%20directory/foo"
+        path = Path("/tmp/some directory/foo")
+
+    (dist_info / "direct_url.json").write_text('{"dir_info": {"editable": true}, "url": "' + uri + '"}')
 
     linked_path, is_editable = _load_dist_info(tmp_path, "package_foo", require_project_target=False)
-    assert linked_path == Path("/tmp/some directory/foo")
+    assert linked_path == path
     assert is_editable
 
 

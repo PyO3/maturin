@@ -175,7 +175,6 @@ class MaturinProjectImporter(importlib.abc.MetaPathFinder):
             logger.info('building "%s"', package_name)
             start = time.perf_counter()
             maturin_output = develop_build_project(resolved.cargo_manifest_path, settings)
-            _fix_direct_url(project_dir, package_name)
             logger.debug(
                 'compiled project "%s" in %.3fs',
                 package_name,
@@ -345,33 +344,6 @@ def _uri_to_path(uri: str) -> Path:
     host = "{0}{0}{netloc}{0}".format(os.path.sep, netloc=parsed.netloc)
     path = urllib.request.url2pathname(urllib.parse.unquote(parsed.path))
     return Path(os.path.normpath(os.path.join(host, path)))
-
-
-def _fix_direct_url(project_dir: Path, package_name: str) -> None:
-    """Seemingly due to a bug, installing with `pip install -e` will write the correct entry into `direct_url.json` to
-    point at the project directory, but calling `maturin develop` does not currently write this value correctly.
-    """
-    logger.debug("fixing direct_url for %s", package_name)
-    for path in site.getsitepackages():
-        dist_info = next(Path(path).glob(f"{package_name}-*.dist-info"), None)
-        if dist_info is None:
-            continue
-        direct_url_path = dist_info / "direct_url.json"
-        try:
-            with open(direct_url_path) as f:
-                direct_url = json.load(f)
-        except OSError:
-            continue
-        url = project_dir.as_uri()
-        if direct_url.get("url") != url:
-            logger.debug("fixing direct_url.json for package %s", package_name)
-            logger.debug('"%s" -> "%s"', direct_url.get("url"), url)
-            direct_url = {"dir_info": {"editable": True}, "url": url}
-            try:
-                with open(direct_url_path, "w") as f:
-                    json.dump(direct_url, f)
-            except OSError:
-                return
 
 
 def _find_installed_package_root(resolved: MaturinProject, package_spec: ModuleSpec) -> Optional[Path]:

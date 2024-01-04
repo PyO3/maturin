@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, Callable, Any, Dict
 
-from maturin.import_hook.project_importer import _fix_direct_url, _load_dist_info
+from maturin.import_hook.project_importer import _load_dist_info
 
 verbose = True
 
@@ -155,8 +155,6 @@ def install_editable(project_dir: Path) -> None:
     env = os.environ.copy()
     env["VIRTUAL_ENV"] = sys.exec_prefix
     subprocess.check_call(["maturin", "develop"], cwd=project_dir, env=env)
-    package_name = with_underscores(project_dir.name)
-    _fix_direct_url(project_dir, package_name)
 
 
 def install_non_editable(project_dir: Path) -> None:

@@ -129,6 +129,11 @@ To install a package in editable mode with pip:
 cd my-project
 pip install -e .
 ```
+or
+```bash
+cd my-project
+maturin develop
+```
 
 Then Python source code changes will take effect immediately because the interpreter looks
 for the modules directly in the project source tree.
@@ -144,7 +149,7 @@ It supports importing editable-installed pure Rust and mixed Rust/Python project
 layouts as well as importing standalone `.rs` files.
 
 > **Note**: you must install maturin with the import-hook extra to be
-> able to use the import hook: `pip install maturin[import-hook]`
+> able to use the import hook: `pipx install maturin[import-hook]`
 
 ```python
 from maturin import import_hook
@@ -196,6 +201,17 @@ into `site-packages/sitecustomize.py` of your development virtual environment
 enable the hook for every script run by that interpreter without calling `import_hook.install()`
 in every script, meaning the scripts do not need alteration before deployment.
 
+### Environment
+The import hook can be disabled by setting `MATURIN_IMPORT_HOOK_ENABLED=0`. This can be used to disable
+the import hook in production if you want to leave calls to `import_hook.install()` in place.
+
+Build files will be stored in an appropriate place for the current system but can be overridden
+by setting `MATURIN_BUILD_DIR`. The precedence for storing build files is:
+
+* `MATURIN_BUILD_DIR`
+* `<virtualenv_dir>/maturin_build_cache`
+* `<system_cache_dir>/maturin_build_cache`
+    * e.g. `~/.cache/maturin_build_cache` on POSIX
 
 ### Advanced Usage
 

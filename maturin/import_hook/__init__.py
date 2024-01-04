@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 from typing import Optional, Set
 
 from maturin.import_hook import project_importer, rust_file_importer
-from maturin.import_hook._logging import reset_logger
+from maturin.import_hook._logging import logger, reset_logger
 from maturin.import_hook.settings import MaturinSettings
 
 __all__ = ["install", "uninstall", "reset_logger"]
@@ -21,6 +22,8 @@ def install(
     show_warnings: bool = True,
 ) -> None:
     """Install import hooks for automatically rebuilding and importing maturin projects or .rs files.
+
+    see the guide at <maturin.rs> for more details
 
     :param enable_project_importer: enable the hook for automatically rebuilding editable installed maturin projects
 
@@ -47,6 +50,10 @@ def install(
     :param show_warnings: whether to show compilation warnings
 
     """
+    if os.environ.get("MATURIN_IMPORT_HOOK_ENABLED") == "0":
+        logger.info("maturin import hook disabled by environment variable")
+        return
+
     if enable_rs_file_importer:
         rust_file_importer.install(
             settings=settings,

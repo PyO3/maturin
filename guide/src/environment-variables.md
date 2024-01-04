@@ -15,6 +15,11 @@ See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/referenc
 * `MATURIN_PYPI_TOKEN`: PyPI token for uploading wheels
 * `MATURIN_PASSWORD`: PyPI password for uploading wheels
 
+## Import hook environment variables
+
+* `MATURIN_BUILD_DIR`: Path to a location to cache build files
+* `MATURIN_IMPORT_HOOK_ENABLED`: set to `0` to disable calls to `import_hook.install()`
+
 ## `pyo3` environment variables
 
 * `PYO3_CROSS_PYTHON_VERSION`: Python version to use for cross compilation

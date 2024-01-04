@@ -149,12 +149,13 @@ It supports importing editable-installed pure Rust and mixed Rust/Python project
 layouts as well as importing standalone `.rs` files.
 
 > **Note**: you must install maturin with the import-hook extra to be
-> able to use the import hook: `pipx install maturin[import-hook]`
+> able to use the import hook: `pip install maturin[import-hook]`
 
 ```python
 from maturin import import_hook
 
-# install the import hook with default settings
+# install the import hook with default settings.
+# this must be called before importing any maturin project
 import_hook.install()
 
 # when a rust package that is installed in editable mode is imported,
@@ -172,6 +173,7 @@ The maturin project importer and the rust file importer can be used separately
 ```python
 from maturin.import_hook import rust_file_importer
 rust_file_importer.install()
+
 from maturin.import_hook import project_importer
 project_importer.install()
 ```
@@ -206,7 +208,8 @@ The import hook can be disabled by setting `MATURIN_IMPORT_HOOK_ENABLED=0`. This
 the import hook in production if you want to leave calls to `import_hook.install()` in place.
 
 Build files will be stored in an appropriate place for the current system but can be overridden
-by setting `MATURIN_BUILD_DIR`. The precedence for storing build files is:
+by setting `MATURIN_BUILD_DIR`. These files can be deleted without causing any issues (unless a build is in progress).
+The precedence for storing build files is:
 
 * `MATURIN_BUILD_DIR`
 * `<virtualenv_dir>/maturin_build_cache`

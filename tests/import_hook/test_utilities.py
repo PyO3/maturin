@@ -157,6 +157,7 @@ class TestGetProjectMtime:
         extension_module.touch()
         _small_sleep()
         (project_b / "source").touch()
+        _small_sleep()
 
         project_mtime = _get_project_mtime(project_a, [project_b], extension_module, set())
         assert project_mtime == (project_b / "source").stat().st_mtime

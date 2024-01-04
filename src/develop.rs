@@ -128,7 +128,7 @@ fn pip_install_wheel(
     pip_path: Option<&Path>,
     wheel_filename: &Path,
 ) -> Result<()> {
-    let mut pip_cmd = make_pip_command(&python, pip_path);
+    let mut pip_cmd = make_pip_command(python, pip_path);
     let output = pip_cmd
         .args(["install", "--no-deps", "--force-reinstall"])
         .arg(dunce::simplified(wheel_filename))
@@ -172,7 +172,7 @@ fn fix_direct_url(
     pip_path: Option<&Path>,
 ) -> Result<()> {
     println!("✏️  Setting installed package as editable");
-    let mut pip_cmd = make_pip_command(&python, pip_path);
+    let mut pip_cmd = make_pip_command(python, pip_path);
     let output = pip_cmd
         .args(["show", "--files"])
         .arg(&build_context.metadata21.name)
@@ -322,7 +322,7 @@ Files:
   my_project-0.1.0+abc123de.dist-info/entry_points.txt
   my_project.pth
 ";
-        assert_eq!(parse_direct_url_path(example_with_direct_url).unwrap(), Some(PathBuf::from("/foo bar/venv/lib/pythonABC/site-packages/my_project-0.1.0.dist-info/direct_url.json")));
+        assert_eq!(parse_direct_url_path(example_with_direct_url).unwrap(), Some(PathBuf::from("/foo bar/venv/lib/pythonABC/site-packages/my_project-0.1.0+abc123de.dist-info/direct_url.json")));
 
         let example_without_direct_url = "\
 Name: my-project

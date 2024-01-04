@@ -197,7 +197,7 @@ fn fix_direct_url(
 }
 
 fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
-    if let Some(Some(location)) = Regex::new(r"Location: (.*)")?
+    if let Some(Some(location)) = Regex::new(r"Location: ([^\r\n]*)")?
         .captures(pip_show_output)
         .map(|c| c.get(1))
     {
@@ -205,8 +205,9 @@ fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
             .captures(pip_show_output)
             .map(|c| c.get(1))
         {
-            let absolute_path = PathBuf::from(location.as_str()).join(direct_url_path.as_str());
-            return Ok(Some(absolute_path));
+            return Ok(Some(
+                PathBuf::from(location.as_str()).join(direct_url_path.as_str()),
+            ));
         }
     }
     Ok(None)
@@ -306,6 +307,7 @@ mod test {
     use super::parse_direct_url_path;
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn test_parse_direct_url() {
         let example_with_direct_url = "\
 Name: my-project
@@ -322,7 +324,11 @@ Files:
   my_project-0.1.0+abc123de.dist-info/entry_points.txt
   my_project.pth
 ";
-        assert_eq!(parse_direct_url_path(example_with_direct_url).unwrap(), Some(PathBuf::from("/foo bar/venv/lib/pythonABC/site-packages/my_project-0.1.0+abc123de.dist-info/direct_url.json")));
+        let expected_path = PathBuf::from("/foo bar/venv/lib/pythonABC/site-packages/my_project-0.1.0+abc123de.dist-info/direct_url.json");
+        assert_eq!(
+            parse_direct_url_path(example_with_direct_url).unwrap(),
+            Some(expected_path)
+        );
 
         let example_without_direct_url = "\
 Name: my-project
@@ -341,6 +347,31 @@ Files:
         assert_eq!(
             parse_direct_url_path(example_without_direct_url).unwrap(),
             None
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_parse_direct_url_windows() {
+        let example_with_direct_url_windows = "\
+Name: my-project\r
+Version: 0.1.0\r
+Location: C:\\foo bar\\venv\\Lib\\site-packages\r
+Files:\r
+  my_project-0.1.0+abc123de.dist-info\\INSTALLER\r
+  my_project-0.1.0+abc123de.dist-info\\METADATA\r
+  my_project-0.1.0+abc123de.dist-info\\RECORD\r
+  my_project-0.1.0+abc123de.dist-info\\REQUESTED\r
+  my_project-0.1.0+abc123de.dist-info\\WHEEL\r
+  my_project-0.1.0+abc123de.dist-info\\direct_url.json\r
+  my_project-0.1.0+abc123de.dist-info\\entry_points.txt\r
+  my_project.pth\r
+";
+
+        let expected_path = PathBuf::from("C:\\foo bar\\venv\\Lib\\site-packages\\my_project-0.1.0+abc123de.dist-info\\direct_url.json");
+        assert_eq!(
+            parse_direct_url_path(example_with_direct_url_windows).unwrap(),
+            Some(expected_path)
         );
     }
 }

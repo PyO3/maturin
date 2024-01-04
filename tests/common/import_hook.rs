@@ -59,7 +59,13 @@ pub fn test_import_hook(
     let path = env::join_paths(paths).unwrap();
 
     let output = Command::new(&python)
-        .args(["-m", "pytest", test_specifier])
+        .args([
+            "-m",
+            "pytest",
+            "--show-capture=all",
+            "--log-level=DEBUG",
+            test_specifier,
+        ])
         .env("PATH", path)
         .env("VIRTUAL_ENV", venv_dir)
         .envs(extra_envs.iter().cloned())

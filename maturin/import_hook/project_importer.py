@@ -395,13 +395,13 @@ def _get_project_mtime(
         excluded_dirs.add(installed_package_root)
 
     try:
-        return max(
-            path.stat().st_mtime
-            for path in _get_files_in_dirs(
+        latest_path = max(
+            _get_files_in_dirs(
                 itertools.chain((project_dir,), all_path_dependencies),
                 excluded_dir_names,
                 excluded_dirs,
-            )
+            ),
+            key=lambda p: p.stat().st_mtime,
         )
     except FileNotFoundError as e:
         logger.debug("error getting project mtime: %r (%s)", e, e.filename)
@@ -409,6 +409,10 @@ def _get_project_mtime(
     except ValueError as e:
         logger.debug("error getting project mtime: %r", e)
         return None
+    else:
+        mtime = latest_path.stat().st_mtime
+        logger.debug("most recently written path: '%s' at %f", latest_path, mtime)
+        return mtime
 
 
 def _package_is_up_to_date(

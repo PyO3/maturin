@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from maturin.import_hook import MaturinSettings
+from maturin.import_hook import MaturinSettings, reset_logger
 from maturin.import_hook._building import BuildCache, BuildStatus
 from maturin.import_hook._resolve_project import ProjectResolveError, _resolve_project
 from maturin.import_hook.project_importer import (
@@ -29,6 +29,9 @@ if SAVED_RESOLVED_PACKAGES_PATH is not None:
     if "RESOLVED_PACKAGES_PATH" in os.environ:
         shutil.copy(os.environ["RESOLVED_PACKAGES_PATH"], SAVED_RESOLVED_PACKAGES_PATH)
     os.environ["RESOLVED_PACKAGES_PATH"] = str(SAVED_RESOLVED_PACKAGES_PATH)
+
+
+reset_logger()
 
 
 def test_settings() -> None:

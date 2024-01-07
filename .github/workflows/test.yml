@@ -104,7 +104,7 @@ jobs:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           architecture: "x64"
@@ -230,7 +230,7 @@ jobs:
       NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         id: setup-python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -323,7 +323,7 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Login to GitHub Container Registry
@@ -429,7 +429,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.5.3"
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:
           python-version: "3.10"

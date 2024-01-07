@@ -323,7 +323,7 @@ impl BuildContext {
             );
         }
 
-        let tag = others.get(0).or_else(|| musllinux.get(0)).copied();
+        let tag = others.first().or_else(|| musllinux.first()).copied();
         get_policy_and_libs(artifact, tag, &self.target, allow_linking_libpython)
     }
 
@@ -694,7 +694,7 @@ impl BuildContext {
         let mut wheels = Vec::new();
         // On windows, we have picked an interpreter to set the location of python.lib,
         // otherwise it's none
-        let python_interpreter = interpreters.get(0);
+        let python_interpreter = interpreters.first();
         let artifact = self.compile_cdylib(
             python_interpreter,
             Some(&self.project_layout.extension_name),
@@ -822,7 +822,7 @@ impl BuildContext {
             .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
-        let artifacts = artifacts.get(0).context(error_msg)?;
+        let artifacts = artifacts.first().context(error_msg)?;
 
         let mut artifact = artifacts
             .get("cdylib")

@@ -880,13 +880,27 @@ fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
                 .any(|target| target.name == "uniffi-bindgen" && target.is_bin())
         })
         .unwrap_or(false);
+    let has_uniffi_bindgen_workspace_package = cargo_metadata.packages.iter().any(|pkg| {
+        pkg.targets
+            .iter()
+            .any(|target| target.name == "uniffi-bindgen" && target.is_bin())
+    });
+
     let command = if has_uniffi_bindgen_target {
         let mut command = Command::new("cargo");
         command.args(["run", "--bin", "uniffi-bindgen", "--manifest-path"]);
         command.arg(manifest_path);
+        command.current_dir(crate_dir);
+        command
+    } else if has_uniffi_bindgen_workspace_package {
+        let mut command = Command::new("cargo");
+        command.args(["run", "--bin", "uniffi-bindgen"]);
+        command.current_dir(cargo_metadata.workspace_root);
         command
     } else {
-        Command::new("uniffi-bindgen")
+        let mut command = Command::new("uniffi-bindgen");
+        command.current_dir(crate_dir);
+        command
     };
     Ok(command)
 }
@@ -922,7 +936,6 @@ fn generate_uniffi_bindings(
     };
 
     let mut cmd = uniffi_bindgen_command(crate_dir)?;
-    cmd.current_dir(crate_dir);
     cmd.args([
         "generate",
         "--no-format",

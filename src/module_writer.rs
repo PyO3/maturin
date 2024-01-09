@@ -14,6 +14,7 @@ use fs_err::File;
 use ignore::overrides::Override;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use normpath::PathExt as _;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -859,9 +860,9 @@ struct UniFfiBindingsConfig {
 
 #[derive(Debug, Clone)]
 struct UniFfiBindings {
-    name: String,
+    bindings: Vec<String>,
     cdylib: String,
-    path: PathBuf,
+    dir: PathBuf,
 }
 
 fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
@@ -968,7 +969,17 @@ fn generate_uniffi_bindings(
         bail!("Command {:?} failed", cmd);
     }
 
-    let py_binding = binding_dir.join(&py_binding_name).with_extension("py");
+    let py_bindings = fs::read_dir(&binding_dir)?
+        .flatten()
+        .filter(|file| {
+            file.path()
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .map_or(false, |ext| ext == "py")
+        })
+        .flat_map(|file| file.file_name().into_string())
+        .collect_vec();
+
     // uniffi bindings hardcoded the extension filenames
     let cdylib_name = match cdylib_name {
         Some(name) => name,
@@ -981,9 +992,9 @@ fn generate_uniffi_bindings(
     };
 
     Ok(UniFfiBindings {
-        name: py_binding_name,
+        bindings: py_bindings,
         cdylib,
-        path: py_binding,
+        dir: binding_dir,
     })
 }
 
@@ -1001,11 +1012,15 @@ pub fn write_uniffi_module(
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let UniFfiBindings {
-        name: binding_name,
+        bindings: binding_names,
         cdylib,
-        path: uniffi_binding,
+        dir: binding_dir,
     } = generate_uniffi_bindings(crate_dir, target_dir, target_os, artifact)?;
-    let py_init = format!("from .{binding_name} import *  # NOQA\n");
+    let py_init = binding_names
+        .iter()
+        .map(|name| format!("from .{name} import *  # NOQA\n"))
+        .collect::<Vec<String>>()
+        .join("");
 
     if !editable {
         write_python_part(writer, project_layout, pyproject_toml)
@@ -1025,12 +1040,14 @@ pub fn write_uniffi_module(
             ))?;
 
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
-            let target = base_path.join(&binding_name).with_extension("py");
-            fs::copy(&uniffi_binding, &target).context(format!(
-                "Failed to copy {} to {}",
-                uniffi_binding.display(),
-                target.display()
-            ))?;
+            for binding in binding_names.iter() {
+                let target = base_path.join(binding).with_extension("py");
+                fs::copy(&binding_dir.join(binding), &target).context(format!(
+                    "Failed to copy {} to {}",
+                    binding_dir.display(),
+                    target.display()
+                ))?;
+            }
         }
 
         let relative = project_layout
@@ -1056,10 +1073,12 @@ pub fn write_uniffi_module(
 
     if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(&module.join("__init__.py"), py_init.as_bytes())?;
-        writer.add_file(
-            module.join(binding_name).with_extension("py"),
-            uniffi_binding,
-        )?;
+        for binding in binding_names.iter() {
+            writer.add_file(
+                module.join(binding).with_extension("py"),
+                binding_dir.join(binding),
+            )?;
+        }
         writer.add_file_with_permissions(&module.join(cdylib), artifact, 0o755)?;
     }
 

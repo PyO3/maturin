@@ -2,7 +2,7 @@ use crate::module_writer::{add_data, ModuleWriter};
 use crate::pyproject_toml::SdistGenerator;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
-use cargo_metadata::{Metadata, MetadataCommand};
+use cargo_metadata::{Metadata, MetadataCommand, PackageId};
 use fs_err as fs;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
@@ -242,14 +242,40 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDepen
             package
                 .readme
                 .as_ref()
-                .map(|readme| (package.name.clone(), readme.clone().into_std_path_buf()))
+                .map(|readme| (package.id.clone(), readme.clone().into_std_path_buf()))
         })
-        .collect::<HashMap<String, PathBuf>>();
+        .collect::<HashMap<PackageId, PathBuf>>();
     // scan the dependency graph for path dependencies
     let mut path_deps = HashMap::new();
     let mut stack: Vec<&cargo_metadata::Package> = vec![root];
     while let Some(top) = stack.pop() {
-        for dependency in &top.dependencies {
+        // There seems to be no API to get the package id of a dependency, so collect the package ids from resolve
+        // and match them up with the `Dependency`s from `Package.dependencies`.
+        let dep_ids = &cargo_metadata
+            .resolve
+            .as_ref()
+            .unwrap()
+            .nodes
+            .iter()
+            .find(|node| node.id == top.id)
+            .unwrap()
+            .dependencies;
+        for dep_id in dep_ids {
+            // Assumption: Each package name can only occur once in a `[dependencies]` table.
+            let dependency = top
+                .dependencies
+                .iter()
+                .find(|package| {
+                    // Package ids are opaque and there seems to be no way to query their name.
+                    let dep_name = &cargo_metadata
+                        .packages
+                        .iter()
+                        .find(|package| &package.id == dep_id)
+                        .unwrap()
+                        .name;
+                    &package.name == dep_name
+                })
+                .unwrap();
             if let Some(path) = &dependency.path {
                 let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
                 if path_deps.contains_key(dep_name) {
@@ -269,9 +295,10 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDepen
                     .with_context(|| {
                         format!(
                             "Failed to resolve workspace root for {} at '{}'",
-                            dep_name, dep_manifest_path
+                            dep_id, dep_manifest_path
                         )
                     })?;
+
                 path_deps.insert(
                     dep_name.clone(),
                     PathDependency {
@@ -280,7 +307,7 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDepen
                             .workspace_root
                             .clone()
                             .into_std_path_buf(),
-                        readme: pkg_readmes.get(dep_name.as_str()).cloned(),
+                        readme: pkg_readmes.get(dep_id).cloned(),
                     },
                 );
                 if let Some(dep_package) = cargo_metadata
@@ -398,7 +425,7 @@ fn add_cargo_package_files_to_sdist(
             let abs_readme = path_dep_manifest_dir
                 .join(readme)
                 .normalize()
-                .with_context(|| format!("failed to normalize path `{}`", readme.display()))?
+                .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
                 .into_path_buf();
             let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
             writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
@@ -419,7 +446,12 @@ fn add_cargo_package_files_to_sdist(
     // Add the main crate
     let abs_manifest_path = manifest_path
         .normalize()
-        .with_context(|| format!("failed to normalize path `{}`", manifest_path.display()))?
+        .with_context(|| {
+            format!(
+                "failed to normalize manifest path `{}`",
+                manifest_path.display()
+            )
+        })?
         .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let main_crate = build_context.cargo_metadata.root_package().unwrap();
@@ -441,7 +473,7 @@ fn add_cargo_package_files_to_sdist(
         let abs_readme = abs_manifest_dir
             .join(readme)
             .normalize()
-            .with_context(|| format!("failed to normalize path `{}`", readme))?
+            .with_context(|| format!("failed to normalize readme path `{}`", readme))?
             .into_path_buf();
         let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
         writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
@@ -575,7 +607,7 @@ pub fn source_distribution(
         .normalize()
         .with_context(|| {
             format!(
-                "failed to normalize path `{}`",
+                "failed to normalize pyproject.toml path `{}`",
                 build_context.pyproject_toml_path.display()
             )
         })?
@@ -605,7 +637,7 @@ pub fn source_distribution(
         .normalize()
         .with_context(|| {
             format!(
-                "failed to normalize path `{}`",
+                "failed to normalize pyproject.toml path `{}`",
                 build_context.pyproject_toml_path.display()
             )
         })?

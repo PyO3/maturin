@@ -24,7 +24,7 @@ You can either download binaries from the [latest release](https://github.com/Py
 pipx install maturin
 ```
 
-> **Note**
+> [!NOTE]
 >
 > `pip install maturin` should also work if you don't want to use pipx.
 
@@ -142,7 +142,7 @@ my-project
     └── lib.rs
 ```
 
-> **Note**
+> [!NOTE]
 >
 > This structure is recommended to avoid [a common `ImportError` pitfall](https://github.com/PyO3/maturin/issues/490)
 

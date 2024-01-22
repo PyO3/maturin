@@ -238,7 +238,7 @@ jobs:\n",
             // job steps
             conf.push_str(
                 "    steps:
-      - uses: actions/checkout@v3\n",
+      - uses: actions/checkout@v4\n",
             );
 
             // install pyodide-build for emscripten
@@ -261,7 +261,7 @@ jobs:\n",
           actions-cache-folder: emsdk-cache\n",
                 );
                 conf.push_str(
-                    "      - uses: actions/setup-python@v4
+                    "      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}\n",
                 );
@@ -271,7 +271,7 @@ jobs:\n",
                 // setup python on demand
                 if setup_python {
                     conf.push_str(
-                        "      - uses: actions/setup-python@v4
+                        "      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'\n",
                     );
@@ -432,7 +432,7 @@ jobs:\n",
                 r#"  sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -546,8 +546,8 @@ mod tests {
                   matrix:
                     target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                   - name: Build wheels
@@ -569,8 +569,8 @@ mod tests {
                   matrix:
                     target: [x64, x86]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                       architecture: ${{ matrix.target }}
@@ -592,8 +592,8 @@ mod tests {
                   matrix:
                     target: [x86_64, aarch64]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                   - name: Build wheels
@@ -611,7 +611,7 @@ mod tests {
               sdist:
                 runs-on: ubuntu-latest
                 steps:
-                  - uses: actions/checkout@v3
+                  - uses: actions/checkout@v4
                   - name: Build sdist
                     uses: PyO3/maturin-action@v1
                     with:
@@ -672,8 +672,8 @@ mod tests {
                   matrix:
                     target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                   - name: Build wheels
@@ -695,8 +695,8 @@ mod tests {
                   matrix:
                     target: [x64, x86]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                       architecture: ${{ matrix.target }}
@@ -718,8 +718,8 @@ mod tests {
                   matrix:
                     target: [x86_64, aarch64]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                   - name: Build wheels
@@ -792,8 +792,8 @@ mod tests {
                   matrix:
                     target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                   - name: Build wheels
@@ -838,8 +838,8 @@ mod tests {
                   matrix:
                     target: [x64, x86]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                       architecture: ${{ matrix.target }}
@@ -869,8 +869,8 @@ mod tests {
                   matrix:
                     target: [x86_64, aarch64]
                 steps:
-                  - uses: actions/checkout@v3
-                  - uses: actions/setup-python@v4
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
                   - name: Build wheels
@@ -896,7 +896,7 @@ mod tests {
               sdist:
                 runs-on: ubuntu-latest
                 steps:
-                  - uses: actions/checkout@v3
+                  - uses: actions/checkout@v4
                   - name: Build sdist
                     uses: PyO3/maturin-action@v1
                     with:
@@ -957,7 +957,7 @@ mod tests {
                   matrix:
                     target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
                 steps:
-                  - uses: actions/checkout@v3
+                  - uses: actions/checkout@v4
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -977,7 +977,7 @@ mod tests {
                   matrix:
                     target: [x64, x86]
                 steps:
-                  - uses: actions/checkout@v3
+                  - uses: actions/checkout@v4
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -996,7 +996,7 @@ mod tests {
                   matrix:
                     target: [x86_64, aarch64]
                 steps:
-                  - uses: actions/checkout@v3
+                  - uses: actions/checkout@v4
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1012,7 +1012,7 @@ mod tests {
               sdist:
                 runs-on: ubuntu-latest
                 steps:
-                  - uses: actions/checkout@v3
+                  - uses: actions/checkout@v4
                   - name: Build sdist
                     uses: PyO3/maturin-action@v1
                     with:

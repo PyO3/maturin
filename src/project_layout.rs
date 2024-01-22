@@ -209,7 +209,7 @@ impl ProjectResolver {
         if let Some(path) = cargo_manifest_path {
             let path = path
                 .normalize()
-                .with_context(|| format!("failed to normalize path `{}`", path.display()))?
+                .with_context(|| format!("failed to normalize manifest path `{}`", path.display()))?
                 .into_path_buf();
             debug!(
                 "Using cargo manifest path from command line argument: {:?}",
@@ -248,7 +248,9 @@ impl ProjectResolver {
                 debug!("Using cargo manifest path from pyproject.toml {:?}", path);
                 return Ok((
                     path.normalize()
-                        .with_context(|| format!("failed to normalize path `{}`", path.display()))?
+                        .with_context(|| {
+                            format!("failed to normalize manifest path `{}`", path.display())
+                        })?
                         .into_path_buf(),
                     pyproject_file,
                 ));

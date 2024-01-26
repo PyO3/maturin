@@ -508,15 +508,17 @@ fn entry_points_txt(
 }
 
 /// Glue code that exposes `lib`.
-fn cffi_init_file() -> &'static str {
-    r#"__all__ = ["lib", "ffi"]
+fn cffi_init_file(extension_name: &str) -> String {
+    format!(
+        r#"__all__ = ["lib", "ffi"]
 
 import os
 from .ffi import ffi
 
-lib = ffi.dlopen(os.path.join(os.path.dirname(__file__), 'native.so'))
+lib = ffi.dlopen(os.path.join(os.path.dirname(__file__), '{extension_name}.so'))
 del os
 "#
+    )
 }
 
 /// Wraps some boilerplate around error handling when calling python
@@ -804,13 +806,17 @@ pub fn write_cffi_module(
         if editable {
             let base_path = python_module.join(&project_layout.extension_name);
             fs::create_dir_all(&base_path)?;
-            let target = base_path.join("native.so");
+            let target = base_path.join(format!(
+                "{extension_name}.so",
+                extension_name = &project_layout.extension_name
+            ));
             fs::copy(artifact, &target).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
                 target.display()
             ))?;
-            File::create(base_path.join("__init__.py"))?.write_all(cffi_init_file().as_bytes())?;
+            File::create(base_path.join("__init__.py"))?
+                .write_all(cffi_init_file(&project_layout.extension_name).as_bytes())?;
             File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
         }
 
@@ -836,9 +842,19 @@ pub fn write_cffi_module(
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(&module.join("__init__.py"), cffi_init_file().as_bytes())?;
+        writer.add_bytes(
+            &module.join("__init__.py"),
+            cffi_init_file(&project_layout.extension_name).as_bytes(),
+        )?;
         writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
-        writer.add_file_with_permissions(&module.join("native.so"), artifact, 0o755)?;
+        writer.add_file_with_permissions(
+            &module.join(format!(
+                "{extension_name}.so",
+                extension_name = &project_layout.extension_name
+            )),
+            artifact,
+            0o755,
+        )?;
     }
 
     Ok(())

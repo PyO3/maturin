@@ -9,10 +9,8 @@ _formerly pyo3-pack_
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?logo=gitter&style=flat-square)](https://gitter.im/PyO3/Lobby)
 
-Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages.
-
-This project is meant as a zero configuration replacement for [setuptools-rust](https://github.com/PyO3/setuptools-rust) and [milksnake](https://github.com/getsentry/milksnake).
-It supports building wheels for python 3.7+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
+Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages with minimal configuration.
+It supports building wheels for python 3.8+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
 
 Check out the [User Guide](https://maturin.rs/)!
 

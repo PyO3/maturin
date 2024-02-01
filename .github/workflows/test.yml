@@ -40,9 +40,14 @@ jobs:
 
             OS.forEach(os => {
               PYTHON_VERSIONS.forEach(pythonVersion => {
-                if (os == "macos-14" && pythonVersion.startsWith("pypy")) {
-                  // Skip PyPy on macOS M1 runner because they are built for x86_64
-                  return
+                if (os == "macos-14") {
+                  if (pythonVersion.startsWith("pypy")) {
+                    // Skip PyPy on macOS M1 runner because they are built for x86_64
+                    return
+                  } else if (parseInt(pythonVersion.slice(2)) < 11) {
+                    // macOS M1 runner only have Python 3.11+
+                    return
+                  }
                 }
                 platforms.push({
                   "os": os,

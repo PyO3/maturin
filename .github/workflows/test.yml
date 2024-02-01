@@ -309,11 +309,7 @@ jobs:
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
-        # manylinux2014 fails with `/lib64/libc.so.6: version `GLIBC_2.18'` not found recently
-        # could be an upstream Rust issue, disable it for now
-        #
-        # manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
-        manylinux: ["manylinux_2_24"]
+        manylinux: ["manylinux_2_28"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v4
@@ -327,7 +323,7 @@ jobs:
       - name: Compliant Build
         run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
-        if: matrix.manylinux == 'manylinux_2_24'
+        if: matrix.manylinux == 'manylinux_2_28'
         run: tests/manylinux_incompliant.sh ${{ matrix.manylinux }}
 
   test-docker:

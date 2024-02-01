@@ -82,7 +82,7 @@ clap_complete_command = { version = "0.5.1", optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.18.3", default-features = false, optional = true }
-cargo-xwin = { version = "0.16.2", default-features = false, optional = true }
+cargo-xwin = { version = "0.16.4", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
@@ -98,13 +98,13 @@ bytesize = { version = "1.0.1", optional = true }
 configparser = { version = "3.0.3", optional = true }
 dirs = { version = "5.0.0", optional = true }
 multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
-ureq = { version = "2.9.1", features = ["gzip", "json", "socks-proxy"], default-features = false, optional = true }
+ureq = { version = "2.9.4", features = ["gzip", "json", "socks-proxy"], default-features = false, optional = true }
 native-tls = { version = "0.2.8", optional = true }
-rustls = { version = "0.21.9", optional = true }
+rustls = { version = "0.22.2", optional = true }
 rustls-pemfile = { version = "2.0.0", optional = true }
 keyring = { version = "2.0.0", default-features = false, features = ["linux-no-secret-service"], optional = true }
 wild = { version = "2.1.0", optional = true }
-url = { version = "2.5.0", optional = true }
+url = { version = "2.3.0", optional = true }
 
 [dev-dependencies]
 expect-test = "1.4.1"

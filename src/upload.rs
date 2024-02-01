@@ -390,9 +390,8 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
         let mut reader = io::BufReader::new(File::open(ca_bundle)?);
         let certs = rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>()?;
         let mut root_certs = rustls::RootCertStore::empty();
-        root_certs.add_parsable_certificates(&certs);
+        root_certs.add_parsable_certificates(certs);
         let client_config = rustls::ClientConfig::builder()
-            .with_safe_defaults()
             .with_root_certificates(root_certs)
             .with_no_client_auth();
         Ok(builder.tls_config(Arc::new(client_config)).build())

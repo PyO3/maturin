@@ -21,8 +21,7 @@ jobs:
     name: Generate Matrix
     runs-on: ubuntu-latest
     outputs:
-      os: ${{ steps.generate-matrix.outputs.os }}
-      python-version: ${{ steps.generate-matrix.outputs.python-version }}
+      platform: ${{ steps.generate-matrix.outputs.platform }}
       fail-fast: ${{ steps.generate-matrix.outputs.fail-fast }}
     steps:
       - uses: actions/setup-node@v4
@@ -37,11 +36,28 @@ jobs:
             const yaml = require('js-yaml')
             const OS = yaml.load(process.env.OS_MATRIX)
             const PYTHON_VERSIONS = yaml.load(process.env.PYTHON_VERSION)
+            let platforms = []
+
+            OS.forEach(os => {
+              PYTHON_VERSIONS.forEach(pythonVersion => {
+                if (os == "macos-14") {
+                  if (pythonVersion.startsWith("pypy")) {
+                    // Skip PyPy on macOS M1 runner because they are built for x86_64
+                    return
+                  } else if (parseInt(pythonVersion.slice(2)) < 11) {
+                    // macOS M1 runner only have Python 3.11+
+                    return
+                  }
+                }
+                platforms.push({
+                  "os": os,
+                  "python-version": pythonVersion
+                })
+              })
+            })
 
             if (context.eventName == 'workflow_dispatch' || context.eventName == 'merge_group') {
               // Run all of them on workflow dispatch or merge group
-              core.setOutput('os', OS)
-              core.setOutput('python-version', PYTHON_VERSIONS)
               core.setOutput('fail-fast', 'false')
             } else if (context.eventName == 'pull_request') {
               const { data: { labels: labels } } = await github.rest.pulls.get({
@@ -56,15 +72,17 @@ jobs:
               // Only run latest CPython and PyPy tests on pull requests
               const firstPyPy = PYTHON_VERSIONS.findIndex(version => version.startsWith('pypy'))
               const pythonVersions = [PYTHON_VERSIONS[firstPyPy - 1], PYTHON_VERSIONS[PYTHON_VERSIONS.length - 1]]
-              core.setOutput('python-version', pythonVersions)
-
-              // Skip macOS tests on pull requests, it's slow and already partially covered by Cirrus CI
-              core.setOutput('os', OS.filter(os => !os.startsWith('macos')))
+              // Only use macOS M1 runner on pull requests
+              platforms = platforms.filter(
+                platform => platform.os != 'macos-13' && pythonVersions.indexOf(platform["python-version"]) != -1
+              )
             }
+            core.setOutput('platform', platforms)
     env:
       OS_MATRIX: |
         - ubuntu-latest
         - macos-13
+        - macos-14
         - windows-latest
       PYTHON_VERSION: |
         - '3.8'
@@ -81,23 +99,22 @@ jobs:
     strategy:
       fail-fast: ${{ needs.generate-matrix.outputs.fail-fast != 'false' }}
       matrix:
-        os: ${{ fromJson(needs.generate-matrix.outputs.os) }}
-        python-version: ${{ fromJson(needs.generate-matrix.outputs.python-version) }}
-    runs-on: ${{ matrix.os }}
+        platform: ${{ fromJson(needs.generate-matrix.outputs.platform) }}
+    runs-on: ${{ matrix.platform.os }}
     env:
       RUST_BACKTRACE: "1"
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     steps:
       - name: Cleanup Disk
-        if: ${{ !startsWith(matrix.os, 'windows') }}
+        if: ${{ !startsWith(matrix.platform.os, 'windows') }}
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.4
         with:
-          version: "v0.5.3"
+          version: "v0.7.6"
       - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v3
         with:
@@ -106,17 +123,17 @@ jobs:
           miniconda-version: "latest"
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.platform.python-version }}
           architecture: "x64"
       - name: Set PYTHON_VERSION env var
         shell: bash
         run: |
           set -ex
           # remove -dev suffix
-          python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
+          python_version=$(echo ${{ matrix.platform.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
       - name: Install cffi
-        if: ${{ !contains(matrix.python-version, 'pypy') }}
+        if: ${{ !contains(matrix.platform.python-version, 'pypy') }}
         run: pip install cffi
       - name: Install python packages
         run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.26.0
@@ -126,11 +143,11 @@ jobs:
           targets: wasm32-wasi # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Install aarch64-apple-darwin Rust target
-        if: startsWith(matrix.os, 'macos')
-        run: rustup target add aarch64-apple-darwin
+      - name: Install additional Rust target
+        if: startsWith(matrix.platform.os, 'macos')
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - name: Setup Xcode env
-        if: startsWith(matrix.os, 'macos')
+        if: startsWith(matrix.platform.os, 'macos')
         shell: bash
         run: |
           set -ex
@@ -143,23 +160,22 @@ jobs:
       # Caching
       # Install gnu-tar because BSD tar is buggy
       # https://github.com/actions/cache/issues/403
-      - name: Install GNU tar (macOS)
-        if: startsWith(matrix.os, 'macos')
+      - name: Add GNU tar to PATH (macOS)
+        if: startsWith(matrix.platform.os, 'macos')
         run: |
-          brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash
-        if: contains(matrix.python-version, 'pypy')
+        if: contains(matrix.platform.python-version, 'pypy')
         run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
       # To save disk space
       - name: Disable debuginfo on Windows
-        if: startsWith(matrix.os, 'windows')
+        if: startsWith(matrix.platform.os, 'windows')
         run: echo "RUSTFLAGS="-C debuginfo=0"" >> $GITHUB_ENV
       - name: cargo test
         run: cargo nextest run --features password-storage
       - name: test cross compiling with zig
-        if: ${{ !contains(matrix.python-version, '-dev') }}
+        if: ${{ !contains(matrix.platform.python-version, '-dev') }}
         shell: bash
         run: |
           set -ex
@@ -190,7 +206,7 @@ jobs:
           # Check wheels with twine
           twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
       - name: test cross compiling windows wheel
-        if: ${{ matrix.os == 'ubuntu-latest' && !contains(matrix.python-version, 'pypy') && !contains(matrix.python-version, '-dev') }}
+        if: ${{ matrix.platform.os == 'ubuntu-latest' && !contains(matrix.platform.python-version, 'pypy') && !contains(matrix.platform.python-version, '-dev') }}
         run: |
           set -ex
           sudo apt-get install -y mingw-w64
@@ -293,11 +309,7 @@ jobs:
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
-        # manylinux2014 fails with `/lib64/libc.so.6: version `GLIBC_2.18'` not found recently
-        # could be an upstream Rust issue, disable it for now
-        #
-        # manylinux: [ 'manylinux2014', 'manylinux_2_24' ]
-        manylinux: ["manylinux_2_24"]
+        manylinux: ["manylinux_2_28"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v4
@@ -311,7 +323,7 @@ jobs:
       - name: Compliant Build
         run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
       - name: Incompliant Build
-        if: matrix.manylinux == 'manylinux_2_24'
+        if: matrix.manylinux == 'manylinux_2_28'
         run: tests/manylinux_incompliant.sh ${{ matrix.manylinux }}
 
   test-docker:
@@ -407,10 +419,10 @@ jobs:
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:
-        os: [ubuntu-latest, macos-13, windows-latest]
+        os: [ubuntu-latest, macos-14, windows-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: changes
         with:
           filters: |
@@ -426,9 +438,9 @@ jobs:
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.4
         with:
-          version: "v0.5.3"
+          version: "v0.7.6"
       - uses: actions/setup-python@v5
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:

@@ -32,22 +32,6 @@ freebsd_task:
     - python3 -m ensurepip
   <<: *BUILD_AND_TEST
 
-macos_arm64_task:
-  name: Test (arm64 macOS)
-  macos_instance:
-    image: ghcr.io/cirruslabs/macos-monterey-xcode:latest
-  env:
-    PATH: $HOME/.cargo/bin:/opt/homebrew/opt/python@3.10/bin:$PATH
-  target_cache:
-    folder: target
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
-  install_script:
-    - brew install python3
-    - python3 -m pip install uniffi-bindgen==0.26.0
-  <<: *BUILD_AND_TEST
-
 linux_aarch64_task:
   name: Test (arm64 Linux)
   arm_container:

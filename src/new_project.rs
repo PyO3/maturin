@@ -146,11 +146,26 @@ impl<'a> ProjectGenerator<'a> {
     }
 }
 
+fn validate_name(name: &str) -> Result<String, String> {
+    // TODO: replace with actual cargo rules:
+    // https://github.com/rust-lang/cargo/blob/7b7af3077bff8d60b7f124189bc9de227d3063a9/crates/cargo-util-schemas/src/restricted_names.rs#L42C1-L42C11
+    // +
+    // https://github.com/rust-lang/cargo/blob/master/src/cargo/util/restricted_names.rs#L11
+
+    // TODO: add python rules
+    if name.chars().any(|c| c.is_whitespace()) {
+        return Err("Name cannot contain whitespace".to_string());
+    }
+    Ok(name.to_string())
+}
 /// Options common to `maturin new` and `maturin init`.
 #[derive(Debug, clap::Parser)]
 pub struct GenerateProjectOptions {
     /// Set the resulting package name, defaults to the directory name
-    #[arg(long)]
+    #[arg(
+        long,
+        value_parser=validate_name,
+    )]
     name: Option<String>,
     /// Use mixed Rust/Python project layout
     #[arg(long)]
@@ -212,10 +227,12 @@ fn generate_project(
         let file_name = project_path.file_name().with_context(|| {
             format!("Failed to get name from path '{}'", project_path.display())
         })?;
-        file_name
+        let temp = file_name
             .to_str()
             .context("Filename isn't valid Unicode")?
-            .to_string()
+            .to_string();
+
+        validate_name(temp.as_str()).map_err(|e| anyhow::anyhow!(e))?
     };
     let bindings_items = if options.mixed {
         vec!["pyo3", "rust-cpython", "cffi", "uniffi"]

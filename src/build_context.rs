@@ -128,7 +128,7 @@ fn bin_wasi_helper(
     if !metadata21
         .requires_dist
         .iter()
-        .any(|requirement| requirement.name == "wasmtime")
+        .any(|requirement| requirement.name.as_ref() == "wasmtime")
     {
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
         metadata21
@@ -900,7 +900,7 @@ impl BuildContext {
             .metadata21
             .requires_dist
             .iter()
-            .any(|requirement| requirement.name == "cffi")
+            .any(|requirement| requirement.name.as_ref() == "cffi")
         {
             eprintln!(
                 "⚠️  Warning: missing cffi package dependency, please add it to pyproject.toml. \

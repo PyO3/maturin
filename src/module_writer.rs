@@ -1360,7 +1360,7 @@ mod tests {
     #[test]
     // The mechanism is the same for wheel_writer
     fn sdist_writer_excludes() -> Result<(), Box<dyn std::error::Error>> {
-        let metadata = Metadata21::new("dummy".to_string(), Version::from_release(vec![1, 0]));
+        let metadata = Metadata21::new("dummy".to_string(), Version::new([1, 0]));
         let perm = 0o777;
 
         // No excludes

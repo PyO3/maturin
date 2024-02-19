@@ -40,7 +40,7 @@ fn windows_interpreter_no_build(
 
     // From requires-python in pyproject.toml
     if let Some(requires_python) = requires_python {
-        if !requires_python.contains(&Version::from_release(vec![major, minor])) {
+        if !requires_python.contains(&Version::new([major as u64, minor as u64])) {
             return true;
         }
     }
@@ -726,7 +726,7 @@ impl PythonInterpreter {
             .filter_map(|config| match requires_python {
                 Some(requires_python) => {
                     if requires_python
-                        .contains(&Version::from_release(vec![config.major, config.minor]))
+                        .contains(&Version::new([config.major as u64, config.minor as u64]))
                     {
                         Some(Self::from_config(config))
                     } else {
@@ -760,7 +760,7 @@ impl PythonInterpreter {
                 .filter(|minor| {
                     requires_python
                         .map(|requires_python| {
-                            requires_python.contains(&Version::from_release(vec![3, *minor]))
+                            requires_python.contains(&Version::new([3, *minor as u64]))
                         })
                         .unwrap_or(true)
                 })
@@ -776,8 +776,7 @@ impl PythonInterpreter {
                         .filter(|minor| {
                             requires_python
                                 .map(|requires_python| {
-                                    requires_python
-                                        .contains(&Version::from_release(vec![3, *minor]))
+                                    requires_python.contains(&Version::new([3, *minor as u64]))
                                 })
                                 .unwrap_or(true)
                         })

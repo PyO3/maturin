@@ -544,18 +544,24 @@ fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result
     } else {
         if crate_dir.join("cbindgen.toml").is_file() {
             eprintln!(
-                "💼 Using the existing cbindgen.toml configuration. \n\
-                 💼 Enforcing the following settings: \n   \
+                "💼 Using the existing cbindgen.toml configuration.\n\
+                 💼 Enforcing the following settings:\n   \
                  - language = \"C\" \n   \
-                 - no_includes = true \n   \
-                 - no include_guard \t (directives are not yet supported) \n   \
-                 - no defines       \t (directives are not yet supported)"
+                 - no_includes = true, sys_includes = []\n     \
+                   (#include is not yet supported by CFFI)\n   \
+                 - defines = [], no include_guard, pragma_once = false, cpp_compat = false\n     \
+                   (#define, #ifdef, etc. is not yet supported by CFFI)\n"
             );
         }
 
         let mut config = cbindgen::Config::from_root_or_default(crate_dir);
+        config.language = cbindgen::Language::C;
+        config.no_includes = true;
+        config.sys_includes = Vec::new();
         config.defines = HashMap::new();
         config.include_guard = None;
+        config.pragma_once = false;
+        config.cpp_compat = false;
 
         let bindings = cbindgen::Builder::new()
             .with_config(config)

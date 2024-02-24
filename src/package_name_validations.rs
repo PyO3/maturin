@@ -61,7 +61,7 @@ fn validate_package_name(name: &str) -> anyhow::Result<()> {
 
     let mut chars = name.chars();
     if let Some(ch) = chars.next() {
-        if ch.is_digit(10) {
+        if ch.is_ascii_digit() {
             // A specific error for a potentially common case.
             anyhow::bail!("Package names cannot start with a digit");
         }

@@ -148,8 +148,6 @@ impl<'a> ProjectGenerator<'a> {
 }
 
 fn validate_name(name: &str) -> anyhow::Result<String> {
-    // TODO: add python rules
-
     cargo_check_name(name)?;
 
     Ok(name.to_string())

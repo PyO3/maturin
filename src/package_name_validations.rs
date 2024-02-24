@@ -1,6 +1,6 @@
 // Based on: https://github.com/rust-lang/cargo/blob/e975158c1b542aa3833fd8584746538c17a6ae55/src/cargo/ops/cargo_new.rs#L169
 pub fn cargo_check_name(name: &str) -> anyhow::Result<()> {
-    // Instead of `PackageName::new`, which performs these checks
+    // Instead of `PackageName::new` which performs these checks in the original cargo code
     validate_package_name(name)?;
 
     if is_keyword(name) {
@@ -23,45 +23,61 @@ pub fn cargo_check_name(name: &str) -> anyhow::Result<()> {
         );
     }
     if ["core", "std", "alloc", "proc_macro", "proc-macro"].contains(&name) {
-        //  TODO: shell.warn?
-        println!(
-            "the name `{}` is part of Rust's standard library\n\
+        eprintln!(
+            "⚠️  Warning: the name `{}` is part of Rust's standard library\n\
             It is recommended to use a different name to avoid problems.",
             name,
         );
     }
     if is_windows_reserved(name) {
-        // TODO: ????
-        if cfg!(windows) {
-            anyhow::bail!(
-                "cannot use name `{}`, it is a reserved Windows filename",
-                name,
-            );
-        } else {
-            //  TODO: shell.warn?
-            println!(
-                "the name `{}` is a reserved Windows filename\n\
-                This package will not work on Windows platforms.",
-                name
-            );
-        }
+        eprintln!(
+            "⚠️  Warning: the name `{}` is a reserved Windows filename\n\
+            This package will not work on Windows platforms.",
+            name
+        );
     }
     if is_non_ascii_name(name) {
-        //  TODO: shell.warn?
-        println!(
-            "the name `{}` contains non-ASCII characters\n\
+        eprintln!(
+            "⚠️  Warning: the name `{}` contains non-ASCII characters\n\
             Non-ASCII crate names are not supported by Rust.",
             name
         );
     }
     let name_in_lowercase = name.to_lowercase();
     if name != name_in_lowercase {
-        //  TODO: shell.warn?
-        println!(
-            "the name `{name}` is not snake_case or kebab-case which is recommended for package names, consider `{name_in_lowercase}`"
+        eprintln!(
+            "⚠️  Warning: the name `{name}` is not snake_case or kebab-case which is recommended for package names, consider `{name_in_lowercase}`"
         );
     }
 
+    Ok(())
+}
+
+// Based on: https://github.com/rust-lang/cargo/blob/7b7af3077bff8d60b7f124189bc9de227d3063a9/crates/cargo-util-schemas/src/restricted_names.rs#L42
+fn validate_package_name(name: &str) -> anyhow::Result<()> {
+    if name.is_empty() {
+        anyhow::bail!("Package names cannot be empty");
+    }
+
+    let mut chars = name.chars();
+    if let Some(ch) = chars.next() {
+        if ch.is_digit(10) {
+            // A specific error for a potentially common case.
+            anyhow::bail!("Package names cannot start with a digit");
+        }
+        if !(unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_') {
+            anyhow::bail!(
+                "the first character must be a Unicode XID start character (most letters or `_`)"
+            );
+        }
+    }
+    for ch in chars {
+        if !(unicode_xid::UnicodeXID::is_xid_continue(ch) || ch == '-') {
+            anyhow::bail!(
+                "characters must be Unicode XID characters (numbers, `-`, `_`, or most letters)"
+            );
+        }
+    }
     Ok(())
 }
 
@@ -97,32 +113,4 @@ pub fn is_windows_reserved(name: &str) -> bool {
 /// An artifact with this name will conflict with one of Cargo's build directories.
 pub fn is_conflicting_artifact_name(name: &str) -> bool {
     ["deps", "examples", "build", "incremental"].contains(&name)
-}
-
-// Based on: https://github.com/rust-lang/cargo/blob/7b7af3077bff8d60b7f124189bc9de227d3063a9/crates/cargo-util-schemas/src/restricted_names.rs#L42
-fn validate_package_name(name: &str) -> anyhow::Result<()> {
-    if name.is_empty() {
-        anyhow::bail!("Package names cannot be empty");
-    }
-
-    let mut chars = name.chars();
-    if let Some(ch) = chars.next() {
-        if ch.is_digit(10) {
-            // A specific error for a potentially common case.
-            anyhow::bail!("Package names cannot start with a digit");
-        }
-        if !(unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_') {
-            anyhow::bail!(
-                "the first character must be a Unicode XID start character (most letters or `_`)"
-            );
-        }
-    }
-    for ch in chars {
-        if !(unicode_xid::UnicodeXID::is_xid_continue(ch) || ch == '-') {
-            anyhow::bail!(
-                "characters must be Unicode XID characters (numbers, `-`, `_`, or most letters)"
-            );
-        }
-    }
-    Ok(())
 }

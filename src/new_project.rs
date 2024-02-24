@@ -1,4 +1,5 @@
 use crate::ci::GenerateCI;
+use crate::package_name_validations::cargo_check_name;
 use crate::BridgeModel;
 use anyhow::{bail, Context, Result};
 use console::style;
@@ -146,16 +147,11 @@ impl<'a> ProjectGenerator<'a> {
     }
 }
 
-fn validate_name(name: &str) -> Result<String, String> {
-    // TODO: replace with actual cargo rules:
-    // https://github.com/rust-lang/cargo/blob/7b7af3077bff8d60b7f124189bc9de227d3063a9/crates/cargo-util-schemas/src/restricted_names.rs#L42C1-L42C11
-    // +
-    // https://github.com/rust-lang/cargo/blob/master/src/cargo/util/restricted_names.rs#L11
-
+fn validate_name(name: &str) -> anyhow::Result<String> {
     // TODO: add python rules
-    if name.chars().any(|c| c.is_whitespace()) {
-        return Err("Name cannot contain whitespace".to_string());
-    }
+
+    cargo_check_name(name)?;
+
     Ok(name.to_string())
 }
 /// Options common to `maturin new` and `maturin init`.

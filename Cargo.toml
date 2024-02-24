@@ -75,6 +75,7 @@ path-slash = "0.2.1"
 pep440_rs = { version = "0.3.6", features = ["serde"] }
 pep508_rs = { version = "0.2.1", features = ["serde"] }
 time = "0.3.17"
+unicode-xid = "0.2.4"
 
 # cli
 clap = { version = "4.0.0", features = ["derive", "env", "wrap_help", "unstable-styles"] }

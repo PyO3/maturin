@@ -62,7 +62,7 @@ rustc_version = "0.4.0"
 semver = "1.0.13"
 target-lexicon = "0.12.8"
 indexmap = "2.0.2"
-pyproject-toml = "0.8.1"
+pyproject-toml = "0.10.0"
 python-pkginfo = "0.6.0"
 textwrap = "0.16.0"
 ignore = "0.4.20"
@@ -72,8 +72,8 @@ cc = "1.0.72"
 dunce = "1.0.2"
 normpath = "1.0.0"
 path-slash = "0.2.1"
-pep440_rs = { version = "0.3.6", features = ["serde"] }
-pep508_rs = { version = "0.2.1", features = ["serde"] }
+pep440_rs = { version = "0.5.0", features = ["serde", "tracing"] }
+pep508_rs = { version = "0.4.2", features = ["serde", "tracing"] }
 time = "0.3.17"
 unicode-xid = "0.2.4"
 

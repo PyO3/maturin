@@ -318,7 +318,7 @@ impl PyProjectToml {
             .build_system
             .requires
             .iter()
-            .find(|x| x.name == maturin);
+            .find(|x| x.name.as_ref() == maturin);
         if let Some(requires_maturin) = requires_maturin {
             match requires_maturin.version_or_url.as_ref() {
                 Some(VersionOrUrl::VersionSpecifier(version_specifier)) => {

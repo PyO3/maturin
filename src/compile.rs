@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{Command, Stdio};
 use std::str;
 use tracing::{debug, trace};
 
@@ -141,16 +141,17 @@ fn compile_targets(
 ) -> Result<Vec<HashMap<String, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
     for target in targets {
-        artifacts.push(compile_target(context, python_interpreter, target)?);
+        let build_command = cargo_build_command(context, python_interpreter, target)?;
+        artifacts.push(compile_target(context, build_command)?);
     }
     Ok(artifacts)
 }
 
-fn compile_target(
+fn cargo_build_command(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     compile_target: &CompileTarget,
-) -> Result<HashMap<String, BuildArtifact>> {
+) -> Result<Command> {
     let target = &context.target;
 
     let mut cargo_rustc: cargo_options::Rustc = context.cargo_options.clone().into();
@@ -281,9 +282,17 @@ fn compile_target(
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
         {
-            let mut build = cargo_xwin::Rustc::from(cargo_rustc);
+            let xwin_options = {
+                use clap::Parser;
 
+                // This will populate the default values for the options
+                // and then override them with cargo-xwin environment variables.
+                cargo_xwin::XWinOptions::parse_from(Vec::<&str>::new())
+            };
+
+            let mut build = cargo_xwin::Rustc::from(cargo_rustc);
             build.target = vec![target_triple.to_string()];
+            build.xwin = xwin_options;
             build.build_command()?
         }
         #[cfg(not(feature = "xwin"))]
@@ -444,7 +453,13 @@ fn compile_target(
         };
         build_command.env("MACOSX_DEPLOYMENT_TARGET", deployment_target);
     }
+    Ok(build_command)
+}
 
+fn compile_target(
+    context: &BuildContext,
+    mut build_command: Command,
+) -> Result<HashMap<String, BuildArtifact>> {
     debug!("Running {:?}", build_command);
 
     let using_cross = build_command

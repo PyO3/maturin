@@ -78,7 +78,7 @@ itertools = "0.12.1"
 lddtree = "0.3.4"
 cc = "1.0.88"
 dunce = "1.0.2"
-normpath = "1.2.0"
+normpath = "1.1.1"
 path-slash = "0.2.1"
 pep440_rs = { version = "0.5.0", features = ["serde", "tracing"] }
 pep508_rs = { version = "0.4.2", features = ["serde", "tracing"] }

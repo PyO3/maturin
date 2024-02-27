@@ -69,6 +69,7 @@ pub enum Arch {
     X86_64,
     S390X,
     Wasm32,
+    Riscv32,
     Riscv64,
     Mips64el,
     Mips64,
@@ -91,6 +92,7 @@ impl fmt::Display for Arch {
             Arch::X86_64 => write!(f, "x86_64"),
             Arch::S390X => write!(f, "s390x"),
             Arch::Wasm32 => write!(f, "wasm32"),
+            Arch::Riscv32 => write!(f, "riscv32"),
             Arch::Riscv64 => write!(f, "riscv64"),
             Arch::Mips64el => write!(f, "mips64el"),
             Arch::Mips64 => write!(f, "mips64"),
@@ -115,7 +117,7 @@ impl Arch {
             Arch::Powerpc | Arch::Powerpc64Le | Arch::Powerpc64 => "powerpc",
             Arch::X86 => "i386",
             Arch::X86_64 => "amd64",
-            Arch::Riscv64 => "riscv",
+            Arch::Riscv32 | Arch::Riscv64 => "riscv",
             Arch::Mips64el | Arch::Mips64 | Arch::Mipsel | Arch::Mips => "mips",
             // sparc64 is unsupported since FreeBSD 13.0
             Arch::Sparc64 => "sparc64",
@@ -139,6 +141,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::S390X,
             Arch::X86,
             Arch::X86_64,
+            Arch::Riscv32,
             Arch::Riscv64,
             Arch::Mips64el,
             Arch::Mips64,
@@ -158,6 +161,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Powerpc64Le,
             Arch::X86,
             Arch::X86_64,
+            Arch::Riscv32,
             Arch::Riscv64,
             Arch::Mips64el,
             Arch::Mipsel,
@@ -171,6 +175,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Powerpc,
             Arch::Powerpc64,
             Arch::Powerpc64Le,
+            Arch::Riscv32,
             Arch::Riscv64,
             Arch::Sparc64,
         ],
@@ -255,6 +260,7 @@ impl Target {
             Architecture::Powerpc64le => Arch::Powerpc64Le,
             Architecture::S390x => Arch::S390X,
             Architecture::Wasm32 => Arch::Wasm32,
+            Architecture::Riscv32(_) => Arch::Riscv32,
             Architecture::Riscv64(_) => Arch::Riscv64,
             Architecture::Mips64(mips64_arch) => match mips64_arch {
                 Mips64Architecture::Mips64el => Arch::Mips64el,
@@ -343,6 +349,7 @@ impl Target {
             Arch::X86_64 => "x86_64",
             Arch::S390X => "s390x",
             Arch::Wasm32 => "wasm32",
+            Arch::Riscv32 => "riscv32",
             Arch::Riscv64 => "riscv64",
             // It's kinda surprising that Python doesn't include the `el` suffix
             Arch::Mips64el | Arch::Mips64 => "mips64",
@@ -388,6 +395,7 @@ impl Target {
             }
             Arch::Armv6L
             | Arch::Wasm32
+            | Arch::Riscv32
             | Arch::Riscv64
             | Arch::Mips64el
             | Arch::Mips64
@@ -418,6 +426,7 @@ impl Target {
             | Arch::Wasm32
             | Arch::Mipsel
             | Arch::Mips
+            | Arch::Riscv32
             | Arch::Powerpc => 32,
         }
     }

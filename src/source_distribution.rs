@@ -612,12 +612,12 @@ pub fn source_distribution(
             )
         })?
         .into_path_buf();
-    let metadata21 = &build_context.metadata21;
-    let mut writer = SDistWriter::new(&build_context.out, metadata21, excludes)?;
+    let metadata23 = &build_context.metadata23;
+    let mut writer = SDistWriter::new(&build_context.out, metadata23, excludes)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
-        &metadata21.get_distribution_escaped(),
-        &metadata21.get_version_escaped()
+        &metadata23.get_distribution_escaped(),
+        &metadata23.get_version_escaped()
     ));
 
     match pyproject.sdist_generator() {
@@ -684,7 +684,7 @@ pub fn source_distribution(
 
     writer.add_bytes(
         root_dir.join("PKG-INFO"),
-        metadata21.to_file_contents()?.as_bytes(),
+        metadata23.to_file_contents()?.as_bytes(),
     )?;
 
     add_data(&mut writer, build_context.project_layout.data.as_deref())?;

@@ -494,7 +494,7 @@ impl BuildOptions {
             pyproject_toml_path,
             pyproject_toml,
             module_name,
-            metadata21,
+            metadata23,
             mut cargo_options,
             cargo_metadata,
             mut pyproject_toml_maturin_options,
@@ -564,7 +564,7 @@ impl BuildOptions {
                 &bridge,
                 &[],
                 &target,
-                metadata21.requires_python.as_ref(),
+                metadata23.requires_python.as_ref(),
                 generate_import_lib,
             )?
         } else {
@@ -678,7 +678,7 @@ impl BuildOptions {
             project_layout,
             pyproject_toml_path,
             pyproject_toml,
-            metadata21,
+            metadata23,
             crate_name,
             module_name,
             manifest_path: cargo_toml_path,

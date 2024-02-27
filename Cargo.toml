@@ -4,27 +4,31 @@ name = "maturin"
 version = "1.4.0"
 description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
 exclude = [
-  "test-crates/**/*",
-  "sysconfig/*",
-  "test-data/*",
-  "ci/*",
-  "tests/*",
-  "guide/*",
-  ".github/*",
-  ".devcontainer/*",
-  "Dockerfile",
-  ".dockerignore",
-  "deny.toml",
-  "noxfile.py",
-  "test-dockerfile.sh",
-  "Code-of-Conduct.md",
+    "test-crates/**/*",
+    "sysconfig/*",
+    "test-data/*",
+    "ci/*",
+    "tests/*",
+    "guide/*",
+    ".github/*",
+    ".devcontainer/*",
+    "Dockerfile",
+    ".dockerignore",
+    "deny.toml",
+    "noxfile.py",
+    "test-dockerfile.sh",
+    "Code-of-Conduct.md",
 ]
 homepage = "https://github.com/pyo3/maturin"
 readme = "README.md"
 repository = "https://github.com/pyo3/maturin"
 license = "MIT OR Apache-2.0"
 keywords = ["python", "cffi", "packaging", "pypi", "pyo3"]
-categories = ["api-bindings", "development-tools::ffi", "command-line-utilities"]
+categories = [
+    "api-bindings",
+    "development-tools::ffi",
+    "command-line-utilities",
+]
 edition = "2021"
 rust-version = "1.70"
 
@@ -53,7 +57,11 @@ tar = "0.4.38"
 tempfile = "3.2.0"
 toml = "0.8.8"
 toml_edit = "0.21.0"
-zip = { version = "0.6.1", default-features = false, features = ["bzip2", "deflate", "time"] }
+zip = { version = "0.6.1", default-features = false, features = [
+    "bzip2",
+    "deflate",
+    "time",
+] }
 thiserror = "1.0.37"
 fs-err = "2.11.0"
 fat-macho = { version = "0.4.8", default-features = false }
@@ -76,10 +84,15 @@ pep440_rs = { version = "0.5.0", features = ["serde", "tracing"] }
 pep508_rs = { version = "0.4.2", features = ["serde", "tracing"] }
 time = "0.3.17"
 url = "2.5.0"
-unicode-xid = "0.2.4"
+unicode-xid = { version = "0.2.4", optional = true }
 
 # cli
-clap = { version = "4.0.0", features = ["derive", "env", "wrap_help", "unstable-styles"] }
+clap = { version = "4.0.0", features = [
+    "derive",
+    "env",
+    "wrap_help",
+    "unstable-styles",
+] }
 clap_complete_command = { version = "0.5.1", optional = true }
 
 # cross compile
@@ -88,7 +101,9 @@ cargo-xwin = { version = "0.16.4", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
-tracing-subscriber = { version = "0.3.15", features = ["env-filter"], optional = true }
+tracing-subscriber = { version = "0.3.15", features = [
+    "env-filter",
+], optional = true }
 
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.11.0", default-features = false, optional = true }
@@ -99,12 +114,20 @@ minijinja = { version = "1.0.7", optional = true }
 bytesize = { version = "1.0.1", optional = true }
 configparser = { version = "3.0.3", optional = true }
 dirs = { version = "5.0.0", optional = true }
-multipart = { version = "0.18.0", features = ["client"], default-features = false, optional = true }
-ureq = { version = "2.9.4", features = ["gzip", "json", "socks-proxy"], default-features = false, optional = true }
+multipart = { version = "0.18.0", features = [
+    "client",
+], default-features = false, optional = true }
+ureq = { version = "2.9.4", features = [
+    "gzip",
+    "json",
+    "socks-proxy",
+], default-features = false, optional = true }
 native-tls = { version = "0.2.8", optional = true }
 rustls = { version = "0.22.2", optional = true }
 rustls-pemfile = { version = "2.0.0", optional = true }
-keyring = { version = "2.0.0", default-features = false, features = ["linux-no-secret-service"], optional = true }
+keyring = { version = "2.0.0", default-features = false, features = [
+    "linux-no-secret-service",
+], optional = true }
 wild = { version = "2.1.0", optional = true }
 
 [dev-dependencies]
@@ -125,12 +148,31 @@ log = ["tracing-subscriber"]
 
 cli-completion = ["dep:clap_complete_command"]
 
-upload = ["ureq", "multipart", "configparser", "bytesize", "dialoguer/password", "wild", "dep:dirs"]
+upload = [
+    "ureq",
+    "multipart",
+    "configparser",
+    "bytesize",
+    "dialoguer/password",
+    "wild",
+    "dep:dirs",
+]
+
 # keyring doesn't support *BSD so it's not enabled in `full` by default
 password-storage = ["upload", "keyring"]
 
-rustls = ["dep:rustls", "ureq?/tls", "cargo-xwin?/rustls-tls", "dep:rustls-pemfile"]
-native-tls = ["dep:native-tls", "ureq?/native-tls", "cargo-xwin?/native-tls", "dep:rustls-pemfile"]
+rustls = [
+    "dep:rustls",
+    "ureq?/tls",
+    "cargo-xwin?/rustls-tls",
+    "dep:rustls-pemfile",
+]
+native-tls = [
+    "dep:native-tls",
+    "ureq?/native-tls",
+    "cargo-xwin?/native-tls",
+    "dep:rustls-pemfile",
+]
 
 # cross compile using zig or xwin
 cross-compile = ["zig", "xwin"]
@@ -138,7 +180,7 @@ zig = ["cargo-zigbuild"]
 xwin = ["cargo-xwin"]
 
 # project scaffolding
-scaffolding = ["dialoguer", "console", "minijinja"]
+scaffolding = ["dialoguer", "console", "minijinja", "unicode-xid"]
 
 # Internal feature to speed up the tests significantly
 faster-tests = []

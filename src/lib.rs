@@ -55,7 +55,6 @@ mod metadata;
 mod module_writer;
 #[cfg(feature = "scaffolding")]
 mod new_project;
-mod package_name_validations;
 mod project_layout;
 pub mod pyproject_toml;
 mod python_interpreter;

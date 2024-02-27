@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: [ 'v*' ]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -95,7 +95,7 @@ jobs:
         if: matrix.target == 'x86_64-apple-darwin'
         env:
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
-          MACOSX_DEPLOYMENT_TARGET: '10.9'
+          MACOSX_DEPLOYMENT_TARGET: "10.9"
         run: |
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
@@ -132,15 +132,15 @@ jobs:
         run: ci/build_deb.sh
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.target }}
           path: dist
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.target }}
           path: |
             *.tar.gz
             *.zip
@@ -198,14 +198,14 @@ jobs:
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.target }}
           path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
 
   release-pypi:
@@ -221,14 +221,15 @@ jobs:
       name: PyPI
       url: ${{ steps.set_url.outputs.env_url }}
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ build, build-musl ]
+    needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: wheels
+          pattern: wheels-*
+          merge-multiple: true
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
       - name: Publish
         run: |
           pip install maturin
@@ -261,11 +262,12 @@ jobs:
     name: Publish to GitHub releases
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ build, build-musl ]
+    needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: binaries
+          pattern: binaries-*
+          merge-multiple: true
       - name: Sigstore Sign
         uses: sigstore/gh-action-sigstore-python@v2.1.1
         with:

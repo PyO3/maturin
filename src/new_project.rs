@@ -1,4 +1,5 @@
 use crate::ci::GenerateCI;
+use crate::package_name_validations::cargo_check_name;
 use crate::BridgeModel;
 use anyhow::{bail, Context, Result};
 use console::style;
@@ -146,11 +147,19 @@ impl<'a> ProjectGenerator<'a> {
     }
 }
 
+fn validate_name(name: &str) -> anyhow::Result<String> {
+    cargo_check_name(name)?;
+
+    Ok(name.to_string())
+}
 /// Options common to `maturin new` and `maturin init`.
 #[derive(Debug, clap::Parser)]
 pub struct GenerateProjectOptions {
     /// Set the resulting package name, defaults to the directory name
-    #[arg(long)]
+    #[arg(
+        long,
+        value_parser=validate_name,
+    )]
     name: Option<String>,
     /// Use mixed Rust/Python project layout
     #[arg(long)]
@@ -212,10 +221,12 @@ fn generate_project(
         let file_name = project_path.file_name().with_context(|| {
             format!("Failed to get name from path '{}'", project_path.display())
         })?;
-        file_name
+        let temp = file_name
             .to_str()
             .context("Filename isn't valid Unicode")?
-            .to_string()
+            .to_string();
+
+        validate_name(temp.as_str()).map_err(|e| anyhow::anyhow!(e))?
     };
     let bindings_items = if options.mixed {
         vec!["pyo3", "rust-cpython", "cffi", "uniffi"]

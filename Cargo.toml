@@ -76,6 +76,7 @@ pep440_rs = { version = "0.5.0", features = ["serde", "tracing"] }
 pep508_rs = { version = "0.4.2", features = ["serde", "tracing"] }
 time = "0.3.17"
 url = "2.5.0"
+unicode-xid = "0.2.4"
 
 # cli
 clap = { version = "4.0.0", features = ["derive", "env", "wrap_help", "unstable-styles"] }

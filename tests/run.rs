@@ -65,6 +65,16 @@ fn develop_pyo3_mixed_submodule() {
 }
 
 #[test]
+fn develop_pyo3_mixed_with_path_dep() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-mixed-with-path-dep",
+        None,
+        "develop-pyo3-mixed-with-path-dep",
+        false,
+    ));
+}
+
+#[test]
 fn develop_pyo3_mixed_implicit() {
     handle_result(develop::test_develop(
         "test-crates/pyo3-mixed-implicit",
@@ -234,6 +244,17 @@ fn integration_pyo3_mixed_submodule() {
         "test-crates/pyo3-mixed-submodule",
         None,
         "integration-pyo3-mixed-submodule",
+        false,
+        None,
+    ));
+}
+
+#[test]
+fn integration_pyo3_mixed_with_path_dep() {
+    handle_result(integration::test_integration(
+        "test-crates/pyo3-mixed-with-path-dep",
+        None,
+        "integration-pyo3-mixed-with-path-dep",
         false,
         None,
     ));

@@ -30,7 +30,7 @@ use tracing::debug;
     after_help = "Visit https://maturin.rs to learn more about maturin.",
     styles = cargo_options::styles(),
 )]
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::large_enum_variant))]
+#[cfg_attr(clippy, allow(clippy::large_enum_variant))]
 /// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
 enum Opt {

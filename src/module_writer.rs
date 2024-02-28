@@ -549,7 +549,7 @@ fn cffi_header(crate_dir: &Path, target_dir: &Path, tempdir: &TempDir) -> Result
                  - language = \"C\" \n   \
                  - no_includes = true, sys_includes = []\n     \
                    (#include is not yet supported by CFFI)\n   \
-                 - defines = [], no include_guard, pragma_once = false, cpp_compat = false\n     \
+                 - defines = [], include_guard = None, pragma_once = false, cpp_compat = false\n     \
                    (#define, #ifdef, etc. is not yet supported by CFFI)\n"
             );
         }

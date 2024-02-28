@@ -11,7 +11,7 @@
 - [Python Metadata](./metadata.md)
 - [Configuration](./config.md)
 - [Environment Variables](./environment-variables.md)
-- [Local Development](./develop.md)
+- [Local Development](./local_development.md)
 - [Distribution](./distribution.md)
 - [Sphinx Integration](./sphinx.md)
 

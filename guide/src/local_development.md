@@ -117,15 +117,26 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 ```
 
-Editable installs right now is only useful in mixed Rust/Python project so you
-don't have to recompile and reinstall when only Python source code changes. For
-example when using pip you can make an editable installation with
+Editable installs can be used with mixed Rust/Python projects so you
+don't have to recompile and reinstall when only Python source code changes.
+They can also be used with mixed and pure projects together with the
+import hook so that recompilation/re-installation occurs automatically
+when Python or Rust source code changes.
+
+To install a package in editable mode with pip:
 
 ```bash
+cd my-project
 pip install -e .
 ```
+or
+```bash
+cd my-project
+maturin develop
+```
 
-Then Python source code changes will take effect immediately.
+Then Python source code changes will take effect immediately because the interpreter looks
+for the modules directly in the project source tree.
 
 ## Import Hook
 

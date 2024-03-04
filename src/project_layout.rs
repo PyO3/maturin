@@ -1,5 +1,5 @@
 use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
-use crate::{CargoToml, Metadata21, PyProjectToml};
+use crate::{CargoToml, Metadata23, PyProjectToml};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, MetadataCommand};
 use normpath::PathExt as _;
@@ -45,8 +45,8 @@ pub struct ProjectResolver {
     pub pyproject_toml: Option<PyProjectToml>,
     /// Rust module name
     pub module_name: String,
-    /// Python Package Metadata 2.1
-    pub metadata21: Metadata21,
+    /// Python Package Metadata 2.3
+    pub metadata23: Metadata23,
     /// Cargo options
     pub cargo_options: CargoOptions,
     /// Cargo.toml as resolved by [cargo_metadata]
@@ -107,11 +107,11 @@ impl ProjectResolver {
 
         let cargo_metadata = Self::resolve_cargo_metadata(&manifest_file, &cargo_options)?;
 
-        let mut metadata21 = Metadata21::from_cargo_toml(manifest_dir, &cargo_metadata)
+        let mut metadata23 = Metadata23::from_cargo_toml(manifest_dir, &cargo_metadata)
             .context("Failed to parse Cargo.toml into python metadata")?;
         if let Some(pyproject) = pyproject {
             let pyproject_dir = pyproject_file.parent().unwrap();
-            metadata21.merge_pyproject_toml(pyproject_dir, pyproject)?;
+            metadata23.merge_pyproject_toml(pyproject_dir, pyproject)?;
         }
 
         let crate_name = &cargo_toml.package.name;
@@ -193,7 +193,7 @@ impl ProjectResolver {
             pyproject_toml_path: pyproject_file,
             pyproject_toml,
             module_name,
-            metadata21,
+            metadata23,
             cargo_options,
             cargo_metadata,
             pyproject_toml_maturin_options,

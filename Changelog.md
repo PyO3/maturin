@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Bump metadata version from 2.1 to 2.3 in [#1960](https://github.com/PyO3/maturin/pull/1960). Source distributions created by maturin now have reliable metadata, meaning tool such as pip, uv and poetry could skip building them for version resolution.
+
 ## [1.4.0] - 2023-12-02
 
 * Bump MSRV to 1.67.0 in [#1847](https://github.com/PyO3/maturin/pull/1847)

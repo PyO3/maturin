@@ -82,9 +82,9 @@ fn install_dependencies(
     interpreter: &PythonInterpreter,
     pip_path: Option<&Path>,
 ) -> Result<()> {
-    if !build_context.metadata21.requires_dist.is_empty() {
+    if !build_context.metadata23.requires_dist.is_empty() {
         let mut args = vec!["install".to_string()];
-        args.extend(build_context.metadata21.requires_dist.iter().map(|x| {
+        args.extend(build_context.metadata23.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
             // Remove extra marker to make it installable with pip
             // Keep in sync with `Metadata21::merge_pyproject_toml()`!
@@ -175,7 +175,7 @@ fn fix_direct_url(
     let mut pip_cmd = make_pip_command(python, pip_path);
     let output = pip_cmd
         .args(["show", "--files"])
-        .arg(&build_context.metadata21.name)
+        .arg(&build_context.metadata23.name)
         .output()
         .context(format!(
             "pip show failed (ran {:?} with {:?})",
@@ -292,7 +292,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             )?;
             eprintln!(
                 "🛠 Installed {}-{}",
-                build_context.metadata21.name, build_context.metadata21.version
+                build_context.metadata23.name, build_context.metadata23.version
             );
         }
     }

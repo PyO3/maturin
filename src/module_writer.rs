@@ -2,7 +2,7 @@
 use crate::project_layout::ProjectLayout;
 use crate::target::Os;
 use crate::{
-    pyproject_toml::Format, BridgeModel, Metadata21, PyProjectToml, PythonInterpreter, Target,
+    pyproject_toml::Format, BridgeModel, Metadata23, PyProjectToml, PythonInterpreter, Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -126,10 +126,10 @@ impl PathWriter {
     }
 
     /// Writes the RECORD file after everything else has been written
-    pub fn write_record(self, metadata21: &Metadata21) -> Result<()> {
+    pub fn write_record(self, metadata23: &Metadata23) -> Result<()> {
         let record_file = self
             .base_path
-            .join(metadata21.get_dist_info_dir())
+            .join(metadata23.get_dist_info_dir())
             .join("RECORD");
         let mut buffer = File::create(&record_file).context(format!(
             "Failed to create a file at {}",
@@ -264,14 +264,14 @@ impl WheelWriter {
     pub fn new(
         tag: &str,
         wheel_dir: &Path,
-        metadata21: &Metadata21,
+        metadata23: &Metadata23,
         tags: &[String],
         excludes: Override,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
-            metadata21.get_distribution_escaped(),
-            metadata21.get_version_escaped(),
+            metadata23.get_distribution_escaped(),
+            metadata23.get_version_escaped(),
             tag
         ));
 
@@ -280,12 +280,12 @@ impl WheelWriter {
         let mut builder = WheelWriter {
             zip: ZipWriter::new(file),
             record: Vec::new(),
-            record_file: metadata21.get_dist_info_dir().join("RECORD"),
+            record_file: metadata23.get_dist_info_dir().join("RECORD"),
             wheel_path,
             excludes,
         };
 
-        write_dist_info(&mut builder, metadata21, tags)?;
+        write_dist_info(&mut builder, metadata23, tags)?;
 
         Ok(builder)
     }
@@ -294,7 +294,7 @@ impl WheelWriter {
     pub fn add_pth(
         &mut self,
         project_layout: &ProjectLayout,
-        metadata21: &Metadata21,
+        metadata23: &Metadata23,
     ) -> Result<()> {
         if project_layout.python_module.is_some() || !project_layout.python_packages.is_empty() {
             let absolute_path = project_layout
@@ -308,7 +308,7 @@ impl WheelWriter {
                 })?
                 .into_path_buf();
             if let Some(python_path) = absolute_path.to_str() {
-                let name = metadata21.get_distribution_escaped();
+                let name = metadata23.get_distribution_escaped();
                 let target = format!("{name}.pth");
                 debug!("Adding {} from {}", target, python_path);
                 self.add_bytes(target, python_path.as_bytes())?;
@@ -441,7 +441,7 @@ impl SDistWriter {
     /// Create a source distribution .tar.gz which can be subsequently expanded
     pub fn new(
         wheel_dir: impl AsRef<Path>,
-        metadata21: &Metadata21,
+        metadata23: &Metadata23,
         excludes: Override,
     ) -> Result<Self, io::Error> {
         let path = wheel_dir
@@ -449,8 +449,8 @@ impl SDistWriter {
             .normalize()?
             .join(format!(
                 "{}-{}.tar.gz",
-                &metadata21.get_distribution_escaped(),
-                &metadata21.get_version_escaped()
+                &metadata23.get_distribution_escaped(),
+                &metadata23.get_version_escaped()
             ))
             .into_path_buf();
 
@@ -1105,7 +1105,7 @@ pub fn write_uniffi_module(
 pub fn write_bin(
     writer: &mut impl ModuleWriter,
     artifact: &Path,
-    metadata: &Metadata21,
+    metadata: &Metadata23,
     bin_name: &str,
 ) -> Result<()> {
     let data_dir = PathBuf::from(format!(
@@ -1127,7 +1127,7 @@ pub fn write_bin(
 /// Note that the wasm binary needs to be written separately by [write_bin]
 pub fn write_wasm_launcher(
     writer: &mut impl ModuleWriter,
-    metadata: &Metadata21,
+    metadata: &Metadata23,
     bin_name: &str,
 ) -> Result<()> {
     let entrypoint_script = format!(
@@ -1251,28 +1251,28 @@ pub fn write_python_part(
 /// Creates the .dist-info directory and fills it with all metadata files except RECORD
 pub fn write_dist_info(
     writer: &mut impl ModuleWriter,
-    metadata21: &Metadata21,
+    metadata23: &Metadata23,
     tags: &[String],
 ) -> Result<()> {
-    let dist_info_dir = metadata21.get_dist_info_dir();
+    let dist_info_dir = metadata23.get_dist_info_dir();
 
     writer.add_directory(&dist_info_dir)?;
 
     writer.add_bytes(
         &dist_info_dir.join("METADATA"),
-        metadata21.to_file_contents()?.as_bytes(),
+        metadata23.to_file_contents()?.as_bytes(),
     )?;
 
     writer.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags)?.as_bytes())?;
 
     let mut entry_points = String::new();
-    if !metadata21.scripts.is_empty() {
-        entry_points.push_str(&entry_points_txt("console_scripts", &metadata21.scripts));
+    if !metadata23.scripts.is_empty() {
+        entry_points.push_str(&entry_points_txt("console_scripts", &metadata23.scripts));
     }
-    if !metadata21.gui_scripts.is_empty() {
-        entry_points.push_str(&entry_points_txt("gui_scripts", &metadata21.gui_scripts));
+    if !metadata23.gui_scripts.is_empty() {
+        entry_points.push_str(&entry_points_txt("gui_scripts", &metadata23.gui_scripts));
     }
-    for (entry_type, scripts) in &metadata21.entry_points {
+    for (entry_type, scripts) in &metadata23.entry_points {
         entry_points.push_str(&entry_points_txt(entry_type, scripts));
     }
     if !entry_points.is_empty() {
@@ -1282,10 +1282,10 @@ pub fn write_dist_info(
         )?;
     }
 
-    if !metadata21.license_files.is_empty() {
+    if !metadata23.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("license_files");
         writer.add_directory(&license_files_dir)?;
-        for path in &metadata21.license_files {
+        for path in &metadata23.license_files {
             let filename = path.file_name().with_context(|| {
                 format!("missing file name for license file {}", path.display())
             })?;
@@ -1366,7 +1366,7 @@ mod tests {
     #[test]
     // The mechanism is the same for wheel_writer
     fn sdist_writer_excludes() -> Result<(), Box<dyn std::error::Error>> {
-        let metadata = Metadata21::new("dummy".to_string(), Version::new([1, 0]));
+        let metadata = Metadata23::new("dummy".to_string(), Version::new([1, 0]));
         let perm = 0o777;
 
         // No excludes

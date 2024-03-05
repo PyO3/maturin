@@ -1,13 +1,16 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (for the cli, not for the crate).
-
-## [Unreleased]
+## [1.5.0] - 2024-03-05
 
 * Bump metadata version from 2.1 to 2.3 in [#1960](https://github.com/PyO3/maturin/pull/1960). Source distributions created by maturin now have reliable metadata, meaning tool such as pip, uv and poetry could skip building them for version resolution.
+* Allow identical `VIRTUAL_ENV` and `CONDA_PREFIX` env vars in [#1879](https://github.com/PyO3/maturin/pull/1879)
+* Reject `-i python` when cross compiling in [#1891](https://github.com/PyO3/maturin/pull/1891)
+* Support uniffi-bindgen in cargo workspaces in [#1909](https://github.com/PyO3/maturin/pull/1909)
+* Add support for configuring `xwin` using env vars in [#1961](https://github.com/PyO3/maturin/pull/1961)
+*  Add validation for crate/package name in new/init in [#1943](https://github.com/PyO3/maturin/pull/1943)
+* Add 32-bit RISC-V support in [#1969](https://github.com/PyO3/maturin/pull/1969)
+* Improve import hook changes in [#1958](https://github.com/PyO3/maturin/pull/1958)
+* Adjust cbindgen Overrides for CFFI in [#1957](https://github.com/PyO3/maturin/pull/1957)
 
 ## [1.4.0] - 2023-12-02
 
@@ -943,7 +946,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/pyo3/maturin/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/pyo3/maturin/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/pyo3/maturin/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/pyo3/maturin/compare/v1.3.0...v1.3.1

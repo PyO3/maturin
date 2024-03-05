@@ -183,6 +183,7 @@ fn cargo_build_command(
     let mut rustflags = cargo_config2::Config::load_with_cwd(manifest_dir)?
         .rustflags(target_triple)?
         .unwrap_or_default();
+    let original_rustflags = rustflags.flags.clone();
 
     // We need to pass --bin / --lib
     let bridge_model = &compile_target.bridge_model;
@@ -358,7 +359,7 @@ fn cargo_build_command(
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
 
-    if !rustflags.flags.is_empty() {
+    if !rustflags.flags.is_empty() && rustflags.flags != original_rustflags {
         build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
     }
 

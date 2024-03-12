@@ -534,20 +534,30 @@ jobs:
       matrix:
         platform:
           - target: armv5te-unknown-linux-gnueabi
-            apt-packages: gcc-arm-linux-gnueabi
+            install-script: |
+              sudo apt-get update
+              sudo apt-get install -y gcc-arm-linux-gnueabi
+          - target: loongarch64-unknown-linux-gnu
+            install-script: |
+              wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+              sudo add-apt-repository "deb http://apt.llvm.org/$(lsb_release --codename --short)/ llvm-toolchain-$(lsb_release --codename --short)-18 main"
+              sudo apt-get update
+              sudo apt-get install -y clang-18 llvm-18
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ${{ matrix.platform.apt-packages }}
+        run: ${{ matrix.platform.install-script }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
       - name: cargo check
+        env:
+          CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER: clang-18
+          CC_loongarch64_unknown_linux_gnu: clang-18
+          AR_loongarch64_unknown_linux_gnu: llvm-ar-18
         run: cargo check --target ${{ matrix.platform.target }}
 
   conclusion:

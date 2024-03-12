@@ -77,7 +77,7 @@ def _build_wheel(
     if pep517_args:
         options.extend(pep517_args)
 
-    if "--compatibility" not in command:
+    if "--compatibility" not in options:
         # default to off if not otherwise specified
         options = ["--compatibility", "off", *options]
 

@@ -81,7 +81,7 @@ def _build_wheel(
         # default to off if not otherwise specified
         options = ["--compatibility", "off", *options]
 
-    command = [base_command, *options]
+    command = [*base_command, *options]
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()

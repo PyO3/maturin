@@ -2,7 +2,7 @@
 
 ## [1.5.0] - 2024-03-05
 
-* Bump metadata version from 2.1 to 2.3 in [#1960](https://github.com/PyO3/maturin/pull/1960). Source distributions created by maturin now have reliable metadata, meaning tool such as pip, uv and poetry could skip building them for version resolution.
+* Bump metadata version from 2.1 to 2.3 in [#1965](https://github.com/PyO3/maturin/pull/1965). Source distributions created by maturin now have reliable metadata, meaning tool such as pip, uv and poetry could skip building them for version resolution.
 * Allow identical `VIRTUAL_ENV` and `CONDA_PREFIX` env vars in [#1879](https://github.com/PyO3/maturin/pull/1879)
 * Reject `-i python` when cross compiling in [#1891](https://github.com/PyO3/maturin/pull/1891)
 * Support uniffi-bindgen in cargo workspaces in [#1909](https://github.com/PyO3/maturin/pull/1909)

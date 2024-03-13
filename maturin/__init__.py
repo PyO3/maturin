@@ -8,6 +8,7 @@ On windows, apparently pip's subprocess handling sets stdout to some windows enc
 even though the terminal supports utf8. Writing directly to the binary stdout buffer avoids encoding errors due to
 maturin's emojis.
 """
+
 from __future__ import annotations
 
 import os

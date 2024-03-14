@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+* Fix usage of `--compatibility` when run as a PEP517 backend in [#1992](https://github.com/PyO3/maturin/pull/1992)
+
 ## [1.5.0] - 2024-03-05
 
 * Bump metadata version from 2.1 to 2.3 in [#1965](https://github.com/PyO3/maturin/pull/1965). Source distributions created by maturin now have reliable metadata, meaning tool such as pip, uv and poetry could skip building them for version resolution.

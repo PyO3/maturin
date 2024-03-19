@@ -93,7 +93,7 @@ clap = { version = "4.0.0", features = [
     "wrap_help",
     "unstable-styles",
 ] }
-clap_complete_command = { version = "0.5.1", optional = true }
+clap_complete_command = { version = "0.5.1", default-features = false, features = ["nushell"], optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.18.3", default-features = false, optional = true }

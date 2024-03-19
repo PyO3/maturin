@@ -390,18 +390,7 @@ checksum = "183495371ea78d4c9ff638bfc6497d46fed2396e4f9c50aebc1278a4a9919a3d"
 dependencies = [
  "clap",
  "clap_complete",
- "clap_complete_fig",
  "clap_complete_nushell",
-]
-
-[[package]]
-name = "clap_complete_fig"
-version = "4.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87e571d70e22ec91d34e1c5317c8308035a2280d925167646bf094fc5de1737c"
-dependencies = [
- "clap",
- "clap_complete",
 ]
 
 [[package]]

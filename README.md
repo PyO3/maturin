@@ -254,7 +254,7 @@ The Rust compiler since version 1.64 [requires at least glibc 2.17](https://blog
 For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
 The [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action already takes care of this if you set e.g. `manylinux: 2014`.
 
-maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper name tag.
+maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper platform tag.
 If your system's glibc is too new or you link other shared libraries, it will assign the `linux` tag.
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 

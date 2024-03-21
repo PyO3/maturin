@@ -373,10 +373,12 @@ jobs:\n",
                 }
             }
             if self.pytest {
-                if matches!(platform, Platform::Linux) {
-                    // Test on host for x86_64
-                    conf.push_str(&format!(
-                        "      - name: pytest
+                match platform {
+                    Platform::All => {}
+                    Platform::Linux => {
+                        // Test on host for x86_64
+                        conf.push_str(&format!(
+                            "      - name: pytest
         if: ${{{{ startsWith(matrix.platform.target, 'x86_64') }}}}
         shell: bash
         run: |
@@ -385,10 +387,10 @@ jobs:\n",
           pip install pytest
           {chdir}pytest
 "
-                    ));
-                    // Test on QEMU for other architectures
-                    conf.push_str(&format!(
-                        "      - name: pytest
+                        ));
+                        // Test on QEMU for other architectures
+                        conf.push_str(&format!(
+                                                "      - name: pytest
         if: ${{{{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}}}
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
@@ -404,28 +406,11 @@ jobs:\n",
             pip3 install {project_name} --find-links dist --force-reinstall
             {chdir}pytest
 "
-                    ));
-                } else if matches!(platform, Platform::Emscripten) {
-                    conf.push_str(
-                        "      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-",
-                    );
-                    conf.push_str(&format!(
-                        "      - name: pytest
-        run: |
-          set -e
-          pyodide venv .venv
-          source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
-          pip install pytest
-          {chdir}python -m pytest
-"
-                    ));
-                } else {
-                    conf.push_str(&format!(
-                        "      - name: pytest
+                                            ));
+                    }
+                    Platform::Windows => {
+                        conf.push_str(&format!(
+                            "      - name: pytest
         if: ${{{{ !startsWith(matrix.platform.target, 'aarch64') }}}}
         shell: bash
         run: |
@@ -434,7 +419,38 @@ jobs:\n",
           pip install pytest
           {chdir}pytest
 "
-                    ));
+                        ));
+                    }
+                    Platform::Macos => {
+                        conf.push_str(&format!(
+                            "      - name: pytest
+        run: |
+          set -e
+          pip install {project_name} --find-links dist --force-reinstall
+          pip install pytest
+          {chdir}pytest
+"
+                        ));
+                    }
+                    Platform::Emscripten => {
+                        conf.push_str(
+                            "      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+",
+                        );
+                        conf.push_str(&format!(
+                            "      - name: pytest
+        run: |
+          set -e
+          pyodide venv .venv
+          source .venv/bin/activate
+          pip install {project_name} --find-links dist --force-reinstall
+          pip install pytest
+          {chdir}python -m pytest
+"
+                        ));
+                    }
                 }
             }
 
@@ -973,8 +989,6 @@ mod tests {
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
                   - name: pytest
-                    if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
-                    shell: bash
                     run: |
                       set -e
                       pip install example --find-links dist --force-reinstall

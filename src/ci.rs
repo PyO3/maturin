@@ -32,11 +32,18 @@ pub enum Platform {
     Macos,
     /// Emscripten
     Emscripten,
+    /// macOSM1
+    MacosM1,
 }
 
 impl Platform {
     fn defaults() -> Vec<Self> {
-        vec![Platform::Linux, Platform::Windows, Platform::Macos]
+        vec![
+            Platform::Linux,
+            Platform::Windows,
+            Platform::Macos,
+            Platform::MacosM1,
+        ]
     }
 
     fn all() -> Vec<Self> {
@@ -45,6 +52,7 @@ impl Platform {
             Platform::Windows,
             Platform::Macos,
             Platform::Emscripten,
+            Platform::MacosM1,
         ]
     }
 }
@@ -57,6 +65,7 @@ impl fmt::Display for Platform {
             Platform::Windows => write!(f, "windows"),
             Platform::Macos => write!(f, "macos"),
             Platform::Emscripten => write!(f, "emscripten"),
+            Platform::MacosM1 => write!(f, "macos"),
         }
     }
 }
@@ -79,7 +88,7 @@ pub struct GenerateCI {
         long,
         action = ArgAction::Append,
         num_args = 1..,
-        default_values_t = vec![Platform::Linux, Platform::Windows, Platform::Macos],
+        default_values_t = vec![Platform::Linux, Platform::Windows, Platform::Macos, Platform::MacosM1],
     )]
     pub platforms: Vec<Platform>,
     /// Enable pytest
@@ -96,7 +105,12 @@ impl Default for GenerateCI {
             ci: Provider::GitHub,
             manifest_path: None,
             output: PathBuf::from("-"),
-            platforms: vec![Platform::Linux, Platform::Windows, Platform::Macos],
+            platforms: vec![
+                Platform::Linux,
+                Platform::Windows,
+                Platform::Macos,
+                Platform::MacosM1,
+            ],
             pytest: false,
             zig: false,
         }
@@ -210,21 +224,30 @@ jobs:\n",
             if bridge_model.is_bin() && matches!(platform, Platform::Emscripten) {
                 continue;
             }
-            let plat_name = platform.to_string();
+            let plat_name = match platform {
+                Platform::MacosM1 => "macos_m1".to_string(),
+                _ => platform.to_string(),
+            };
+            let tag_name = match platform {
+                Platform::MacosM1 => "14".to_string(),
+                _ => "latest".to_string(),
+            };
             let os_name = match platform {
                 Platform::Linux | Platform::Emscripten => "ubuntu",
+                Platform::Macos | Platform::MacosM1 => "macos",
                 _ => &plat_name,
             };
-            needs.push(platform.to_string());
+            needs.push(plat_name.clone());
             conf.push_str(&format!(
                 "  {plat_name}:
-    runs-on: {os_name}-latest\n"
+    runs-on: {os_name}-{tag_name}\n"
             ));
             // target matrix
             let targets = match platform {
                 Platform::Linux => vec!["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"],
                 Platform::Windows => vec!["x64", "x86"],
-                Platform::Macos => vec!["x86_64", "aarch64"],
+                Platform::Macos => vec!["x86_64"],
+                Platform::MacosM1 => vec!["aarch64"],
                 _ => Vec::new(),
             };
             if !targets.is_empty() {

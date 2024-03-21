@@ -32,18 +32,11 @@ pub enum Platform {
     Macos,
     /// Emscripten
     Emscripten,
-    /// macOS(Arm64)
-    MacosArm64,
 }
 
 impl Platform {
     fn defaults() -> Vec<Self> {
-        vec![
-            Platform::Linux,
-            Platform::Windows,
-            Platform::Macos,
-            Platform::MacosArm64,
-        ]
+        vec![Platform::Linux, Platform::Windows, Platform::Macos]
     }
 
     fn all() -> Vec<Self> {
@@ -52,7 +45,6 @@ impl Platform {
             Platform::Windows,
             Platform::Macos,
             Platform::Emscripten,
-            Platform::MacosArm64,
         ]
     }
 }
@@ -65,9 +57,13 @@ impl fmt::Display for Platform {
             Platform::Windows => write!(f, "windows"),
             Platform::Macos => write!(f, "macos"),
             Platform::Emscripten => write!(f, "emscripten"),
-            Platform::MacosArm64 => write!(f, "macosarm64"),
         }
     }
+}
+
+struct MatrixPlatform {
+    runner: String,
+    target: String,
 }
 
 /// Generate CI configuration
@@ -88,7 +84,7 @@ pub struct GenerateCI {
         long,
         action = ArgAction::Append,
         num_args = 1..,
-        default_values_t = vec![Platform::Linux, Platform::Windows, Platform::Macos, Platform::MacosArm64],
+        default_values_t = vec![Platform::Linux, Platform::Windows, Platform::Macos],
     )]
     pub platforms: Vec<Platform>,
     /// Enable pytest
@@ -105,12 +101,7 @@ impl Default for GenerateCI {
             ci: Provider::GitHub,
             manifest_path: None,
             output: PathBuf::from("-"),
-            platforms: vec![
-                Platform::Linux,
-                Platform::Windows,
-                Platform::Macos,
-                Platform::MacosArm64,
-            ],
+            platforms: vec![Platform::Linux, Platform::Windows, Platform::Macos],
             pytest: false,
             zig: false,
         }
@@ -224,38 +215,57 @@ jobs:\n",
             if bridge_model.is_bin() && matches!(platform, Platform::Emscripten) {
                 continue;
             }
-            let plat_name = match platform {
-                Platform::MacosArm64 => "macos_arm64".to_string(),
-                _ => platform.to_string(),
-            };
-            let tag_name = match platform {
-                Platform::MacosArm64 => "14".to_string(),
-                _ => "latest".to_string(),
-            };
-            let os_name = match platform {
-                Platform::Linux | Platform::Emscripten => "ubuntu",
-                Platform::Macos | Platform::MacosArm64 => "macos",
-                _ => &plat_name,
-            };
+            let plat_name = platform.to_string();
             needs.push(plat_name.clone());
             conf.push_str(&format!(
                 "  {plat_name}:
-    runs-on: {os_name}-{tag_name}\n"
+    runs-on: ${{{{ matrix.platform.runner }}}}\n"
             ));
             // target matrix
-            let targets = match platform {
-                Platform::Linux => vec!["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"],
-                Platform::Windows => vec!["x64", "x86"],
-                Platform::Macos => vec!["x86_64"],
-                Platform::MacosArm64 => vec!["aarch64"],
+            let targets: Vec<_> = match platform {
+                Platform::Linux => ["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"]
+                    .into_iter()
+                    .map(|target| MatrixPlatform {
+                        runner: "ubuntu-latest".to_string(),
+                        target: target.to_string(),
+                    })
+                    .collect(),
+                Platform::Windows => ["x64", "x86"]
+                    .into_iter()
+                    .map(|target| MatrixPlatform {
+                        runner: "windows-latest".to_string(),
+                        target: target.to_string(),
+                    })
+                    .collect(),
+                Platform::Macos => {
+                    vec![
+                        MatrixPlatform {
+                            runner: "macos-latest".to_string(),
+                            target: "x86_64".to_string(),
+                        },
+                        MatrixPlatform {
+                            runner: "macos-14".to_string(),
+                            target: "aarch64".to_string(),
+                        },
+                    ]
+                }
+                Platform::Emscripten => vec![MatrixPlatform {
+                    runner: "ubuntu-latest".to_string(),
+                    target: "wasm32-unknown-emscripten".to_string(),
+                }],
                 _ => Vec::new(),
             };
             if !targets.is_empty() {
                 conf.push_str(&format!(
                     "    strategy:
       matrix:
-        target: [{targets}]\n",
-                    targets = targets.join(", ")
+        platform:\n",
+                ));
+            }
+            for target in targets {
+                conf.push_str(&format!(
+                    "         - runner: {}\n           target: {}\n",
+                    target.runner, target.target
                 ));
             }
             // job steps
@@ -299,7 +309,7 @@ jobs:\n",
           python-version: '3.10'\n",
                     );
                     if matches!(platform, Platform::Windows) {
-                        conf.push_str("          architecture: ${{ matrix.target }}\n");
+                        conf.push_str("          architecture: ${{ matrix.platform.target }}\n");
                     }
                 }
             }
@@ -326,16 +336,11 @@ jobs:\n",
             } else {
                 format!(" {}", maturin_args.join(" "))
             };
-            let maturin_target = if matches!(platform, Platform::Emscripten) {
-                "wasm32-unknown-emscripten"
-            } else {
-                "${{ matrix.target }}"
-            };
             conf.push_str(&format!(
                 "      - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: {maturin_target}
+          target: ${{{{ matrix.platform.target }}}}
           args: --release --out dist{maturin_args}
           sccache: 'true'
 "
@@ -349,7 +354,7 @@ jobs:\n",
             let artifact_name = if matches!(platform, Platform::Emscripten) {
                 String::from("wasm-wheels")
             } else {
-                format!("wheels-{platform}-${{{{ matrix.target }}}}")
+                format!("wheels-{platform}-${{{{ matrix.platform.target }}}}")
             };
             conf.push_str(&format!(
                 "      - name: Upload wheels
@@ -372,7 +377,7 @@ jobs:\n",
                     // Test on host for x86_64
                     conf.push_str(&format!(
                         "      - name: pytest
-        if: ${{{{ startsWith(matrix.target, 'x86_64') }}}}
+        if: ${{{{ startsWith(matrix.platform.target, 'x86_64') }}}}
         shell: bash
         run: |
           set -e
@@ -384,10 +389,10 @@ jobs:\n",
                     // Test on QEMU for other architectures
                     conf.push_str(&format!(
                         "      - name: pytest
-        if: ${{{{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' }}}}
+        if: ${{{{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}}}
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
-          arch: ${{{{ matrix.target }}}}
+          arch: ${{{{ matrix.platform.target }}}}
           distro: ubuntu22.04
           githubToken: ${{{{ github.token }}}}
           install: |
@@ -421,7 +426,7 @@ jobs:\n",
                 } else {
                     conf.push_str(&format!(
                         "      - name: pytest
-        if: ${{{{ !startsWith(matrix.target, 'aarch64') }}}}
+        if: ${{{{ !startsWith(matrix.platform.target, 'aarch64') }}}}
         shell: bash
         run: |
           set -e
@@ -564,10 +569,22 @@ mod tests {
 
             jobs:
               linux:
-                runs-on: ubuntu-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
+                    platform:
+                     - runner: ubuntu-latest
+                       target: x86_64
+                     - runner: ubuntu-latest
+                       target: x86
+                     - runner: ubuntu-latest
+                       target: aarch64
+                     - runner: ubuntu-latest
+                       target: armv7
+                     - runner: ubuntu-latest
+                       target: s390x
+                     - runner: ubuntu-latest
+                       target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -576,44 +593,52 @@ mod tests {
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-linux-${{ matrix.target }}
+                      name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
 
               windows:
-                runs-on: windows-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x64, x86]
+                    platform:
+                     - runner: windows-latest
+                       target: x64
+                     - runner: windows-latest
+                       target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
-                      architecture: ${{ matrix.target }}
+                      architecture: ${{ matrix.platform.target }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-windows-${{ matrix.target }}
+                      name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
 
               macos:
-                runs-on: macos-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64]
+                    platform:
+                     - runner: macos-latest
+                       target: x86_64
+                     - runner: macos-14
+                       target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -622,35 +647,13 @@ mod tests {
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-macos-${{ matrix.target }}
-                      path: dist
-
-              macos_arm64:
-                runs-on: macos-14
-                strategy:
-                  matrix:
-                    target: [aarch64]
-                steps:
-                  - uses: actions/checkout@v4
-                  - uses: actions/setup-python@v5
-                    with:
-                      python-version: '3.10'
-                  - name: Build wheels
-                    uses: PyO3/maturin-action@v1
-                    with:
-                      target: ${{ matrix.target }}
-                      args: --release --out dist --find-interpreter
-                      sccache: 'true'
-                  - name: Upload wheels
-                    uses: actions/upload-artifact@v4
-                    with:
-                      name: wheels-macosarm64-${{ matrix.target }}
+                      name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
 
               sdist:
@@ -672,7 +675,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, macos_arm64, sdist]
+                needs: [linux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
@@ -712,10 +715,22 @@ mod tests {
 
             jobs:
               linux:
-                runs-on: ubuntu-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
+                    platform:
+                     - runner: ubuntu-latest
+                       target: x86_64
+                     - runner: ubuntu-latest
+                       target: x86
+                     - runner: ubuntu-latest
+                       target: aarch64
+                     - runner: ubuntu-latest
+                       target: armv7
+                     - runner: ubuntu-latest
+                       target: s390x
+                     - runner: ubuntu-latest
+                       target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -724,44 +739,52 @@ mod tests {
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-linux-${{ matrix.target }}
+                      name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
 
               windows:
-                runs-on: windows-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x64, x86]
+                    platform:
+                     - runner: windows-latest
+                       target: x64
+                     - runner: windows-latest
+                       target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
-                      architecture: ${{ matrix.target }}
+                      architecture: ${{ matrix.platform.target }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-windows-${{ matrix.target }}
+                      name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
 
               macos:
-                runs-on: macos-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64]
+                    platform:
+                     - runner: macos-latest
+                       target: x86_64
+                     - runner: macos-14
+                       target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -770,42 +793,20 @@ mod tests {
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-macos-${{ matrix.target }}
-                      path: dist
-
-              macos_arm64:
-                runs-on: macos-14
-                strategy:
-                  matrix:
-                    target: [aarch64]
-                steps:
-                  - uses: actions/checkout@v4
-                  - uses: actions/setup-python@v5
-                    with:
-                      python-version: '3.10'
-                  - name: Build wheels
-                    uses: PyO3/maturin-action@v1
-                    with:
-                      target: ${{ matrix.target }}
-                      args: --release --out dist
-                      sccache: 'true'
-                  - name: Upload wheels
-                    uses: actions/upload-artifact@v4
-                    with:
-                      name: wheels-macosarm64-${{ matrix.target }}
+                      name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
 
               release:
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, macos_arm64]
+                needs: [linux, windows, macos]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
@@ -854,10 +855,22 @@ mod tests {
 
             jobs:
               linux:
-                runs-on: ubuntu-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
+                    platform:
+                     - runner: ubuntu-latest
+                       target: x86_64
+                     - runner: ubuntu-latest
+                       target: x86
+                     - runner: ubuntu-latest
+                       target: aarch64
+                     - runner: ubuntu-latest
+                       target: armv7
+                     - runner: ubuntu-latest
+                       target: s390x
+                     - runner: ubuntu-latest
+                       target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -866,17 +879,17 @@ mod tests {
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter --zig
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-linux-${{ matrix.target }}
+                      name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
                   - name: pytest
-                    if: ${{ startsWith(matrix.target, 'x86_64') }}
+                    if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
                     shell: bash
                     run: |
                       set -e
@@ -884,10 +897,10 @@ mod tests {
                       pip install pytest
                       pytest
                   - name: pytest
-                    if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' }}
+                    if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
                     uses: uraimo/run-on-arch-action@v2.5.0
                     with:
-                      arch: ${{ matrix.target }}
+                      arch: ${{ matrix.platform.target }}
                       distro: ubuntu22.04
                       githubToken: ${{ github.token }}
                       install: |
@@ -900,29 +913,33 @@ mod tests {
                         pytest
 
               windows:
-                runs-on: windows-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x64, x86]
+                    platform:
+                     - runner: windows-latest
+                       target: x64
+                     - runner: windows-latest
+                       target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
                       python-version: '3.10'
-                      architecture: ${{ matrix.target }}
+                      architecture: ${{ matrix.platform.target }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-windows-${{ matrix.target }}
+                      name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
                   - name: pytest
-                    if: ${{ !startsWith(matrix.target, 'aarch64') }}
+                    if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
                     shell: bash
                     run: |
                       set -e
@@ -931,10 +948,14 @@ mod tests {
                       pytest
 
               macos:
-                runs-on: macos-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64]
+                    platform:
+                     - runner: macos-latest
+                       target: x86_64
+                     - runner: macos-14
+                       target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -943,46 +964,16 @@ mod tests {
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-macos-${{ matrix.target }}
+                      name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
                   - name: pytest
-                    if: ${{ !startsWith(matrix.target, 'aarch64') }}
-                    shell: bash
-                    run: |
-                      set -e
-                      pip install example --find-links dist --force-reinstall
-                      pip install pytest
-                      pytest
-
-              macos_arm64:
-                runs-on: macos-14
-                strategy:
-                  matrix:
-                    target: [aarch64]
-                steps:
-                  - uses: actions/checkout@v4
-                  - uses: actions/setup-python@v5
-                    with:
-                      python-version: '3.10'
-                  - name: Build wheels
-                    uses: PyO3/maturin-action@v1
-                    with:
-                      target: ${{ matrix.target }}
-                      args: --release --out dist --find-interpreter
-                      sccache: 'true'
-                  - name: Upload wheels
-                    uses: actions/upload-artifact@v4
-                    with:
-                      name: wheels-macosarm64-${{ matrix.target }}
-                      path: dist
-                  - name: pytest
-                    if: ${{ !startsWith(matrix.target, 'aarch64') }}
+                    if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
                     shell: bash
                     run: |
                       set -e
@@ -1009,7 +1000,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, macos_arm64, sdist]
+                needs: [linux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
@@ -1049,80 +1040,81 @@ mod tests {
 
             jobs:
               linux:
-                runs-on: ubuntu-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
+                    platform:
+                     - runner: ubuntu-latest
+                       target: x86_64
+                     - runner: ubuntu-latest
+                       target: x86
+                     - runner: ubuntu-latest
+                       target: aarch64
+                     - runner: ubuntu-latest
+                       target: armv7
+                     - runner: ubuntu-latest
+                       target: s390x
+                     - runner: ubuntu-latest
+                       target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: 'true'
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-linux-${{ matrix.target }}
+                      name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
 
               windows:
-                runs-on: windows-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x64, x86]
+                    platform:
+                     - runner: windows-latest
+                       target: x64
+                     - runner: windows-latest
+                       target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-windows-${{ matrix.target }}
+                      name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
 
               macos:
-                runs-on: macos-latest
+                runs-on: ${{ matrix.platform.runner }}
                 strategy:
                   matrix:
-                    target: [x86_64]
+                    platform:
+                     - runner: macos-latest
+                       target: x86_64
+                     - runner: macos-14
+                       target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
-                      target: ${{ matrix.target }}
+                      target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: 'true'
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
-                      name: wheels-macos-${{ matrix.target }}
-                      path: dist
-
-              macos_arm64:
-                runs-on: macos-14
-                strategy:
-                  matrix:
-                    target: [aarch64]
-                steps:
-                  - uses: actions/checkout@v4
-                  - name: Build wheels
-                    uses: PyO3/maturin-action@v1
-                    with:
-                      target: ${{ matrix.target }}
-                      args: --release --out dist
-                      sccache: 'true'
-                  - name: Upload wheels
-                    uses: actions/upload-artifact@v4
-                    with:
-                      name: wheels-macosarm64-${{ matrix.target }}
+                      name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
 
               sdist:
@@ -1144,7 +1136,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, macos_arm64, sdist]
+                needs: [linux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI

@@ -449,7 +449,6 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     add_option("home_page", &metadata.home_page);
     add_option("download_url", &metadata.download_url);
     add_option("requires_python", &metadata.requires_python);
-    add_option("summary", &metadata.summary);
 
     if metadata.requires_python.is_none() {
         // GitLab PyPI repository API implementation requires this metadata field

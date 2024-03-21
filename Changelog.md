@@ -2,7 +2,10 @@
 
 ## [Unreleased]
 
+## [1.5.1] - 2024-03-21
+
 * Fix usage of `--compatibility` when run as a PEP517 backend in [#1992](https://github.com/PyO3/maturin/pull/1992)
+* Fix upload returning malformed summary error in [#2002](https://github.com/PyO3/maturin/pull/2002)
 
 ## [1.5.0] - 2024-03-05
 
@@ -950,7 +953,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/pyo3/maturin/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/pyo3/maturin/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/pyo3/maturin/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/pyo3/maturin/compare/v1.3.1...v1.3.2

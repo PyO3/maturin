@@ -256,15 +256,15 @@ jobs:\n",
                 _ => Vec::new(),
             };
             if !targets.is_empty() {
-                conf.push_str(&format!(
+                conf.push_str(
                     "    strategy:
       matrix:
         platform:\n",
-                ));
+                );
             }
             for target in targets {
                 conf.push_str(&format!(
-                    "         - runner: {}\n           target: {}\n",
+                    "          - runner: {}\n            target: {}\n",
                     target.runner, target.target
                 ));
             }
@@ -573,18 +573,18 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: ubuntu-latest
-                       target: x86_64
-                     - runner: ubuntu-latest
-                       target: x86
-                     - runner: ubuntu-latest
-                       target: aarch64
-                     - runner: ubuntu-latest
-                       target: armv7
-                     - runner: ubuntu-latest
-                       target: s390x
-                     - runner: ubuntu-latest
-                       target: ppc64le
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                      - runner: ubuntu-latest
+                        target: s390x
+                      - runner: ubuntu-latest
+                        target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -608,10 +608,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: windows-latest
-                       target: x64
-                     - runner: windows-latest
-                       target: x86
+                      - runner: windows-latest
+                        target: x64
+                      - runner: windows-latest
+                        target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -635,10 +635,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: macos-latest
-                       target: x86_64
-                     - runner: macos-14
-                       target: aarch64
+                      - runner: macos-latest
+                        target: x86_64
+                      - runner: macos-14
+                        target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -719,18 +719,18 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: ubuntu-latest
-                       target: x86_64
-                     - runner: ubuntu-latest
-                       target: x86
-                     - runner: ubuntu-latest
-                       target: aarch64
-                     - runner: ubuntu-latest
-                       target: armv7
-                     - runner: ubuntu-latest
-                       target: s390x
-                     - runner: ubuntu-latest
-                       target: ppc64le
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                      - runner: ubuntu-latest
+                        target: s390x
+                      - runner: ubuntu-latest
+                        target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -754,10 +754,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: windows-latest
-                       target: x64
-                     - runner: windows-latest
-                       target: x86
+                      - runner: windows-latest
+                        target: x64
+                      - runner: windows-latest
+                        target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -781,10 +781,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: macos-latest
-                       target: x86_64
-                     - runner: macos-14
-                       target: aarch64
+                      - runner: macos-latest
+                        target: x86_64
+                      - runner: macos-14
+                        target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -859,18 +859,18 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: ubuntu-latest
-                       target: x86_64
-                     - runner: ubuntu-latest
-                       target: x86
-                     - runner: ubuntu-latest
-                       target: aarch64
-                     - runner: ubuntu-latest
-                       target: armv7
-                     - runner: ubuntu-latest
-                       target: s390x
-                     - runner: ubuntu-latest
-                       target: ppc64le
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                      - runner: ubuntu-latest
+                        target: s390x
+                      - runner: ubuntu-latest
+                        target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -917,10 +917,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: windows-latest
-                       target: x64
-                     - runner: windows-latest
-                       target: x86
+                      - runner: windows-latest
+                        target: x64
+                      - runner: windows-latest
+                        target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -952,10 +952,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: macos-latest
-                       target: x86_64
-                     - runner: macos-14
-                       target: aarch64
+                      - runner: macos-latest
+                        target: x86_64
+                      - runner: macos-14
+                        target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
@@ -1044,18 +1044,18 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: ubuntu-latest
-                       target: x86_64
-                     - runner: ubuntu-latest
-                       target: x86
-                     - runner: ubuntu-latest
-                       target: aarch64
-                     - runner: ubuntu-latest
-                       target: armv7
-                     - runner: ubuntu-latest
-                       target: s390x
-                     - runner: ubuntu-latest
-                       target: ppc64le
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                      - runner: ubuntu-latest
+                        target: s390x
+                      - runner: ubuntu-latest
+                        target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
                   - name: Build wheels
@@ -1076,10 +1076,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: windows-latest
-                       target: x64
-                     - runner: windows-latest
-                       target: x86
+                      - runner: windows-latest
+                        target: x64
+                      - runner: windows-latest
+                        target: x86
                 steps:
                   - uses: actions/checkout@v4
                   - name: Build wheels
@@ -1099,10 +1099,10 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                     - runner: macos-latest
-                       target: x86_64
-                     - runner: macos-14
-                       target: aarch64
+                      - runner: macos-latest
+                        target: x86_64
+                      - runner: macos-14
+                        target: aarch64
                 steps:
                   - uses: actions/checkout@v4
                   - name: Build wheels

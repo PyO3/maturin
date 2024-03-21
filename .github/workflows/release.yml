@@ -231,9 +231,10 @@ jobs:
         with:
           python-version: "3.10"
       - name: Publish
-        run: |
-          pip install maturin
-          maturin upload --skip-existing *
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ./
+          skip-existing: true
       - name: Set environment url
         id: set_url
         run: |

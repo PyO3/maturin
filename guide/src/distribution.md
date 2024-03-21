@@ -281,6 +281,7 @@ Options:
           - linux:      Linux
           - windows:    Windows
           - macos:      macOS
+          - macosarm64: macOS(Arm64)
           - emscripten: Emscripten
 
       --pytest

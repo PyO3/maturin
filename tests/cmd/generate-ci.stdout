@@ -21,7 +21,7 @@ Options:
       --platform <platform>...
           Platform support
           
-          [default: linux windows macos]
+          [default: linux windows macos macosarm64]
 
           Possible values:
           - all:        All
@@ -29,6 +29,7 @@ Options:
           - windows:    Windows
           - macos:      macOS
           - emscripten: Emscripten
+          - macosarm64: macOS(Arm64)
 
       --pytest
           Enable pytest

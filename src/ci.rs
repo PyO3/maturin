@@ -383,8 +383,8 @@ jobs:\n",
         shell: bash
         run: |
           set -e
-          python3 -m venv venv
-          source ./venv/bin/activate
+          python3 -m venv .venv
+          source .venv/bin/activate
           pip install {project_name} --find-links dist --force-reinstall
           pip install pytest
           {chdir}pytest
@@ -417,8 +417,8 @@ jobs:\n",
         shell: bash
         run: |
           set -e
-          python3 -m venv venv
-          source ./venv/bin/activate
+          python3 -m venv .venv
+          source .venv/Scripts/activate
           pip install {project_name} --find-links dist --force-reinstall
           pip install pytest
           {chdir}pytest
@@ -430,8 +430,8 @@ jobs:\n",
                             "      - name: pytest
         run: |
           set -e
-          python3 -m venv venv
-          source ./venv/bin/activate
+          python3 -m venv .venv
+          source .venv/bin/activate
           pip install {project_name} --find-links dist --force-reinstall
           pip install pytest
           {chdir}pytest
@@ -915,8 +915,8 @@ mod tests {
                     shell: bash
                     run: |
                       set -e
-                      python3 -m venv venv
-                      source ./venv/bin/activate
+                      python3 -m venv .venv
+                      source .venv/bin/activate
                       pip install example --find-links dist --force-reinstall
                       pip install pytest
                       pytest
@@ -967,8 +967,8 @@ mod tests {
                     shell: bash
                     run: |
                       set -e
-                      python3 -m venv venv
-                      source ./venv/bin/activate
+                      python3 -m venv .venv
+                      source .venv/Scripts/activate
                       pip install example --find-links dist --force-reinstall
                       pip install pytest
                       pytest
@@ -1001,8 +1001,8 @@ mod tests {
                   - name: pytest
                     run: |
                       set -e
-                      python3 -m venv venv
-                      source ./venv/bin/activate
+                      python3 -m venv .venv
+                      source .venv/bin/activate
                       pip install example --find-links dist --force-reinstall
                       pip install pytest
                       pytest

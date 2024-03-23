@@ -6,14 +6,14 @@ use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::{BuildContext, PythonInterpreter, Target};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{bail, format_err, Context, Ok, Result};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::ops::{Deref, DerefMut};
+use std::ops::{ControlFlow, Deref, DerefMut};
 use std::path::PathBuf;
 use tracing::debug;
 
@@ -174,6 +174,9 @@ pub struct BuildOptions {
     /// Find interpreters from the host machine
     #[arg(short = 'f', long, conflicts_with = "interpreter")]
     pub find_interpreter: bool,
+
+    #[arg(long)]
+    pub allow_prereleases: bool,
 
     /// Which kind of bindings to use.
     #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"])]
@@ -560,6 +563,16 @@ impl BuildOptions {
         let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
         let interpreter = if self.find_interpreter {
             // Auto-detect interpreters
+            let requires_python = metadata23.requires_python.as_ref();
+            if requires_python.is_some() {
+                let versions = requires_python.unwrap();
+                let has_pre_release = versions.iter().any(|v| v.any_prerelease());
+                if has_pre_release && !self.allow_prereleases {
+                    print!("⚠️  Warning: python version is pre release, need pass flag --allow-prereleases");
+                    ControlFlow::Break(());
+                }
+            }
+
             self.find_interpreters(
                 &bridge,
                 &[],

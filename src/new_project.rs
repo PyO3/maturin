@@ -1,4 +1,4 @@
-use self::package_name_validations::cargo_check_name;
+use self::package_name_validations::{cargo_check_name, pypi_check_name};
 use crate::ci::GenerateCI;
 use crate::BridgeModel;
 use anyhow::{bail, Context, Result};
@@ -148,9 +148,20 @@ impl<'a> ProjectGenerator<'a> {
 }
 
 fn validate_name(name: &str) -> anyhow::Result<String> {
-    cargo_check_name(name)?;
+    let cargo_result = cargo_check_name(name);
+    let pypi_result = pypi_check_name(name);
 
-    Ok(name.to_string())
+    match (cargo_result, pypi_result) {
+        (Err(cargo_error), _) => {
+            let error_message = format!("Invalid Cargo package name: {}", cargo_error);
+            Err(anyhow::Error::msg(error_message))
+        }
+        (_, Err(pypi_error)) => {
+            let error_message = format!("Invalid PyPi package name: {}", pypi_error);
+            Err(anyhow::Error::msg(error_message))
+        }
+        (Ok(_), Ok(_)) => Ok(name.to_string()),
+    }
 }
 /// Options common to `maturin new` and `maturin init`.
 #[derive(Debug, clap::Parser)]
@@ -258,6 +269,17 @@ fn generate_project(
 }
 
 mod package_name_validations {
+    // based on: https://github.com/pypi/warehouse/blob/8f79d90a310f0243ab15f52c41de093708a61dfd/warehouse/packaging/models.py#L211C9-L214C10
+    pub fn pypi_check_name(name: &str) -> anyhow::Result<()> {
+        // The `(?i)` flag was added to make the regex case-insensitive
+        let pattern = regex::Regex::new(r"^((?i)[A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$").unwrap();
+
+        if !pattern.is_match(name) {
+            anyhow::bail!("The name `{}` is not a valid package name", name)
+        }
+        Ok(())
+    }
+
     // Based on: https://github.com/rust-lang/cargo/blob/e975158c1b542aa3833fd8584746538c17a6ae55/src/cargo/ops/cargo_new.rs#L169
     pub fn cargo_check_name(name: &str) -> anyhow::Result<()> {
         // Instead of `PackageName::new` which performs these checks in the original cargo code

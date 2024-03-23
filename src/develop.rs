@@ -333,6 +333,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         platform_tag: vec![PlatformTag::Linux],
         interpreter: vec![python.clone()],
         find_interpreter: false,
+        allow_prereleases: true,
         bindings,
         out: Some(wheel_dir.path().to_path_buf()),
         skip_auditwheel: false,

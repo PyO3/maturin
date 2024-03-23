@@ -6,10 +6,10 @@ use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::{BuildContext, PythonInterpreter, Target};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{bail, format_err, Context, Ok, Result};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
-use pep440_rs::VersionSpecifiers;
+use pep440_rs::{Version, VersionSpecifiers};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -174,6 +174,9 @@ pub struct BuildOptions {
     /// Find interpreters from the host machine
     #[arg(short = 'f', long, conflicts_with = "interpreter")]
     pub find_interpreter: bool,
+
+    #[arg(long)]
+    pub allow_prereleases: bool,
 
     /// Which kind of bindings to use.
     #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"])]
@@ -586,6 +589,16 @@ impl BuildOptions {
             };
             self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?
         };
+
+        if !self.allow_prereleases {
+            interpreter.retain(|interp| {
+                let version = Version::new([interp.config.major as u64, interp.config.minor as u64]);
+                if version.any_prerelease() {
+                    eprintln!("⚠️  Warning: python version is pre release, need pass flag --allow-prereleases");
+                }
+                !version.any_prerelease()
+            });
+        }
 
         if cargo_options.args.is_empty() {
             // if not supplied on command line, try pyproject.toml

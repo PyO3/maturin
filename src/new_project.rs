@@ -148,20 +148,9 @@ impl<'a> ProjectGenerator<'a> {
 }
 
 fn validate_name(name: &str) -> anyhow::Result<String> {
-    let cargo_result = cargo_check_name(name);
-    let pypi_result = pypi_check_name(name);
-
-    match (cargo_result, pypi_result) {
-        (Err(cargo_error), _) => {
-            let error_message = format!("Invalid Cargo package name: {}", cargo_error);
-            Err(anyhow::Error::msg(error_message))
-        }
-        (_, Err(pypi_error)) => {
-            let error_message = format!("Invalid PyPi package name: {}", pypi_error);
-            Err(anyhow::Error::msg(error_message))
-        }
-        (Ok(_), Ok(_)) => Ok(name.to_string()),
-    }
+    cargo_check_name(name).context("Invalid Cargo package name")?;
+    pypi_check_name(name).context("Invalid PyPI package name")?;
+    Ok(name.to_string())
 }
 /// Options common to `maturin new` and `maturin init`.
 #[derive(Debug, clap::Parser)]

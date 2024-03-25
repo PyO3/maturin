@@ -21,6 +21,7 @@ pub struct Tool {
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// The target format for the include or exclude [GlobPattern].
 ///
 /// See [Formats].
@@ -33,6 +34,7 @@ pub enum Format {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// A single [Format] or multiple [Format] values for a [GlobPattern].
 pub enum Formats {
     /// A single [Format] value
@@ -54,6 +56,7 @@ impl Formats {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// A glob pattern for the include and exclude configuration.
 ///
 /// See [PyProjectToml::include] and [PyProject::exclude].
@@ -89,6 +92,7 @@ impl GlobPattern {
 /// Cargo compile target
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct CargoTarget {
     /// Name as given in the `Cargo.toml` or generated from the file name
     pub name: String,
@@ -102,6 +106,7 @@ pub struct CargoTarget {
 /// Target configuration
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct TargetConfig {
     /// macOS deployment target version
     #[serde(alias = "macosx-deployment-target")]
@@ -111,6 +116,7 @@ pub struct TargetConfig {
 /// Source distribution generator
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
 #[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SdistGenerator {
     /// Use `cargo package --list`
     #[default]
@@ -122,6 +128,7 @@ pub enum SdistGenerator {
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ToolMaturin {
     // maturin specific options
     /// Module name, accepts setuptools style import name like `foo.bar`

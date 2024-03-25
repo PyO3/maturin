@@ -16,6 +16,8 @@ use maturin::{
     develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
     PlatformTag, PythonInterpreter, Target,
 };
+#[cfg(feature = "schemars")]
+use maturin::{generate_json_schema, GenerateJsonSchemaOptions};
 #[cfg(feature = "upload")]
 use maturin::{upload_ui, PublishOpt};
 use std::env;
@@ -141,6 +143,10 @@ enum Opt {
     #[cfg(feature = "zig")]
     #[command(subcommand, hide = true)]
     Zig(Zig),
+    /// Generate the JSON schema for the `pyproject.toml` file.
+    #[cfg(feature = "schemars")]
+    #[command(name = "generate-json-schema", hide = true)]
+    GenerateJsonSchema(GenerateJsonSchemaOptions),
 }
 
 /// Backend for the PEP 517 integration. Not for human consumption
@@ -425,6 +431,8 @@ fn run() -> Result<()> {
                 .execute()
                 .context("Failed to run zig linker wrapper")?;
         }
+        #[cfg(feature = "schemars")]
+        Opt::GenerateJsonSchema(args) => generate_json_schema(args)?,
     }
 
     Ok(())

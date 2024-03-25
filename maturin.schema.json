@@ -1,0 +1,394 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToolMaturin",
+  "description": "The `[tool.maturin]` section of a pyproject.toml",
+  "type": "object",
+  "properties": {
+    "all-features": {
+      "description": "Activate all available features",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "bindings": {
+      "description": "Bindings type",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "compatibility": {
+      "description": "Platform compatibility",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PlatformTag"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "config": {
+      "description": "Override a configuration value (unstable)",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "data": {
+      "description": "Path to the wheel directory, defaults to `<module_name>.data`",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "exclude": {
+      "description": "Exclude files matching the given glob pattern(s)",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/GlobPattern"
+      }
+    },
+    "features": {
+      "description": "Space or comma separated list of features to activate",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "frozen": {
+      "description": "Require Cargo.lock and cache are up to date",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "include": {
+      "description": "Include files matching the given glob pattern(s)",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/GlobPattern"
+      }
+    },
+    "locked": {
+      "description": "Require Cargo.lock is up to date",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "manifest-path": {
+      "description": "Path to Cargo.toml",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "module-name": {
+      "description": "Module name, accepts setuptools style import name like `foo.bar`",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "no-default-features": {
+      "description": "Do not activate the `default` feature",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "profile": {
+      "description": "Build artifacts with the specified Cargo profile",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "python-packages": {
+      "description": "Python packages to include",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "python-source": {
+      "description": "The directory with python module, contains `<module_name>/__init__.py`",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rustc-args": {
+      "description": "Additional rustc arguments",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "sdist-generator": {
+      "description": "Source distribution generator",
+      "default": "cargo",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SdistGenerator"
+        }
+      ]
+    },
+    "skip-auditwheel": {
+      "description": "Skip audit wheel",
+      "default": false,
+      "type": "boolean"
+    },
+    "strip": {
+      "description": "Strip the final binary",
+      "default": false,
+      "type": "boolean"
+    },
+    "target": {
+      "description": "Target configuration",
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/TargetConfig"
+      }
+    },
+    "targets": {
+      "description": "Cargo compile targets",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/CargoTarget"
+      }
+    },
+    "unstable-flags": {
+      "description": "Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "CargoTarget": {
+      "description": "Cargo compile target",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "kind": {
+          "description": "Kind of target (\"bin\", \"lib\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Name as given in the `Cargo.toml` or generated from the file name",
+          "type": "string"
+        }
+      }
+    },
+    "Format": {
+      "description": "The target format for the include or exclude [GlobPattern].\n\nSee [Formats].",
+      "oneOf": [
+        {
+          "description": "Source distribution",
+          "type": "string",
+          "enum": [
+            "sdist"
+          ]
+        },
+        {
+          "description": "Wheel",
+          "type": "string",
+          "enum": [
+            "wheel"
+          ]
+        }
+      ]
+    },
+    "Formats": {
+      "description": "A single [Format] or multiple [Format] values for a [GlobPattern].",
+      "anyOf": [
+        {
+          "description": "A single [Format] value",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Format"
+            }
+          ]
+        },
+        {
+          "description": "Multiple [Format] values",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Format"
+          }
+        }
+      ]
+    },
+    "GlobPattern": {
+      "description": "A glob pattern for the include and exclude configuration.\n\nSee [PyProjectToml::include] and [PyProject::exclude].\n\nBased on <https://python-poetry.org/docs/pyproject/#include-and-exclude>.",
+      "anyOf": [
+        {
+          "description": "A glob",
+          "type": "string"
+        },
+        {
+          "description": "A glob `path` with a `format` key to specify one or more [Format] values",
+          "type": "object",
+          "required": [
+            "format",
+            "path"
+          ],
+          "properties": {
+            "format": {
+              "description": "One or more [Format] values",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Formats"
+                }
+              ]
+            },
+            "path": {
+              "description": "A glob",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "PlatformTag": {
+      "description": "Decides how to handle manylinux and musllinux compliance",
+      "oneOf": [
+        {
+          "description": "Use the manylinux_x_y tag",
+          "type": "object",
+          "required": [
+            "Manylinux"
+          ],
+          "properties": {
+            "Manylinux": {
+              "type": "object",
+              "required": [
+                "x",
+                "y"
+              ],
+              "properties": {
+                "x": {
+                  "description": "GLIBC version major",
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0.0
+                },
+                "y": {
+                  "description": "GLIBC version minor",
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Use the musllinux_x_y tag",
+          "type": "object",
+          "required": [
+            "Musllinux"
+          ],
+          "properties": {
+            "Musllinux": {
+              "type": "object",
+              "required": [
+                "x",
+                "y"
+              ],
+              "properties": {
+                "x": {
+                  "description": "musl libc version major",
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0.0
+                },
+                "y": {
+                  "description": "musl libc version minor",
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Use the native linux tag",
+          "type": "string",
+          "enum": [
+            "Linux"
+          ]
+        }
+      ]
+    },
+    "SdistGenerator": {
+      "description": "Source distribution generator",
+      "oneOf": [
+        {
+          "description": "Use `cargo package --list`",
+          "type": "string",
+          "enum": [
+            "cargo"
+          ]
+        },
+        {
+          "description": "Use `git ls-files`",
+          "type": "string",
+          "enum": [
+            "git"
+          ]
+        }
+      ]
+    },
+    "TargetConfig": {
+      "description": "Target configuration",
+      "type": "object",
+      "properties": {
+        "macos-deployment-target": {
+          "description": "macOS deployment target version",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

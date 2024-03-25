@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 /// Decides how to handle manylinux and musllinux compliance
 #[derive(Serialize, Debug, Clone, Eq, PartialEq, Copy, Ord, PartialOrd)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PlatformTag {
     /// Use the manylinux_x_y tag
     Manylinux {

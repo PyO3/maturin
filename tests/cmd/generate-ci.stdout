@@ -21,11 +21,12 @@ Options:
       --platform <platform>...
           Platform support
           
-          [default: linux windows macos]
+          [default: linux musllinux windows macos]
 
           Possible values:
           - all:        All
-          - linux:      Linux
+          - manylinux:  Manylinux
+          - musllinux:  Musllinux
           - windows:    Windows
           - macos:      macOS
           - emscripten: Emscripten

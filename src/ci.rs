@@ -24,8 +24,11 @@ pub enum Provider {
 pub enum Platform {
     /// All
     All,
-    /// Linux
-    Linux,
+    /// Manylinux
+    #[clap(alias = "linux")]
+    ManyLinux,
+    /// Musllinux
+    Musllinux,
     /// Windows
     Windows,
     /// macOS
@@ -36,12 +39,18 @@ pub enum Platform {
 
 impl Platform {
     fn defaults() -> Vec<Self> {
-        vec![Platform::Linux, Platform::Windows, Platform::Macos]
+        vec![
+            Platform::ManyLinux,
+            Platform::Musllinux,
+            Platform::Windows,
+            Platform::Macos,
+        ]
     }
 
     fn all() -> Vec<Self> {
         vec![
-            Platform::Linux,
+            Platform::ManyLinux,
+            Platform::Musllinux,
             Platform::Windows,
             Platform::Macos,
             Platform::Emscripten,
@@ -53,7 +62,8 @@ impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Platform::All => write!(f, "all"),
-            Platform::Linux => write!(f, "linux"),
+            Platform::ManyLinux => write!(f, "linux"),
+            Platform::Musllinux => write!(f, "musllinux"),
             Platform::Windows => write!(f, "windows"),
             Platform::Macos => write!(f, "macos"),
             Platform::Emscripten => write!(f, "emscripten"),
@@ -62,8 +72,8 @@ impl fmt::Display for Platform {
 }
 
 struct MatrixPlatform {
-    runner: String,
-    target: String,
+    runner: &'static str,
+    target: &'static str,
 }
 
 /// Generate CI configuration
@@ -84,7 +94,12 @@ pub struct GenerateCI {
         long,
         action = ArgAction::Append,
         num_args = 1..,
-        default_values_t = vec![Platform::Linux, Platform::Windows, Platform::Macos],
+        default_values_t = vec![
+            Platform::ManyLinux,
+            Platform::Musllinux,
+            Platform::Windows,
+            Platform::Macos,
+        ],
     )]
     pub platforms: Vec<Platform>,
     /// Enable pytest
@@ -101,7 +116,12 @@ impl Default for GenerateCI {
             ci: Provider::GitHub,
             manifest_path: None,
             output: PathBuf::from("-"),
-            platforms: vec![Platform::Linux, Platform::Windows, Platform::Macos],
+            platforms: vec![
+                Platform::ManyLinux,
+                Platform::Musllinux,
+                Platform::Windows,
+                Platform::Macos,
+            ],
             pytest: false,
             zig: false,
         }
@@ -223,35 +243,42 @@ jobs:\n",
             ));
             // target matrix
             let targets: Vec<_> = match platform {
-                Platform::Linux => ["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"]
+                Platform::ManyLinux => ["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "ubuntu-latest".to_string(),
-                        target: target.to_string(),
+                        runner: "ubuntu-latest",
+                        target,
+                    })
+                    .collect(),
+                Platform::Musllinux => ["x86_64", "x86", "aarch64", "armv7"]
+                    .into_iter()
+                    .map(|target| MatrixPlatform {
+                        runner: "ubuntu-latest",
+                        target,
                     })
                     .collect(),
                 Platform::Windows => ["x64", "x86"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "windows-latest".to_string(),
-                        target: target.to_string(),
+                        runner: "windows-latest",
+                        target,
                     })
                     .collect(),
                 Platform::Macos => {
                     vec![
                         MatrixPlatform {
-                            runner: "macos-latest".to_string(),
-                            target: "x86_64".to_string(),
+                            runner: "macos-latest",
+                            target: "x86_64",
                         },
                         MatrixPlatform {
-                            runner: "macos-14".to_string(),
-                            target: "aarch64".to_string(),
+                            runner: "macos-14",
+                            target: "aarch64",
                         },
                     ]
                 }
                 Platform::Emscripten => vec![MatrixPlatform {
-                    runner: "ubuntu-latest".to_string(),
-                    target: "wasm32-unknown-emscripten".to_string(),
+                    runner: "ubuntu-latest",
+                    target: "wasm32-unknown-emscripten",
                 }],
                 _ => Vec::new(),
             };
@@ -265,7 +292,7 @@ jobs:\n",
             for target in targets {
                 conf.push_str(&format!(
                     "          - runner: {}\n            target: {}\n",
-                    target.runner, target.target
+                    target.runner, target.target,
                 ));
             }
             // job steps
@@ -306,7 +333,7 @@ jobs:\n",
                     conf.push_str(
                         "      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'\n",
+          python-version: 3.x\n",
                     );
                     if matches!(platform, Platform::Windows) {
                         conf.push_str("          architecture: ${{ matrix.platform.target }}\n");
@@ -328,7 +355,7 @@ jobs:\n",
                     maturin_args.push(manifest_path.display().to_string())
                 }
             }
-            if self.zig && matches!(platform, Platform::Linux) {
+            if self.zig && matches!(platform, Platform::ManyLinux) {
                 maturin_args.push("--zig".to_string());
             }
             let maturin_args = if maturin_args.is_empty() {
@@ -345,16 +372,22 @@ jobs:\n",
           sccache: 'true'
 "
             ));
-            if matches!(platform, Platform::Linux) {
-                conf.push_str("          manylinux: auto\n");
-            } else if matches!(platform, Platform::Emscripten) {
-                conf.push_str("          rust-toolchain: nightly\n");
+            match platform {
+                Platform::ManyLinux => {
+                    conf.push_str("          manylinux: auto\n");
+                }
+                Platform::Musllinux => {
+                    conf.push_str("          manylinux: musllinux_1_2\n");
+                }
+                Platform::Emscripten => {
+                    conf.push_str("          rust-toolchain: nightly\n");
+                }
+                _ => {}
             }
             // upload wheels
-            let artifact_name = if matches!(platform, Platform::Emscripten) {
-                String::from("wasm-wheels")
-            } else {
-                format!("wheels-{platform}-${{{{ matrix.platform.target }}}}")
+            let artifact_name = match platform {
+                Platform::Emscripten => "wasm-wheels".to_string(),
+                _ => format!("wheels-{platform}-${{{{ matrix.platform.target }}}}"),
             };
             conf.push_str(&format!(
                 "      - name: Upload wheels
@@ -375,8 +408,8 @@ jobs:\n",
             if self.pytest {
                 match platform {
                     Platform::All => {}
-                    Platform::Linux => {
-                        // Test on host for x86_64
+                    Platform::ManyLinux => {
+                        // Test on host for x86_64 GNU targets
                         conf.push_str(&format!(
                             "      - name: pytest
         if: ${{{{ startsWith(matrix.platform.target, 'x86_64') }}}}
@@ -390,11 +423,11 @@ jobs:\n",
           {chdir}pytest
 "
                         ));
-                        // Test on QEMU for other architectures
+                        // Test on QEMU for other GNU architectures
                         conf.push_str(&format!(
                                                 "      - name: pytest
         if: ${{{{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}}}
-        uses: uraimo/run-on-arch-action@v2.5.0
+        uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{{{ matrix.platform.target }}}}
           distro: ubuntu22.04
@@ -409,6 +442,44 @@ jobs:\n",
             {chdir}pytest
 "
                                             ));
+                    }
+                    Platform::Musllinux => {
+                        conf.push_str(&format!(
+                            "      - name: pytest
+        if: ${{{{ startsWith(matrix.platform.target, 'x86_64') }}}}
+        uses: addnab/docker-run-action@v3
+        with:
+          image: alpine:latest
+          options: -v ${{{{ github.workspace }}}}:/io -w /io
+          run: |
+            set -e
+            apk add py3-pip py3-virtualenv
+            python3 -m virtualenv .venv
+            source .venv/bin/activate
+            pip install {project_name} --no-index --find-links dist --force-reinstall
+            pip install pytest
+            {chdir}pytest
+"
+                        ));
+                        conf.push_str(&format!(
+                            "      - name: pytest
+        if: ${{{{ !startsWith(matrix.platform.target, 'x86') }}}}
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{{{ matrix.platform.target }}}}
+          distro: alpine_latest
+          githubToken: ${{{{ github.token }}}}
+          install: |
+            apk add py3-virtualenv
+          run: |
+            set -e
+            python3 -m virtualenv .venv
+            source .venv/bin/activate
+            pip install pytest
+            pip install {project_name} --find-links dist --force-reinstall
+            {chdir}pytest
+"
+                        ));
                     }
                     Platform::Windows => {
                         conf.push_str(&format!(
@@ -611,7 +682,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -623,6 +694,37 @@ mod tests {
                     uses: actions/upload-artifact@v4
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
+                      path: dist
+
+              musllinux:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist --find-interpreter
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
 
               windows:
@@ -638,7 +740,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                       architecture: ${{ matrix.platform.target }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
@@ -665,7 +767,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -697,7 +799,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, sdist]
+                needs: [linux, musllinux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
@@ -757,7 +859,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -769,6 +871,37 @@ mod tests {
                     uses: actions/upload-artifact@v4
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
+                      path: dist
+
+              musllinux:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
 
               windows:
@@ -784,7 +917,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                       architecture: ${{ matrix.platform.target }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
@@ -811,7 +944,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -828,7 +961,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos]
+                needs: [linux, musllinux, windows, macos]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
@@ -897,7 +1030,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -922,7 +1055,7 @@ mod tests {
                       pytest
                   - name: pytest
                     if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
-                    uses: uraimo/run-on-arch-action@v2.5.0
+                    uses: uraimo/run-on-arch-action@v2
                     with:
                       arch: ${{ matrix.platform.target }}
                       distro: ubuntu22.04
@@ -934,6 +1067,67 @@ mod tests {
                       run: |
                         set -e
                         pip3 install example --find-links dist --force-reinstall
+                        pytest
+
+              musllinux:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist --find-interpreter
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-musllinux-${{ matrix.platform.target }}
+                      path: dist
+                  - name: pytest
+                    if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
+                    uses: addnab/docker-run-action@v3
+                    with:
+                      image: alpine:latest
+                      options: -v ${{ github.workspace }}:/io -w /io
+                      run: |
+                        set -e
+                        apk add py3-pip py3-virtualenv
+                        python3 -m virtualenv .venv
+                        source .venv/bin/activate
+                        pip install example --no-index --find-links dist --force-reinstall
+                        pip install pytest
+                        pytest
+                  - name: pytest
+                    if: ${{ !startsWith(matrix.platform.target, 'x86') }}
+                    uses: uraimo/run-on-arch-action@v2
+                    with:
+                      arch: ${{ matrix.platform.target }}
+                      distro: alpine_latest
+                      githubToken: ${{ github.token }}
+                      install: |
+                        apk add py3-virtualenv
+                      run: |
+                        set -e
+                        python3 -m virtualenv .venv
+                        source .venv/bin/activate
+                        pip install pytest
+                        pip install example --find-links dist --force-reinstall
                         pytest
 
               windows:
@@ -949,7 +1143,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                       architecture: ${{ matrix.platform.target }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
@@ -986,7 +1180,7 @@ mod tests {
                   - uses: actions/checkout@v4
                   - uses: actions/setup-python@v5
                     with:
-                      python-version: '3.10'
+                      python-version: 3.x
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1026,7 +1220,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, sdist]
+                needs: [linux, musllinux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
@@ -1097,6 +1291,34 @@ mod tests {
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
 
+              musllinux:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: ubuntu-latest
+                        target: x86_64
+                      - runner: ubuntu-latest
+                        target: x86
+                      - runner: ubuntu-latest
+                        target: aarch64
+                      - runner: ubuntu-latest
+                        target: armv7
+                steps:
+                  - uses: actions/checkout@v4
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-musllinux-${{ matrix.platform.target }}
+                      path: dist
+
               windows:
                 runs-on: ${{ matrix.platform.runner }}
                 strategy:
@@ -1162,7 +1384,7 @@ mod tests {
                 name: Release
                 runs-on: ubuntu-latest
                 if: "startsWith(github.ref, 'refs/tags/')"
-                needs: [linux, windows, macos, sdist]
+                needs: [linux, musllinux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI

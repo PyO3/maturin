@@ -27,16 +27,9 @@ pub fn is_cross_compiling(target: &Target) -> Result<bool> {
         // Not cross-compiling to compile for 32-bit Python from windows 64-bit
         return Ok(false);
     }
-
-    if let Some(target_without_env) = target_triple
-        .rfind('-')
-        .map(|index| &target_triple[0..index])
-    {
-        if host.starts_with(target_without_env) {
-            // Not cross-compiling if arch-vendor-os is all the same
-            // e.g. x86_64-unknown-linux-musl on x86_64-unknown-linux-gnu host
-            return Ok(false);
-        }
+    if target_triple.ends_with("windows-gnu") && host.ends_with("windows-msvc") {
+        // Not cross-compiling to compile for Windows GNU from Windows MSVC host
+        return Ok(false);
     }
 
     Ok(true)

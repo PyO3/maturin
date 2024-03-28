@@ -12,6 +12,7 @@ pub fn test_develop(
     bindings: Option<String>,
     unique_name: &str,
     conda: bool,
+    uv: bool,
 ) -> Result<()> {
     maybe_mock_cargo();
 
@@ -31,6 +32,7 @@ pub fn test_develop(
             "pip",
             "install",
             "--disable-pip-version-check",
+            "uv",
             "cffi",
         ])
         .output()?;
@@ -57,6 +59,7 @@ pub fn test_develop(
             target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
+        uv,
     };
     develop(develop_options, &venv_dir)?;
 

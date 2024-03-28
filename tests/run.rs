@@ -17,6 +17,7 @@ fn develop_pyo3_pure() {
         None,
         "develop-pyo3-pure",
         false,
+        false,
     ));
 }
 
@@ -30,6 +31,7 @@ fn develop_pyo3_pure_conda() {
             None,
             "develop-pyo3-pure-conda",
             true,
+            false,
         ));
     }
 }
@@ -41,6 +43,7 @@ fn develop_pyo3_mixed() {
         None,
         "develop-pyo3-mixed",
         false,
+        false,
     ));
 }
 
@@ -50,6 +53,7 @@ fn develop_pyo3_mixed_include_exclude() {
         "test-crates/pyo3-mixed-include-exclude",
         None,
         "develop-pyo3-mixed-include-exclude",
+        false,
         false,
     ));
 }
@@ -61,6 +65,7 @@ fn develop_pyo3_mixed_submodule() {
         None,
         "develop-pyo3-mixed-submodule",
         false,
+        false,
     ));
 }
 
@@ -70,6 +75,7 @@ fn develop_pyo3_mixed_with_path_dep() {
         "test-crates/pyo3-mixed-with-path-dep",
         None,
         "develop-pyo3-mixed-with-path-dep",
+        false,
         false,
     ));
 }
@@ -81,6 +87,7 @@ fn develop_pyo3_mixed_implicit() {
         None,
         "develop-pyo3-mixed-implicit",
         false,
+        false,
     ));
 }
 
@@ -91,6 +98,7 @@ fn develop_pyo3_mixed_py_subdir() {
         None,
         "develop-pyo3-mixed-py-subdir",
         false,
+        false,
     ));
 }
 
@@ -100,6 +108,7 @@ fn develop_pyo3_mixed_src_layout() {
         "test-crates/pyo3-mixed-src/rust",
         None,
         "develop-pyo3-mixed-src",
+        false,
         false,
     ));
 }
@@ -116,6 +125,7 @@ fn develop_cffi_pure() {
         None,
         "develop-cffi-pure",
         false,
+        false,
     ));
 }
 
@@ -131,6 +141,7 @@ fn develop_cffi_mixed() {
         None,
         "develop-cffi-mixed",
         false,
+        false,
     ));
 }
 
@@ -141,6 +152,7 @@ fn develop_uniffi_pure() {
             "test-crates/uniffi-pure",
             None,
             "develop-uniffi-pure",
+            false,
             false,
         ));
     }
@@ -153,6 +165,7 @@ fn develop_uniffi_pure_proc_macro() {
         None,
         "develop-uniffi-pure-proc-macro",
         false,
+        false,
     ));
 }
 
@@ -163,6 +176,7 @@ fn develop_uniffi_mixed() {
             "test-crates/uniffi-mixed",
             None,
             "develop-uniffi-mixed",
+            false,
             false,
         ));
     }
@@ -175,6 +189,18 @@ fn develop_hello_world() {
         None,
         "develop-hello-world",
         false,
+        false,
+    ));
+}
+
+#[test]
+fn develop_hello_world_uv() {
+    handle_result(develop::test_develop(
+        "test-crates/hello-world",
+        None,
+        "develop-hello-world-uv",
+        false,
+        true,
     ));
 }
 
@@ -184,6 +210,7 @@ fn develop_pyo3_ffi_pure() {
         "test-crates/pyo3-ffi-pure",
         None,
         "develop-pyo3-ffi-pure",
+        false,
         false,
     ));
 }

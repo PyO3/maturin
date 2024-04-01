@@ -16,7 +16,7 @@ fn add(x: usize, y: usize) -> usize {
 }
 
 #[pymodule]
-fn lib_with_disallowed_lib(_py: Python, m: &PyModule) -> PyResult<()> {
+fn lib_with_disallowed_lib(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(add))?;
 
     Ok(())

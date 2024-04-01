@@ -171,7 +171,7 @@ fn guess_the_number() {
 /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
 /// import the module.
 #[pymodule]
-fn guessing_game(_py: Python, m: &PyModule) -> PyResult<()> {
+fn guessing_game(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(guess_the_number, m)?)?;
 
     Ok(())

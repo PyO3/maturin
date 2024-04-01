@@ -100,7 +100,7 @@ pub(crate) fn __pyo3_get_function_add<'a>(
     )
 }
 
-fn pyo3_pure(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyo3_pure(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(&__pyo3_get_function_add)?;
     Ok(())
 }

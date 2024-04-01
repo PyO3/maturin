@@ -8,7 +8,7 @@ fn get_21() -> usize {
 }
 
 #[pymodule]
-fn pyo3_mixed_workspace_py(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyo3_mixed_workspace_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_21, m)?)?;
 
     Ok(())

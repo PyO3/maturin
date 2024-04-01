@@ -245,7 +245,7 @@ jobs:
           inputs: ./*.tar.gz ./*.whl
           upload-signing-artifacts: true
       - name: Release signing artifacts
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             *.sig
@@ -274,7 +274,7 @@ jobs:
           inputs: ./*.tar.gz ./*.zip ./*.deb
           upload-signing-artifacts: true
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             *.tar.gz

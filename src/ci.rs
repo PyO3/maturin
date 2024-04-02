@@ -267,7 +267,7 @@ jobs:\n",
                 Platform::Macos => {
                     vec![
                         MatrixPlatform {
-                            runner: "macos-latest",
+                            runner: "macos-12",
                             target: "x86_64",
                         },
                         MatrixPlatform {
@@ -759,7 +759,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-latest
+                      - runner: macos-12
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -936,7 +936,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-latest
+                      - runner: macos-12
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -1172,7 +1172,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-latest
+                      - runner: macos-12
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -1347,7 +1347,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-latest
+                      - runner: macos-12
                         target: x86_64
                       - runner: macos-14
                         target: aarch64

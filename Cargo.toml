@@ -101,9 +101,7 @@ cargo-xwin = { version = "0.16.4", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
-tracing-subscriber = { version = "0.3.15", features = [
-    "env-filter",
-], optional = true }
+tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.11.0", default-features = false, optional = true }
@@ -146,9 +144,7 @@ which = "6.0.0"
 [features]
 default = ["full", "rustls"]
 
-full = ["cli-completion", "cross-compile", "log", "scaffolding", "upload"]
-
-log = ["tracing-subscriber"]
+full = ["cli-completion", "cross-compile", "scaffolding", "upload"]
 
 cli-completion = ["dep:clap_complete_command"]
 
@@ -191,8 +187,9 @@ scaffolding = ["dialoguer", "console", "minijinja", "unicode-xid"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
 
-# Deprecated features, keep it now for compatibility
+# Deprecated features, keep them now for compatibility
 human-panic = []
+log = []
 
 [profile.profiling]
 inherits = "release"

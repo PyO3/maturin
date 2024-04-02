@@ -16,9 +16,41 @@ use std::process::Command;
 use tempfile::TempDir;
 use url::Url;
 
-enum Backend {
-    Pip,
+#[derive(PartialEq, Eq, Clone)]
+struct Pip {
+    path: Option<PathBuf>,
+}
+
+#[derive(PartialEq, Eq)]
+enum InstallBackend {
+    Pip(Pip),
     Uv,
+}
+
+impl InstallBackend {
+    fn make_command(&self, python_path: &Path) -> Command {
+        match self {
+            InstallBackend::Pip(pip) => match &pip.path {
+                Some(path) => {
+                    let mut cmd = Command::new(path);
+                    cmd.arg("--python")
+                        .arg(python_path)
+                        .arg("--disable-pip-version-check");
+                    cmd
+                }
+                None => {
+                    let mut cmd = Command::new(python_path);
+                    cmd.arg("-m").arg("pip").arg("--disable-pip-version-check");
+                    cmd
+                }
+            },
+            InstallBackend::Uv => {
+                let mut cmd = Command::new(python_path);
+                cmd.arg("-m").arg("uv").arg("pip");
+                cmd
+            }
+        }
+    }
 }
 /// Install the crate as module in the current virtualenv
 #[derive(Debug, clap::Parser)]
@@ -61,41 +93,16 @@ pub struct DevelopOptions {
     /// `cargo rustc` options
     #[command(flatten)]
     pub cargo_options: CargoOptions,
-    /// Use `uv` as develop backend instead of `pip`
+    /// Use `uv` to install packages instead of `pip`
     #[arg(long)]
     pub uv: bool,
-}
-
-fn make_backend_command(python_path: &Path, pip_path: Option<&Path>, backend: &Backend) -> Command {
-    match backend {
-        Backend::Pip => match pip_path {
-            Some(pip_path) => {
-                let mut cmd = Command::new(pip_path);
-                cmd.arg("--python")
-                    .arg(python_path)
-                    .arg("--disable-pip-version-check");
-                cmd
-            }
-            None => {
-                let mut cmd = Command::new(python_path);
-                cmd.arg("-m").arg("pip").arg("--disable-pip-version-check");
-                cmd
-            }
-        },
-        Backend::Uv => {
-            let mut cmd = Command::new(python_path);
-            cmd.arg("-m").arg("uv").arg("pip");
-            cmd
-        }
-    }
 }
 
 fn install_dependencies(
     build_context: &BuildContext,
     extras: &[String],
     interpreter: &PythonInterpreter,
-    pip_path: Option<&Path>,
-    backend: &Backend,
+    install_backend: &InstallBackend,
 ) -> Result<()> {
     if !build_context.metadata23.requires_dist.is_empty() {
         let mut args = vec!["install".to_string()];
@@ -125,7 +132,8 @@ fn install_dependencies(
             }
             pkg.to_string()
         }));
-        let status = make_backend_command(&interpreter.executable, pip_path, backend)
+        let status = install_backend
+            .make_command(&interpreter.executable)
             .args(&args)
             .status()
             .context("Failed to run pip install")?;
@@ -140,41 +148,45 @@ fn pip_install_wheel(
     build_context: &BuildContext,
     python: &Path,
     venv_dir: &Path,
-    pip_path: Option<&Path>,
     wheel_filename: &Path,
-    backend: &Backend,
+    pip_path: Option<PathBuf>,
+    install_backend: &InstallBackend,
 ) -> Result<()> {
-    let mut pip_cmd = make_backend_command(python, pip_path, backend);
-    let output = pip_cmd
+    let mut cmd = install_backend.make_command(python);
+    let output = cmd
         .args(["install", "--no-deps", "--force-reinstall"])
         .arg(dunce::simplified(wheel_filename))
         .output()
         .context(format!(
             "pip install failed (ran {:?} with {:?})",
-            pip_cmd.get_program(),
-            &pip_cmd.get_args().collect::<Vec<_>>(),
+            cmd.get_program(),
+            &cmd.get_args().collect::<Vec<_>>(),
         ))?;
     if !output.status.success() {
         bail!(
             "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
             venv_dir.display(),
-            &pip_cmd.get_args().collect::<Vec<_>>(),
+            &cmd.get_args().collect::<Vec<_>>(),
             output.status,
             String::from_utf8_lossy(&output.stdout).trim(),
             String::from_utf8_lossy(&output.stderr).trim(),
         );
     }
     // uv pip install sends logs to stderr thus only print this warning for pip
-    if !output.stderr.is_empty() {
-        if let Backend::Pip = backend {
-            eprintln!(
-                "⚠️ Warning: pip raised a warning running {:?}:\n{}",
-                &pip_cmd.get_args().collect::<Vec<_>>(),
-                String::from_utf8_lossy(&output.stderr).trim(),
-            );
-        }
+    if !output.stderr.is_empty() && *install_backend != InstallBackend::Uv {
+        eprintln!(
+            "⚠️ Warning: pip raised a warning running {:?}:\n{}",
+            &cmd.get_args().collect::<Vec<_>>(),
+            String::from_utf8_lossy(&output.stderr).trim(),
+        );
     }
-    fix_direct_url(build_context, python, pip_path)?;
+    // pip show --files is not supported by uv, thus
+    // default to using pip backend all the time
+    fix_direct_url(
+        build_context,
+        python,
+        &InstallBackend::Pip(Pip { path: pip_path }),
+    )?;
     Ok(())
 }
 
@@ -188,20 +200,18 @@ fn pip_install_wheel(
 fn fix_direct_url(
     build_context: &BuildContext,
     python: &Path,
-    pip_path: Option<&Path>,
+    install_backend: &InstallBackend,
 ) -> Result<()> {
     println!("✏️  Setting installed package as editable");
-    // pip show --files is not supported by uv, thus
-    // default to using pip all the time
-    let mut pip_cmd = make_backend_command(python, pip_path, &Backend::Pip);
-    let output = pip_cmd
+    let mut cmd = install_backend.make_command(python);
+    let output = cmd
         .args(["show", "--files"])
         .arg(&build_context.metadata23.name)
         .output()
         .context(format!(
             "pip show failed (ran {:?} with {:?})",
-            pip_cmd.get_program(),
-            &pip_cmd.get_args().collect::<Vec<_>>(),
+            cmd.get_program(),
+            &cmd.get_args().collect::<Vec<_>>(),
         ))?;
     if let Some(direct_url_path) = parse_direct_url_path(&String::from_utf8_lossy(&output.stdout))?
     {
@@ -250,7 +260,13 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         cargo_options,
         uv,
     } = develop_options;
-    let backend = if uv { Backend::Uv } else { Backend::Pip };
+    let install_backend = if uv {
+        InstallBackend::Uv
+    } else {
+        InstallBackend::Pip(Pip {
+            path: pip_path.clone(),
+        })
+    };
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
     let target = Target::from_target_triple(cargo_options.target)?;
     let python = target.get_venv_python(venv_dir);
@@ -301,13 +317,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
         )?;
 
-    install_dependencies(
-        &build_context,
-        &extras,
-        &interpreter,
-        pip_path.as_deref(),
-        &backend,
-    )?;
+    install_dependencies(&build_context, &extras, &interpreter, &install_backend)?;
 
     let wheels = build_context.build_wheels()?;
     if !skip_install {
@@ -316,9 +326,9 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
                 &build_context,
                 &python,
                 venv_dir,
-                pip_path.as_deref(),
                 filename,
-                &backend,
+                pip_path.clone(),
+                &install_backend,
             )?;
             eprintln!(
                 "🛠 Installed {}-{}",

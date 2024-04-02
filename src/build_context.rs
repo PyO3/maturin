@@ -30,6 +30,7 @@ use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use tracing::instrument;
 
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -199,6 +200,7 @@ pub type BuiltWheelMetadata = (PathBuf, String);
 impl BuildContext {
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
     /// correct builder.
+    #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         use itertools::Itertools;
 

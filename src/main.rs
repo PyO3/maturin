@@ -22,7 +22,9 @@ use maturin::{generate_json_schema, GenerateJsonSchemaOptions};
 use maturin::{upload_ui, PublishOpt};
 use std::env;
 use std::path::PathBuf;
-use tracing::debug;
+use tracing::{debug, instrument};
+#[cfg(feature = "log")]
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -304,10 +306,8 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
     Ok(())
 }
 
+#[instrument]
 fn run() -> Result<()> {
-    #[cfg(feature = "log")]
-    tracing_subscriber::fmt::init();
-
     #[cfg(feature = "zig")]
     {
         // Allow symlink `maturin` to `ar` to invoke `zig ar`
@@ -463,6 +463,21 @@ fn setup_panic_hook() {
 fn main() {
     #[cfg(not(debug_assertions))]
     setup_panic_hook();
+
+    #[cfg(feature = "log")]
+    {
+        let logger = tracing_subscriber::fmt::layer()
+            // Avoid showing all the details from the spans
+            .compact()
+            // Log the timing of each span
+            .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE);
+
+        tracing_subscriber::registry()
+            // `RUST_LOG` support
+            .with(tracing_subscriber::EnvFilter::from_default_env())
+            .with(logger)
+            .init();
+    }
 
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");

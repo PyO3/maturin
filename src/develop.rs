@@ -14,6 +14,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
+use tracing::instrument;
 use url::Url;
 
 /// Install the crate as module in the current virtualenv
@@ -76,6 +77,7 @@ fn make_pip_command(python_path: &Path, pip_path: Option<&Path>) -> Command {
     }
 }
 
+#[instrument(skip_all)]
 fn install_dependencies(
     build_context: &BuildContext,
     extras: &[String],
@@ -121,6 +123,7 @@ fn install_dependencies(
     Ok(())
 }
 
+#[instrument(skip_all, fields(wheel_filename = %wheel_filename.display()))]
 fn pip_install_wheel(
     build_context: &BuildContext,
     python: &Path,
@@ -166,6 +169,7 @@ fn pip_install_wheel(
 /// When a maturin package is installed using `pip install -e`, pip takes care of writing the
 /// correct URL, however when a maturin package is installed with `maturin develop`, the URL is
 /// set to the path to the temporary wheel file created during installation.
+#[instrument(skip_all)]
 fn fix_direct_url(
     build_context: &BuildContext,
     python: &Path,

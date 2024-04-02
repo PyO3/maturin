@@ -12,7 +12,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::{self, FromStr};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 mod config;
 
@@ -573,6 +573,7 @@ impl PythonInterpreter {
 
     /// Checks whether the given command is a python interpreter and returns a
     /// [PythonInterpreter] if that is the case
+    #[instrument(skip_all, fields(executable = %executable.as_ref().display()))]
     pub fn check_executable(
         executable: impl AsRef<Path>,
         target: &Target,

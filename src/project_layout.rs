@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 const PYPROJECT_TOML: &str = "pyproject.toml";
 
@@ -312,6 +312,7 @@ impl ProjectResolver {
         }
     }
 
+    #[instrument(skip_all)]
     fn resolve_cargo_metadata(
         manifest_path: &Path,
         cargo_options: &CargoOptions,

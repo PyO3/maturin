@@ -194,6 +194,10 @@ faster-tests = []
 # Deprecated features, keep it now for compatibility
 human-panic = []
 
+[profile.profiling]
+inherits = "release"
+debug = true
+
 # Without this, compressing the .gz archive becomes notably slow for debug builds
 [profile.dev.package.miniz_oxide]
 opt-level = 3

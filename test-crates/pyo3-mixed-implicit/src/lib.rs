@@ -6,7 +6,7 @@ fn get_22() -> usize {
 }
 
 #[pymodule]
-fn rust(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(get_22))?;
 
     Ok(())

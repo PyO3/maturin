@@ -105,7 +105,7 @@ fn print_cli_args(py: Python) -> PyResult<()> {
     // `["/home/ferris/.venv/bin/print_cli_args", "a", "b", "c"])`
     println!(
         "{:?}",
-        py.import("sys")?
+        py.import_bound("sys")?
             .getattr("argv")?
             .extract::<Vec<String>>()?
     );
@@ -113,7 +113,7 @@ fn print_cli_args(py: Python) -> PyResult<()> {
 }
 
 #[pymodule]
-fn my_module(_py: Python, m: &PyModule) -> PyResult<()> {
+fn my_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(print_cli_args))?;
 
     Ok(())

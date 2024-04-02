@@ -18,7 +18,7 @@ fn is_half(a: usize, b: usize) -> bool {
 
 
 #[pymodule]
-fn pyo3_mixed_with_path_dep(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyo3_mixed_with_path_dep(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(get_21))?;
     m.add_wrapped(wrap_pyfunction!(add_21))?;
     m.add_wrapped(wrap_pyfunction!(is_half))?;

@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 // This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
 // These should be treated almost identically but must be correctly identified
@@ -481,6 +481,7 @@ impl BuildOptions {
     }
 
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
+    #[instrument(skip_all)]
     pub fn into_build_context(
         self,
         release: bool,

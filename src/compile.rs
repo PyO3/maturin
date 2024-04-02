@@ -13,7 +13,7 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
-use tracing::{debug, trace};
+use tracing::{debug, instrument, trace};
 
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
@@ -577,6 +577,7 @@ fn compile_target(
 /// to import the module with error if it's missing or named incorrectly
 ///
 /// Currently the check is only run on linux, macOS and Windows
+#[instrument(skip_all)]
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
     let mut fd = File::open(artifact)?;

@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 use tempfile::{tempdir, TempDir};
-use tracing::debug;
+use tracing::{debug, instrument};
 use zip::{self, DateTime, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
@@ -706,6 +706,7 @@ fn handle_cffi_call_result(
 
 /// Copies the shared library into the module, which is the only extra file needed with bindings
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn write_bindings_module(
     writer: &mut impl ModuleWriter,
     project_layout: &ProjectLayout,

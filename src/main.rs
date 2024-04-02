@@ -23,8 +23,8 @@ use maturin::{upload_ui, PublishOpt};
 use std::env;
 use std::path::PathBuf;
 use tracing::{debug, instrument};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+#[cfg(feature = "log")]
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Parser)]
 #[command(

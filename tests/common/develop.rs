@@ -1,4 +1,6 @@
-use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
+use crate::common::{
+    check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo, TestInstallBackend,
+};
 use anyhow::Result;
 use maturin::{develop, CargoOptions, DevelopOptions};
 use std::path::{Path, PathBuf};
@@ -12,7 +14,7 @@ pub fn test_develop(
     bindings: Option<String>,
     unique_name: &str,
     conda: bool,
-    uv: bool,
+    test_backend: TestInstallBackend,
 ) -> Result<()> {
     maybe_mock_cargo();
 
@@ -45,6 +47,7 @@ pub fn test_develop(
         );
     }
 
+    let uv = matches!(test_backend, TestInstallBackend::Uv);
     let manifest_file = package.join("Cargo.toml");
     let develop_options = DevelopOptions {
         bindings,

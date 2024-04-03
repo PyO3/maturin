@@ -12,6 +12,11 @@ pub mod errors;
 pub mod integration;
 pub mod other;
 
+pub enum TestInstallBackend {
+    Pip,
+    Uv,
+}
+
 /// Check that the package is either not installed or works correctly
 pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     let path = if cfg!(windows) {

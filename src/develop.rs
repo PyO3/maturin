@@ -16,21 +16,16 @@ use std::process::Command;
 use tempfile::TempDir;
 use url::Url;
 
-#[derive(PartialEq, Eq, Clone)]
-struct Pip {
-    path: Option<PathBuf>,
-}
-
 #[derive(PartialEq, Eq)]
 enum InstallBackend {
-    Pip(Pip),
+    Pip { path: Option<PathBuf> },
     Uv,
 }
 
 impl InstallBackend {
     fn make_command(&self, python_path: &Path) -> Command {
         match self {
-            InstallBackend::Pip(pip) => match &pip.path {
+            InstallBackend::Pip { path } => match &path {
                 Some(path) => {
                     let mut cmd = Command::new(path);
                     cmd.arg("--python")
@@ -185,7 +180,7 @@ fn pip_install_wheel(
     fix_direct_url(
         build_context,
         python,
-        &InstallBackend::Pip(Pip { path: pip_path }),
+        &InstallBackend::Pip { path: pip_path },
     )?;
     Ok(())
 }
@@ -263,9 +258,9 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let install_backend = if uv {
         InstallBackend::Uv
     } else {
-        InstallBackend::Pip(Pip {
+        InstallBackend::Pip {
             path: pip_path.clone(),
-        })
+        }
     };
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
     let target = Target::from_target_triple(cargo_options.target)?;

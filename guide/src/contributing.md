@@ -81,6 +81,11 @@ Before you submit a pull request, check that it meets these guidelines:
    entry.
 3. When command line interface changes, run `python3 test-crates/update_readme.py` to update related documentation.
 
+## Guide
+
+To build the guide for local viewing, install [mdBook](https://rust-lang.github.io/mdBook/guide/installation.html) and
+run `mdbook watch guide` from the repository root. The output can then be found at `guide/book/index.html`.
+
 ## Code
 
 The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.

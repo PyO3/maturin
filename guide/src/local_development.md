@@ -120,8 +120,8 @@ build-backend = "maturin"
 Editable installs can be used with mixed Rust/Python projects so you
 don't have to recompile and reinstall when only Python source code changes.
 They can also be used with mixed and pure projects together with the
-import hook so that recompilation/re-installation occurs automatically
-when Python or Rust source code changes.
+[import hook](./import_hook.md) so that recompilation/re-installation
+occurs automatically when Python or Rust source code changes.
 
 To install a package in editable mode with pip:
 
@@ -137,25 +137,3 @@ maturin develop
 
 Then Python source code changes will take effect immediately because the interpreter looks
 for the modules directly in the project source tree.
-
-## Import Hook
-
-Starting from v0.12.4, the [Python maturin package](https://pypi.org/project/maturin/) provides
-a Python import hook to allow quickly build and load a Rust module into Python.
-
-It supports pure Rust and mixed Rust/Python project layout as well as a
-standalone `.rs` file.
-
-```python
-from maturin import import_hook
-
-# install the import hook with default settings
-import_hook.install()
-# or you can specify bindings
-import_hook.install(bindings="pyo3")
-# and build in release mode instead of the default debug mode
-import_hook.install(release=True)
-
-# now you can start importing your Rust module
-import pyo3_pure
-```

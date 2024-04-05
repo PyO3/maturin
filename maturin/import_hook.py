@@ -11,6 +11,7 @@ import sys
 from contextvars import ContextVar
 from importlib import abc
 from importlib.machinery import ModuleSpec
+import warnings
 from types import ModuleType
 from typing import Sequence
 
@@ -152,6 +153,11 @@ def install(bindings: str | None = None, release: bool = False) -> Importer | No
 
     :param release: Build in release mode, otherwise debug mode by default
     """
+    warnings.warn(
+        "`maturin.import_hook` is deprecated in favour of a new "
+        "`maturin_import_hook` package and will be removed in a future release. See https://maturin.rs/import_hook",
+        DeprecationWarning,
+    )
     if _have_importer():
         return None
     importer = Importer(bindings=bindings, release=release)

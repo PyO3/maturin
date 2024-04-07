@@ -7,7 +7,7 @@ _formerly pyo3-pack_
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?logo=python&style=flat-square)](https://pypi.org/project/maturin)
 [![Actions Status](https://img.shields.io/github/actions/workflow/status/PyO3/maturin/test.yml?branch=main&logo=github&style=flat-square)](https://github.com/PyO3/maturin/actions)
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
-[![Chat on Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?logo=gitter&style=flat-square)](https://gitter.im/PyO3/Lobby)
+[![discord server](https://img.shields.io/discord/1209263839632424990?logo=discord)](https://discord.gg/33kcChzH7f)
 
 Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages with minimal configuration.
 It supports building wheels for python 3.8+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.

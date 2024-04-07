@@ -1,4 +1,6 @@
-use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
+use crate::common::{
+    check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo, TestInstallBackend,
+};
 use anyhow::Result;
 use maturin::{develop, CargoOptions, DevelopOptions};
 use std::path::{Path, PathBuf};
@@ -12,6 +14,7 @@ pub fn test_develop(
     bindings: Option<String>,
     unique_name: &str,
     conda: bool,
+    test_backend: TestInstallBackend,
 ) -> Result<()> {
     maybe_mock_cargo();
 
@@ -31,6 +34,7 @@ pub fn test_develop(
             "pip",
             "install",
             "--disable-pip-version-check",
+            "uv",
             "cffi",
         ])
         .output()?;
@@ -43,6 +47,7 @@ pub fn test_develop(
         );
     }
 
+    let uv = matches!(test_backend, TestInstallBackend::Uv);
     let manifest_file = package.join("Cargo.toml");
     let develop_options = DevelopOptions {
         bindings,
@@ -57,6 +62,7 @@ pub fn test_develop(
             target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
+        uv,
     };
     develop(develop_options, &venv_dir)?;
 

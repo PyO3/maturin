@@ -1,8 +1,12 @@
 //! To speed up the tests, they are tests all collected in a single module
 
-use common::{develop, errors, handle_result, integration, other, test_python_implementation};
+use common::{
+    develop, errors, handle_result, integration, other, test_python_implementation,
+    TestInstallBackend,
+};
 use expect_test::expect;
 use maturin::pyproject_toml::SdistGenerator;
+use rstest::rstest;
 use std::env;
 use std::path::Path;
 use time::macros::datetime;
@@ -17,6 +21,7 @@ fn develop_pyo3_pure() {
         None,
         "develop-pyo3-pure",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -30,6 +35,7 @@ fn develop_pyo3_pure_conda() {
             None,
             "develop-pyo3-pure-conda",
             true,
+            TestInstallBackend::Pip,
         ));
     }
 }
@@ -41,6 +47,7 @@ fn develop_pyo3_mixed() {
         None,
         "develop-pyo3-mixed",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -51,6 +58,7 @@ fn develop_pyo3_mixed_include_exclude() {
         None,
         "develop-pyo3-mixed-include-exclude",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -61,6 +69,7 @@ fn develop_pyo3_mixed_submodule() {
         None,
         "develop-pyo3-mixed-submodule",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -71,6 +80,7 @@ fn develop_pyo3_mixed_with_path_dep() {
         None,
         "develop-pyo3-mixed-with-path-dep",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -81,6 +91,7 @@ fn develop_pyo3_mixed_implicit() {
         None,
         "develop-pyo3-mixed-implicit",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -91,6 +102,7 @@ fn develop_pyo3_mixed_py_subdir() {
         None,
         "develop-pyo3-mixed-py-subdir",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -101,6 +113,7 @@ fn develop_pyo3_mixed_src_layout() {
         None,
         "develop-pyo3-mixed-src",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -116,6 +129,7 @@ fn develop_cffi_pure() {
         None,
         "develop-cffi-pure",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -131,6 +145,7 @@ fn develop_cffi_mixed() {
         None,
         "develop-cffi-mixed",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -142,6 +157,7 @@ fn develop_uniffi_pure() {
             None,
             "develop-uniffi-pure",
             false,
+            TestInstallBackend::Pip,
         ));
     }
 }
@@ -153,6 +169,7 @@ fn develop_uniffi_pure_proc_macro() {
         None,
         "develop-uniffi-pure-proc-macro",
         false,
+        TestInstallBackend::Pip,
     ));
 }
 
@@ -164,27 +181,36 @@ fn develop_uniffi_mixed() {
             None,
             "develop-uniffi-mixed",
             false,
+            TestInstallBackend::Pip,
         ));
     }
 }
 
+#[rstest]
+#[case(TestInstallBackend::Pip, "pip")]
+#[case(TestInstallBackend::Uv, "uv")]
 #[test]
-fn develop_hello_world() {
+fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) {
     handle_result(develop::test_develop(
         "test-crates/hello-world",
         None,
-        "develop-hello-world",
+        format!("develop-hello-world-{}", name).as_str(),
         false,
+        backend,
     ));
 }
 
+#[rstest]
+#[case(TestInstallBackend::Pip, "pip")]
+#[case(TestInstallBackend::Uv, "uv")]
 #[test]
-fn develop_pyo3_ffi_pure() {
+fn develop_pyo3_ffi_pure(#[case] backend: TestInstallBackend, #[case] name: &str) {
     handle_result(develop::test_develop(
         "test-crates/pyo3-ffi-pure",
         None,
-        "develop-pyo3-ffi-pure",
+        format!("develop-pyo3-ffi-pure-{}", name).as_str(),
         false,
+        backend,
     ));
 }
 

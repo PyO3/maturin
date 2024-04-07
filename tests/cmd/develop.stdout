@@ -52,6 +52,9 @@ Options:
       --future-incompat-report
           Outputs a future incompatibility report at the end of the build (unstable)
 
+      --uv
+          Use `uv` to install packages instead of `pip`
+
   -h, --help
           Print help (see a summary with '-h')
 

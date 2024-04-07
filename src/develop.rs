@@ -13,17 +13,26 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::str;
 use tempfile::TempDir;
-use tracing::instrument;
+use tracing::{debug, instrument};
 use url::Url;
 
-#[derive(PartialEq, Eq)]
 enum InstallBackend {
-    Pip { path: Option<PathBuf> },
-    Uv,
+    Pip {
+        path: Option<PathBuf>,
+    },
+    Uv {
+        path: PathBuf,
+        args: Vec<&'static str>,
+    },
 }
 
 impl InstallBackend {
+    fn is_pip(&self) -> bool {
+        matches!(self, InstallBackend::Pip { .. })
+    }
+
     fn make_command(&self, python_path: &Path) -> Command {
         match self {
             InstallBackend::Pip { path } => match &path {
@@ -40,14 +49,47 @@ impl InstallBackend {
                     cmd
                 }
             },
-            InstallBackend::Uv => {
-                let mut cmd = Command::new(python_path);
-                cmd.arg("-m").arg("uv").arg("pip");
+            InstallBackend::Uv { path, args } => {
+                let mut cmd = Command::new(path);
+                cmd.args(args).arg("pip");
                 cmd
             }
         }
     }
 }
+
+/// Detect the plain uv binary
+fn find_uv_bin() -> Result<(PathBuf, Vec<&'static str>)> {
+    let output = Command::new("uv").arg("--version").output()?;
+    if output.status.success() {
+        let version_str =
+            str::from_utf8(&output.stdout).context("`uv --version` didn't return utf8 output")?;
+        debug!(version = %version_str, "Found uv binary in PATH");
+        Ok((PathBuf::from("uv"), Vec::new()))
+    } else {
+        bail!("`uv --version` failed with status: {}", output.status);
+    }
+}
+
+/// Detect the Python uv package
+fn find_uv_python(python_path: &Path) -> Result<(PathBuf, Vec<&'static str>)> {
+    let output = Command::new(python_path)
+        .args(["-m", "uv", "--version"])
+        .output()?;
+    if output.status.success() {
+        let version_str =
+            str::from_utf8(&output.stdout).context("`uv --version` didn't return utf8 output")?;
+        debug!(version = %version_str, "Found Python uv module");
+        Ok((python_path.to_path_buf(), vec!["-m", "uv"]))
+    } else {
+        bail!(
+            "`{} -m uv --version` failed with status: {}",
+            python_path.display(),
+            output.status
+        );
+    }
+}
+
 /// Install the crate as module in the current virtualenv
 #[derive(Debug, clap::Parser)]
 pub struct DevelopOptions {
@@ -171,7 +213,7 @@ fn pip_install_wheel(
         );
     }
     // uv pip install sends logs to stderr thus only print this warning for pip
-    if !output.stderr.is_empty() && *install_backend != InstallBackend::Uv {
+    if !output.stderr.is_empty() && install_backend.is_pip() {
         eprintln!(
             "⚠️ Warning: pip raised a warning running {:?}:\n{}",
             &cmd.get_args().collect::<Vec<_>>(),
@@ -259,13 +301,6 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         cargo_options,
         uv,
     } = develop_options;
-    let install_backend = if uv {
-        InstallBackend::Uv
-    } else {
-        InstallBackend::Pip {
-            path: pip_path.clone(),
-        }
-    };
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
     let target = Target::from_target_triple(cargo_options.target)?;
     let python = target.get_venv_python(venv_dir);
@@ -315,6 +350,20 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
             || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
         )?;
+
+    let install_backend = if uv {
+        let (uv_path, uv_args) = find_uv_python(&interpreter.executable)
+            .or_else(|_| find_uv_bin())
+            .context("Failed to find uv")?;
+        InstallBackend::Uv {
+            path: uv_path,
+            args: uv_args,
+        }
+    } else {
+        InstallBackend::Pip {
+            path: pip_path.clone(),
+        }
+    };
 
     install_dependencies(&build_context, &extras, &interpreter, &install_backend)?;
 

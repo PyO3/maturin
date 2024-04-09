@@ -86,20 +86,16 @@ Options:
       --compatibility [<compatibility>...]
           Control the platform tag on linux.
 
-          Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux`
-          tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
+          Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native linux tag.
 
-          Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels
-          with the native `linux` tag will be rejected by pypi, unless they are separately validated
-          by `auditwheel`.
+          Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
           The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
 
           This option is ignored on all non-linux platforms
 
   -i, --interpreter [<INTERPRETER>...]
-          The python versions to build wheels for, given as the executables of interpreters such as
-          `python3.9` or `/usr/bin/python3.8`
+          The python versions to build wheels for, given as the executables of interpreters such as `python3.9` or `/usr/bin/python3.8`
 
   -f, --find-interpreter
           Find interpreters from the host machine
@@ -110,8 +106,7 @@ Options:
           [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, uniffi, bin]
 
   -o, --out <OUT>
-          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
-          project's target directory
+          The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target directory
 
       --skip-auditwheel
           Don't check for manylinux compliance

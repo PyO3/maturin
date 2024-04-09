@@ -34,8 +34,7 @@ Options:
       --pip-path <PIP_PATH>
           Use a specific pip installation instead of the default one.
 
-          This can be used to supply the path to a pip executable when the current virtualenv does
-          not provide one.
+          This can be used to supply the path to a pip executable when the current virtualenv does not provide one.
 
   -q, --quiet
           Do not print cargo log messages
@@ -57,6 +56,9 @@ Options:
 
       --future-incompat-report
           Outputs a future incompatibility report at the end of the build (unstable)
+
+      --uv
+          Use `uv` to install packages instead of `pip`
 
   -h, --help
           Print help (see a summary with '-h')

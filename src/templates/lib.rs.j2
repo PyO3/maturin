@@ -13,13 +13,6 @@ fn {{crate_name}}(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     Ok(())
 }
-{%- elif bindings == "rust-cpython" -%}
-use cpython::py_module_initializer;
-
-py_module_initializer!({{crate_name}}, |py, m| {
-    m.add(py, "__doc__", "Module documentation string")?;
-    Ok(())
-});
 {%- elif bindings == "uniffi" -%}
 fn add(a: u32, b: u32) -> u32 {
     a + b

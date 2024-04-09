@@ -30,6 +30,7 @@ pub enum Os {
     Haiku,
     Emscripten,
     Wasi,
+    Aix,
 }
 
 impl fmt::Display for Os {
@@ -47,6 +48,7 @@ impl fmt::Display for Os {
             Os::Haiku => write!(f, "Haiku"),
             Os::Emscripten => write!(f, "Emscripten"),
             Os::Wasi => write!(f, "Wasi"),
+            Os::Aix => write!(f, "AIX"),
         }
     }
 }
@@ -184,6 +186,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Haiku => vec![Arch::X86_64],
         Os::Solaris => vec![Arch::X86_64, Arch::Sparc64],
         Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
+        Os::Aix => vec![Arch::Powerpc64],
     }
 }
 
@@ -244,6 +247,7 @@ impl Target {
             OperatingSystem::Haiku => Os::Haiku,
             OperatingSystem::Emscripten => Os::Emscripten,
             OperatingSystem::Wasi => Os::Wasi,
+            OperatingSystem::Aix => Os::Aix,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -375,6 +379,7 @@ impl Target {
             Os::Emscripten => "emscripten",
             // This isn't real, there's no sys.platform here
             Os::Wasi => "wasi",
+            Os::Aix => "aix",
         }
     }
 
@@ -457,7 +462,8 @@ impl Target {
             | Os::Illumos
             | Os::Haiku
             | Os::Emscripten
-            | Os::Wasi => true,
+            | Os::Wasi
+            | Os::Aix => true,
         }
     }
 

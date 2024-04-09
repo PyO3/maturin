@@ -9,6 +9,6 @@ Options:
       --name <NAME>          Set the resulting package name, defaults to the directory name
       --mixed                Use mixed Rust/Python project layout
       --src                  Use Python first src layout for mixed Rust/Python project
-  -b, --bindings <BINDINGS>  Which kind of bindings to use [possible values: pyo3, rust-cpython,
-                             cffi, uniffi, bin]
+  -b, --bindings <BINDINGS>  Which kind of bindings to use [possible values: pyo3, cffi, uniffi,
+                             bin]
   -h, --help                 Print help

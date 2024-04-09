@@ -171,7 +171,7 @@ pub struct GenerateProjectOptions {
     #[arg(
         short,
         long,
-        value_parser = ["pyo3", "rust-cpython", "cffi", "uniffi", "bin"]
+        value_parser = ["pyo3", "cffi", "uniffi", "bin"]
     )]
     bindings: Option<String>,
 }
@@ -229,9 +229,9 @@ fn generate_project(
         validate_name(temp.as_str()).map_err(|e| anyhow::anyhow!(e))?
     };
     let bindings_items = if options.mixed {
-        vec!["pyo3", "rust-cpython", "cffi", "uniffi"]
+        vec!["pyo3", "cffi", "uniffi"]
     } else {
-        vec!["pyo3", "rust-cpython", "cffi", "uniffi", "bin"]
+        vec!["pyo3", "cffi", "uniffi", "bin"]
     };
     let bindings = if let Some(bindings) = options.bindings {
         bindings

@@ -191,6 +191,18 @@ fn develop_uniffi_mixed() {
 #[case(TestInstallBackend::Uv, "uv")]
 #[test]
 fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) {
+    // Only run uv tests on platforms that has wheel on PyPI or when uv binary is found
+    if matches!(backend, TestInstallBackend::Uv)
+        && !cfg!(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "windows"
+        ))
+        && which("uv").is_err()
+    {
+        return;
+    }
+
     handle_result(develop::test_develop(
         "test-crates/hello-world",
         None,
@@ -205,6 +217,18 @@ fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) 
 #[case(TestInstallBackend::Uv, "uv")]
 #[test]
 fn develop_pyo3_ffi_pure(#[case] backend: TestInstallBackend, #[case] name: &str) {
+    // Only run uv tests on platforms that has wheel on PyPI or when uv binary is found
+    if matches!(backend, TestInstallBackend::Uv)
+        && !cfg!(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "windows"
+        ))
+        && which("uv").is_err()
+    {
+        return;
+    }
+
     handle_result(develop::test_develop(
         "test-crates/pyo3-ffi-pure",
         None,

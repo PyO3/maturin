@@ -28,16 +28,22 @@ pub fn test_develop(
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
 
-    let output = Command::new(&python)
-        .args([
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "uv",
-            "cffi",
-        ])
-        .output()?;
+    let mut cmd = Command::new(&python);
+    cmd.args([
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "cffi",
+    ]);
+    if cfg!(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    )) {
+        cmd.arg("uv");
+    }
+    let output = cmd.output()?;
     if !output.status.success() {
         panic!(
             "Failed to install cffi: {}\n---stdout:\n{}---stderr:\n{}",

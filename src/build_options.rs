@@ -175,6 +175,7 @@ pub struct BuildOptions {
     #[arg(short = 'f', long, conflicts_with = "interpreter")]
     pub find_interpreter: bool,
 
+    /// Allow prerelease python interpreters
     #[arg(long)]
     pub allow_prereleases: bool,
 

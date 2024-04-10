@@ -562,7 +562,7 @@ impl BuildOptions {
         };
 
         let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
-        let interpreter = if self.find_interpreter {
+        let mut interpreter = if self.find_interpreter {
             // Auto-detect interpreters
             self.find_interpreters(
                 &bridge,

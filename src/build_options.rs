@@ -6,7 +6,7 @@ use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::{BuildContext, PythonInterpreter, Target};
-use anyhow::{bail, format_err, Context, Ok, Result};
+use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
 use pep440_rs::{Version, VersionSpecifiers};

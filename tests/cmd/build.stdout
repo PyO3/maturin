@@ -34,6 +34,9 @@ Options:
   -f, --find-interpreter
           Find interpreters from the host machine
 
+      --allow-prereleases
+          Allow prerelease python interpreters
+
   -b, --bindings <BINDINGS>
           Which kind of bindings to use
           

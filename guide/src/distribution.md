@@ -57,7 +57,7 @@ maturin contains a reimplementation of auditwheel automatically checks the gener
 
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 
-For full manylinux compliance you need to compile in a CentOS docker container. The [pyo3/maturin](https://ghcr.io/pyo3/maturin) image is based on the manylinux2010 image,
+For full manylinux compliance you need to compile in a CentOS docker container. The [pyo3/maturin](https://ghcr.io/pyo3/maturin) image is based on the manylinux2014 image,
 and passes arguments to the `maturin` binary. You can use it like this:
 
 ```

@@ -42,7 +42,6 @@ body:
       label: What bindings you're using
       options:
         - "pyo3"
-        - "rust-cpython"
         - "cffi"
         - "uniffi"
         - "bin"

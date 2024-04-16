@@ -28,32 +28,34 @@ pub fn test_develop(
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
 
-    let mut cmd = Command::new(&python);
-    cmd.args([
-        "-m",
-        "pip",
-        "install",
-        "--disable-pip-version-check",
-        "cffi",
-    ]);
+    let uv = matches!(test_backend, TestInstallBackend::Uv);
+    let mut pip_packages = Vec::new();
+    if unique_name.contains("cffi") {
+        pip_packages.push("cffi");
+    }
     if cfg!(any(
         target_os = "linux",
         target_os = "macos",
         target_os = "windows"
-    )) {
-        cmd.arg("uv");
+    )) && uv
+    {
+        pip_packages.push("uv");
     }
-    let output = cmd.output()?;
-    if !output.status.success() {
-        panic!(
-            "Failed to install cffi: {}\n---stdout:\n{}---stderr:\n{}",
-            output.status,
-            str::from_utf8(&output.stdout)?,
-            str::from_utf8(&output.stderr)?
-        );
+    if !pip_packages.is_empty() {
+        let mut cmd = Command::new(&python);
+        cmd.args(["-m", "pip", "install", "--disable-pip-version-check"])
+            .args(pip_packages);
+        let output = cmd.output()?;
+        if !output.status.success() {
+            panic!(
+                "Failed to install cffi: {}\n---stdout:\n{}---stderr:\n{}",
+                output.status,
+                str::from_utf8(&output.stdout)?,
+                str::from_utf8(&output.stderr)?
+            );
+        }
     }
 
-    let uv = matches!(test_backend, TestInstallBackend::Uv);
     let manifest_file = package.join("Cargo.toml");
     let develop_options = DevelopOptions {
         bindings,

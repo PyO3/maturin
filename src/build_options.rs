@@ -245,7 +245,7 @@ impl BuildOptions {
                         eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
                         env::set_var("PYO3_PYTHON", &host_python.executable);
-                        // rust-cpython, and legacy pyo3 versions
+                        // legacy pyo3 versions
                         env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
                         let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
@@ -1363,8 +1363,6 @@ mod test {
             find_bridge(&pyo3_mixed, Some("pyo3")),
             Ok(BridgeModel::Bindings(..))
         ));
-
-        assert!(find_bridge(&pyo3_mixed, Some("rust-cpython")).is_err());
     }
 
     #[test]
@@ -1382,7 +1380,6 @@ mod test {
             find_bridge(&pyo3_pure, Some("pyo3")),
             Ok(BridgeModel::BindingsAbi3(3, 7))
         ));
-        assert!(find_bridge(&pyo3_pure, Some("rust-cpython")).is_err());
     }
 
     #[test]
@@ -1419,7 +1416,6 @@ mod test {
         );
         assert_eq!(find_bridge(&cffi_pure, None).unwrap(), BridgeModel::Cffi);
 
-        assert!(find_bridge(&cffi_pure, Some("rust-cpython")).is_err());
         assert!(find_bridge(&cffi_pure, Some("pyo3")).is_err());
     }
 
@@ -1439,7 +1435,6 @@ mod test {
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("rust-cpython")).is_err());
         assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
 
         let pyo3_bin = MetadataCommand::new()

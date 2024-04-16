@@ -12,6 +12,7 @@ pub mod errors;
 pub mod integration;
 pub mod other;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TestInstallBackend {
     Pip,
     Uv,

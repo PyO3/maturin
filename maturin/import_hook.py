@@ -149,7 +149,7 @@ def install(bindings: str | None = None, release: bool = False) -> Importer | No
     Install the import hook.
 
     :param bindings: Which kind of bindings to use.
-        Possible values are pyo3 and cffi
+        Possible values are pyo3, rust-cpython and cffi
 
     :param release: Build in release mode, otherwise debug mode by default
     """

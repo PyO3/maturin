@@ -245,7 +245,7 @@ impl BuildOptions {
                         eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
                         env::set_var("PYO3_PYTHON", &host_python.executable);
-                        // legacy pyo3 versions
+                        // rust-cpython, and legacy pyo3 versions
                         env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
                         let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;

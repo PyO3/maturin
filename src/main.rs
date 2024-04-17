@@ -1,4 +1,4 @@
-//! Build and publish crates with pyo3 and cffi bindings as well as rust binaries
+//! Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries
 //! as python packages. This file contains the CLI and keyring integration.
 //!
 //! Run with --help for usage information
@@ -34,7 +34,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
     styles = cargo_options::styles(),
 )]
 #[cfg_attr(clippy, allow(clippy::large_enum_variant))]
-/// Build and publish crates with pyo3 and cffi bindings as well
+/// Build and publish crates with pyo3, rust-cpython and cffi bindings as well
 /// as rust binaries as python packages
 enum Opt {
     #[command(name = "build", alias = "b")]

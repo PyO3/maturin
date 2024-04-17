@@ -45,7 +45,7 @@ Maintainer: konstin <konstin@mailbox.org>
 Architecture: $architecture
 Provides: $BINARY_NAME
 Conflicts: $conflictname
-Description: Build and publish crates with pyo3 and cffi bindings as well as rust binaries as python packages
+Description: Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages
 EOF
 
 fakeroot dpkg-deb --build "$tempdir" "${dpkgname}_${version}_${architecture}.deb"

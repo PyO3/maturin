@@ -1,4 +1,5 @@
-Build and publish crates with pyo3 and cffi bindings as well as rust binaries as python packages
+Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as
+python packages
 
 Usage: maturin[EXE] <COMMAND>
 

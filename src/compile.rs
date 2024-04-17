@@ -398,7 +398,7 @@ fn cargo_build_command(
                     );
             }
 
-            // legacy pyo3 versions
+            // rust-cpython, and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if (bridge_model.is_bindings("pyo3")
             || bridge_model.is_bindings("pyo3-ffi")

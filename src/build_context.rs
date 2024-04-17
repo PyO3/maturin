@@ -39,7 +39,7 @@ pub enum BridgeModel {
     /// The String is the name of the bindings
     /// providing crate, e.g. pyo3, the number is the minimum minor python version
     Bin(Option<(String, usize)>),
-    /// A native module with pyo3 bindings. The String is the name of the bindings
+    /// A native module with pyo3 or rust-cpython bindings. The String is the name of the bindings
     /// providing crate, e.g. pyo3, the number is the minimum minor python version
     Bindings(String, usize),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel

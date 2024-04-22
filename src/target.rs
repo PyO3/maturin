@@ -246,7 +246,7 @@ impl Target {
             OperatingSystem::Illumos => Os::Illumos,
             OperatingSystem::Haiku => Os::Haiku,
             OperatingSystem::Emscripten => Os::Emscripten,
-            OperatingSystem::Wasi => Os::Wasi,
+            OperatingSystem::Wasi | OperatingSystem::WasiP1 | OperatingSystem::WasiP2 => Os::Wasi,
             OperatingSystem::Aix => Os::Aix,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };

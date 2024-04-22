@@ -41,4 +41,10 @@ if __name__ == "__main__":
         print("Unable to find `maturin` script")
         exit(1)
 
-    os.execv(maturin, [str(maturin)] + sys.argv[1:])
+    if sys.platform == "win32":
+        import subprocess
+
+        code = subprocess.call([str(maturin)] + sys.argv[1:])
+        sys.exit(code)
+    else:
+        os.execv(maturin, [str(maturin)] + sys.argv[1:])

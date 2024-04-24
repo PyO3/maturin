@@ -51,8 +51,8 @@ The [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action 
 
 maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper platform tag.
 
-* If your system's glibc is too new, it will assign the `linux` tag.
-* If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf),
+- If your system's glibc is too new, it will assign the `linux` tag.
+- If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf),
   it can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
 
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
@@ -67,7 +67,6 @@ docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --release  # or other m
 Note that this image is very basic and only contains python, maturin and stable Rust. If you need additional tools, you can run commands inside the manylinux container.
 See [konstin/complex-manylinux-maturin-docker](https://github.com/konstin/complex-manylinux-maturin-docker) for a small educational example
 or [nanoporetech/fast-ctc-decode](https://github.com/nanoporetech/fast-ctc-decode/blob/b226ea0f2b2f4f474eff47349703d57d2ea4801b/.github/workflows/publish.yml) for a real world setup.
-
 
 ```
 Usage: maturin build [OPTIONS] [ARGS]...
@@ -103,7 +102,7 @@ Options:
   -b, --bindings <BINDINGS>
           Which kind of bindings to use
 
-          [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, uniffi, bin]
+          [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
 
   -o, --out <OUT>
           The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target directory
@@ -202,7 +201,7 @@ And [maturin-action](https://github.com/PyO3/maturin-action) makes it easy to do
 ##### Use Zig
 
 Since v0.12.7 maturin added support for linking with [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html),
-compile for  Linux works and is regularly tested on CI, other platforms may also work but aren't tested regularly.
+compile for Linux works and is regularly tested on CI, other platforms may also work but aren't tested regularly.
 
 You can install zig following the [official documentation](https://ziglang.org/download), or install it from PyPI via `pip install ziglang`.
 Then pass `--zig` to maturin `build` or `publish` commands to use it, for example
@@ -294,6 +293,7 @@ Options:
 By default, the workflow provided by `generate-ci` will publish the release artifacts to PyPI using API token authentication. However, maturin also supports [trusted publishing (OpenID Connect)](https://docs.pypi.org/trusted-publishers/).
 
 To enable it, modify the `release` action in the generated GitHub workflow file:
+
 - remove `MATURIN_PYPI_TOKEN` from the `env` section to make maturin use trusted publishing
 - add `id-token: write` to the action's `permissions` (see [Configuring OpenID Connect in PyPI](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-pypi) from GitHub's documentation).
 - if `Environment name: release` was set in PyPI, add `environment: release`

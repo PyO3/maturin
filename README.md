@@ -9,7 +9,7 @@ _formerly pyo3-pack_
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![discord server](https://img.shields.io/discord/1209263839632424990?logo=discord)](https://discord.gg/33kcChzH7f)
 
-Build and publish crates with pyo3, rust-cpython, cffi and uniffi bindings as well as rust binaries as python packages with minimal configuration.
+Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages with minimal configuration.
 It supports building wheels for python 3.8+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
 
 Check out the [User Guide](https://maturin.rs/)!
@@ -28,12 +28,12 @@ pipx install maturin
 
 There are four main commands:
 
- * `maturin new` creates a new cargo project with maturin configured.
- * `maturin publish` builds the crate into python packages and publishes them to pypi.
- * `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
- * `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
+- `maturin new` creates a new cargo project with maturin configured.
+- `maturin publish` builds the crate into python packages and publishes them to pypi.
+- `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
+- `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 
-`pyo3` and `rust-cpython` bindings are automatically detected. For cffi or binaries, you need to pass `-b cffi` or `-b bin`.
+`pyo3` bindings are automatically detected. For cffi or binaries, you need to pass `-b cffi` or `-b bin`.
 maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust or milksnake configuration.
 You can even integrate it with testing tools such as [tox](https://tox.readthedocs.io/en/latest/).
 There are examples for the different bindings in the `test-crates` folder.
@@ -46,7 +46,7 @@ The name of the module, which you are using when importing, will be the `name` v
 Python packages come in two formats:
 A built form called wheel and source distributions (sdist), both of which are archives.
 A wheel can be compatible with any python version, interpreter (cpython and pypy, mainly), operating system and hardware architecture (for pure python wheels),
-can be limited to a specific platform and architecture (e.g. when using ctypes or cffi) or to a specific python interpreter and version on a specific architecture and operating system (e.g. with pyo3 and rust-cpython).
+can be limited to a specific platform and architecture (e.g. when using ctypes or cffi) or to a specific python interpreter and version on a specific architecture and operating system (e.g. with pyo3).
 
 When using `pip install` on a package, pip tries to find a matching wheel and install that. If it doesn't find one, it downloads the source distribution and builds a wheel for the current platform,
 which requires the right compilers to be installed. Installing a wheel is much faster than installing a source distribution as building wheels is generally slow.
@@ -55,9 +55,9 @@ When you publish a package to be installable with `pip install`, you upload it t
 For testing, you can use [test pypi](https://test.pypi.org/) instead, which you can use with `pip install --index-url https://test.pypi.org/simple/`.
 Note that for publishing for linux, [you need to use the manylinux docker container](#manylinux-and-auditwheel), while for publishing from your repository you can use the [PyO3/maturin-action github action](https://github.com/PyO3/maturin-action).
 
-## pyo3 and rust-cpython
+## pyo3
 
-For pyo3 and rust-cpython, maturin can only build packages for installed python versions. On linux and mac, all python versions in `PATH` are used.
+For pyo3, maturin can only build packages for installed python versions. On linux and mac, all python versions in `PATH` are used.
 If you don't set your own interpreters with `-i`, a heuristic is used to search for python installations.
 On windows all versions from the python launcher (which is installed by default by the python.org installer) and all conda environments except base are used. You can check which versions are picked up with the `list-python` subcommand.
 
@@ -146,7 +146,7 @@ my-project
 
 maturin will add the native extension as a module in your python folder. When using develop, maturin will copy the native library and for cffi also the glue code to your python folder. You should add those files to your gitignore.
 
-With cffi you can do `from .my_project import lib` and then use `lib.my_native_function`, with pyo3/rust-cpython you can directly `from .my_project import my_native_function`.
+With cffi you can do `from .my_project import lib` and then use `lib.my_native_function`, with pyo3 you can directly `from .my_project import my_native_function`.
 
 Example layout with pyo3 after `maturin develop`:
 
@@ -172,7 +172,6 @@ fn my_lib_name(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 ```
-
 
 ## Python metadata
 
@@ -272,23 +271,23 @@ maturin itself is manylinux compliant when compiled for the musl target.
 
 ## Examples
 
-* [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
-* [chardetng-py](https://github.com/john-parton/chardetng-py) - Python binding for the chardetng character encoding detector.
-* [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
-* [datafusion-python](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
-* [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
-* [opendal](https://github.com/apache/incubator-opendal/tree/main/bindings/python) - OpenDAL Python Binding to access data freely
-* [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
-* [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js
-* [pydantic-core](https://github.com/pydantic/pydantic-core) - Core validation logic for pydantic written in Rust
-* [pyrus-cramjam](https://github.com/milesgranger/pyrus-cramjam) - Thin Python wrapper to de/compression algorithms in Rust
-* [pyxel](https://github.com/kitao/pyxel) - A retro game engine for Python
-* [roapi](https://github.com/roapi/roapi) - ROAPI automatically spins up read-only APIs for static datasets without requiring you to write a single line of code
-* [robyn](https://github.com/sansyrox/robyn) -  A fast and extensible async python web server with a Rust runtime
-* [ruff](https://github.com/charliermarsh/ruff) - An extremely fast Python linter, written in Rust
-* [tantivy-py](https://github.com/quickwit-oss/tantivy-py) - Python bindings for Tantivy
-* [watchfiles](https://github.com/samuelcolvin/watchfiles) - Simple, modern and high performance file watching and code reload in python
-* [wonnx](https://github.com/webonnx/wonnx/tree/master/wonnx-py) - Wonnx is a GPU-accelerated ONNX inference run-time written 100% in Rust
+- [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
+- [chardetng-py](https://github.com/john-parton/chardetng-py) - Python binding for the chardetng character encoding detector.
+- [connector-x](https://github.com/sfu-db/connector-x/tree/main/connectorx-python) - ConnectorX enables you to load data from databases into Python in the fastest and most memory efficient way
+- [datafusion-python](https://github.com/apache/arrow-datafusion-python) - a Python library that binds to Apache Arrow in-memory query engine DataFusion
+- [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
+- [opendal](https://github.com/apache/incubator-opendal/tree/main/bindings/python) - OpenDAL Python Binding to access data freely
+- [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
+- [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js
+- [pydantic-core](https://github.com/pydantic/pydantic-core) - Core validation logic for pydantic written in Rust
+- [pyrus-cramjam](https://github.com/milesgranger/pyrus-cramjam) - Thin Python wrapper to de/compression algorithms in Rust
+- [pyxel](https://github.com/kitao/pyxel) - A retro game engine for Python
+- [roapi](https://github.com/roapi/roapi) - ROAPI automatically spins up read-only APIs for static datasets without requiring you to write a single line of code
+- [robyn](https://github.com/sansyrox/robyn) - A fast and extensible async python web server with a Rust runtime
+- [ruff](https://github.com/charliermarsh/ruff) - An extremely fast Python linter, written in Rust
+- [tantivy-py](https://github.com/quickwit-oss/tantivy-py) - Python bindings for Tantivy
+- [watchfiles](https://github.com/samuelcolvin/watchfiles) - Simple, modern and high performance file watching and code reload in python
+- [wonnx](https://github.com/webonnx/wonnx/tree/master/wonnx-py) - Wonnx is a GPU-accelerated ONNX inference run-time written 100% in Rust
 
 ## Contributing
 
@@ -309,7 +308,7 @@ If you don't have time to contribute yourself but still wish to support the proj
 
 Licensed under either of:
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/PyO3/maturin/blob/main/license-apache) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](https://github.com/PyO3/maturin/blob/main/license-mit) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/PyO3/maturin/blob/main/license-apache) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](https://github.com/PyO3/maturin/blob/main/license-mit) or http://opensource.org/licenses/MIT)
 
 at your option.

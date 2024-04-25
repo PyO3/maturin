@@ -73,14 +73,6 @@ from Python.
 > **Note**: Maturin _does not_ automatically detect `cffi` bindings. You _must_
 > specify them via either command line with `-b cffi` or in `pyproject.toml`.
 
-## `rust-cpython`
-
-[rust-cpython](https://github.com/dgrunwald/rust-cpython) is Rust bindings for
-the Python interpreter. Currently it only supports CPython.
-
-Maturin automatically detects rust-cpython bindings when it's added as a
-dependency in `Cargo.toml`.
-
 ## `bin`
 
 Maturin also supports distributing binary applications written in Rust as

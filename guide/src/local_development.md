@@ -16,7 +16,7 @@ Options:
   -b, --bindings <BINDINGS>
           Which kind of bindings to use
 
-          [possible values: pyo3, pyo3-ffi, rust-cpython, cffi, uniffi, bin]
+          [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
 
       --strip
           Strip the library for minimum file size
@@ -131,7 +131,9 @@ To install a package in editable mode with pip:
 cd my-project
 pip install -e .
 ```
+
 or
+
 ```bash
 cd my-project
 maturin develop

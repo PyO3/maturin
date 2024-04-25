@@ -2,7 +2,7 @@
 authors = ["konstin <konstin@mailbox.org>", "messense <messense@icloud.com>"]
 name = "maturin"
 version = "1.5.1"
-description = "Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as python packages"
+description = "Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
 exclude = [
     "test-crates/**/*",
     "sysconfig/*",

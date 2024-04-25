@@ -55,7 +55,7 @@ setup(
     author="konstin",
     author_email="konstin@mailbox.org",
     url="https://github.com/pyo3/maturin",
-    description="Build and publish crates with pyo3, rust-cpython and cffi bindings as well as rust binaries as "
+    description="Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as "
     "python packages",
     long_description=long_description,
     long_description_content_type="text/markdown",

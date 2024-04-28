@@ -96,7 +96,7 @@ clap = { version = "4.0.0", features = [
 clap_complete_command = { version = "0.5.1", default-features = false, features = ["nushell"], optional = true }
 
 # cross compile
-cargo-zigbuild = { version = "0.18.3", default-features = false, optional = true }
+cargo-zigbuild = { version = "0.18.4", default-features = false, optional = true }
 cargo-xwin = { version = "0.16.4", default-features = false, optional = true }
 
 # log

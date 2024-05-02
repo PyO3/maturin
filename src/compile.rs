@@ -552,7 +552,7 @@ fn compile_target(
 
     // Add linked_paths to build artifacts
     for artifact in artifacts.values_mut() {
-        artifact.linked_paths = linked_paths.clone();
+        artifact.linked_paths.clone_from(&linked_paths);
     }
 
     let status = cargo_build

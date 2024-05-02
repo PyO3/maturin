@@ -1280,12 +1280,12 @@ impl CargoOptions {
         let mut args_from_pyproject = Vec::new();
 
         if self.manifest_path.is_none() && tool_maturin.manifest_path.is_some() {
-            self.manifest_path = tool_maturin.manifest_path.clone();
+            self.manifest_path.clone_from(&tool_maturin.manifest_path);
             args_from_pyproject.push("manifest-path");
         }
 
         if self.profile.is_none() && tool_maturin.profile.is_some() {
-            self.profile = tool_maturin.profile.clone();
+            self.profile.clone_from(&tool_maturin.profile);
             args_from_pyproject.push("profile");
         }
 

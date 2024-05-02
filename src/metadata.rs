@@ -134,7 +134,7 @@ impl Metadata23 {
     ) -> Result<()> {
         let pyproject_dir = pyproject_dir.as_ref();
         if let Some(project) = &pyproject_toml.project {
-            self.name = project.name.clone();
+            self.name.clone_from(&project.name);
 
             if let Some(version) = &project.version {
                 self.version = version.clone();
@@ -173,7 +173,7 @@ impl Metadata23 {
                     if let Some(description) = text {
                         self.description = Some(description.clone());
                     }
-                    self.description_content_type = content_type.clone();
+                    self.description_content_type.clone_from(content_type);
                 }
                 None => {}
             }
@@ -279,15 +279,15 @@ impl Metadata23 {
             }
 
             if let Some(classifiers) = &project.classifiers {
-                self.classifiers = classifiers.clone();
+                self.classifiers.clone_from(classifiers);
             }
 
             if let Some(urls) = &project.urls {
-                self.project_url = urls.clone();
+                self.project_url.clone_from(urls);
             }
 
             if let Some(dependencies) = &project.dependencies {
-                self.requires_dist = dependencies.clone();
+                self.requires_dist.clone_from(dependencies);
             }
 
             if let Some(dependencies) = &project.optional_dependencies {
@@ -313,10 +313,10 @@ impl Metadata23 {
             }
 
             if let Some(scripts) = &project.scripts {
-                self.scripts = scripts.clone();
+                self.scripts.clone_from(scripts);
             }
             if let Some(gui_scripts) = &project.gui_scripts {
-                self.gui_scripts = gui_scripts.clone();
+                self.gui_scripts.clone_from(gui_scripts);
             }
             if let Some(entry_points) = &project.entry_points {
                 // Raise error on ambiguous entry points: https://www.python.org/dev/peps/pep-0621/#entry-points
@@ -326,7 +326,7 @@ impl Metadata23 {
                 if entry_points.contains_key("gui_scripts") {
                     bail!("gui_scripts is not allowed in project.entry-points table");
                 }
-                self.entry_points = entry_points.clone();
+                self.entry_points.clone_from(entry_points);
             }
         }
         Ok(())

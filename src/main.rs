@@ -33,7 +33,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
     after_help = "Visit https://maturin.rs to learn more about maturin.",
     styles = cargo_options::styles(),
 )]
-#[cfg_attr(clippy, allow(clippy::large_enum_variant))]
+#[allow(clippy::large_enum_variant)]
 /// Build and publish crates with pyo3, cffi and uniffi bindings as well
 /// as rust binaries as python packages
 enum Opt {

@@ -1210,8 +1210,12 @@ pub fn write_python_part(
                         continue;
                     }
                 }
+                #[cfg(unix)]
+                let mode = absolute.metadata()?.permissions().mode();
+                #[cfg(not(unix))]
+                let mode = 0o644;
                 writer
-                    .add_file(relative, &absolute)
+                    .add_file_with_permissions(relative, &absolute, mode)
                     .context(format!("File to add file from {}", absolute.display()))?;
             }
         }

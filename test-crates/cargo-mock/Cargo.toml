@@ -10,5 +10,5 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.38"
-cargo_metadata = "0.12.3"
+cargo_metadata = "0.18.1"
 serde_json = "1.0.62"

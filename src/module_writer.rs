@@ -10,7 +10,11 @@ use base64::Engine;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use fs_err as fs;
+#[cfg(unix)]
+use fs_err::os::unix::fs::OpenOptionsExt;
 use fs_err::File;
+#[cfg(unix)]
+use fs_err::OpenOptions;
 use ignore::overrides::Override;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
@@ -20,12 +24,10 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
-#[cfg(unix)]
-use std::fs::OpenOptions;
 use std::io;
 use std::io::{Read, Write};
 #[cfg(unix)]
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;

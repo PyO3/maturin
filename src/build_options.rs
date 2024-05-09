@@ -94,6 +94,7 @@ pub struct CargoOptions {
     pub ignore_rust_version: bool,
 
     /// Use verbose output (-vv very verbose/build.rs output)
+    // Note that this duplicates the global option, but clap seems to be fine with that.
     #[arg(short = 'v', long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 

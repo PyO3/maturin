@@ -13,6 +13,15 @@ Options:
   -m, --manifest-path <PATH>
           Path to Cargo.toml
 
+  -v, --verbose...
+          Use verbose output.
+          
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
+          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+          
+          You can configure fine-grained logging using the `RUST_LOG` environment variable.
+          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
   -o, --output <PATH>
           Output path
           

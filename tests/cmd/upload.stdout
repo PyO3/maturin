@@ -18,6 +18,15 @@ Options:
           [env: MATURIN_REPOSITORY=]
           [default: pypi]
 
+  -v, --verbose...
+          Use verbose output.
+          
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
+          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+          
+          You can configure fine-grained logging using the `RUST_LOG` environment variable.
+          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
       --repository-url <REPOSITORY_URL>
           The URL of the registry where the wheels are uploaded to. This overrides --repository.
           

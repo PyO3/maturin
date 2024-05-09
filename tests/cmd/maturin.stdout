@@ -1,7 +1,7 @@
 Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python
 packages
 
-Usage: maturin[EXE] <COMMAND>
+Usage: maturin[EXE] [OPTIONS] <COMMAND>
 
 Commands:
   build        Build the crate into python packages
@@ -16,7 +16,19 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+  -v, --verbose...
+          Use verbose output.
+          
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
+          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+          
+          You can configure fine-grained logging using the `RUST_LOG` environment variable.
+          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
 
 Visit https://maturin.rs to learn more about maturin.

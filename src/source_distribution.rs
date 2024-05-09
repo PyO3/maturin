@@ -422,8 +422,8 @@ fn add_cargo_package_files_to_sdist(
         })?;
         // Handle possible relative readme field in Cargo.toml
         if let Some(readme) = path_dep.readme.as_ref() {
-            let abs_readme = path_dep_manifest_dir
-                .join(readme)
+            let readme = path_dep_manifest_dir.join(readme);
+            let abs_readme = readme
                 .normalize()
                 .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
                 .into_path_buf();
@@ -470,10 +470,10 @@ fn add_cargo_package_files_to_sdist(
     )?;
     // Handle possible relative readme field in Cargo.toml
     if let Some(readme) = main_crate.readme.as_ref() {
-        let abs_readme = abs_manifest_dir
-            .join(readme)
+        let readme = abs_manifest_dir.join(readme);
+        let abs_readme = readme
             .normalize()
-            .with_context(|| format!("failed to normalize readme path `{}`", readme))?
+            .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
             .into_path_buf();
         let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
         writer.add_file(root_dir.join(relative_readme), &abs_readme)?;

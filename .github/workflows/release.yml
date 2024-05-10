@@ -280,7 +280,6 @@ jobs:
             *.tar.gz
             *.zip
             *.deb
-            *.sig
-            *.crt
+            *.sigstore
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
           generate_release_notes: true

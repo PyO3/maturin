@@ -531,7 +531,6 @@ jobs:
       - test-cross-compile
       - test-bootstrap
       - test-msrv
-      - test-pyston
       - test-downstream
       - check
     if: always()

@@ -476,35 +476,6 @@ jobs:
       - name: cargo build
         run: cargo build --all
 
-  test-pyston:
-    name: Test Pyston
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    container: pyston/pyston:2.3.5
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fix git permissions
-        run: git config --global --add safe.directory $GITHUB_WORKSPACE
-      - uses: dtolnay/rust-toolchain@stable
-        id: rustup
-        with:
-          targets: wasm32-wasi
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-      - name: Install python packages
-        run: pip install virtualenv cffi
-      # Caching
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: maturin-build
-      - name: cargo test
-        env:
-          MATURIN_TEST_PYTHON: pyston
-        run: |
-          # unset GITHUB_ACTIONS env var to disable zig and conda related tests
-          env -u GITHUB_ACTIONS cargo nextest run --features password-storage
-
   test-downstream:
     name: Test downstream - ${{ matrix.downstream.repository }}
     if: ${{ contains(github.event.pull_request.labels.*.name, 'sdist') && github.event_name == 'pull_request' }}

@@ -327,6 +327,7 @@ impl ProjectResolver {
             .manifest_path(manifest_path)
             .verbose(true)
             .other_options(cargo_metadata_extra_args)
+            .no_deps()
             .exec();
 
         let cargo_metadata = match result {

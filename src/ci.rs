@@ -418,7 +418,7 @@ jobs:\n",
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
+          pip install {project_name} --find-links dist --no-index --force-reinstall
           pip install pytest
           {chdir}pytest
 "
@@ -438,7 +438,7 @@ jobs:\n",
             pip3 install -U pip pytest
           run: |
             set -e
-            pip3 install {project_name} --find-links dist --force-reinstall
+            pip3 install {project_name} --find-links dist --no-index --force-reinstall
             {chdir}pytest
 "
                                             ));
@@ -456,7 +456,7 @@ jobs:\n",
             apk add py3-pip py3-virtualenv
             python3 -m virtualenv .venv
             source .venv/bin/activate
-            pip install {project_name} --no-index --find-links dist --force-reinstall
+            pip install {project_name} --find-links dist --no-index --force-reinstall
             pip install pytest
             {chdir}pytest
 "
@@ -476,7 +476,7 @@ jobs:\n",
             python3 -m virtualenv .venv
             source .venv/bin/activate
             pip install pytest
-            pip install {project_name} --find-links dist --force-reinstall
+            pip install {project_name} --find-links dist --no-index --force-reinstall
             {chdir}pytest
 "
                         ));
@@ -490,7 +490,7 @@ jobs:\n",
           set -e
           python3 -m venv .venv
           source .venv/Scripts/activate
-          pip install {project_name} --find-links dist --force-reinstall
+          pip install {project_name} --find-links dist --no-index --force-reinstall
           pip install pytest
           {chdir}pytest
 "
@@ -503,7 +503,7 @@ jobs:\n",
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
+          pip install {project_name} --find-links dist --no-index --force-reinstall
           pip install pytest
           {chdir}pytest
 "
@@ -522,7 +522,7 @@ jobs:\n",
           set -e
           pyodide venv .venv
           source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
+          pip install {project_name} --find-links dist --no-index --force-reinstall
           pip install pytest
           {chdir}python -m pytest
 "
@@ -1050,7 +1050,7 @@ mod tests {
                       set -e
                       python3 -m venv .venv
                       source .venv/bin/activate
-                      pip install example --find-links dist --force-reinstall
+                      pip install example --find-links dist --no-index --force-reinstall
                       pip install pytest
                       pytest
                   - name: pytest
@@ -1066,7 +1066,7 @@ mod tests {
                         pip3 install -U pip pytest
                       run: |
                         set -e
-                        pip3 install example --find-links dist --force-reinstall
+                        pip3 install example --find-links dist --no-index --force-reinstall
                         pytest
 
               musllinux:
@@ -1110,7 +1110,7 @@ mod tests {
                         apk add py3-pip py3-virtualenv
                         python3 -m virtualenv .venv
                         source .venv/bin/activate
-                        pip install example --no-index --find-links dist --force-reinstall
+                        pip install example --find-links dist --no-index --force-reinstall
                         pip install pytest
                         pytest
                   - name: pytest
@@ -1127,7 +1127,7 @@ mod tests {
                         python3 -m virtualenv .venv
                         source .venv/bin/activate
                         pip install pytest
-                        pip install example --find-links dist --force-reinstall
+                        pip install example --find-links dist --no-index --force-reinstall
                         pytest
 
               windows:
@@ -1163,7 +1163,7 @@ mod tests {
                       set -e
                       python3 -m venv .venv
                       source .venv/Scripts/activate
-                      pip install example --find-links dist --force-reinstall
+                      pip install example --find-links dist --no-index --force-reinstall
                       pip install pytest
                       pytest
 
@@ -1197,7 +1197,7 @@ mod tests {
                       set -e
                       python3 -m venv .venv
                       source .venv/bin/activate
-                      pip install example --find-links dist --force-reinstall
+                      pip install example --find-links dist --no-index --force-reinstall
                       pip install pytest
                       pytest
 

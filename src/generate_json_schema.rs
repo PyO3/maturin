@@ -1,5 +1,6 @@
 #![cfg(feature = "schemars")]
-use std::fs;
+
+use fs_err as fs;
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};

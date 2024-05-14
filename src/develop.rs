@@ -1,5 +1,5 @@
 use crate::build_options::CargoOptions;
-use crate::target::detect_arch_from_python;
+use crate::target::Arch;
 use crate::BuildContext;
 use crate::BuildOptions;
 use crate::PlatformTag;
@@ -307,8 +307,22 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     // check python platform and architecture
     if !target.user_specified {
-        if let Some(detected_target) = detect_arch_from_python(&python, &target) {
-            target_triple = Some(detected_target);
+        match Command::new(&python)
+            .arg("-c")
+            .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
+            .output()
+        {
+            Ok(output) if output.status.success() => {
+                let platform = String::from_utf8_lossy(&output.stdout);
+                if platform.contains("macos") {
+                    if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
+                        target_triple = Some("x86_64-apple-darwin".to_string());
+                    } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
+                        target_triple = Some("aarch64-apple-darwin".to_string());
+                    }
+                }
+            }
+            _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
         }
     }
 

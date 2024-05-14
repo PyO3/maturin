@@ -8,7 +8,6 @@ use std::env;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::str;
 use target_lexicon::{Architecture, Environment, Triple};
 use tracing::error;
@@ -618,25 +617,4 @@ fn rustc_version_meta() -> Result<VersionMeta> {
         err => anyhow!(err).context("Failed to run rustc to get the host target"),
     })?;
     Ok(meta)
-}
-
-pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Option<String> {
-    match Command::new(python)
-        .arg("-c")
-        .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
-        .output()
-    {
-        Ok(output) if output.status.success() => {
-            let platform = String::from_utf8_lossy(&output.stdout);
-            if platform.contains("macos") {
-                if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
-                    return Some("x86_64-apple-darwin".to_string());
-                } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
-                    return Some("aarch64-apple-darwin".to_string());
-                }
-            }
-        }
-        _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
-    }
-    None
 }

@@ -551,16 +551,7 @@ impl BuildOptions {
             target_triple = None;
         }
 
-        let mut target = Target::from_target_triple(target_triple)?;
-        if !target.user_specified && !universal2 {
-            if let Some(interpreter) = self.interpreter.first() {
-                if let Some(detected_target) =
-                    crate::target::detect_arch_from_python(interpreter, &target)
-                {
-                    target = Target::from_target_triple(Some(detected_target))?;
-                }
-            }
-        }
+        let target = Target::from_target_triple(target_triple)?;
 
         let wheel_dir = match self.out {
             Some(ref dir) => dir.clone(),

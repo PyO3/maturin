@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+* Add a global `-v` option [#2080](https://github.com/PyO3/maturin/pull/2080)
+
 ## [1.5.1] - 2024-03-21
 
 * Fix usage of `--compatibility` when run as a PEP517 backend in [#1992](https://github.com/PyO3/maturin/pull/1992)

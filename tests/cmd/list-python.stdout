@@ -3,5 +3,17 @@ Search and list the available python installations
 Usage: maturin[EXE] list-python [OPTIONS]
 
 Options:
-      --target <TARGET>  
-  -h, --help             Print help
+      --target <TARGET>
+          
+
+  -v, --verbose...
+          Use verbose output.
+          
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
+          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+          
+          You can configure fine-grained logging using the `RUST_LOG` environment variable.
+          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
+  -h, --help
+          Print help (see a summary with '-h')

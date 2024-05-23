@@ -10,6 +10,15 @@ Options:
   -m, --manifest-path <MANIFEST_PATH>
           The path to the Cargo.toml
 
+  -v, --verbose...
+          Use verbose output.
+          
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
+          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+          
+          You can configure fine-grained logging using the `RUST_LOG` environment variable.
+          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
   -o, --out <OUT>
           The directory to store the built wheels in. Defaults to a new "wheels" directory in the
           project's target directory

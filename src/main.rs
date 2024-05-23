@@ -22,8 +22,10 @@ use maturin::{generate_json_schema, GenerateJsonSchemaOptions};
 use maturin::{upload_ui, PublishOpt};
 use std::env;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tracing::{debug, instrument};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::filter::Directive;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -33,10 +35,29 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
     after_help = "Visit https://maturin.rs to learn more about maturin.",
     styles = cargo_options::styles(),
 )]
+/// Build and publish crates with pyo3, cffi and uniffi bindings as well
+/// as rust binaries as python packages
+struct Opt {
+    /// Use verbose output.
+    ///
+    /// * Default: Show build information and `cargo build` output.
+    /// * `-v`: Use `cargo build -v`.
+    /// * `-vv`: Show debug logging and use `cargo build -vv`.
+    /// * `-vvv`: Show trace logging.
+    ///
+    /// You can configure fine-grained logging using the `RUST_LOG` environment variable.
+    /// (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+    #[arg(global = true, action = clap::ArgAction::Count, long, short)]
+    verbose: u8,
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Parser)]
 #[allow(clippy::large_enum_variant)]
 /// Build and publish crates with pyo3, cffi and uniffi bindings as well
 /// as rust binaries as python packages
-enum Opt {
+enum Command {
     #[command(name = "build", alias = "b")]
     /// Build the crate into python packages
     Build {
@@ -328,8 +349,10 @@ fn run() -> Result<()> {
     #[cfg(feature = "wild")]
     let opt = Opt::parse_from(wild::args_os());
 
-    match opt {
-        Opt::Build {
+    setup_logging(opt.verbose)?;
+
+    match opt.command {
+        Command::Build {
             build,
             release,
             strip,
@@ -345,7 +368,7 @@ fn run() -> Result<()> {
             assert!(!wheels.is_empty());
         }
         #[cfg(feature = "upload")]
-        Opt::Publish {
+        Command::Publish {
             build,
             mut publish,
             debug,
@@ -370,7 +393,7 @@ fn run() -> Result<()> {
 
             upload_ui(&items, &publish)?
         }
-        Opt::ListPython { target } => {
+        Command::ListPython { target } => {
             let found = if target.is_some() {
                 let target = Target::from_target_triple(target)?;
                 PythonInterpreter::find_by_target(&target, None)
@@ -384,12 +407,12 @@ fn run() -> Result<()> {
                 eprintln!(" - {interpreter}");
             }
         }
-        Opt::Develop(develop_options) => {
+        Command::Develop(develop_options) => {
             let target = Target::from_target_triple(develop_options.cargo_options.target.clone())?;
             let venv_dir = detect_venv(&target)?;
             develop(develop_options, &venv_dir)?;
         }
-        Opt::SDist { manifest_path, out } => {
+        Command::SDist { manifest_path, out } => {
             let build_options = BuildOptions {
                 out,
                 cargo: CargoOptions {
@@ -403,15 +426,15 @@ fn run() -> Result<()> {
                 .build_source_distribution()?
                 .context("Failed to build source distribution, pyproject.toml not found")?;
         }
-        Opt::Pep517(subcommand) => pep517(subcommand)?,
+        Command::Pep517(subcommand) => pep517(subcommand)?,
         #[cfg(feature = "scaffolding")]
-        Opt::InitProject { path, options } => init_project(path, options)?,
+        Command::InitProject { path, options } => init_project(path, options)?,
         #[cfg(feature = "scaffolding")]
-        Opt::NewProject { path, options } => new_project(path, options)?,
+        Command::NewProject { path, options } => new_project(path, options)?,
         #[cfg(feature = "scaffolding")]
-        Opt::GenerateCI(generate_ci) => generate_ci.execute()?,
+        Command::GenerateCI(generate_ci) => generate_ci.execute()?,
         #[cfg(feature = "upload")]
-        Opt::Upload { mut publish, files } => {
+        Command::Upload { mut publish, files } => {
             if files.is_empty() {
                 eprintln!("⚠️  Warning: No files given, exiting.");
                 return Ok(());
@@ -421,17 +444,17 @@ fn run() -> Result<()> {
             upload_ui(&files, &publish)?
         }
         #[cfg(feature = "cli-completion")]
-        Opt::Completions { shell } => {
+        Command::Completions { shell } => {
             shell.generate(&mut Opt::command(), &mut std::io::stdout());
         }
         #[cfg(feature = "zig")]
-        Opt::Zig(subcommand) => {
+        Command::Zig(subcommand) => {
             subcommand
                 .execute()
                 .context("Failed to run zig linker wrapper")?;
         }
         #[cfg(feature = "schemars")]
-        Opt::GenerateJsonSchema(args) => generate_json_schema(args)?,
+        Command::GenerateJsonSchema(args) => generate_json_schema(args)?,
     }
 
     Ok(())
@@ -459,9 +482,19 @@ fn setup_panic_hook() {
     }));
 }
 
-fn main() {
-    #[cfg(not(debug_assertions))]
-    setup_panic_hook();
+fn setup_logging(verbose: u8) -> Result<()> {
+    // `RUST_LOG` takes precedence over these
+    let default_directive = match verbose {
+        // `-v` runs `cargo build -v`, but doesn't show maturin debug logging yet.
+        0..=1 => tracing::level_filters::LevelFilter::OFF.into(),
+        2 => Directive::from_str("debug").unwrap(),
+        3.. => Directive::from_str("trace").unwrap(),
+    };
+
+    let filter = EnvFilter::builder()
+        .with_default_directive(default_directive)
+        .from_env()
+        .context("Invalid RUST_LOG directives")?;
 
     let logger = tracing_subscriber::fmt::layer()
         // Avoid showing all the details from the spans
@@ -470,10 +503,15 @@ fn main() {
         .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE);
 
     tracing_subscriber::registry()
-        // `RUST_LOG` support
-        .with(tracing_subscriber::EnvFilter::from_default_env())
-        .with(logger)
+        .with(logger.with_filter(filter))
         .init();
+
+    Ok(())
+}
+
+fn main() {
+    #[cfg(not(debug_assertions))]
+    setup_panic_hook();
 
     if let Err(e) = run() {
         eprintln!("💥 maturin failed");

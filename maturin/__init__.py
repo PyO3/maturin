@@ -45,6 +45,15 @@ def get_maturin_pep517_args(config_settings: Optional[Mapping[str, Any]] = None)
     return args
 
 
+def _get_sys_executable() -> str:
+    # Use the base interpreter path when running inside a venv to avoid recompilation
+    # when switching between venvs
+    executable = getattr(sys, "_base_executable", sys.executable)
+    if not os.path.exists(executable):
+        executable = sys.executable
+    return executable
+
+
 def _additional_pep517_args() -> List[str]:
     # Support building for 32-bit Python on x64 Windows
     if platform.system().lower() == "windows" and platform.machine().lower() == "amd64":
@@ -68,7 +77,7 @@ def _build_wheel(
         "pep517",
         "build-wheel",
         "-i",
-        sys.executable,
+        _get_sys_executable(),
     ]
     options = _additional_pep517_args()
     if editable:
@@ -180,7 +189,7 @@ def prepare_metadata_for_build_wheel(
         # PEP 517 specifies that only `sys.executable` points to the correct
         # python interpreter
         "--interpreter",
-        sys.executable,
+        _get_sys_executable(),
     ]
     command.extend(_additional_pep517_args())
     pep517_args = get_maturin_pep517_args(config_settings)

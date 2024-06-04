@@ -2,7 +2,16 @@
 
 ## [Unreleased]
 
-* Add a global `-v` option [#2080](https://github.com/PyO3/maturin/pull/2080)
+## [1.6.0] - 2024-06-04
+
+* Detect compiling from Linux gnu to Linux musl as cross compiling in [#2010](https://github.com/PyO3/maturin/pull/2010)
+* Add musllinux support to `generate-ci` in [#2011](https://github.com/PyO3/maturin/pull/2011)
+* Add uv support to `develop` command in [#2015](https://github.com/PyO3/maturin/pull/2015)
+* Add support for AIX target in [#2030](https://github.com/PyO3/maturin/pull/2030)
+* Remove rust-cpython support in [#2044](https://github.com/PyO3/maturin/pull/2044)
+* Add a global `-v` option in [#2080](https://github.com/PyO3/maturin/pull/2080)
+* Detect target based on interpreter for pep517 build-wheel  in [#2088](https://github.com/PyO3/maturin/pull/2088)
+* Use base executable when possible in PEP 517 build in [#2094](https://github.com/PyO3/maturin/pull/2094)
 
 ## [1.5.1] - 2024-03-21
 
@@ -955,7 +964,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/pyo3/maturin/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/pyo3/maturin/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/pyo3/maturin/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/pyo3/maturin/compare/v1.3.2...v1.4.0

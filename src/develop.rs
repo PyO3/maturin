@@ -98,7 +98,7 @@ pub struct DevelopOptions {
         short = 'b',
         long = "bindings",
         alias = "binding-crate",
-        value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"]
+        value_parser = ["pyo3", "pyo3-ffi", "cffi", "uniffi", "bin"]
     )]
     pub bindings: Option<String>,
     /// Pass --release to cargo

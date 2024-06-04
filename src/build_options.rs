@@ -177,7 +177,7 @@ pub struct BuildOptions {
     pub find_interpreter: bool,
 
     /// Which kind of bindings to use.
-    #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "rust-cpython", "cffi", "uniffi", "bin"])]
+    #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "cffi", "uniffi", "bin"])]
     pub bindings: Option<String>,
 
     /// The directory to store the built wheels in. Defaults to a new "wheels"
@@ -930,8 +930,6 @@ fn find_bindings(
         let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
             .unwrap_or(MINIMUM_PYTHON_MINOR);
         Some(("pyo3-ffi".to_string(), minor))
-    } else if deps.contains_key("cpython") {
-        Some(("rust-cpython".to_string(), MINIMUM_PYTHON_MINOR))
     } else if deps.contains_key("uniffi") {
         Some(("uniffi".to_string(), MINIMUM_PYTHON_MINOR))
     } else {
@@ -1375,8 +1373,6 @@ mod test {
             find_bridge(&pyo3_mixed, Some("pyo3")),
             Ok(BridgeModel::Bindings(..))
         ));
-
-        assert!(find_bridge(&pyo3_mixed, Some("rust-cpython")).is_err());
     }
 
     #[test]
@@ -1394,7 +1390,6 @@ mod test {
             find_bridge(&pyo3_pure, Some("pyo3")),
             Ok(BridgeModel::BindingsAbi3(3, 7))
         ));
-        assert!(find_bridge(&pyo3_pure, Some("rust-cpython")).is_err());
     }
 
     #[test]
@@ -1431,7 +1426,6 @@ mod test {
         );
         assert_eq!(find_bridge(&cffi_pure, None).unwrap(), BridgeModel::Cffi);
 
-        assert!(find_bridge(&cffi_pure, Some("rust-cpython")).is_err());
         assert!(find_bridge(&cffi_pure, Some("pyo3")).is_err());
     }
 
@@ -1451,7 +1445,6 @@ mod test {
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("rust-cpython")).is_err());
         assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
 
         let pyo3_bin = MetadataCommand::new()

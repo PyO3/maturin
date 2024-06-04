@@ -365,14 +365,19 @@ impl PyProjectToml {
     /// Returns true if the pyproject.toml has `build-backend` set to `maturin`
     pub fn warn_missing_build_backend(&self) -> bool {
         let maturin = env!("CARGO_PKG_NAME");
-        if self.build_system.build_backend.as_deref() != Some(maturin) {
-            eprintln!(
-                "⚠️  Warning: `build-backend` in pyproject.toml is not set to `{maturin}`, \
-                    packaging tools such as pip will not use maturin to build this project."
-            );
+        if self.build_system.build_backend.as_deref() == Some(maturin) {
+            return true;
+        }
+
+        if std::env::var("MATURIN_NO_MISSING_BUILD_BACKEND_WARNING").is_ok() {
             return false;
         }
-        true
+
+        eprintln!(
+            "⚠️  Warning: `build-backend` in pyproject.toml is not set to `{maturin}`, \
+                packaging tools such as pip will not use maturin to build this project."
+        );
+        false
     }
 }
 

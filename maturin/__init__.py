@@ -48,8 +48,10 @@ def get_maturin_pep517_args(config_settings: Optional[Mapping[str, Any]] = None)
 def _get_sys_executable() -> str:
     # Use the base interpreter path when running inside a venv to avoid recompilation
     # when switching between venvs
-    executable = getattr(sys, "_base_executable", sys.executable)
-    if not os.path.exists(executable):
+    base_executable = getattr(sys, "_base_executable")
+    if base_executable and os.path.exists(base_executable):
+        executable = os.path.realpath(base_executable)
+    else:
         executable = sys.executable
     return executable
 

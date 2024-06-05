@@ -157,7 +157,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
-        Os::Ios => vec![Arch::Aarch64],
+        Os::Ios => vec![Arch::Aarch64, Arch::X86_64],
         Os::FreeBsd | Os::NetBsd => vec![
             Arch::Aarch64,
             Arch::Armv6L,

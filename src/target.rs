@@ -22,6 +22,7 @@ pub enum Os {
     Linux,
     Windows,
     Macos,
+    Ios,
     FreeBsd,
     NetBsd,
     OpenBsd,
@@ -40,6 +41,7 @@ impl fmt::Display for Os {
             Os::Linux => write!(f, "Linux"),
             Os::Windows => write!(f, "Windows"),
             Os::Macos => write!(f, "macOS"),
+            Os::Ios => write!(f, "iOS"),
             Os::FreeBsd => write!(f, "FreeBSD"),
             Os::NetBsd => write!(f, "NetBSD"),
             Os::OpenBsd => write!(f, "OpenBSD"),
@@ -155,6 +157,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
+        Os::Ios => vec![Arch::Aarch64],
         Os::FreeBsd | Os::NetBsd => vec![
             Arch::Aarch64,
             Arch::Armv6L,
@@ -239,6 +242,7 @@ impl Target {
             OperatingSystem::Linux => Os::Linux,
             OperatingSystem::Windows => Os::Windows,
             OperatingSystem::MacOSX { .. } | OperatingSystem::Darwin => Os::Macos,
+            OperatingSystem::Ios => Os::Ios,
             OperatingSystem::Netbsd => Os::NetBsd,
             OperatingSystem::Freebsd => Os::FreeBsd,
             OperatingSystem::Openbsd => Os::OpenBsd,
@@ -370,6 +374,7 @@ impl Target {
             Os::Windows => "windows",
             Os::Linux => "linux",
             Os::Macos => "darwin",
+            Os::Ios => "darwin",
             Os::FreeBsd => "freebsd",
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
@@ -455,6 +460,7 @@ impl Target {
             Os::Windows => false,
             Os::Linux
             | Os::Macos
+            | Os::Ios
             | Os::FreeBsd
             | Os::NetBsd
             | Os::OpenBsd

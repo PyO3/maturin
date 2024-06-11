@@ -10,6 +10,24 @@ Development of maturin is made possible by the following sponsors:
 
 <div class="sponsors">
   <div>
+    <a rel="sponsored" target="_blank" href="https://astral.sh">
+      <img src="./assets/sponsors/astral.png" alt="Astral" width="80" height="80" />
+      <span>Astral</span>
+    </a>
+  </div>
+  <div>
+    <a rel="sponsored" target="_blank" href="http://bytewax.io">
+      <img src="./assets/sponsors/bytewax.png" alt="Bytewax" width="80" height="80" />
+      <span>Bytewax</span>
+    </a>
+  </div>
+  <div>
+    <a rel="sponsored" target="_blank" href="https://frontendmasters.com">
+      <img src="./assets/sponsors/frontend-masters.png" alt="Frontend Masters" width="80" height="80" />
+      <span>Frontend Masters</span>
+    </a>
+  </div>
+  <div>
     <a rel="sponsored" target="_blank" href="https://pydantic.dev">
       <img src="./assets/sponsors/pydantic.png" alt="Pydantic" width="80" height="80" />
       <span>Pydantic</span>
@@ -19,6 +37,12 @@ Development of maturin is made possible by the following sponsors:
     <a rel="sponsored" target="_blank" href="https://www.rerun.io">
       <img src="./assets/sponsors/rerun.png" alt="Rerun" width="80" height="80" />
       <span>Rerun</span>
+    </a>
+  </div>
+  <div>
+    <a rel="sponsored" target="_blank" href="http://sentry.io">
+      <img src="./assets/sponsors/sentry.png" alt="Sentry" width="80" height="80" />
+      <span>Sentry</span>
     </a>
   </div>
   <div>

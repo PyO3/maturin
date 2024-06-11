@@ -88,6 +88,7 @@ allow = [
     "0BSD",
     "BSD-3-Clause",
     "CC0-1.0",
+    "Unicode-3.0",
 ]
 # List of explicitly disallowed licenses
 # See https://spdx.org/licenses/ for list of possible licenses

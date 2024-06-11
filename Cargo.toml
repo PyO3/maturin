@@ -30,7 +30,7 @@ categories = [
     "command-line-utilities",
 ]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.74"
 
 [[bin]]
 name = "maturin"

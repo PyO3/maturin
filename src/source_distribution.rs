@@ -30,9 +30,9 @@ struct PathDependency {
     readme: Option<PathBuf>,
 }
 
-fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::Document> {
+fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
     let text = fs::read_to_string(path)?;
-    let document = text.parse::<toml_edit::Document>().context(format!(
+    let document = text.parse::<toml_edit::DocumentMut>().context(format!(
         "Failed to parse {} at {}",
         kind,
         path.display()

@@ -46,7 +46,7 @@ Development of maturin is made possible by the following sponsors:
     </a>
   </div>
   <div>
-    <a rel="sponsored" target="_blank" href="https://github.com/TSYCapital">
+    <a rel="sponsored" target="_blank" href="https://tsycapital.com">
       <img src="./assets/sponsors/tsy-capital.png" alt="TSY Capital" width="80" height="80" />
       <span>TSY Capital</span>
     </a>

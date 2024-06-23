@@ -136,7 +136,15 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
         fs::remove_dir_all(&venv_dir)?;
     }
 
-    let mut cmd = Command::new("virtualenv");
+    let mut cmd = {
+        if let Ok(uv) = which::which("uv") {
+            let mut cmd = Command::new(uv);
+            cmd.args(["venv", "--seed"]);
+            cmd
+        } else {
+            Command::new("virtualenv")
+        }
+    };
     if let Some(interp) = interp {
         cmd.arg("-p").arg(interp);
     }

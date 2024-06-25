@@ -46,5 +46,5 @@ linux_aarch64_task:
       - echo $CIRRUS_OS
       - cat Cargo.lock
   install_script:
-    - python3 -m pip install uniffi-bindgen==0.27.0
+    - python3 -m pip install uniffi-bindgen==0.28.0
   <<: *BUILD_AND_TEST

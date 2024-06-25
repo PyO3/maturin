@@ -136,7 +136,7 @@ jobs:
         if: ${{ !contains(matrix.platform.python-version, 'pypy') }}
         run: pip install cffi
       - name: Install python packages
-        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.27.0
+        run: pip install virtualenv ziglang~=0.10.0 twine uniffi-bindgen==0.28.0
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:

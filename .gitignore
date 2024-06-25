@@ -3,6 +3,7 @@ venv*/
 .venv/
 .pytest_cache/
 .tox/
+*.o
 *.so
 *.py[cdo]
 __pycache__/

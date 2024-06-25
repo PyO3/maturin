@@ -12,10 +12,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 {% if bindings == "pyo3" -%}
-pyo3 = "0.21.1"
+pyo3 = "0.22.0"
 {% elif bindings == "uniffi" -%}
-uniffi = "0.27.0"
+uniffi = "0.28.0"
 
 [build-dependencies]
-uniffi = { version = "0.27.0", features = ["build"] }
+uniffi = { version = "0.28.0", features = ["build"] }
 {% endif -%}

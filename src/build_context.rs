@@ -519,7 +519,7 @@ impl BuildContext {
 
     /// Returns the platform part of the tag for the wheel name
     pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
-        if let Some(host_platform) = env::var("_PYTHON_HOST_PLATFORM").ok() {
+        if let Ok(host_platform) = env::var("_PYTHON_HOST_PLATFORM") {
             return Ok(host_platform.replace(['.', '-'], "_"));
         }
 

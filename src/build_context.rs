@@ -519,6 +519,10 @@ impl BuildContext {
 
     /// Returns the platform part of the tag for the wheel name
     pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+        if let Ok(host_platform) = env::var("_PYTHON_HOST_PLATFORM") {
+            return Ok(host_platform.replace(['.', '-'], "_"));
+        }
+
         let target = &self.target;
         let tag = match (&target.target_os(), &target.target_arch()) {
             // Windows

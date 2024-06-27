@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+* Don't add files to an archive more than once [#2125](https://github.com/PyO3/maturin/issues/2125)
+
 ## [1.6.0] - 2024-06-04
 
 * Detect compiling from Linux gnu to Linux musl as cross compiling in [#2010](https://github.com/PyO3/maturin/pull/2010)

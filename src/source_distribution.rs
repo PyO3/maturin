@@ -218,7 +218,11 @@ fn add_crate_to_source_distribution(
 
     if root_crate {
         let rewritten_cargo_toml = rewrite_cargo_toml(manifest_path, known_path_deps)?;
-        writer.add_bytes(cargo_toml_path, rewritten_cargo_toml.as_bytes())?;
+        writer.add_bytes(
+            cargo_toml_path,
+            Some(manifest_path),
+            rewritten_cargo_toml.as_bytes(),
+        )?;
     } else if !skip_cargo_toml {
         writer.add_file(cargo_toml_path, manifest_path)?;
     }
@@ -520,9 +524,10 @@ fn add_cargo_package_files_to_sdist(
                     readme: None,
                 },
             );
-            let workspace_cargo_toml = rewrite_cargo_toml(workspace_manifest_path, &deps_to_keep)?;
+            let workspace_cargo_toml = rewrite_cargo_toml(&workspace_manifest_path, &deps_to_keep)?;
             writer.add_bytes(
                 root_dir.join(relative_workspace_cargo_toml),
+                Some(workspace_manifest_path.as_std_path()),
                 workspace_cargo_toml.as_bytes(),
             )?;
         }
@@ -545,6 +550,7 @@ fn add_cargo_package_files_to_sdist(
         )?;
         writer.add_bytes(
             root_dir.join("pyproject.toml"),
+            Some(pyproject_toml_path),
             rewritten_pyproject_toml.as_bytes(),
         )?;
     } else {
@@ -684,6 +690,7 @@ pub fn source_distribution(
 
     writer.add_bytes(
         root_dir.join("PKG-INFO"),
+        None,
         metadata23.to_file_contents()?.as_bytes(),
     )?;
 

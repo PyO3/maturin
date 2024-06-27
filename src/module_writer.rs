@@ -19,8 +19,9 @@ use ignore::overrides::Override;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use normpath::PathExt as _;
+use same_file::is_same_file;
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
@@ -40,18 +41,28 @@ pub trait ModuleWriter {
     /// Adds a directory relative to the module base path
     fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()>;
 
-    /// Adds a file with bytes as content in target relative to the module base path
-    fn add_bytes(&mut self, target: impl AsRef<Path>, bytes: &[u8]) -> Result<()> {
+    /// Adds a file with bytes as content in target relative to the module base path.
+    ///
+    /// For generated files, `source` is `None`.
+    fn add_bytes(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: Option<&Path>,
+        bytes: &[u8],
+    ) -> Result<()> {
         debug!("Adding {}", target.as_ref().display());
         // 0o644 is the default from the zip crate
-        self.add_bytes_with_permissions(target, bytes, 0o644)
+        self.add_bytes_with_permissions(target, source, bytes, 0o644)
     }
 
     /// Adds a file with bytes as content in target relative to the module base path while setting
     /// the given unix permissions
+    ///
+    /// For generated files, `source` is `None`.
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
+        source: Option<&Path>,
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()>;
@@ -61,7 +72,7 @@ pub trait ModuleWriter {
         self.add_file_with_permissions(target, source, 0o644)
     }
 
-    /// Copies the source file the the target path relative to the module base path while setting
+    /// Copies the source file the target path relative to the module base path while setting
     /// the given unix permissions
     fn add_file_with_permissions(
         &mut self,
@@ -77,7 +88,7 @@ pub trait ModuleWriter {
         let mut file = File::open(source).context(read_failed_context.clone())?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).context(read_failed_context)?;
-        self.add_bytes_with_permissions(target, &buffer, permissions)
+        self.add_bytes_with_permissions(target, Some(source), &buffer, permissions)
             .context(format!("Failed to write to {}", target.display()))?;
         Ok(())
     }
@@ -87,6 +98,7 @@ pub trait ModuleWriter {
 pub struct PathWriter {
     base_path: PathBuf,
     record: Vec<(String, String, usize)>,
+    file_tracker: FileTracker,
 }
 
 impl PathWriter {
@@ -103,6 +115,7 @@ impl PathWriter {
         Ok(PathWriter {
             base_path,
             record: Vec::new(),
+            file_tracker: FileTracker::default(),
         })
     }
 
@@ -111,6 +124,7 @@ impl PathWriter {
         Self {
             base_path: path.as_ref().to_path_buf(),
             record: Vec::new(),
+            file_tracker: FileTracker::default(),
         }
     }
 
@@ -169,10 +183,16 @@ impl ModuleWriter for PathWriter {
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
+        source: Option<&Path>,
         bytes: &[u8],
-        _permissions: u32,
+        permissions: u32,
     ) -> Result<()> {
         let path = self.base_path.join(&target);
+
+        if !self.file_tracker.add_file(target.as_ref(), source)? {
+            // Ignore duplicate files.
+            return Ok(());
+        }
 
         // We only need to set the executable bit on unix
         let mut file = {
@@ -182,7 +202,7 @@ impl ModuleWriter for PathWriter {
                     .create(true)
                     .write(true)
                     .truncate(true)
-                    .mode(_permissions)
+                    .mode(permissions)
                     .open(&path)
             }
             #[cfg(target_os = "windows")]
@@ -212,6 +232,7 @@ pub struct WheelWriter {
     record: Vec<(String, String, usize)>,
     record_file: PathBuf,
     wheel_path: PathBuf,
+    file_tracker: FileTracker,
     excludes: Override,
 }
 
@@ -223,6 +244,7 @@ impl ModuleWriter for WheelWriter {
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
+        source: Option<&Path>,
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()> {
@@ -230,6 +252,12 @@ impl ModuleWriter for WheelWriter {
         if self.exclude(target) {
             return Ok(());
         }
+
+        if !self.file_tracker.add_file(target, source)? {
+            // Ignore duplicate files.
+            return Ok(());
+        }
+
         // The zip standard mandates using unix style paths
         let target = target.to_str().unwrap().replace('\\', "/");
 
@@ -284,6 +312,7 @@ impl WheelWriter {
             record: Vec::new(),
             record_file: metadata23.get_dist_info_dir().join("RECORD"),
             wheel_path,
+            file_tracker: FileTracker::default(),
             excludes,
         };
 
@@ -313,7 +342,7 @@ impl WheelWriter {
                 let name = metadata23.get_distribution_escaped();
                 let target = format!("{name}.pth");
                 debug!("Adding {} from {}", target, python_path);
-                self.add_bytes(target, python_path.as_bytes())?;
+                self.add_bytes(target, None, python_path.as_bytes())?;
             } else {
                 eprintln!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
             }
@@ -375,7 +404,7 @@ impl WheelWriter {
 pub struct SDistWriter {
     tar: tar::Builder<GzEncoder<Vec<u8>>>,
     path: PathBuf,
-    files: HashSet<PathBuf>,
+    file_tracker: FileTracker,
     excludes: Override,
 }
 
@@ -387,6 +416,7 @@ impl ModuleWriter for SDistWriter {
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
+        source: Option<&Path>,
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()> {
@@ -395,8 +425,8 @@ impl ModuleWriter for SDistWriter {
             return Ok(());
         }
 
-        if self.files.contains(target) {
-            // Ignore duplicate files
+        if !self.file_tracker.add_file(target, source)? {
+            // Ignore duplicate files.
             return Ok(());
         }
 
@@ -411,7 +441,6 @@ impl ModuleWriter for SDistWriter {
                 bytes.len(),
                 target.display()
             ))?;
-        self.files.insert(target.to_path_buf());
         Ok(())
     }
 
@@ -421,12 +450,12 @@ impl ModuleWriter for SDistWriter {
             return Ok(());
         }
         let target = target.as_ref();
-        if self.files.contains(target) {
-            // Ignore duplicate files
+        if !self.file_tracker.add_file(target, Some(source))? {
+            // Ignore duplicate files.
             return Ok(());
         }
-        debug!("Adding {} from {}", target.display(), source.display());
 
+        debug!("Adding {} from {}", target.display(), source.display());
         self.tar
             .append_path_with_name(source, target)
             .context(format!(
@@ -434,7 +463,6 @@ impl ModuleWriter for SDistWriter {
                 source.display(),
                 target.display(),
             ))?;
-        self.files.insert(target.to_path_buf());
         Ok(())
     }
 }
@@ -462,7 +490,7 @@ impl SDistWriter {
         Ok(Self {
             tar,
             path,
-            files: HashSet::new(),
+            file_tracker: FileTracker::default(),
             excludes,
         })
     }
@@ -477,6 +505,63 @@ impl SDistWriter {
         let archive = self.tar.into_inner()?;
         fs::write(&self.path, archive.finish()?)?;
         Ok(self.path)
+    }
+}
+
+/// Keep track of which files we added from where, so we can skip duplicate files and error when
+/// adding conflicting files.
+///
+/// The wrapped type contains as key the path added to the archive and as value the originating path
+/// on the file system or `None` for generated files.
+#[derive(Default)]
+struct FileTracker(HashMap<PathBuf, Option<PathBuf>>);
+
+impl FileTracker {
+    /// Returns `true` if the file should be added, `false` if an identical file was already added
+    /// (skip) and an error if a different file was already added.
+    fn add_file(&mut self, target: &Path, source: Option<&Path>) -> Result<bool> {
+        let Some(previous_source) = self
+            .0
+            .insert(target.to_path_buf(), source.map(|path| path.to_path_buf()))
+        else {
+            // The path doesn't exist in the archive yet.
+            return Ok(true);
+        };
+        match (previous_source, source) {
+            (None, None) => {
+                bail!(
+                    "Generated file {} was already added, can't add it again",
+                    target.display()
+                );
+            }
+            (Some(previous_source), None) => {
+                bail!(
+                    "File {} was already added from {}, can't overwrite with generated file",
+                    target.display(),
+                    previous_source.display()
+                )
+            }
+            (None, Some(source)) => {
+                bail!(
+                    "Generated file {} was already added, can't overwrite it with {}",
+                    target.display(),
+                    source.display()
+                );
+            }
+            (Some(previous_source), Some(source)) => {
+                if is_same_file(source, &previous_source).unwrap_or(false) {
+                    // Ignore identical duplicate files
+                    Ok(false)
+                } else {
+                    bail!(
+                        "File {} was already added from {}, can't added it from {}",
+                        target.display(),
+                        previous_source.display(),
+                        source.display()
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -769,6 +854,7 @@ pub fn write_bindings_module(
         // Reexport the shared library as if it were the top level module
         writer.add_bytes(
             &module.join("__init__.py"),
+            None,
             format!(
                 r#"from .{ext_name} import *
 
@@ -782,7 +868,7 @@ if hasattr({ext_name}, "__all__"):
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {ext_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(&module.join("py.typed"), b"")?;
+            writer.add_bytes(&module.join("py.typed"), None, b"")?;
         }
         writer.add_file_with_permissions(&module.join(so_filename), artifact, 0o755)?;
     }
@@ -846,16 +932,17 @@ pub fn write_cffi_module(
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(&module.join("py.typed"), b"")?;
+            writer.add_bytes(&module.join("py.typed"), None, b"")?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(
             &module.join("__init__.py"),
+            None,
             cffi_init_file(&project_layout.extension_name).as_bytes(),
         )?;
-        writer.add_bytes(&module.join("ffi.py"), cffi_declarations.as_bytes())?;
+        writer.add_bytes(&module.join("ffi.py"), None, cffi_declarations.as_bytes())?;
         writer.add_file_with_permissions(
             &module.join(format!(
                 "{extension_name}.so",
@@ -1088,12 +1175,12 @@ pub fn write_uniffi_module(
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(&module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(&module.join("py.typed"), b"")?;
+            writer.add_bytes(&module.join("py.typed"), None, b"")?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(&module.join("__init__.py"), py_init.as_bytes())?;
+        writer.add_bytes(&module.join("__init__.py"), None, py_init.as_bytes())?;
         writer.add_file(
             module.join(binding_name).with_extension("py"),
             uniffi_binding,
@@ -1175,7 +1262,7 @@ if __name__ == '__main__':
     let launcher_path = Path::new(&metadata.get_distribution_escaped())
         .join(bin_name.replace('-', "_"))
         .with_extension("py");
-    writer.add_bytes_with_permissions(&launcher_path, entrypoint_script.as_bytes(), 0o755)?;
+    writer.add_bytes_with_permissions(&launcher_path, None, entrypoint_script.as_bytes(), 0o755)?;
     Ok(())
 }
 
@@ -1267,10 +1354,15 @@ pub fn write_dist_info(
 
     writer.add_bytes(
         &dist_info_dir.join("METADATA"),
+        None,
         metadata23.to_file_contents()?.as_bytes(),
     )?;
 
-    writer.add_bytes(&dist_info_dir.join("WHEEL"), wheel_file(tags)?.as_bytes())?;
+    writer.add_bytes(
+        &dist_info_dir.join("WHEEL"),
+        None,
+        wheel_file(tags)?.as_bytes(),
+    )?;
 
     let mut entry_points = String::new();
     if !metadata23.scripts.is_empty() {
@@ -1285,6 +1377,7 @@ pub fn write_dist_info(
     if !entry_points.is_empty() {
         writer.add_bytes(
             &dist_info_dir.join("entry_points.txt"),
+            None,
             entry_points.as_bytes(),
         )?;
     }
@@ -1379,9 +1472,9 @@ mod tests {
         // No excludes
         let tmp_dir = TempDir::new()?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty())?;
-        assert!(writer.files.is_empty());
-        writer.add_bytes_with_permissions("test", &[], perm)?;
-        assert_eq!(writer.files.len(), 1);
+        assert!(writer.file_tracker.0.is_empty());
+        writer.add_bytes_with_permissions("test", Some(Path::new("test")), &[], perm)?;
+        assert_eq!(writer.file_tracker.0.len(), 1);
         writer.finish()?;
         tmp_dir.close()?;
 
@@ -1391,13 +1484,13 @@ mod tests {
         excludes.add("test*")?;
         excludes.add("!test2")?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?)?;
-        writer.add_bytes_with_permissions("test1", &[], perm)?;
-        writer.add_bytes_with_permissions("test3", &[], perm)?;
-        assert!(writer.files.is_empty());
-        writer.add_bytes_with_permissions("test2", &[], perm)?;
-        assert!(!writer.files.is_empty());
-        writer.add_bytes_with_permissions("yes", &[], perm)?;
-        assert_eq!(writer.files.len(), 2);
+        writer.add_bytes_with_permissions("test1", Some(Path::new("test1")), &[], perm)?;
+        writer.add_bytes_with_permissions("test3", Some(Path::new("test3")), &[], perm)?;
+        assert!(writer.file_tracker.0.is_empty());
+        writer.add_bytes_with_permissions("test2", Some(Path::new("test2")), &[], perm)?;
+        assert!(!writer.file_tracker.0.is_empty());
+        writer.add_bytes_with_permissions("yes", Some(Path::new("yes")), &[], perm)?;
+        assert_eq!(writer.file_tracker.0.len(), 2);
         writer.finish()?;
         tmp_dir.close()?;
 

@@ -3,7 +3,9 @@ use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
+use fs_err::File;
 use maturin::{BuildOptions, PlatformTag, PythonInterpreter};
+use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::process::Command;
@@ -93,6 +95,7 @@ pub fn test_integration(
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
+        check_for_duplicates(filename)?;
         if test_zig
             && build_context.target.is_linux()
             && !build_context.target.is_musl_libc()
@@ -229,5 +232,19 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         check_installed(package.as_ref(), &executable)?;
     }
 
+    Ok(())
+}
+
+/// See <https://github.com/PyO3/maturin/issues/2106> and
+/// <https://github.com/PyO3/maturin/issues/2066>.
+fn check_for_duplicates(wheel: &Path) -> Result<()> {
+    let mut seen = HashSet::new();
+    let mut reader = File::open(wheel)?;
+    // We have to use this API since `ZipArchive` deduplicates names.
+    while let Some(file) = zip::read::read_zipfile_from_stream(&mut reader)? {
+        if !seen.insert(file.name().to_string()) {
+            bail!("Duplicate file: {}", file.name());
+        }
+    }
     Ok(())
 }

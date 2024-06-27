@@ -97,7 +97,7 @@ clap_complete_command = { version = "0.5.1", default-features = false, features 
 
 # cross compile
 cargo-zigbuild = { version = "0.18.4", default-features = false, optional = true }
-cargo-xwin = { version = "0.16.4", default-features = false, optional = true }
+cargo-xwin = { version = "0.16.5", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"

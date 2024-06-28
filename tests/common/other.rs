@@ -176,7 +176,12 @@ pub fn test_source_distribution(
         }
     }
     expected_files.assert_debug_eq(&files);
-    assert_eq!(file_count, files.len(), "duplicated files found in sdist");
+    assert_eq!(
+        file_count,
+        files.len(),
+        "duplicated files found in sdist: {:?}",
+        files
+    );
 
     if let Some((cargo_toml_path, expected)) = expected_cargo_toml {
         let cargo_toml = cargo_toml

@@ -2,7 +2,7 @@
 
 maturin supports [PEP 621](https://www.python.org/dev/peps/pep-0621/),
 you can specify python package metadata in `pyproject.toml`.
-maturin merges metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` take precedence over `Cargo.toml`.
+maturin merges metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
 
 Here is a `pyproject.toml` example from PEP 621 for reference purpose:
 

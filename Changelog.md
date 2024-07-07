@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+## [1.7.0] - 2024-07-07
+
+* Initial iOS support in [#2101](https://github.com/PyO3/maturin/pull/2102)
+* Remove old import hook in [#2105](https://github.com/PyO3/maturin/pull/2105), use [maturin-import-hook](https://github.com/PyO3/maturin-import-hook) instead
+* Bump MSRV to 1.74.0 in [#2108](https://github.com/PyO3/maturin/pull/2108)
+* Add support for overriding wheel tag with `_PYTHON_HOST_PLATFORM` in [#2122](https://github.com/PyO3/maturin/pull/2122)
 * Don't add files to an archive more than once [#2125](https://github.com/PyO3/maturin/issues/2125)
+* Only use base python executable when `MATURIN_PEP517_USE_BASE_PYTHON` is set in [#2134](https://github.com/PyO3/maturin/pull/2134)
 
 ## [1.6.0] - 2024-06-04
 
@@ -966,7 +973,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/pyo3/maturin/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/pyo3/maturin/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/pyo3/maturin/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/pyo3/maturin/compare/v1.4.0...v1.5.0

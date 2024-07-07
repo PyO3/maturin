@@ -4,6 +4,7 @@ Maturin reads a number of environment variables which you can use to configure t
 Here is a list of all environment variables that are read by maturin:
 
 ## Cargo environment variables
+
 See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-reads)
 
 ## Python environment variables
@@ -32,5 +33,6 @@ See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/referenc
 * `MACOSX_DEPLOYMENT_TARGET`: The minimum macOS version to target
 * `SOURCE_DATE_EPOCH`: The time to use for the timestamp in the wheel metadata
 * `MATURIN_EMSCRIPTEN_VERSION`: The version of emscripten to use for emscripten builds
+* `MATURIN_NO_MISSING_BUILD_BACKEND_WARNING`: Suppress missing build backend warning
 * `TARGET_SYSROOT`: The sysroot to use for auditwheel wheel when cross compiling
 * `ARCHFLAGS`: Flags to control the architecture of the build on macOS, for example you can use `ARCHFLAGS="-arch x86_64 -arch arm64"` to build universal2 wheels

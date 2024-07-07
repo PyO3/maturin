@@ -57,7 +57,7 @@ tar = "0.4.38"
 tempfile = "3.2.0"
 toml = "0.8.10"
 toml_edit = "0.22.6"
-zip = { version = "0.6.1", default-features = false, features = [
+zip = { version = "1.1.4", default-features = false, features = [
     "bzip2",
     "deflate",
     "time",
@@ -70,18 +70,18 @@ rustc_version = "0.4.0"
 semver = "1.0.22"
 target-lexicon = "0.12.14"
 indexmap = "2.2.3"
-pyproject-toml = "0.10.0"
+pyproject-toml = "0.11.0"
 python-pkginfo = "0.6.0"
 textwrap = "0.16.1"
 ignore = "0.4.20"
-itertools = "0.12.1"
+itertools = "0.13.0"
 lddtree = "0.3.4"
 cc = "1.0.88"
 dunce = "1.0.2"
 normpath = "1.1.1"
 path-slash = "0.2.1"
-pep440_rs = { version = "0.5.0", features = ["serde", "tracing"] }
-pep508_rs = { version = "0.4.2", features = ["serde", "tracing"] }
+pep440_rs = { version = "0.6.0", features = ["serde", "tracing"] }
+pep508_rs = { version = "0.6.0", features = ["serde", "tracing"] }
 same-file = "1.0.6"
 time = "0.3.17"
 url = "2.5.0"
@@ -97,8 +97,8 @@ clap = { version = "4.0.0", features = [
 clap_complete_command = { version = "0.5.1", default-features = false, features = ["nushell"], optional = true }
 
 # cross compile
-cargo-zigbuild = { version = "0.18.4", default-features = false, optional = true }
-cargo-xwin = { version = "0.16.5", default-features = false, optional = true }
+cargo-zigbuild = { version = "0.19.0", default-features = false, optional = true }
+cargo-xwin = { version = "0.17.2", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
@@ -107,7 +107,7 @@ tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.11.0", default-features = false, optional = true }
 console = { version = "0.15.4", optional = true }
-minijinja = { version = "1.0.7", optional = true }
+minijinja = { version = "2.0.3", optional = true }
 
 # upload
 bytesize = { version = "1.0.1", optional = true }
@@ -116,13 +116,13 @@ dirs = { version = "5.0.0", optional = true }
 multipart = { version = "0.18.0", features = [
     "client",
 ], default-features = false, optional = true }
-ureq = { version = "2.9.4", features = [
+ureq = { version = "2.10.0", features = [
     "gzip",
     "json",
     "socks-proxy",
 ], default-features = false, optional = true }
 native-tls = { version = "0.2.8", optional = true }
-rustls = { version = "0.22.4", optional = true }
+rustls = { version = "0.23.10", optional = true }
 rustls-pemfile = { version = "2.1.0", optional = true }
 keyring = { version = "2.3.2", default-features = false, features = [
     "linux-no-secret-service",

@@ -549,7 +549,9 @@ impl BuildOptions {
             };
         }
         if universal2 {
-            target_triple = None;
+            // Ensure that target_triple is valid. This is necessary to properly
+            // infer the platform tags when cross-compiling from Linux.
+            target_triple = Some("aarch64-apple-darwin".to_string());
         }
 
         let mut target = Target::from_target_triple(target_triple)?;

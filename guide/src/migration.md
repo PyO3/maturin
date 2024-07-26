@@ -40,7 +40,7 @@ can be configured to apply to sdist and/or wheel.
 ### macOS deployment target version defaults what `rustc` supports
 
 If you don't set the `MACOSX_DEPLOYMENT_TARGET` environment variable,
-maturin 0.14 will use the default target version quired from `rustc`,
+maturin 0.14 will use the default target version acquired from `rustc`,
 this may cause build issue for projects that depend on C/C++ code,
 usually you can fix it by setting a correct `MACOSX_DEPLOYMENT_TARGET`, for example
 

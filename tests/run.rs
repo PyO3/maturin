@@ -511,13 +511,12 @@ fn abi3_without_version() {
         target_os = "linux",
         target_env = "gnu",
         any(
-            target_arch = "i686",
+            target_arch = "x86",
             target_arch = "x86_64",
             target_arch = "aarch64",
             target_arch = "powerpc64",
-            target_arch = "powerpc64le",
             target_arch = "s390x",
-            target_arch = "armv7"
+            target_arch = "arm"
         )
     )),
     ignore

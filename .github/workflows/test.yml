@@ -106,6 +106,10 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     steps:
+      - name: Enable long paths
+        if: startsWith(matrix.platform.os, 'windows')
+        run: |
+          reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
       - name: Cleanup Disk
         if: ${{ !startsWith(matrix.platform.os, 'windows') }}
         run: |

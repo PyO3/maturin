@@ -12,14 +12,14 @@
 //! - upload: Uses ureq to add the upload command.
 //!
 //! - rustls: Makes ureq use the rustls stack so that we can build maturin in a CentOS 6
-//! docker container and which maturin itself manylinux compliant.
+//!   docker container and which maturin itself manylinux compliant.
 //!
 //! - native-tls: Makes ureq use the platform native tls stack
 //!
 //! - password-storage (off by default): Uses the keyring package to store the password. keyring
-//! pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
-//! for the build on the github releases page.
-//! (https://github.com/hwchen/secret-service-rs/issues/9)
+//!   pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
+//!   for the build on the github releases page.
+//!   (https://github.com/hwchen/secret-service-rs/issues/9)
 
 #![deny(missing_docs)]
 

@@ -412,7 +412,7 @@ fn add_cargo_package_files_to_sdist(
         add_crate_to_source_distribution(
             writer,
             &path_dep.manifest_path,
-            &root_dir.join(relative_path_dep_manifest_dir),
+            root_dir.join(relative_path_dep_manifest_dir),
             &known_path_deps,
             false,
             skip_cargo_toml,

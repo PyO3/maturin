@@ -853,7 +853,7 @@ pub fn write_bindings_module(
         writer.add_directory(&module)?;
         // Reexport the shared library as if it were the top level module
         writer.add_bytes(
-            &module.join("__init__.py"),
+            module.join("__init__.py"),
             None,
             format!(
                 r#"from .{ext_name} import *
@@ -867,10 +867,10 @@ if hasattr({ext_name}, "__all__"):
         let type_stub = project_layout.rust_module.join(format!("{ext_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {ext_name}.pyi");
-            writer.add_file(&module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(&module.join("py.typed"), None, b"")?;
+            writer.add_file(module.join("__init__.pyi"), type_stub)?;
+            writer.add_bytes(module.join("py.typed"), None, b"")?;
         }
-        writer.add_file_with_permissions(&module.join(so_filename), artifact, 0o755)?;
+        writer.add_file_with_permissions(module.join(so_filename), artifact, 0o755)?;
     }
 
     Ok(())
@@ -931,20 +931,20 @@ pub fn write_cffi_module(
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
-            writer.add_file(&module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(&module.join("py.typed"), None, b"")?;
+            writer.add_file(module.join("__init__.pyi"), type_stub)?;
+            writer.add_bytes(module.join("py.typed"), None, b"")?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(
-            &module.join("__init__.py"),
+            module.join("__init__.py"),
             None,
             cffi_init_file(&project_layout.extension_name).as_bytes(),
         )?;
-        writer.add_bytes(&module.join("ffi.py"), None, cffi_declarations.as_bytes())?;
+        writer.add_bytes(module.join("ffi.py"), None, cffi_declarations.as_bytes())?;
         writer.add_file_with_permissions(
-            &module.join(format!(
+            module.join(format!(
                 "{extension_name}.so",
                 extension_name = &project_layout.extension_name
             )),
@@ -1174,18 +1174,18 @@ pub fn write_uniffi_module(
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
-            writer.add_file(&module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(&module.join("py.typed"), None, b"")?;
+            writer.add_file(module.join("__init__.pyi"), type_stub)?;
+            writer.add_bytes(module.join("py.typed"), None, b"")?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(&module.join("__init__.py"), None, py_init.as_bytes())?;
+        writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes())?;
         writer.add_file(
             module.join(binding_name).with_extension("py"),
             uniffi_binding,
         )?;
-        writer.add_file_with_permissions(&module.join(cdylib), artifact, 0o755)?;
+        writer.add_file_with_permissions(module.join(cdylib), artifact, 0o755)?;
     }
 
     Ok(())
@@ -1208,7 +1208,7 @@ pub fn write_bin(
     writer.add_directory(&data_dir)?;
 
     // We can't use add_file since we need to mark the file as executable
-    writer.add_file_with_permissions(&data_dir.join(bin_name), artifact, 0o755)?;
+    writer.add_file_with_permissions(data_dir.join(bin_name), artifact, 0o755)?;
     Ok(())
 }
 
@@ -1353,13 +1353,13 @@ pub fn write_dist_info(
     writer.add_directory(&dist_info_dir)?;
 
     writer.add_bytes(
-        &dist_info_dir.join("METADATA"),
+        dist_info_dir.join("METADATA"),
         None,
         metadata23.to_file_contents()?.as_bytes(),
     )?;
 
     writer.add_bytes(
-        &dist_info_dir.join("WHEEL"),
+        dist_info_dir.join("WHEEL"),
         None,
         wheel_file(tags)?.as_bytes(),
     )?;
@@ -1376,7 +1376,7 @@ pub fn write_dist_info(
     }
     if !entry_points.is_empty() {
         writer.add_bytes(
-            &dist_info_dir.join("entry_points.txt"),
+            dist_info_dir.join("entry_points.txt"),
             None,
             entry_points.as_bytes(),
         )?;

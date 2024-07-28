@@ -729,6 +729,7 @@ fn pyo3_mixed_include_exclude_sdist() {
         SdistGenerator::Cargo,
         expect![[r#"
             {
+                "pyo3_mixed_include_exclude-2.1.3/.gitignore",
                 "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
                 "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
                 "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",
@@ -758,6 +759,7 @@ fn pyo3_mixed_include_exclude_git_sdist_generator() {
         SdistGenerator::Git,
         expect![[r#"
             {
+                "pyo3_mixed_include_exclude-2.1.3/.gitignore",
                 "pyo3_mixed_include_exclude-2.1.3/Cargo.lock",
                 "pyo3_mixed_include_exclude-2.1.3/Cargo.toml",
                 "pyo3_mixed_include_exclude-2.1.3/PKG-INFO",

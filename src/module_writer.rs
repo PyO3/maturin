@@ -1286,8 +1286,17 @@ pub fn write_python_part(
     }
 
     for package in python_packages {
-        for absolute in WalkBuilder::new(package).hidden(false).build() {
+        for absolute in WalkBuilder::new(&project_layout.project_root)
+            .hidden(false)
+            .parents(false)
+            .git_global(false)
+            .git_exclude(false)
+            .build()
+        {
             let absolute = absolute?.into_path();
+            if !absolute.starts_with(package.as_path()) {
+                continue;
+            }
             let relative = absolute.strip_prefix(python_dir).unwrap();
             if absolute.is_dir() {
                 writer.add_directory(relative)?;

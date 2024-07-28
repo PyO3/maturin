@@ -826,7 +826,7 @@ With this release, the name of this project changes from _pyo3-pack_ to _maturin
 
 ### Changed
 
- * The `--skip-auditwheel` flag has been deprecated in favor of `--manxlinux=[1|1-unchecked|2010|2010-unchecked|off]`.
+ * The `--skip-auditwheel` flag has been deprecated in favor of `--manylinux=[1|1-unchecked|2010|2010-unchecked|off]`.
  * Switched to rustls. This means the upload feature can be used from the docker container and builds of maturin itself are manylinux compliant when compiled with the musl target.
 
 ## [0.4.2] - 2018-12-15

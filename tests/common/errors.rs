@@ -123,7 +123,7 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
             .source()
             .ok_or_else(|| format_err!("{}", err))?
             .to_string();
-        assert_eq!(err_string, "manylinux_2_99 compatibility policy is not defined by auditwheel yet, pass `--skip-auditwheel` to proceed anyway");
+        assert_eq!(err_string, "manylinux_2_99 compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway");
     } else {
         bail!("Should have errored");
     }

@@ -1,3 +1,4 @@
+use crate::auditwheel::AuditWheelMode;
 use crate::build_options::CargoOptions;
 use crate::target::detect_arch_from_python;
 use crate::BuildContext;
@@ -321,6 +322,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         find_interpreter: false,
         bindings,
         out: Some(wheel_dir.path().to_path_buf()),
+        auditwheel: Some(AuditWheelMode::Skip),
         skip_auditwheel: false,
         #[cfg(feature = "zig")]
         zig: false,

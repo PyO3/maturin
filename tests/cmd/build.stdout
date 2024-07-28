@@ -43,8 +43,13 @@ Options:
           The directory to store the built wheels in. Defaults to a new "wheels" directory in the
           project's target directory
 
-      --skip-auditwheel
-          Don't check for manylinux compliance
+      --auditwheel <AUDITWHEEL>
+          Audit wheel for manylinux compliance
+
+          Possible values:
+          - repair: Audit and repair wheel for manylinux compliance
+          - check:  Check wheel for manylinux compliance, but do not repair
+          - skip:   Don't check for manylinux compliance
 
       --zig
           For manylinux targets, use zig to ensure compliance for the chosen manylinux version

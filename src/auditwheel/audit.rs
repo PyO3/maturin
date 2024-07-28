@@ -9,10 +9,11 @@ use goblin::elf::{sym::STT_FUNC, Elf};
 use lddtree::Library;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::{fmt, io};
 use thiserror::Error;
 
 static IS_LIBPYTHON: Lazy<Regex> =
@@ -54,11 +55,35 @@ pub enum AuditWheelError {
     #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
     UnsupportedArchitecture(Policy, String),
     /// This platform tag isn't defined by auditwheel yet
-    #[error("{0} compatibility policy is not defined by auditwheel yet, pass `--skip-auditwheel` to proceed anyway")]
+    #[error("{0} compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway")]
     UndefinedPolicy(String),
     /// Failed to analyze external shared library dependencies of the wheel
     #[error("Failed to analyze external shared library dependencies of the wheel")]
     DependencyAnalysisError(#[source] lddtree::Error),
+}
+
+/// Auditwheel mode
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum AuditWheelMode {
+    /// Audit and repair wheel for manylinux compliance
+    #[default]
+    Repair,
+    /// Check wheel for manylinux compliance, but do not repair
+    Check,
+    /// Don't check for manylinux compliance
+    Skip,
+}
+
+impl fmt::Display for AuditWheelMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AuditWheelMode::Repair => write!(f, "repair"),
+            AuditWheelMode::Check => write!(f, "check"),
+            AuditWheelMode::Skip => write!(f, "skip"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

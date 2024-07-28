@@ -46,7 +46,9 @@ exclude = []
 bindings = "pyo3"
 # Control the platform tag on linux
 compatibility = "manylinux2014"
-# Don't check for manylinux compliance
+# auditwheel mode, possible values are repair, check and skip
+auditwheel = "repair"
+# Don't check for manylinux compliance, deprecated in favor of auditwheel = "audit"
 skip-auditwheel = false
 # Python source directory
 python-source = "src"

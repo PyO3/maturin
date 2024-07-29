@@ -11,6 +11,17 @@
         "null"
       ]
     },
+    "auditwheel": {
+      "description": "Audit wheel mode",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AuditWheelMode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "bindings": {
       "description": "Bindings type",
       "type": [
@@ -194,6 +205,32 @@
     }
   },
   "definitions": {
+    "AuditWheelMode": {
+      "description": "Auditwheel mode",
+      "oneOf": [
+        {
+          "description": "Audit and repair wheel for manylinux compliance",
+          "type": "string",
+          "enum": [
+            "repair"
+          ]
+        },
+        {
+          "description": "Check wheel for manylinux compliance, but do not repair",
+          "type": "string",
+          "enum": [
+            "check"
+          ]
+        },
+        {
+          "description": "Don't check for manylinux compliance",
+          "type": "string",
+          "enum": [
+            "skip"
+          ]
+        }
+      ]
+    },
     "CargoTarget": {
       "description": "Cargo compile target",
       "type": "object",

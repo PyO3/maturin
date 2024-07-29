@@ -1,4 +1,4 @@
-use crate::auditwheel::{get_policy_and_libs, patchelf, relpath};
+use crate::auditwheel::{get_policy_and_libs, patchelf, relpath, AuditWheelMode};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::build_options::CargoOptions;
 use crate::compile::{warn_missing_py_init, CompileTarget};
@@ -172,8 +172,8 @@ pub struct BuildContext {
     pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
-    /// Skip checking the linked libraries for manylinux/musllinux compliance
-    pub skip_auditwheel: bool,
+    /// Checking the linked libraries for manylinux/musllinux compliance
+    pub auditwheel: AuditWheelMode,
     /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
     #[cfg(feature = "zig")]
     pub zig: bool,
@@ -285,7 +285,7 @@ impl BuildContext {
         platform_tag: &[PlatformTag],
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<(Policy, Vec<Library>)> {
-        if self.skip_auditwheel {
+        if matches!(self.auditwheel, AuditWheelMode::Skip) {
             return Ok((Policy::default(), Vec::new()));
         }
 
@@ -367,6 +367,18 @@ impl BuildContext {
         }
         if ext_libs.iter().all(|libs| libs.is_empty()) {
             return Ok(());
+        }
+
+        if matches!(self.auditwheel, AuditWheelMode::Check) {
+            eprintln!("🖨️ Your library is not manylinux/musllinux compliant because it requires copying the following libraries:");
+            for lib in ext_libs.iter().flatten() {
+                if let Some(path) = lib.realpath.as_ref() {
+                    eprintln!("    {} => {}", lib.name, path.display())
+                } else {
+                    eprintln!("    {} => not found", lib.name)
+                };
+            }
+            bail!("Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries.");
         }
 
         patchelf::verify_patchelf()?;
@@ -841,7 +853,7 @@ impl BuildContext {
             let _ = warn_missing_py_init(&artifact.path, extension_name);
         }
 
-        if self.editable || self.skip_auditwheel {
+        if self.editable || matches!(self.auditwheel, AuditWheelMode::Skip) {
             return Ok(artifact);
         }
         // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns

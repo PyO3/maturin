@@ -1,5 +1,6 @@
 //! A pyproject.toml as specified in PEP 517
 
+use crate::auditwheel::AuditWheelMode;
 use crate::PlatformTag;
 use anyhow::{Context, Result};
 use fs_err as fs;
@@ -142,6 +143,8 @@ pub struct ToolMaturin {
     /// Platform compatibility
     #[serde(alias = "manylinux")]
     pub compatibility: Option<PlatformTag>,
+    /// Audit wheel mode
+    pub auditwheel: Option<AuditWheelMode>,
     /// Skip audit wheel
     #[serde(default)]
     pub skip_auditwheel: bool,
@@ -252,6 +255,13 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
     pub fn compatibility(&self) -> Option<PlatformTag> {
         self.maturin()?.compatibility
+    }
+
+    /// Returns the value of `[tool.maturin.auditwheel]` in pyproject.toml
+    pub fn auditwheel(&self) -> Option<AuditWheelMode> {
+        self.maturin()
+            .map(|maturin| maturin.auditwheel)
+            .unwrap_or_default()
     }
 
     /// Returns the value of `[tool.maturin.skip-auditwheel]` in pyproject.toml

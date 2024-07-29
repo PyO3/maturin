@@ -1,4 +1,4 @@
-use crate::auditwheel::PlatformTag;
+use crate::auditwheel::{AuditWheelMode, PlatformTag};
 use crate::build_context::BridgeModel;
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
@@ -185,8 +185,12 @@ pub struct BuildOptions {
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 
+    /// Audit wheel for manylinux compliance
+    #[arg(long, conflicts_with = "skip_auditwheel")]
+    pub auditwheel: Option<AuditWheelMode>,
+
     /// Don't check for manylinux compliance
-    #[arg(long = "skip-auditwheel")]
+    #[arg(long, hide = true)]
     pub skip_auditwheel: bool,
 
     /// For manylinux targets, use zig to ensure compliance for the chosen manylinux version
@@ -611,6 +615,14 @@ impl BuildOptions {
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
         let skip_auditwheel =
             pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
+        let auditwheel = self
+            .auditwheel
+            .or_else(|| pyproject.and_then(|x| x.auditwheel()))
+            .unwrap_or(if skip_auditwheel {
+                AuditWheelMode::Skip
+            } else {
+                AuditWheelMode::Repair
+            });
         let platform_tags = if self.platform_tag.is_empty() {
             #[cfg(feature = "zig")]
             let use_zig = self.zig;
@@ -699,7 +711,7 @@ impl BuildOptions {
             out: wheel_dir,
             release,
             strip,
-            skip_auditwheel,
+            auditwheel,
             #[cfg(feature = "zig")]
             zig: self.zig,
             platform_tag: platform_tags,

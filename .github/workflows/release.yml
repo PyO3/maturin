@@ -240,7 +240,7 @@ jobs:
           VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
           echo "env_url=https://pypi.org/project/maturin/$VERSION" >> $GITHUB_OUTPUT
       - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v2.1.1
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
         with:
           inputs: ./*.tar.gz ./*.whl
           upload-signing-artifacts: true
@@ -269,7 +269,7 @@ jobs:
           pattern: binaries-*
           merge-multiple: true
       - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v2.1.1
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
         with:
           inputs: ./*.tar.gz ./*.zip ./*.deb
           upload-signing-artifacts: true

@@ -275,9 +275,10 @@ fn cargo_build_command(
     }
 
     if context.strip {
+        // https://doc.rust-lang.org/rustc/codegen-options/index.html#strip
         cargo_rustc
             .args
-            .extend(["-C".to_string(), "link-arg=-s".to_string()]);
+            .extend(["-C".to_string(), "strip=symbols".to_string()]);
     }
 
     let mut build_command = if target.is_msvc() && target.cross_compiling() {

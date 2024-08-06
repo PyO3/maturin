@@ -38,9 +38,6 @@ try:
 except ImportError:
     bdist_wheel = None
 
-with open("README.md", encoding="utf-8", errors="ignore") as fp:
-    long_description = fp.read()
-
 with open("Cargo.toml", "rb") as fp:
     version = tomllib.load(fp)["package"]["version"]
 
@@ -51,8 +48,6 @@ if os.getenv("MATURIN_SETUP_ARGS"):
     cargo_args = shlex.split(os.getenv("MATURIN_SETUP_ARGS", ""))
 
 setup(
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     version=version,
     cmdclass={"bdist_wheel": bdist_wheel},
     rust_extensions=[RustBin("maturin", args=cargo_args, cargo_manifest_args=["--locked"])],

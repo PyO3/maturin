@@ -38,9 +38,6 @@ try:
 except ImportError:
     bdist_wheel = None
 
-with open("README.md", encoding="utf-8", errors="ignore") as fp:
-    long_description = fp.read()
-
 with open("Cargo.toml", "rb") as fp:
     version = tomllib.load(fp)["package"]["version"]
 
@@ -51,25 +48,8 @@ if os.getenv("MATURIN_SETUP_ARGS"):
     cargo_args = shlex.split(os.getenv("MATURIN_SETUP_ARGS", ""))
 
 setup(
-    name="maturin",
-    author="konstin",
-    author_email="konstin@mailbox.org",
-    url="https://github.com/pyo3/maturin",
-    description="Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as "
-    "python packages",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     version=version,
-    license="MIT OR Apache-2.0",
-    python_requires=">=3.7",
     cmdclass={"bdist_wheel": bdist_wheel},
-    packages=["maturin"],
     rust_extensions=[RustBin("maturin", args=cargo_args, cargo_manifest_args=["--locked"])],
-    classifiers=[
-        "Topic :: Software Development :: Build Tools",
-        "Programming Language :: Rust",
-        "Programming Language :: Python :: Implementation :: CPython",
-        "Programming Language :: Python :: Implementation :: PyPy",
-    ],
     zip_safe=False,
 )

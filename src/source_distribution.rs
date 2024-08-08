@@ -1,5 +1,6 @@
 use crate::module_writer::{add_data, ModuleWriter};
 use crate::pyproject_toml::SdistGenerator;
+use crate::upload::http_agent;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
 use cargo_metadata::camino::Utf8Path;
@@ -11,9 +12,11 @@ use path_slash::PathExt as _;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Write;
+use std::io::copy;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
+use tempfile::NamedTempFile;
 use toml_edit::DocumentMut;
 use tracing::debug;
 
@@ -829,4 +832,37 @@ where
     } else {
         None
     }
+}
+
+/// Downloads the rustup installer script and executes it to install rustup
+///
+/// Inspired by https://github.com/chriskuehl/rustenv
+pub fn download_and_execute_rustup(rustup_home: &str, cargo_home: &str) -> Result<()> {
+    let mut tf = NamedTempFile::new()?;
+    let agent = http_agent()?;
+    let response = agent.get("https://sh.rustup.rs").call()?.into_string()?;
+
+    copy(&mut response.as_bytes(), &mut tf)?;
+
+    #[cfg(unix)]
+    {
+        Command::new("sh")
+            .arg(tf.path())
+            .arg("-y")
+            .arg("--no-modify-path")
+            .env("RUSTUP_HOME", rustup_home)
+            .env("CARGO_HOME", cargo_home)
+            .status()?;
+    }
+
+    #[cfg(windows)]
+    {
+        Command::new("cmd")
+            .args(&["/C", tf.path(), "-y", "--no-modify-path"])
+            .env("RUSTUP_HOME", rustup_home)
+            .env("CARGO_HOME", cargo_home)
+            .status()?;
+    }
+
+    Ok(())
 }

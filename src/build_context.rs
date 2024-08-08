@@ -8,7 +8,7 @@ use crate::module_writer::{
 };
 use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
-use crate::source_distribution::source_distribution;
+use crate::source_distribution::{download_and_execute_rustup, source_distribution};
 use crate::target::{Arch, Os};
 use crate::{
     compile, pyproject_toml::Format, BuildArtifact, Metadata23, ModuleWriter, PyProjectToml,
@@ -273,6 +273,22 @@ impl BuildContext {
                 let sdist_path =
                     source_distribution(self, pyproject, self.excludes(Format::Sdist)?)
                         .context("Failed to build source distribution")?;
+                if self.require_rust_toolchain() {
+                    let mut target_path = sdist_path.clone().to_path_buf();
+                    target_path.pop();
+                    target_path.pop();
+                    target_path.push("bin");
+
+                    fs::create_dir_all(&target_path)
+                        .context("Fail to create directory for installing rust toolchain")?;
+
+                    let target_path_str = target_path
+                        .to_str()
+                        .context("Fail to construct target path for installing rust toolchain")?;
+
+                    download_and_execute_rustup(target_path_str, target_path_str)
+                        .context("Failed to download rust toolchain")?;
+                }
                 Ok(Some((sdist_path, "source".to_string())))
             }
             None => Ok(None),
@@ -1131,6 +1147,19 @@ impl BuildContext {
             wheels.extend(self.build_bin_wheel(Some(python_interpreter))?);
         }
         Ok(wheels)
+    }
+    /// Check if user requires to install rust toolchain
+    ///
+    /// Loop over `build-system.requires` defined in pyproject.toml and see if `rust-toolchain` is provided
+    pub fn require_rust_toolchain(&self) -> bool {
+        match &self.pyproject_toml {
+            Some(pyproject_toml) => pyproject_toml
+                .build_system
+                .requires
+                .iter()
+                .any(|req| req.name.as_ref() == "rust-toolchain"),
+            None => false,
+        }
     }
 }
 

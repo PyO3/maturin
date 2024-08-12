@@ -1392,7 +1392,7 @@ pub fn write_dist_info(
     }
 
     if !metadata23.license_files.is_empty() {
-        let license_files_dir = dist_info_dir.join("license_files");
+        let license_files_dir = dist_info_dir.join("licenses");
         writer.add_directory(&license_files_dir)?;
         for path in &metadata23.license_files {
             let filename = path.file_name().with_context(|| {

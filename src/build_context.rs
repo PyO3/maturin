@@ -1187,7 +1187,7 @@ impl BuildContext {
         {
             let current_path = env::var("PATH").unwrap_or_default();
             let new_path = format!("{}:{}", cargo_bin_path.display(), current_path);
-            unsafe {env::set_var("PATH", &new_path)};
+            unsafe { env::set_var("PATH", &new_path) };
             Command::new(cargo_bin_path.join("rustup"))
                 .arg("default")
                 .arg("stable")

@@ -18,7 +18,6 @@ import shutil
 import struct
 import subprocess
 import sys
-from subprocess import SubprocessError
 from typing import Any, Dict, Mapping, List, Optional
 
 try:

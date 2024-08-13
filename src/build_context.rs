@@ -8,8 +8,10 @@ use crate::module_writer::{
 };
 use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
-use crate::source_distribution::{download_and_execute_rustup, source_distribution};
+use crate::source_distribution::source_distribution;
 use crate::target::{Arch, Os};
+#[cfg(feature = "upload")]
+use crate::upload::http_agent;
 use crate::{
     compile, pyproject_toml::Format, BuildArtifact, Metadata23, ModuleWriter, PyProjectToml,
     PythonInterpreter, Target,
@@ -28,8 +30,13 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io;
+#[cfg(feature = "rustls")]
+use std::io::copy;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str::FromStr;
+#[cfg(feature = "rustls")]
+use tempfile::NamedTempFile;
 use tracing::instrument;
 
 /// The way the rust code is used in the wheel
@@ -273,22 +280,6 @@ impl BuildContext {
                 let sdist_path =
                     source_distribution(self, pyproject, self.excludes(Format::Sdist)?)
                         .context("Failed to build source distribution")?;
-                if self.require_rust_toolchain() {
-                    let mut target_path = sdist_path.clone().to_path_buf();
-                    target_path.pop();
-                    target_path.pop();
-                    target_path.push("bin");
-
-                    fs::create_dir_all(&target_path)
-                        .context("Fail to create directory for installing rust toolchain")?;
-
-                    let target_path_str = target_path
-                        .to_str()
-                        .context("Fail to construct target path for installing rust toolchain")?;
-
-                    download_and_execute_rustup(target_path_str, target_path_str)
-                        .context("Failed to download rust toolchain")?;
-                }
                 Ok(Some((sdist_path, "source".to_string())))
             }
             None => Ok(None),
@@ -1152,18 +1143,72 @@ impl BuildContext {
         }
         Ok(wheels)
     }
-    /// Check if user requires to install rust toolchain
+
+    /// Check if Rust toolchain is installed
+    pub fn is_toolchain_installed() -> bool {
+        return Command::new("cargo").arg("--version").output().is_ok();
+    }
+
+    /// Downloads the rustup installer script and executes it to install rustup
     ///
-    /// Loop over `build-system.requires` defined in pyproject.toml and see if `rust-toolchain` is provided
-    pub fn require_rust_toolchain(&self) -> bool {
-        match &self.pyproject_toml {
-            Some(pyproject_toml) => pyproject_toml
-                .build_system
-                .requires
-                .iter()
-                .any(|req| req.name.as_ref() == "rust-toolchain"),
-            None => false,
+    /// Inspired by https://github.com/chriskuehl/rustenv
+    #[cfg(feature = "rustls")]
+    pub fn download_and_execute_rustup(rustup_home: &str, cargo_home: &str) -> Result<()> {
+        let mut tf = NamedTempFile::new()?;
+        let agent = http_agent()?;
+        let response = agent.get("https://sh.rustup.rs").call()?.into_string()?;
+
+        copy(&mut response.as_bytes(), &mut tf)?;
+
+        #[cfg(unix)]
+        {
+            Command::new("sh")
+                .arg(tf.path())
+                .arg("-y")
+                .env("RUSTUP_HOME", rustup_home)
+                .env("CARGO_HOME", cargo_home)
+                .status()?;
         }
+
+        #[cfg(windows)]
+        {
+            let cargo_env_path = cargo_env_path.replace("/", "\\");
+
+            Command::new("cmd")
+                .args(&["/C", "CALL", &cargo_env_path])
+                .status()?;
+        }
+
+        Ok(())
+    }
+
+    /// Refresh the current shell to include path for rust toolchain
+    pub fn add_cargo_to_path(cargo_home: &str) -> Result<()> {
+        let cargo_bin_path = Path::new(cargo_home).join("bin");
+
+        #[cfg(unix)]
+        {
+            let current_path = env::var("PATH").unwrap_or_default();
+            let new_path = format!("{}:{}", cargo_bin_path.display(), current_path);
+            unsafe {env::set_var("PATH", &new_path)};
+            Command::new(cargo_bin_path.join("rustup"))
+                .arg("default")
+                .arg("stable")
+                .output()
+                .context("Failed to set default Rust toolchain using rustup")?;
+        }
+
+        /// FIXME: Test the following command
+        #[cfg(windows)]
+        {
+            Command::new("cmd")
+                .args(&["/C", tf.path(), "-y", "--no-modify-path"])
+                .env("RUSTUP_HOME", rustup_home)
+                .env("CARGO_HOME", cargo_home)
+                .status()?;
+        }
+
+        Ok(())
     }
 }
 

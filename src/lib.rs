@@ -40,7 +40,7 @@ pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::target::Target;
 #[cfg(feature = "upload")]
-pub use crate::upload::{upload, upload_ui, PublishOpt, Registry, UploadError};
+pub use crate::upload::{upload_ui, PublishOpt, Registry, UploadError};
 pub use auditwheel::PlatformTag;
 
 mod auditwheel;

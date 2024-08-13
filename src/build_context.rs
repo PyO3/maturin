@@ -1172,11 +1172,12 @@ impl BuildContext {
 
         #[cfg(windows)]
         {
-            let cargo_env_path = cargo_env_path.replace("/", "\\");
-
             Command::new("cmd")
-                .args(&["/C", "CALL", &cargo_env_path])
-                .status()?;
+                .args(&["/C", tf.path().to_str().unwrap()])
+                .env("RUSTUP_HOME", rustup_home)
+                .env("CARGO_HOME", cargo_home)
+                .status()
+                .context("Failed to execute rustup script on Windows")?;
         }
 
         Ok(())
@@ -1198,14 +1199,16 @@ impl BuildContext {
                 .context("Failed to set default Rust toolchain using rustup")?;
         }
 
-        /// FIXME: Test the following command
         #[cfg(windows)]
         {
-            Command::new("cmd")
-                .args(&["/C", tf.path(), "-y", "--no-modify-path"])
-                .env("RUSTUP_HOME", rustup_home)
-                .env("CARGO_HOME", cargo_home)
-                .status()?;
+            let current_path = env::var("PATH").unwrap_or_default();
+            let new_path = format!("{};{}", cargo_bin_path.display(), current_path);
+            env::set_var("PATH", &new_path);
+            Command::new(cargo_bin_path.join("rustup.exe"))
+                .arg("default")
+                .arg("stable")
+                .output()
+                .context("Failed to set default Rust toolchain using rustup")?;
         }
 
         Ok(())

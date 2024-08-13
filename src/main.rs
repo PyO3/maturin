@@ -279,7 +279,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             assert_eq!(build_options.interpreter.len(), 1);
             #[cfg(feature = "rustls")]
             if !BuildContext::is_toolchain_installed() {
-                let home_dir = home_dir().context("Unabel to get user home directory")?;
+                let home_dir = home_dir().context("Unable to get user home directory")?;
                 let home_dir_str = home_dir
                     .to_str()
                     .context("Unable to convert home directory string")?;

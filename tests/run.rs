@@ -458,6 +458,17 @@ fn integration_with_data() {
 }
 
 #[test]
+fn integration_readme_duplication() {
+    handle_result(integration::test_integration(
+        "test-crates/readme-duplication/readme-py",
+        None,
+        "integration-readme-duplication",
+        false,
+        None,
+    ));
+}
+
+#[test]
 // Sourced from https://pypi.org/project/wasmtime/11.0.0/#files
 // update with wasmtime updates
 #[cfg(any(

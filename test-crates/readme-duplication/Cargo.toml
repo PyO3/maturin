@@ -1,0 +1,6 @@
+[workspace]
+resolver = "2"
+members = ["readme-py", "readme-rs"]
+
+[workspace.package]
+readme = "README.md"

@@ -9,10 +9,12 @@ use ignore::overrides::Override;
 use normpath::PathExt as _;
 use path_slash::PathExt as _;
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
+use toml_edit::DocumentMut;
 use tracing::debug;
 
 /// Path dependency information.
@@ -47,13 +49,14 @@ fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
 /// We only want to add path dependencies that are actually used
 /// to reduce the size of the source distribution.
 fn rewrite_cargo_toml(
-    manifest_path: impl AsRef<Path>,
+    document: &mut DocumentMut,
+    manifest_path: &Path,
     known_path_deps: &HashMap<String, PathDependency>,
-) -> Result<String> {
-    let manifest_path = manifest_path.as_ref();
-    debug!("Rewriting Cargo.toml at {}", manifest_path.display());
-    let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
-
+) -> Result<()> {
+    debug!(
+        "Rewriting Cargo.toml `workspace.members` at {}",
+        manifest_path.display()
+    );
     // Update workspace members
     if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut()) {
         if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array()) {
@@ -102,7 +105,34 @@ fn rewrite_cargo_toml(
             }
         }
     }
-    Ok(document.to_string())
+    Ok(())
+}
+
+/// Rewrite `Cargo.toml` to find the readme in the same directory.
+///
+/// `package.readme` may point to any point above the package, so when we move the directory, but
+/// keep the readme position, we could get different readme files at the same archive location.
+/// Putting the readme in the same directory as the `Cargo.toml` prevents this.
+fn rewrite_cargo_toml_readme(
+    document: &mut DocumentMut,
+    manifest_path: &Path,
+    readme_name: Option<&str>,
+) -> Result<()> {
+    debug!(
+        "Rewriting Cargo.toml `package.readme` at {}",
+        manifest_path.display()
+    );
+
+    if let Some(readme_name) = readme_name {
+        let project = document.get_mut("package").with_context(|| {
+            format!(
+                "Missing `[package]` table in Cargo.toml with readme at {}",
+                manifest_path.display()
+            )
+        })?;
+        project["readme"] = toml_edit::value(readme_name);
+    }
+    Ok(())
 }
 
 /// When `pyproject.toml` is inside the Cargo workspace root,
@@ -150,6 +180,7 @@ fn add_crate_to_source_distribution(
     writer: &mut SDistWriter,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
+    readme: Option<&Path>,
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
     skip_cargo_toml: bool,
@@ -223,15 +254,33 @@ fn add_crate_to_source_distribution(
 
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
 
+    let readme_name = readme
+        .as_ref()
+        .map(|readme| {
+            readme
+                .file_name()
+                .and_then(OsStr::to_str)
+                .with_context(|| format!("Missing readme filename for {}", manifest_path.display()))
+        })
+        .transpose()?;
+
     if root_crate {
-        let rewritten_cargo_toml = rewrite_cargo_toml(manifest_path, known_path_deps)?;
+        let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
+        rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
+        rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),
-            rewritten_cargo_toml.as_bytes(),
+            document.to_string().as_bytes(),
         )?;
     } else if !skip_cargo_toml {
-        writer.add_file(cargo_toml_path, manifest_path)?;
+        let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
+        rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
+        writer.add_bytes(
+            cargo_toml_path,
+            Some(manifest_path),
+            document.to_string().as_bytes(),
+        )?;
     }
 
     for (target, source) in target_source {
@@ -440,6 +489,7 @@ fn add_cargo_package_files_to_sdist(
         writer,
         manifest_path,
         root_dir.join(relative_main_crate_manifest_dir),
+        None,
         &known_path_deps,
         true,
         false,
@@ -451,8 +501,9 @@ fn add_cargo_package_files_to_sdist(
             .normalize()
             .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
             .into_path_buf();
-        let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
-        writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+        // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
+        // higher up the file tree.
+        writer.add_file(root_dir.join(readme.file_name().unwrap()), &abs_readme)?;
     }
 
     // Add Cargo.lock file and workspace Cargo.toml
@@ -496,11 +547,17 @@ fn add_cargo_package_files_to_sdist(
                     readme: None,
                 },
             );
-            let workspace_cargo_toml = rewrite_cargo_toml(&workspace_manifest_path, &deps_to_keep)?;
+            let mut document =
+                parse_toml_file(workspace_manifest_path.as_std_path(), "Cargo.toml")?;
+            rewrite_cargo_toml(
+                &mut document,
+                workspace_manifest_path.as_std_path(),
+                &deps_to_keep,
+            )?;
             writer.add_bytes(
                 root_dir.join(relative_workspace_cargo_toml),
                 Some(workspace_manifest_path.as_std_path()),
-                workspace_cargo_toml.as_bytes(),
+                document.to_string().as_bytes(),
             )?;
         }
     } else if cargo_lock_required {
@@ -593,6 +650,7 @@ fn add_path_dep(
         writer,
         &path_dep.manifest_path,
         root_dir.join(relative_path_dep_manifest_dir),
+        path_dep.readme.as_deref(),
         known_path_deps,
         false,
         skip_cargo_toml,
@@ -604,15 +662,21 @@ fn add_path_dep(
             path_dep.manifest_path.display()
         )
     })?;
-    // Handle possible relative readme field in Cargo.toml
+    // Include readme
     if let Some(readme) = path_dep.readme.as_ref() {
         let readme = path_dep_manifest_dir.join(readme);
         let abs_readme = readme
             .normalize()
             .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
             .into_path_buf();
-        let relative_readme = abs_readme.strip_prefix(sdist_root).unwrap();
-        writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+        // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
+        // higher up the file tree. See also [`rewrite_cargo_toml_readme`].
+        writer.add_file(
+            root_dir
+                .join(relative_path_dep_manifest_dir)
+                .join(readme.file_name().unwrap()),
+            &abs_readme,
+        )?;
     }
     // Handle different workspace manifest
     if path_dep.workspace_root != workspace_root {

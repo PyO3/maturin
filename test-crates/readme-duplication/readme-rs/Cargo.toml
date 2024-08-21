@@ -1,0 +1,5 @@
+[package]
+name = "readme-rs"
+version = "0.2.0"
+edition = "2021"
+readme.workspace = true

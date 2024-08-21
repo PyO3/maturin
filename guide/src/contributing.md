@@ -63,7 +63,7 @@ Ready to contribute? Here's how to setup maturin for local development.
 7. Commit your changes and push your branch to GitHub:
    ```bash
    $ git add .
-   $ git Commit
+   $ git commit
    $ git push origin branch-name
    ```
 8. Submit a pull request through the [GitHub website](https://github.com/PyO3/maturin/pulls).

@@ -8,6 +8,7 @@ use ignore::overrides::Override;
 use normpath::PathExt as _;
 use path_slash::PathExt as _;
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -153,8 +154,9 @@ fn add_crate_to_source_distribution(
     skip_cargo_toml: bool,
 ) -> Result<()> {
     let manifest_path = manifest_path.as_ref();
+    let args = ["package", "--list", "--allow-dirty", "--manifest-path"];
     let output = Command::new("cargo")
-        .args(["package", "--list", "--allow-dirty", "--manifest-path"])
+        .args(args)
         .arg(manifest_path)
         .output()
         .with_context(|| {
@@ -171,6 +173,10 @@ fn add_crate_to_source_distribution(
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
         );
+    }
+    if !output.stderr.is_empty() {
+        eprintln!("From `cargo {}`:", args.join(" "));
+        std::io::stderr().write_all(&output.stderr)?;
     }
 
     let file_list: Vec<&Path> = str::from_utf8(&output.stdout)

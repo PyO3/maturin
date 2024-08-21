@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+* Forward `cargo package --list` warnings in [#2186](https://github.com/PyO3/maturin/pull/2186)
+* In source distributions, we move the readmes of path dependencies into the respective crate to avoid collision between different readmes in [#2184](https://github.com/PyO3/maturin/pull/2184)
+
 ## [1.7.0] - 2024-07-07
 
 * Initial iOS support in [#2101](https://github.com/PyO3/maturin/pull/2102)

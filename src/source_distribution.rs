@@ -2,6 +2,7 @@ use crate::module_writer::{add_data, ModuleWriter};
 use crate::pyproject_toml::SdistGenerator;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
+use cargo_metadata::camino::Utf8Path;
 use cargo_metadata::{Metadata, MetadataCommand, PackageId};
 use fs_err as fs;
 use ignore::overrides::Override;
@@ -405,52 +406,17 @@ fn add_cargo_package_files_to_sdist(
 
     // Add local path dependencies
     for (name, path_dep) in known_path_deps.iter() {
-        debug!(
-            "Adding path dependency: {} at {}",
-            name,
-            path_dep.manifest_path.display()
-        );
-        let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
-        let relative_path_dep_manifest_dir =
-            path_dep_manifest_dir.strip_prefix(&sdist_root).unwrap();
-        // we may need to rewrite workspace Cargo.toml later so don't add it to sdist yet
-        let skip_cargo_toml = workspace_manifest_path == path_dep.manifest_path;
-        add_crate_to_source_distribution(
+        add_path_dep(
             writer,
-            &path_dep.manifest_path,
-            root_dir.join(relative_path_dep_manifest_dir),
+            root_dir,
+            workspace_root,
+            &workspace_manifest_path,
             &known_path_deps,
-            false,
-            skip_cargo_toml,
+            &sdist_root,
+            name,
+            path_dep,
         )
-        .with_context(|| {
-            format!(
-                "Failed to add local dependency {} at {} to the source distribution",
-                name,
-                path_dep.manifest_path.display()
-            )
-        })?;
-        // Handle possible relative readme field in Cargo.toml
-        if let Some(readme) = path_dep.readme.as_ref() {
-            let readme = path_dep_manifest_dir.join(readme);
-            let abs_readme = readme
-                .normalize()
-                .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
-                .into_path_buf();
-            let relative_readme = abs_readme.strip_prefix(&sdist_root).unwrap();
-            writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
-        }
-        // Handle different workspace manifest
-        if &path_dep.workspace_root != workspace_root {
-            let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
-            let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
-                .strip_prefix(&sdist_root)
-                .unwrap();
-            writer.add_file(
-                root_dir.join(relative_path_dep_workspace_manifest),
-                &path_dep_workspace_manifest,
-            )?;
-        }
+        .with_context(|| format!("Failed to add path dependency {}", name))?;
     }
 
     // Add the main crate
@@ -600,6 +566,65 @@ fn add_cargo_package_files_to_sdist(
         }
     }
 
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)] // TODO(konsti)
+fn add_path_dep(
+    writer: &mut SDistWriter,
+    root_dir: &Path,
+    workspace_root: &Utf8Path,
+    workspace_manifest_path: &Utf8Path,
+    known_path_deps: &HashMap<String, PathDependency>,
+    sdist_root: &Path,
+    name: &str,
+    path_dep: &PathDependency,
+) -> Result<()> {
+    debug!(
+        "Adding path dependency: {} at {}",
+        name,
+        path_dep.manifest_path.display()
+    );
+    let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
+    let relative_path_dep_manifest_dir = path_dep_manifest_dir.strip_prefix(sdist_root).unwrap();
+    // we may need to rewrite workspace Cargo.toml later so don't add it to sdist yet
+    let skip_cargo_toml = workspace_manifest_path == path_dep.manifest_path;
+    add_crate_to_source_distribution(
+        writer,
+        &path_dep.manifest_path,
+        root_dir.join(relative_path_dep_manifest_dir),
+        known_path_deps,
+        false,
+        skip_cargo_toml,
+    )
+    .with_context(|| {
+        format!(
+            "Failed to add local dependency {} at {} to the source distribution",
+            name,
+            path_dep.manifest_path.display()
+        )
+    })?;
+    // Handle possible relative readme field in Cargo.toml
+    if let Some(readme) = path_dep.readme.as_ref() {
+        let readme = path_dep_manifest_dir.join(readme);
+        let abs_readme = readme
+            .normalize()
+            .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
+            .into_path_buf();
+        let relative_readme = abs_readme.strip_prefix(sdist_root).unwrap();
+        writer.add_file(root_dir.join(relative_readme), &abs_readme)?;
+    }
+    // Handle different workspace manifest
+    if path_dep.workspace_root != workspace_root {
+        let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
+        let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
+            .strip_prefix(sdist_root)
+            .unwrap();
+        writer.add_file(
+            root_dir.join(relative_path_dep_workspace_manifest),
+            &path_dep_workspace_manifest,
+        )?;
+    }
     Ok(())
 }
 

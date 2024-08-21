@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.7.1]
 
 * Forward `cargo package --list` warnings in [#2186](https://github.com/PyO3/maturin/pull/2186)
 * In source distributions, we move the readmes of path dependencies into the respective crate to avoid collision between different readmes in [#2184](https://github.com/PyO3/maturin/pull/2184)

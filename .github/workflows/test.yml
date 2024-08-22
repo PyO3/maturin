@@ -243,14 +243,14 @@ jobs:
           version: "v0.7.6"
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.platform.python-version }}
+          python-version: 3.12
           architecture: "x64"
       - name: Set PYTHON_VERSION env var
         shell: bash
         run: |
           set -ex
           # remove -dev suffix
-          python_version=$(echo ${{ matrix.platform.python-version }} | sed -e s/-dev//)
+          python_version=$(echo "3.12" | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
       - uses: dtolnay/rust-toolchain@stable
         id: rustup

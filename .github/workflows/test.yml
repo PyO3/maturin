@@ -209,21 +209,6 @@ jobs:
           fi
           # Check wheels with twine
           twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
-      - name: test cross compiling windows wheel
-        if: ${{ matrix.platform.os == 'ubuntu-latest' && !contains(matrix.platform.python-version, 'pypy') && !contains(matrix.platform.python-version, '-dev') }}
-        run: |
-          set -ex
-          sudo apt-get install -y mingw-w64
-          rustup component add llvm-tools-preview
-          rustup target add x86_64-pc-windows-gnu
-          rustup target add x86_64-pc-windows-msvc
-
-          # abi3
-          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
-
-          # no-abi3
-          cargo run -- build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
       - name: test compiling with PYO3_CONFIG_FILE
         shell: bash
         run: |
@@ -239,6 +224,50 @@ jobs:
           cargo run build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
           cargo run new --mixed -b pyo3 test-crates/pyo3-new-mixed
           cargo run build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
+
+  test-windows-cross:
+    name: Test windows cross
+    needs: [generate-matrix]
+    strategy:
+      fail-fast: ${{ needs.generate-matrix.outputs.fail-fast != 'false' }}
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.5
+        with:
+          version: "v0.7.6"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+          architecture: "x64"
+      - name: Set PYTHON_VERSION env var
+        shell: bash
+        run: |
+          set -ex
+          # remove -dev suffix
+          python_version=$(echo "3.12" | sed -e s/-dev//)
+          echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
+      - uses: dtolnay/rust-toolchain@stable
+        id: rustup
+      - name: test cross compiling windows wheel
+        run: |
+          set -ex
+          sudo apt-get install -y mingw-w64
+          rustup component add llvm-tools-preview
+          rustup target add x86_64-pc-windows-gnu
+          rustup target add x86_64-pc-windows-msvc
+
+          # abi3
+          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+
+          # no-abi3
+          cargo run -- build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
     name: Test Emscripten

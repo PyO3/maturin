@@ -380,6 +380,8 @@ impl Target {
             "ppc_64"
         } else if matches!(self.target_arch(), Arch::X86) && python_impl == InterpreterKind::PyPy {
             "x86"
+        } else if matches!(self.target_arch(), Arch::Powerpc) {
+            "powerpc"
         } else {
             self.get_python_arch()
         }

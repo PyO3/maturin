@@ -425,6 +425,14 @@ mod test {
         );
 
         let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("powerpc-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-310-powerpc-linux-gnu.so");
+
+        let sysconfig = InterpreterConfig::lookup_one(
             &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),

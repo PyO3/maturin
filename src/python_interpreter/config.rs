@@ -306,7 +306,7 @@ impl InterpreterConfig {
                     format!(
                         ".cpython-{}-{}-{}-{}.{}",
                         abi_tag,
-                        target.get_python_arch(),
+                        target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
                         target_env,
                         file_ext,
@@ -319,7 +319,7 @@ impl InterpreterConfig {
                         major,
                         minor,
                         abi_tag,
-                        target.get_python_arch(),
+                        target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
                         target_env,
                         file_ext,
@@ -330,7 +330,7 @@ impl InterpreterConfig {
                     format!(
                         ".{}-{}-{}.{}",
                         abi_tag.replace('_', "-"),
-                        target.get_python_arch(),
+                        target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
                         file_ext,
                     )
@@ -341,7 +341,7 @@ impl InterpreterConfig {
                 format!(
                     ".cpython-{}-{}-{}.{}",
                     abi_tag,
-                    target.get_python_arch(),
+                    target.get_python_ext_arch(interpreter_kind),
                     target.get_python_os(),
                     file_ext
                 )

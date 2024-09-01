@@ -396,7 +396,9 @@ impl Target {
         match python_impl {
             CPython => {
                 // For musl handling see https://github.com/pypa/auditwheel/issues/349
-                if python_version >= (3, 11) {
+                if matches!(self.target_arch(), Arch::Mips64 | Arch::Mips64el) && self.is_linux() {
+                    "gnuabi64".to_string()
+                } else if python_version >= (3, 11) {
                     self.target_env().to_string()
                 } else {
                     self.target_env().to_string().replace("musl", "gnu")

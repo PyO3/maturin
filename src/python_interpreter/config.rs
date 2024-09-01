@@ -47,15 +47,7 @@ impl InterpreterConfig {
             // Python 2 is not supported
             return None;
         }
-        let python_arch = if matches!(target.target_arch(), Arch::Armv6L | Arch::Armv7L) {
-            "arm"
-        } else if matches!(target.target_arch(), Arch::Powerpc64Le) && python_impl == PyPy {
-            "ppc_64"
-        } else if matches!(target.target_arch(), Arch::X86) && python_impl == PyPy {
-            "x86"
-        } else {
-            target.get_python_arch()
-        };
+        let python_ext_arch = target.get_python_ext_arch(python_impl);
         // See https://github.com/pypa/auditwheel/issues/349
         let target_env = match python_impl {
             CPython => {
@@ -77,7 +69,7 @@ impl InterpreterConfig {
                 let ldversion = format!("{}{}{}", major, minor, abiflags);
                 let ext_suffix = format!(
                     ".cpython-{}-{}-linux-{}.so",
-                    ldversion, python_arch, target_env
+                    ldversion, python_ext_arch, target_env
                 );
                 Some(Self {
                     major,
@@ -90,7 +82,8 @@ impl InterpreterConfig {
             }
             (Os::Linux, PyPy) => {
                 let abi_tag = format!("pypy{}{}-{}", major, minor, PYPY_ABI_TAG);
-                let ext_suffix = format!(".{}-{}-linux-{}.so", abi_tag, python_arch, target_env);
+                let ext_suffix =
+                    format!(".{}-{}-linux-{}.so", abi_tag, python_ext_arch, target_env);
                 Some(Self {
                     major,
                     minor,
@@ -204,7 +197,8 @@ impl InterpreterConfig {
             }
             (Os::Emscripten, CPython) => {
                 let ldversion = format!("{}{}", major, minor);
-                let ext_suffix = format!(".cpython-{}-{}-emscripten.so", ldversion, python_arch);
+                let ext_suffix =
+                    format!(".cpython-{}-{}-emscripten.so", ldversion, python_ext_arch);
                 Some(Self {
                     major,
                     minor,

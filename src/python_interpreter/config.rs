@@ -48,17 +48,7 @@ impl InterpreterConfig {
             return None;
         }
         let python_ext_arch = target.get_python_ext_arch(python_impl);
-        // See https://github.com/pypa/auditwheel/issues/349
-        let target_env = match python_impl {
-            CPython => {
-                if python_version >= (3, 11) {
-                    target.target_env().to_string()
-                } else {
-                    target.target_env().to_string().replace("musl", "gnu")
-                }
-            }
-            PyPy | GraalPy => "gnu".to_string(),
-        };
+        let target_env = target.get_python_target_env(python_impl, python_version);
         match (target.target_os(), python_impl) {
             (Os::Linux, CPython) => {
                 let abiflags = if python_version < (3, 8) {
@@ -294,12 +284,7 @@ impl InterpreterConfig {
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
         let ext_suffix = if target.is_linux() || target.is_macos() {
-            // See https://github.com/pypa/auditwheel/issues/349
-            let target_env = if (major, minor) >= (3, 11) {
-                target.target_env().to_string()
-            } else {
-                target.target_env().to_string().replace("musl", "gnu")
-            };
+            let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
             match interpreter_kind {
                 InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
                     // Eg: .cpython-38-x86_64-linux-gnu.so

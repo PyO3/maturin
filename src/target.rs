@@ -1,4 +1,5 @@
 use crate::cross_compile::is_cross_compiling;
+use crate::python_interpreter::InterpreterKind;
 use crate::PlatformTag;
 use anyhow::{anyhow, bail, format_err, Result};
 use platform_info::*;
@@ -365,6 +366,21 @@ impl Target {
             Arch::Mipsel | Arch::Mips => "mips",
             Arch::Sparc64 => "sparc64",
             Arch::LoongArch64 => "loongarch64",
+        }
+    }
+
+    /// Returns the extension architecture name python uses in `ext_suffix` for this architecture.
+    pub fn get_python_ext_arch(&self, python_impl: InterpreterKind) -> &str {
+        if matches!(self.target_arch(), Arch::Armv6L | Arch::Armv7L) {
+            "arm"
+        } else if matches!(self.target_arch(), Arch::Powerpc64Le)
+            && python_impl == InterpreterKind::PyPy
+        {
+            "ppc_64"
+        } else if matches!(self.target_arch(), Arch::X86) && python_impl == InterpreterKind::PyPy {
+            "x86"
+        } else {
+            self.get_python_arch()
         }
     }
 

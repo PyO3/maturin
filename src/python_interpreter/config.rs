@@ -433,6 +433,25 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-powerpc-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("mips64-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(
+            sysconfig.ext_suffix,
+            ".cpython-310-mips64-linux-gnuabi64.so"
+        );
+
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("mips-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-310-mips-linux-gnu.so");
+
+        let sysconfig = InterpreterConfig::lookup_one(
             &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),

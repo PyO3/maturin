@@ -984,7 +984,14 @@ fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
         .no_deps()
         .verbose(true)
         .exec()?;
-    let root_pkg = cargo_metadata.root_package();
+    let root_pkg = match cargo_metadata.root_package() {
+        Some(pkg) => Some(pkg),
+        None => cargo_metadata
+            .packages
+            .iter()
+            .find(|p| p.manifest_path == manifest_path),
+    };
+
     let has_uniffi_bindgen_target = root_pkg
         .map(|pkg| {
             pkg.targets
@@ -1093,7 +1100,6 @@ fn generate_uniffi_bindings(
         bail!("Command {:?} failed", cmd);
     }
 
-    let py_binding = binding_dir.join(&py_binding_name).with_extension("py");
     // uniffi bindings hardcoded the extension filenames
     let cdylib_name = match cdylib_name {
         Some(name) => name,
@@ -1108,7 +1114,7 @@ fn generate_uniffi_bindings(
     Ok(UniFfiBindings {
         name: py_binding_name,
         cdylib,
-        path: py_binding,
+        path: binding_dir,
     })
 }
 
@@ -1128,7 +1134,7 @@ pub fn write_uniffi_module(
     let UniFfiBindings {
         name: binding_name,
         cdylib,
-        path: uniffi_binding,
+        path: binding_dir,
     } = generate_uniffi_bindings(crate_dir, target_dir, target_os, artifact)?;
     let py_init = format!("from .{binding_name} import *  # NOQA\n");
 
@@ -1150,12 +1156,16 @@ pub fn write_uniffi_module(
             ))?;
 
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
-            let target = base_path.join(&binding_name).with_extension("py");
-            fs::copy(&uniffi_binding, &target).context(format!(
-                "Failed to copy {} to {}",
-                uniffi_binding.display(),
-                target.display()
-            ))?;
+            if let Ok(read_dir) = fs::read_dir(binding_dir.clone()) {
+                for binding_file in read_dir.flatten() {
+                    let target: PathBuf = base_path.join(binding_file.file_name());
+                    fs::copy(binding_file.path(), &target).context(format!(
+                        "Failed to copy {:?} to {:?}",
+                        binding_file.path(),
+                        target
+                    ))?;
+                }
+            }
         }
 
         let relative = project_layout
@@ -1181,10 +1191,11 @@ pub fn write_uniffi_module(
 
     if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes())?;
-        writer.add_file(
-            module.join(binding_name).with_extension("py"),
-            uniffi_binding,
-        )?;
+        if let Ok(read_dir) = fs::read_dir(binding_dir) {
+            for binding_file in read_dir.flatten() {
+                writer.add_file(module.join(binding_file.file_name()), binding_file.path())?;
+            }
+        }
         writer.add_file_with_permissions(module.join(cdylib), artifact, 0o755)?;
     }
 

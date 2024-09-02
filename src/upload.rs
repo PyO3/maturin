@@ -69,10 +69,6 @@ impl PublishOpt {
             self.non_interactive = true;
         }
     }
-    /// Helper function to normalize URLs by removing trailing slashes
-    fn normalize_url(url: &str) -> &str {
-        url.trim_end_matches('/')
-    }
 }
 
 /// Error type for different types of errors that can happen when uploading a
@@ -320,8 +316,8 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
     let pypirc = load_pypirc();
     let (registry_name, registry_url) = if let Some(repository_url) = opt.repository_url.as_deref()
     {
-        let normalized_url = PublishOpt::normalize_url(repository_url);
-        let name = match normalized_url {
+        // to normalize URLs by removing trailing slashes
+        let name = match repository_url.trim_end_matches('/') {
             PublishOpt::DEFAULT_REPOSITORY_URL => Some("pypi"),
             PublishOpt::TEST_REPOSITORY_URL => Some("testpypi"),
             _ => None,

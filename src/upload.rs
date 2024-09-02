@@ -59,8 +59,8 @@ pub struct PublishOpt {
 }
 
 impl PublishOpt {
-    const DEFAULT_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy/";
-    const TEST_REPOSITORY_URL: &'static str = "https://test.pypi.org/legacy/";
+    const DEFAULT_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy";
+    const TEST_REPOSITORY_URL: &'static str = "https://test.pypi.org/legacy";
 
     /// Set to non interactive mode if we're running on CI
     pub fn non_interactive_on_ci(&mut self) {
@@ -316,7 +316,8 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
     let pypirc = load_pypirc();
     let (registry_name, registry_url) = if let Some(repository_url) = opt.repository_url.as_deref()
     {
-        let name = match repository_url {
+        // to normalize URLs by removing trailing slashes
+        let name = match repository_url.trim_end_matches('/') {
             PublishOpt::DEFAULT_REPOSITORY_URL => Some("pypi"),
             PublishOpt::TEST_REPOSITORY_URL => Some("testpypi"),
             _ => None,

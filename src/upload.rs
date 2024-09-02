@@ -322,8 +322,8 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
     {
         let normalized_url = PublishOpt::normalize_url(repository_url);
         let name = match normalized_url {
-            normalized if normalized == PublishOpt::DEFAULT_REPOSITORY_URL => Some("pypi"),
-            normalized if normalized == PublishOpt::TEST_REPOSITORY_URL => Some("testpypi"),
+            PublishOpt::DEFAULT_REPOSITORY_URL => Some("pypi"),
+            PublishOpt::TEST_REPOSITORY_URL => Some("testpypi"),
             _ => None,
         };
         (name, repository_url.to_string())

@@ -1156,7 +1156,7 @@ pub fn write_uniffi_module(
             ))?;
 
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
-            if let Ok(read_dir) = fs::read_dir(binding_dir.clone()) {
+            if let Ok(read_dir) = fs::read_dir(&binding_dir) {
                 for binding_file in read_dir.flatten() {
                     let target: PathBuf = base_path.join(binding_file.file_name());
                     fs::copy(binding_file.path(), &target).context(format!(

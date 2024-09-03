@@ -1159,11 +1159,9 @@ pub fn write_uniffi_module(
             if let Ok(read_dir) = fs::read_dir(&binding_dir) {
                 for binding_file in read_dir.flatten() {
                     let target: PathBuf = base_path.join(binding_file.file_name());
-                    fs::copy(binding_file.path(), &target).with_context(|| format!(
-                        "Failed to copy {:?} to {:?}",
-                        binding_file.path(),
-                        target
-                    ))?;
+                    fs::copy(binding_file.path(), &target).with_context(|| {
+                        format!("Failed to copy {:?} to {:?}", binding_file.path(), target)
+                    })?;
                 }
             }
         }

@@ -1,0 +1,2 @@
+[bindings.python]
+cdylib_name = "uniffi_multiple_binding_files"

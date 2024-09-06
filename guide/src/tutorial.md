@@ -199,6 +199,8 @@ manager).
 
 So let's use maturin to build and install in our current environment.
 
+You can also compile a performance-optimized program by adding the `-r` or `--release` flag for speed testing.
+
 ```shell
 (.venv) ferris@rustbox [~/src/rust/guessing-game] % maturin develop
 🔗 Found pyo3 bindings with abi3 support for Python ≥ 3.8

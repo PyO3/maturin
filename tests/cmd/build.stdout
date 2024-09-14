@@ -58,6 +58,10 @@ Options:
           
           Make sure you installed zig with `pip install maturin[zig]`
 
+      --with-debuginfo
+          Include debug information in the Wheel. Currently only support `.pdb` files with the same
+          name as the binary(`*[EXE]`/`*.dll`) on `msvc` platform
+
   -q, --quiet
           Do not print cargo log messages
 

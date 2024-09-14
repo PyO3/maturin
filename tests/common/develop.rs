@@ -71,6 +71,7 @@ pub fn test_develop(
             ..Default::default()
         },
         uv,
+        with_debuginfo: false, // TODO testing
     };
     develop(develop_options, &venv_dir)?;
 

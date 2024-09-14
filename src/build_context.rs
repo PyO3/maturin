@@ -3,8 +3,8 @@ use crate::auditwheel::{PlatformTag, Policy};
 use crate::build_options::CargoOptions;
 use crate::compile::{warn_missing_py_init, CompileTarget};
 use crate::module_writer::{
-    add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
-    write_uniffi_module, write_wasm_launcher, WheelWriter,
+    add_data, include_artifact_for_editable_install, write_bin, write_bindings_module,
+    write_cffi_module, write_python_part, write_uniffi_module, write_wasm_launcher, WheelWriter,
 };
 use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
@@ -187,6 +187,11 @@ pub struct BuildContext {
     pub universal2: bool,
     /// Build editable wheels
     pub editable: bool,
+    /// Whether to include debug information(`.pdb` on msvc)
+    /// in the wheels or editable-installs.
+    /// Currently only support `.pdb` files with
+    /// the same name as the binary(`*.exe`/`*.dll`) on `msvc` platform
+    pub with_debuginfo: bool,
     /// Cargo build options
     pub cargo_options: CargoOptions,
 }
@@ -692,6 +697,7 @@ impl BuildContext {
             &self.target,
             self.editable,
             self.pyproject_toml.as_ref(),
+            self.with_debuginfo,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -770,6 +776,7 @@ impl BuildContext {
             &self.target,
             self.editable,
             self.pyproject_toml.as_ref(),
+            self.with_debuginfo,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -861,7 +868,11 @@ impl BuildContext {
         let maturin_build = artifact_path.parent().unwrap().join("maturin");
         fs::create_dir_all(&maturin_build)?;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
-        fs::copy(artifact_path, &new_artifact_path)?;
+        include_artifact_for_editable_install(
+            artifact_path,
+            &new_artifact_path,
+            self.with_debuginfo,
+        )?;
         artifact.path = new_artifact_path;
         Ok(artifact)
     }
@@ -893,6 +904,7 @@ impl BuildContext {
             &self.interpreter[0].executable,
             self.editable,
             self.pyproject_toml.as_ref(),
+            self.with_debuginfo,
         )?;
 
         self.add_pth(&mut writer)?;
@@ -959,6 +971,7 @@ impl BuildContext {
             self.target.target_os(),
             self.editable,
             self.pyproject_toml.as_ref(),
+            self.with_debuginfo,
         )?;
 
         self.add_pth(&mut writer)?;
@@ -1059,7 +1072,13 @@ impl BuildContext {
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());
         for (artifact, bin_name) in &artifacts_and_files {
             artifacts_ref.push(*artifact);
-            write_bin(&mut writer, &artifact.path, &self.metadata23, bin_name)?;
+            write_bin(
+                &mut writer,
+                &artifact.path,
+                &self.metadata23,
+                bin_name,
+                self.with_debuginfo,
+            )?;
             if self.target.is_wasi() {
                 write_wasm_launcher(&mut writer, &self.metadata23, bin_name)?;
             }

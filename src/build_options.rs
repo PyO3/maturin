@@ -202,6 +202,12 @@ pub struct BuildOptions {
     #[arg(long)]
     pub zig: bool,
 
+    /// Include debug information in the Wheel.
+    /// Currently only support `.pdb` files with
+    /// the same name as the binary(`*.exe`/`*.dll`) on `msvc` platform
+    #[arg(long)]
+    pub with_debuginfo: bool,
+
     /// Cargo build options
     #[command(flatten)]
     pub cargo: CargoOptions,
@@ -719,6 +725,7 @@ impl BuildOptions {
             cargo_metadata,
             universal2,
             editable,
+            with_debuginfo: self.with_debuginfo,
             cargo_options,
         })
     }

@@ -55,6 +55,9 @@ Options:
       --uv
           Use `uv` to install packages instead of `pip`
 
+      --with-debuginfo
+          The same as `--with-debuginfo` in `maturin build`
+
   -h, --help
           Print help (see a summary with '-h')
 

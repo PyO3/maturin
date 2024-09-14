@@ -791,6 +791,103 @@ fn handle_cffi_call_result(
     }
 }
 
+struct ArtifactDebuginfoPaths {
+    pub(self) target_path: PathBuf,
+    pub(self) source_path: PathBuf,
+}
+
+fn get_msvc_artifact_debuginfo_path_to_write(
+    artifact_target_path: &Path,
+    artifact_source_path: &Path,
+) -> Result<ArtifactDebuginfoPaths> {
+    const DEBUGINFO_EXTENSION: &str = "pdb";
+
+    if !cfg!(target_env = "msvc") {
+        bail!("`--with-debuginfo` is only supported on `MSVC` targets")
+    }
+
+    let artifact_name: &Path = artifact_source_path
+        .file_name()
+        .ok_or(anyhow!(
+            "Failed to get file name of {:?}",
+            artifact_source_path
+        ))?
+        .as_ref();
+    let artifact_debuginfo_name = artifact_name.with_extension(DEBUGINFO_EXTENSION);
+
+    let artifact_target_dir = artifact_target_path.parent().ok_or(anyhow!(
+        "Failed to get parent directory of {:?}",
+        artifact_target_path
+    ))?;
+    // On msvc, rustc emits the linker flags `/DEBUG` and `/PDBALTPATH:%_PDB%`,
+    // so the `.pdb` file should keep the same name as the artifact.
+    // For example, if the artifact is `foo.dll`, the target path is `/mylib/foo.cp310-win_amd64.pyd`,
+    // then the debuginfo target path should be `/mylib/foo.pdb`(i.e. not `/mylib/foo.cp310-win_amd64.pdb`).
+    let artifact_debuginfo_target_path = artifact_target_dir.join(artifact_debuginfo_name);
+
+    let artifact_debuginfo_source_path = artifact_source_path.with_extension(DEBUGINFO_EXTENSION);
+
+    Ok(ArtifactDebuginfoPaths {
+        target_path: artifact_debuginfo_target_path,
+        source_path: artifact_debuginfo_source_path,
+    })
+}
+
+/// Currently, `with_debuginfo` is only supported on `MSVC` targets.
+fn write_artifact_to_module_writer(
+    writer: &mut impl ModuleWriter,
+    target_path: &Path,
+    source_path: &Path,
+    with_debuginfo: bool,
+) -> Result<()> {
+    // We can't use add_file since we need to mark the file as executable
+    writer.add_file_with_permissions(target_path, source_path, 0o755)?;
+
+    if with_debuginfo {
+        let ArtifactDebuginfoPaths {
+            target_path: debuginfo_target_path,
+            source_path: debuginfo_source_path,
+        } = get_msvc_artifact_debuginfo_path_to_write(target_path, source_path)?;
+
+        // `.pdb` file doesn't need to be executable, so `0o644` is enough.
+        writer.add_file(debuginfo_target_path, debuginfo_source_path)?;
+    }
+    Ok(())
+}
+
+fn copy_artifact(artifact: &Path, target: &Path) -> Result<()> {
+    // Remove existing so file to avoid triggering SIGSEV in running process
+    // See https://github.com/PyO3/maturin/issues/758
+    debug!("Removing {}", target.display());
+    let _ = fs::remove_file(target);
+
+    debug!("Copying {} to {}", artifact.display(), target.display());
+    fs::copy(artifact, target).context(format!(
+        "Failed to copy {} to {}",
+        artifact.display(),
+        target.display()
+    ))?;
+    Ok(())
+}
+
+/// Currently, `with_debuginfo` is only supported on `MSVC` targets.
+pub(crate) fn include_artifact_for_editable_install(
+    artifact: &Path,
+    target: &Path,
+    with_debuginfo: bool,
+) -> Result<()> {
+    copy_artifact(artifact, target)?;
+    if with_debuginfo {
+        let ArtifactDebuginfoPaths {
+            target_path: debuginfo_target_path,
+            source_path: debuginfo_source_path,
+        } = get_msvc_artifact_debuginfo_path_to_write(target, artifact)?;
+
+        copy_artifact(&debuginfo_source_path, &debuginfo_target_path)?;
+    }
+    Ok(())
+}
+
 /// Copies the shared library into the module, which is the only extra file needed with bindings
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
@@ -803,6 +900,7 @@ pub fn write_bindings_module(
     target: &Target,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
+    with_debuginfo: bool,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
     let so_filename = if is_abi3 {
@@ -830,23 +928,18 @@ pub fn write_bindings_module(
     if let Some(python_module) = &project_layout.python_module {
         if editable {
             let target = project_layout.rust_module.join(&so_filename);
-            // Remove existing so file to avoid triggering SIGSEV in running process
-            // See https://github.com/PyO3/maturin/issues/758
-            debug!("Removing {}", target.display());
-            let _ = fs::remove_file(&target);
-
-            debug!("Copying {} to {}", artifact.display(), target.display());
-            fs::copy(artifact, &target).context(format!(
-                "Failed to copy {} to {}",
-                artifact.display(),
-                target.display()
-            ))?;
+            include_artifact_for_editable_install(artifact, &target, with_debuginfo)?;
         } else {
             let relative = project_layout
                 .rust_module
                 .strip_prefix(python_module.parent().unwrap())
                 .unwrap();
-            writer.add_file_with_permissions(relative.join(&so_filename), artifact, 0o755)?;
+            write_artifact_to_module_writer(
+                writer,
+                &relative.join(&so_filename),
+                artifact,
+                with_debuginfo,
+            )?;
         }
     } else {
         let module = PathBuf::from(ext_name);
@@ -870,7 +963,12 @@ if hasattr({ext_name}, "__all__"):
             writer.add_file(module.join("__init__.pyi"), type_stub)?;
             writer.add_bytes(module.join("py.typed"), None, b"")?;
         }
-        writer.add_file_with_permissions(module.join(so_filename), artifact, 0o755)?;
+        write_artifact_to_module_writer(
+            writer,
+            &module.join(so_filename),
+            artifact,
+            with_debuginfo,
+        )?;
     }
 
     Ok(())
@@ -888,6 +986,7 @@ pub fn write_cffi_module(
     python: &Path,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
+    with_debuginfo: bool,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
@@ -905,11 +1004,7 @@ pub fn write_cffi_module(
                 "{extension_name}.so",
                 extension_name = &project_layout.extension_name
             ));
-            fs::copy(artifact, &target).context(format!(
-                "Failed to copy {} to {}",
-                artifact.display(),
-                target.display()
-            ))?;
+            include_artifact_for_editable_install(artifact, &target, with_debuginfo)?;
             File::create(base_path.join("__init__.py"))?
                 .write_all(cffi_init_file(&project_layout.extension_name).as_bytes())?;
             File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
@@ -943,13 +1038,14 @@ pub fn write_cffi_module(
             cffi_init_file(&project_layout.extension_name).as_bytes(),
         )?;
         writer.add_bytes(module.join("ffi.py"), None, cffi_declarations.as_bytes())?;
-        writer.add_file_with_permissions(
-            module.join(format!(
+        write_artifact_to_module_writer(
+            writer,
+            &module.join(format!(
                 "{extension_name}.so",
                 extension_name = &project_layout.extension_name
             )),
             artifact,
-            0o755,
+            with_debuginfo,
         )?;
     }
 
@@ -1130,6 +1226,7 @@ pub fn write_uniffi_module(
     target_os: Os,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
+    with_debuginfo: bool,
 ) -> Result<()> {
     let UniFfiBindings {
         name: binding_name,
@@ -1149,11 +1246,7 @@ pub fn write_uniffi_module(
             let base_path = python_module.join(&project_layout.extension_name);
             fs::create_dir_all(&base_path)?;
             let target = base_path.join(&cdylib);
-            fs::copy(artifact, &target).context(format!(
-                "Failed to copy {} to {}",
-                artifact.display(),
-                target.display()
-            ))?;
+            include_artifact_for_editable_install(artifact, &target, with_debuginfo)?;
 
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
             if let Ok(read_dir) = fs::read_dir(&binding_dir) {
@@ -1194,7 +1287,7 @@ pub fn write_uniffi_module(
                 writer.add_file(module.join(binding_file.file_name()), binding_file.path())?;
             }
         }
-        writer.add_file_with_permissions(module.join(cdylib), artifact, 0o755)?;
+        write_artifact_to_module_writer(writer, &module.join(cdylib), artifact, with_debuginfo)?;
     }
 
     Ok(())
@@ -1206,6 +1299,7 @@ pub fn write_bin(
     artifact: &Path,
     metadata: &Metadata23,
     bin_name: &str,
+    with_debuginfo: bool,
 ) -> Result<()> {
     let data_dir = PathBuf::from(format!(
         "{}-{}.data",
@@ -1216,9 +1310,7 @@ pub fn write_bin(
 
     writer.add_directory(&data_dir)?;
 
-    // We can't use add_file since we need to mark the file as executable
-    writer.add_file_with_permissions(data_dir.join(bin_name), artifact, 0o755)?;
-    Ok(())
+    write_artifact_to_module_writer(writer, &data_dir.join(bin_name), artifact, with_debuginfo)
 }
 
 /// Adds a wrapper script that start the wasm binary through wasmtime.

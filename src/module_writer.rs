@@ -813,7 +813,25 @@ fn get_msvc_artifact_debuginfo_path_to_write(
             artifact_source_path
         ))?
         .as_ref();
-    let artifact_debuginfo_name = artifact_name.with_extension(DEBUGINFO_EXTENSION);
+    let artifact_debuginfo_name: PathBuf = artifact_name
+        .with_extension(DEBUGINFO_EXTENSION)
+        .into_os_string()
+        .into_string()
+        .map_err(|os_string| {
+            anyhow!(
+                "Failed to convert artifact name to utf8 string: {:?}",
+                os_string
+            )
+        })?
+        // For cdylib, library target names cannot contain hyphens, i.e. `foo-bar.dll` is not allowed.
+        // But for `bin`, it's allowed, e.g. `foo-bar.exe`. However, the `pbd` file is `foo_bar.pdb`.
+        // See: <https://github.com/rust-lang/cargo/issues/8519>
+        //
+        // We don't need to worry about conflicts between `.pdb` files for `bin` and `cdylib` with the same name,
+        // because Cargo will issue a warning, and it may be upgraded to an error in the future.
+        // See: <https://github.com/rust-lang/cargo/issues/6313>
+        .replace("-", "_")
+        .into();
 
     let artifact_target_dir = artifact_target_path.parent().ok_or(anyhow!(
         "Failed to get parent directory of {:?}",
@@ -823,9 +841,10 @@ fn get_msvc_artifact_debuginfo_path_to_write(
     // so the `.pdb` file should keep the same name as the artifact.
     // For example, if the artifact is `foo.dll`, the target path is `/mylib/foo.cp310-win_amd64.pyd`,
     // then the debuginfo target path should be `/mylib/foo.pdb`(i.e. not `/mylib/foo.cp310-win_amd64.pdb`).
-    let artifact_debuginfo_target_path = artifact_target_dir.join(artifact_debuginfo_name);
+    let artifact_debuginfo_target_path = artifact_target_dir.join(&artifact_debuginfo_name);
 
-    let artifact_debuginfo_source_path = artifact_source_path.with_extension(DEBUGINFO_EXTENSION);
+    let artifact_debuginfo_source_path =
+        artifact_source_path.with_file_name(artifact_debuginfo_name);
 
     Ok(ArtifactDebuginfoPaths {
         target_path: artifact_debuginfo_target_path,

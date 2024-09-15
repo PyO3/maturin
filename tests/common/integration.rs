@@ -74,6 +74,12 @@ pub fn test_integration(
         cli.push(interp);
     }
 
+    if cfg!(target_env = "msvc") {
+        // Currently only supported on msvc.
+        // Note, DO NOT enable `release`, or the debuginfo(pdb file) will not be generated.
+        cli.push("--with-debuginfo");
+    }
+
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
     let wheels = build_context.build_wheels()?;

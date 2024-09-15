@@ -71,7 +71,7 @@ pub fn test_develop(
             ..Default::default()
         },
         uv,
-        with_debuginfo: false, // TODO testing
+        with_debuginfo: cfg!(target_env = "msvc"), // Currently only supported on msvc
     };
     develop(develop_options, &venv_dir)?;
 

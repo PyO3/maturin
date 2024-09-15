@@ -204,7 +204,7 @@ pub struct BuildOptions {
 
     /// Include debug information in the Wheel.
     /// Currently only support `.pdb` files with
-    /// the same name as the binary(`*.exe`/`*.dll`) on `msvc` platform
+    /// the same name as the binary(`exe/dll`) on `msvc` platform
     #[arg(long)]
     pub with_debuginfo: bool,
 

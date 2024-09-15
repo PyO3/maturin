@@ -71,7 +71,10 @@ pub fn test_develop(
             ..Default::default()
         },
         uv,
-        with_debuginfo: cfg!(target_env = "msvc"), // Currently only supported on msvc
+        // Currently only supported on msvc.
+        // If enable: DO NOT set `release` and `strip`, or the debuginfo will not be generated.
+        // Also, DO NOT set `CargoOptions::target` to targets other than MSVC.
+        with_debuginfo: cfg!(target_env = "msvc"),
     };
     develop(develop_options, &venv_dir)?;
 

@@ -791,86 +791,114 @@ fn handle_cffi_call_result(
     }
 }
 
-struct ArtifactDebuginfoPaths {
+pub(crate) struct MsvcDebugInfo;
+
+struct MsvcArtifactDebuginfoPaths {
+    /// The target path where debuginfo is to be written
     pub(self) target_path: PathBuf,
+    /// The source path where debuginfo is currently located
     pub(self) source_path: PathBuf,
 }
 
-fn get_msvc_artifact_debuginfo_path_to_write(
-    artifact_target_path: &Path,
-    artifact_source_path: &Path,
-) -> Result<ArtifactDebuginfoPaths> {
-    const DEBUGINFO_EXTENSION: &str = "pdb";
+impl MsvcDebugInfo {
+    /// `artifact_target_path` is the target path of the artifact to be written.
+    /// `artifact_source_path` is the source path where the artifact is located.
+    pub(self) fn get_msvc_artifact_debuginfo_path_to_write(
+        &self,
+        artifact_target_path: &Path,
+        artifact_source_path: &Path,
+    ) -> Result<MsvcArtifactDebuginfoPaths> {
+        const DEBUGINFO_EXTENSION: &str = "pdb";
 
-    if !cfg!(target_env = "msvc") {
-        bail!("`--with-debuginfo` is only supported on `MSVC` targets")
+        let artifact_name: &Path = artifact_source_path
+            .file_name()
+            .ok_or(anyhow!(
+                "Failed to get file name of {:?}",
+                artifact_source_path
+            ))?
+            .as_ref();
+        let artifact_debuginfo_name: PathBuf = artifact_name
+            .with_extension(DEBUGINFO_EXTENSION)
+            .into_os_string()
+            .into_string()
+            .map_err(|os_string| {
+                anyhow!(
+                    "Failed to convert artifact name to utf8 string: {:?}",
+                    os_string
+                )
+            })?
+            // For cdylib, library target names cannot contain hyphens, i.e. `foo-bar.dll` is not allowed.
+            // But for `bin`, it's allowed, e.g. `foo-bar.exe`. However, the `pbd` file is `foo_bar.pdb`.
+            // See: <https://github.com/rust-lang/cargo/issues/8519>
+            //
+            // We don't need to worry about conflicts between `.pdb` files for `bin` and `cdylib` with the same name,
+            // because Cargo will issue a warning, and it may be upgraded to an error in the future.
+            // See: <https://github.com/rust-lang/cargo/issues/6313>
+            .replace("-", "_")
+            .into();
+
+        let artifact_target_dir = artifact_target_path.parent().ok_or(anyhow!(
+            "Failed to get parent directory of {:?}",
+            artifact_target_path
+        ))?;
+        // On msvc, rustc emits the linker flags `/DEBUG` and `/PDBALTPATH:%_PDB%`,
+        // so the `.pdb` file should keep the same name as the artifact.
+        // For example, if the artifact is `foo.dll`, the target path is `/mylib/foo.cp310-win_amd64.pyd`,
+        // then the debuginfo target path should be `/mylib/foo.pdb`(i.e. not `/mylib/foo.cp310-win_amd64.pdb`).
+        let artifact_debuginfo_target_path = artifact_target_dir.join(&artifact_debuginfo_name);
+
+        let artifact_debuginfo_source_path =
+            artifact_source_path.with_file_name(artifact_debuginfo_name);
+
+        Ok(MsvcArtifactDebuginfoPaths {
+            target_path: artifact_debuginfo_target_path,
+            source_path: artifact_debuginfo_source_path,
+        })
     }
-
-    let artifact_name: &Path = artifact_source_path
-        .file_name()
-        .ok_or(anyhow!(
-            "Failed to get file name of {:?}",
-            artifact_source_path
-        ))?
-        .as_ref();
-    let artifact_debuginfo_name: PathBuf = artifact_name
-        .with_extension(DEBUGINFO_EXTENSION)
-        .into_os_string()
-        .into_string()
-        .map_err(|os_string| {
-            anyhow!(
-                "Failed to convert artifact name to utf8 string: {:?}",
-                os_string
-            )
-        })?
-        // For cdylib, library target names cannot contain hyphens, i.e. `foo-bar.dll` is not allowed.
-        // But for `bin`, it's allowed, e.g. `foo-bar.exe`. However, the `pbd` file is `foo_bar.pdb`.
-        // See: <https://github.com/rust-lang/cargo/issues/8519>
-        //
-        // We don't need to worry about conflicts between `.pdb` files for `bin` and `cdylib` with the same name,
-        // because Cargo will issue a warning, and it may be upgraded to an error in the future.
-        // See: <https://github.com/rust-lang/cargo/issues/6313>
-        .replace("-", "_")
-        .into();
-
-    let artifact_target_dir = artifact_target_path.parent().ok_or(anyhow!(
-        "Failed to get parent directory of {:?}",
-        artifact_target_path
-    ))?;
-    // On msvc, rustc emits the linker flags `/DEBUG` and `/PDBALTPATH:%_PDB%`,
-    // so the `.pdb` file should keep the same name as the artifact.
-    // For example, if the artifact is `foo.dll`, the target path is `/mylib/foo.cp310-win_amd64.pyd`,
-    // then the debuginfo target path should be `/mylib/foo.pdb`(i.e. not `/mylib/foo.cp310-win_amd64.pdb`).
-    let artifact_debuginfo_target_path = artifact_target_dir.join(&artifact_debuginfo_name);
-
-    let artifact_debuginfo_source_path =
-        artifact_source_path.with_file_name(artifact_debuginfo_name);
-
-    Ok(ArtifactDebuginfoPaths {
-        target_path: artifact_debuginfo_target_path,
-        source_path: artifact_debuginfo_source_path,
-    })
 }
 
-/// Currently, `with_debuginfo` is only supported on `MSVC` targets.
+#[non_exhaustive]
+pub(crate) enum DebugInfoType {
+    Msvc(MsvcDebugInfo),
+}
+
+impl DebugInfoType {
+    pub(crate) fn build(target: &Target) -> Result<Self> {
+        if target.is_msvc() {
+            Ok(DebugInfoType::Msvc(MsvcDebugInfo))
+        } else {
+            bail!("`--with-debuginfo` is only supported on `MSVC` targets")
+        }
+    }
+}
+
+/// Writes the artifact to the module writer.
+///
+/// - `target_path` is the target path to the writer where the artifact is to be written.
+/// - `source_path` is the source path where the artifact is currently located.
+/// - `with_debuginfo` is the debuginfo type of the artifact. If `Some`, the debuginfo will also be written.
 fn write_artifact_to_module_writer(
     writer: &mut impl ModuleWriter,
     target_path: &Path,
     source_path: &Path,
-    with_debuginfo: bool,
+    with_debuginfo: &Option<DebugInfoType>,
 ) -> Result<()> {
     // We can't use add_file since we need to mark the file as executable
     writer.add_file_with_permissions(target_path, source_path, 0o755)?;
 
-    if with_debuginfo {
-        let ArtifactDebuginfoPaths {
-            target_path: debuginfo_target_path,
-            source_path: debuginfo_source_path,
-        } = get_msvc_artifact_debuginfo_path_to_write(target_path, source_path)?;
+    if let Some(debuginfo_type) = with_debuginfo {
+        match debuginfo_type {
+            DebugInfoType::Msvc(msvc) => {
+                let MsvcArtifactDebuginfoPaths {
+                    target_path: debuginfo_target_path,
+                    source_path: debuginfo_source_path,
+                } = msvc.get_msvc_artifact_debuginfo_path_to_write(target_path, source_path)?;
 
-        // `.pdb` file doesn't need to be executable, so `0o644` is enough.
-        writer.add_file(debuginfo_target_path, debuginfo_source_path)?;
-    }
+                // `.pdb` file doesn't need to be executable, so `0o644` is enough.
+                writer.add_file(debuginfo_target_path, debuginfo_source_path)?;
+            }
+        }
+    };
     Ok(())
 }
 
@@ -889,21 +917,29 @@ fn copy_artifact(artifact: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Currently, `with_debuginfo` is only supported on `MSVC` targets.
+/// Includes the artifact for editable install.
+///
+/// - `artifact` is the artifact to be included.
+/// - `target` is the target path where the artifact is to be written.
+/// - `with_debuginfo` is the debuginfo type of the artifact. If `Some`, the debuginfo will also be included.
 pub(crate) fn include_artifact_for_editable_install(
     artifact: &Path,
     target: &Path,
-    with_debuginfo: bool,
+    with_debuginfo: &Option<DebugInfoType>,
 ) -> Result<()> {
     copy_artifact(artifact, target)?;
-    if with_debuginfo {
-        let ArtifactDebuginfoPaths {
-            target_path: debuginfo_target_path,
-            source_path: debuginfo_source_path,
-        } = get_msvc_artifact_debuginfo_path_to_write(target, artifact)?;
+    if let Some(debuginfo_type) = with_debuginfo {
+        match debuginfo_type {
+            DebugInfoType::Msvc(msvc) => {
+                let MsvcArtifactDebuginfoPaths {
+                    target_path: debuginfo_target_path,
+                    source_path: debuginfo_source_path,
+                } = msvc.get_msvc_artifact_debuginfo_path_to_write(target, artifact)?;
 
-        copy_artifact(&debuginfo_source_path, &debuginfo_target_path)?;
-    }
+                copy_artifact(&debuginfo_source_path, &debuginfo_target_path)?;
+            }
+        }
+    };
     Ok(())
 }
 
@@ -919,7 +955,7 @@ pub fn write_bindings_module(
     target: &Target,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
-    with_debuginfo: bool,
+    with_debuginfo: &Option<DebugInfoType>,
 ) -> Result<()> {
     let ext_name = &project_layout.extension_name;
     let so_filename = if is_abi3 {
@@ -1005,7 +1041,7 @@ pub fn write_cffi_module(
     python: &Path,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
-    with_debuginfo: bool,
+    with_debuginfo: &Option<DebugInfoType>,
 ) -> Result<()> {
     let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
 
@@ -1245,7 +1281,7 @@ pub fn write_uniffi_module(
     target_os: Os,
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
-    with_debuginfo: bool,
+    with_debuginfo: &Option<DebugInfoType>,
 ) -> Result<()> {
     let UniFfiBindings {
         name: binding_name,
@@ -1318,7 +1354,7 @@ pub fn write_bin(
     artifact: &Path,
     metadata: &Metadata23,
     bin_name: &str,
-    with_debuginfo: bool,
+    with_debuginfo: &Option<DebugInfoType>,
 ) -> Result<()> {
     let data_dir = PathBuf::from(format!(
         "{}-{}.data",

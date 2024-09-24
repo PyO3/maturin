@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2]
+
+* Fix cross compilation issues for armv7l, mips64 and ppc in [#2204](https://github.com/PyO3/maturin/pull/2204)
+* UniFFI: supports bindings generated from multiple crates in [#2208](https://github.com/PyO3/maturin/pull/2208)
+* Enable `--all-features` when building source distribution in [#2215](https://github.com/PyO3/maturin/pull/2215)
+* Fix rpath when module-name contains `.` in [#2219](https://github.com/PyO3/maturin/pull/2219)
+
 ## [1.7.1]
 
 * Forward `cargo package --list` warnings in [#2186](https://github.com/PyO3/maturin/pull/2186)
@@ -976,7 +983,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/pyo3/maturin/compare/v1.7.1...v1.7.2
+[1.7.1]: https://github.com/pyo3/maturin/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/pyo3/maturin/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/pyo3/maturin/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/pyo3/maturin/compare/v1.5.0...v1.5.1

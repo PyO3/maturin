@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.7.3]
+
+* Fix upload regression to pypi/testpypi in [#2229](https://github.com/PyO3/maturin/pull/2229)
+
 ## [1.7.2]
 
 * Fix cross compilation issues for armv7l, mips64 and ppc in [#2204](https://github.com/PyO3/maturin/pull/2204)
@@ -983,7 +987,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.3...HEAD
+[1.7.3]: https://github.com/pyo3/maturin/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/pyo3/maturin/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/pyo3/maturin/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/pyo3/maturin/compare/v1.6.0...v1.7.0

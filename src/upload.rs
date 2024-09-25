@@ -59,6 +59,7 @@ pub struct PublishOpt {
 }
 
 impl PublishOpt {
+    // Here we omit trailing slashes from the repository URL, which we'll add back in `complete_registry`
     const DEFAULT_REPOSITORY_URL: &'static str = "https://upload.pypi.org/legacy";
     const TEST_REPOSITORY_URL: &'static str = "https://test.pypi.org/legacy";
 
@@ -317,20 +318,32 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
     let (registry_name, registry_url) = if let Some(repository_url) = opt.repository_url.as_deref()
     {
         // to normalize URLs by removing trailing slashes
-        let name = match repository_url.trim_end_matches('/') {
-            PublishOpt::DEFAULT_REPOSITORY_URL => Some("pypi"),
-            PublishOpt::TEST_REPOSITORY_URL => Some("testpypi"),
-            _ => None,
-        };
-        (name, repository_url.to_string())
+        match repository_url.trim_end_matches('/') {
+            PublishOpt::DEFAULT_REPOSITORY_URL => (
+                Some("pypi"),
+                // Add trailing slash back
+                format!("{}/", PublishOpt::DEFAULT_REPOSITORY_URL),
+            ),
+            PublishOpt::TEST_REPOSITORY_URL => (
+                Some("testpypi"),
+                // Add trailing slash back
+                format!("{}/", PublishOpt::TEST_REPOSITORY_URL),
+            ),
+            _ => (None, repository_url.to_string()),
+        }
     } else if let Some(url) = pypirc.get(&opt.repository, "repository") {
         (Some(opt.repository.as_str()), url)
     } else if opt.repository == "pypi" {
-        (Some("pypi"), PublishOpt::DEFAULT_REPOSITORY_URL.to_string())
+        (
+            Some("pypi"),
+            // Add trailing slash back
+            format!("{}/", PublishOpt::DEFAULT_REPOSITORY_URL),
+        )
     } else if opt.repository == "testpypi" {
         (
             Some("testpypi"),
-            PublishOpt::TEST_REPOSITORY_URL.to_string(),
+            // Add trailing slash back
+            format!("{}/", PublishOpt::TEST_REPOSITORY_URL),
         )
     } else {
         bail!(

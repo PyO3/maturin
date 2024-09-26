@@ -479,8 +479,12 @@ impl BuildContext {
             eprintln!("    {}", lib_path.display());
         }
 
-        // Currently artifact .so file always resides at ${module_name}/${module_name}.so
-        let artifact_dir = self.module_name.split(".").collect::<PathBuf>();
+        let artifact_dir = match self.bridge() {
+            // cffi bindings that contains '.' in the module name will be split into directories
+            BridgeModel::Cffi => self.module_name.split(".").collect::<PathBuf>(),
+            // For other bindings artifact .so file usually resides at ${module_name}/${module_name}.so
+            _ => PathBuf::from(&self.module_name),
+        };
         for artifact in artifacts {
             let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel

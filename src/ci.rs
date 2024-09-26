@@ -576,13 +576,14 @@ jobs:\n",
             r#"  release:
     name: Release
     runs-on: ubuntu-latest
+    if: ${{{{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}}}
     needs: [{needs}]
 "#,
             needs = needs.join(", ")
         ));
-        if platforms.contains(&Platform::Emscripten) {
-            conf.push_str(
-                r#"    permissions:
+
+        conf.push_str(
+            r#"    permissions:
       # Use to sign the release artifacts
       id-token: write
       # Used to upload release artifacts
@@ -590,8 +591,7 @@ jobs:\n",
       # Used to generate artifact attestation
       attestations: write
 "#,
-            );
-        }
+        );
         conf.push_str(
             r#"    steps:
       - uses: actions/download-artifact@v4
@@ -806,7 +806,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos, sdist]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
@@ -972,7 +980,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
@@ -1235,7 +1251,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos, sdist]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
@@ -1403,7 +1427,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos, sdist]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation

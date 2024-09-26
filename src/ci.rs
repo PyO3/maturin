@@ -430,7 +430,7 @@ jobs:\n",
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{{{ matrix.platform.target }}}}
-          distro: ubuntu24.04
+          distro: ubuntu22.04
           githubToken: ${{{{ github.token }}}}
           install: |
             apt-get update
@@ -1074,7 +1074,7 @@ mod tests {
                     uses: uraimo/run-on-arch-action@v2
                     with:
                       arch: ${{ matrix.platform.target }}
-                      distro: ubuntu24.04
+                      distro: ubuntu22.04
                       githubToken: ${{ github.token }}
                       install: |
                         apt-get update

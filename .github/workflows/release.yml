@@ -210,27 +210,36 @@ jobs:
 
   release-pypi:
     permissions:
-      # Used to sign the release's artifacts with sigstore-python
+      # Used to sign the release's artifacts
       # and upload to PyPI using trusted publisher.
       id-token: write
       # Used to upload release artifacts.
       contents: write
+      # Use to generate artifact attestation.
+      attestations: write
     name: Publish to PyPI
     runs-on: ubuntu-latest
     environment:
       name: PyPI
       url: ${{ steps.set_url.outputs.env_url }}
-    if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build, build-musl]
     steps:
       - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
           merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            ./*.tar.gz
+            ./*.whl
       - uses: actions/setup-python@v5
+        if: "startsWith(github.ref, 'refs/tags/')"
         with:
           python-version: "3.10"
       - name: Publish
+        if: "startsWith(github.ref, 'refs/tags/')"
         run: |
           pip install maturin
           maturin upload --skip-existing *
@@ -239,47 +248,37 @@ jobs:
         run: |
           VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
           echo "env_url=https://pypi.org/project/maturin/$VERSION" >> $GITHUB_OUTPUT
-      - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v2.1.1
-        with:
-          inputs: ./*.tar.gz ./*.whl
-          upload-signing-artifacts: true
-      - name: Release signing artifacts
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            *.sig
-            *.crt
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
-          generate_release_notes: true
 
   release-github:
     permissions:
-      # Used to sign the release's artifacts with sigstore-python.
+      # Used to sign the release's artifacts.
       id-token: write
       # Used to upload release artifacts.
       contents: write
+      # Use to generate artifact attestation.
+      attestations: write
     name: Publish to GitHub releases
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
     needs: [build, build-musl]
     steps:
       - uses: actions/download-artifact@v4
         with:
           pattern: binaries-*
           merge-multiple: true
-      - name: Sigstore Sign
-        uses: sigstore/gh-action-sigstore-python@v2.1.1
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
         with:
-          inputs: ./*.tar.gz ./*.zip ./*.deb
-          upload-signing-artifacts: true
+          subject-path: |
+            ./*.tar.gz
+            ./*.zip
+            ./*.deb
       - name: Release
+        if: "startsWith(github.ref, 'refs/tags/')"
         uses: softprops/action-gh-release@v2
         with:
           files: |
             *.tar.gz
             *.zip
             *.deb
-            *.sigstore
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
           generate_release_notes: true

@@ -576,7 +576,6 @@ jobs:\n",
             r#"  release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
     needs: [{needs}]
 "#,
             needs = needs.join(", ")
@@ -584,15 +583,24 @@ jobs:\n",
         if platforms.contains(&Platform::Emscripten) {
             conf.push_str(
                 r#"    permissions:
+      # Use to sign the release artifacts
+      id-token: write
       # Used to upload release artifacts
       contents: write
+      # Used to generate artifact attestation
+      attestations: write
 "#,
             );
         }
         conf.push_str(
             r#"    steps:
       - uses: actions/download-artifact@v4
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'wheels-*/*'
       - name: Publish to PyPI
+        if: "startsWith(github.ref, 'refs/tags/')"
         uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -798,11 +806,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, musllinux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -960,11 +972,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, musllinux, windows, macos]
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1219,11 +1235,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, musllinux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1383,11 +1403,15 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
                 needs: [linux, musllinux, windows, macos, sdist]
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

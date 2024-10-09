@@ -264,18 +264,13 @@ jobs:\n",
                         target,
                     })
                     .collect(),
-                Platform::Macos => {
-                    vec![
-                        MatrixPlatform {
-                            runner: "macos-12",
-                            target: "x86_64",
-                        },
-                        MatrixPlatform {
-                            runner: "macos-14",
-                            target: "aarch64",
-                        },
-                    ]
-                }
+                Platform::Macos => ["x86_64", "aarch64"]
+                    .into_iter()
+                    .map(|target| MatrixPlatform {
+                        runner: "macos-14",
+                        target,
+                    })
+                    .collect(),
                 Platform::Emscripten => vec![MatrixPlatform {
                     runner: "ubuntu-latest",
                     target: "wasm32-unknown-emscripten",
@@ -767,7 +762,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-14
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -956,7 +951,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-14
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -1204,7 +1199,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-14
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -1391,7 +1386,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-14
                         target: x86_64
                       - runner: macos-14
                         target: aarch64

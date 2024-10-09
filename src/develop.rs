@@ -135,6 +135,9 @@ pub struct DevelopOptions {
     /// Use `uv` to install packages instead of `pip`
     #[arg(long)]
     pub uv: bool,
+    /// The same as `--with-debuginfo` in `maturin build`
+    #[arg(long)]
+    pub with_debuginfo: bool,
 }
 
 #[instrument(skip_all)]
@@ -301,6 +304,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         pip_path,
         cargo_options,
         uv,
+        with_debuginfo,
     } = develop_options;
     let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
     let target = Target::from_target_triple(cargo_options.target)?;
@@ -326,6 +330,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         skip_auditwheel: false,
         #[cfg(feature = "zig")]
         zig: false,
+        with_debuginfo,
         cargo: CargoOptions {
             target: target_triple,
             ..cargo_options

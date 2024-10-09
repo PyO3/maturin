@@ -191,7 +191,11 @@ pub fn test_source_distribution(
     Ok(())
 }
 
-fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<ZipArchive<File>> {
+fn build_wheel_files(
+    package: impl AsRef<Path>,
+    unique_name: &str,
+    with_debuginfo: bool,
+) -> Result<ZipArchive<File>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
     let wheel_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
@@ -204,6 +208,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
             ..Default::default()
         },
         platform_tag: vec![PlatformTag::Linux],
+        with_debuginfo,
         ..Default::default()
     };
 
@@ -223,7 +228,7 @@ pub fn check_wheel_mtimes(
     expected_mtime: Vec<OffsetDateTime>,
     unique_name: &str,
 ) -> Result<()> {
-    let mut wheel = build_wheel_files(package, unique_name)?;
+    let mut wheel = build_wheel_files(package, unique_name, false)?;
     let mut mtimes = BTreeSet::<OffsetDateTime>::new();
 
     for idx in 0..wheel.len() {
@@ -240,8 +245,9 @@ pub fn check_wheel_files(
     package: impl AsRef<Path>,
     expected_files: Vec<&str>,
     unique_name: &str,
+    with_debuginfo: bool,
 ) -> Result<()> {
-    let wheel = build_wheel_files(package, unique_name)?;
+    let wheel = build_wheel_files(package, unique_name, with_debuginfo)?;
     let drop_platform_specific_files = |file: &&str| -> bool {
         !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
     };

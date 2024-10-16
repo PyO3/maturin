@@ -250,14 +250,14 @@ jobs:\n",
                 Platform::ManyLinux => ["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "ubuntu-latest",
+                        runner: "ubuntu-22.04",
                         target,
                     })
                     .collect(),
                 Platform::Musllinux => ["x86_64", "x86", "aarch64", "armv7"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "ubuntu-latest",
+                        runner: "ubuntu-22.04",
                         target,
                     })
                     .collect(),
@@ -281,7 +281,7 @@ jobs:\n",
                     ]
                 }
                 Platform::Emscripten => vec![MatrixPlatform {
-                    runner: "ubuntu-latest",
+                    runner: "ubuntu-22.04",
                     target: "wasm32-unknown-emscripten",
                 }],
                 _ => Vec::new(),
@@ -691,17 +691,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -726,13 +726,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -880,17 +880,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -915,13 +915,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -1057,17 +1057,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -1092,13 +1092,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -1234,17 +1234,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -1294,13 +1294,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -1496,17 +1496,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -1528,13 +1528,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4

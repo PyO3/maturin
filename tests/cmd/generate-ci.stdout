@@ -46,5 +46,8 @@ Options:
       --zig
           Use zig to do cross compilation
 
+      --skip-attestation
+          Skip artifact attestation
+
   -h, --help
           Print help (see a summary with '-h')

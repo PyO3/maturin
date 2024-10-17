@@ -396,7 +396,7 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 
 #[cfg(feature = "rustls")]
 #[allow(clippy::result_large_err)]
-fn http_agent() -> Result<ureq::Agent, UploadError> {
+pub fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
     let builder = ureq::builder().try_proxy_from_env(true);

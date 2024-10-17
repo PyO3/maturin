@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+* Improve wheel reproducibility by sorting external libraries [#2261](https://github.com/PyO3/maturin/pull/2261)
+
 ## [1.7.4]
 
 * Fix musllinux rpath for non-cffi bindings in [#2233](https://github.com/PyO3/maturin/pull/2233)

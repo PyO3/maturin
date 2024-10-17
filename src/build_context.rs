@@ -24,7 +24,7 @@ use normpath::PathExt;
 use pep508_rs::Requirement;
 use platform_info::*;
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -396,7 +396,7 @@ impl BuildContext {
         writer.add_directory(&libs_dir)?;
 
         let temp_dir = tempfile::tempdir()?;
-        let mut soname_map = HashMap::new();
+        let mut soname_map = BTreeMap::new();
         let mut libs_copied = HashSet::new();
         for lib in ext_libs.iter().flatten() {
             let lib_path = lib.realpath.clone().with_context(|| {

@@ -252,6 +252,30 @@ fn develop_pyo3_ffi_pure(#[case] backend: TestInstallBackend, #[case] name: &str
 }
 
 #[test]
+#[cfg_attr(not(target_env = "msvc"), ignore)] // msvc debuginfo is only supported on `msvc`
+fn develop_pyo3_mixed_msvc_debuginfo() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-mixed-msvc-debuginfo",
+        None,
+        "develop-pyo3-mixed-msvc-debuginfo",
+        false,
+        TestInstallBackend::Pip,
+    ));
+}
+
+#[test]
+#[cfg_attr(not(target_env = "msvc"), ignore)] // msvc debuginfo is only supported on `msvc`
+fn develop_pyo3_bin_msvc_debuginfo() {
+    handle_result(develop::test_develop(
+        "test-crates/pyo3-bin-msvc-debuginfo",
+        None, // `bindings=bin` is already set in `pyproject.toml`
+        "develop-pyo3-bin-msvc-debuginfo",
+        false,
+        TestInstallBackend::Pip,
+    ));
+}
+
+#[test]
 fn integration_pyo3_bin() {
     let python_implementation = test_python_implementation().unwrap();
     if python_implementation == "pypy" || python_implementation == "graalpy" {
@@ -819,6 +843,41 @@ fn pyo3_mixed_include_exclude_wheel_files() {
             "README.md",
         ],
         "wheel-files-pyo3-mixed-include-exclude",
+        false,
+    ))
+}
+
+#[test]
+#[cfg_attr(not(target_env = "msvc"), ignore)] // msvc debuginfo is only supported on `msvc`
+fn pyo3_mixed_msvc_debuginfo_wheel_files() {
+    handle_result(other::check_wheel_files(
+        "test-crates/pyo3-mixed-msvc-debuginfo",
+        vec![
+            "pyo3_mixed-0.1.0.dist-info/METADATA",
+            "pyo3_mixed-0.1.0.dist-info/RECORD",
+            "pyo3_mixed-0.1.0.dist-info/WHEEL",
+            "pyo3_mixed/__init__.py",
+            "pyo3_mixed/pyo3_mixed.pdb",
+        ],
+        "wheel-files-pyo3-mixed-msvc-debuginfo",
+        true,
+    ))
+}
+
+#[test]
+#[cfg_attr(not(target_env = "msvc"), ignore)] // msvc debuginfo is only supported on `msvc`
+fn pyo3_bin_msvc_debuginfo_wheel_files() {
+    handle_result(other::check_wheel_files(
+        "test-crates/pyo3-bin-msvc-debuginfo",
+        vec![
+            "pyo3_mixed-0.1.0.dist-info/METADATA",
+            "pyo3_mixed-0.1.0.dist-info/RECORD",
+            "pyo3_mixed-0.1.0.dist-info/WHEEL",
+            "pyo3_mixed-0.1.0.data/scripts/pyo3-bin.exe",
+            "pyo3_mixed-0.1.0.data/scripts/pyo3_bin.pdb",
+        ],
+        "wheel-files-pyo3-bin-msvc-debuginfo",
+        true,
     ))
 }
 

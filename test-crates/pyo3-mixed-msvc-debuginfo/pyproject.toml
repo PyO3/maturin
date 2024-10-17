@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyo3-mixed"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dynamic = ["version"]
+
+[tool.maturin]
+python-source = "python"
+# keep the pyd name different from the rust lib name to test `.pdb` file name
+module-name = "pyo3_mixed._pyo3_lib"
+features = ["pyo3/extension-module"]

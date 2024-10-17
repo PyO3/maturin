@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 use toml_edit::DocumentMut;
-use tracing::debug;
+use tracing::{debug, trace};
 
 /// Path dependency information.
 /// It may be in a different workspace than the root crate.
@@ -185,6 +185,11 @@ fn add_crate_to_source_distribution(
     root_crate: bool,
     skip_cargo_toml: bool,
 ) -> Result<()> {
+    debug!(
+        "Getting cargo package file list for {}",
+        manifest_path.as_ref().display()
+    );
+    let prefix = prefix.as_ref();
     let manifest_path = manifest_path.as_ref();
     let args = ["package", "--list", "--allow-dirty", "--manifest-path"];
     let output = Command::new("cargo")
@@ -207,41 +212,53 @@ fn add_crate_to_source_distribution(
         );
     }
     if !output.stderr.is_empty() {
-        eprintln!("From `cargo {}`:", args.join(" "));
+        eprintln!(
+            "From `cargo {} {}`:",
+            args.join(" "),
+            manifest_path.display()
+        );
         std::io::stderr().write_all(&output.stderr)?;
     }
 
-    let file_list: Vec<&Path> = str::from_utf8(&output.stdout)
+    let file_list: Vec<&str> = str::from_utf8(&output.stdout)
         .context("Cargo printed invalid utf-8 ಠ_ಠ")?
         .lines()
-        .map(Path::new)
         .collect();
+
+    trace!("File list: {}", file_list.join(", "));
 
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
-    let target_source: Vec<(PathBuf, PathBuf)> = file_list
-        .iter()
+    let target_source: Vec<_> = file_list
+        .into_iter()
         .map(|relative_to_manifests| {
             let relative_to_cwd = manifest_dir.join(relative_to_manifests);
-            (relative_to_manifests.to_path_buf(), relative_to_cwd)
+            (relative_to_manifests, relative_to_cwd)
         })
-        // We rewrite Cargo.toml and add it separately
         .filter(|(target, source)| {
             #[allow(clippy::if_same_then_else)]
-            // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
-            // and https://github.com/PyO3/maturin/issues/449
-            if target == Path::new("Cargo.toml.orig") || target == Path::new("Cargo.toml") {
+            if *target == "Cargo.toml.orig" {
+                // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
+                // and https://github.com/PyO3/maturin/issues/449
                 false
-            } else if root_crate && target == Path::new("pyproject.toml") {
-                // pyproject.toml is handled separately because it has be to put in the root dir
+            } else if *target == "Cargo.toml" {
+                // We rewrite Cargo.toml and add it separately
+                false
+            } else if root_crate && *target == "pyproject.toml" {
+                // pyproject.toml is handled separately because it has to be put in the root dir
                 // of source distribution
                 false
-            } else if matches!(target.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so") {
+            } else if prefix.components().count() == 1 && *target == "pyproject.toml" {
+                // Skip pyproject.toml for cases when the root is in a workspace member and both the
+                // member and the root have a pyproject.toml.
+                debug!("Skipping potentially non-main {}", prefix.join(target).display());
+                false
+            } else if matches!(Path::new(target).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so") {
                 // Technically, `cargo package --list` should handle this,
                 // but somehow it doesn't on Alpine Linux running in GitHub Actions,
                 // so we do it manually here.
                 // See https://github.com/PyO3/maturin/pull/1255#issuecomment-1308838786
-                debug!("Ignoring {}", target.display());
+                debug!("Ignoring {}", target);
                 false
             } else {
                 source.exists()
@@ -249,7 +266,6 @@ fn add_crate_to_source_distribution(
         })
         .collect();
 
-    let prefix = prefix.as_ref();
     writer.add_directory(prefix)?;
 
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
@@ -468,6 +484,7 @@ fn add_cargo_package_files_to_sdist(
         .with_context(|| format!("Failed to add path dependency {}", name))?;
     }
 
+    debug!("Adding the main crate {}", manifest_path.display());
     // Add the main crate
     let abs_manifest_path = manifest_path
         .normalize()
@@ -503,7 +520,12 @@ fn add_cargo_package_files_to_sdist(
             .into_path_buf();
         // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
         // higher up the file tree.
-        writer.add_file(root_dir.join(readme.file_name().unwrap()), &abs_readme)?;
+        writer.add_file(
+            root_dir
+                .join(relative_main_crate_manifest_dir)
+                .join(readme.file_name().unwrap()),
+            &abs_readme,
+        )?;
     }
 
     // Add Cargo.lock file and workspace Cargo.toml

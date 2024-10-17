@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    ".",
+    "path-dep-with-root",
+]
+
+[workspace.package]
+authors = []
+version = "0.10.2-dev"
+publish = false
+repository = "https://github.com/mitmproxy/mitmproxy-rs"
+
+[package]
+name = "top_level"
+version = "0.1.0"
+description = "root dep"
+edition = "2021"
+
+[dependencies]
+anyhow = { version = "1.0.89" }

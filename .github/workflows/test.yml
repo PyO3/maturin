@@ -118,12 +118,6 @@ jobs:
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
 
       # Caching
-      # Install gnu-tar because BSD tar is buggy
-      # https://github.com/actions/cache/issues/403
-      - name: Add GNU tar to PATH (macOS)
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
       - name: Set MATURIN_TEST_PYTHON for PyPy
         shell: bash
         if: contains(matrix.python-version, 'pypy')

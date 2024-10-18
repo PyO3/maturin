@@ -15,33 +15,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fmt:
+  lint:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt,clippy
       - name: cargo fmt
         run: cargo fmt --all -- --check
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - name: cargo clippy
-        run: cargo clippy --tests --all-features -- -D warnings
-
-  cargo-deny:
-    name: Cargo deny
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           arguments: --all-features
+      - name: cargo clippy
+        run: cargo clippy --tests --all-features -- -D warnings

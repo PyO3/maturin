@@ -223,7 +223,6 @@ jobs:
 
   test-emscripten:
     name: Test Emscripten
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       PYODIDE_VERSION: "0.23.4"
@@ -260,7 +259,6 @@ jobs:
 
   test-alpine:
     name: Test Alpine Linux
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: "1"
@@ -289,7 +287,6 @@ jobs:
 
   test-auditwheel:
     name: Test Auditwheel
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
@@ -313,7 +310,6 @@ jobs:
 
   test-docker:
     name: Test Docker
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: "0"
@@ -343,7 +339,6 @@ jobs:
 
   test-cross-compile:
     name: Test Cross Compile
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container: ${{ matrix.platform.container }}
     strategy:
@@ -483,7 +478,6 @@ jobs:
 
   check:
     name: Check ${{ matrix.platform.target }}
-    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
       matrix:

@@ -562,7 +562,6 @@ jobs:
       - test-msrv
       - test-downstream
       - check
-    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Result

@@ -39,13 +39,13 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          #- macos-13
+          - macos-13
           - macos-14
-          #- windows-latest
+          - windows-latest
         python-version:
-          #- '3.9'
+          - '3.9'
           - '3.13'
-          #- 'pypy3.10'
+          - 'pypy3.10'
         exclude:
           # Skip PyPy on macOS M1 runner because they are built for x86_64
           - os: macos-14
@@ -145,10 +145,10 @@ jobs:
       #    rustup target add aarch64-apple-darwin
       #
       #    # abi3
-      #    cargo run -- build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
-      #    cargo run -- build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
+      #    cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+      #    cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
       #    if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
-      #      cargo run -- build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
+      #      cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
       #    fi
       #
       #    if [[ "$PYTHON_VERSION" == "3.1"* ]]; then
@@ -160,9 +160,9 @@ jobs:
       #    twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
       #
       #    # non-abi3
-      #    cargo run -- build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+      #    cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
       #    if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
-      #      cargo run -- build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
+      #      cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
       #    fi
       #    # Check wheels with twine
       #    twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
@@ -172,18 +172,17 @@ jobs:
           set -ex
           rustup target add x86_64-unknown-linux-gnu
           export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
-          cargo run -- build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
+          target/debug/maturin build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
       - name: test maturin new
         shell: bash
         run: |
           set -ex
-          cargo run new -b pyo3 test-crates/pyo3-new
-          cargo run build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
-          cargo run new --mixed -b pyo3 test-crates/pyo3-new-mixed
-          cargo run build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
+          target/debug/maturin new -b pyo3 test-crates/pyo3-new
+          target/debug/maturin build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
+          target/debug/maturin new --mixed -b pyo3 test-crates/pyo3-new-mixed
+          target/debug/maturin build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
 
   test-windows-cross:
-    if: false
     name: Test windows cross
     runs-on: ubuntu-latest
     env:
@@ -216,16 +215,15 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
           # abi3
-          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          cargo run -- build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+          cargo run build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+          cargo run build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
 
           # no-abi3
-          cargo run -- build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
+          cargo run build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
     name: Test Emscripten
     runs-on: ubuntu-latest
-    if: false
     env:
       PYODIDE_VERSION: "0.23.4"
       PYTHON_VERSION: "3.11.2"
@@ -263,7 +261,6 @@ jobs:
   test-alpine:
     name: Test Alpine Linux
     runs-on: ubuntu-latest
-    if: false
     env:
       RUST_BACKTRACE: "1"
       CARGO_INCREMENTAL: "0"
@@ -292,7 +289,6 @@ jobs:
   test-auditwheel:
     name: Test Auditwheel
     runs-on: ubuntu-latest
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -314,7 +310,6 @@ jobs:
   test-docker:
     name: Test Docker
     runs-on: ubuntu-latest
-    if: false
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
@@ -344,7 +339,6 @@ jobs:
   test-cross-compile:
     name: Test Cross Compile
     runs-on: ubuntu-latest
-    if: false
     container: ${{ matrix.platform.container }}
     strategy:
       fail-fast: false
@@ -395,7 +389,6 @@ jobs:
   test-bootstrap:
     name: Test Bootstrap
     runs-on: ${{ matrix.os }}
-    if: false
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
@@ -448,7 +441,6 @@ jobs:
   test-msrv:
     name: Test MSRV
     runs-on: ubuntu-latest
-    if: false
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.74.0
@@ -490,7 +482,6 @@ jobs:
           - target: armv5te-unknown-linux-gnueabi
             apt-packages: gcc-arm-linux-gnueabi
     runs-on: ubuntu-latest
-    if: false
     steps:
       - uses: actions/checkout@v4
       - name: Install packages
@@ -516,7 +507,6 @@ jobs:
       - test-downstream
       - check
     runs-on: ubuntu-latest
-    if: false
     steps:
       - name: Result
         run: |

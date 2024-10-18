@@ -35,6 +35,7 @@ jobs:
   test:
     name: Test
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
@@ -180,8 +181,6 @@ jobs:
 
   test-windows-cross:
     name: Test windows cross
-    strategy:
-      fail-fast: ${{ needs.generate-matrix.outputs.fail-fast != 'false' }}
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: "1"
@@ -289,7 +288,7 @@ jobs:
     name: Test Auditwheel
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
+      fail-fast: false
       matrix:
         manylinux: ["manylinux_2_28"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
@@ -342,7 +341,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ${{ matrix.platform.container }}
     strategy:
-      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
+      fail-fast: false
       matrix:
         platform:
           # CPython
@@ -396,7 +395,7 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     strategy:
-      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-14, windows-latest]
     steps:
@@ -463,6 +462,7 @@ jobs:
       repository: ${{ matrix.downstream.repository }}
       manifest-dir: ${{ matrix.downstream.manifest-dir }}
     strategy:
+      fail-fast: false
       matrix:
         downstream:
           - repository: "pola-rs/polars"
@@ -479,7 +479,7 @@ jobs:
   check:
     name: Check ${{ matrix.platform.target }}
     strategy:
-      fail-fast: ${{ !contains(github.event.pull_request.labels.*.name, 'CI-no-fail-fast') }}
+      fail-fast: false
       matrix:
         platform:
           - target: armv5te-unknown-linux-gnueabi

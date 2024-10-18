@@ -123,14 +123,6 @@ jobs:
           tar czvf ../../../maturin-aarch64-apple-darwin.tar.gz ${{ github.event.repository.name }}
           cd -
 
-      - name: Build debian package
-        if: ${{ matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/') }}
-        env:
-          BINARY_NAME: ${{ github.event.repository.name }}
-          TARGET: ${{ matrix.target }}
-          VERSION: ${{ github.ref }}
-        run: ci/build_deb.sh
-
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -144,7 +136,6 @@ jobs:
           path: |
             *.tar.gz
             *.zip
-            *.deb
 
   build-musl:
     name: Build ${{ matrix.platform.target }}

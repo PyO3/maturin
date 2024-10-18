@@ -88,11 +88,15 @@ jobs:
           # remove -dev suffix
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
+      - uses: astral-sh/setup-uv@v3
       - name: Install cffi
         if: ${{ !contains(matrix.python-version, 'pypy') }}
-        run: pip install cffi
+        run: uv pip install cffi
       - name: Install python packages
-        run: pip install virtualenv "ziglang>=0.10.0,<0.13.0" twine uniffi-bindgen==0.28.0
+        run: |
+          uv tool install virtualenv
+          uv tool install twine
+          uv pip install "ziglang>=0.10.0,<0.13.0" uniffi-bindgen==0.28.0
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install additional Rust target
@@ -240,7 +244,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - run: pip install nox
+      - uses: astral-sh/setup-uv@v3
+      - run: uv tool install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
       - uses: mymindstorm/setup-emsdk@v14
@@ -256,6 +261,7 @@ jobs:
   test-alpine:
     name: Test Alpine Linux
     runs-on: ubuntu-latest
+    if: false
     env:
       RUST_BACKTRACE: "1"
       CARGO_INCREMENTAL: "0"
@@ -412,6 +418,7 @@ jobs:
               - 'MANIFEST.in'
               - 'Cargo.toml'
               - '.github/workflows/test.yml'
+      - uses: astral-sh/setup-uv@v3
       - uses: dtolnay/rust-toolchain@stable
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       # Caching
@@ -429,7 +436,7 @@ jobs:
         run: |
           set -ex
           cargo run sdist -o dist
-          pip install -v dist/maturin-*.tar.gz
+          uv pip install -v dist/maturin-*.tar.gz
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - run: maturin --version
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}

@@ -15,6 +15,3 @@ name = "top_level"
 version = "0.1.0"
 description = "root dep"
 edition = "2021"
-
-[dependencies]
-anyhow = { version = "1.0.89" }

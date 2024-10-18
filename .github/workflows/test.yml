@@ -42,17 +42,17 @@ jobs:
           #- macos-13
           - macos-14
           #- windows-latest
-        python_version:
+        python-version:
           #- '3.9'
           - '3.13'
           #- 'pypy3.10'
         exclude:
           # Skip PyPy on macOS M1 runner because they are built for x86_64
           - os: macos-14
-            python_version: pypy3.10
+            python-version: pypy3.10
           # macOS M1 runner only have Python 3.11+
           - os: macos-14
-            python_version: 3.9
+            python-version: 3.9
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: "1"

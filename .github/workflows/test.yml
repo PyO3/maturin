@@ -81,7 +81,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: "x64"
       - name: Set PYTHON_VERSION env var
         shell: bash
         run: |
@@ -94,10 +93,6 @@ jobs:
         run: pip install cffi
       - name: Install python packages
         run: pip install virtualenv "ziglang>=0.10.0,<0.13.0" twine uniffi-bindgen==0.28.0
-      - uses: dtolnay/rust-toolchain@stable
-        id: rustup
-        with:
-          targets: wasm32-wasi # Additional target
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install additional Rust target

@@ -383,7 +383,6 @@ jobs:
           tags: maturin
           load: true
           cache-from: type=registry,ref=ghcr.io/pyo3/maturin:buildcache
-          cache-to: type=registry,ref=ghcr.io/pyo3/maturin:buildcache,mode=max
       - name: Test the Docker container
         run: ./test-dockerfile.sh
 

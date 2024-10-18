@@ -97,6 +97,10 @@ jobs:
           uv tool install virtualenv
           uv tool install twine
           uv pip install --system "ziglang>=0.10.0,<0.13.0" uniffi-bindgen==0.28.0
+      - uses: dtolnay/rust-toolchain@stable
+        id: rustup
+        with:
+          targets: wasm32-wasi # Used by the test suite
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install additional Rust target

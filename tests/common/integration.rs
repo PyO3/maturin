@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
-use maturin::{BuildOptions, PlatformTag, PythonInterpreter};
+use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
 use std::collections::HashSet;
 use std::env;
 use std::path::Path;
@@ -72,6 +72,14 @@ pub fn test_integration(
     if let Some(interp) = python_interp.as_ref() {
         cli.push("--interpreter");
         cli.push(interp);
+    }
+
+    // Currently only supported on msvc.
+    // If enable: DO NOT set `release` and `strip`, or the debuginfo will not be generated.
+    if (target.is_none() && cfg!(target_env = "msvc"))
+        || Target::from_target_triple(target.map(|x| x.to_owned()))?.is_msvc()
+    {
+        cli.push("--with-debuginfo");
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;

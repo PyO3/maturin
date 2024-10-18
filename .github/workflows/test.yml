@@ -91,12 +91,12 @@ jobs:
       - uses: astral-sh/setup-uv@v3
       - name: Install cffi
         if: ${{ !contains(matrix.python-version, 'pypy') }}
-        run: uv pip install cffi
+        run: uv pip install --system cffi
       - name: Install python packages
         run: |
           uv tool install virtualenv
           uv tool install twine
-          uv pip install "ziglang>=0.10.0,<0.13.0" uniffi-bindgen==0.28.0
+          uv pip install --system "ziglang>=0.10.0,<0.13.0" uniffi-bindgen==0.28.0
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install additional Rust target
@@ -428,7 +428,7 @@ jobs:
         run: |
           set -ex
           cargo run sdist -o dist
-          uv pip install -v dist/maturin-*.tar.gz
+          uv pip install --system -v dist/maturin-*.tar.gz
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - run: maturin --version
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}

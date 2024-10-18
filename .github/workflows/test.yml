@@ -180,8 +180,9 @@ jobs:
     name: Build maturin
     runs-on: ubuntu-latest
     steps:
-      - name: "Install Rust toolchain"
-        run: rustup show
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - run: rustup target add x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --target x86_64-unknown-linux-musl
       - uses: actions/upload-artifact@v4

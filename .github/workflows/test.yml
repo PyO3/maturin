@@ -182,8 +182,22 @@ jobs:
           target/debug/maturin new --mixed -b pyo3 test-crates/pyo3-new-mixed
           target/debug/maturin build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
 
+  build-maturin:
+    name: Build maturin
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --target x86_64-unknown-linux-musl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maturin-build
+          path: target/x86_64-unknown-linux-musl/debug/maturin
+
   test-windows-cross:
     name: Test windows cross
+    needs: build-maturin
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: "1"
@@ -198,7 +212,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.12
-          architecture: "x64"
+      - uses: actions/download-artifact@v4
+        with:
+          name: maturin-build
       - name: Set PYTHON_VERSION env var
         shell: bash
         run: |
@@ -215,11 +231,11 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
           # abi3
-          cargo run build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          cargo run build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+          ./maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+          ./maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
 
           # no-abi3
-          cargo run build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
+          ./maturin build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
     name: Test Emscripten
@@ -288,6 +304,7 @@ jobs:
 
   test-auditwheel:
     name: Test Auditwheel
+    needs: build-maturin
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -296,16 +313,17 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v4
-      # Caching
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
+      - name: "Install Rust toolchain"
+        run:
+          rustup show
+      - uses: actions/download-artifact@v4
         with:
-          shared-key: maturin-build
+          name: maturin-build
       - name: Compliant Build
-        run: tests/manylinux_compliant.sh ${{ matrix.manylinux }}
+        run: tests/manylinux_compliant.sh ./maturin ${{ matrix.manylinux }}
       - name: Incompliant Build
         if: matrix.manylinux == 'manylinux_2_28'
-        run: tests/manylinux_incompliant.sh ${{ matrix.manylinux }}
+        run: tests/manylinux_incompliant.sh ./maturin
 
   test-docker:
     name: Test Docker
@@ -338,6 +356,7 @@ jobs:
 
   test-cross-compile:
     name: Test Cross Compile
+    needs: build-maturin
     runs-on: ubuntu-latest
     container: ${{ matrix.platform.container }}
     strategy:
@@ -368,23 +387,28 @@ jobs:
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v4
-      - run: rustup target add ${{ matrix.platform.target }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: maturin-build
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
           set -ex
           # Use bundled sysconfig
-          cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          ./maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
 
           # Use PYO3_CROSS_LIB_DIR
           export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          cargo run --target x86_64-unknown-linux-gnu -- build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          ./maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
           unset PYO3_CROSS_LIB_DIR
 
           # Test abi3
-          cargo run --target x86_64-unknown-linux-gnu -- build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
+          ./maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
 
           # --find-interpreter
-          cargo run --target x86_64-unknown-linux-gnu -- build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          ./maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
 
   test-bootstrap:
     name: Test Bootstrap

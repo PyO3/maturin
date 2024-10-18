@@ -21,9 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt,clippy
+      - run: |
+          rustup component add rustfmt
+          rustup component add clippy
       - name: cargo fmt
         run: cargo fmt --all -- --check
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -203,8 +203,6 @@ jobs:
           # remove -dev suffix
           python_version=$(echo "3.12" | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
-      - uses: dtolnay/rust-toolchain@stable
-        id: rustup
       - name: test cross compiling windows wheel
         run: |
           set -ex
@@ -298,8 +296,6 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        id: rustup
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
@@ -374,9 +370,7 @@ jobs:
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
+      - run: rustup target add ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
           set -ex
@@ -419,8 +413,6 @@ jobs:
               - 'Cargo.toml'
               - '.github/workflows/test.yml'
       - uses: astral-sh/setup-uv@v3
-      - uses: dtolnay/rust-toolchain@stable
-        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
@@ -501,9 +493,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.platform.apt-packages }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
+      - run: rustup target add ${{ matrix.platform.target }}
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
       - name: cargo check

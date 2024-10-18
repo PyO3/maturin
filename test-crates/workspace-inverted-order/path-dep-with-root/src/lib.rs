@@ -2,13 +2,11 @@ use pyo3::prelude::*;
 
 #[pymodule]
 mod path_dep_with_root {
-    use pyo3::prelude::*;
+    use pyo3::pyfunction;
     use top_level::NUMBER;
 
-    #[pymodule_init]
-    #[allow(unused_variables)]
-    fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        println!("Hi from rust {NUMBER}");
-        Ok(())
+    #[pyfunction]
+    fn add_number(x: u32) -> u32 {
+        x + NUMBER
     }
 }

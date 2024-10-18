@@ -180,7 +180,6 @@ jobs:
 
   test-windows-cross:
     name: Test windows cross
-    needs: [generate-matrix]
     strategy:
       fail-fast: ${{ needs.generate-matrix.outputs.fail-fast != 'false' }}
     runs-on: ubuntu-latest

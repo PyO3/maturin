@@ -211,13 +211,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: maturin-build
-      - name: Set PYTHON_VERSION env var
-        shell: bash
-        run: |
-          set -ex
-          # remove -dev suffix
-          python_version=$(echo "3.12" | sed -e s/-dev//)
-          echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
+          path: bin
+      - run: chmod +x bin/maturin
       - name: test cross compiling windows wheel
         run: |
           set -ex
@@ -227,11 +222,11 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
           # abi3
-          ./maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          ./maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+          bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
+          bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
 
           # no-abi3
-          ./maturin build -i "python${PYTHON_VERSION}" -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
+          bin/maturin build -i python3.12 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
     name: Test Emscripten
@@ -313,6 +308,7 @@ jobs:
         with:
           name: maturin-build
           path: bin
+      - run: chmod +x bin/maturin
       - name: Compliant Build
         run: tests/manylinux_compliant.sh bin/maturin ${{ matrix.manylinux }}
       - name: Incompliant Build
@@ -384,6 +380,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: maturin-build
+          path: bin
+      - run: chmod +x bin/maturin-build
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
@@ -391,18 +389,18 @@ jobs:
         run: |
           set -ex
           # Use bundled sysconfig
-          ./maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
 
           # Use PYO3_CROSS_LIB_DIR
           export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          ./maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          bin/maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
           unset PYO3_CROSS_LIB_DIR
 
           # Test abi3
-          ./maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
+          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
 
           # --find-interpreter
-          ./maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          bin/maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
 
   test-bootstrap:
     name: Test Bootstrap

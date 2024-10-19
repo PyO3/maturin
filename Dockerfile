@@ -1,17 +1,17 @@
 # x86_64 base
-FROM quay.io/pypa/manylinux2014_x86_64 as base-amd64
+FROM quay.io/pypa/manylinux2014_x86_64 AS base-amd64
 # x86_64 builder
-FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:x86_64-musl as builder-amd64
+FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:x86_64-musl AS builder-amd64
 
 # aarch64 base
-FROM quay.io/pypa/manylinux2014_aarch64 as base-arm64
+FROM quay.io/pypa/manylinux2014_aarch64 AS base-arm64
 # aarch64 cross compile builder
-FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:aarch64-musl as builder-arm64
+FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:aarch64-musl AS builder-arm64
 
 ARG TARGETARCH
-FROM builder-$TARGETARCH as builder
+FROM builder-$TARGETARCH AS builder
 
-ENV PATH /root/.cargo/bin:$PATH
+ENV PATH=/root/.cargo/bin:$PATH
 
 # Compile dependencies only for build caching
 ADD Cargo.toml /maturin/Cargo.toml
@@ -37,11 +37,11 @@ RUN --mount=type=cache,target=/root/.cargo/git \
 
 FROM base-$TARGETARCH
 
-ENV PATH /root/.cargo/bin:$PATH
+ENV PATH=/root/.cargo/bin:$PATH
 # Add all supported python versions
-ENV PATH /opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin:/opt/python/cp310-cp310/bin:/opt/python/cp311-cp311/bin:/opt/python/cp312-cp312/bin:$PATH
+ENV PATH=/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin:/opt/python/cp310-cp310/bin:/opt/python/cp311-cp311/bin:/opt/python/cp312-cp312/bin:$PATH
 # Otherwise `cargo new` errors
-ENV USER root
+ENV USER=root
 
 RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && yum install -y libffi-devel openssh-clients \

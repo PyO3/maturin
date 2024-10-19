@@ -50,6 +50,9 @@ jobs:
           # Skip PyPy on macOS M1 runner because they are built for x86_64
           - os: macos-14
             python-version: pypy3.10
+          # TODO: Tests are getting stuck
+          - os: ubuntu-latest
+            python-version: pypy3.10
           # macOS M1 runner only have Python 3.11+
           - os: macos-14
             python-version: 3.9

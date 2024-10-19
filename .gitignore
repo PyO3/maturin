@@ -6,6 +6,7 @@ venv*/
 *.o
 *.so
 *.py[cdo]
+*.pdb
 __pycache__/
 *.egg-info/
 *.egg

@@ -50,8 +50,7 @@ Ready to contribute? Here's how to setup maturin for local development.
    ```bash
    $ cargo test
    ```
-   Note that in order to run tests you need to install `virtualenv` and
-   `cffi` (`pip3 install cffi virtualenv`).
+   Note that in order to run tests you need to install `virtualenv` (`pip install virtualenv`).
 6. make sure your changes are well formatted and pass the linting checks by
    installing [pre-commit](https://pre-commit.com/) and running
    ```bash

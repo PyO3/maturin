@@ -1,13 +1,17 @@
-use crate::common::{check_installed, create_virtualenv, maybe_mock_cargo, test_python_path};
+use crate::common::{
+    check_installed, create_virtualenv, create_virtualenv_name, maybe_mock_cargo, test_python_path,
+};
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
+use fs2::FileExt;
 use fs_err::File;
-use maturin::{BuildOptions, PlatformTag, PythonInterpreter};
+use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
+use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
@@ -69,9 +73,55 @@ pub fn test_integration(
         false
     };
 
+    // One scope up to extend the lifetime
+    let venvs_dir = Path::new("test-crates")
+        .normalize()?
+        .into_path_buf()
+        .join("venvs");
+    let cffi_provider = "cffi-provider";
+    let cffi_venv = venvs_dir.join(cffi_provider);
+    let target_triple = Target::from_target_triple(None)?;
+    let python = target_triple.get_venv_python(&cffi_venv);
+
     if let Some(interp) = python_interp.as_ref() {
         cli.push("--interpreter");
         cli.push(interp);
+    } else {
+        // Install cffi in a separate environment
+
+        // All tests try to use this venv at the same time, so we need to make sure only one
+        // modifies it at a time and that during that time, no other test reads it.
+        let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
+        file.file().lock_exclusive()?;
+        if !dbg!(venvs_dir.join(cffi_provider)).is_dir() {
+            println!("CRAETAITROAPTGIIDSOGRKADS");
+            dbg!(create_virtualenv_name(
+                cffi_provider,
+                python_interp.clone().map(PathBuf::from)
+            )?);
+            let pip_install_cffi = [
+                "-m",
+                "pip",
+                "--disable-pip-version-check",
+                "install",
+                "cffi",
+            ];
+            let output = Command::new(&python)
+                .args(pip_install_cffi)
+                .status()
+                //.output()
+                .context(format!("pip install cffi failed with {python:?}"))?;
+            if !output.success() {
+                bail!("Installing cffi into {} failed", cffi_venv.display());
+            }
+        }
+        file.file().unlock()?;
+        cli.push("--interpreter");
+        cli.push(
+            python
+                .to_str()
+                .context("non-utf8 python interpreter path")?,
+        );
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;

@@ -92,9 +92,6 @@ jobs:
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
       - uses: astral-sh/setup-uv@v3
-      - name: Install cffi
-        if: ${{ !contains(matrix.python-version, 'pypy') }}
-        run: uv pip install --system cffi
       - name: Install python packages
         run: |
           uv tool install virtualenv
@@ -282,7 +279,7 @@ jobs:
         run: |
           set -ex
           apk add cargo python3-dev libffi-dev py3-pip curl \
-            bash tar zstd git patchelf py3-cffi py3-virtualenv
+            bash tar zstd git patchelf py3-virtualenv
       - uses: actions/checkout@v4
       - name: Fix git permissions
         run: git config --global --add safe.directory $GITHUB_WORKSPACE

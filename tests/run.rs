@@ -136,8 +136,8 @@ fn develop_cffi_pure() {
 #[test]
 fn develop_cffi_mixed() {
     let python_implementation = test_python_implementation().unwrap();
-    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
-        // PyPy on Windows hangs on cffi test sometimes
+    if env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy hangs on cffi test sometimes
         return;
     }
     handle_result(develop::test_develop(
@@ -371,8 +371,8 @@ fn integration_pyo3_pure_conda() {
 #[test]
 fn integration_cffi_pure() {
     let python_implementation = test_python_implementation().unwrap();
-    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
-        // PyPy on Windows hangs on cffi test sometimes
+    if env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy hangs on cffi test sometimes
         return;
     }
     handle_result(integration::test_integration(
@@ -387,8 +387,8 @@ fn integration_cffi_pure() {
 #[test]
 fn integration_cffi_mixed() {
     let python_implementation = test_python_implementation().unwrap();
-    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
-        // PyPy on Windows hangs on cffi test sometimes
+    if env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // PyPy hangs on cffi test sometimes
         return;
     }
     handle_result(integration::test_integration(

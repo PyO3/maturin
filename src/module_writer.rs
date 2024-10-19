@@ -185,7 +185,7 @@ impl ModuleWriter for PathWriter {
         target: impl AsRef<Path>,
         source: Option<&Path>,
         bytes: &[u8],
-        permissions: u32,
+        #[cfg_attr(target_os = "windows", allow(unused_variables))] permissions: u32,
     ) -> Result<()> {
         let path = self.base_path.join(&target);
 

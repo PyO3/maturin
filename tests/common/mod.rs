@@ -125,12 +125,20 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
         Ok(python_impl) => format!("{name}-{python_impl}"),
         Err(_) => name.to_string(),
     };
+
+    let venv_dir = create_virtualenv_name(&venv_name, interp)?;
+
+    let target = Target::from_target_triple(None)?;
+    let python = target.get_venv_python(&venv_dir);
+    Ok((venv_dir, python))
+}
+
+pub fn create_virtualenv_name(venv_name: &str, interp: Option<PathBuf>) -> Result<PathBuf> {
     let venv_dir = PathBuf::from("test-crates")
         .normalize()?
         .into_path_buf()
         .join("venvs")
         .join(venv_name);
-    let target = Target::from_target_triple(None)?;
 
     if venv_dir.is_dir() {
         fs::remove_dir_all(&venv_dir)?;
@@ -153,9 +161,7 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
             str::from_utf8(&output.stderr)?
         );
     }
-
-    let python = target.get_venv_python(&venv_dir);
-    Ok((venv_dir, python))
+    Ok(venv_dir)
 }
 
 /// Creates conda environments

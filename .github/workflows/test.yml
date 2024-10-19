@@ -309,17 +309,15 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run:
-          rustup show
       - uses: actions/download-artifact@v4
         with:
           name: maturin-build
+          path: bin
       - name: Compliant Build
-        run: tests/manylinux_compliant.sh ./maturin ${{ matrix.manylinux }}
+        run: tests/manylinux_compliant.sh bin/maturin ${{ matrix.manylinux }}
       - name: Incompliant Build
         if: matrix.manylinux == 'manylinux_2_28'
-        run: tests/manylinux_incompliant.sh ./maturin
+        run: tests/manylinux_incompliant.sh bin/maturin
 
   test-docker:
     name: Test Docker

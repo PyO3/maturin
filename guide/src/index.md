@@ -28,6 +28,12 @@ Development of maturin is made possible by the following sponsors:
     </a>
   </div>
   <div>
+    <a rel="sponsored" target="_blank" href="https://www.prefect.io">
+      <img src="./assets/sponsors/prefect.png" alt="Prefect" width="80" height="80" />
+      <span>Prefect</span>
+    </a>
+  </div>
+  <div>
     <a rel="sponsored" target="_blank" href="https://pydantic.dev">
       <img src="./assets/sponsors/pydantic.png" alt="Pydantic" width="80" height="80" />
       <span>Pydantic</span>

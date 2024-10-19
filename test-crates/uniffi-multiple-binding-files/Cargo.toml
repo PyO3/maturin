@@ -1,0 +1,17 @@
+[package]
+name = "uniffi-multiple-binding-files"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "uniffi_multiple_binding_files"
+crate-type = ["cdylib"]
+
+[dependencies]
+uniffi = { version = "0.28.0", features = ["cli"] }
+mylib = { path = "mylib" }
+
+[build-dependencies]
+uniffi = { version = "0.28.0", features = ["build"] }

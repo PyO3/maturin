@@ -326,6 +326,9 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 out: Some(sdist_directory),
                 cargo: CargoOptions {
                     manifest_path,
+                    // Enable all features to ensure all optional path dependencies are packaged
+                    // into source distribution
+                    all_features: true,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -432,6 +435,9 @@ fn run() -> Result<()> {
                 out,
                 cargo: CargoOptions {
                     manifest_path,
+                    // Enable all features to ensure all optional path dependencies are packaged
+                    // into source distribution
+                    all_features: true,
                     ..Default::default()
                 },
                 ..Default::default()

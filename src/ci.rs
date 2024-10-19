@@ -108,6 +108,9 @@ pub struct GenerateCI {
     /// Use zig to do cross compilation
     #[arg(long)]
     pub zig: bool,
+    /// Skip artifact attestation
+    #[arg(long)]
+    pub skip_attestation: bool,
 }
 
 impl Default for GenerateCI {
@@ -124,6 +127,7 @@ impl Default for GenerateCI {
             ],
             pytest: false,
             zig: false,
+            skip_attestation: false,
         }
     }
 }
@@ -246,14 +250,14 @@ jobs:\n",
                 Platform::ManyLinux => ["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "ubuntu-latest",
+                        runner: "ubuntu-22.04",
                         target,
                     })
                     .collect(),
                 Platform::Musllinux => ["x86_64", "x86", "aarch64", "armv7"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "ubuntu-latest",
+                        runner: "ubuntu-22.04",
                         target,
                     })
                     .collect(),
@@ -267,7 +271,7 @@ jobs:\n",
                 Platform::Macos => {
                     vec![
                         MatrixPlatform {
-                            runner: "macos-12",
+                            runner: "macos-13",
                             target: "x86_64",
                         },
                         MatrixPlatform {
@@ -277,7 +281,7 @@ jobs:\n",
                     ]
                 }
                 Platform::Emscripten => vec![MatrixPlatform {
-                    runner: "ubuntu-latest",
+                    runner: "ubuntu-22.04",
                     target: "wasm32-unknown-emscripten",
                 }],
                 _ => Vec::new(),
@@ -576,23 +580,44 @@ jobs:\n",
             r#"  release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
+    if: ${{{{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}}}
     needs: [{needs}]
 "#,
             needs = needs.join(", ")
         ));
-        if platforms.contains(&Platform::Emscripten) {
-            conf.push_str(
-                r#"    permissions:
+
+        conf.push_str(
+            r#"    permissions:
+      # Use to sign the release artifacts
+      id-token: write
       # Used to upload release artifacts
       contents: write
+"#,
+        );
+        if !self.skip_attestation {
+            conf.push_str(
+                r#"      # Used to generate artifact attestation
+      attestations: write
 "#,
             );
         }
         conf.push_str(
             r#"    steps:
       - uses: actions/download-artifact@v4
-      - name: Publish to PyPI
+"#,
+        );
+        if !self.skip_attestation {
+            conf.push_str(
+                r#"      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'wheels-*/*'
+"#,
+            );
+        }
+        conf.push_str(
+            r#"      - name: Publish to PyPI
+        if: "startsWith(github.ref, 'refs/tags/')"
         uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -666,17 +691,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -701,13 +726,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -759,7 +784,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-13
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -798,11 +823,23 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos, sdist]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -843,17 +880,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -878,13 +915,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -936,7 +973,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-13
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -960,11 +997,194 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
+                steps:
+                  - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
+                  - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
+                    uses: PyO3/maturin-action@v1
+                    env:
+                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+                    with:
+                      command: upload
+                      args: --non-interactive --skip-existing wheels-*/*"#]];
+        expected.assert_eq(&conf);
+    }
+
+    #[test]
+    fn test_generate_github_no_attestations() {
+        let conf = GenerateCI {
+            skip_attestation: true,
+            ..Default::default()
+        }
+        .generate_github("example", &BridgeModel::BindingsAbi3(3, 7), false)
+        .unwrap()
+        .lines()
+        .skip(5)
+        .collect::<Vec<_>>()
+        .join("\n");
+        let expected = expect![[r#"
+            name: CI
+
+            on:
+              push:
+                branches:
+                  - main
+                  - master
+                tags:
+                  - '*'
+              pull_request:
+              workflow_dispatch:
+
+            permissions:
+              contents: read
+
+            jobs:
+              linux:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: ubuntu-22.04
+                        target: x86_64
+                      - runner: ubuntu-22.04
+                        target: x86
+                      - runner: ubuntu-22.04
+                        target: aarch64
+                      - runner: ubuntu-22.04
+                        target: armv7
+                      - runner: ubuntu-22.04
+                        target: s390x
+                      - runner: ubuntu-22.04
+                        target: ppc64le
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist
+                      sccache: 'true'
+                      manylinux: auto
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-linux-${{ matrix.platform.target }}
+                      path: dist
+
+              musllinux:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: ubuntu-22.04
+                        target: x86_64
+                      - runner: ubuntu-22.04
+                        target: x86
+                      - runner: ubuntu-22.04
+                        target: aarch64
+                      - runner: ubuntu-22.04
+                        target: armv7
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-musllinux-${{ matrix.platform.target }}
+                      path: dist
+
+              windows:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: windows-latest
+                        target: x64
+                      - runner: windows-latest
+                        target: x86
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                      architecture: ${{ matrix.platform.target }}
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist
+                      sccache: 'true'
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-windows-${{ matrix.platform.target }}
+                      path: dist
+
+              macos:
+                runs-on: ${{ matrix.platform.runner }}
+                strategy:
+                  matrix:
+                    platform:
+                      - runner: macos-13
+                        target: x86_64
+                      - runner: macos-14
+                        target: aarch64
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.x
+                  - name: Build wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist
+                      sccache: 'true'
+                  - name: Upload wheels
+                    uses: actions/upload-artifact@v4
+                    with:
+                      name: wheels-macos-${{ matrix.platform.target }}
+                      path: dist
+
+              release:
+                name: Release
+                runs-on: ubuntu-latest
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+                needs: [linux, musllinux, windows, macos]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1014,17 +1234,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -1074,13 +1294,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -1172,7 +1392,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-13
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -1219,11 +1439,23 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos, sdist]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1264,17 +1496,17 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: s390x
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v4
@@ -1296,13 +1528,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86_64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: x86
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: aarch64
-                      - runner: ubuntu-latest
+                      - runner: ubuntu-22.04
                         target: armv7
                 steps:
                   - uses: actions/checkout@v4
@@ -1347,7 +1579,7 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-12
+                      - runner: macos-13
                         target: x86_64
                       - runner: macos-14
                         target: aarch64
@@ -1383,11 +1615,23 @@ mod tests {
               release:
                 name: Release
                 runs-on: ubuntu-latest
-                if: "startsWith(github.ref, 'refs/tags/')"
+                if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
                 needs: [linux, musllinux, windows, macos, sdist]
+                permissions:
+                  # Use to sign the release artifacts
+                  id-token: write
+                  # Used to upload release artifacts
+                  contents: write
+                  # Used to generate artifact attestation
+                  attestations: write
                 steps:
                   - uses: actions/download-artifact@v4
+                  - name: Generate artifact attestation
+                    uses: actions/attest-build-provenance@v1
+                    with:
+                      subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
+                    if: "startsWith(github.ref, 'refs/tags/')"
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

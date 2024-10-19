@@ -186,6 +186,19 @@ fn develop_uniffi_mixed() {
     }
 }
 
+#[test]
+fn develop_uniffi_multiple_binding_files() {
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/uniffi-multiple-binding-files",
+            None,
+            "develop-uniffi-multiple-binding-files",
+            false,
+            TestInstallBackend::Pip,
+        ));
+    }
+}
+
 #[rstest]
 #[case(TestInstallBackend::Pip, "pip")]
 #[case(TestInstallBackend::Uv, "uv")]
@@ -452,6 +465,17 @@ fn integration_with_data() {
         "test-crates/with-data",
         None,
         "integration-with-data",
+        false,
+        None,
+    ));
+}
+
+#[test]
+fn integration_readme_duplication() {
+    handle_result(integration::test_integration(
+        "test-crates/readme-duplication/readme-py",
+        None,
+        "integration-readme-duplication",
         false,
         None,
     ));

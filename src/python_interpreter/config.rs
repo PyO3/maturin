@@ -47,26 +47,8 @@ impl InterpreterConfig {
             // Python 2 is not supported
             return None;
         }
-        let python_arch = if matches!(target.target_arch(), Arch::Armv6L | Arch::Armv7L) {
-            "arm"
-        } else if matches!(target.target_arch(), Arch::Powerpc64Le) && python_impl == PyPy {
-            "ppc_64"
-        } else if matches!(target.target_arch(), Arch::X86) && python_impl == PyPy {
-            "x86"
-        } else {
-            target.get_python_arch()
-        };
-        // See https://github.com/pypa/auditwheel/issues/349
-        let target_env = match python_impl {
-            CPython => {
-                if python_version >= (3, 11) {
-                    target.target_env().to_string()
-                } else {
-                    target.target_env().to_string().replace("musl", "gnu")
-                }
-            }
-            PyPy | GraalPy => "gnu".to_string(),
-        };
+        let python_ext_arch = target.get_python_ext_arch(python_impl);
+        let target_env = target.get_python_target_env(python_impl, python_version);
         match (target.target_os(), python_impl) {
             (Os::Linux, CPython) => {
                 let abiflags = if python_version < (3, 8) {
@@ -77,7 +59,7 @@ impl InterpreterConfig {
                 let ldversion = format!("{}{}{}", major, minor, abiflags);
                 let ext_suffix = format!(
                     ".cpython-{}-{}-linux-{}.so",
-                    ldversion, python_arch, target_env
+                    ldversion, python_ext_arch, target_env
                 );
                 Some(Self {
                     major,
@@ -90,7 +72,8 @@ impl InterpreterConfig {
             }
             (Os::Linux, PyPy) => {
                 let abi_tag = format!("pypy{}{}-{}", major, minor, PYPY_ABI_TAG);
-                let ext_suffix = format!(".{}-{}-linux-{}.so", abi_tag, python_arch, target_env);
+                let ext_suffix =
+                    format!(".{}-{}-linux-{}.so", abi_tag, python_ext_arch, target_env);
                 Some(Self {
                     major,
                     minor,
@@ -204,7 +187,8 @@ impl InterpreterConfig {
             }
             (Os::Emscripten, CPython) => {
                 let ldversion = format!("{}{}", major, minor);
-                let ext_suffix = format!(".cpython-{}-{}-emscripten.so", ldversion, python_arch);
+                let ext_suffix =
+                    format!(".cpython-{}-{}-emscripten.so", ldversion, python_ext_arch);
                 Some(Self {
                     major,
                     minor,
@@ -300,19 +284,14 @@ impl InterpreterConfig {
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
         let ext_suffix = if target.is_linux() || target.is_macos() {
-            // See https://github.com/pypa/auditwheel/issues/349
-            let target_env = if (major, minor) >= (3, 11) {
-                target.target_env().to_string()
-            } else {
-                target.target_env().to_string().replace("musl", "gnu")
-            };
+            let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
             match interpreter_kind {
                 InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
                     // Eg: .cpython-38-x86_64-linux-gnu.so
                     format!(
                         ".cpython-{}-{}-{}-{}.{}",
                         abi_tag,
-                        target.get_python_arch(),
+                        target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
                         target_env,
                         file_ext,
@@ -325,7 +304,7 @@ impl InterpreterConfig {
                         major,
                         minor,
                         abi_tag,
-                        target.get_python_arch(),
+                        target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
                         target_env,
                         file_ext,
@@ -336,7 +315,7 @@ impl InterpreterConfig {
                     format!(
                         ".{}-{}-{}.{}",
                         abi_tag.replace('_', "-"),
-                        target.get_python_arch(),
+                        target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
                         file_ext,
                     )
@@ -347,7 +326,7 @@ impl InterpreterConfig {
                 format!(
                     ".cpython-{}-{}-{}.{}",
                     abi_tag,
-                    target.get_python_arch(),
+                    target.get_python_ext_arch(interpreter_kind),
                     target.get_python_os(),
                     file_ext
                 )
@@ -444,6 +423,33 @@ mod test {
             sysconfig.ext_suffix,
             ".cpython-310-powerpc64le-linux-gnu.so"
         );
+
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("powerpc-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-310-powerpc-linux-gnu.so");
+
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("mips64-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(
+            sysconfig.ext_suffix,
+            ".cpython-310-mips64-linux-gnuabi64.so"
+        );
+
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("mips-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 10),
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-310-mips-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
             &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),

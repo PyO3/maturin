@@ -25,7 +25,7 @@ format for the pyo3 features, where `XX` is corresponds to a Python version.
 For example `abi3-py37` will indicate a minimum Python version of 3.7.
 
 > **Note**: Read more about abi3 support in [pyo3's
-> documentation](https://pyo3.rs/latest/building_and_distribution.html#py_limited_apiabi3).
+> documentation](https://pyo3.rs/latest/building-and-distribution#py_limited_apiabi3).
 
 ### Cross Compiling
 
@@ -33,7 +33,7 @@ pyo3 bindings has decent cross compilation support.
 For manylinux support the [manylinux-cross](https://github.com/rust-cross/manylinux-cross) docker images can be used.
 
 > **Note**: Read more about cross compiling in [pyo3's
-> documentation](https://pyo3.rs/latest/building_and_distribution.html#cross-compiling).
+> documentation](https://pyo3.rs/latest/building-and-distribution#cross-compiling).
 
 ## `cffi`
 

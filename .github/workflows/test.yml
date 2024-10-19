@@ -39,9 +39,9 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          #- macos-13
-          #- macos-14
-          #- windows-latest
+          - macos-13
+          - macos-14
+          - windows-latest
         python-version:
           - '3.9'
           - '3.13'
@@ -304,6 +304,7 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/download-artifact@v4
         with:
           name: maturin-build
@@ -381,7 +382,7 @@ jobs:
         with:
           name: maturin-build
           path: bin
-      - run: chmod +x bin/maturin-build
+      - run: chmod +x bin/maturin
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}

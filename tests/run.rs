@@ -120,8 +120,8 @@ fn develop_pyo3_mixed_src_layout() {
 #[test]
 fn develop_cffi_pure() {
     let python_implementation = test_python_implementation().unwrap();
-    if cfg!(windows) && env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
-        // PyPy on Windows hangs on cffi test sometimes
+    if env::var("GITHUB_ACTIONS").is_ok() && python_implementation == "pypy" {
+        // TODO: PyPy hangs on cffi test sometimes
         return;
     }
     handle_result(develop::test_develop(

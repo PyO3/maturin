@@ -182,7 +182,7 @@ def prepare_metadata_for_build_wheel(
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        _output = subprocess.check_output(command)
+        _output = subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f"Error running maturin: {e}\n")
         sys.exit(1)

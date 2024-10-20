@@ -530,6 +530,34 @@ jobs:
           - repository: "oxigraph/oxigraph"
             manifest-dir: "python"
 
+  test-pip-install-without-toolchain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: dtolnay/rust-toolchain@stable
+        id: rustup
+      - name: Install python build tools
+        run: pip install setuptools wheel>=0.36.2 setuptools-rust>=1.4.0 tomli>=1.1.0
+      - name: Build maturin wheel
+        run: |
+          export MATURIN_SETUP_ARGS="--features rustls"
+          python setup.py bdist_wheel
+      - name: install maturin wheel
+        run: pip install --force-reinstall ./dist/*.whl
+      - name: test
+        run: maturin sdist --manifest-path ./test-crates/hello-world/Cargo.toml -o ./target/hello-world/sdist
+      - name: Remove toolchain
+        run: rustup self uninstall -y
+      - name: pip install
+        run: |
+          export MATURIN_PEP517_ARGS="--verbose"
+          export RUST_LOG="debug"
+          pip install --no-build-isolation --verbose ./target/hello-world/sdist/hello_world-0.1.0.tar.gz
+
   check:
     name: Check ${{ matrix.platform.target }}
     if: github.event_name != 'pull_request'

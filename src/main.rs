@@ -277,16 +277,16 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
         } => {
             assert_eq!(build_options.interpreter.len(), 1);
-            #[cfg(feature = "rustls")]
+            #[cfg(feature = "rustls")] {
             if !BuildContext::is_toolchain_installed() {
                 let home_dir = home_dir().context("Unable to get user home directory")?;
                 let home_dir_str = home_dir
                     .to_str()
                     .context("Unable to convert home directory string")?;
-                BuildContext::download_and_execute_rustup(home_dir_str, home_dir_str)
-                    .context("Unable to install & execute rustup")?;
-                BuildContext::add_cargo_to_path(home_dir_str)
-                    .context("Unable to add cargo path")?;
+                let _ = BuildContext::install_installer(home_dir_str, home_dir_str);
+                let _ = BuildContext::install_toolchain(home_dir_str)
+                    .context("Unable to install rust toolchain")?;
+                }
             }
             let context = build_options.into_build_context(true, strip, false)?;
 

@@ -1146,14 +1146,18 @@ impl BuildContext {
 
     /// Check if Rust toolchain is installed
     pub fn is_toolchain_installed() -> bool {
-        return Command::new("cargo").arg("--version").output().is_ok();
+        let output = Command::new("cargo").arg("--version").output();
+        match output {
+            Ok(out) => out.status.success(),
+            Err(_) => false,
+        }
     }
 
     /// Downloads the rustup installer script and executes it to install rustup
     ///
     /// Inspired by https://github.com/chriskuehl/rustenv
     #[cfg(feature = "rustls")]
-    pub fn download_and_execute_rustup(rustup_home: &str, cargo_home: &str) -> Result<()> {
+    pub fn install_installer(rustup_home: &str, cargo_home: &str) -> Result<()> {
         let mut tf = NamedTempFile::new()?;
         let agent = http_agent()?;
         let response = agent.get("https://sh.rustup.rs").call()?.into_string()?;
@@ -1165,6 +1169,8 @@ impl BuildContext {
             Command::new("sh")
                 .arg(tf.path())
                 .arg("-y")
+                .arg("--default-toolchain")
+                .arg("none")
                 .env("RUSTUP_HOME", rustup_home)
                 .env("CARGO_HOME", cargo_home)
                 .status()?;
@@ -1184,31 +1190,37 @@ impl BuildContext {
     }
 
     /// Refresh the current shell to include path for rust toolchain
-    pub fn add_cargo_to_path(cargo_home: &str) -> Result<()> {
-        let cargo_bin_path = Path::new(cargo_home).join("bin");
+    pub fn install_toolchain(cargo_home: &str) -> Result<()> {
+        let current_path = env::var("PATH").unwrap_or_else(|_| String::from(""));
 
         #[cfg(unix)]
         {
-            let current_path = env::var("PATH").unwrap_or_default();
-            let new_path = format!("{}:{}", cargo_bin_path.display(), current_path);
-            unsafe { env::set_var("PATH", &new_path) };
-            Command::new(cargo_bin_path.join("rustup"))
+            let cargo_bin_path = format!("{}/bin", cargo_home);
+            let new_path = format!("{}:{}", cargo_bin_path, current_path);
+            env::set_var("PATH", &new_path);
+
+            let cargo_env_path = format!("{}/env", cargo_home);
+            Command::new("sh")
+                .arg("-c")
+                .arg(format!(". {}", cargo_env_path))
+                .status()?;  // Execute and get the status
+
+            let rustup_command = format!("{}/bin/rustup", cargo_home);
+            Command::new(rustup_command)
                 .arg("default")
                 .arg("stable")
-                .output()
-                .context("Failed to set default Rust toolchain using rustup")?;
+                .status()?;
         }
 
         #[cfg(windows)]
         {
-            let current_path = env::var("PATH").unwrap_or_default();
-            let new_path = format!("{};{}", cargo_bin_path.display(), current_path);
+            let cargo_bin_path = format!("{}\\bin", cargo_home);
+            let new_path = format!("{};{}", cargo_bin_path, current_path);
             env::set_var("PATH", &new_path);
-            Command::new(cargo_bin_path.join("rustup.exe"))
-                .arg("default")
-                .arg("stable")
-                .output()
-                .context("Failed to set default Rust toolchain using rustup")?;
+            Command::new("cmd")
+                .args(&["/C", "rustup default stable"])
+                .status()
+                .context("Failed to set rustup default stable on Windows");
         }
 
         Ok(())

@@ -11,11 +11,9 @@ use path_slash::PathExt as _;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Write;
-use std::io::copy;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
-use tempfile::NamedTempFile;
 use toml_edit::DocumentMut;
 use tracing::debug;
 

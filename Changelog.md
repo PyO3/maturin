@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.5]
+
+* Improve wheel reproducibility by sorting external libraries [#2261](https://github.com/PyO3/maturin/pull/2261)
+* Fix Readme and pyproject.toml inclusions for workspace where the bindings crate is not in the root in [#2262](https://github.com/PyO3/maturin/pull/2262)
+
 ## [1.7.4]
 
 * Fix musllinux rpath for non-cffi bindings in [#2233](https://github.com/PyO3/maturin/pull/2233)

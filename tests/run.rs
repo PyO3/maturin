@@ -482,6 +482,17 @@ fn integration_readme_duplication() {
 }
 
 #[test]
+fn integration_workspace_inverted_order() {
+    handle_result(integration::test_integration(
+        "test-crates/workspace-inverted-order/path-dep-with-root",
+        None,
+        "integration-workspace-inverted-order",
+        false,
+        None,
+    ));
+}
+
+#[test]
 // Sourced from https://pypi.org/project/wasmtime/11.0.0/#files
 // update with wasmtime updates
 #[cfg(any(

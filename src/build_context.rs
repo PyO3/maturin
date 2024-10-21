@@ -1180,10 +1180,12 @@ impl BuildContext {
         {
             Command::new("cmd")
                 .args(&["/C", tf.path().to_str().unwrap()])
+                .args("-y")
+                .arg("--default-toolchain")
+                .arg("none")
                 .env("RUSTUP_HOME", rustup_home)
                 .env("CARGO_HOME", cargo_home)
-                .status()
-                .context("Failed to execute rustup script on Windows")?;
+                .status()?;
         }
 
         Ok(())
@@ -1203,7 +1205,7 @@ impl BuildContext {
             Command::new("sh")
                 .arg("-c")
                 .arg(format!(". {}", cargo_env_path))
-                .status()?;  // Execute and get the status
+                .status()?;
 
             let rustup_command = format!("{}/bin/rustup", cargo_home);
             Command::new(rustup_command)
@@ -1219,8 +1221,7 @@ impl BuildContext {
             env::set_var("PATH", &new_path);
             Command::new("cmd")
                 .args(&["/C", "rustup default stable"])
-                .status()
-                .context("Failed to set rustup default stable on Windows");
+                .status();
         }
 
         Ok(())

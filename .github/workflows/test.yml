@@ -531,7 +531,7 @@ jobs:
           - repository: "oxigraph/oxigraph"
             manifest-dir: "python"
 
-  test-pip-install-without-toolchain:
+  build-maturin-wheel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -551,8 +551,44 @@ jobs:
         run: pip install --force-reinstall ./dist/*.whl
       - name: test
         run: maturin sdist --manifest-path ./test-crates/hello-world/Cargo.toml -o ./target/hello-world/sdist
-      - name: Remove toolchain
-        run: rustup self uninstall -y
+      - name: Upload sdist
+        id: upload-sdist
+        uses: actions/upload-artifact@v3
+        env:
+          ACTIONS_RUNTIME_TOKEN: abc
+        with:
+          name: hello-world-sdist
+          path: ./target/hello-world/sdist/*.tar.gz
+      - name: Upload wheels
+        id: upload-wheel
+        uses: actions/upload-artifact@v3
+        env:
+          ACTIONS_RUNTIME_TOKEN: abc
+        with:
+          name: maturin-wheel
+          path: ./dist/*.whl
+
+  test-pip-install-without-toolchain:
+    runs-on: ubuntu-latest
+    needs: [build-maturin-wheel]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Download sdist from previous job
+        uses: actions/download-artifact@v3
+        with:
+          name: hello-world-sdist
+          path: ./target/hello-world/sdist
+      - name: Download wheel from previous job
+        uses: actions/download-artifact@v3
+        with:
+          name: maturin-wheel
+          path: ./dist/*.whl
+      - name: Install maturin whl
+        run: pip install --force-reinstall ./dist/*.whl
       - name: pip install
         run: |
           export MATURIN_PEP517_ARGS="--verbose"

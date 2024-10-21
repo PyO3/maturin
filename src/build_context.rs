@@ -1179,10 +1179,8 @@ impl BuildContext {
         #[cfg(windows)]
         {
             Command::new("cmd")
-                .args(&["/C", tf.path().to_str().unwrap()])
-                .args("-y")
-                .arg("--default-toolchain")
-                .arg("none")
+                .args(["/C", tf.path().to_str().unwrap()])
+                .args(vec!["-y", "--default-toolchain", "none"])
                 .env("RUSTUP_HOME", rustup_home)
                 .env("CARGO_HOME", cargo_home)
                 .status()?;
@@ -1220,8 +1218,8 @@ impl BuildContext {
             let new_path = format!("{};{}", cargo_bin_path, current_path);
             env::set_var("PATH", &new_path);
             Command::new("cmd")
-                .args(&["/C", "rustup default stable"])
-                .status();
+                .args(vec!["/C", "rustup default stable"])
+                .status()?;
         }
 
         Ok(())

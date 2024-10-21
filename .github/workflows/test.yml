@@ -554,16 +554,12 @@ jobs:
       - name: Upload sdist
         id: upload-sdist
         uses: actions/upload-artifact@v3
-        env:
-          ACTIONS_RUNTIME_TOKEN: abc
         with:
           name: hello-world-sdist
           path: ./target/hello-world/sdist/*.tar.gz
       - name: Upload wheels
         id: upload-wheel
         uses: actions/upload-artifact@v3
-        env:
-          ACTIONS_RUNTIME_TOKEN: abc
         with:
           name: maturin-wheel
           path: ./dist/*.whl
@@ -588,7 +584,9 @@ jobs:
           name: maturin-wheel
           path: ./dist/*.whl
       - name: Install maturin whl
-        run: pip install --force-reinstall ./dist/*.whl
+        run: |
+          WHEEL_FILE=$(ls ./dist/*.whl)
+          pip install --force-reinstall "$WHEEL_FILE"
       - name: pip install
         run: |
           export MATURIN_PEP517_ARGS="--verbose"

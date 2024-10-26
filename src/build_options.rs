@@ -1200,7 +1200,7 @@ fn find_interpreter_in_sysconfig(
                 bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
             }
         };
-        if python_ver.is_empty() {
+        if python_ver.is_empty() || !python_ver.contains('.') {
             continue;
         }
         let (ver_major, ver_minor) = python_ver

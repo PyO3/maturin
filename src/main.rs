@@ -212,7 +212,9 @@ enum Pep517Command {
         #[arg(short = 'm', long = "manifest-path", value_name = "PATH")]
         /// The path to the Cargo.toml
         manifest_path: Option<PathBuf>,
-        /// The interpreter to use when building an sdist
+        /// The interpreter to use when building an sdist. If empty, maturin
+        /// will attempt to find an interpreter from the virtual environment
+        /// or system environment.
         #[arg(short = 'i', long = "interpreter", value_name = "PATH")]
         interpreter: Option<PathBuf>,
     },

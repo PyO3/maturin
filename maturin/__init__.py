@@ -121,7 +121,7 @@ def build_wheel(
 
 # noinspection PyUnusedLocal
 def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any]] = None) -> str:
-    command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
+    command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory, "--interpreter", _get_sys_executable()]
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()

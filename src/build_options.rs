@@ -167,7 +167,7 @@ pub struct BuildOptions {
     )]
     pub platform_tag: Vec<PlatformTag>,
 
-    /// The python versions to build wheels for, given as the executables of
+    /// The python versions to build wheels or an sdist for, given as the executables of
     /// interpreters such as `python3.9` or `/usr/bin/python3.8`.
     #[arg(short, long, num_args = 0.., action = clap::ArgAction::Append)]
     pub interpreter: Vec<PathBuf>,
@@ -1200,7 +1200,7 @@ fn find_interpreter_in_sysconfig(
                 bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
             }
         };
-        if python_ver.is_empty() || !python_ver.contains('.') {
+        if python_ver.is_empty() {
             continue;
         }
         let (ver_major, ver_minor) = python_ver

@@ -212,6 +212,9 @@ enum Pep517Command {
         #[arg(short = 'm', long = "manifest-path", value_name = "PATH")]
         /// The path to the Cargo.toml
         manifest_path: Option<PathBuf>,
+        /// The interpreter to use when building an sdist
+        #[arg(short = 'i', long = "interpreter", value_name = "PATH")]
+        interpreter: Option<PathBuf>,
     },
 }
 
@@ -306,6 +309,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
         Pep517Command::WriteSDist {
             sdist_directory,
             manifest_path,
+            interpreter,
         } => {
             let build_options = BuildOptions {
                 out: Some(sdist_directory),
@@ -316,6 +320,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                     all_features: true,
                     ..Default::default()
                 },
+                interpreter: interpreter.map_or_else(Vec::new, |interp| vec![interp]),
                 ..Default::default()
             };
             let build_context = build_options.into_build_context(false, false, false)?;

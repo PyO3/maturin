@@ -18,7 +18,6 @@ import shutil
 import struct
 import subprocess
 import sys
-from subprocess import SubprocessError
 from typing import Any, Dict, Mapping, List, Optional
 
 try:
@@ -165,23 +164,6 @@ def get_requires_for_build_sdist(config_settings: Optional[Mapping[str, Any]] = 
 def prepare_metadata_for_build_wheel(
     metadata_directory: str, config_settings: Optional[Mapping[str, Any]] = None
 ) -> str:
-    print("Checking for Rust toolchain....")
-    is_cargo_installed = False
-    try:
-        output = subprocess.check_output(["cargo", "--version"]).decode("utf-8", "ignore")
-        if "cargo" in output:
-            is_cargo_installed = True
-    except (FileNotFoundError, SubprocessError):
-        pass
-
-    if not is_cargo_installed:
-        sys.stderr.write(
-            "\nCargo, the Rust package manager, is not installed or is not on PATH.\n"
-            "This package requires Rust and Cargo to compile extensions. Install it through\n"
-            "the system's package manager or via https://rustup.rs/\n\n"
-        )
-        sys.exit(1)
-
     command = [
         "maturin",
         "pep517",
@@ -200,7 +182,7 @@ def prepare_metadata_for_build_wheel(
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        _output = subprocess.check_output(command)
+        _output = subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f"Error running maturin: {e}\n")
         sys.exit(1)

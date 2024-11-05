@@ -10,6 +10,8 @@ use crate::project_layout::ProjectLayout;
 use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::target::{Arch, Os};
+#[cfg(feature = "upload")]
+use crate::upload::http_agent;
 use crate::{
     compile, pyproject_toml::Format, BuildArtifact, Metadata23, ModuleWriter, PyProjectToml,
     PythonInterpreter, Target,
@@ -28,8 +30,13 @@ use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io;
+#[cfg(feature = "rustls")]
+use std::io::copy;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str::FromStr;
+#[cfg(feature = "rustls")]
+use tempfile::NamedTempFile;
 use tracing::instrument;
 
 /// The way the rust code is used in the wheel
@@ -1135,6 +1142,87 @@ impl BuildContext {
             wheels.extend(self.build_bin_wheel(Some(python_interpreter))?);
         }
         Ok(wheels)
+    }
+
+    /// Check if Rust toolchain is installed
+    pub fn is_toolchain_installed() -> bool {
+        let output = Command::new("cargo").arg("--version").output();
+        match output {
+            Ok(out) => out.status.success(),
+            Err(_) => false,
+        }
+    }
+
+    /// Downloads the rustup installer script and executes it to install rustup
+    ///
+    /// Inspired by https://github.com/chriskuehl/rustenv
+    #[cfg(feature = "rustls")]
+    pub fn install_installer(rustup_home: &str, cargo_home: &str) -> Result<()> {
+        let mut tf = NamedTempFile::new()?;
+        let agent = http_agent()?;
+        let response = agent.get("https://sh.rustup.rs").call()?.into_string()?;
+
+        copy(&mut response.as_bytes(), &mut tf)?;
+
+        #[cfg(unix)]
+        {
+            Command::new("sh")
+                .arg(tf.path())
+                .arg("-y")
+                .arg("--default-toolchain")
+                .arg("none")
+                .env("RUSTUP_HOME", rustup_home)
+                .env("CARGO_HOME", cargo_home)
+                .status()?;
+        }
+
+        #[cfg(windows)]
+        {
+            Command::new("cmd")
+                .args(["/C", tf.path().to_str().unwrap()])
+                .args(vec!["-y", "--default-toolchain", "none"])
+                .env("RUSTUP_HOME", rustup_home)
+                .env("CARGO_HOME", cargo_home)
+                .status()?;
+        }
+
+        Ok(())
+    }
+
+    /// Refresh the current shell to include path for rust toolchain
+    pub fn install_toolchain(cargo_home: &str) -> Result<()> {
+        let current_path = env::var("PATH").unwrap_or_else(|_| String::from(""));
+
+        #[cfg(unix)]
+        {
+            let cargo_bin_path = format!("{}/bin", cargo_home);
+            let new_path = format!("{}:{}", cargo_bin_path, current_path);
+            env::set_var("PATH", &new_path);
+
+            let cargo_env_path = format!("{}/env", cargo_home);
+            Command::new("sh")
+                .arg("-c")
+                .arg(format!(". {}", cargo_env_path))
+                .status()?;
+
+            let rustup_command = format!("{}/bin/rustup", cargo_home);
+            Command::new(rustup_command)
+                .arg("default")
+                .arg("stable")
+                .status()?;
+        }
+
+        #[cfg(windows)]
+        {
+            let cargo_bin_path = format!("{}\\bin", cargo_home);
+            let new_path = format!("{};{}", cargo_bin_path, current_path);
+            env::set_var("PATH", &new_path);
+            Command::new("cmd")
+                .args(vec!["/C", "rustup default stable"])
+                .status()?;
+        }
+
+        Ok(())
     }
 }
 

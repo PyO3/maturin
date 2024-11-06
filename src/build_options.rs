@@ -487,12 +487,59 @@ impl BuildOptions {
 
     /// Tries to fill the missing metadata for a BuildContext by querying cargo and python
     #[instrument(skip_all)]
-    pub fn into_build_context(
-        self,
-        release: bool,
-        strip: bool,
-        editable: bool,
-    ) -> Result<BuildContext> {
+    pub fn into_build_context(self) -> BuildContextBuilder {
+        BuildContextBuilder::new(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct BuildContextBuilder {
+    build_options: BuildOptions,
+    release: bool,
+    strip: bool,
+    editable: bool,
+    sdist_only: bool,
+}
+
+impl BuildContextBuilder {
+    fn new(build_options: BuildOptions) -> Self {
+        Self {
+            build_options,
+            release: false,
+            strip: false,
+            editable: false,
+            sdist_only: false,
+        }
+    }
+
+    pub fn release(mut self, release: bool) -> Self {
+        self.release = release;
+        self
+    }
+
+    pub fn strip(mut self, strip: bool) -> Self {
+        self.strip = strip;
+        self
+    }
+
+    pub fn editable(mut self, editable: bool) -> Self {
+        self.editable = editable;
+        self
+    }
+
+    pub fn sdist_only(mut self, sdist_only: bool) -> Self {
+        self.sdist_only = sdist_only;
+        self
+    }
+
+    pub fn build(self) -> Result<BuildContext> {
+        let Self {
+            build_options,
+            release,
+            strip,
+            editable,
+            sdist_only,
+        } = self;
         let ProjectResolver {
             project_layout,
             cargo_toml_path,
@@ -504,12 +551,15 @@ impl BuildOptions {
             mut cargo_options,
             cargo_metadata,
             mut pyproject_toml_maturin_options,
-        } = ProjectResolver::resolve(self.manifest_path.clone(), self.cargo.clone())?;
+        } = ProjectResolver::resolve(
+            build_options.manifest_path.clone(),
+            build_options.cargo.clone(),
+        )?;
         let pyproject = pyproject_toml.as_ref();
 
         let bridge = find_bridge(
             &cargo_metadata,
-            self.bindings.as_deref().or_else(|| {
+            build_options.bindings.as_deref().or_else(|| {
                 pyproject.and_then(|x| {
                     if x.bindings().is_some() {
                         pyproject_toml_maturin_options.push("bindings");
@@ -527,7 +577,7 @@ impl BuildOptions {
             );
         }
 
-        let mut target_triple = self.target.clone();
+        let mut target_triple = build_options.target.clone();
 
         let mut universal2 = target_triple.as_deref() == Some("universal2-apple-darwin");
         // Also try to determine universal2 from ARCHFLAGS environment variable
@@ -560,7 +610,7 @@ impl BuildOptions {
 
         let mut target = Target::from_target_triple(target_triple)?;
         if !target.user_specified && !universal2 {
-            if let Some(interpreter) = self.interpreter.first() {
+            if let Some(interpreter) = build_options.interpreter.first() {
                 if let Some(detected_target) =
                     crate::target::detect_arch_from_python(interpreter, &target)
                 {
@@ -569,38 +619,23 @@ impl BuildOptions {
             }
         }
 
-        let wheel_dir = match self.out {
+        let wheel_dir = match build_options.out {
             Some(ref dir) => dir.clone(),
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
         let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
-        let interpreter = if self.find_interpreter {
-            // Auto-detect interpreters
-            self.find_interpreters(
+        let interpreter = if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
+            // We don't need a python interpreter to build sdist only
+            Vec::new()
+        } else {
+            resolve_interpreters(
+                &build_options,
                 &bridge,
-                &[],
                 &target,
                 metadata23.requires_python.as_ref(),
                 generate_import_lib,
             )?
-        } else {
-            // User given list of interpreters
-            let interpreter = if self.interpreter.is_empty() && !target.cross_compiling() {
-                if cfg!(test) {
-                    match env::var_os("MATURIN_TEST_PYTHON") {
-                        Some(python) => vec![python.into()],
-                        None => vec![target.get_python()],
-                    }
-                } else {
-                    vec![target.get_python()]
-                }
-            } else {
-                // XXX: False positive clippy warning
-                #[allow(clippy::redundant_clone)]
-                self.interpreter.clone()
-            };
-            self.find_interpreters(&bridge, &interpreter, &target, None, generate_import_lib)?
         };
 
         if cargo_options.args.is_empty() {
@@ -613,9 +648,9 @@ impl BuildOptions {
         }
 
         let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
-        let skip_auditwheel =
-            pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default() || self.skip_auditwheel;
-        let auditwheel = self
+        let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
+            || build_options.skip_auditwheel;
+        let auditwheel = build_options
             .auditwheel
             .or_else(|| pyproject.and_then(|x| x.auditwheel()))
             .unwrap_or(if skip_auditwheel {
@@ -623,9 +658,9 @@ impl BuildOptions {
             } else {
                 AuditWheelMode::Repair
             });
-        let platform_tags = if self.platform_tag.is_empty() {
+        let platform_tags = if build_options.platform_tag.is_empty() {
             #[cfg(feature = "zig")]
-            let use_zig = self.zig;
+            let use_zig = build_options.zig;
             #[cfg(not(feature = "zig"))]
             let use_zig = false;
             let compatibility = pyproject
@@ -658,7 +693,7 @@ impl BuildOptions {
                 Vec::new()
             }
         } else {
-            self.platform_tag
+            build_options.platform_tag
         };
 
         for platform_tag in &platform_tags {
@@ -683,7 +718,7 @@ impl BuildOptions {
             );
         }
 
-        let target_dir = self
+        let target_dir = build_options
             .cargo
             .target_dir
             .clone()
@@ -713,7 +748,7 @@ impl BuildOptions {
             strip,
             auditwheel,
             #[cfg(feature = "zig")]
-            zig: self.zig,
+            zig: build_options.zig,
             platform_tag: platform_tags,
             interpreter,
             cargo_metadata,
@@ -722,6 +757,43 @@ impl BuildOptions {
             cargo_options,
         })
     }
+}
+
+fn resolve_interpreters(
+    build_options: &BuildOptions,
+    bridge: &BridgeModel,
+    target: &Target,
+    requires_python: Option<&VersionSpecifiers>,
+    generate_import_lib: bool,
+) -> Result<Vec<PythonInterpreter>, anyhow::Error> {
+    let interpreter = if build_options.find_interpreter {
+        // Auto-detect interpreters
+        build_options.find_interpreters(
+            bridge,
+            &[],
+            target,
+            requires_python,
+            generate_import_lib,
+        )?
+    } else {
+        // User given list of interpreters
+        let interpreter = if build_options.interpreter.is_empty() && !target.cross_compiling() {
+            if cfg!(test) {
+                match env::var_os("MATURIN_TEST_PYTHON") {
+                    Some(python) => vec![python.into()],
+                    None => vec![target.get_python()],
+                }
+            } else {
+                vec![target.get_python()]
+            }
+        } else {
+            // XXX: False positive clippy warning
+            #[allow(clippy::redundant_clone)]
+            build_options.interpreter.clone()
+        };
+        build_options.find_interpreters(bridge, &interpreter, target, None, generate_import_lib)?
+    };
+    Ok(interpreter)
 }
 
 /// Checks for bridge/platform type edge cases

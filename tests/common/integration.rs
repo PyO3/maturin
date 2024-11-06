@@ -125,7 +125,12 @@ pub fn test_integration(
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build()?;
     let wheels = build_context.build_wheels()?;
 
     // For abi3 on unix, we didn't use a python interpreter, but we need one here
@@ -248,7 +253,12 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
 
     let options = BuildOptions::try_parse_from(cli)?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build()?;
     let wheels = build_context.build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];

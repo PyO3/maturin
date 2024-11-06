@@ -273,7 +273,13 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
         } => {
             assert_eq!(build_options.interpreter.len(), 1);
-            let context = build_options.into_build_context(true, strip, false)?;
+            let context = build_options
+                .into_build_context()
+                .release(true)
+                .strip(strip)
+                .editable(false)
+                .sdist_only(true)
+                .build()?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge() {
@@ -298,7 +304,12 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
             editable,
         } => {
-            let build_context = build_options.into_build_context(true, strip, editable)?;
+            let build_context = build_options
+                .into_build_context()
+                .release(true)
+                .strip(strip)
+                .editable(editable)
+                .build()?;
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
@@ -318,7 +329,13 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 },
                 ..Default::default()
             };
-            let build_context = build_options.into_build_context(false, false, false)?;
+            let build_context = build_options
+                .into_build_context()
+                .release(false)
+                .strip(false)
+                .editable(false)
+                .sdist_only(true)
+                .build()?;
             let (path, _) = build_context
                 .build_source_distribution()?
                 .context("Failed to build source distribution, pyproject.toml not found")?;
@@ -361,7 +378,12 @@ fn run() -> Result<()> {
             strip,
             sdist,
         } => {
-            let build_context = build.into_build_context(release, strip, false)?;
+            let build_context = build
+                .into_build_context()
+                .release(release)
+                .strip(strip)
+                .editable(false)
+                .build()?;
             if sdist {
                 build_context
                     .build_source_distribution()?
@@ -378,7 +400,12 @@ fn run() -> Result<()> {
             no_strip,
             no_sdist,
         } => {
-            let build_context = build.into_build_context(!debug, !no_strip, false)?;
+            let build_context = build
+                .into_build_context()
+                .release(!debug)
+                .strip(!no_strip)
+                .editable(false)
+                .build()?;
 
             if !build_context.release {
                 eprintln!("⚠️  Warning: You're publishing debug wheels");
@@ -427,7 +454,13 @@ fn run() -> Result<()> {
                 },
                 ..Default::default()
             };
-            let build_context = build_options.into_build_context(false, false, false)?;
+            let build_context = build_options
+                .into_build_context()
+                .release(false)
+                .strip(false)
+                .editable(false)
+                .sdist_only(true)
+                .build()?;
             build_context
                 .build_source_distribution()?
                 .context("Failed to build source distribution, pyproject.toml not found")?;

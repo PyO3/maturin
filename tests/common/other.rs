@@ -68,7 +68,12 @@ pub fn test_musl() -> Result<bool> {
         "test-crates/wheels/test_musl",
     ])?;
 
-    let build_context = options.into_build_context(false, cfg!(feature = "faster-tests"), false)?;
+    let build_context = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build()?;
     let built_lib =
         PathBuf::from("test-crates/targets/test_musl/x86_64-unknown-linux-musl/debug/hello-world");
     if built_lib.is_file() {
@@ -107,7 +112,12 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         "test-crates/wheels/test_workspace_cargo_lock",
     ])?;
 
-    let build_context = options.into_build_context(false, false, false)?;
+    let build_context = options
+        .into_build_context()
+        .release(false)
+        .strip(false)
+        .editable(false)
+        .build()?;
     let source_distribution = build_context.build_source_distribution()?;
     assert!(source_distribution.is_some());
 
@@ -137,7 +147,13 @@ pub fn test_source_distribution(
         ..Default::default()
     };
 
-    let mut build_context = build_options.into_build_context(false, false, false)?;
+    let mut build_context = build_options
+        .into_build_context()
+        .release(false)
+        .strip(false)
+        .editable(false)
+        .sdist_only(true)
+        .build()?;
 
     // Override the sdist generator for testing
     let mut pyproject_toml = build_context.pyproject_toml.take().unwrap();
@@ -207,7 +223,12 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         ..Default::default()
     };
 
-    let build_context = build_options.into_build_context(false, false, false)?;
+    let build_context = build_options
+        .into_build_context()
+        .release(false)
+        .strip(false)
+        .editable(false)
+        .build()?;
     let wheels = build_context
         .build_wheels()
         .context("Failed to build wheels")?;
@@ -263,7 +284,12 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         "test-crates/pyo3-pure/Cargo.toml",
         "--quiet",
     ])?;
-    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
     assert!(result.is_ok());
 
     // Case 2: maturin build -i python3.10, should work because python3.10 is in bundled sysconfigs
@@ -275,7 +301,12 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         "-i",
         "python3.10",
     ])?;
-    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
     assert!(result.is_ok());
 
     // Windows is a bit different so we exclude it from case 3 & 4
@@ -291,7 +322,12 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
             "-i",
             "python2.7",
         ])?;
-        let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+        let result = options
+            .into_build_context()
+            .release(false)
+            .strip(cfg!(feature = "faster-tests"))
+            .editable(false)
+            .build();
         assert!(result.is_err());
 
         // Case 4: maturin build -i python-does-not-exists, errors because python executable is not found
@@ -303,7 +339,12 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
             "-i",
             "python-does-not-exists",
         ])?;
-        let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+        let result = options
+            .into_build_context()
+            .release(false)
+            .strip(cfg!(feature = "faster-tests"))
+            .editable(false)
+            .build();
         assert!(result.is_err());
     }
 

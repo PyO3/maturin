@@ -332,7 +332,12 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         },
     };
 
-    let build_context = build_options.into_build_context(release, strip, true)?;
+    let build_context = build_options
+        .into_build_context()
+        .release(release)
+        .strip(strip)
+        .editable(true)
+        .build()?;
 
     let interpreter =
         PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(

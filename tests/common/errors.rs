@@ -19,7 +19,12 @@ pub fn abi3_without_version() -> Result<()> {
     ];
 
     let options = BuildOptions::try_parse_from(cli)?;
-    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
     if let Err(err) = result {
         assert_eq!(err.to_string(),
             "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
@@ -48,7 +53,11 @@ pub fn pyo3_no_extension_module() -> Result<()> {
 
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
-        .into_build_context(false, cfg!(feature = "faster-tests"), false)?
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build()?
         .build_wheels();
     if let Err(err) = result {
         if !(err
@@ -81,7 +90,12 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
         "test-crates/targets/locked_doesnt_build_without_cargo_lock",
     ];
     let options = BuildOptions::try_parse_from(cli)?;
-    let result = options.into_build_context(false, cfg!(feature = "faster-tests"), false);
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
     if let Err(err) = result {
         let err_string = err
             .source()
@@ -115,7 +129,11 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
     ];
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
-        .into_build_context(false, cfg!(feature = "faster-tests"), false)?
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build()?
         .build_wheels();
     if let Err(err) = result {
         assert_eq!(err.to_string(), "Error ensuring manylinux_2_99 compliance");

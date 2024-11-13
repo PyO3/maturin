@@ -278,7 +278,6 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .release(true)
                 .strip(strip)
                 .editable(false)
-                .sdist_only(true)
                 .build()?;
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too

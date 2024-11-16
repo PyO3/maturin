@@ -18,6 +18,7 @@ use fs_err::OpenOptions;
 use ignore::overrides::Override;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use normpath::PathExt as _;
 use same_file::is_same_file;
 use sha2::{Digest, Sha256};
@@ -971,7 +972,7 @@ struct UniFfiBindingsConfig {
 
 #[derive(Debug, Clone)]
 struct UniFfiBindings {
-    name: String,
+    names: Vec<String>,
     cdylib: String,
     path: PathBuf,
 }
@@ -1111,8 +1112,19 @@ fn generate_uniffi_bindings(
         _ => format!("lib{cdylib_name}.so"),
     };
 
+    let py_bindings = fs::read_dir(&binding_dir)?
+        .flatten()
+        .filter(|file| {
+            file.path()
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .map_or(false, |ext| ext == "py")
+        })
+        .flat_map(|file| file.file_name().into_string())
+        .collect_vec();
+
     Ok(UniFfiBindings {
-        name: py_binding_name,
+        names: py_bindings,
         cdylib,
         path: binding_dir,
     })
@@ -1132,11 +1144,16 @@ pub fn write_uniffi_module(
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
     let UniFfiBindings {
-        name: binding_name,
+        names: binding_names,
         cdylib,
         path: binding_dir,
     } = generate_uniffi_bindings(crate_dir, target_dir, target_os, artifact)?;
-    let py_init = format!("from .{binding_name} import *  # NOQA\n");
+
+    let py_init = binding_names
+        .iter()
+        .map(|name| format!("from .{name} import *  # NOQA\n"))
+        .collect::<Vec<String>>()
+        .join("");
 
     if !editable {
         write_python_part(writer, project_layout, pyproject_toml)
@@ -1156,13 +1173,12 @@ pub fn write_uniffi_module(
             ))?;
 
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
-            if let Ok(read_dir) = fs::read_dir(&binding_dir) {
-                for binding_file in read_dir.flatten() {
-                    let target: PathBuf = base_path.join(binding_file.file_name());
-                    fs::copy(binding_file.path(), &target).with_context(|| {
-                        format!("Failed to copy {:?} to {:?}", binding_file.path(), target)
-                    })?;
-                }
+
+            for binding_name in binding_names.iter() {
+                let target: PathBuf = base_path.join(binding_name);
+                fs::copy(binding_dir.join(binding_name), &target).with_context(|| {
+                    format!("Failed to copy {:?} to {:?}", binding_dir.display(), target)
+                })?;
             }
         }
 

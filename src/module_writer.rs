@@ -1120,7 +1120,13 @@ fn generate_uniffi_bindings(
                 .and_then(std::ffi::OsStr::to_str)
                 .map_or(false, |ext| ext == "py")
         })
-        .flat_map(|file| file.file_name().into_string())
+        .map(|file| {
+            file.path()
+                .file_stem()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
+        })
         .collect_vec();
 
     Ok(UniFfiBindings {
@@ -1176,9 +1182,10 @@ pub fn write_uniffi_module(
 
             for binding_name in binding_names.iter() {
                 let target: PathBuf = base_path.join(binding_name);
-                fs::copy(binding_dir.join(binding_name), &target).with_context(|| {
-                    format!("Failed to copy {:?} to {:?}", binding_dir.display(), target)
-                })?;
+                fs::copy(binding_dir.join(binding_name).with_extension("py"), &target)
+                    .with_context(|| {
+                        format!("Failed to copy {:?} to {:?}", binding_dir.display(), target)
+                    })?;
             }
         }
 
@@ -1205,10 +1212,11 @@ pub fn write_uniffi_module(
 
     if !editable || project_layout.python_module.is_none() {
         writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes())?;
-        if let Ok(read_dir) = fs::read_dir(binding_dir) {
-            for binding_file in read_dir.flatten() {
-                writer.add_file(module.join(binding_file.file_name()), binding_file.path())?;
-            }
+        for binding in binding_names.iter() {
+            writer.add_file(
+                module.join(binding).with_extension("py"),
+                binding_dir.join(binding).with_extension("py"),
+            )?;
         }
         writer.add_file_with_permissions(module.join(cdylib), artifact, 0o755)?;
     }

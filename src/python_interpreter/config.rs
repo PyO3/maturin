@@ -39,6 +39,7 @@ impl InterpreterConfig {
         target: &Target,
         python_impl: InterpreterKind,
         python_version: (usize, usize),
+        abiflags: &str,
     ) -> Option<Self> {
         use InterpreterKind::*;
 
@@ -54,13 +55,11 @@ impl InterpreterConfig {
                 let abiflags = if python_version < (3, 8) {
                     "m".to_string()
                 } else {
-                    "".to_string()
+                    abiflags.to_string()
                 };
-                let ldversion = format!("{}{}{}", major, minor, abiflags);
-                let ext_suffix = format!(
-                    ".cpython-{}-{}-linux-{}.so",
-                    ldversion, python_ext_arch, target_env
-                );
+                let ldversion = format!("{major}{minor}{abiflags}");
+                let ext_suffix =
+                    format!(".cpython-{ldversion}-{python_ext_arch}-linux-{target_env}.so");
                 Some(Self {
                     major,
                     minor,
@@ -71,9 +70,8 @@ impl InterpreterConfig {
                 })
             }
             (Os::Linux, PyPy) => {
-                let abi_tag = format!("pypy{}{}-{}", major, minor, PYPY_ABI_TAG);
-                let ext_suffix =
-                    format!(".{}-{}-linux-{}.so", abi_tag, python_ext_arch, target_env);
+                let abi_tag = format!("pypy{major}{minor}-{PYPY_ABI_TAG}");
+                let ext_suffix = format!(".{abi_tag}-{python_ext_arch}-linux-{target_env}.so");
                 Some(Self {
                     major,
                     minor,
@@ -87,10 +85,10 @@ impl InterpreterConfig {
                 let abiflags = if python_version < (3, 8) {
                     "m".to_string()
                 } else {
-                    "".to_string()
+                    abiflags.to_string()
                 };
-                let ldversion = format!("{}{}{}", major, minor, abiflags);
-                let ext_suffix = format!(".cpython-{}-darwin.so", ldversion);
+                let ldversion = format!("{major}{minor}{abiflags}");
+                let ext_suffix = format!(".cpython-{ldversion}-darwin.so");
                 Some(Self {
                     major,
                     minor,
@@ -101,7 +99,7 @@ impl InterpreterConfig {
                 })
             }
             (Os::Macos, PyPy) => {
-                let ext_suffix = format!(".pypy{}{}-{}-darwin.so", major, minor, PYPY_ABI_TAG);
+                let ext_suffix = format!(".pypy{major}{minor}-{PYPY_ABI_TAG}-darwin.so");
                 Some(Self {
                     major,
                     minor,
@@ -121,7 +119,7 @@ impl InterpreterConfig {
                         Arch::X86_64 => "win_amd64",
                         _ => return None,
                     };
-                    format!(".cp{}{}-{}.pyd", major, minor, platform)
+                    format!(".cp{major}{minor}{abiflags}-{platform}.pyd")
                 };
                 Some(Self {
                     major,
@@ -137,7 +135,7 @@ impl InterpreterConfig {
                     // PyPy on Windows only supports x86_64
                     return None;
                 }
-                let ext_suffix = format!(".pypy{}{}-{}-win_amd64.pyd", major, minor, PYPY_ABI_TAG);
+                let ext_suffix = format!(".pypy{major}{minor}-{PYPY_ABI_TAG}-win_amd64.pyd");
                 Some(Self {
                     major,
                     minor,
@@ -151,7 +149,10 @@ impl InterpreterConfig {
                 let (abiflags, ext_suffix) = if python_version < (3, 8) {
                     ("m".to_string(), ".so".to_string())
                 } else {
-                    ("".to_string(), format!(".cpython-{}{}.so", major, minor))
+                    (
+                        abiflags.to_string(),
+                        format!(".cpython-{major}{minor}{abiflags}.so"),
+                    )
                 };
                 Some(Self {
                     major,
@@ -168,14 +169,15 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: CPython,
+                    // FIXME: netbsd abiflags for free-threaded python?
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
                 })
             }
             (Os::OpenBsd, CPython) => {
-                let ldversion = format!("{}{}", major, minor);
-                let ext_suffix = format!(".cpython-{}.so", ldversion);
+                let ldversion = format!("{major}{minor}");
+                let ext_suffix = format!(".cpython-{ldversion}{abiflags}.so");
                 Some(Self {
                     major,
                     minor,
@@ -186,9 +188,8 @@ impl InterpreterConfig {
                 })
             }
             (Os::Emscripten, CPython) => {
-                let ldversion = format!("{}{}", major, minor);
-                let ext_suffix =
-                    format!(".cpython-{}-{}-emscripten.so", ldversion, python_ext_arch);
+                let ldversion = format!("{major}{minor}");
+                let ext_suffix = format!(".cpython-{ldversion}-{python_ext_arch}-emscripten.so");
                 Some(Self {
                     major,
                     minor,
@@ -210,7 +211,12 @@ impl InterpreterConfig {
             (InterpreterKind::PyPy, MAXIMUM_PYPY_MINOR),
         ] {
             for minor in MINIMUM_PYTHON_MINOR..=max_minor_ver {
-                if let Some(config) = Self::lookup_one(target, python_impl, (3, minor)) {
+                if let Some(config) = Self::lookup_one(target, python_impl, (3, minor), "") {
+                    configs.push(config);
+                }
+            }
+            for minor in 13..=max_minor_ver {
+                if let Some(config) = Self::lookup_one(target, python_impl, (3, minor), "t") {
                     configs.push(config);
                 }
             }
@@ -346,12 +352,17 @@ impl InterpreterConfig {
 
     /// Generate pyo3 config file content
     pub fn pyo3_config_file(&self) -> String {
+        let build_flags = if self.abiflags == "t" {
+            "Py_GIL_DISABLED"
+        } else {
+            ""
+        };
         let mut content = format!(
             r#"implementation={implementation}
 version={major}.{minor}
 shared=true
 abi3=false
-build_flags=WITH_THREAD
+build_flags={build_flags}
 suppress_build_script_link_lines=false"#,
             implementation = self.interpreter_kind,
             major = self.major,
@@ -377,6 +388,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-x86_64-linux-gnu.so");
@@ -385,6 +397,7 @@ mod test {
             &Target::from_target_triple(Some("i686-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-i386-linux-gnu.so");
@@ -393,6 +406,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-aarch64-linux-gnu.so");
@@ -401,6 +415,7 @@ mod test {
             &Target::from_target_triple(Some("armv7-unknown-linux-gnueabihf".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-arm-linux-gnueabihf.so");
@@ -409,6 +424,7 @@ mod test {
             &Target::from_target_triple(Some("arm-unknown-linux-gnueabihf".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-arm-linux-gnueabihf.so");
@@ -417,6 +433,7 @@ mod test {
             &Target::from_target_triple(Some("powerpc64le-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(
@@ -428,6 +445,7 @@ mod test {
             &Target::from_target_triple(Some("powerpc-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-powerpc-linux-gnu.so");
@@ -436,6 +454,7 @@ mod test {
             &Target::from_target_triple(Some("mips64-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(
@@ -447,6 +466,7 @@ mod test {
             &Target::from_target_triple(Some("mips-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-mips-linux-gnu.so");
@@ -455,6 +475,7 @@ mod test {
             &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-s390x-linux-gnu.so");
@@ -464,6 +485,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
@@ -473,6 +495,7 @@ mod test {
             &Target::from_target_triple(Some("i686-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-x86-linux-gnu.so");
@@ -481,6 +504,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-aarch64-linux-gnu.so");
@@ -489,6 +513,7 @@ mod test {
             &Target::from_target_triple(Some("armv7-unknown-linux-gnueabihf".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-arm-linux-gnu.so");
@@ -497,6 +522,7 @@ mod test {
             &Target::from_target_triple(Some("arm-unknown-linux-gnueabihf".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-arm-linux-gnu.so");
@@ -505,6 +531,7 @@ mod test {
             &Target::from_target_triple(Some("powerpc64le-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-ppc_64-linux-gnu.so");
@@ -513,6 +540,7 @@ mod test {
             &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-s390x-linux-gnu.so");
@@ -525,6 +553,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-apple-darwin".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-darwin.so");
@@ -533,6 +562,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-apple-darwin".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-darwin.so");
@@ -541,6 +571,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-apple-darwin".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 7),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "m");
@@ -551,6 +582,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-apple-darwin".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
@@ -560,6 +592,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-apple-darwin".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-darwin.so");
@@ -572,6 +605,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-pc-windows-msvc".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cp310-win_amd64.pyd");
@@ -580,6 +614,7 @@ mod test {
             &Target::from_target_triple(Some("i686-pc-windows-msvc".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cp310-win32.pyd");
@@ -588,6 +623,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-pc-windows-msvc".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cp310-win_arm64.pyd");
@@ -597,6 +633,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-pc-windows-msvc".to_string())).unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-win_amd64.pyd");
@@ -609,6 +646,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-freebsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 7),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "m");
@@ -618,6 +656,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-freebsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
@@ -627,6 +666,7 @@ mod test {
             &Target::from_target_triple(Some("i686-unknown-freebsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
@@ -635,6 +675,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-unknown-freebsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
@@ -643,6 +684,7 @@ mod test {
             &Target::from_target_triple(Some("armv7-unknown-freebsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
@@ -655,6 +697,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-netbsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 7),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
@@ -664,6 +707,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-netbsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".so");
@@ -676,6 +720,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-openbsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
@@ -684,6 +729,7 @@ mod test {
             &Target::from_target_triple(Some("i686-unknown-openbsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
@@ -692,6 +738,7 @@ mod test {
             &Target::from_target_triple(Some("aarch64-unknown-openbsd".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
@@ -704,6 +751,7 @@ mod test {
             &Target::from_target_triple(Some("wasm32-unknown-emscripten".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.abiflags, "");
@@ -716,6 +764,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 10),
+            "",
         )
         .unwrap();
         let config_file = sysconfig.pyo3_config_file();
@@ -724,7 +773,29 @@ mod test {
             version=3.10
             shared=true
             abi3=false
-            build_flags=WITH_THREAD
+            build_flags=
+            suppress_build_script_link_lines=false
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+    }
+
+    #[test]
+    fn test_pyo3_config_file_free_threaded_python_3_13() {
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
+            InterpreterKind::CPython,
+            (3, 13),
+            "t",
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".cpython-313t-x86_64-linux-gnu.so");
+        let config_file = sysconfig.pyo3_config_file();
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.13
+            shared=true
+            abi3=false
+            build_flags=Py_GIL_DISABLED
             suppress_build_script_link_lines=false
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
@@ -736,6 +807,7 @@ mod test {
             &Target::from_target_triple(Some("x86_64-unknown-linux-musl".to_string())).unwrap(),
             InterpreterKind::CPython,
             (3, 11),
+            "",
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-311-x86_64-linux-musl.so");
@@ -745,7 +817,7 @@ mod test {
             version=3.11
             shared=true
             abi3=false
-            build_flags=WITH_THREAD
+            build_flags=
             suppress_build_script_link_lines=false
             pointer_width=64"#]];
         expected.assert_eq(&config_file);

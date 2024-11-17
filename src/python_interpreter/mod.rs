@@ -924,6 +924,11 @@ impl PythonInterpreter {
             venv_base.as_ref().join("Lib").join("site-packages")
         }
     }
+
+    /// Is this a free threaded python interpreter
+    pub fn is_free_threaded(&self) -> bool {
+        self.abiflags == "t"
+    }
 }
 
 impl fmt::Display for PythonInterpreter {
@@ -989,19 +994,19 @@ mod tests {
         let target =
             Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
         let pythons = PythonInterpreter::find_by_target(&target, None);
-        assert_eq!(pythons.len(), 11);
+        assert_eq!(pythons.len(), 12);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
         );
-        assert_eq!(pythons.len(), 9);
+        assert_eq!(pythons.len(), 10);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
         );
-        assert_eq!(pythons.len(), 5);
+        assert_eq!(pythons.len(), 6);
     }
 
     #[test]
@@ -1010,6 +1015,7 @@ mod tests {
             (".cpython-37m-x86_64-linux-gnu.so", Some("cp37m")),
             (".cpython-310-x86_64-linux-gnu.so", Some("cp310")),
             (".cpython-310-darwin.so", Some("cp310")),
+            (".cpython-313t-darwin.so", Some("cp313t")),
             (".cp310-win_amd64.pyd", Some("cp310")),
             (".cp39-mingw_x86_64.pyd", Some("cp39")),
             (".cpython-312-wasm32-wasi.so", Some("cp312")),

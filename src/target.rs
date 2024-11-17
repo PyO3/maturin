@@ -430,7 +430,7 @@ impl Target {
             // This isn't real, there's no sys.platform here
             Os::Wasi => "wasi",
             Os::Aix => "aix",
-            Os::Hurd => "gnu0",
+            Os::Hurd => "gnu",
         }
     }
 

@@ -283,7 +283,7 @@ impl InterpreterConfig {
             InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| GRAALPY_ABI_TAG.to_string()),
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
-        let ext_suffix = if target.is_linux() || target.is_macos() {
+        let ext_suffix = if target.is_linux() || target.is_macos() || target.is_hurd() {
             let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
             match interpreter_kind {
                 InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {

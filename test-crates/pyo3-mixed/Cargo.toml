@@ -6,7 +6,7 @@ description = "Implements a dummy function combining rust and python"
 edition = "2021"
 
 [dependencies]
-pyo3 = { version = "0.22.0", features = ["extension-module", "generate-import-lib"] }
+pyo3 = { version = "0.23.1", features = ["extension-module", "generate-import-lib"] }
 
 [lib]
 name = "pyo3_mixed"

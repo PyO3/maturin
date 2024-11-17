@@ -6,7 +6,7 @@ description = "Does not use the extension-module feature, thus erroneously linki
 edition = "2021"
 
 [dependencies]
-pyo3 = { version = "0.22.0", default-features = false }
+pyo3 = { version = "0.23.1", default-features = false }
 
 [lib]
 name = "pyo3_no_extension_module"

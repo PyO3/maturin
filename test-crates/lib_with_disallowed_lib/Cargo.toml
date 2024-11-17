@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libz-sys = { version = "1.1.2", default-features = false }
-pyo3 = { version = "0.22.4", features = ["extension-module"] }
+pyo3 = { version = "0.23.1", features = ["extension-module"] }

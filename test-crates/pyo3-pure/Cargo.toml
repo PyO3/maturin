@@ -7,7 +7,7 @@ description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in
 license = "MIT"
 
 [dependencies]
-pyo3 = { version = "0.22.0", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
+pyo3 = { version = "0.23.1", features = ["abi3-py37", "extension-module", "generate-import-lib"] }
 
 [lib]
 name = "pyo3_pure"

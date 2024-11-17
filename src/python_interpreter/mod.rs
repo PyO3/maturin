@@ -466,7 +466,8 @@ impl PythonInterpreter {
         let target = &context.target;
         let use_sysconfig_platform = target.is_windows()
             || (target.is_linux() && platform_tags.iter().any(|tag| !tag.is_portable()))
-            || target.is_illumos();
+            || target.is_illumos()
+            || target.is_hurd();
         let platform = if use_sysconfig_platform {
             if let Some(platform) = self.platform.clone() {
                 platform

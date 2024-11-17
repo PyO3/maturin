@@ -35,6 +35,7 @@ pub enum Os {
     Emscripten,
     Wasi,
     Aix,
+    Hurd,
 }
 
 impl fmt::Display for Os {
@@ -54,6 +55,7 @@ impl fmt::Display for Os {
             Os::Emscripten => write!(f, "Emscripten"),
             Os::Wasi => write!(f, "Wasi"),
             Os::Aix => write!(f, "AIX"),
+            Os::Hurd => write!(f, "Hurd"),
         }
     }
 }
@@ -193,6 +195,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Solaris => vec![Arch::X86_64, Arch::Sparc64],
         Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
         Os::Aix => vec![Arch::Powerpc64],
+        Os::Hurd => vec![Arch::X86, Arch::X86_64],
     }
 }
 
@@ -255,6 +258,7 @@ impl Target {
             OperatingSystem::Emscripten => Os::Emscripten,
             OperatingSystem::Wasi | OperatingSystem::WasiP1 | OperatingSystem::WasiP2 => Os::Wasi,
             OperatingSystem::Aix => Os::Aix,
+            OperatingSystem::Hurd => Os::Hurd,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -426,6 +430,7 @@ impl Target {
             // This isn't real, there's no sys.platform here
             Os::Wasi => "wasi",
             Os::Aix => "aix",
+            Os::Hurd => "gnu0",
         }
     }
 
@@ -510,7 +515,8 @@ impl Target {
             | Os::Haiku
             | Os::Emscripten
             | Os::Wasi
-            | Os::Aix => true,
+            | Os::Aix
+            | Os::Hurd => true,
         }
     }
 
@@ -584,6 +590,12 @@ impl Target {
     #[inline]
     pub fn is_wasi(&self) -> bool {
         self.os == Os::Wasi
+    }
+
+    /// Returns true if we're building a binary for GNU/Hurd
+    #[inline]
+    pub fn is_hurd(&self) -> bool {
+        self.os == Os::Hurd
     }
 
     /// Returns true if the current platform's target env is Musl

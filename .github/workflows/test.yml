@@ -43,9 +43,10 @@ jobs:
           - macos-14
           - windows-latest
         python-version:
-          - '3.9'
-          - '3.13'
-          - 'pypy3.10'
+          - "3.9"
+          - "3.13"
+          - "3.13t"
+          - "pypy3.10"
         exclude:
           # Skip PyPy on macOS M1 runner because they are built for x86_64
           - os: macos-14
@@ -81,7 +82,7 @@ jobs:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
-      - uses: actions/setup-python@v5
+      - uses: Quansight-Labs/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set PYTHON_VERSION env var
@@ -96,7 +97,10 @@ jobs:
         run: |
           uv tool install virtualenv
           uv tool install twine
-          uv pip install --system "ziglang>=0.10.0,<0.13.0" uniffi-bindgen==0.28.0
+          uv tool install uniffi-bindgen==0.28.0
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.12.1
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:

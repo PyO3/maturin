@@ -94,7 +94,6 @@ pub fn test_integration(
         let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
         file.file().lock_exclusive()?;
         if !dbg!(venvs_dir.join(cffi_provider)).is_dir() {
-            println!("CRAETAITROAPTGIIDSOGRKADS");
             dbg!(create_virtualenv_name(
                 cffi_provider,
                 python_interp.clone().map(PathBuf::from)

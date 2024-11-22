@@ -448,7 +448,7 @@ impl PythonInterpreter {
             false
         } else {
             match self.interpreter_kind {
-                InterpreterKind::CPython => true,
+                InterpreterKind::CPython => !(self.config.abiflags.starts_with("t")),
                 InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
             }
         }

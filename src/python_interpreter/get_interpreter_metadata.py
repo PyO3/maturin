@@ -35,6 +35,7 @@ metadata = {
     "system": platform.system().lower(),
     # This one is for generating a config file for pyo3
     "pointer_width": struct.calcsize("P") * 8,
+    "gil_disabled": sysconfig.get_config_var("Py_GIL_DISABLED") == 1,
 }
 
 print(json.dumps(metadata))

@@ -52,6 +52,7 @@ KEYS = [
     "ABIFLAGS",
     "EXT_SUFFIX",
     "SOABI",
+    "Py_GIL_DISABLED",
 ]
 for key in KEYS:
     print(key, build_time_vars.get(key, ""))

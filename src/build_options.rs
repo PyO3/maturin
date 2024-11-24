@@ -274,6 +274,10 @@ impl BuildOptions {
                             .get("ABIFLAGS")
                             .map(ToString::to_string)
                             .unwrap_or_default();
+                        let gil_disabled = sysconfig_data
+                            .get("Py_GIL_DISABLED")
+                            .map(|x| x == "1")
+                            .unwrap_or_default();
                         let ext_suffix = sysconfig_data
                             .get("EXT_SUFFIX")
                             .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
@@ -299,6 +303,7 @@ impl BuildOptions {
                                 abiflags,
                                 ext_suffix: ext_suffix.to_string(),
                                 pointer_width: None,
+                                gil_disabled,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -376,6 +381,7 @@ impl BuildOptions {
                                 abiflags: "".to_string(),
                                 ext_suffix: ".pyd".to_string(),
                                 pointer_width: None,
+                                gil_disabled: false,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -402,6 +408,7 @@ impl BuildOptions {
                                 abiflags: "".to_string(),
                                 ext_suffix: ".pyd".to_string(),
                                 pointer_width: None,
+                                gil_disabled: false,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -441,6 +448,7 @@ impl BuildOptions {
                                 abiflags: "".to_string(),
                                 ext_suffix: "".to_string(),
                                 pointer_width: None,
+                                gil_disabled: false,
                             },
                             executable: PathBuf::new(),
                             platform: None,

@@ -245,7 +245,13 @@ fn find_all_windows(
     Ok(interpreter)
 }
 
-fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
+struct WindowsPythonInfo {
+    major: usize,
+    minor: usize,
+    pointer_width: Option<usize>,
+}
+
+fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
     let python_info = Command::new(executable)
         .arg("-c")
         .arg("import sys; print(sys.version)")
@@ -276,12 +282,9 @@ fn windows_python_info(executable: &Path) -> Result<Option<InterpreterConfig>> {
         } else {
             32
         };
-        Ok(Some(InterpreterConfig {
+        Ok(Some(WindowsPythonInfo {
             major,
             minor,
-            interpreter_kind: InterpreterKind::CPython,
-            abiflags: String::new(),
-            ext_suffix: String::new(),
             pointer_width: Some(pointer_width),
         }))
     } else {
@@ -353,6 +356,7 @@ struct InterpreterMetadataMessage {
     // comes from `platform.system()`
     system: String,
     soabi: Option<String>,
+    gil_disabled: bool,
 }
 
 /// The location and version of an interpreter
@@ -425,19 +429,19 @@ fn fun_with_abiflags(
         if matches!(message.abiflags.as_deref(), Some("") | None) {
             Ok("".to_string())
         } else {
-            bail!("A python 3 interpreter on windows does not define abiflags in its sysconfig ಠ_ಠ")
+            bail!("A python 3 interpreter on Windows does not define abiflags in its sysconfig ಠ_ಠ")
         }
     } else if let Some(ref abiflags) = message.abiflags {
         if message.minor >= 8 {
             // for 3.8, "builds with and without pymalloc are ABI compatible" and the flag dropped
             Ok(abiflags.to_string())
         } else if (abiflags != "m") && (abiflags != "dm") {
-            bail!("A python 3 interpreter on linux or mac os must have 'm' or 'dm' as abiflags ಠ_ಠ")
+            bail!("A python 3 interpreter on Linux or macOS must have 'm' or 'dm' as abiflags ಠ_ಠ")
         } else {
             Ok(abiflags.to_string())
         }
     } else {
-        bail!("A python 3 interpreter on linux or mac os must define abiflags in its sysconfig ಠ_ಠ")
+        bail!("A python 3 interpreter on Linux or macOS must define abiflags in its sysconfig ಠ_ಠ")
     }
 }
 
@@ -448,7 +452,8 @@ impl PythonInterpreter {
             false
         } else {
             match self.interpreter_kind {
-                InterpreterKind::CPython => !(self.config.abiflags.starts_with("t")),
+                // Free-threaded python does not have stable api support yet
+                InterpreterKind::CPython => !self.config.gil_disabled,
                 InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
             }
         }
@@ -695,6 +700,7 @@ impl PythonInterpreter {
                     .ext_suffix
                     .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
                 pointer_width: None,
+                gil_disabled: message.gil_disabled,
             },
             executable,
             platform,
@@ -923,11 +929,6 @@ impl PythonInterpreter {
         } else {
             venv_base.as_ref().join("Lib").join("site-packages")
         }
-    }
-
-    /// Is this a free threaded python interpreter
-    pub fn is_free_threaded(&self) -> bool {
-        self.abiflags == "t"
     }
 }
 

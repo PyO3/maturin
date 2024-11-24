@@ -22,8 +22,11 @@ pub struct InterpreterConfig {
     #[serde(rename = "interpreter")]
     pub interpreter_kind: InterpreterKind,
     /// For linux and mac, this contains the value of the abiflags, e.g. "m"
-    /// for python3.7m or "dm" for python3.6dm. Since python3.8, the value is
-    /// empty. On windows, the value was always None.
+    /// for python3.7m or "dm" for python3.6dm.
+    ///
+    /// * Since python3.8, the value is empty
+    /// * Since python3.13, the value is "t" for free-threaded builds.
+    /// * On Windows, the value was always None.
     ///
     /// See PEP 261 and PEP 393 for details
     pub abiflags: String,
@@ -31,6 +34,8 @@ pub struct InterpreterConfig {
     pub ext_suffix: String,
     /// Pointer width
     pub pointer_width: Option<usize>,
+    /// Is GIL disabled, i.e. free-threaded build
+    pub gil_disabled: bool,
 }
 
 impl InterpreterConfig {
@@ -50,6 +55,7 @@ impl InterpreterConfig {
         }
         let python_ext_arch = target.get_python_ext_arch(python_impl);
         let target_env = target.get_python_target_env(python_impl, python_version);
+        let gil_disabled = abiflags == "t";
         match (target.target_os(), python_impl) {
             (Os::Linux, CPython) => {
                 let abiflags = if python_version < (3, 8) {
@@ -67,6 +73,7 @@ impl InterpreterConfig {
                     abiflags,
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::Linux, PyPy) => {
@@ -79,6 +86,7 @@ impl InterpreterConfig {
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::Macos, CPython) => {
@@ -96,6 +104,7 @@ impl InterpreterConfig {
                     abiflags,
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::Macos, PyPy) => {
@@ -107,6 +116,7 @@ impl InterpreterConfig {
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::Windows, CPython) => {
@@ -125,9 +135,11 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: CPython,
+                    // abiflags is always empty on Windows
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::Windows, PyPy) => {
@@ -140,9 +152,11 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: PyPy,
+                    // abiflags is always empty on Windows
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::FreeBsd, CPython) => {
@@ -161,6 +175,7 @@ impl InterpreterConfig {
                     abiflags,
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::NetBsd, CPython) => {
@@ -169,10 +184,10 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: CPython,
-                    // FIXME: netbsd abiflags for free-threaded python?
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::OpenBsd, CPython) => {
@@ -185,6 +200,7 @@ impl InterpreterConfig {
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (Os::Emscripten, CPython) => {
@@ -197,6 +213,7 @@ impl InterpreterConfig {
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
                 })
             }
             (_, _) => None,
@@ -249,6 +266,7 @@ impl InterpreterConfig {
         let mut ext_suffix = None;
         let mut abi_tag = None;
         let mut pointer_width = None;
+        let mut build_flags: Option<String> = None;
 
         for (i, line) in lines.enumerate() {
             let line = line.context("failed to read line from config")?;
@@ -262,6 +280,7 @@ impl InterpreterConfig {
                 "ext_suffix" => parse_value!(ext_suffix, value),
                 "abi_tag" => parse_value!(abi_tag, value),
                 "pointer_width" => parse_value!(pointer_width, value),
+                "build_flags" => parse_value!(build_flags, value),
                 _ => continue,
             }
         }
@@ -340,6 +359,9 @@ impl InterpreterConfig {
         } else {
             ext_suffix.context("missing value for ext_suffix")?
         };
+        let gil_disabled = build_flags
+            .map(|flags| flags.contains("Py_GIL_DISABLED"))
+            .unwrap_or(false);
         Ok(Self {
             major,
             minor,
@@ -347,12 +369,13 @@ impl InterpreterConfig {
             abiflags: abiflags.unwrap_or_default(),
             ext_suffix,
             pointer_width,
+            gil_disabled,
         })
     }
 
     /// Generate pyo3 config file content
     pub fn pyo3_config_file(&self) -> String {
-        let build_flags = if self.abiflags == "t" {
+        let build_flags = if self.gil_disabled {
             "Py_GIL_DISABLED"
         } else {
             ""

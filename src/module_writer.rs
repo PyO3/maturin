@@ -1181,7 +1181,7 @@ pub fn write_uniffi_module(
             File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
 
             for binding_name in binding_names.iter() {
-                let target: PathBuf = base_path.join(binding_name);
+                let target: PathBuf = base_path.join(binding_name).with_extension("py");
                 fs::copy(binding_dir.join(binding_name).with_extension("py"), &target)
                     .with_context(|| {
                         format!("Failed to copy {:?} to {:?}", binding_dir.display(), target)

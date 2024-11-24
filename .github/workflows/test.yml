@@ -85,11 +85,6 @@ jobs:
       - uses: Quansight-Labs/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Get interpreter metadata for dev
-        shell: bash
-        run: |
-          python src/python_interpreter/get_interpreter_metadata.py
-          python -m pip debug --verbose
       - name: Set PYTHON_VERSION env var
         shell: bash
         run: |

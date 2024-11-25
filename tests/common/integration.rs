@@ -1,11 +1,11 @@
 use crate::common::{
-    check_installed, create_virtualenv, create_virtualenv_name, maybe_mock_cargo, test_python_path,
+    check_installed, create_named_virtualenv, create_virtualenv, maybe_mock_cargo, test_python_path,
 };
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
-use fs2::FileExt;
+use fs4::fs_err::FileExt;
 use fs_err::File;
 use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
 use normpath::PathExt;
@@ -92,29 +92,34 @@ pub fn test_integration(
         // All tests try to use this venv at the same time, so we need to make sure only one
         // modifies it at a time and that during that time, no other test reads it.
         let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
-        file.file().lock_exclusive()?;
-        if !dbg!(venvs_dir.join(cffi_provider)).is_dir() {
-            dbg!(create_virtualenv_name(
-                cffi_provider,
-                python_interp.clone().map(PathBuf::from)
-            )?);
+        file.lock_exclusive()?;
+        if !python.is_file() {
+            create_named_virtualenv(cffi_provider, python_interp.clone().map(PathBuf::from))?;
+            assert!(python.is_file(), "cffi venv not created correctly");
             let pip_install_cffi = [
                 "-m",
                 "pip",
                 "--disable-pip-version-check",
+                "--no-cache-dir",
                 "install",
                 "cffi",
             ];
             let output = Command::new(&python)
                 .args(pip_install_cffi)
-                .status()
-                //.output()
-                .context(format!("pip install cffi failed with {python:?}"))?;
-            if !output.success() {
-                bail!("Installing cffi into {} failed", cffi_venv.display());
+                .output()
+                .with_context(|| format!("pip install cffi failed with {python:?}"))?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                bail!(
+                    "Installing cffi into {} failed.\nstdout: {}\nstderr: {}",
+                    cffi_venv.display(),
+                    stdout,
+                    stderr
+                );
             }
         }
-        file.file().unlock()?;
+        file.unlock()?;
         cli.push("--interpreter");
         cli.push(
             python

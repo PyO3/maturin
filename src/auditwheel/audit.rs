@@ -17,7 +17,7 @@ use std::{fmt, io};
 use thiserror::Error;
 
 static IS_LIBPYTHON: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^libpython3\.\d+m?u?\.so\.\d+\.\d+$").unwrap());
+    Lazy::new(|| Regex::new(r"^libpython3\.\d+m?u?t?\.so\.\d+\.\d+$").unwrap());
 
 /// Error raised during auditing an elf file for manylinux/musllinux compatibility
 #[derive(Error, Debug)]

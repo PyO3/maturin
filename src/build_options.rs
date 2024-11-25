@@ -274,6 +274,10 @@ impl BuildOptions {
                             .get("ABIFLAGS")
                             .map(ToString::to_string)
                             .unwrap_or_default();
+                        let gil_disabled = sysconfig_data
+                            .get("Py_GIL_DISABLED")
+                            .map(|x| x == "1")
+                            .unwrap_or_default();
                         let ext_suffix = sysconfig_data
                             .get("EXT_SUFFIX")
                             .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
@@ -299,6 +303,7 @@ impl BuildOptions {
                                 abiflags,
                                 ext_suffix: ext_suffix.to_string(),
                                 pointer_width: None,
+                                gil_disabled,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -376,6 +381,7 @@ impl BuildOptions {
                                 abiflags: "".to_string(),
                                 ext_suffix: ".pyd".to_string(),
                                 pointer_width: None,
+                                gil_disabled: false,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -402,6 +408,7 @@ impl BuildOptions {
                                 abiflags: "".to_string(),
                                 ext_suffix: ".pyd".to_string(),
                                 pointer_width: None,
+                                gil_disabled: false,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -441,6 +448,7 @@ impl BuildOptions {
                                 abiflags: "".to_string(),
                                 ext_suffix: "".to_string(),
                                 pointer_width: None,
+                                gil_disabled: false,
                             },
                             executable: PathBuf::new(),
                             platform: None,
@@ -1244,18 +1252,27 @@ fn find_interpreter_in_sysconfig(
     let mut interpreters = Vec::new();
     for interp in interpreter {
         let python = interp.display().to_string();
-        let (python_impl, python_ver) = if let Some(ver) = python.strip_prefix("pypy") {
-            (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
+        let (python_impl, python_ver, abiflags) = if let Some(ver) = python.strip_prefix("pypy") {
+            (
+                InterpreterKind::PyPy,
+                ver.strip_prefix('-').unwrap_or(ver),
+                "",
+            )
         } else if let Some(ver) = python.strip_prefix("graalpy") {
             (
                 InterpreterKind::GraalPy,
                 ver.strip_prefix('-').unwrap_or(ver),
+                "",
             )
         } else if let Some(ver) = python.strip_prefix("python") {
-            (
-                InterpreterKind::CPython,
-                ver.strip_prefix('-').unwrap_or(ver),
-            )
+            // Also accept things like `python3.13t` for free-threaded python
+            let (ver, abiflags) =
+                if let Some(ver) = ver.strip_prefix('-').unwrap_or(ver).strip_suffix('t') {
+                    (ver, "t")
+                } else {
+                    (ver, "")
+                };
+            (InterpreterKind::CPython, ver, abiflags)
         } else if python
             .chars()
             .next()
@@ -1263,7 +1280,7 @@ fn find_interpreter_in_sysconfig(
             .unwrap_or(false)
         {
             // Eg: -i 3.9 without interpreter kind, assume it's CPython
-            (InterpreterKind::CPython, &*python)
+            (InterpreterKind::CPython, &*python, "")
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {
@@ -1284,7 +1301,12 @@ fn find_interpreter_in_sysconfig(
         let ver_minor = ver_minor.parse::<usize>().with_context(|| {
             format!("Invalid python interpreter minor version '{ver_minor}', expect a digit")
         })?;
-        let sysconfig = InterpreterConfig::lookup_one(target, python_impl, (ver_major, ver_minor))
+
+        if (ver_major, ver_minor) < (3, 13) && abiflags == "t" {
+            bail!("Free-threaded Python interpreter is only supported on 3.13 and later.");
+        }
+
+        let sysconfig = InterpreterConfig::lookup_one(target, python_impl, (ver_major, ver_minor), abiflags)
             .with_context(|| {
                 format!("Failed to find a {python_impl} {ver_major}.{ver_minor} interpreter in known sysconfig")
             })?;

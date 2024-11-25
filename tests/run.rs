@@ -704,8 +704,7 @@ fn lib_with_target_path_dep_sdist() {
         crate-type = ["cdylib"]
 
         [dependencies]
-        # Don't use the macros feature, which makes compilation much faster
-        pyo3 = { version = "0.23.1", default-features = false, features = ["extension-module"] }
+        pyo3 = { version = "0.23.1", features = ["extension-module"] }
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }

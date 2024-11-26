@@ -104,6 +104,7 @@ allow = [
     "0BSD",
     "BSD-3-Clause",
     "CC0-1.0",
+    "Unicode-3.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the

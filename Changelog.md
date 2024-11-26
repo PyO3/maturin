@@ -5,6 +5,7 @@
 * Improve wheel reproducibility by sorting external libraries [#2261](https://github.com/PyO3/maturin/pull/2261)
 * Fix Readme and pyproject.toml inclusions for workspace where the bindings crate is not in the root in [#2262](https://github.com/PyO3/maturin/pull/2262)
 * Add support for GNU/Hurd target in [#2306](https://github.com/PyO3/maturin/pull/2306)
+* Add preliminary free-threaded Python wheel building support in [#2310](https://github.com/PyO3/maturin/pull/2310)
 
 ## [1.7.4]
 

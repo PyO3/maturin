@@ -1,11 +1,11 @@
 use crate::common::{
-    check_installed, create_virtualenv, create_virtualenv_name, maybe_mock_cargo, test_python_path,
+    check_installed, create_named_virtualenv, create_virtualenv, maybe_mock_cargo, test_python_path,
 };
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
-use fs2::FileExt;
+use fs4::fs_err::FileExt;
 use fs_err::File;
 use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
 use normpath::PathExt;
@@ -38,25 +38,25 @@ pub fn test_integration(
     let shed = format!("test-crates/wheels/{unique_name}");
     let target_dir = format!("test-crates/targets/{unique_name}");
     let python_interp = test_python_path();
-    let mut cli = vec![
-        "build",
-        "--quiet",
-        "--manifest-path",
-        &package_string,
-        "--target-dir",
-        &target_dir,
-        "--out",
-        &shed,
+    let mut cli: Vec<std::ffi::OsString> = vec![
+        "build".into(),
+        "--quiet".into(),
+        "--manifest-path".into(),
+        package_string.into(),
+        "--target-dir".into(),
+        target_dir.into(),
+        "--out".into(),
+        shed.into(),
     ];
 
     if let Some(ref bindings) = bindings {
-        cli.push("--bindings");
-        cli.push(bindings);
+        cli.push("--bindings".into());
+        cli.push(bindings.into());
     }
 
     if let Some(target) = target {
-        cli.push("--target");
-        cli.push(target)
+        cli.push("--target".into());
+        cli.push(target.into())
     }
 
     #[cfg(feature = "zig")]
@@ -65,11 +65,11 @@ pub fn test_integration(
     let zig_found = false;
 
     let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
-        cli.push("--zig");
+        cli.push("--zig".into());
         true
     } else {
-        cli.push("--compatibility");
-        cli.push("linux");
+        cli.push("--compatibility".into());
+        cli.push("linux".into());
         false
     };
 
@@ -80,47 +80,52 @@ pub fn test_integration(
         .join("venvs");
     let cffi_provider = "cffi-provider";
     let cffi_venv = venvs_dir.join(cffi_provider);
-    let target_triple = Target::from_target_triple(None)?;
-    let python = target_triple.get_venv_python(&cffi_venv);
 
     if let Some(interp) = python_interp.as_ref() {
-        cli.push("--interpreter");
-        cli.push(interp);
+        cli.push("--interpreter".into());
+        cli.push(interp.into());
     } else {
         // Install cffi in a separate environment
 
         // All tests try to use this venv at the same time, so we need to make sure only one
         // modifies it at a time and that during that time, no other test reads it.
         let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
-        file.file().lock_exclusive()?;
-        if !dbg!(venvs_dir.join(cffi_provider)).is_dir() {
-            dbg!(create_virtualenv_name(
-                cffi_provider,
-                python_interp.clone().map(PathBuf::from)
-            )?);
+        file.lock_exclusive()?;
+        let python = if !cffi_venv.is_dir() {
+            create_named_virtualenv(cffi_provider, python_interp.clone().map(PathBuf::from))?;
+            let target_triple = Target::from_target_triple(None)?;
+            let python = target_triple.get_venv_python(&cffi_venv);
+            assert!(python.is_file(), "cffi venv not created correctly");
             let pip_install_cffi = [
                 "-m",
                 "pip",
                 "--disable-pip-version-check",
+                "--no-cache-dir",
                 "install",
                 "cffi",
             ];
             let output = Command::new(&python)
                 .args(pip_install_cffi)
-                .status()
-                //.output()
-                .context(format!("pip install cffi failed with {python:?}"))?;
-            if !output.success() {
-                bail!("Installing cffi into {} failed", cffi_venv.display());
+                .output()
+                .with_context(|| format!("pip install cffi failed with {python:?}"))?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                bail!(
+                    "Installing cffi into {} failed.\nstdout: {}\nstderr: {}",
+                    cffi_venv.display(),
+                    stdout,
+                    stderr
+                );
             }
-        }
-        file.file().unlock()?;
-        cli.push("--interpreter");
-        cli.push(
             python
-                .to_str()
-                .context("non-utf8 python interpreter path")?,
-        );
+        } else {
+            let target_triple = Target::from_target_triple(None)?;
+            target_triple.get_venv_python(&cffi_venv)
+        };
+        file.unlock()?;
+        cli.push("--interpreter".into());
+        cli.push(python.as_os_str().to_owned());
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
@@ -234,20 +239,20 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     }
 
     // The first argument is ignored by clap
-    let mut cli = vec![
-        "build",
-        "--manifest-path",
-        &package_string,
-        "--quiet",
-        "--interpreter",
+    let mut cli: Vec<std::ffi::OsString> = vec![
+        "build".into(),
+        "--manifest-path".into(),
+        package_string.into(),
+        "--quiet".into(),
+        "--interpreter".into(),
     ];
     for interp in &interpreters {
-        cli.push(interp.to_str().unwrap());
+        cli.push(interp.to_str().unwrap().into());
     }
 
     if let Some(ref bindings) = bindings {
-        cli.push("--bindings");
-        cli.push(bindings);
+        cli.push("--bindings".into());
+        cli.push(bindings.into());
     }
 
     let options = BuildOptions::try_parse_from(cli)?;

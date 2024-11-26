@@ -793,13 +793,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs2"
-version = "0.4.3"
+name = "fs4"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+checksum = "e871a4cfa68bb224863b53149d973df1ac8d1ed2fa1d1bfc37ac1bb65dd37207"
 dependencies = [
- "libc",
- "winapi",
+ "fs-err",
+ "rustix",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1233,7 +1234,7 @@ dependencies = [
  "fat-macho",
  "flate2",
  "fs-err",
- "fs2",
+ "fs4",
  "glob",
  "goblin",
  "ignore",

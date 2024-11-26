@@ -126,14 +126,14 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
         Err(_) => name.to_string(),
     };
 
-    let venv_dir = create_virtualenv_name(&venv_name, interp)?;
+    let venv_dir = create_named_virtualenv(&venv_name, interp)?;
 
     let target = Target::from_target_triple(None)?;
     let python = target.get_venv_python(&venv_dir);
     Ok((venv_dir, python))
 }
 
-pub fn create_virtualenv_name(venv_name: &str, interp: Option<PathBuf>) -> Result<PathBuf> {
+pub fn create_named_virtualenv(venv_name: &str, interp: Option<PathBuf>) -> Result<PathBuf> {
     let venv_dir = PathBuf::from("test-crates")
         .normalize()?
         .into_path_buf()

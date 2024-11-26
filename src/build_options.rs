@@ -1266,12 +1266,7 @@ fn find_interpreter_in_sysconfig(
             )
         } else if let Some(ver) = python.strip_prefix("python") {
             // Also accept things like `python3.13t` for free-threaded python
-            let (ver, abiflags) =
-                if let Some(ver) = ver.strip_prefix('-').unwrap_or(ver).strip_suffix('t') {
-                    (ver, "t")
-                } else {
-                    (ver, "")
-                };
+            let (ver, abiflags) = maybe_free_threaded(ver.strip_prefix('-').unwrap_or(ver));
             (InterpreterKind::CPython, ver, abiflags)
         } else if python
             .chars()
@@ -1280,7 +1275,8 @@ fn find_interpreter_in_sysconfig(
             .unwrap_or(false)
         {
             // Eg: -i 3.9 without interpreter kind, assume it's CPython
-            (InterpreterKind::CPython, &*python, "")
+            let (ver, abiflags) = maybe_free_threaded(&python);
+            (InterpreterKind::CPython, ver, abiflags)
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {
@@ -1317,6 +1313,14 @@ fn find_interpreter_in_sysconfig(
         interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
     }
     Ok(interpreters)
+}
+
+fn maybe_free_threaded(python_ver: &str) -> (&str, &str) {
+    if let Some(ver) = python_ver.strip_suffix('t') {
+        (ver, "t")
+    } else {
+        (python_ver, "")
+    }
 }
 
 /// We need to pass the global flags to cargo metadata

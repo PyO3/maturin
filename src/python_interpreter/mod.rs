@@ -499,23 +499,13 @@ impl PythonInterpreter {
         } else {
             match self.interpreter_kind {
                 InterpreterKind::CPython => {
-                    if target.is_unix() {
-                        format!(
-                            "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
-                            major = self.major,
-                            minor = self.minor,
-                            abiflags = self.abiflags,
-                            platform = platform
-                        )
-                    } else {
-                        // On windows the abiflags are missing, but this seems to work
-                        format!(
-                            "cp{major}{minor}-none-{platform}",
-                            major = self.major,
-                            minor = self.minor,
-                            platform = platform
-                        )
-                    }
+                    format!(
+                        "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                        major = self.major,
+                        minor = self.minor,
+                        abiflags = self.abiflags,
+                        platform = platform
+                    )
                 }
                 InterpreterKind::PyPy => {
                     // pypy uses its version as part of the ABI, e.g.

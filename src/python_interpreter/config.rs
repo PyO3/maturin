@@ -135,8 +135,7 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: CPython,
-                    // abiflags is always empty on Windows
-                    abiflags: String::new(),
+                    abiflags: abiflags.to_string(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
                     gil_disabled,
@@ -152,7 +151,6 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: PyPy,
-                    // abiflags is always empty on Windows
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),

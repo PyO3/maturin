@@ -1279,8 +1279,17 @@ fn find_interpreter_in_sysconfig(
             .map(|c| c.is_ascii_digit())
             .unwrap_or(false)
         {
-            // Eg: -i 3.9 without interpreter kind, assume it's CPython
-            (InterpreterKind::CPython, &*python, "")
+            // Eg: -i 3.9 or 3.13t without interpreter kind, assume it's CPython
+            let (ver, abiflags) = if let Some(ver) = python
+                .strip_prefix('-')
+                .unwrap_or(&python)
+                .strip_suffix('t')
+            {
+                (ver, "t")
+            } else {
+                (&*python, "")
+            };
+            (InterpreterKind::CPython, ver, abiflags)
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {

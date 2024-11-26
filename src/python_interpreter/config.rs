@@ -120,6 +120,11 @@ impl InterpreterConfig {
                 })
             }
             (Os::Windows, CPython) => {
+                let abiflags = if python_version < (3, 8) {
+                    "m".to_string()
+                } else {
+                    abiflags.to_string()
+                };
                 let ext_suffix = if python_version < (3, 8) {
                     ".pyd".to_string()
                 } else {
@@ -135,7 +140,7 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: CPython,
-                    abiflags: abiflags.to_string(),
+                    abiflags,
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
                     gil_disabled,

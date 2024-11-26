@@ -9,6 +9,7 @@ use maturin::pyproject_toml::SdistGenerator;
 use rstest::rstest;
 use std::env;
 use std::path::Path;
+use std::time::Duration;
 use time::macros::datetime;
 use which::which;
 
@@ -200,6 +201,7 @@ fn develop_uniffi_multiple_binding_files() {
 }
 
 #[rstest]
+#[timeout(Duration::from_secs(60))]
 #[case(TestInstallBackend::Pip, "pip")]
 #[case(TestInstallBackend::Uv, "uv")]
 #[test]
@@ -226,6 +228,7 @@ fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) 
 }
 
 #[rstest]
+#[timeout(Duration::from_secs(60))]
 #[case(TestInstallBackend::Pip, "pip")]
 #[case(TestInstallBackend::Uv, "uv")]
 #[test]

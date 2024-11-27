@@ -425,10 +425,35 @@ fn fun_with_abiflags(
     if message.interpreter == "pypy" || message.interpreter == "graalvm" {
         // pypy and graalpy do not specify abi flags
         Ok("".to_string())
-    } else if let Some(abiflags) = &message.abiflags {
-        Ok(abiflags.to_string())
+    } else if message.system == "windows" {
+        if matches!(message.abiflags.as_deref(), Some("") | None) {
+            // windows has a few annoying cases, but its abiflags in sysconfig always empty
+            // python <= 3.7 has "m"
+            if message.minor <= 7 {
+                Ok("m".to_string())
+            } else if message.gil_disabled {
+                assert!(
+                    message.minor >= 13,
+                    "gil_disabled is only available in python 3.13+"
+                );
+                Ok("t".to_string())
+            } else {
+                Ok("".to_string())
+            }
+        } else {
+            bail!("A python 3 interpreter on Windows does not define abiflags in its sysconfig ಠ_ಠ")
+        }
+    } else if let Some(ref abiflags) = message.abiflags {
+        if message.minor >= 8 {
+            // for 3.8, "builds with and without pymalloc are ABI compatible" and the flag dropped
+            Ok(abiflags.to_string())
+        } else if (abiflags != "m") && (abiflags != "dm") {
+            bail!("A python 3 interpreter on Linux or macOS must have 'm' or 'dm' as abiflags ಠ_ಠ")
+        } else {
+            Ok(abiflags.to_string())
+        }
     } else {
-        bail!("A python 3 interpreter is expected to define abiflags in its sysconfig ಠ_ಠ")
+        bail!("A python 3 interpreter on Linux or macOS must define abiflags in its sysconfig ಠ_ಠ")
     }
 }
 

@@ -26,7 +26,7 @@ metadata = {
     "executable": sys.executable or None,
     "major": sys.version_info.major,
     "minor": sys.version_info.minor,
-    "abiflags": sysconfig.get_config_var("ABIFLAGS"),
+    "abiflags": sysconfig.get_config_var("abiflags"),
     "interpreter": platform.python_implementation().lower(),
     "ext_suffix": ext_suffix,
     "soabi": sysconfig.get_config_var("SOABI") or None,

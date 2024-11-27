@@ -1,7 +1,7 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
 use crate::{BridgeModel, BuildContext, Target};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{bail, ensure, format_err, Context, Result};
 use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
@@ -432,9 +432,9 @@ fn fun_with_abiflags(
             if message.minor <= 7 {
                 Ok("m".to_string())
             } else if message.gil_disabled {
-                assert!(
+                ensure!(
                     message.minor >= 13,
-                    "gil_disabled is only available in python 3.13+"
+                    "gil_disabled is only available in python 3.13+ ಠ_ಠ"
                 );
                 Ok("t".to_string())
             } else {

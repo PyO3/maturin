@@ -367,7 +367,7 @@ impl BuildOptions {
                         .or_else(|err| {
                             // Can only use sysconfig-derived interpreter on windows if generating the import lib
                             if target.is_windows() && !generate_import_lib {
-                                return Err(err);
+                                return Err(err.context("Need a Python interpreter to compile for Windows without PyO3's `generate-import-lib` feature"));
                             }
 
                             let interps =

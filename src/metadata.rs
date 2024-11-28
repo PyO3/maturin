@@ -70,7 +70,7 @@ impl Metadata23 {
     /// Initializes with name, version and otherwise the defaults
     pub fn new(name: String, version: Version) -> Self {
         Self {
-            metadata_version: "2.3".to_string(),
+            metadata_version: "2.4".to_string(),
             name,
             version,
             platform: vec![],

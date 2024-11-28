@@ -1,7 +1,7 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
 use crate::{BridgeModel, BuildContext, Target};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{bail, ensure, format_err, Context, Result};
 use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
@@ -427,7 +427,19 @@ fn fun_with_abiflags(
         Ok("".to_string())
     } else if message.system == "windows" {
         if matches!(message.abiflags.as_deref(), Some("") | None) {
-            Ok("".to_string())
+            // windows has a few annoying cases, but its abiflags in sysconfig always empty
+            // python <= 3.7 has "m"
+            if message.minor <= 7 {
+                Ok("m".to_string())
+            } else if message.gil_disabled {
+                ensure!(
+                    message.minor >= 13,
+                    "gil_disabled is only available in python 3.13+ ಠ_ಠ"
+                );
+                Ok("t".to_string())
+            } else {
+                Ok("".to_string())
+            }
         } else {
             bail!("A python 3 interpreter on Windows does not define abiflags in its sysconfig ಠ_ಠ")
         }
@@ -499,23 +511,13 @@ impl PythonInterpreter {
         } else {
             match self.interpreter_kind {
                 InterpreterKind::CPython => {
-                    if target.is_unix() {
-                        format!(
-                            "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
-                            major = self.major,
-                            minor = self.minor,
-                            abiflags = self.abiflags,
-                            platform = platform
-                        )
-                    } else {
-                        // On windows the abiflags are missing, but this seems to work
-                        format!(
-                            "cp{major}{minor}-none-{platform}",
-                            major = self.major,
-                            minor = self.minor,
-                            platform = platform
-                        )
-                    }
+                    format!(
+                        "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                        major = self.major,
+                        minor = self.minor,
+                        abiflags = self.abiflags,
+                        platform = platform
+                    )
                 }
                 InterpreterKind::PyPy => {
                     // pypy uses its version as part of the ABI, e.g.

@@ -7,7 +7,6 @@ use crate::module_writer::{
     write_uniffi_module, write_wasm_launcher, WheelWriter,
 };
 use crate::project_layout::ProjectLayout;
-use crate::python_interpreter::InterpreterKind;
 use crate::source_distribution::source_distribution;
 use crate::target::{Arch, Os};
 use crate::{

@@ -235,12 +235,7 @@ impl BuildContext {
                 if !non_abi3_interps.is_empty() {
                     let interp_names: HashSet<_> = non_abi3_interps
                         .iter()
-                        .map(|interp| match interp.interpreter_kind {
-                            InterpreterKind::CPython | InterpreterKind::GraalPy => {
-                                interp.implementation_name.to_string()
-                            }
-                            InterpreterKind::PyPy => "PyPy".to_string(),
-                        })
+                        .map(|interp| format!("{}{}{}", interp, interp.major, interp.minor))
                         .collect();
                     eprintln!(
                         "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",

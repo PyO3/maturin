@@ -679,7 +679,7 @@ mod test {
         );
 
         let expected = expect![[r#"
-            Metadata-Version: 2.3
+            Metadata-Version: 2.4
             Name: info-project
             Version: 0.1.0
             Summary: A test project

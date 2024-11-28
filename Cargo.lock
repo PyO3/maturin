@@ -306,20 +306,20 @@ dependencies = [
 
 [[package]]
 name = "cbindgen"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da6bc11b07529f16944307272d5bd9b22530bc7d05751717c9d416586cedab49"
+checksum = "3fce8dd7fcfcbf3a0a87d8f515194b49d6135acab73e18bd380d1d93bb1a15eb"
 dependencies = [
  "heck 0.4.1",
- "indexmap 1.9.3",
+ "indexmap",
  "log",
  "proc-macro2",
  "quote",
  "serde",
  "serde_json",
- "syn 1.0.109",
+ "syn 2.0.89",
  "tempfile",
- "toml 0.5.11",
+ "toml",
 ]
 
 [[package]]
@@ -364,7 +364,7 @@ version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8eebd66744a15ded14960ab4ccdbfb51ad3b81f51f3f04a80adac98c985396c9"
 dependencies = [
- "hashbrown 0.14.5",
+ "hashbrown",
  "stacker",
 ]
 
@@ -962,12 +962,6 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-
-[[package]]
-name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
@@ -1170,22 +1164,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
-dependencies = [
- "autocfg",
- "hashbrown 0.12.3",
-]
-
-[[package]]
-name = "indexmap"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68b900aa2f7301e21c36462b170ee99994de34dff39a4a6a528e80e7376d07e5"
 dependencies = [
  "equivalent",
- "hashbrown 0.14.5",
+ "hashbrown",
  "serde",
 ]
 
@@ -1384,7 +1368,7 @@ dependencies = [
  "glob",
  "goblin",
  "ignore",
- "indexmap 2.5.0",
+ "indexmap",
  "indoc",
  "itertools",
  "keyring",
@@ -1419,7 +1403,7 @@ dependencies = [
  "textwrap",
  "thiserror",
  "time",
- "toml 0.8.15",
+ "toml",
  "toml_edit 0.22.16",
  "tracing",
  "tracing-subscriber",
@@ -1815,11 +1799,11 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef7061023bcb58a0fc4a4bbe9819c13b0dca7c2abc14da14f5ecc1532ab3a36a"
 dependencies = [
- "indexmap 2.5.0",
+ "indexmap",
  "pep440_rs",
  "pep508_rs",
  "serde",
- "toml 0.8.15",
+ "toml",
 ]
 
 [[package]]
@@ -2582,15 +2566,6 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml"
 version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac2caab0bf757388c6c0ae23b3293fdb463fee59434529014f85e3263b995c28"
@@ -2616,7 +2591,7 @@ version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
 dependencies = [
- "indexmap 2.5.0",
+ "indexmap",
  "toml_datetime",
  "winnow 0.5.40",
 ]
@@ -2627,7 +2602,7 @@ version = "0.22.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "278f3d518e152219c994ce877758516bca5e118eaed6996192a774fb9fbf0788"
 dependencies = [
- "indexmap 2.5.0",
+ "indexmap",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -3198,7 +3173,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
- "toml 0.8.15",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "twox-hash",

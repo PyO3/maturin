@@ -234,7 +234,7 @@ impl BuildContext {
                 if !non_abi3_interps.is_empty() {
                     let interp_names: HashSet<_> = non_abi3_interps
                         .iter()
-                        .map(|interp| format!("{}{}{}", interp, interp.major, interp.minor))
+                        .map(|interp| interp.to_string())
                         .collect();
                     eprintln!(
                         "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",

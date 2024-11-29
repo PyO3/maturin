@@ -2,7 +2,7 @@
 
 ## [1.7.6]
 
-* Set core metadata version to 2.4 to fix `project.license.files` handling in [#2332](https://github.com/PyO3/maturin/pull/2332) 
+* Set core metadata version to 2.4 to fix `project.license.files` handling in [#2332](https://github.com/PyO3/maturin/pull/2332)
 
 ## [1.7.5]
 

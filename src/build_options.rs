@@ -362,13 +362,28 @@ impl BuildOptions {
             }
             BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
             BridgeModel::BindingsAbi3(major, minor) => {
+                let found_interpreters =
+                    find_interpreter_in_host(bridge, interpreter, target, requires_python)
+                        .or_else(|err| {
+                            // Can only use sysconfig-derived interpreter on windows if generating the import lib
+                            if target.is_windows() && !generate_import_lib {
+                                return Err(err.context("Need a Python interpreter to compile for Windows without PyO3's `generate-import-lib` feature"));
+                            }
+
+                            let interps =
+                                find_interpreter_in_sysconfig(interpreter, target, requires_python)
+                                    .unwrap_or_default();
+                            if interps.is_empty() && !self.interpreter.is_empty() {
+                                // Print error when user supplied `--interpreter` option
+                                Err(err)
+                            } else {
+                                Ok(interps)
+                            }
+                        })?;
+
                 if target.is_windows() {
-                    // Ideally, we wouldn't want to use any python interpreter without abi3 at all.
-                    // Unfortunately, on windows we need one to figure out base_prefix for a linker
-                    // argument.
-                    let interpreters =
-                        find_interpreter_in_host(bridge, interpreter, target, requires_python)
-                            .unwrap_or_default();
+                    // On windows we might need a Python executable to locate a base prefix for
+                    // linker args, if we're not using PyO3's `generate-import-lib` feature.
                     if env::var_os("PYO3_CROSS_LIB_DIR").is_some() {
                         // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
                         // when cross compiling, so we fake a python interpreter matching it
@@ -394,48 +409,36 @@ impl BuildOptions {
                             InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
                                 .context("Invalid PYO3_CONFIG_FILE")?;
                         Ok(vec![PythonInterpreter::from_config(interpreter_config)])
-                    } else if let Some(interp) = interpreters.first() {
-                        eprintln!("🐍 Using {interp} to generate to link bindings (With abi3, an interpreter is only required on windows)");
-                        Ok(interpreters)
                     } else if generate_import_lib {
-                        eprintln!("🐍 Not using a specific python interpreter (Automatically generating windows import library)");
-                        // fake a python interpreter
-                        Ok(vec![PythonInterpreter {
-                            config: InterpreterConfig {
-                                major: *major as usize,
-                                minor: *minor as usize,
-                                interpreter_kind: InterpreterKind::CPython,
-                                abiflags: "".to_string(),
-                                ext_suffix: ".pyd".to_string(),
-                                pointer_width: None,
-                                gil_disabled: false,
-                            },
-                            executable: PathBuf::new(),
-                            platform: None,
-                            runnable: false,
-                            implementation_name: "cpython".to_string(),
-                            soabi: None,
-                        }])
+                        eprintln!("🐍 Not using a specific python interpreter (automatically generating windows import library)");
+                        let mut found_interpreters = found_interpreters;
+                        // fake a python interpreter if none directly found
+                        if found_interpreters.is_empty() {
+                            found_interpreters.push(PythonInterpreter {
+                                config: InterpreterConfig {
+                                    major: *major as usize,
+                                    minor: *minor as usize,
+                                    interpreter_kind: InterpreterKind::CPython,
+                                    abiflags: "".to_string(),
+                                    ext_suffix: ".pyd".to_string(),
+                                    pointer_width: None,
+                                    gil_disabled: false,
+                                },
+                                executable: PathBuf::new(),
+                                platform: None,
+                                runnable: false,
+                                implementation_name: "cpython".to_string(),
+                                soabi: None,
+                            })
+                        }
+                        Ok(found_interpreters)
                     } else {
-                        bail!("Failed to find a python interpreter");
+                        if found_interpreters.is_empty() {
+                            bail!("Failed to find any python interpreter");
+                        }
+                        Ok(found_interpreters)
                     }
                 } else {
-                    let found_interpreters =
-                        find_interpreter_in_host(bridge, interpreter, target, requires_python)
-                            .or_else(|err| {
-                                let interps = find_interpreter_in_sysconfig(
-                                    interpreter,
-                                    target,
-                                    requires_python,
-                                )
-                                .unwrap_or_default();
-                                if interps.is_empty() && !self.interpreter.is_empty() {
-                                    // Print error when user supplied `--interpreter` option
-                                    Err(err)
-                                } else {
-                                    Ok(interps)
-                                }
-                            })?;
                     eprintln!("🐍 Not using a specific python interpreter");
                     if self.interpreter.is_empty() {
                         // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host

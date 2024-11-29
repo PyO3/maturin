@@ -389,12 +389,12 @@ jobs:\n",
                 // build free-threaded wheel for python3.13t
                 conf.push_str(&format!(
                     "      - name: Build free-threaded wheels
-          uses: PyO3/maturin-action@v1
-          with:
-            target: ${{{{ matrix.platform.target }}}}
-            args: --release --out dist{maturin_args} -i python3.13t
-            sccache: 'true'
-  "
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{{{ matrix.platform.target }}}}
+          args: --release --out dist{maturin_args} -i python3.13t
+          sccache: 'true'
+"
                 ));
                 if !maturin_action_args.is_empty() {
                     conf.push_str(&format!("          {maturin_action_args}\n"));

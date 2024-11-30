@@ -144,7 +144,7 @@ impl ProjectResolver {
             .unwrap_or_default()
             .to_vec();
         let py_root = match pyproject.and_then(|x| x.python_source()) {
-            Some(py_src) => project_root.join(py_src),
+            Some(py_src) => project_root.join(py_src).normalize()?.into_path_buf(),
             None => match pyproject.and_then(|x| x.project_name()) {
                 Some(project_name) => {
                     // Detect src layout

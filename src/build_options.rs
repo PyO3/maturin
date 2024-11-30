@@ -7,6 +7,7 @@ use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
 use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
+use cargo_metadata::{CrateType, TargetKind};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
@@ -884,7 +885,7 @@ fn filter_cargo_targets(
                             .all(|f| resolved_features.contains(f))
                 }
             }
-            _ => target.kind.contains(&"cdylib".to_string()),
+            _ => target.crate_types.contains(&CrateType::CDyLib),
         })
         .map(|target| CompileTarget {
             target: target.clone(),
@@ -896,9 +897,9 @@ fn filter_cargo_targets(
         // Let's try compile one of the target with `--crate-type cdylib`
         let lib_target = root_pkg.targets.iter().find(|target| {
             target
-                .kind
+                .crate_types
                 .iter()
-                .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
+                .any(|crate_type| LIB_CRATE_TYPES.contains(crate_type))
         });
         if let Some(target) = lib_target {
             targets.push(CompileTarget {
@@ -914,7 +915,7 @@ fn filter_cargo_targets(
             config_targets.iter().any(|config_target| {
                 let name_eq = config_target.name == target.name;
                 match &config_target.kind {
-                    Some(kind) => name_eq && target.kind.contains(kind),
+                    Some(kind) => name_eq && target.crate_types.contains(&CrateType::from(*kind)),
                     None => name_eq,
                 }
             })
@@ -1066,11 +1067,17 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         .iter()
         .filter(|target| {
             target.kind.iter().any(|kind| {
-                kind != "example" && kind != "test" && kind != "bench" && kind != "custom-build"
+                !matches!(
+                    kind,
+                    TargetKind::Bench
+                        | TargetKind::CustomBuild
+                        | TargetKind::Example
+                        | TargetKind::ProcMacro
+                        | TargetKind::Test
+                )
             })
         })
-        .flat_map(|target| target.crate_types.iter())
-        .map(String::as_str)
+        .flat_map(|target| target.crate_types.iter().cloned())
         .collect();
 
     let bridge = if let Some(bindings) = bridge {
@@ -1094,7 +1101,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             BridgeModel::Bindings(bindings.to_string(), MINIMUM_PYTHON_MINOR)
         }
     } else if let Some((bindings, minor)) = find_bindings(&deps, &packages) {
-        if !targets.contains(&"cdylib") && targets.contains(&"bin") {
+        if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
             if bindings == "uniffi" {
                 // uniffi bindings don't support bin
                 BridgeModel::Bin(None)
@@ -1106,9 +1113,9 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else {
             BridgeModel::Bindings(bindings, minor)
         }
-    } else if targets.contains(&"cdylib") {
+    } else if targets.contains(&CrateType::CDyLib) {
         BridgeModel::Cffi
-    } else if targets.contains(&"bin") {
+    } else if targets.contains(&CrateType::Bin) {
         BridgeModel::Bin(find_bindings(&deps, &packages))
     } else {
         bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")

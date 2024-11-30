@@ -4,6 +4,7 @@ use crate::target::RUST_1_64_0;
 use crate::PlatformTag;
 use crate::{BuildContext, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
+use cargo_metadata::CrateType;
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use normpath::PathExt;
@@ -20,7 +21,12 @@ use tracing::{debug, instrument, trace};
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
-pub(crate) const LIB_CRATE_TYPES: [&str; 4] = ["lib", "dylib", "rlib", "staticlib"];
+pub(crate) const LIB_CRATE_TYPES: [CrateType; 4] = [
+    CrateType::Lib,
+    CrateType::DyLib,
+    CrateType::RLib,
+    CrateType::StaticLib,
+];
 
 /// A cargo target to build
 #[derive(Debug, Clone)]
@@ -48,7 +54,7 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
-) -> Result<Vec<HashMap<String, BuildArtifact>>> {
+) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
     if context.universal2 {
         compile_universal2(context, python_interpreter, targets)
     } else {
@@ -61,7 +67,7 @@ fn compile_universal2(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
-) -> Result<Vec<HashMap<String, BuildArtifact>>> {
+) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
     let mut aarch64_context = context.clone();
     aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
 
@@ -80,12 +86,12 @@ fn compile_universal2(
         .zip(aarch64_artifacts.iter().zip(&x86_64_artifacts))
     {
         let build_type = if bridge_model.is_bin() {
-            "bin"
+            CrateType::Bin
         } else {
-            "cdylib"
+            CrateType::CDyLib
         };
-        let aarch64_artifact = aarch64_artifact.get(build_type).cloned().ok_or_else(|| {
-            if build_type == "cdylib" {
+        let aarch64_artifact = aarch64_artifact.get(&build_type).cloned().ok_or_else(|| {
+            if build_type == CrateType::CDyLib {
                 anyhow!(
                     "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
@@ -94,8 +100,8 @@ fn compile_universal2(
                 anyhow!("Cargo didn't build an aarch64 bin.")
             }
         })?;
-        let x86_64_artifact = x86_64_artifact.get(build_type).cloned().ok_or_else(|| {
-            if build_type == "cdylib" {
+        let x86_64_artifact = x86_64_artifact.get(&build_type).cloned().ok_or_else(|| {
+            if build_type == CrateType::CDyLib {
                 anyhow!(
                     "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?",
@@ -128,7 +134,7 @@ fn compile_universal2(
             path: PathBuf::from(output_path),
             ..x86_64_artifact
         };
-        result.insert(build_type.to_string(), universal_artifact);
+        result.insert(build_type, universal_artifact);
         universal_artifacts.push(result);
     }
     Ok(universal_artifacts)
@@ -138,7 +144,7 @@ fn compile_targets(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
-) -> Result<Vec<HashMap<String, BuildArtifact>>> {
+) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
     let mut artifacts = Vec::with_capacity(targets.len());
     for target in targets {
         let build_command = cargo_build_command(context, python_interpreter, target)?;
@@ -165,9 +171,9 @@ fn cargo_build_command(
     // Add `--crate-type cdylib` if available
     if compile_target
         .target
-        .kind
+        .crate_types
         .iter()
-        .any(|k| LIB_CRATE_TYPES.contains(&k.as_str()))
+        .any(|crate_type| LIB_CRATE_TYPES.contains(crate_type))
     {
         // `--crate-type` is stable since Rust 1.64.0
         // See https://github.com/rust-lang/cargo/pull/10838
@@ -461,7 +467,7 @@ fn cargo_build_command(
 fn compile_target(
     context: &BuildContext,
     mut build_command: Command,
-) -> Result<HashMap<String, BuildArtifact>> {
+) -> Result<HashMap<CrateType, BuildArtifact>> {
     debug!("Running {:?}", build_command);
 
     let using_cross = build_command

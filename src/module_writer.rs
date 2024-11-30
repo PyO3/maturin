@@ -270,7 +270,7 @@ impl ModuleWriter for WheelWriter {
             zip::CompressionMethod::Deflated
         };
 
-        let mut options = zip::write::FileOptions::default()
+        let mut options = zip::write::SimpleFileOptions::default()
             .unix_permissions(permissions)
             .compression_method(compression_method);
         let mtime = self.mtime().ok();
@@ -379,7 +379,8 @@ impl WheelWriter {
             zip::CompressionMethod::Deflated
         };
 
-        let mut options = zip::write::FileOptions::default().compression_method(compression_method);
+        let mut options =
+            zip::write::SimpleFileOptions::default().compression_method(compression_method);
         let mtime = self.mtime().ok();
         if let Some(mtime) = mtime {
             options = options.last_modified_time(mtime);

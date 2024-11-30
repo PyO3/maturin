@@ -248,7 +248,7 @@ pub fn check_wheel_mtimes(
     let mut mtimes = BTreeSet::<OffsetDateTime>::new();
 
     for idx in 0..wheel.len() {
-        let mtime = wheel.by_index(idx)?.last_modified().to_time()?;
+        let mtime = wheel.by_index(idx)?.last_modified().unwrap().try_into()?;
         mtimes.insert(mtime);
     }
 

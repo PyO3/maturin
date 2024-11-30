@@ -14,6 +14,7 @@ use crate::{
     PythonInterpreter, Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
+use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
 use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
@@ -841,7 +842,7 @@ impl BuildContext {
         let artifacts = artifacts.first().context(error_msg)?;
 
         let mut artifact = artifacts
-            .get("cdylib")
+            .get(&CrateType::CDyLib)
             .cloned()
             .ok_or_else(|| anyhow!(error_msg,))?;
 
@@ -1089,7 +1090,7 @@ impl BuildContext {
         let mut artifact_paths = Vec::with_capacity(artifacts.len());
         for artifact in artifacts {
             let artifact = artifact
-                .get("bin")
+                .get(&CrateType::Bin)
                 .cloned()
                 .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 

@@ -389,12 +389,12 @@ jobs:\n",
                 // build free-threaded wheel for python3.13t
                 conf.push_str(&format!(
                     "      - name: Build free-threaded wheels
-          uses: PyO3/maturin-action@v1
-          with:
-            target: ${{{{ matrix.platform.target }}}}
-            args: --release --out dist{maturin_args} -i python3.13t
-            sccache: 'true'
-  "
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{{{ matrix.platform.target }}}}
+          args: --release --out dist{maturin_args} -i python3.13t
+          sccache: 'true'
+"
                 ));
                 if !maturin_action_args.is_empty() {
                     conf.push_str(&format!("          {maturin_action_args}\n"));
@@ -917,12 +917,12 @@ mod tests {
                       sccache: 'true'
                       manylinux: auto
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                        manylinux: auto
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                      manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -955,12 +955,12 @@ mod tests {
                       sccache: 'true'
                       manylinux: musllinux_1_2
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                        manylinux: musllinux_1_2
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -989,12 +989,12 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                    - name: Upload wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                  - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
@@ -1021,12 +1021,12 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                    - name: Upload wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                  - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
@@ -1120,12 +1120,12 @@ mod tests {
                       sccache: 'true'
                       manylinux: auto
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                        manylinux: auto
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                      manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1158,12 +1158,12 @@ mod tests {
                       sccache: 'true'
                       manylinux: musllinux_1_2
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                        manylinux: musllinux_1_2
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                      manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1192,12 +1192,12 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                    - name: Upload wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                  - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
@@ -1224,12 +1224,12 @@ mod tests {
                       args: --release --out dist
                       sccache: 'true'
                   - name: Build free-threaded wheels
-                      uses: PyO3/maturin-action@v1
-                      with:
-                        target: ${{ matrix.platform.target }}
-                        args: --release --out dist -i python3.13t
-                        sccache: 'true'
-                    - name: Upload wheels
+                    uses: PyO3/maturin-action@v1
+                    with:
+                      target: ${{ matrix.platform.target }}
+                      args: --release --out dist -i python3.13t
+                      sccache: 'true'
+                  - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}

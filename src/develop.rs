@@ -233,7 +233,7 @@ fn install_dependencies(
         args.extend(build_context.metadata24.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
             // Remove extra marker to make it installable with pip
-            // Keep in sync with `Metadata21::merge_pyproject_toml()`!
+            // Keep in sync with `Metadata23::merge_pyproject_toml()`!
             for extra in extras {
                 pkg.marker = pkg.marker.and_then(|marker| -> Option<MarkerTree> {
                     match marker.clone() {

@@ -70,7 +70,7 @@ rustc_version = "0.4.0"
 semver = "1.0.22"
 target-lexicon = "0.13.0"
 indexmap = "2.2.3"
-pyproject-toml = "0.11.0"
+pyproject-toml = "0.13.4"
 python-pkginfo = "0.6.5"
 textwrap = "0.16.1"
 ignore = "0.4.20"
@@ -80,8 +80,8 @@ cc = "1.0.88"
 dunce = "1.0.2"
 normpath = "1.1.1"
 path-slash = "0.2.1"
-pep440_rs = { version = "0.6.0", features = ["serde", "tracing"] }
-pep508_rs = { version = "0.6.0", features = ["serde", "tracing"] }
+pep440_rs = { version = "0.7.2", features = ["tracing"] }
+pep508_rs = { version = "0.9.2", features = ["tracing"] }
 same-file = "1.0.6"
 time = "0.3.17"
 url = "2.5.0"

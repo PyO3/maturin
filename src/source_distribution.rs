@@ -771,12 +771,8 @@ pub fn source_distribution(
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
             writer.add_file(root_dir.join(readme), pyproject_dir.join(readme))?;
         }
-        if let Some(pyproject_toml::License::Table {
-            file: Some(license),
-            text: None,
-        }) = project.license.as_ref()
-        {
-            writer.add_file(root_dir.join(license), pyproject_dir.join(license))?;
+        if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
+            writer.add_file(root_dir.join(file), pyproject_dir.join(file))?;
         }
     }
 

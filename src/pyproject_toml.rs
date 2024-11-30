@@ -97,11 +97,48 @@ impl GlobPattern {
 pub struct CargoTarget {
     /// Name as given in the `Cargo.toml` or generated from the file name
     pub name: String,
-    /// Kind of target ("bin", "lib")
-    pub kind: Option<String>,
+    /// Kind of target ("bin", "cdylib")
+    pub kind: Option<CargoCrateType>,
     // TODO: Add bindings option
     // Bridge model, which kind of bindings to use
     // pub bindings: Option<String>,
+}
+
+/// Supported cargo crate types
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum CargoCrateType {
+    /// Binary executable target
+    #[serde(rename = "bin")]
+    Bin,
+    /// Dynamic system library target
+    #[serde(rename = "cdylib")]
+    CDyLib,
+    /// Dynamic Rust library target
+    #[serde(rename = "dylib")]
+    DyLib,
+    /// Rust library
+    #[serde(rename = "lib")]
+    Lib,
+    /// Rust library for use as an intermediate target
+    #[serde(rename = "rlib")]
+    RLib,
+    /// Static library
+    #[serde(rename = "staticlib")]
+    StaticLib,
+}
+
+impl From<CargoCrateType> for cargo_metadata::CrateType {
+    fn from(value: CargoCrateType) -> Self {
+        match value {
+            CargoCrateType::Bin => cargo_metadata::CrateType::Bin,
+            CargoCrateType::CDyLib => cargo_metadata::CrateType::CDyLib,
+            CargoCrateType::DyLib => cargo_metadata::CrateType::DyLib,
+            CargoCrateType::Lib => cargo_metadata::CrateType::Lib,
+            CargoCrateType::RLib => cargo_metadata::CrateType::RLib,
+            CargoCrateType::StaticLib => cargo_metadata::CrateType::StaticLib,
+        }
+    }
 }
 
 /// Target configuration

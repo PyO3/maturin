@@ -231,6 +231,53 @@
         }
       ]
     },
+    "CargoCrateType": {
+      "description": "Supported cargo crate types",
+      "oneOf": [
+        {
+          "description": "Binary executable target",
+          "type": "string",
+          "enum": [
+            "bin"
+          ]
+        },
+        {
+          "description": "Dynamic system library target",
+          "type": "string",
+          "enum": [
+            "cdylib"
+          ]
+        },
+        {
+          "description": "Dynamic Rust library target",
+          "type": "string",
+          "enum": [
+            "dylib"
+          ]
+        },
+        {
+          "description": "Rust library",
+          "type": "string",
+          "enum": [
+            "lib"
+          ]
+        },
+        {
+          "description": "Rust library for use as an intermediate target",
+          "type": "string",
+          "enum": [
+            "rlib"
+          ]
+        },
+        {
+          "description": "Static library",
+          "type": "string",
+          "enum": [
+            "staticlib"
+          ]
+        }
+      ]
+    },
     "CargoTarget": {
       "description": "Cargo compile target",
       "type": "object",
@@ -239,10 +286,14 @@
       ],
       "properties": {
         "kind": {
-          "description": "Kind of target (\"bin\", \"lib\")",
-          "type": [
-            "string",
-            "null"
+          "description": "Kind of target (\"bin\", \"cdylib\")",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CargoCrateType"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "name": {

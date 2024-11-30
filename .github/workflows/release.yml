@@ -161,6 +161,7 @@ jobs:
           - target: "powerpc64le-unknown-linux-musl"
             image: "rust-musl-cross:powerpc64le-musl"
             compatibility: "manylinux2014 musllinux_1_1"
+            lto: "off"
           - target: "s390x-unknown-linux-gnu"
             image: "manylinux2014-cross:s390x"
             compatibility: "manylinux2014"
@@ -169,7 +170,7 @@ jobs:
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
-        CARGO_PROFILE_RELEASE_LTO: "fat"
+        CARGO_PROFILE_RELEASE_LTO: "${{ matrix.platform.lto || 'fat' }}"
     steps:
       - uses: actions/checkout@v4
       # powerpc64le-unknown-linux-musl doesn't have official std library release

@@ -27,10 +27,12 @@ pub fn test_integration(
     maybe_mock_cargo();
 
     // Pass CARGO_BIN_EXE_maturin for testing purpose
-    env::set_var(
-        "CARGO_BIN_EXE_cargo-zigbuild",
-        env!("CARGO_BIN_EXE_maturin"),
-    );
+    unsafe {
+        env::set_var(
+            "CARGO_BIN_EXE_cargo-zigbuild",
+            env!("CARGO_BIN_EXE_maturin"),
+        )
+    };
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 

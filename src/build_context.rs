@@ -499,16 +499,16 @@ impl BuildContext {
             // macOS
             (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
                 let ((x86_64_major, x86_64_minor), (arm64_major, arm64_minor)) = macosx_deployment_target(env::var("MACOSX_DEPLOYMENT_TARGET").ok().as_deref(), self.universal2)?;
-                let x86_64_tag = if let Some(deployment_target) = self.pyproject_toml.as_ref().and_then(|x| x.target_config("x86_64-apple-darwin")).and_then(|config| config.macos_deployment_target.as_ref()) {
+                let x86_64_tag = match self.pyproject_toml.as_ref().and_then(|x| x.target_config("x86_64-apple-darwin")).and_then(|config| config.macos_deployment_target.as_ref()) { Some(deployment_target) => {
                     deployment_target.replace('.', "_")
-                } else {
+                } _ => {
                     format!("{x86_64_major}_{x86_64_minor}")
-                };
-                let arm64_tag = if let Some(deployment_target) = self.pyproject_toml.as_ref().and_then(|x| x.target_config("aarch64-apple-darwin")).and_then(|config| config.macos_deployment_target.as_ref()) {
+                }};
+                let arm64_tag = match self.pyproject_toml.as_ref().and_then(|x| x.target_config("aarch64-apple-darwin")).and_then(|config| config.macos_deployment_target.as_ref()) { Some(deployment_target) => {
                     deployment_target.replace('.', "_")
-                } else {
+                } _ => {
                     format!("{arm64_major}_{arm64_minor}")
-                };
+                }};
                 if self.universal2 {
                     format!(
                         "macosx_{x86_64_tag}_x86_64.macosx_{arm64_tag}_arm64.macosx_{x86_64_tag}_universal2"

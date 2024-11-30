@@ -1286,12 +1286,12 @@ mod tests {
 
     #[test]
     fn test_generate_github_zig_pytest() {
-        let gen = GenerateCI {
+        let r#gen = GenerateCI {
             zig: true,
             pytest: true,
             ..Default::default()
         };
-        let conf = gen
+        let conf = r#gen
             .generate_github(
                 "example",
                 &BridgeModel::Bindings(Bindings {

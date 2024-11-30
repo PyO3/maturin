@@ -238,15 +238,17 @@ impl BuildOptions {
                         let host_python = &host_interpreters[0];
                         eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
-                        env::set_var("PYO3_PYTHON", &host_python.executable);
+                        unsafe { env::set_var("PYO3_PYTHON", &host_python.executable) };
                         // rust-cpython, and legacy pyo3 versions
-                        env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
+                        unsafe { env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable) };
 
                         let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
-                        env::set_var(
-                            "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
-                            sysconfig_path.parent().unwrap(),
-                        );
+                        unsafe {
+                            env::set_var(
+                                "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
+                                sysconfig_path.parent().unwrap(),
+                            )
+                        };
 
                         let sysconfig_data = parse_sysconfigdata(host_python, sysconfig_path)?;
                         let major = sysconfig_data

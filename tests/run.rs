@@ -931,7 +931,7 @@ fn abi3_python_interpreter_args() {
 
 #[test]
 fn pyo3_source_date_epoch() {
-    env::set_var("SOURCE_DATE_EPOCH", "0");
+    unsafe { env::set_var("SOURCE_DATE_EPOCH", "0") };
     handle_result(other::check_wheel_mtimes(
         "test-crates/pyo3-mixed-include-exclude",
         vec![datetime!(1980-01-01 0:00 UTC)],

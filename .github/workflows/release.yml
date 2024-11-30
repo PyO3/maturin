@@ -57,6 +57,8 @@ jobs:
             os: windows-latest
             name: maturin-aarch64-pc-windows-msvc.zip
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "fat"
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
       - uses: actions/checkout@v4
@@ -167,6 +169,7 @@ jobs:
       env:
         RUSTUP_HOME: /root/.rustup
         CARGO_HOME: /root/.cargo
+        CARGO_PROFILE_RELEASE_LTO: "fat"
     steps:
       - uses: actions/checkout@v4
       # powerpc64le-unknown-linux-musl doesn't have official std library release

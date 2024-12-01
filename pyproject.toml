@@ -42,7 +42,7 @@ packages = ["maturin"]
 bindings = "bin"
 
 [tool.black]
-target_version = ['py37']
+target-version = ['py37']
 extend-exclude = '''
 # Ignore cargo-generate templates
 ^/src/templates

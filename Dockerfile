@@ -39,7 +39,7 @@ FROM base-$TARGETARCH
 
 ENV PATH=/root/.cargo/bin:$PATH
 # Add all supported python versions
-ENV PATH=/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin:/opt/python/cp310-cp310/bin:/opt/python/cp311-cp311/bin:/opt/python/cp312-cp312/bin:$PATH
+ENV PATH=/opt/python/cp39-cp39/bin:/opt/python/cp310-cp310/bin:/opt/python/cp311-cp311/bin:/opt/python/cp312-cp312/bin:/opt/python/cp313-cp313/bin/:/opt/python/cp313-cp313t/bin/:$PATH
 # Otherwise `cargo new` errors
 ENV USER=root
 

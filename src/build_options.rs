@@ -27,14 +27,8 @@ const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
 fn pyo3_minimum_python_minor_version(major_version: u64, minor_version: u64) -> Option<usize> {
     if (major_version, minor_version) >= (0, 16) {
         Some(7)
-    } else {
-        None
-    }
-}
-
-fn pyo3_ffi_minimum_python_minor_version(major_version: u64, minor_version: u64) -> Option<usize> {
-    if (major_version, minor_version) >= (0, 16) {
-        pyo3_minimum_python_minor_version(major_version, minor_version)
+    } else if (major_version, minor_version) >= (0, 23) {
+        Some(8)
     } else {
         None
     }
@@ -1025,8 +1019,8 @@ fn find_bindings(
         Some(("pyo3".to_string(), minor))
     } else if deps.get("pyo3-ffi").is_some() {
         let ver = &packages["pyo3-ffi"].version;
-        let minor = pyo3_ffi_minimum_python_minor_version(ver.major, ver.minor)
-            .unwrap_or(MINIMUM_PYTHON_MINOR);
+        let minor =
+            pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
         Some(("pyo3-ffi".to_string(), minor))
     } else if deps.contains_key("uniffi") {
         Some(("uniffi".to_string(), MINIMUM_PYTHON_MINOR))

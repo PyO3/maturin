@@ -6,6 +6,7 @@ use crate::BuildOptions;
 use crate::PlatformTag;
 use crate::PythonInterpreter;
 use crate::Target;
+use anyhow::ensure;
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_options::heading;
 use fs_err as fs;
@@ -30,6 +31,13 @@ enum InstallBackend {
 }
 
 impl InstallBackend {
+    fn name(&self) -> &'static str {
+        match self {
+            InstallBackend::Pip { .. } => "pip",
+            InstallBackend::Uv { .. } => "uv pip",
+        }
+    }
+
     fn is_pip(&self) -> bool {
         matches!(self, InstallBackend::Pip { .. })
     }
@@ -69,6 +77,24 @@ fn find_uv_bin() -> Result<(PathBuf, Vec<&'static str>)> {
         Ok((PathBuf::from("uv"), Vec::new()))
     } else {
         bail!("`uv --version` failed with status: {}", output.status);
+    }
+}
+
+fn check_pip_exists(python_path: &Path, pip_path: Option<&PathBuf>) -> Result<()> {
+    let output = if let Some(pip_path) = pip_path {
+        Command::new(pip_path).args(["--version"]).output()?
+    } else {
+        Command::new(python_path)
+            .args(["-m", "pip", "--version"])
+            .output()?
+    };
+    if output.status.success() {
+        let version_str =
+            str::from_utf8(&output.stdout).context("`pip --version` didn't return utf8 output")?;
+        debug!(version = %version_str, "Found pip");
+        Ok(())
+    } else {
+        bail!("`pip --version` failed with status: {}", output.status);
     }
 }
 
@@ -185,12 +211,11 @@ fn install_dependencies(
 }
 
 #[instrument(skip_all, fields(wheel_filename = %wheel_filename.display()))]
-fn pip_install_wheel(
+fn install_wheel(
     build_context: &BuildContext,
     python: &Path,
     venv_dir: &Path,
     wheel_filename: &Path,
-    pip_path: Option<PathBuf>,
     install_backend: &InstallBackend,
 ) -> Result<()> {
     let mut cmd = install_backend.make_command(python);
@@ -199,13 +224,15 @@ fn pip_install_wheel(
         .arg(dunce::simplified(wheel_filename))
         .output()
         .context(format!(
-            "pip install failed (ran {:?} with {:?})",
+            "{} install failed (ran {:?} with {:?})",
+            install_backend.name(),
             cmd.get_program(),
             &cmd.get_args().collect::<Vec<_>>(),
         ))?;
     if !output.status.success() {
         bail!(
-            "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            "{} install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            install_backend.name(),
             venv_dir.display(),
             &cmd.get_args().collect::<Vec<_>>(),
             output.status,
@@ -221,17 +248,11 @@ fn pip_install_wheel(
             String::from_utf8_lossy(&output.stderr).trim(),
         );
     }
-    // pip show --files is not supported by uv, thus
-    // default to using pip backend all the time
-    fix_direct_url(
-        build_context,
-        python,
-        &InstallBackend::Pip { path: pip_path },
-    )?;
+    fix_direct_url(build_context, python, install_backend)?;
     Ok(())
 }
 
-/// Each editable-installed python package has a direct_url.json file that includes a file:// URL
+/// Each editable-installed python package has a `direct_url.json` file that includes a `file://` URL
 /// indicating the location of the source code of that project. The maturin import hook uses this
 /// URL to locate and rebuild editable-installed projects.
 ///
@@ -246,15 +267,10 @@ fn fix_direct_url(
 ) -> Result<()> {
     println!("✏️  Setting installed package as editable");
     let mut cmd = install_backend.make_command(python);
-    let output = cmd
-        .args(["show", "--files"])
-        .arg(&build_context.metadata23.name)
-        .output()
-        .context(format!(
-            "pip show failed (ran {:?} with {:?})",
-            cmd.get_program(),
-            &cmd.get_args().collect::<Vec<_>>(),
-        ))?;
+    let cmd = cmd.args(["show", "--files", &build_context.metadata23.name]);
+    debug!("running {:?}", cmd);
+    let output = cmd.output()?;
+    ensure!(output.status.success(), "failed to list package files");
     if let Some(direct_url_path) = parse_direct_url_path(&String::from_utf8_lossy(&output.stdout))?
     {
         let project_dir = build_context
@@ -353,6 +369,8 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             args: uv_args,
         }
     } else {
+        check_pip_exists(&interpreter.executable, pip_path.as_ref())
+            .context("Failed to find pip (if working with a uv venv try `maturin develop --uv`)")?;
         InstallBackend::Pip {
             path: pip_path.clone(),
         }
@@ -363,12 +381,11 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let wheels = build_context.build_wheels()?;
     if !skip_install {
         for (filename, _supported_version) in wheels.iter() {
-            pip_install_wheel(
+            install_wheel(
                 &build_context,
                 &python,
                 venv_dir,
                 filename,
-                pip_path.clone(),
                 &install_backend,
             )?;
             eprintln!(

@@ -1029,6 +1029,7 @@ fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
 fn generate_uniffi_bindings(
     crate_dir: &Path,
     target_dir: &Path,
+    module_name: &str,
     target_os: Os,
     artifact: &Path,
 ) -> Result<UniFfiBindings> {
@@ -1038,6 +1039,7 @@ fn generate_uniffi_bindings(
         .normalize()?
         .join("maturin")
         .join("uniffi")
+        .join(module_name)
         .into_path_buf();
     fs::create_dir_all(&binding_dir)?;
 
@@ -1154,7 +1156,7 @@ pub fn write_uniffi_module(
         names: binding_names,
         cdylib,
         path: binding_dir,
-    } = generate_uniffi_bindings(crate_dir, target_dir, target_os, artifact)?;
+    } = generate_uniffi_bindings(crate_dir, target_dir, module_name, target_os, artifact)?;
 
     let py_init = binding_names
         .iter()

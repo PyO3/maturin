@@ -629,7 +629,7 @@ jobs:\n",
         }
         conf.push_str(
             r#"      - name: Publish to PyPI
-        if: "startsWith(github.ref, 'refs/tags/')"
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -855,7 +855,7 @@ mod tests {
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
-                    if: "startsWith(github.ref, 'refs/tags/')"
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1055,7 +1055,7 @@ mod tests {
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
-                    if: "startsWith(github.ref, 'refs/tags/')"
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1252,7 +1252,7 @@ mod tests {
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Publish to PyPI
-                    if: "startsWith(github.ref, 'refs/tags/')"
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1526,7 +1526,7 @@ mod tests {
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
-                    if: "startsWith(github.ref, 'refs/tags/')"
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -1702,7 +1702,7 @@ mod tests {
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
-                    if: "startsWith(github.ref, 'refs/tags/')"
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
                     uses: PyO3/maturin-action@v1
                     env:
                       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

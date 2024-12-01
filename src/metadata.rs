@@ -3,7 +3,9 @@ use anyhow::{bail, format_err, Context, Result};
 use fs_err as fs;
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
-use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue, Requirement};
+use pep508_rs::{
+    ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
+};
 use pyproject_toml::License;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -309,16 +311,14 @@ impl Metadata24 {
                     for dep in deps {
                         let mut dep = dep.clone();
                         // Keep in sync with `develop()`!
-                        let new_extra = MarkerTree::Expression(MarkerExpression {
-                            l_value: MarkerValue::Extra,
-                            operator: MarkerOperator::Equal,
-                            r_value: MarkerValue::QuotedString(extra.to_string()),
-                        });
-                        if let Some(existing) = dep.marker.take() {
-                            dep.marker = Some(MarkerTree::And(vec![existing, new_extra]));
-                        } else {
-                            dep.marker = Some(new_extra);
-                        }
+                        let new_extra = MarkerExpression::Extra {
+                            operator: ExtraOperator::Equal,
+                            name: MarkerValueExtra::Extra(
+                                ExtraName::new(extra.clone())
+                                    .with_context(|| format!("invalid extra name: {extra}"))?,
+                            ),
+                        };
+                        dep.marker.and(MarkerTree::expression(new_extra));
                         self.requires_dist.push(dep);
                     }
                 }

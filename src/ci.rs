@@ -175,7 +175,7 @@ impl GenerateCI {
             || matches!(
                 bridge_model,
                 BridgeModel::Bin(Some(_))
-                    | BridgeModel::Bindings(..)
+                    | BridgeModel::Bindings { .. }
                     | BridgeModel::BindingsAbi3(..)
                     | BridgeModel::Cffi
                     | BridgeModel::UniFfi
@@ -665,15 +665,19 @@ jobs:\n",
 #[cfg(test)]
 mod tests {
     use super::GenerateCI;
-    use crate::BridgeModel;
+    use crate::{Bindings, BridgeModel};
     use expect_test::expect;
+    use semver::Version;
 
     #[test]
     fn test_generate_github() {
         let conf = GenerateCI::default()
             .generate_github(
                 "example",
-                &BridgeModel::Bindings("pyo3".to_string(), 7),
+                &BridgeModel::Bindings(Bindings {
+                    name: "pyo3".to_string(),
+                    version: Version::new(0, 23, 0),
+                }),
                 true,
             )
             .unwrap()
@@ -1268,7 +1272,10 @@ mod tests {
         let conf = gen
             .generate_github(
                 "example",
-                &BridgeModel::Bindings("pyo3".to_string(), 7),
+                &BridgeModel::Bindings(Bindings {
+                    name: "pyo3".to_string(),
+                    version: Version::new(0, 23, 0),
+                }),
                 true,
             )
             .unwrap()

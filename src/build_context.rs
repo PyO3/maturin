@@ -32,16 +32,22 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tracing::instrument;
 
+/// The name and version of the bindings crate
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Bindings {
+    /// The name of the bindings crate, `pyo3`, `rust-cpython` or `uniffi`
+    pub name: String,
+    /// bindings crate version
+    pub version: semver::Version,
+}
+
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BridgeModel {
     /// A rust binary to be shipped a python package
-    /// The String is the name of the bindings
-    /// providing crate, e.g. pyo3, the number is the minimum minor python version
-    Bin(Option<(String, usize)>),
-    /// A native module with pyo3 or rust-cpython bindings. The String is the name of the bindings
-    /// providing crate, e.g. pyo3, the number is the minimum minor python version
-    Bindings(String, usize),
+    Bin(Option<Bindings>),
+    /// A native module with pyo3 or rust-cpython bindings.
+    Bindings(Bindings),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
     /// for all cpython versions (pypy & graalpy still need multiple versions).
     /// The numbers are the minimum major and minor version
@@ -56,7 +62,7 @@ impl BridgeModel {
     /// Returns the name of the bindings crate
     pub fn unwrap_bindings(&self) -> &str {
         match self {
-            BridgeModel::Bindings(value, _) => value,
+            BridgeModel::Bindings(bindings) => &bindings.name,
             _ => panic!("Expected Bindings"),
         }
     }
@@ -64,8 +70,8 @@ impl BridgeModel {
     /// Test whether this is using a specific bindings crate
     pub fn is_bindings(&self, name: &str) -> bool {
         match self {
-            BridgeModel::Bin(Some((value, _))) => value == name,
-            BridgeModel::Bindings(value, _) => value == name,
+            BridgeModel::Bin(Some(bindings)) => bindings.name == name,
+            BridgeModel::Bindings(bindings) => bindings.name == name,
             _ => false,
         }
     }
@@ -79,9 +85,9 @@ impl BridgeModel {
 impl Display for BridgeModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            BridgeModel::Bin(Some((name, _))) => write!(f, "{name} bin"),
+            BridgeModel::Bin(Some(bindings)) => write!(f, "{} bin", bindings.name),
             BridgeModel::Bin(None) => write!(f, "bin"),
-            BridgeModel::Bindings(name, _) => write!(f, "{name}"),
+            BridgeModel::Bindings(bindings) => write!(f, "{}", bindings.name),
             BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
@@ -210,7 +216,7 @@ impl BuildContext {
         let wheels = match self.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
-            BridgeModel::Bindings(..) => self.build_binding_wheels(&self.interpreter)?,
+            BridgeModel::Bindings { .. } => self.build_binding_wheels(&self.interpreter)?,
             BridgeModel::BindingsAbi3(major, minor) => {
                 let abi3_interps: Vec<_> = self
                     .interpreter

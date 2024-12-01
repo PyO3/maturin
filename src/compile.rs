@@ -199,7 +199,7 @@ fn cargo_build_command(
         }
         BridgeModel::Cffi
         | BridgeModel::UniFfi
-        | BridgeModel::Bindings(..)
+        | BridgeModel::Bindings { .. }
         | BridgeModel::BindingsAbi3(..) => {
             cargo_rustc.lib = true;
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
@@ -220,7 +220,7 @@ fn cargo_build_command(
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
-        if let BridgeModel::Bindings(..) | BridgeModel::BindingsAbi3(..) = bridge_model {
+        if let BridgeModel::Bindings { .. } | BridgeModel::BindingsAbi3(..) = bridge_model {
             // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
             // non-existent library.
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail

@@ -4,8 +4,8 @@ use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
-use crate::python_interpreter::{InterpreterConfig, InterpreterKind, MINIMUM_PYTHON_MINOR};
-use crate::{BuildContext, PythonInterpreter, Target};
+use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
+use crate::{Bindings, BuildContext, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, TargetKind};
 use cargo_metadata::{Metadata, Node};
@@ -23,16 +23,6 @@ use tracing::{debug, instrument};
 // as one or the other in logs. pyo3-ffi is ordered first because it is newer
 // and more restrictive.
 const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
-
-fn pyo3_minimum_python_minor_version(major_version: u64, minor_version: u64) -> Option<usize> {
-    if (major_version, minor_version) >= (0, 16) {
-        Some(7)
-    } else if (major_version, minor_version) >= (0, 23) {
-        Some(8)
-    } else {
-        None
-    }
-}
 
 /// Cargo options for the build process
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
@@ -227,7 +217,12 @@ impl BuildOptions {
         generate_import_lib: bool,
     ) -> Result<Vec<PythonInterpreter>> {
         match bridge {
-            BridgeModel::Bindings(binding_name, _) | BridgeModel::Bin(Some((binding_name, _))) => {
+            BridgeModel::Bindings(Bindings {
+                name: binding_name, ..
+            })
+            | BridgeModel::Bin(Some(Bindings {
+                name: binding_name, ..
+            })) => {
                 let mut interpreters = Vec::new();
                 if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
                     if !binding_name.starts_with("pyo3") {
@@ -1011,19 +1006,25 @@ fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
 fn find_bindings(
     deps: &HashMap<&str, &Node>,
     packages: &HashMap<&str, &cargo_metadata::Package>,
-) -> Option<(String, usize)> {
+) -> Option<Bindings> {
     if deps.get("pyo3").is_some() {
-        let ver = &packages["pyo3"].version;
-        let minor =
-            pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
-        Some(("pyo3".to_string(), minor))
+        let version = packages["pyo3"].version.clone();
+        Some(Bindings {
+            name: "pyo3".to_string(),
+            version,
+        })
     } else if deps.get("pyo3-ffi").is_some() {
-        let ver = &packages["pyo3-ffi"].version;
-        let minor =
-            pyo3_minimum_python_minor_version(ver.major, ver.minor).unwrap_or(MINIMUM_PYTHON_MINOR);
-        Some(("pyo3-ffi".to_string(), minor))
+        let version = packages["pyo3-ffi"].version.clone();
+        Some(Bindings {
+            name: "pyo3-ffi".to_string(),
+            version,
+        })
     } else if deps.contains_key("uniffi") {
-        Some(("uniffi".to_string(), MINIMUM_PYTHON_MINOR))
+        let version = packages["uniffi"].version.clone();
+        Some(Bindings {
+            name: "uniffi".to_string(),
+            version,
+        })
     } else {
         None
     }
@@ -1082,7 +1083,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else if bindings == "bin" {
             // uniffi bindings don't support bin
             let bindings =
-                find_bindings(&deps, &packages).filter(|(bindings, _)| bindings != "uniffi");
+                find_bindings(&deps, &packages).filter(|bindings| bindings.name != "uniffi");
             BridgeModel::Bin(bindings)
         } else {
             if !deps.contains_key(bindings) {
@@ -1092,20 +1093,24 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 );
             }
 
-            BridgeModel::Bindings(bindings.to_string(), MINIMUM_PYTHON_MINOR)
+            let version = packages[bindings].version.clone();
+            BridgeModel::Bindings(Bindings {
+                name: bindings.to_string(),
+                version,
+            })
         }
-    } else if let Some((bindings, minor)) = find_bindings(&deps, &packages) {
+    } else if let Some(bindings) = find_bindings(&deps, &packages) {
         if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
-            if bindings == "uniffi" {
+            if bindings.name == "uniffi" {
                 // uniffi bindings don't support bin
                 BridgeModel::Bin(None)
             } else {
-                BridgeModel::Bin(Some((bindings, minor)))
+                BridgeModel::Bin(Some(bindings))
             }
-        } else if bindings == "uniffi" {
+        } else if bindings.name == "uniffi" {
             BridgeModel::UniFfi
         } else {
-            BridgeModel::Bindings(bindings, minor)
+            BridgeModel::Bindings(bindings)
         }
     } else if targets.contains(&CrateType::CDyLib) {
         BridgeModel::Cffi
@@ -1483,11 +1488,11 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_mixed, None),
-            Ok(BridgeModel::Bindings(..))
+            Ok(BridgeModel::Bindings { .. })
         ));
         assert!(matches!(
             find_bridge(&pyo3_mixed, Some("pyo3")),
-            Ok(BridgeModel::Bindings(..))
+            Ok(BridgeModel::Bindings { .. })
         ));
     }
 
@@ -1525,7 +1530,7 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_pure, None).unwrap(),
-            BridgeModel::Bindings(..)
+            BridgeModel::Bindings { .. }
         ));
     }
 
@@ -1569,11 +1574,11 @@ mod test {
             .unwrap();
         assert!(matches!(
             find_bridge(&pyo3_bin, Some("bin")).unwrap(),
-            BridgeModel::Bin(Some((..)))
+            BridgeModel::Bin(Some(_))
         ));
         assert!(matches!(
             find_bridge(&pyo3_bin, None).unwrap(),
-            BridgeModel::Bin(Some(..))
+            BridgeModel::Bin(Some(_))
         ));
     }
 

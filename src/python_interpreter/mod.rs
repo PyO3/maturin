@@ -24,6 +24,16 @@ pub const MINIMUM_PYTHON_MINOR: usize = 7;
 pub const MAXIMUM_PYTHON_MINOR: usize = 13;
 pub const MAXIMUM_PYPY_MINOR: usize = 10;
 
+fn pyo3_minimum_python_minor_version(major_version: u64, minor_version: u64) -> usize {
+    if (major_version, minor_version) >= (0, 16) {
+        7
+    } else if (major_version, minor_version) >= (0, 23) {
+        8
+    } else {
+        MINIMUM_PYTHON_MINOR
+    }
+}
+
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
     major: usize,
@@ -759,7 +769,10 @@ impl PythonInterpreter {
         requires_python: Option<&VersionSpecifiers>,
     ) -> Result<Vec<PythonInterpreter>> {
         let min_python_minor = match bridge {
-            BridgeModel::Bindings(_, minor) | BridgeModel::Bin(Some((_, minor))) => *minor,
+            BridgeModel::Bindings(bindings) | BridgeModel::Bin(Some(bindings)) => {
+                let version = &bindings.version;
+                pyo3_minimum_python_minor_version(version.major, version.minor)
+            }
             _ => MINIMUM_PYTHON_MINOR,
         };
         let executables = if target.is_windows() {

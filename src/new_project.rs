@@ -1,11 +1,12 @@
 use self::package_name_validations::{cargo_check_name, pypi_check_name};
 use crate::ci::GenerateCI;
-use crate::BridgeModel;
+use crate::{Bindings, BridgeModel};
 use anyhow::{bail, Context, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
 use fs_err as fs;
 use minijinja::{context, Environment};
+use semver::Version;
 use std::path::Path;
 
 /// Mixed Rust/Python project layout
@@ -25,7 +26,7 @@ struct ProjectGenerator<'a> {
     overwrite: bool,
 }
 
-impl<'a> ProjectGenerator<'a> {
+impl ProjectGenerator<'_> {
     fn new(
         project_name: String,
         layout: ProjectLayout,
@@ -52,7 +53,10 @@ impl<'a> ProjectGenerator<'a> {
             "bin" => BridgeModel::Bin(None),
             "cffi" => BridgeModel::Cffi,
             "uniffi" => BridgeModel::UniFfi,
-            _ => BridgeModel::Bindings(bindings.clone(), 7),
+            _ => BridgeModel::Bindings(Bindings {
+                name: bindings.clone(),
+                version: Version::new(0, 23, 1),
+            }),
         };
         let ci_config =
             GenerateCI::default().generate_github(&project_name, &bridge_model, true)?;

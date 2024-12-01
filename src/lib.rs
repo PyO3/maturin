@@ -23,7 +23,7 @@
 
 #![deny(missing_docs)]
 
-pub use crate::build_context::{BridgeModel, BuildContext, BuiltWheelMetadata};
+pub use crate::build_context::{Bindings, BridgeModel, BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::{BuildOptions, CargoOptions};
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{compile, BuildArtifact};

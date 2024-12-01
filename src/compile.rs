@@ -287,7 +287,9 @@ fn cargo_build_command(
             .extend(["-C".to_string(), "strip=symbols".to_string()]);
     }
 
-    let mut build_command = if target.is_msvc() && target.cross_compiling() {
+    let mut build_command = if target.is_msvc()
+        && (target.cross_compiling() || env::var("MATURIN_USE_XWIN").ok().as_deref() == Some("1"))
+    {
         #[cfg(feature = "xwin")]
         {
             println!("🛠️ Using xwin for cross-compiling to {target_triple}");

@@ -34,5 +34,6 @@ See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/referenc
 * `SOURCE_DATE_EPOCH`: The time to use for the timestamp in the wheel metadata
 * `MATURIN_EMSCRIPTEN_VERSION`: The version of emscripten to use for emscripten builds
 * `MATURIN_NO_MISSING_BUILD_BACKEND_WARNING`: Suppress missing build backend warning
+* `MATURIN_USE_XWIN`: Set to `1` to force to use `xwin` for cross compiling even on Windows that supports native compilation
 * `TARGET_SYSROOT`: The sysroot to use for auditwheel wheel when cross compiling
 * `ARCHFLAGS`: Flags to control the architecture of the build on macOS, for example you can use `ARCHFLAGS="-arch x86_64 -arch arm64"` to build universal2 wheels

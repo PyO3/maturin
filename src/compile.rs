@@ -287,9 +287,12 @@ fn cargo_build_command(
             .extend(["-C".to_string(), "strip=symbols".to_string()]);
     }
 
-    let mut build_command = if target.is_msvc() && target.cross_compiling() {
+    let mut build_command = if target.is_msvc()
+        && (target.cross_compiling() || env::var("MATURIN_USE_XWIN").ok().as_deref() == Some("1"))
+    {
         #[cfg(feature = "xwin")]
         {
+            println!("🛠️ Using xwin for cross-compiling to {target_triple}");
             let xwin_options = {
                 use clap::Parser;
 
@@ -320,6 +323,7 @@ fn cargo_build_command(
                     build.target = vec![target_triple.to_string()];
                 }
             } else {
+                println!("🛠️ Using zig for cross-compiling to {target_triple}");
                 build.enable_zig_ar = true;
                 let zig_triple = if target.is_linux() && !target.is_musl_libc() {
                     match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {

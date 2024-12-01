@@ -27,6 +27,21 @@ pub fn is_cross_compiling(target: &Target) -> Result<bool> {
         // Not cross-compiling to compile for 32-bit Python from windows 64-bit
         return Ok(false);
     }
+    if (target_triple == "aarch64-pc-windows-msvc" && host == "x86_64-pc-windows-msvc")
+        || (target_triple == "x86_64-pc-windows-msvc" && host == "aarch64-pc-windows-msvc")
+    {
+        // Not cross-compiling if the Windows MSVC compiler can compile to the target
+        let native_compile = cc::Build::new()
+            .opt_level(0)
+            .host(host)
+            .target(target_triple)
+            .cargo_metadata(false)
+            .cargo_warnings(false)
+            .cargo_output(false)
+            .try_get_compiler()
+            .is_ok();
+        return Ok(!native_compile);
+    }
     if target_triple.ends_with("windows-gnu") && host.ends_with("windows-msvc") {
         // Not cross-compiling to compile for Windows GNU from Windows MSVC host
         return Ok(false);

@@ -314,8 +314,12 @@ impl BuildOptions {
                                 bail!("{} is not a valid python interpreter", interp.display());
                             }
                         }
-                        interpreters =
-                            find_interpreter_in_sysconfig(interpreter, target, requires_python)?;
+                        interpreters = find_interpreter_in_sysconfig(
+                            bridge,
+                            interpreter,
+                            target,
+                            requires_python,
+                        )?;
                         if interpreters.is_empty() {
                             bail!(
                                 "Couldn't find any python interpreters from '{}'. Please check that both major and minor python version have been specified in -i/--interpreter.",
@@ -361,7 +365,7 @@ impl BuildOptions {
                             }
 
                             let interps =
-                                find_interpreter_in_sysconfig(interpreter, target, requires_python)
+                                find_interpreter_in_sysconfig(bridge,interpreter, target, requires_python)
                                     .unwrap_or_default();
                             if interps.is_empty() && !self.interpreter.is_empty() {
                                 // Print error when user supplied `--interpreter` option
@@ -466,6 +470,7 @@ impl BuildOptions {
                         // we cannot use host pypy so switch to bundled sysconfig instead
                         if !pypys.is_empty() {
                             interps.extend(find_interpreter_in_sysconfig(
+                                bridge,
                                 &pypys,
                                 target,
                                 requires_python,
@@ -1195,7 +1200,7 @@ fn find_interpreter(
         }
         if !missing.is_empty() {
             let sysconfig_interps =
-                find_interpreter_in_sysconfig(&missing, target, requires_python)?;
+                find_interpreter_in_sysconfig(bridge, &missing, target, requires_python)?;
             found_interpreters.extend(sysconfig_interps);
         }
     } else {
@@ -1251,12 +1256,17 @@ fn find_interpreter_in_host(
 
 /// Find python interpreters in the bundled sysconfig
 fn find_interpreter_in_sysconfig(
+    bridge: &BridgeModel,
     interpreter: &[PathBuf],
     target: &Target,
     requires_python: Option<&VersionSpecifiers>,
 ) -> Result<Vec<PythonInterpreter>> {
     if interpreter.is_empty() {
-        return Ok(PythonInterpreter::find_by_target(target, requires_python));
+        return Ok(PythonInterpreter::find_by_target(
+            target,
+            requires_python,
+            Some(bridge),
+        ));
     }
     let mut interpreters = Vec::new();
     for interp in interpreter {

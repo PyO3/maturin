@@ -1,4 +1,7 @@
-use super::{InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYTHON_MINOR};
+use super::{
+    InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
+    MINIMUM_PYTHON_MINOR,
+};
 use crate::target::{Arch, Os};
 use crate::Target;
 use anyhow::{format_err, Context, Result};
@@ -226,11 +229,19 @@ impl InterpreterConfig {
     /// Lookup wellknown sysconfigs for a given target
     pub fn lookup_target(target: &Target) -> Vec<Self> {
         let mut configs = Vec::new();
-        for (python_impl, max_minor_ver) in [
-            (InterpreterKind::CPython, MAXIMUM_PYTHON_MINOR),
-            (InterpreterKind::PyPy, MAXIMUM_PYPY_MINOR),
+        for (python_impl, min_minor_ver, max_minor_ver) in [
+            (
+                InterpreterKind::CPython,
+                MINIMUM_PYTHON_MINOR,
+                MAXIMUM_PYTHON_MINOR,
+            ),
+            (
+                InterpreterKind::PyPy,
+                MINIMUM_PYPY_MINOR,
+                MAXIMUM_PYPY_MINOR,
+            ),
         ] {
-            for minor in MINIMUM_PYTHON_MINOR..=max_minor_ver {
+            for minor in min_minor_ver..=max_minor_ver {
                 if let Some(config) = Self::lookup_one(target, python_impl, (3, minor), "") {
                     configs.push(config);
                 }

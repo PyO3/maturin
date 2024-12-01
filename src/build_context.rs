@@ -41,6 +41,50 @@ pub struct Bindings {
     pub version: semver::Version,
 }
 
+impl Bindings {
+    /// Returns the minimum python minor version supported
+    pub fn minimal_python_minor_version(&self) -> usize {
+        use crate::python_interpreter::MINIMUM_PYTHON_MINOR;
+
+        match self.name.as_str() {
+            "pyo3" | "pyo3-ffi" => {
+                let major_version = self.version.major;
+                let minor_version = self.version.minor;
+                // N.B. must check large minor versions first
+                if (major_version, minor_version) >= (0, 23) {
+                    8
+                } else if (major_version, minor_version) >= (0, 16) {
+                    7
+                } else {
+                    MINIMUM_PYTHON_MINOR
+                }
+            }
+            _ => MINIMUM_PYTHON_MINOR,
+        }
+    }
+
+    /// Returns the minimum PyPy minor version supported
+    pub fn minimal_pypy_minor_version(&self) -> usize {
+        use crate::python_interpreter::MINIMUM_PYPY_MINOR;
+
+        match self.name.as_str() {
+            "pyo3" | "pyo3-ffi" => {
+                let major_version = self.version.major;
+                let minor_version = self.version.minor;
+                // N.B. must check large minor versions first
+                if (major_version, minor_version) >= (0, 23) {
+                    9
+                } else if (major_version, minor_version) >= (0, 14) {
+                    7
+                } else {
+                    MINIMUM_PYPY_MINOR
+                }
+            }
+            _ => MINIMUM_PYPY_MINOR,
+        }
+    }
+}
+
 /// The way the rust code is used in the wheel
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BridgeModel {
@@ -59,8 +103,17 @@ pub enum BridgeModel {
 }
 
 impl BridgeModel {
+    /// Returns the bindings
+    pub fn bindings(&self) -> Option<&Bindings> {
+        match self {
+            BridgeModel::Bin(Some(bindings)) => Some(bindings),
+            BridgeModel::Bindings(bindings) => Some(bindings),
+            _ => None,
+        }
+    }
+
     /// Returns the name of the bindings crate
-    pub fn unwrap_bindings(&self) -> &str {
+    pub fn unwrap_bindings_name(&self) -> &str {
         match self {
             BridgeModel::Bindings(bindings) => &bindings.name,
             _ => panic!("Expected Bindings"),

@@ -20,19 +20,10 @@ mod config;
 /// version and abi as json through stdout
 const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py");
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
+pub const MINIMUM_PYPY_MINOR: usize = 8;
 /// Be liberal here to include preview versions
 pub const MAXIMUM_PYTHON_MINOR: usize = 13;
 pub const MAXIMUM_PYPY_MINOR: usize = 10;
-
-fn pyo3_minimum_python_minor_version(major_version: u64, minor_version: u64) -> usize {
-    if (major_version, minor_version) >= (0, 16) {
-        7
-    } else if (major_version, minor_version) >= (0, 23) {
-        8
-    } else {
-        MINIMUM_PYTHON_MINOR
-    }
-}
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -739,7 +730,15 @@ impl PythonInterpreter {
     pub fn find_by_target(
         target: &Target,
         requires_python: Option<&VersionSpecifiers>,
+        bridge: Option<&BridgeModel>,
     ) -> Vec<PythonInterpreter> {
+        let bindings = bridge.and_then(|bridge| bridge.bindings());
+        let min_python_minor = bindings
+            .map(|bindings| bindings.minimal_python_minor_version())
+            .unwrap_or(MINIMUM_PYTHON_MINOR);
+        let min_pypy_minor = bindings
+            .map(|bindings| bindings.minimal_pypy_minor_version())
+            .unwrap_or(MINIMUM_PYPY_MINOR);
         InterpreterConfig::lookup_target(target)
             .into_iter()
             .filter_map(|config| match requires_python {
@@ -753,6 +752,23 @@ impl PythonInterpreter {
                     }
                 }
                 None => Some(Self::from_config(config)),
+            })
+            .filter_map(|config| match config.interpreter_kind {
+                InterpreterKind::CPython => {
+                    if config.minor >= min_python_minor {
+                        Some(config)
+                    } else {
+                        None
+                    }
+                }
+                InterpreterKind::PyPy => {
+                    if config.minor >= min_pypy_minor {
+                        Some(config)
+                    } else {
+                        None
+                    }
+                }
+                InterpreterKind::GraalPy => Some(config),
             })
             .collect()
     }
@@ -770,12 +786,18 @@ impl PythonInterpreter {
     ) -> Result<Vec<PythonInterpreter>> {
         let min_python_minor = match bridge {
             BridgeModel::Bindings(bindings) | BridgeModel::Bin(Some(bindings)) => {
-                let version = &bindings.version;
-                pyo3_minimum_python_minor_version(version.major, version.minor)
+                bindings.minimal_python_minor_version()
             }
             _ => MINIMUM_PYTHON_MINOR,
         };
+        let min_pypy_minor = match bridge {
+            BridgeModel::Bindings(bindings) | BridgeModel::Bin(Some(bindings)) => {
+                bindings.minimal_pypy_minor_version()
+            }
+            _ => MINIMUM_PYPY_MINOR,
+        };
         let executables = if target.is_windows() {
+            // TOFIX: add PyPy support to Windows
             find_all_windows(target, min_python_minor, requires_python)?
         } else {
             let mut executables: Vec<String> = (min_python_minor..=MAXIMUM_PYTHON_MINOR)
@@ -794,7 +816,7 @@ impl PythonInterpreter {
                 || bridge.is_bindings("pyo3-ffi")
             {
                 executables.extend(
-                    (min_python_minor..=MAXIMUM_PYPY_MINOR)
+                    (min_pypy_minor..=MAXIMUM_PYPY_MINOR)
                         .filter(|minor| {
                             requires_python
                                 .map(|requires_python| {
@@ -1003,26 +1025,106 @@ fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::Bindings;
+    use expect_test::expect;
+
     use super::*;
 
     #[test]
     fn test_find_interpreter_by_target() {
         let target =
             Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
-        let pythons = PythonInterpreter::find_by_target(&target, None);
-        assert_eq!(pythons.len(), 12);
+        let pythons = PythonInterpreter::find_by_target(&target, None, None)
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let expected = expect![[r#"
+            [
+                "CPython 3.7m",
+                "CPython 3.8",
+                "CPython 3.9",
+                "CPython 3.10",
+                "CPython 3.11",
+                "CPython 3.12",
+                "CPython 3.13",
+                "CPython 3.13t",
+                "PyPy 3.8",
+                "PyPy 3.9",
+                "PyPy 3.10",
+            ]
+        "#]];
+        expected.assert_debug_eq(&pythons);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
-        );
-        assert_eq!(pythons.len(), 10);
+            None,
+        )
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+        let expected = expect![[r#"
+            [
+                "CPython 3.8",
+                "CPython 3.9",
+                "CPython 3.10",
+                "CPython 3.11",
+                "CPython 3.12",
+                "CPython 3.13",
+                "CPython 3.13t",
+                "PyPy 3.8",
+                "PyPy 3.9",
+                "PyPy 3.10",
+            ]
+        "#]];
+        expected.assert_debug_eq(&pythons);
 
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
-        );
-        assert_eq!(pythons.len(), 6);
+            None,
+        )
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+        let expected = expect![[r#"
+            [
+                "CPython 3.10",
+                "CPython 3.11",
+                "CPython 3.12",
+                "CPython 3.13",
+                "CPython 3.13t",
+                "PyPy 3.10",
+            ]
+        "#]];
+        expected.assert_debug_eq(&pythons);
+
+        let pythons = PythonInterpreter::find_by_target(
+            &target,
+            Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
+            Some(&BridgeModel::Bindings(Bindings {
+                name: "pyo3".to_string(),
+                version: semver::Version::new(0, 23, 0),
+            })),
+        )
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+        // should exclude PyPy < 3.9
+        let expected = expect![[r#"
+            [
+                "CPython 3.8",
+                "CPython 3.9",
+                "CPython 3.10",
+                "CPython 3.11",
+                "CPython 3.12",
+                "CPython 3.13",
+                "CPython 3.13t",
+                "PyPy 3.9",
+                "PyPy 3.10",
+            ]
+        "#]];
+        expected.assert_debug_eq(&pythons);
     }
 
     #[test]

@@ -425,7 +425,7 @@ fn run() -> Result<()> {
         Command::ListPython { target } => {
             let found = if target.is_some() {
                 let target = Target::from_target_triple(target)?;
-                PythonInterpreter::find_by_target(&target, None)
+                PythonInterpreter::find_by_target(&target, None, None)
             } else {
                 let target = Target::from_target_triple(None)?;
                 // We don't know the targeted bindings yet, so we use the most lenient

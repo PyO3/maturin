@@ -51,9 +51,7 @@ impl Bindings {
                 let major_version = self.version.major;
                 let minor_version = self.version.minor;
                 // N.B. must check large minor versions first
-                if (major_version, minor_version) >= (0, 23) {
-                    8
-                } else if (major_version, minor_version) >= (0, 16) {
+                if (major_version, minor_version) >= (0, 16) {
                     7
                 } else {
                     MINIMUM_PYTHON_MINOR

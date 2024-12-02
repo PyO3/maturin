@@ -1253,7 +1253,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "1.7.7-beta.1"
+version = "1.7.7"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

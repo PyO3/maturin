@@ -92,7 +92,7 @@ jobs:
           # remove -dev suffix
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v4
       - name: Install python packages
         run: |
           uv tool install virtualenv
@@ -256,7 +256,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v4
       - run: uv tool install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
@@ -427,7 +427,7 @@ jobs:
               - 'MANIFEST.in'
               - 'Cargo.toml'
               - '.github/workflows/test.yml'
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v4
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}

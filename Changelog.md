@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.7]
+
+* Fix abi3 interpreter discovery on Windows in [#2333](https://github.com/PyO3/maturin/pull/2333)
+* Normalize python source directory path in [#2343](https://github.com/PyO3/maturin/pull/2343)
+* Use different binding dirs for different uniffi modules in [#2348](https://github.com/PyO3/maturin/pull/2348)
+* Limit minimal PyPy version based on bindings crate version in [#2351](https://github.com/PyO3/maturin/pull/2351)
+* Do not use `xwin` to compile on Windows when MSVC compiler can build for the target in [#2353](https://github.com/PyO3/maturin/pull/2353)
+
 ## [1.7.6]
 
 * Set core metadata version to 2.4 to fix `project.license.files` handling in [#2332](https://github.com/PyO3/maturin/pull/2332)
@@ -1003,7 +1011,10 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.4...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.7...HEAD
+[1.7.7]: https://github.com/pyo3/maturin/compare/v1.7.6...v1.7.7
+[1.7.6]: https://github.com/pyo3/maturin/compare/v1.7.5...v1.7.6
+[1.7.5]: https://github.com/pyo3/maturin/compare/v1.7.4...v1.7.5
 [1.7.4]: https://github.com/pyo3/maturin/compare/v1.7.3...v1.7.4
 [1.7.3]: https://github.com/pyo3/maturin/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/pyo3/maturin/compare/v1.7.1...v1.7.2

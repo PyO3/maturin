@@ -1,11 +1,10 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::build_context::BridgeModel;
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
-use crate::{Bindings, BuildContext, PythonInterpreter, Target};
+use crate::{Bindings, BridgeModel, BuildContext, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, TargetKind};
 use cargo_metadata::{Metadata, Node};

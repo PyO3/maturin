@@ -23,7 +23,8 @@
 
 #![deny(missing_docs)]
 
-pub use crate::build_context::{Bindings, BridgeModel, BuildContext, BuiltWheelMetadata};
+pub use crate::bridge::{Bindings, BridgeModel};
+pub use crate::build_context::{BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::{BuildOptions, CargoOptions};
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{compile, BuildArtifact};
@@ -44,6 +45,7 @@ pub use crate::upload::{upload, upload_ui, PublishOpt, Registry, UploadError};
 pub use auditwheel::PlatformTag;
 
 mod auditwheel;
+mod bridge;
 mod build_context;
 mod build_options;
 mod cargo_toml;

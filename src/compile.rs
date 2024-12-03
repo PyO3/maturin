@@ -1,8 +1,7 @@
-use crate::build_context::BridgeModel;
 use crate::target::RUST_1_64_0;
 #[cfg(feature = "zig")]
 use crate::PlatformTag;
-use crate::{BuildContext, PythonInterpreter, Target};
+use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_metadata::CrateType;
 use fat_macho::FatWriter;

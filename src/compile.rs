@@ -287,24 +287,40 @@ fn cargo_build_command(
             .extend(["-C".to_string(), "strip=symbols".to_string()]);
     }
 
-    let mut build_command = if target.is_msvc()
-        && (target.cross_compiling() || env::var("MATURIN_USE_XWIN").ok().as_deref() == Some("1"))
-    {
+    let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
         {
-            println!("🛠️ Using xwin for cross-compiling to {target_triple}");
-            let xwin_options = {
-                use clap::Parser;
+            // Don't use xwin if the Windows MSVC compiler can compile to the target
+            let native_compile = cc::Build::new()
+                .opt_level(0)
+                .host(target.host_triple())
+                .target(target_triple)
+                .cargo_metadata(false)
+                .cargo_warnings(false)
+                .cargo_output(false)
+                .try_get_compiler()
+                .is_ok();
+            let force_xwin = env::var("MATURIN_USE_XWIN").ok().as_deref() == Some("1");
+            if !native_compile || force_xwin {
+                println!("🛠️ Using xwin for cross-compiling to {target_triple}");
+                let xwin_options = {
+                    use clap::Parser;
 
-                // This will populate the default values for the options
-                // and then override them with cargo-xwin environment variables.
-                cargo_xwin::XWinOptions::parse_from(Vec::<&str>::new())
-            };
+                    // This will populate the default values for the options
+                    // and then override them with cargo-xwin environment variables.
+                    cargo_xwin::XWinOptions::parse_from(Vec::<&str>::new())
+                };
 
-            let mut build = cargo_xwin::Rustc::from(cargo_rustc);
-            build.target = vec![target_triple.to_string()];
-            build.xwin = xwin_options;
-            build.build_command()?
+                let mut build = cargo_xwin::Rustc::from(cargo_rustc);
+                build.target = vec![target_triple.to_string()];
+                build.xwin = xwin_options;
+                build.build_command()?
+            } else {
+                if target.user_specified {
+                    cargo_rustc.target = vec![target_triple.to_string()];
+                }
+                cargo_rustc.command()
+            }
         }
         #[cfg(not(feature = "xwin"))]
         {

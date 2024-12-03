@@ -144,9 +144,9 @@ dependencies = [
 
 [[package]]
 name = "python3-dll-a"
-version = "0.2.9"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5f07cd4412be8fa09a721d40007c483981bbe072cd6a21f2e83e04ec8f8343f"
+checksum = "9b9e268ee1be609e93a13eb06839f68f67e5fe0fb4049834d261c2d5091c1b6d"
 dependencies = [
  "cc",
 ]

@@ -1,4 +1,4 @@
-use crate::module_writer::{add_data, ModuleWriter};
+use crate::module_writer::ModuleWriter;
 use crate::pyproject_toml::SdistGenerator;
 use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
 use anyhow::{bail, Context, Result};
@@ -811,7 +811,6 @@ pub fn source_distribution(
         metadata23.to_file_contents()?.as_bytes(),
     )?;
 
-    add_data(&mut writer, build_context.project_layout.data.as_deref())?;
     let source_distribution_path = writer.finish()?;
 
     eprintln!(

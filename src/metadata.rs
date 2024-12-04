@@ -3,7 +3,9 @@ use anyhow::{bail, format_err, Context, Result};
 use fs_err as fs;
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
-use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue, Requirement};
+use pep508_rs::{
+    ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
+};
 use pyproject_toml::License;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -185,18 +187,12 @@ impl Metadata23 {
             if let Some(license) = &project.license {
                 match license {
                     // TODO: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
-                    License::String(license_expr) => self.license = Some(license_expr.clone()),
-                    License::Table { file, text } => match (file, text) {
-                        (Some(_), Some(_)) => {
-                            bail!("file and text fields of 'project.license' are mutually-exclusive, only one of them should be specified");
-                        }
-                        (Some(license_path), None) => {
-                            let license_path = pyproject_dir.join(license_path);
-                            self.license_files.push(license_path);
-                        }
-                        (None, Some(license_text)) => self.license = Some(license_text.clone()),
-                        (None, None) => {}
-                    },
+                    License::Spdx(license_expr) => self.license = Some(license_expr.clone()),
+                    License::File { file } => {
+                        let license_path = pyproject_dir.join(file);
+                        self.license_files.push(license_path);
+                    }
+                    License::Text { text } => self.license = Some(text.clone()),
                 }
             }
 
@@ -228,15 +224,15 @@ impl Metadata23 {
                 let mut names = Vec::with_capacity(authors.len());
                 let mut emails = Vec::with_capacity(authors.len());
                 for author in authors {
-                    match (&author.name, &author.email) {
+                    match (author.name(), author.email()) {
                         (Some(name), Some(email)) => {
                             emails.push(escape_email_with_display_name(name, email));
                         }
                         (Some(name), None) => {
-                            names.push(name.as_str());
+                            names.push(name);
                         }
                         (None, Some(email)) => {
-                            emails.push(email.clone());
+                            emails.push(email.to_string());
                         }
                         (None, None) => {}
                     }
@@ -253,15 +249,15 @@ impl Metadata23 {
                 let mut names = Vec::with_capacity(maintainers.len());
                 let mut emails = Vec::with_capacity(maintainers.len());
                 for maintainer in maintainers {
-                    match (&maintainer.name, &maintainer.email) {
+                    match (maintainer.name(), maintainer.email()) {
                         (Some(name), Some(email)) => {
                             emails.push(escape_email_with_display_name(name, email));
                         }
                         (Some(name), None) => {
-                            names.push(name.as_str());
+                            names.push(name);
                         }
                         (None, Some(email)) => {
-                            emails.push(email.clone());
+                            emails.push(email.to_string());
                         }
                         (None, None) => {}
                     }
@@ -297,16 +293,14 @@ impl Metadata23 {
                     for dep in deps {
                         let mut dep = dep.clone();
                         // Keep in sync with `develop()`!
-                        let new_extra = MarkerTree::Expression(MarkerExpression {
-                            l_value: MarkerValue::Extra,
-                            operator: MarkerOperator::Equal,
-                            r_value: MarkerValue::QuotedString(extra.to_string()),
-                        });
-                        if let Some(existing) = dep.marker.take() {
-                            dep.marker = Some(MarkerTree::And(vec![existing, new_extra]));
-                        } else {
-                            dep.marker = Some(new_extra);
-                        }
+                        let new_extra = MarkerExpression::Extra {
+                            operator: ExtraOperator::Equal,
+                            name: MarkerValueExtra::Extra(
+                                ExtraName::new(extra.clone())
+                                    .with_context(|| format!("invalid extra name: {extra}"))?,
+                            ),
+                        };
+                        dep.marker.and(MarkerTree::expression(new_extra));
                         self.requires_dist.push(dep);
                     }
                 }

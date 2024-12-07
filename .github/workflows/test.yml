@@ -104,7 +104,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
-          targets: wasm32-wasi # Used by the test suite
+          targets: wasm32-wasip1 # Used by the test suite
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install additional Rust target

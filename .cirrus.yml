@@ -9,7 +9,7 @@ build_and_test: &BUILD_AND_TEST
   only_if: $CIRRUS_BRANCH =~ 'gh-readonly-queue/.*' || $CIRRUS_PR != ""
   setup_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-    - rustup target add wasm32-wasi
+    - rustup target add wasm32-wasip1
     - python3 -m pip install --upgrade cffi virtualenv
   build_script:
     - cargo build

@@ -9,6 +9,7 @@ import nox
 PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.23.4")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
+MSRV = "1.74.0"
 
 
 def append_to_github_env(name: str, value: str):
@@ -17,6 +18,23 @@ def append_to_github_env(name: str, value: str):
 
     with open(GITHUB_ENV, "w+") as f:
         f.write(f"{name}={value}\n")
+
+
+@nox.session(name="update-pyo3", python=False)
+def update_pyo3(session: nox.Session):
+    # TODO: support updating major and minor versions by editing Cargo.toml first
+    test_crate_dir = Path("./test-crates").resolve()
+    for root, _, files in os.walk(test_crate_dir):
+        if "Cargo.lock" in files:
+            cargo_lock_path = Path(root) / "Cargo.lock"
+            with open(cargo_lock_path, "r") as lock_file:
+                content = lock_file.read()
+                if 'name = "pyo3"' in content:
+                    with session.chdir(root):
+                        session.run("cargo", f"+{MSRV}", "update", "-p", "pyo3", external=True)
+                elif 'name = "pyo3-ffi"' in content:
+                    with session.chdir(root):
+                        session.run("cargo", f"+{MSRV}", "update", "-p", "pyo3-ffi", external=True)
 
 
 @nox.session(name="setup-pyodide", python=False)

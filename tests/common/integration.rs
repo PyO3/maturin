@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
-use fs4::fs_std::FileExt;
+use fs4::fs_err3::FileExt;
 use fs_err::File;
 use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
 use normpath::PathExt;
@@ -90,7 +90,7 @@ pub fn test_integration(
         // All tests try to use this venv at the same time, so we need to make sure only one
         // modifies it at a time and that during that time, no other test reads it.
         let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
-        file.file().lock_exclusive()?;
+        file.lock_exclusive()?;
         let python = if !cffi_venv.is_dir() {
             create_named_virtualenv(cffi_provider, python_interp.clone().map(PathBuf::from))?;
             let target_triple = Target::from_target_triple(None)?;
@@ -123,7 +123,7 @@ pub fn test_integration(
             let target_triple = Target::from_target_triple(None)?;
             target_triple.get_venv_python(&cffi_venv)
         };
-        file.file().unlock()?;
+        file.unlock()?;
         cli.push("--interpreter".into());
         cli.push(python.as_os_str().to_owned());
     }

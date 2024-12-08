@@ -70,7 +70,7 @@ fn rewrite_cargo_toml(
             } else {
                 let mut new_members = toml_edit::Array::new();
                 for member in members {
-                    if let toml_edit::Value::String(ref s) = member {
+                    if let &toml_edit::Value::String(ref s) = member {
                         let member_path = s.value();
                         // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
                         let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);
@@ -386,13 +386,16 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDepen
                         readme: pkg_readmes.get(dep_id).cloned(),
                     },
                 );
-                if let Some(dep_package) = cargo_metadata
+                match cargo_metadata
                     .packages
                     .iter()
                     .find(|package| package.manifest_path == dep_manifest_path)
                 {
-                    // scan the dependencies of the path dependency
-                    stack.push(dep_package)
+                    Some(dep_package) => {
+                        // scan the dependencies of the path dependency
+                        stack.push(dep_package)
+                    }
+                    _ => {}
                 }
             }
         }

@@ -80,7 +80,7 @@ impl GlobPattern {
     pub fn targets(&self, format: Format) -> Option<&str> {
         match self {
             // Not specified defaults to both
-            Self::Path(ref glob) => Some(glob),
+            &Self::Path(ref glob) => Some(glob),
             Self::WithFormat {
                 path,
                 format: formats,

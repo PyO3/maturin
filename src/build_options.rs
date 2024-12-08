@@ -238,15 +238,17 @@ impl BuildOptions {
                         let host_python = &host_interpreters[0];
                         eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
-                        env::set_var("PYO3_PYTHON", &host_python.executable);
+                        unsafe { env::set_var("PYO3_PYTHON", &host_python.executable) };
                         // rust-cpython, and legacy pyo3 versions
-                        env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
+                        unsafe { env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable) };
 
                         let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
-                        env::set_var(
-                            "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
-                            sysconfig_path.parent().unwrap(),
-                        );
+                        unsafe {
+                            env::set_var(
+                                "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
+                                sysconfig_path.parent().unwrap(),
+                            )
+                        };
 
                         let sysconfig_data = parse_sysconfigdata(host_python, sysconfig_path)?;
                         let major = sysconfig_data
@@ -616,10 +618,11 @@ impl BuildContextBuilder {
         let mut target = Target::from_target_triple(target_triple)?;
         if !target.user_specified && !universal2 {
             if let Some(interpreter) = build_options.interpreter.first() {
-                if let Some(detected_target) =
-                    crate::target::detect_arch_from_python(interpreter, &target)
-                {
-                    target = Target::from_target_triple(Some(detected_target))?;
+                match crate::target::detect_arch_from_python(interpreter, &target) {
+                    Some(detected_target) => {
+                        target = Target::from_target_triple(Some(detected_target))?;
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1141,12 +1144,17 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 );
             }
 
-            return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
-                eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
-                Ok(BridgeModel::BindingsAbi3(major, minor))
-            } else {
-                eprintln!("🔗 Found {lib} bindings");
-                Ok(bridge)
+            return match has_abi3(cargo_metadata)? {
+                Some((major, minor)) => {
+                    eprintln!(
+                        "🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}"
+                    );
+                    Ok(BridgeModel::BindingsAbi3(major, minor))
+                }
+                _ => {
+                    eprintln!("🔗 Found {lib} bindings");
+                    Ok(bridge)
+                }
             };
         }
     }

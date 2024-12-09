@@ -1137,7 +1137,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 eprintln!(
                     "⚠️  Warning: You're building a library without activating {lib}'s \
                      `extension-module` feature. \
-                     See https://pyo3.rs/v{version}/building_and_distribution.html#linking"
+                     See https://pyo3.rs/v{version}/building-and-distribution.html#the-extension-module-feature"
                 );
             }
 

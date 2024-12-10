@@ -412,8 +412,11 @@ fn run() -> Result<()> {
 
             let mut wheels = build_context.build_wheels()?;
             if !no_sdist {
-                if let Some(sd) = build_context.build_source_distribution()? {
-                    wheels.push(sd);
+                match build_context.build_source_distribution()? {
+                    Some(sd) => {
+                        wheels.push(sd);
+                    }
+                    _ => {}
                 }
             }
 
@@ -551,11 +554,14 @@ fn main() {
     #[cfg(not(debug_assertions))]
     setup_panic_hook();
 
-    if let Err(e) = run() {
-        eprintln!("💥 maturin failed");
-        for cause in e.chain() {
-            eprintln!("  Caused by: {cause}");
+    match run() {
+        Err(e) => {
+            eprintln!("💥 maturin failed");
+            for cause in e.chain() {
+                eprintln!("  Caused by: {cause}");
+            }
+            std::process::exit(1);
         }
-        std::process::exit(1);
+        _ => {}
     }
 }

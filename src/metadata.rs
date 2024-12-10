@@ -318,15 +318,18 @@ impl Metadata23 {
             if let Some(gui_scripts) = &project.gui_scripts {
                 self.gui_scripts.clone_from(gui_scripts);
             }
-            if let Some(entry_points) = &project.entry_points {
-                // Raise error on ambiguous entry points: https://www.python.org/dev/peps/pep-0621/#entry-points
-                if entry_points.contains_key("console_scripts") {
-                    bail!("console_scripts is not allowed in project.entry-points table");
+            match &project.entry_points {
+                Some(entry_points) => {
+                    // Raise error on ambiguous entry points: https://www.python.org/dev/peps/pep-0621/#entry-points
+                    if entry_points.contains_key("console_scripts") {
+                        bail!("console_scripts is not allowed in project.entry-points table");
+                    }
+                    if entry_points.contains_key("gui_scripts") {
+                        bail!("gui_scripts is not allowed in project.entry-points table");
+                    }
+                    self.entry_points.clone_from(entry_points);
                 }
-                if entry_points.contains_key("gui_scripts") {
-                    bail!("gui_scripts is not allowed in project.entry-points table");
-                }
-                self.entry_points.clone_from(entry_points);
+                _ => {}
             }
         }
         Ok(())

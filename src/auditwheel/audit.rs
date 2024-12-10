@@ -179,12 +179,16 @@ fn policy_is_satisfied(
             }
             offending_libs.insert(dep.clone());
         }
-        if let Some(sym_list) = policy.blacklist.get(dep) {
-            let mut intersection: Vec<_> = sym_list.intersection(&undef_symbols).cloned().collect();
-            if !intersection.is_empty() {
-                intersection.sort();
-                offending_blacklist_syms.insert(dep, intersection);
+        match policy.blacklist.get(dep) {
+            Some(sym_list) => {
+                let mut intersection: Vec<_> =
+                    sym_list.intersection(&undef_symbols).cloned().collect();
+                if !intersection.is_empty() {
+                    intersection.sort();
+                    offending_blacklist_syms.insert(dep, intersection);
+                }
             }
+            _ => {}
         }
     }
     for library in versioned_libraries {
@@ -263,14 +267,18 @@ fn policy_is_satisfied(
 
 fn get_default_platform_policies() -> Vec<Policy> {
     if let Ok(Some(musl_libc)) = find_musl_libc() {
-        if let Ok(Some((major, minor))) = get_musl_version(musl_libc) {
-            return MUSLLINUX_POLICIES
-                .iter()
-                .filter(|policy| {
-                    policy.name == "linux" || policy.name == format!("musllinux_{major}_{minor}")
-                })
-                .cloned()
-                .collect();
+        match get_musl_version(musl_libc) {
+            Ok(Some((major, minor))) => {
+                return MUSLLINUX_POLICIES
+                    .iter()
+                    .filter(|policy| {
+                        policy.name == "linux"
+                            || policy.name == format!("musllinux_{major}_{minor}")
+                    })
+                    .cloned()
+                    .collect();
+            }
+            _ => {}
         }
     }
     MANYLINUX_POLICIES.clone()
@@ -394,16 +402,19 @@ pub fn auditwheel_rs(
             }
             Err(err) => Err(err),
         }
-    } else if let Some(policy) = highest_policy {
-        Ok(policy)
     } else {
-        eprintln!(
-            "⚠️  Warning: No compatible platform tag found, using the linux tag instead. \
+        match highest_policy {
+            Some(policy) => Ok(policy),
+            _ => {
+                eprintln!(
+                    "⚠️  Warning: No compatible platform tag found, using the linux tag instead. \
             You won't be able to upload those wheels to PyPI."
-        );
+                );
 
-        // Fallback to linux
-        Ok(Policy::default())
+                // Fallback to linux
+                Ok(Policy::default())
+            }
+        }
     }?;
     Ok((policy, should_repair))
 }

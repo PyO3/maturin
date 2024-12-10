@@ -290,13 +290,16 @@ fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
         .captures(pip_show_output)
         .map(|c| c.get(1))
     {
-        if let Some(Some(direct_url_path)) = Regex::new(r"  (.*direct_url.json)")?
+        match Regex::new(r"  (.*direct_url.json)")?
             .captures(pip_show_output)
             .map(|c| c.get(1))
         {
-            return Ok(Some(
-                PathBuf::from(location.as_str()).join(direct_url_path.as_str()),
-            ));
+            Some(Some(direct_url_path)) => {
+                return Ok(Some(
+                    PathBuf::from(location.as_str()).join(direct_url_path.as_str()),
+                ));
+            }
+            _ => {}
         }
     }
     Ok(None)
@@ -324,8 +327,11 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     // check python platform and architecture
     if !target.user_specified {
-        if let Some(detected_target) = detect_arch_from_python(&python, &target) {
-            target_triple = Some(detected_target);
+        match detect_arch_from_python(&python, &target) {
+            Some(detected_target) => {
+                target_triple = Some(detected_target);
+            }
+            _ => {}
         }
     }
 

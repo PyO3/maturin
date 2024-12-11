@@ -85,6 +85,7 @@ pub enum Arch {
     Mipsel,
     Mips,
     Sparc64,
+    Sparcv9,
     LoongArch64,
 }
 
@@ -108,6 +109,7 @@ impl fmt::Display for Arch {
             Arch::Mipsel => write!(f, "mipsel"),
             Arch::Mips => write!(f, "mips"),
             Arch::Sparc64 => write!(f, "sparc64"),
+            Arch::Sparcv9 => write!(f, "sparcv9"),
             Arch::LoongArch64 => write!(f, "loongarch64"),
         }
     }
@@ -130,6 +132,7 @@ impl Arch {
             Arch::Mips64el | Arch::Mips64 | Arch::Mipsel | Arch::Mips => "mips",
             // sparc64 is unsupported since FreeBSD 13.0
             Arch::Sparc64 => "sparc64",
+            Arch::Sparcv9 => "sparcv9",
             Arch::Wasm32 => "wasm32",
             Arch::S390X => "s390x",
             Arch::LoongArch64 => "loongarch64",
@@ -192,7 +195,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Dragonfly => vec![Arch::X86_64],
         Os::Illumos => vec![Arch::X86_64],
         Os::Haiku => vec![Arch::X86_64],
-        Os::Solaris => vec![Arch::X86_64, Arch::Sparc64],
+        Os::Solaris => vec![Arch::X86_64, Arch::Sparc64, Arch::Sparcv9],
         Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
         Os::Aix => vec![Arch::Powerpc64],
         Os::Hurd => vec![Arch::X86, Arch::X86_64],
@@ -288,6 +291,7 @@ impl Target {
                 _ => bail!("The architecture {} is not supported", mips32_arch),
             },
             Architecture::Sparc64 => Arch::Sparc64,
+            Architecture::Sparcv9 => Arch::Sparcv9,
             Architecture::LoongArch64 => Arch::LoongArch64,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
@@ -370,6 +374,7 @@ impl Target {
             Arch::Mips64el | Arch::Mips64 => "mips64",
             Arch::Mipsel | Arch::Mips => "mips",
             Arch::Sparc64 => "sparc64",
+            Arch::Sparcv9 => "sparcv9",
             Arch::LoongArch64 => "loongarch64",
         }
     }
@@ -459,6 +464,7 @@ impl Target {
             | Arch::Mips
             | Arch::Powerpc
             | Arch::Sparc64
+            | Arch::Sparcv9
             | Arch::LoongArch64 => PlatformTag::Linux,
         }
     }
@@ -475,6 +481,7 @@ impl Target {
             | Arch::Mips64el
             | Arch::Mips64
             | Arch::Sparc64
+            | Arch::Sparcv9
             | Arch::LoongArch64 => 64,
             Arch::Armv6L
             | Arch::Armv7L

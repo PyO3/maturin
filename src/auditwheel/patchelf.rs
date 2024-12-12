@@ -16,12 +16,12 @@ pub fn verify_patchelf() -> Result<()> {
         .trim()
         .to_string();
     let version = version.strip_prefix("patchelf").unwrap_or(&version).trim();
-    let semver = version
-        .parse::<semver::Version>()
-        .context("Failed to parse patchelf version")?;
+    let semver = version.parse::<semver::Version>().context(
+        "Failed to parse patchelf version, auditwheel repair requires patchelf >= 0.14.0.",
+    )?;
     if semver < semver::Version::new(0, 14, 0) {
         bail!(
-            "patchelf {} found. auditwheel repair requires patchelf >= 0.14.",
+            "patchelf {} found. auditwheel repair requires patchelf >= 0.14.0.",
             version
         );
     }

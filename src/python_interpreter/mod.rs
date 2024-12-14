@@ -117,60 +117,63 @@ fn find_all_windows(
         let expr = Regex::new(r" -(V:)?(\d).(\d+)-?(arm)?(\d*)\s*\*?\s*(.*)?").unwrap();
         let stdout = str::from_utf8(&output.stdout).unwrap();
         for line in stdout.lines() {
-            if let Some(capture) = expr.captures(line) {
-                let major = capture
-                    .get(2)
-                    .unwrap()
-                    .as_str()
-                    .parse::<usize>()
-                    .context("Expected a digit for major version")?;
-                let minor = capture
-                    .get(3)
-                    .unwrap()
-                    .as_str()
-                    .parse::<usize>()
-                    .context("Expected a digit for minor version")?;
-                if !versions_found.contains(&(major, minor)) {
-                    let pointer_width = capture
-                        .get(5)
-                        .map(|m| m.as_str())
-                        .filter(|m| !m.is_empty())
-                        .unwrap_or("64")
+            match expr.captures(line) {
+                Some(capture) => {
+                    let major = capture
+                        .get(2)
+                        .unwrap()
+                        .as_str()
                         .parse::<usize>()
-                        .context("Expected a digit for pointer width")?;
+                        .context("Expected a digit for major version")?;
+                    let minor = capture
+                        .get(3)
+                        .unwrap()
+                        .as_str()
+                        .parse::<usize>()
+                        .context("Expected a digit for minor version")?;
+                    if !versions_found.contains(&(major, minor)) {
+                        let pointer_width = capture
+                            .get(5)
+                            .map(|m| m.as_str())
+                            .filter(|m| !m.is_empty())
+                            .unwrap_or("64")
+                            .parse::<usize>()
+                            .context("Expected a digit for pointer width")?;
 
-                    if windows_interpreter_no_build(
-                        major,
-                        minor,
-                        target.pointer_width(),
-                        pointer_width,
-                        min_python_minor,
-                        requires_python,
-                    ) {
-                        continue;
-                    }
-
-                    let executable = capture.get(6).unwrap().as_str();
-                    let output = Command::new(executable).args(["-c", code]).output();
-                    let output = match output {
-                        Ok(output) => output,
-                        Err(err) => {
-                            eprintln!(
-                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
-                            );
+                        if windows_interpreter_no_build(
+                            major,
+                            minor,
+                            target.pointer_width(),
+                            pointer_width,
+                            min_python_minor,
+                            requires_python,
+                        ) {
                             continue;
                         }
-                    };
-                    let path = str::from_utf8(&output.stdout).unwrap().trim();
-                    if !output.status.success() || path.trim().is_empty() {
-                        eprintln!(
+
+                        let executable = capture.get(6).unwrap().as_str();
+                        let output = Command::new(executable).args(["-c", code]).output();
+                        let output = match output {
+                            Ok(output) => output,
+                            Err(err) => {
+                                eprintln!(
+                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                            );
+                                continue;
+                            }
+                        };
+                        let path = str::from_utf8(&output.stdout).unwrap().trim();
+                        if !output.status.success() || path.trim().is_empty() {
+                            eprintln!(
                             "⚠️  Warning: couldn't determine the path to python for `{executable}`"
                         );
-                        continue;
+                            continue;
+                        }
+                        interpreter.push(path.to_string());
+                        versions_found.insert((major, minor));
                     }
-                    interpreter.push(path.to_string());
-                    versions_found.insert((major, minor));
                 }
+                _ => {}
             }
         }
     }
@@ -185,11 +188,14 @@ fn find_all_windows(
         let re = Regex::new(r"^([^#].*?)[\s*]+([\w\\:.-]+)\s*$").unwrap();
         let mut paths = vec![];
         for i in lines {
-            if let Some(capture) = re.captures(i) {
-                if &capture[1] == "base" {
-                    continue;
+            match re.captures(i) {
+                Some(capture) => {
+                    if &capture[1] == "base" {
+                        continue;
+                    }
+                    paths.push(String::from(&capture[2]));
                 }
-                paths.push(String::from(&capture[2]));
+                _ => {}
             }
         }
 
@@ -200,19 +206,22 @@ fn find_all_windows(
             } else {
                 Path::new(&path).join("python")
             };
-            if let Some(python_info) = windows_python_info(&executable)? {
-                if windows_interpreter_no_build(
-                    python_info.major,
-                    python_info.minor,
-                    target.pointer_width(),
-                    python_info.pointer_width.unwrap(),
-                    min_python_minor,
-                    requires_python,
-                ) {
-                    continue;
+            match windows_python_info(&executable)? {
+                Some(python_info) => {
+                    if windows_interpreter_no_build(
+                        python_info.major,
+                        python_info.minor,
+                        target.pointer_width(),
+                        python_info.pointer_width.unwrap(),
+                        min_python_minor,
+                        requires_python,
+                    ) {
+                        continue;
+                    }
+                    interpreter.push(String::from(executable.to_str().unwrap()));
+                    versions_found.insert((python_info.major, python_info.minor));
                 }
-                interpreter.push(String::from(executable.to_str().unwrap()));
-                versions_found.insert((python_info.major, python_info.minor));
+                _ => {}
             }
         }
     }
@@ -221,19 +230,22 @@ fn find_all_windows(
     for minor in min_python_minor..=MAXIMUM_PYTHON_MINOR {
         if !versions_found.contains(&(3, minor)) {
             let executable = format!("python3.{minor}.exe");
-            if let Some(python_info) = windows_python_info(Path::new(&executable))? {
-                if windows_interpreter_no_build(
-                    python_info.major,
-                    python_info.minor,
-                    target.pointer_width(),
-                    python_info.pointer_width.unwrap(),
-                    min_python_minor,
-                    requires_python,
-                ) {
-                    continue;
+            match windows_python_info(Path::new(&executable))? {
+                Some(python_info) => {
+                    if windows_interpreter_no_build(
+                        python_info.major,
+                        python_info.minor,
+                        target.pointer_width(),
+                        python_info.pointer_width.unwrap(),
+                        min_python_minor,
+                        requires_python,
+                    ) {
+                        continue;
+                    }
+                    interpreter.push(executable);
+                    versions_found.insert((3, minor));
                 }
-                interpreter.push(executable);
-                versions_found.insert((3, minor));
+                _ => {}
             }
         }
     }
@@ -275,21 +287,22 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
 
     let version_info = str::from_utf8(&python_info.stdout).unwrap();
     let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
-    if let Some(capture) = expr.captures(version_info) {
-        let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
-        let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
-        let pointer_width = if version_info.contains("64 bit (AMD64)") {
-            64
-        } else {
-            32
-        };
-        Ok(Some(WindowsPythonInfo {
-            major,
-            minor,
-            pointer_width: Some(pointer_width),
-        }))
-    } else {
-        Ok(None)
+    match expr.captures(version_info) {
+        Some(capture) => {
+            let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
+            let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
+            let pointer_width = if version_info.contains("64 bit (AMD64)") {
+                64
+            } else {
+                32
+            };
+            Ok(Some(WindowsPythonInfo {
+                major,
+                minor,
+                pointer_width: Some(pointer_width),
+            }))
+        }
+        _ => Ok(None),
     }
 }
 
@@ -620,28 +633,31 @@ impl PythonInterpreter {
             Err(err) => {
                 if err.kind() == io::ErrorKind::NotFound {
                     if cfg!(windows) {
-                        if let Some(python) = executable.as_ref().to_str() {
-                            let ver = if python.starts_with("python") {
-                                python.strip_prefix("python").unwrap_or(python)
-                            } else {
-                                python
-                            };
-                            // Try py -x.y on Windows
-                            let mut metadata_py = tempfile::NamedTempFile::new()?;
-                            write!(metadata_py, "{GET_INTERPRETER_METADATA}")?;
-                            let mut cmd = Command::new("cmd");
-                            cmd.arg("/c")
-                                .arg("py")
-                                .arg(format!("-{}-{}", ver, target.pointer_width()))
-                                .arg(metadata_py.path())
-                                .env("PYTHONNOUSERSITE", "1");
-                            let output = cmd.output();
-                            match output {
-                                Ok(output) if output.status.success() => output,
-                                _ => return Ok(None),
+                        match executable.as_ref().to_str() {
+                            Some(python) => {
+                                let ver = if python.starts_with("python") {
+                                    python.strip_prefix("python").unwrap_or(python)
+                                } else {
+                                    python
+                                };
+                                // Try py -x.y on Windows
+                                let mut metadata_py = tempfile::NamedTempFile::new()?;
+                                write!(metadata_py, "{GET_INTERPRETER_METADATA}")?;
+                                let mut cmd = Command::new("cmd");
+                                cmd.arg("/c")
+                                    .arg("py")
+                                    .arg(format!("-{}-{}", ver, target.pointer_width()))
+                                    .arg(metadata_py.path())
+                                    .env("PYTHONNOUSERSITE", "1");
+                                let output = cmd.output();
+                                match output {
+                                    Ok(output) if output.status.success() => output,
+                                    _ => return Ok(None),
+                                }
                             }
-                        } else {
-                            return Ok(None);
+                            _ => {
+                                return Ok(None);
+                            }
                         }
                     } else {
                         return Ok(None);
@@ -831,9 +847,11 @@ impl PythonInterpreter {
         };
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)?
-            {
-                available_versions.push(version);
+            match PythonInterpreter::check_executable(executable, target, bridge)? {
+                Some(version) => {
+                    available_versions.push(version);
+                }
+                _ => {}
             }
         }
 
@@ -850,17 +868,18 @@ impl PythonInterpreter {
     ) -> Result<Vec<PythonInterpreter>> {
         let mut available_versions = Vec::new();
         for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)
-                .context(format!(
-                "{} is not a valid python interpreter",
-                executable.display()
-            ))? {
-                available_versions.push(version);
-            } else {
-                bail!(
-                    "Python interpreter `{}` doesn't exist",
-                    executable.display()
-                );
+            match PythonInterpreter::check_executable(executable, target, bridge).context(
+                format!("{} is not a valid python interpreter", executable.display()),
+            )? {
+                Some(version) => {
+                    available_versions.push(version);
+                }
+                _ => {
+                    bail!(
+                        "Python interpreter `{}` doesn't exist",
+                        executable.display()
+                    );
+                }
             }
         }
 

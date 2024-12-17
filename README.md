@@ -9,8 +9,8 @@ _formerly pyo3-pack_
 [![FreeBSD](https://img.shields.io/cirrus/github/PyO3/maturin/main?logo=CircleCI&style=flat-square)](https://cirrus-ci.com/github/PyO3/maturin)
 [![discord server](https://img.shields.io/discord/1209263839632424990?logo=discord)](https://discord.gg/33kcChzH7f)
 
-Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages with minimal configuration.
-It supports building wheels for python 3.8+ on windows, linux, mac and freebsd, can upload them to [pypi](https://pypi.org/) and has basic pypy and graalpy support.
+Build and publish crates with [pyo3, cffi and uniffi bindings](https://maturin.rs/bindings) as well as rust binaries as python packages with minimal configuration.
+It supports building wheels for python 3.8+ on Windows, Linux, macOS and FreeBSD, can upload them to [pypi](https://pypi.org/) and has basic PyPy and GraalPy support.
 
 Check out the [User Guide](https://maturin.rs/)!
 
@@ -33,7 +33,6 @@ There are four main commands:
 - `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
 - `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 
-`pyo3` bindings are automatically detected. For cffi or binaries, you need to pass `-b cffi` or `-b bin`.
 maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust or milksnake configuration.
 You can even integrate it with testing tools such as [tox](https://tox.readthedocs.io/en/latest/).
 There are examples for the different bindings in the `test-crates` folder.
@@ -56,50 +55,6 @@ which requires the right compilers to be installed. Installing a wheel is much f
 When you publish a package to be installable with `pip install`, you upload it to [pypi](https://pypi.org/), the official package repository.
 For testing, you can use [test pypi](https://test.pypi.org/) instead, which you can use with `pip install --index-url https://test.pypi.org/simple/`.
 Note that for publishing for linux, [you need to use the manylinux docker container](#manylinux-and-auditwheel), while for publishing from your repository you can use the [PyO3/maturin-action github action](https://github.com/PyO3/maturin-action).
-
-## pyo3
-
-For pyo3, maturin can only build packages for installed python versions. On linux and mac, all python versions in `PATH` are used.
-If you don't set your own interpreters with `-i`, a heuristic is used to search for python installations.
-On windows all versions from the python launcher (which is installed by default by the python.org installer) and all conda environments except base are used. You can check which versions are picked up with the `list-python` subcommand.
-
-pyo3 will set the used python interpreter in the environment variable `PYTHON_SYS_EXECUTABLE`, which can be used from custom build scripts. Maturin can build and upload wheels for pypy with pyo3, even though only pypy3.7-7.3 on linux is tested.
-
-## Cffi
-
-Cffi wheels are compatible with all python versions including pypy. If `cffi` isn't installed and python is running inside a virtualenv, maturin will install it, otherwise you have to install it yourself (`pip install cffi`).
-
-maturin uses cbindgen to generate a header file, which can be customized by configuring cbindgen through a `cbindgen.toml` file inside your project root. Alternatively you can use a build script that writes a header file to `$PROJECT_ROOT/target/header.h`.
-
-Based on the header file maturin generates a module which exports an `ffi` and a `lib` object.
-
-<details>
-<summary>Example of a custom build script</summary>
-
-```rust
-use cbindgen;
-use std::env;
-use std::path::Path;
-
-fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-
-    let bindings = cbindgen::Builder::new()
-        .with_no_includes()
-        .with_language(cbindgen::Language::C)
-        .with_crate(crate_dir)
-        .generate()
-        .unwrap();
-    bindings.write_to_file(Path::new("target").join("header.h"));
-}
-```
-
-</details>
-
-## uniffi
-
-uniffi bindings use [uniffi-rs](https://mozilla.github.io/uniffi-rs/) to generate Python `ctypes` bindings
-from an interface definition file. uniffi wheels are compatible with all python versions including pypy.
 
 ## Mixed rust/python projects
 

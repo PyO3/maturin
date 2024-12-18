@@ -169,14 +169,14 @@ impl GenerateCI {
         bridge_model: &BridgeModel,
         sdist: bool,
     ) -> Result<String> {
-        let is_abi3 = matches!(bridge_model, BridgeModel::BindingsAbi3(..));
+        let is_abi3 = matches!(bridge_model, BridgeModel::BindingsAbi3 { .. });
         let is_bin = bridge_model.is_bin();
         let setup_python = self.pytest
             || matches!(
                 bridge_model,
                 BridgeModel::Bin(Some(_))
                     | BridgeModel::Bindings { .. }
-                    | BridgeModel::BindingsAbi3(..)
+                    | BridgeModel::BindingsAbi3 { .. }
                     | BridgeModel::Cffi
                     | BridgeModel::UniFfi
             );
@@ -868,7 +868,18 @@ mod tests {
     #[test]
     fn test_generate_github_abi3() {
         let conf = GenerateCI::default()
-            .generate_github("example", &BridgeModel::BindingsAbi3(3, 7), false)
+            .generate_github(
+                "example",
+                &BridgeModel::BindingsAbi3 {
+                    bindings: Bindings {
+                        name: "pyo3".to_string(),
+                        version: Version::new(0, 23, 0),
+                    },
+                    major: 3,
+                    minor: 7,
+                },
+                false,
+            )
             .unwrap()
             .lines()
             .skip(5)
@@ -1071,7 +1082,18 @@ mod tests {
             skip_attestation: true,
             ..Default::default()
         }
-        .generate_github("example", &BridgeModel::BindingsAbi3(3, 7), false)
+        .generate_github(
+            "example",
+            &BridgeModel::BindingsAbi3 {
+                bindings: Bindings {
+                    name: "pyo3".to_string(),
+                    version: Version::new(0, 23, 0),
+                },
+                major: 3,
+                minor: 7,
+            },
+            false,
+        )
         .unwrap()
         .lines()
         .skip(5)

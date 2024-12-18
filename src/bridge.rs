@@ -60,8 +60,14 @@ pub enum BridgeModel {
     Bindings(Bindings),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
     /// for all cpython versions (pypy & graalpy still need multiple versions).
-    /// The numbers are the minimum major and minor version
-    BindingsAbi3(u8, u8),
+    BindingsAbi3 {
+        /// The bindings crate
+        bindings: Bindings,
+        /// Minimal abi3 major version
+        major: u8,
+        /// Minimal abi3 minor version
+        minor: u8,
+    },
     /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
     Cffi,
     /// A native module generated from uniffi
@@ -74,6 +80,7 @@ impl BridgeModel {
         match self {
             BridgeModel::Bin(Some(bindings)) => Some(bindings),
             BridgeModel::Bindings(bindings) => Some(bindings),
+            BridgeModel::BindingsAbi3 { bindings, .. } => Some(bindings),
             _ => None,
         }
     }
@@ -82,6 +89,7 @@ impl BridgeModel {
     pub fn unwrap_bindings_name(&self) -> &str {
         match self {
             BridgeModel::Bindings(bindings) => &bindings.name,
+            BridgeModel::BindingsAbi3 { bindings, .. } => &bindings.name,
             _ => panic!("Expected Bindings"),
         }
     }
@@ -91,6 +99,7 @@ impl BridgeModel {
         match self {
             BridgeModel::Bin(Some(bindings)) => bindings.name == name,
             BridgeModel::Bindings(bindings) => bindings.name == name,
+            BridgeModel::BindingsAbi3 { bindings, .. } => bindings.name == name,
             _ => false,
         }
     }
@@ -107,7 +116,7 @@ impl Display for BridgeModel {
             BridgeModel::Bin(Some(bindings)) => write!(f, "{} bin", bindings.name),
             BridgeModel::Bin(None) => write!(f, "bin"),
             BridgeModel::Bindings(bindings) => write!(f, "{}", bindings.name),
-            BridgeModel::BindingsAbi3(..) => write!(f, "pyo3"),
+            BridgeModel::BindingsAbi3 { bindings, .. } => write!(f, "{}", bindings.name),
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
         }

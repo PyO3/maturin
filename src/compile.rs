@@ -199,7 +199,7 @@ fn cargo_build_command(
         BridgeModel::Cffi
         | BridgeModel::UniFfi
         | BridgeModel::Bindings { .. }
-        | BridgeModel::BindingsAbi3(..) => {
+        | BridgeModel::BindingsAbi3 { .. } => {
             cargo_rustc.lib = true;
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
@@ -219,13 +219,13 @@ fn cargo_build_command(
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
-        if let BridgeModel::Bindings { .. } | BridgeModel::BindingsAbi3(..) = bridge_model {
+        if let BridgeModel::Bindings { .. } | BridgeModel::BindingsAbi3 { .. } = bridge_model {
             // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
             // non-existent library.
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
             let module_name = &context.module_name;
             let so_filename = match bridge_model {
-                BridgeModel::BindingsAbi3(..) => format!("{module_name}.abi3.so"),
+                BridgeModel::BindingsAbi3 { .. } => format!("{module_name}.abi3.so"),
                 _ => python_interpreter
                     .expect("missing python interpreter for non-abi3 wheel build")
                     .get_library_name(module_name),
@@ -390,7 +390,7 @@ fn cargo_build_command(
         build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
     }
 
-    if let BridgeModel::BindingsAbi3(_, _) = bridge_model {
+    if let BridgeModel::BindingsAbi3 { .. } = bridge_model {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
@@ -411,7 +411,7 @@ fn cargo_build_command(
         if interpreter.runnable {
             if bridge_model.is_bindings("pyo3")
                 || bridge_model.is_bindings("pyo3-ffi")
-                || matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
+                || matches!(bridge_model, BridgeModel::BindingsAbi3 { .. })
             {
                 debug!(
                     "Setting PYO3_PYTHON to {}",
@@ -429,7 +429,7 @@ fn cargo_build_command(
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if (bridge_model.is_bindings("pyo3")
             || bridge_model.is_bindings("pyo3-ffi")
-            || (matches!(bridge_model, BridgeModel::BindingsAbi3(_, _))
+            || (matches!(bridge_model, BridgeModel::BindingsAbi3 { .. })
                 && (interpreter.interpreter_kind.is_pypy()
                     || interpreter.interpreter_kind.is_graalpy())))
             && env::var_os("PYO3_CONFIG_FILE").is_none()

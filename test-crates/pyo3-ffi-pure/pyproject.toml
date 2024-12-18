@@ -13,3 +13,4 @@ maintainers = [
     {name = "messense", email = "messense@icloud.com"}
 ]
 license = { file = "LICENSE" }
+dynamic = ["version"]

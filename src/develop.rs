@@ -38,8 +38,53 @@ impl InstallBackend {
         }
     }
 
-    fn is_pip(&self) -> bool {
-        matches!(self, InstallBackend::Pip { .. })
+    fn version(&self, python_path: &Path) -> Result<semver::Version> {
+        let mut cmd = self.make_command(python_path);
+        let output = cmd
+            .arg("--version")
+            .output()
+            .context("failed to get version of install backend")?;
+        ensure!(
+            output.status.success(),
+            "failed to get version of install backend"
+        );
+        let stdout = str::from_utf8(&output.stdout)?;
+        let re = match self {
+            InstallBackend::Pip { .. } => Regex::new(r"pip ([\w\.]+).*"),
+            InstallBackend::Uv { .. } => Regex::new(r"uv-pip ([\w\.]+).*"),
+        };
+        if let Some(captures) = re.expect("regex should be valid").captures(stdout) {
+            Ok(semver::Version::parse(&captures[1])
+                .with_context(|| format!("failed to parse semver from {:?}", stdout))?)
+        } else {
+            bail!("failed to parse version from {:?}", stdout);
+        }
+    }
+
+    /// check whether this install backend supports `show --files`. Returns Ok(()) if it does.
+    fn check_supports_show_files(&self, python_path: &Path) -> Result<()> {
+        match self {
+            InstallBackend::Pip { .. } => Ok(()),
+            InstallBackend::Uv { .. } => {
+                // https://github.com/astral-sh/uv/releases/tag/0.4.25
+                let version = self.version(python_path)?;
+                if version < semver::Version::new(0, 4, 25) {
+                    bail!(
+                        "uv >= 0.4.25 is required for `show --files`. Version {} was found.",
+                        version
+                    );
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn stderr_indicates_problem(&self) -> bool {
+        match self {
+            InstallBackend::Pip { .. } => true,
+            // `uv pip install` sends regular logs to stderr, not just errors
+            InstallBackend::Uv { .. } => false,
+        }
     }
 
     fn make_command(&self, python_path: &Path) -> Command {
@@ -240,15 +285,17 @@ fn install_wheel(
             String::from_utf8_lossy(&output.stderr).trim(),
         );
     }
-    // uv pip install sends logs to stderr thus only print this warning for pip
-    if !output.stderr.is_empty() && install_backend.is_pip() {
+    if !output.stderr.is_empty() && install_backend.stderr_indicates_problem() {
         eprintln!(
-            "⚠️ Warning: pip raised a warning running {:?}:\n{}",
+            "⚠️ Warning: {} raised a warning running {:?}:\n{}",
+            install_backend.name(),
             &cmd.get_args().collect::<Vec<_>>(),
             String::from_utf8_lossy(&output.stderr).trim(),
         );
     }
-    fix_direct_url(build_context, python, install_backend)?;
+    if let Err(err) = configure_as_editable(build_context, python, install_backend) {
+        eprintln!("⚠️ Warning: failed to set package as editable: {}", err);
+    }
     Ok(())
 }
 
@@ -260,12 +307,13 @@ fn install_wheel(
 /// correct URL, however when a maturin package is installed with `maturin develop`, the URL is
 /// set to the path to the temporary wheel file created during installation.
 #[instrument(skip_all)]
-fn fix_direct_url(
+fn configure_as_editable(
     build_context: &BuildContext,
     python: &Path,
     install_backend: &InstallBackend,
 ) -> Result<()> {
     println!("✏️  Setting installed package as editable");
+    install_backend.check_supports_show_files(python)?;
     let mut cmd = install_backend.make_command(python);
     let cmd = cmd.args(["show", "--files", &build_context.metadata23.name]);
     debug!("running {:?}", cmd);

@@ -16,23 +16,23 @@ use std::str::FromStr;
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct WheelMetadata {
-    /// Python Package Metadata 2.3
-    pub metadata23: Metadata23,
+    /// Python Package Metadata 2.4
+    pub metadata24: Metadata24,
     /// The `[console_scripts]` for the entry_points.txt
     pub scripts: HashMap<String, String>,
     /// The name of the module can be distinct from the package name, mostly
     /// because package names normally contain minuses while module names
-    /// have underscores. The package name is part of metadata23
+    /// have underscores. The package name is part of metadata24
     pub module_name: String,
 }
 
-/// Python Package Metadata 2.3 as specified in
+/// Python Package Metadata 2.4 as specified in
 /// https://packaging.python.org/specifications/core-metadata/
 /// Maturin writes static metadata and does not support dynamic fields atm.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
-pub struct Metadata23 {
+pub struct Metadata24 {
     // Mandatory fields
     pub metadata_version: String,
     pub name: String,
@@ -66,7 +66,7 @@ pub struct Metadata23 {
     pub entry_points: IndexMap<String, IndexMap<String, String>>,
 }
 
-impl Metadata23 {
+impl Metadata24 {
     /// Initializes with name, version and otherwise the defaults
     pub fn new(name: String, version: Version) -> Self {
         Self {
@@ -123,7 +123,7 @@ fn path_to_content_type(path: &Path) -> String {
         })
 }
 
-impl Metadata23 {
+impl Metadata24 {
     /// Merge metadata with pyproject.toml, where pyproject.toml takes precedence
     ///
     /// pyproject_dir must be the directory containing pyproject.toml
@@ -338,7 +338,7 @@ impl Metadata23 {
     pub fn from_cargo_toml(
         manifest_path: impl AsRef<Path>,
         cargo_metadata: &cargo_metadata::Metadata,
-    ) -> Result<Metadata23> {
+    ) -> Result<Metadata24> {
         let package = cargo_metadata
             .root_package()
             .context("Expected cargo to return metadata with root_package")?;
@@ -401,8 +401,8 @@ impl Metadata23 {
                 err
             )
         })?;
-        let metadata = Metadata23 {
-            // name, version and metadata_version are added through metadata23::new()
+        let metadata = Metadata24 {
+            // name, version and metadata_version are added through metadata24::new()
             // Mapped from cargo metadata
             summary: package.description.clone(),
             description,
@@ -424,7 +424,7 @@ impl Metadata23 {
             license: package.license.clone(),
             license_files,
             project_url,
-            ..Metadata23::new(name, version)
+            ..Metadata24::new(name, version)
         };
         Ok(metadata)
     }
@@ -611,7 +611,7 @@ mod test {
         readme: &str,
         cargo_toml: &str,
         expected: Expect,
-    ) -> Metadata23 {
+    ) -> Metadata24 {
         let crate_dir = tempfile::tempdir().unwrap();
         let crate_path = crate_dir.path();
         let manifest_path = crate_path.join("Cargo.toml");
@@ -635,7 +635,7 @@ mod test {
             .exec()
             .unwrap();
 
-        let metadata = Metadata23::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
+        let metadata = Metadata24::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
 
         let actual = metadata.to_file_contents().unwrap();
 
@@ -727,7 +727,7 @@ mod test {
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata = Metadata23::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -776,7 +776,7 @@ mod test {
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata = Metadata23::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
@@ -797,7 +797,7 @@ mod test {
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let metadata = Metadata23::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
+        let metadata = Metadata24::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         assert!(metadata.description.unwrap().starts_with("# pyo3-mixed"));
         assert_eq!(
             metadata.description_content_type.unwrap(),
@@ -812,7 +812,7 @@ mod test {
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
             .unwrap();
-        let mut metadata = Metadata23::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
         metadata
             .merge_pyproject_toml(&manifest_dir, &pyproject_toml)

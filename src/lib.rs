@@ -31,7 +31,7 @@ pub use crate::compile::{compile, BuildArtifact};
 pub use crate::develop::{develop, DevelopOptions};
 #[cfg(feature = "schemars")]
 pub use crate::generate_json_schema::{generate_json_schema, GenerateJsonSchemaOptions, Mode};
-pub use crate::metadata::{Metadata23, WheelMetadata};
+pub use crate::metadata::{Metadata24, WheelMetadata};
 pub use crate::module_writer::{
     write_dist_info, ModuleWriter, PathWriter, SDistWriter, WheelWriter,
 };

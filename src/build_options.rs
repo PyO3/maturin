@@ -552,7 +552,7 @@ impl BuildContextBuilder {
             pyproject_toml_path,
             pyproject_toml,
             module_name,
-            metadata23,
+            metadata24,
             mut cargo_options,
             cargo_metadata,
             mut pyproject_toml_maturin_options,
@@ -638,7 +638,7 @@ impl BuildContextBuilder {
                 &build_options,
                 &bridge,
                 &target,
-                metadata23.requires_python.as_ref(),
+                metadata24.requires_python.as_ref(),
                 generate_import_lib,
             )?
         };
@@ -743,7 +743,7 @@ impl BuildContextBuilder {
             project_layout,
             pyproject_toml_path,
             pyproject_toml,
-            metadata23,
+            metadata24,
             crate_name,
             module_name,
             manifest_path: cargo_toml_path,

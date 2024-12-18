@@ -215,9 +215,9 @@ fn install_dependencies(
     interpreter: &PythonInterpreter,
     install_backend: &InstallBackend,
 ) -> Result<()> {
-    if !build_context.metadata23.requires_dist.is_empty() {
+    if !build_context.metadata24.requires_dist.is_empty() {
         let mut args = vec!["install".to_string()];
-        args.extend(build_context.metadata23.requires_dist.iter().map(|x| {
+        args.extend(build_context.metadata24.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
             // Remove extra marker to make it installable with pip
             // Keep in sync with `Metadata21::merge_pyproject_toml()`!
@@ -315,7 +315,7 @@ fn configure_as_editable(
     println!("✏️  Setting installed package as editable");
     install_backend.check_supports_show_files(python)?;
     let mut cmd = install_backend.make_command(python);
-    let cmd = cmd.args(["show", "--files", &build_context.metadata23.name]);
+    let cmd = cmd.args(["show", "--files", &build_context.metadata24.name]);
     debug!("running {:?}", cmd);
     let output = cmd.output()?;
     ensure!(output.status.success(), "failed to list package files");
@@ -438,7 +438,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             )?;
             eprintln!(
                 "🛠 Installed {}-{}",
-                build_context.metadata23.name, build_context.metadata23.version
+                build_context.metadata24.name, build_context.metadata24.version
             );
         }
     }

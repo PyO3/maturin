@@ -10,7 +10,7 @@ use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::target::{Arch, Os};
 use crate::{
-    compile, pyproject_toml::Format, BridgeModel, BuildArtifact, Metadata23, ModuleWriter,
+    compile, pyproject_toml::Format, BridgeModel, BuildArtifact, Metadata24, ModuleWriter,
     PyProjectToml, PythonInterpreter, Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -34,17 +34,17 @@ use tracing::instrument;
 /// Insert wasm launcher scripts as entrypoints and the wasmtime dependency
 fn bin_wasi_helper(
     artifacts_and_files: &[(&BuildArtifact, String)],
-    mut metadata23: Metadata23,
-) -> Result<Metadata23> {
+    mut metadata24: Metadata24,
+) -> Result<Metadata24> {
     eprintln!("⚠️  Warning: wasi support is experimental");
     // escaped can contain [\w\d.], but i don't know how we'd handle dots correctly here
-    if metadata23.get_distribution_escaped().contains('.') {
+    if metadata24.get_distribution_escaped().contains('.') {
         bail!(
             "Can't build wasm wheel if there is a dot in the name ('{}')",
-            metadata23.get_distribution_escaped()
+            metadata24.get_distribution_escaped()
         )
     }
-    if !metadata23.entry_points.is_empty() {
+    if !metadata24.entry_points.is_empty() {
         bail!("You can't define entrypoints yourself for a binary project");
     }
 
@@ -57,29 +57,29 @@ fn bin_wasi_helper(
             base_name.to_string(),
             format!(
                 "{}.{}:main",
-                metadata23.get_distribution_escaped(),
+                metadata24.get_distribution_escaped(),
                 base_name.replace('-', "_")
             ),
         );
     }
 
-    metadata23
+    metadata24
         .entry_points
         .insert("console_scripts".to_string(), console_scripts);
 
     // Add our wasmtime default version if the user didn't provide one
-    if !metadata23
+    if !metadata24
         .requires_dist
         .iter()
         .any(|requirement| requirement.name.as_ref() == "wasmtime")
     {
         // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
-        metadata23
+        metadata24
             .requires_dist
             .push(Requirement::from_str("wasmtime>=11.0.0,<12.0.0").unwrap());
     }
 
-    Ok(metadata23)
+    Ok(metadata24)
 }
 
 /// Contains all the metadata required to build the crate
@@ -96,12 +96,12 @@ pub struct BuildContext {
     /// Parsed pyproject.toml if any
     pub pyproject_toml: Option<PyProjectToml>,
     /// Python Package Metadata 2.3
-    pub metadata23: Metadata23,
+    pub metadata24: Metadata24,
     /// The name of the crate
     pub crate_name: String,
     /// The name of the module can be distinct from the package name, mostly
     /// because package names normally contain minuses while module names
-    /// have underscores. The package name is part of metadata23
+    /// have underscores. The package name is part of metadata24
     pub module_name: String,
     /// The path to the Cargo.toml. Required for the cargo invocations
     pub manifest_path: PathBuf,
@@ -436,7 +436,7 @@ impl BuildContext {
 
     fn add_pth(&self, writer: &mut WheelWriter) -> Result<()> {
         if self.editable {
-            writer.add_pth(&self.project_layout, &self.metadata23)?;
+            writer.add_pth(&self.project_layout, &self.metadata24)?;
         }
         Ok(())
     }
@@ -463,7 +463,7 @@ impl BuildContext {
                 "{}{}{}-*.tar.gz",
                 self.out.display(),
                 std::path::MAIN_SEPARATOR,
-                &self.metadata23.get_distribution_escaped(),
+                &self.metadata24.get_distribution_escaped(),
             );
             excludes.add(&glob_pattern)?;
         }
@@ -618,7 +618,7 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.metadata23,
+            &self.metadata24,
             &[tag.clone()],
             self.excludes(Format::Wheel)?,
         )?;
@@ -696,7 +696,7 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.metadata23,
+            &self.metadata24,
             &[tag.clone()],
             self.excludes(Format::Wheel)?,
         )?;
@@ -818,7 +818,7 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.metadata23,
+            &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
         )?;
@@ -856,7 +856,7 @@ impl BuildContext {
 
         // Warn if cffi isn't specified in the requirements
         if !self
-            .metadata23
+            .metadata24
             .requires_dist
             .iter()
             .any(|requirement| requirement.name.as_ref() == "cffi")
@@ -884,7 +884,7 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.metadata23,
+            &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
         )?;
@@ -942,7 +942,7 @@ impl BuildContext {
             _ => unreachable!(),
         };
 
-        if !self.metadata23.scripts.is_empty() {
+        if !self.metadata24.scripts.is_empty() {
             bail!("Defining scripts and working with a binary doesn't mix well");
         }
 
@@ -969,16 +969,16 @@ impl BuildContext {
             artifacts_and_files.push((artifact, bin_name))
         }
 
-        let metadata23 = if self.target.is_wasi() {
-            bin_wasi_helper(&artifacts_and_files, self.metadata23.clone())?
+        let metadata24 = if self.target.is_wasi() {
+            bin_wasi_helper(&artifacts_and_files, self.metadata24.clone())?
         } else {
-            self.metadata23.clone()
+            self.metadata24.clone()
         };
 
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &metadata23,
+            &metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
         )?;
@@ -1000,9 +1000,9 @@ impl BuildContext {
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());
         for (artifact, bin_name) in &artifacts_and_files {
             artifacts_ref.push(*artifact);
-            write_bin(&mut writer, &artifact.path, &self.metadata23, bin_name)?;
+            write_bin(&mut writer, &artifact.path, &self.metadata24, bin_name)?;
             if self.target.is_wasi() {
-                write_wasm_launcher(&mut writer, &self.metadata23, bin_name)?;
+                write_wasm_launcher(&mut writer, &self.metadata24, bin_name)?;
             }
         }
         self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;

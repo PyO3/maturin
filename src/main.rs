@@ -285,7 +285,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 BridgeModel::Bindings(..) | BridgeModel::Bin(Some(..)) => {
                     vec![context.interpreter[0].get_tag(&context, &[PlatformTag::Linux])?]
                 }
-                BridgeModel::BindingsAbi3(major, minor) => {
+                BridgeModel::BindingsAbi3 { major, minor, .. } => {
                     let platform = context.get_platform_tag(&[PlatformTag::Linux])?;
                     vec![format!("cp{major}{minor}-abi3-{platform}")]
                 }

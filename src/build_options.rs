@@ -354,7 +354,7 @@ impl BuildOptions {
                 Ok(vec![interpreter])
             }
             BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
-            BridgeModel::BindingsAbi3(major, minor) => {
+            BridgeModel::BindingsAbi3 { major, minor, .. } => {
                 let found_interpreters =
                     find_interpreter_in_host(bridge, interpreter, target, requires_python)
                         .or_else(|err| {
@@ -1143,7 +1143,16 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
                 eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
-                Ok(BridgeModel::BindingsAbi3(major, minor))
+                let version = packages[lib].version.clone();
+                let bindings = Bindings {
+                    name: lib.to_string(),
+                    version,
+                };
+                Ok(BridgeModel::BindingsAbi3 {
+                    bindings,
+                    major,
+                    minor,
+                })
             } else {
                 eprintln!("🔗 Found {lib} bindings");
                 Ok(bridge)
@@ -1512,14 +1521,16 @@ mod test {
             .exec()
             .unwrap();
 
-        assert!(matches!(
-            find_bridge(&pyo3_pure, None),
-            Ok(BridgeModel::BindingsAbi3(3, 7))
-        ));
-        assert!(matches!(
-            find_bridge(&pyo3_pure, Some("pyo3")),
-            Ok(BridgeModel::BindingsAbi3(3, 7))
-        ));
+        let bridge = BridgeModel::BindingsAbi3 {
+            bindings: Bindings {
+                name: "pyo3".to_string(),
+                version: semver::Version::new(0, 23, 3),
+            },
+            major: 3,
+            minor: 7,
+        };
+        assert_eq!(find_bridge(&pyo3_pure, None).unwrap(), bridge);
+        assert_eq!(find_bridge(&pyo3_pure, Some("pyo3")).unwrap(), bridge);
     }
 
     #[test]

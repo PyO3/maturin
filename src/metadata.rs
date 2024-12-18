@@ -7,7 +7,7 @@ use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue, Requi
 use pyproject_toml::License;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str;
@@ -134,10 +134,23 @@ impl Metadata24 {
     ) -> Result<()> {
         let pyproject_dir = pyproject_dir.as_ref();
         if let Some(project) = &pyproject_toml.project {
-            self.name.clone_from(&project.name);
+            let dynamic: HashSet<&str> = project
+                .dynamic
+                .as_ref()
+                .map(|x| x.iter().map(AsRef::as_ref).collect())
+                .unwrap_or_default();
+            if dynamic.contains("name") {
+                bail!("`project.dynamic` must not specify `name` in pyproject.toml");
+            }
 
+            self.name.clone_from(&project.name);
             if let Some(version) = &project.version {
+                if dynamic.contains("version") {
+                    bail!("`project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
+                }
                 self.version = version.clone();
+            } else if !dynamic.contains("version") {
+                bail!("`project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
             }
 
             if let Some(description) = &project.description {

@@ -9,3 +9,4 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 requires-python = ">=3.7"
+dynamic = ["version"]

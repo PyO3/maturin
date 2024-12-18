@@ -5,6 +5,7 @@ build-backend = "maturin"
 [project]
 name = "license-test"
 license = { file = "LICENCE.txt" }
+dynamic = ["version"]
 
 [tool.maturin]
 bindings = "bin"

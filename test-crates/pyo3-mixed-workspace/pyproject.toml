@@ -9,6 +9,7 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 requires-python = ">=3.7"
+dynamic = ["version"]
 
 [project.scripts]
 get_42 = "pyo3_mixed_workspace:get_42"

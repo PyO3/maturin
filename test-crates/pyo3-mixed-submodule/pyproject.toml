@@ -8,6 +8,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Rust"
 ]
+dynamic = ["version"]
 
 [tool.maturin]
 module-name = "pyo3_mixed_submodule.rust_module.rust"

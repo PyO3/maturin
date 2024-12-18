@@ -290,15 +290,16 @@ fn cargo_build_command(
         #[cfg(feature = "xwin")]
         {
             // Don't use xwin if the Windows MSVC compiler can compile to the target
-            let native_compile = cc::Build::new()
-                .opt_level(0)
-                .host(target.host_triple())
-                .target(target_triple)
-                .cargo_metadata(false)
-                .cargo_warnings(false)
-                .cargo_output(false)
-                .try_get_compiler()
-                .is_ok();
+            let native_compile = target.host_triple().contains("windows-msvc")
+                && cc::Build::new()
+                    .opt_level(0)
+                    .host(target.host_triple())
+                    .target(target_triple)
+                    .cargo_metadata(false)
+                    .cargo_warnings(false)
+                    .cargo_output(false)
+                    .try_get_compiler()
+                    .is_ok();
             let force_xwin = env::var("MATURIN_USE_XWIN").ok().as_deref() == Some("1");
             if !native_compile || force_xwin {
                 println!("🛠️ Using xwin for cross-compiling to {target_triple}");

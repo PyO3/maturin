@@ -282,9 +282,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.19.5"
+version = "0.19.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5eb13fbc2ba490ac9eb0b359cf46ba265255424c04a172f1c1772a8b9532283d"
+checksum = "04cc649328f39bbf1ef92ef753406e1785ff1074941c398e5214b6c74d318a9e"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -301,7 +301,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shlex",
- "target-lexicon",
+ "target-lexicon 0.13.0",
  "which",
 ]
 
@@ -1430,7 +1430,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tar",
- "target-lexicon",
+ "target-lexicon 0.12.16",
  "tempfile",
  "textwrap",
  "thiserror 2.0.3",
@@ -2489,6 +2489,12 @@ name = "target-lexicon"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
+
+[[package]]
+name = "target-lexicon"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ff4a4048091358129767b8a200d6927f58876c8b5ea16fb7b0222d43b79bfa8"
 
 [[package]]
 name = "tempfile"

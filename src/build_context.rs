@@ -1186,7 +1186,10 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
             .context("llvm-target is not a string")?;
         let triple = llvm_target.parse::<target_lexicon::Triple>();
         let (major, minor) = match triple.map(|t| t.operating_system) {
-            Ok(OperatingSystem::MacOSX { major, minor, .. }) => (major, minor),
+            Ok(
+                OperatingSystem::MacOSX(Some(deployment_target))
+                | OperatingSystem::Darwin(Some(deployment_target)),
+            ) => (deployment_target.major, u16::from(deployment_target.minor)),
             _ => fallback_version,
         };
         Ok((major, minor))

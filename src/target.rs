@@ -249,8 +249,8 @@ impl Target {
         let os = match platform.operating_system {
             OperatingSystem::Linux => Os::Linux,
             OperatingSystem::Windows => Os::Windows,
-            OperatingSystem::MacOSX { .. } | OperatingSystem::Darwin => Os::Macos,
-            OperatingSystem::Ios => Os::Ios,
+            OperatingSystem::MacOSX(_) | OperatingSystem::Darwin(_) => Os::Macos,
+            OperatingSystem::IOS(_) => Os::Ios,
             OperatingSystem::Netbsd => Os::NetBsd,
             OperatingSystem::Freebsd => Os::FreeBsd,
             OperatingSystem::Openbsd => Os::OpenBsd,

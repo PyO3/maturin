@@ -65,6 +65,7 @@ impl fmt::Display for Os {
 #[serde(rename_all = "lowercase")]
 pub enum Arch {
     Aarch64,
+    Armv5teL,
     Armv6L,
     Armv7L,
     #[serde(alias = "ppc")]
@@ -93,6 +94,7 @@ impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Arch::Aarch64 => write!(f, "aarch64"),
+            Arch::Armv5teL => write!(f, "armv5tel"),
             Arch::Armv6L => write!(f, "armv6l"),
             Arch::Armv7L => write!(f, "armv7l"),
             Arch::Powerpc => write!(f, "ppc"),
@@ -124,7 +126,7 @@ impl Arch {
         // MACHINE_ARCH	vs MACHINE_CPUARCH vs MACHINE section
         match self {
             Arch::Aarch64 => "arm64",
-            Arch::Armv6L | Arch::Armv7L => "arm",
+            Arch::Armv5teL | Arch::Armv6L | Arch::Armv7L => "arm",
             Arch::Powerpc | Arch::Powerpc64Le | Arch::Powerpc64 => "powerpc",
             Arch::X86 => "i386",
             Arch::X86_64 => "amd64",
@@ -145,6 +147,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
     match os {
         Os::Linux => vec![
             Arch::Aarch64,
+            Arch::Armv5teL,
             Arch::Armv6L,
             Arch::Armv7L,
             Arch::Powerpc,
@@ -269,6 +272,7 @@ impl Target {
             Architecture::X86_64 | Architecture::X86_64h => Arch::X86_64,
             Architecture::X86_32(_) => Arch::X86,
             Architecture::Arm(arm_arch) => match arm_arch {
+                ArmArchitecture::Armv5te => Arch::Armv5teL,
                 ArmArchitecture::Arm | ArmArchitecture::Armv6 => Arch::Armv6L,
                 ArmArchitecture::Armv7 => Arch::Armv7L,
                 _ => bail!("The architecture {} is not supported", arm_arch),
@@ -360,6 +364,7 @@ impl Target {
     pub fn get_python_arch(&self) -> &str {
         match self.arch {
             Arch::Aarch64 => "aarch64",
+            Arch::Armv5teL => "armv5tel",
             Arch::Armv6L => "armv6l",
             Arch::Armv7L => "armv7l",
             Arch::Powerpc => "ppc",
@@ -382,7 +387,10 @@ impl Target {
 
     /// Returns the extension architecture name python uses in `ext_suffix` for this architecture.
     pub fn get_python_ext_arch(&self, python_impl: InterpreterKind) -> &str {
-        if matches!(self.target_arch(), Arch::Armv6L | Arch::Armv7L) {
+        if matches!(
+            self.target_arch(),
+            Arch::Armv5teL | Arch::Armv6L | Arch::Armv7L
+        ) {
             "arm"
         } else if matches!(self.target_arch(), Arch::Powerpc64Le)
             && python_impl == InterpreterKind::PyPy
@@ -455,7 +463,8 @@ impl Target {
                     PlatformTag::manylinux2010()
                 }
             }
-            Arch::Armv6L
+            Arch::Armv5teL
+            | Arch::Armv6L
             | Arch::Wasm32
             | Arch::Riscv32
             | Arch::Riscv64
@@ -484,7 +493,8 @@ impl Target {
             | Arch::Sparc64
             | Arch::Sparcv9
             | Arch::LoongArch64 => 64,
-            Arch::Armv6L
+            Arch::Armv5teL
+            | Arch::Armv6L
             | Arch::Armv7L
             | Arch::X86
             | Arch::Wasm32

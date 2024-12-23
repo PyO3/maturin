@@ -597,14 +597,14 @@ fn entry_points_txt(
 }
 
 /// Glue code that exposes `lib`.
-fn cffi_init_file(extension_name: &str) -> String {
+fn cffi_init_file(cffi_module_file_name: &str) -> String {
     format!(
         r#"__all__ = ["lib", "ffi"]
 
 import os
 from .ffi import ffi
 
-lib = ffi.dlopen(os.path.join(os.path.dirname(__file__), '{extension_name}.so'))
+lib = ffi.dlopen(os.path.join(os.path.dirname(__file__), '{cffi_module_file_name}'))
 del os
 "#
     )
@@ -882,6 +882,7 @@ if hasattr({ext_name}, "__all__"):
 #[allow(clippy::too_many_arguments)]
 pub fn write_cffi_module(
     writer: &mut impl ModuleWriter,
+    target: &Target,
     project_layout: &ProjectLayout,
     crate_dir: &Path,
     target_dir: &Path,
@@ -898,22 +899,28 @@ pub fn write_cffi_module(
             .context("Failed to add the python module to the package")?;
     }
 
+    let cffi_module_file_name = {
+        let extension_name = &project_layout.extension_name;
+        // https://cffi.readthedocs.io/en/stable/embedding.html#issues-about-using-the-so
+        match target.target_os() {
+            Os::Macos => format!("lib{extension_name}.dylib"),
+            Os::Windows => format!("{extension_name}.dll"),
+            _ => format!("lib{extension_name}.so"),
+        }
+    };
     let module;
     if let Some(python_module) = &project_layout.python_module {
         if editable {
             let base_path = python_module.join(&project_layout.extension_name);
             fs::create_dir_all(&base_path)?;
-            let target = base_path.join(format!(
-                "{extension_name}.so",
-                extension_name = &project_layout.extension_name
-            ));
+            let target = base_path.join(&cffi_module_file_name);
             fs::copy(artifact, &target).context(format!(
                 "Failed to copy {} to {}",
                 artifact.display(),
                 target.display()
             ))?;
             File::create(base_path.join("__init__.py"))?
-                .write_all(cffi_init_file(&project_layout.extension_name).as_bytes())?;
+                .write_all(cffi_init_file(&cffi_module_file_name).as_bytes())?;
             File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
         }
 
@@ -942,17 +949,10 @@ pub fn write_cffi_module(
         writer.add_bytes(
             module.join("__init__.py"),
             None,
-            cffi_init_file(&project_layout.extension_name).as_bytes(),
+            cffi_init_file(&cffi_module_file_name).as_bytes(),
         )?;
         writer.add_bytes(module.join("ffi.py"), None, cffi_declarations.as_bytes())?;
-        writer.add_file_with_permissions(
-            module.join(format!(
-                "{extension_name}.so",
-                extension_name = &project_layout.extension_name
-            )),
-            artifact,
-            0o755,
-        )?;
+        writer.add_file_with_permissions(module.join(&cffi_module_file_name), artifact, 0o755)?;
     }
 
     Ok(())

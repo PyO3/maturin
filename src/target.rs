@@ -270,7 +270,8 @@ impl Target {
             Architecture::X86_32(_) => Arch::X86,
             Architecture::Arm(arm_arch) => match arm_arch {
                 ArmArchitecture::Arm | ArmArchitecture::Armv6 => Arch::Armv6L,
-                _ => Arch::Armv7L,
+                ArmArchitecture::Armv7 => Arch::Armv7L,
+                _ => bail!("The architecture {} is not supported", arm_arch),
             },
             Architecture::Aarch64(_) => Arch::Aarch64,
             Architecture::Powerpc => Arch::Powerpc,

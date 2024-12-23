@@ -826,6 +826,7 @@ impl BuildContext {
 
         write_cffi_module(
             &mut writer,
+            &self.target,
             &self.project_layout,
             self.manifest_path.parent().unwrap(),
             &self.target_dir,

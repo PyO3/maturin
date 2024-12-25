@@ -739,6 +739,9 @@ impl PythonInterpreter {
         let min_pypy_minor = bindings
             .map(|bindings| bindings.minimal_pypy_minor_version())
             .unwrap_or(MINIMUM_PYPY_MINOR);
+        let supports_free_threaded = bridge
+            .map(|bridge| bridge.supports_free_threaded())
+            .unwrap_or(false);
         InterpreterConfig::lookup_target(target)
             .into_iter()
             .filter_map(|config| match requires_python {
@@ -769,6 +772,13 @@ impl PythonInterpreter {
                     }
                 }
                 InterpreterKind::GraalPy => Some(config),
+            })
+            .filter_map(|config| {
+                if config.gil_disabled && !supports_free_threaded {
+                    None
+                } else {
+                    Some(config)
+                }
             })
             .collect()
     }
@@ -1047,8 +1057,35 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
-                "CPython 3.13t",
                 "PyPy 3.8",
+                "PyPy 3.9",
+                "PyPy 3.10",
+            ]
+        "#]];
+        expected.assert_debug_eq(&pythons);
+
+        // pyo3 0.23+ should find CPython 3.13t
+        let pythons = PythonInterpreter::find_by_target(
+            &target,
+            None,
+            Some(&BridgeModel::Bindings(Bindings {
+                name: "pyo3".to_string(),
+                version: semver::Version::new(0, 23, 0),
+            })),
+        )
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+        let expected = expect![[r#"
+            [
+                "CPython 3.7m",
+                "CPython 3.8",
+                "CPython 3.9",
+                "CPython 3.10",
+                "CPython 3.11",
+                "CPython 3.12",
+                "CPython 3.13",
+                "CPython 3.13t",
                 "PyPy 3.9",
                 "PyPy 3.10",
             ]
@@ -1071,7 +1108,6 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
-                "CPython 3.13t",
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
@@ -1093,7 +1129,6 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
-                "CPython 3.13t",
                 "PyPy 3.10",
             ]
         "#]];

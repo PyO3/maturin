@@ -49,6 +49,18 @@ impl Bindings {
             _ => MINIMUM_PYPY_MINOR,
         }
     }
+
+    /// free-threaded Python support
+    fn supports_free_threaded(&self) -> bool {
+        match self.name.as_str() {
+            "pyo3" | "pyo3-ffi" => {
+                let major_version = self.version.major;
+                let minor_version = self.version.minor;
+                (major_version, minor_version) >= (0, 23)
+            }
+            _ => false,
+        }
+    }
 }
 
 /// The way the rust code is used in the wheel
@@ -107,6 +119,17 @@ impl BridgeModel {
     /// Test whether this is bin bindings
     pub fn is_bin(&self) -> bool {
         matches!(self, BridgeModel::Bin(_))
+    }
+
+    /// free-threaded Python support
+    pub fn supports_free_threaded(&self) -> bool {
+        match self {
+            BridgeModel::Bin(Some(bindings))
+            | BridgeModel::Bindings(bindings)
+            | BridgeModel::BindingsAbi3 { bindings, .. } => bindings.supports_free_threaded(),
+            BridgeModel::Bin(None) => true,
+            BridgeModel::Cffi | BridgeModel::UniFfi => false,
+        }
     }
 }
 

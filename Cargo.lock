@@ -258,9 +258,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "514304d9e9a4b3577168d9e36b6fd9315c206b48bbe60bd2033f250c6e5b85ab"
+checksum = "76ddeb44d5109bca38ed11f0400b0385b5ba3fc03e737d188d9b86d784daeb49"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -1388,7 +1388,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "1.7.8"
+version = "1.8.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

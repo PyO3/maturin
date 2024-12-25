@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.8.0]
+
+* Don't add wheel data to sdist in [#2367](https://github.com/PyO3/maturin/pull/2367)
+* Add sparcv9 architecture support in [#2380](https://github.com/PyO3/maturin/pull/2380)
+* Properly handle dynamic version in pyproject.toml in [#2391](https://github.com/PyO3/maturin/pull/2391)
+* Fix xwin cross compile on non-Windows system in [#2391](https://github.com/PyO3/maturin/pull/2391)
+* Fix interpreter selection for abi3 bindings in [#2392](https://github.com/PyO3/maturin/pull/2392)
+* Use the official recommended naming pattern for cffi module file in [#2406](https://github.com/PyO3/maturin/pull/2406)
+* Add Linux armv5te architecture support in [#2409](https://github.com/PyO3/maturin/pull/2409)
+* Only build Python 3.13t wheels by default for `pyo3` 0.23+ in [#2413](https://github.com/PyO3/maturin/pull/2413)
+
+## [1.7.8]
+
+* Fix aarch64 Windows cross compilation in [#2359](https://github.com/PyO3/maturin/pull/2359)
+
 ## [1.7.7]
 
 * Fix abi3 interpreter discovery on Windows in [#2333](https://github.com/PyO3/maturin/pull/2333)
@@ -1011,7 +1026,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.7.7...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/pyo3/maturin/compare/v1.7.8...v1.8.0
+[1.7.8]: https://github.com/pyo3/maturin/compare/v1.7.7...v1.7.8
 [1.7.7]: https://github.com/pyo3/maturin/compare/v1.7.6...v1.7.7
 [1.7.6]: https://github.com/pyo3/maturin/compare/v1.7.5...v1.7.6
 [1.7.5]: https://github.com/pyo3/maturin/compare/v1.7.4...v1.7.5

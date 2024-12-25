@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>", "messense <messense@icloud.com>"]
 name = "maturin"
-version = "1.7.8"
+version = "1.8.0"
 description = "Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
 exclude = [
     "test-crates/**/*",
@@ -98,7 +98,7 @@ clap_complete_command = { version = "0.6.1", optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.19.7", default-features = false, optional = true }
-cargo-xwin = { version = "0.18.2", default-features = false, optional = true }
+cargo-xwin = { version = "0.18.3", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"

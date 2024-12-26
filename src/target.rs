@@ -463,11 +463,11 @@ impl Target {
                     PlatformTag::manylinux2010()
                 }
             }
+            Arch::Riscv64 => PlatformTag::Manylinux { x: 2, y: 31 },
             Arch::Armv5teL
             | Arch::Armv6L
             | Arch::Wasm32
             | Arch::Riscv32
-            | Arch::Riscv64
             | Arch::Mips64el
             | Arch::Mips64
             | Arch::Mipsel

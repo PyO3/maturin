@@ -146,11 +146,11 @@ impl Metadata24 {
             self.name.clone_from(&project.name);
             if let Some(version) = &project.version {
                 if dynamic.contains("version") {
-                    bail!("`project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
+                    eprintln!("⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
                 }
                 self.version = version.clone();
             } else if !dynamic.contains("version") {
-                bail!("`project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
+                eprintln!("⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
             }
 
             if let Some(description) = &project.description {

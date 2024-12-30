@@ -409,8 +409,8 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         .as_ref()
         .is_some_and(|p| !p.warn_invalid_version_info())
     {
-        bail!("Cannot build source distribution without valid version information. \
-               You need to specify either `project.version` or `project.dynamic = ['version']` in pyproject.toml.");
+        bail!("Cannot build without valid version information. \
+               You need to specify either `project.version` or `project.dynamic = [\"version\"]` in pyproject.toml.");
     }
 
     let interpreter =

@@ -426,6 +426,30 @@ impl PyProjectToml {
         );
         false
     }
+
+    /// Having a pyproject.toml project table with neither `version` nor `dynamic = ['version']`
+    /// violates https://packaging.python.org/en/latest/specifications/pyproject-toml/#dynamic.
+    ///
+    /// Returns true if version information is specified correctly or no project table is present.
+    pub fn warn_invalid_version_info(&self) -> bool {
+        let Some(project) = &self.project else {
+            return true;
+        };
+        let has_static_version = project.version.is_some();
+        let has_dynamic_version = project
+            .dynamic
+            .as_ref()
+            .is_some_and(|d| d.iter().any(|s| s == "version"));
+        if has_static_version && has_dynamic_version {
+            eprintln!("⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
+            return false;
+        }
+        if !has_static_version && !has_dynamic_version {
+            eprintln!("⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
+            return false;
+        }
+        true
+    }
 }
 
 #[cfg(test)]
@@ -542,6 +566,62 @@ mod tests {
         .unwrap();
         let without_constraint = PyProjectToml::new(pyproject_file).unwrap();
         assert!(!without_constraint.warn_bad_maturin_version());
+    }
+
+    #[test]
+    fn test_warn_invalid_version_info_conflict() {
+        let conflict = toml::from_str::<PyProjectToml>(
+            r#"[build-system]
+            requires = ["maturin==1.0.0"]
+
+            [project]
+            name = "..."
+            version = "1.2.3"
+            dynamic = ['version']
+            "#,
+        )
+        .unwrap();
+        assert!(!conflict.warn_invalid_version_info());
+    }
+
+    #[test]
+    fn test_warn_invalid_version_info_missing() {
+        let missing = toml::from_str::<PyProjectToml>(
+            r#"[build-system]
+            requires = ["maturin==1.0.0"]
+
+            [project]
+            name = "..."
+            "#,
+        )
+        .unwrap();
+        assert!(!missing.warn_invalid_version_info());
+    }
+
+    #[test]
+    fn test_warn_invalid_version_info_ok() {
+        let static_ver = toml::from_str::<PyProjectToml>(
+            r#"[build-system]
+            requires = ["maturin==1.0.0"]
+
+            [project]
+            name = "..."
+            version = "1.2.3"
+            "#,
+        )
+        .unwrap();
+        assert!(static_ver.warn_invalid_version_info());
+        let dynamic_ver = toml::from_str::<PyProjectToml>(
+            r#"[build-system]
+            requires = ["maturin==1.0.0"]
+
+            [project]
+            name = "..."
+            dynamic = ['version']
+            "#,
+        )
+        .unwrap();
+        assert!(dynamic_ver.warn_invalid_version_info());
     }
 
     #[test]

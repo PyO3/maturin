@@ -403,6 +403,16 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         .editable(true)
         .build()?;
 
+    // Ensure that version information is present, https://github.com/PyO3/maturin/issues/2416
+    if build_context
+        .pyproject_toml
+        .as_ref()
+        .is_some_and(|p| !p.warn_invalid_version_info())
+    {
+        bail!("Cannot build source distribution without valid version information. \
+               You need to specify either `project.version` or `project.dynamic = ['version']` in pyproject.toml.");
+    }
+
     let interpreter =
         PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
             || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),

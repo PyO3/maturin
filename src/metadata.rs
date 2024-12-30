@@ -144,13 +144,18 @@ impl Metadata24 {
             }
 
             self.name.clone_from(&project.name);
-            if let Some(version) = &project.version {
-                if dynamic.contains("version") {
-                    eprintln!("⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
+
+            let version_ok = pyproject_toml.warn_invalid_version_info();
+            if !version_ok {
+                // This is a hard error for maturin>=2.0, see https://github.com/PyO3/maturin/issues/2416.
+                let current_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<usize>().unwrap();
+                if current_major > 1 {
+                    bail!("Invalid version information in pyproject.toml.");
                 }
+            }
+
+            if let Some(version) = &project.version {
                 self.version = version.clone();
-            } else if !dynamic.contains("version") {
-                eprintln!("⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
             }
 
             if let Some(description) = &project.description {

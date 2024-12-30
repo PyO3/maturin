@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.1]
+
+* Downgrade invalid version info in `pyproject.toml` error to warning in [#2417](https://github.com/PyO3/maturin/pull/2417)
+* Make `maturin develop` fail if version info is invalid in pyproject.toml in [#2418](https://github.com/PyO3/maturin/pull/2418)
+
 ## [1.8.0]
 
 * Don't add wheel data to sdist in [#2367](https://github.com/PyO3/maturin/pull/2367)
@@ -1026,7 +1031,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/pyo3/maturin/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/pyo3/maturin/compare/v1.7.8...v1.8.0
 [1.7.8]: https://github.com/pyo3/maturin/compare/v1.7.7...v1.7.8
 [1.7.7]: https://github.com/pyo3/maturin/compare/v1.7.6...v1.7.7

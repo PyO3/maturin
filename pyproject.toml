@@ -1,6 +1,6 @@
 # Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
-requires = ["setuptools", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust @ git+https://github.com/PyO3/setuptools-rust#konsti/add-custom-env-vars"]
+requires = ["setuptools", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust @ git+https://github.com/PyO3/setuptools-rust@konsti/add-custom-env-vars"]
 backend-path = ["maturin"]
 build-backend = "boostrap"
 

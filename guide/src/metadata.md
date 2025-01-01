@@ -56,6 +56,34 @@ spam-gui = "spam:main_gui"
 tomatoes = "spam:main_tomatoes"
 ```
 
+## Dynamic metadata
+
+Maturin has limited support for [dynamic metadata](https://packaging.python.org/en/latest/specifications/pyproject-toml/#dynamic) in `pyproject.toml`.
+
+When the `[project]` section is not present, maturin will populate metadata from `Cargo.toml` with the following fields:
+
+* `name` - From `package.name` in Cargo.toml
+* `version` - From `package.version` in Cargo.toml (converted from SemVer to PEP 440 format)
+* `summary` - From `package.description` in Cargo.toml
+* `description` - From the contents of the README file specified in Cargo.toml's `package.readme`
+* `description_content_type` - Set based on the README file extension (e.g. `text/markdown` for `.md` files)
+* `keywords` - From `package.keywords` in Cargo.toml, joined with commas
+* `home_page` - From `package.homepage` in Cargo.toml
+* `author` - From `package.authors` in Cargo.toml, joined with commas
+* `author_email` - From `package.authors` in Cargo.toml if it contains email addresses
+* `license` - From `package.license` in Cargo.toml
+* `project_url` - From various URLs in Cargo.toml (like repository, homepage, etc.)
+
+When the `[project]` section is present, maturin will merge metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
+Per specification, maturin is not allowed to populate fields that are not present in `project.dynamic` list when the `[project]` section is present.
+For example, to use the Rust crate version as the Python package version, you need to add `version` to the `project.dynamic` list:
+
+```toml
+[project]
+name = "my-awesome-project"
+dynamic = ["version"]
+```
+
 ## Add Python dependencies
 
 To specify python dependencies, add a list `dependencies` in a `[project]` section in the `pyproject.toml`. This list is equivalent to `install_requires` in setuptools:

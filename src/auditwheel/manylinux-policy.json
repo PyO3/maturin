@@ -29,7 +29,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -54,7 +54,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -114,7 +114,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -167,7 +167,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -220,7 +220,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -273,7 +273,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -333,7 +333,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "uncompress2", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -393,7 +393,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -453,7 +453,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "bi_windup", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "crc_fold_512to32", "crc_fold_copy", "crc_fold_init", "deflate_copyright", "deflate_medium", "fill_window", "flush_pending", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "longest_match", "slide_hash_sse", "static_ltree", "x86_check_features", "x86_cpu_has_pclmul", "x86_cpu_has_sse2", "x86_cpu_has_sse42", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -513,7 +513,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_acle", "crc32_combine_gen", "crc32_combine_gen64", "crc32_combine_op", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -522,58 +522,58 @@
     "priority": 55,
     "symbol_versions": {
       "i686": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "FLOAT128", "TM_1"],
-        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "4.0.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0", "13.0.0"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "FLOAT128", "TM_1"],
+        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "4.0.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0"],
         "GLIBC": ["2.0", "2.1", "2.1.1", "2.1.2", "2.1.3", "2.2", "2.2.1", "2.2.2", "2.2.3", "2.2.4", "2.2.6", "2.3", "2.3.2", "2.3.3", "2.3.4", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.37", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "x86_64": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "FLOAT128", "TM_1"],
-        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0", "13.0.0"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "FLOAT128", "TM_1"],
+        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0"],
         "GLIBC": ["2.2.5", "2.2.6", "2.3", "2.3.2", "2.3.3", "2.3.4", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "aarch64": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.5.0", "4.7.0", "7.0.0", "11.0"],
         "GLIBC": ["2.0", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "ppc64le": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "IEEE128_1.3.13", "LDBL_1.3", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "IEEE128_1.3.13", "LDBL_1.3", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.0", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "IEEE128_3.4.29", "IEEE128_3.4.30", "IEEE128_3.4.31", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.31", "LDBL_3.4.7"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "IEEE128_3.4.29", "IEEE128_3.4.30", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.7"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "s390x": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "LDBL_1.3", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "LDBL_1.3", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.1.0", "4.2.0", "4.3.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.2", "2.2.1", "2.2.2", "2.2.3", "2.2.4", "2.2.6", "2.3", "2.3.2", "2.3.3", "2.3.4", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.19", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.31", "LDBL_3.4.7"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.7"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "armv7l": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "ARM_1.3.3", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "ARM_1.3.3", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.3.4", "3.4", "3.4.2", "3.5", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.0", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.37", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "riscv64": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.0", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.37"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       }
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_acle", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -582,58 +582,58 @@
     "priority": 54,
     "symbol_versions": {
       "i686": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "FLOAT128", "TM_1"],
-        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "4.0.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0", "13.0.0"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "FLOAT128", "TM_1"],
+        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "4.0.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0"],
         "GLIBC": ["2.0", "2.1", "2.1.1", "2.1.2", "2.1.3", "2.2", "2.2.1", "2.2.2", "2.2.3", "2.2.4", "2.2.6", "2.3", "2.3.2", "2.3.3", "2.3.4", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.37", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "x86_64": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "FLOAT128", "TM_1"],
-        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0", "13.0.0"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "FLOAT128", "TM_1"],
+        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "4.8.0", "7.0.0", "12.0.0"],
         "GLIBC": ["2.2.5", "2.2.6", "2.3", "2.3.2", "2.3.3", "2.3.4", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "aarch64": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "TM_1"],
-        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.5.0", "4.7.0", "7.0.0", "11.0", "13.0.0"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "TM_1"],
+        "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.5.0", "4.7.0", "7.0.0", "11.0"],
         "GLIBC": ["2.0", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "ppc64le": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "IEEE128_1.3.13", "LDBL_1.3", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "IEEE128_1.3.13", "LDBL_1.3", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.0", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32", "IEEE128_3.4.29", "IEEE128_3.4.30", "IEEE128_3.4.31", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.31", "LDBL_3.4.7"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "IEEE128_3.4.29", "IEEE128_3.4.30", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.7"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "s390x": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "LDBL_1.3", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "LDBL_1.3", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.1.0", "4.2.0", "4.3.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.2", "2.2.1", "2.2.2", "2.2.3", "2.2.4", "2.2.6", "2.3", "2.3.2", "2.3.3", "2.3.4", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.19", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.31", "LDBL_3.4.7"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "LDBL_3.4", "LDBL_3.4.10", "LDBL_3.4.21", "LDBL_3.4.29", "LDBL_3.4.7"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "armv7l": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "ARM_1.3.3", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "ARM_1.3.3", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.3.4", "3.4", "3.4.2", "3.5", "4.0.0", "4.2.0", "4.3.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.0", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.18", "2.22", "2.23", "2.24", "2.25", "2.26", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.37", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       },
       "riscv64": {
-        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "1.3.14", "TM_1"],
+        "CXXABI": ["1.3", "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6", "1.3.7", "1.3.8", "1.3.9", "1.3.10", "1.3.11", "1.3.12", "1.3.13", "TM_1"],
         "GCC": ["3.0", "3.3", "3.3.1", "3.4", "3.4.2", "3.4.4", "4.0.0", "4.2.0", "4.3.0", "4.4.0", "4.5.0", "4.7.0", "7.0.0"],
         "GLIBC": ["2.0", "2.27", "2.28", "2.29", "2.30", "2.31", "2.32", "2.33", "2.34", "2.35", "2.36", "2.37", "2.38", "ABI_DT_RELR"],
-        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30", "3.4.31", "3.4.32"],
+        "GLIBCXX": ["3.4", "3.4.1", "3.4.2", "3.4.3", "3.4.4", "3.4.5", "3.4.6", "3.4.7", "3.4.8", "3.4.9", "3.4.10", "3.4.11", "3.4.12", "3.4.13", "3.4.14", "3.4.15", "3.4.16", "3.4.17", "3.4.18", "3.4.19", "3.4.20", "3.4.21", "3.4.22", "3.4.23", "3.4.24", "3.4.25", "3.4.26", "3.4.27", "3.4.28", "3.4.29", "3.4.30"],
         "ZLIB": ["1.2.0", "1.2.0.2", "1.2.0.8", "1.2.2", "1.2.2.3", "1.2.2.4", "1.2.3.3", "1.2.3.4", "1.2.3.5", "1.2.5.1", "1.2.5.2", "1.2.7.1", "1.2.9", "1.2.12"]
       }
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_acle", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   },
   {
@@ -693,7 +693,7 @@
     },
     "lib_whitelist": ["libgcc_s.so.1", "libstdc++.so.6", "libm.so.6", "libdl.so.2", "librt.so.1", "libc.so.6", "libnsl.so.1", "libutil.so.1", "libpthread.so.0", "libX11.so.6", "libXext.so.6", "libXrender.so.1", "libICE.so.6", "libSM.so.6", "libGL.so.1", "libgobject-2.0.so.0", "libgthread-2.0.so.0", "libglib-2.0.so.0", "libresolv.so.2", "libexpat.so.1", "libz.so.1"],
     "blacklist": {
-      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_le_vgfm_16", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
+      "libz.so.1": ["_dist_code", "_length_code", "_tr_align", "_tr_flush_block", "_tr_init", "_tr_stored_block", "_tr_tally", "adler32_default", "crc32_acle", "crc32_le_vgfm_16", "crc32_neon", "crc32_vpmsum", "crc32_z_default", "deflate_copyright", "gzflags", "inflate_copyright", "inflate_fast", "inflate_table", "z_errmsg", "z_vstring", "zcalloc", "zcfree"]
     }
   }
 ]

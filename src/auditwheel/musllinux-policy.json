@@ -21,6 +21,8 @@
       "s390x": {
       },
       "armv7l": {
+      },
+      "riscv64": {
       }
     },
     "lib_whitelist": ["libc.so", "libz.so.1"],
@@ -42,6 +44,8 @@
       "s390x": {
       },
       "armv7l": {
+      },
+      "riscv64": {
       }
     },
     "lib_whitelist": ["libc.so", "libz.so.1"],

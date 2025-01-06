@@ -6,7 +6,7 @@ use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
 use crate::{Bindings, BridgeModel, BuildContext, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
-use cargo_metadata::{CrateType, TargetKind};
+use cargo_metadata::{CrateType, PackageId, TargetKind};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
@@ -1034,18 +1034,47 @@ fn find_bindings(
     }
 }
 
-/// Tries to determine the [BridgeModel] for the target crate
-pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
+/// Return a map with all (transitive) dependencies of the *current* crate.
+/// This is different from `metadata.resolve`, which also includes packages
+/// that are used in the same workspace, but on which the current crate does not depend.
+fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str, &Node>> {
     let resolve = cargo_metadata
         .resolve
         .as_ref()
-        .ok_or_else(|| format_err!("Expected to get a dependency graph from cargo"))?;
+        .context("Expected to get a dependency graph from cargo")?;
+    let root = resolve
+        .root
+        .as_ref()
+        .context("expected to get a root package")?;
+    let nodes: HashMap<&PackageId, &Node> =
+        resolve.nodes.iter().map(|node| (&node.id, node)).collect();
 
-    let deps: HashMap<&str, &Node> = resolve
-        .nodes
-        .iter()
-        .map(|node| (cargo_metadata[&node.id].name.as_ref(), node))
-        .collect();
+    // Walk the dependency tree to get all (in)direct children.
+    let mut dep_ids = HashSet::with_capacity(nodes.len());
+    let mut todo = Vec::from([root]);
+    while let Some(id) = todo.pop() {
+        for dep in nodes[id].deps.iter() {
+            if dep_ids.contains(&dep.pkg) {
+                continue;
+            }
+            dep_ids.insert(&dep.pkg);
+            todo.push(&dep.pkg);
+        }
+    }
+
+    Ok(nodes
+        .into_iter()
+        .filter_map(|(id, node)| {
+            dep_ids
+                .contains(&id)
+                .then_some((cargo_metadata[id].name.as_ref(), node))
+        })
+        .collect())
+}
+
+/// Tries to determine the [BridgeModel] for the target crate
+pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
+    let deps = current_crate_dependencies(cargo_metadata)?;
     let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
         .packages
         .iter()

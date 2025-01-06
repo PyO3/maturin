@@ -373,7 +373,7 @@ jobs:\n",
         with:
           target: ${{{{ matrix.platform.target }}}}
           args: --release --out dist{maturin_args}
-          sccache: 'true'
+          sccache: ${{{{ !startsWith(github.ref, 'refs/tags/') }}}}
 "
             ));
             let maturin_action_args = match platform {
@@ -393,7 +393,7 @@ jobs:\n",
         with:
           target: ${{{{ matrix.platform.target }}}}
           args: --release --out dist{maturin_args} -i python3.13t
-          sccache: 'true'
+          sccache: ${{{{ !startsWith(github.ref, 'refs/tags/') }}}}
 "
                 ));
                 if !maturin_action_args.is_empty() {
@@ -729,7 +729,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -760,7 +760,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -788,7 +788,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -814,7 +814,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -929,14 +929,14 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -967,14 +967,14 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1002,13 +1002,13 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1034,13 +1034,13 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1143,14 +1143,14 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1181,14 +1181,14 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1216,13 +1216,13 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1248,13 +1248,13 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist -i python3.13t
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1349,7 +1349,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter --zig
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1405,7 +1405,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1463,7 +1463,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1499,7 +1499,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist --find-interpreter
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1608,7 +1608,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1636,7 +1636,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
@@ -1660,7 +1660,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:
@@ -1683,7 +1683,7 @@ mod tests {
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
-                      sccache: 'true'
+                      sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v4
                     with:

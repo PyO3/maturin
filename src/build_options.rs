@@ -934,46 +934,34 @@ fn filter_cargo_targets(
 }
 
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
-fn has_abi3(cargo_metadata: &Metadata) -> Result<Option<(u8, u8)>> {
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected cargo to return metadata with resolve")?;
+fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<(u8, u8)>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
-        let pyo3_packages = resolve
-            .nodes
-            .iter()
-            .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
-            .collect::<Vec<_>>();
-        match pyo3_packages.as_slice() {
-            [pyo3_crate] => {
-                // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
-                // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-                let abi3_selected = pyo3_crate.features.iter().any(|x| x == "abi3");
+        if let Some(pyo3_crate) = deps.get(lib) {
+            // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
+            // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
+            let abi3_selected = pyo3_crate.features.iter().any(|x| x == "abi3");
 
-                let min_abi3_version = pyo3_crate
-                    .features
-                    .iter()
-                    .filter(|x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
-                    .map(|x| {
-                        Ok((
-                            (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
-                            x[8..].parse::<u8>()?,
-                        ))
-                    })
-                    .collect::<Result<Vec<(u8, u8)>>>()
-                    .context(format!("Bogus {lib} cargo features"))?
-                    .into_iter()
-                    .min();
-                if abi3_selected && min_abi3_version.is_none() {
-                    bail!(
+            let min_abi3_version = pyo3_crate
+                .features
+                .iter()
+                .filter(|x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
+                .map(|x| {
+                    Ok((
+                        (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
+                        x[8..].parse::<u8>()?,
+                    ))
+                })
+                .collect::<Result<Vec<(u8, u8)>>>()
+                .context(format!("Bogus {lib} cargo features"))?
+                .into_iter()
+                .min();
+            if abi3_selected && min_abi3_version.is_none() {
+                bail!(
                         "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
                         maturin needs a minimum version feature to build abi3 wheels."
                     )
-                }
-                return Ok(min_abi3_version);
             }
-            _ => continue,
+            return Ok(min_abi3_version);
         }
     }
     Ok(None)
@@ -1170,7 +1158,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 );
             }
 
-            return if let Some((major, minor)) = has_abi3(cargo_metadata)? {
+            return if let Some((major, minor)) = has_abi3(&deps)? {
                 eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
                 let version = packages[lib].version.clone();
                 let bindings = Bindings {

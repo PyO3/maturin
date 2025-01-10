@@ -1117,12 +1117,7 @@ fn generate_uniffi_bindings(
 
     let py_bindings = fs::read_dir(&binding_dir)?
         .flatten()
-        .filter(|file| {
-            file.path()
-                .extension()
-                .and_then(std::ffi::OsStr::to_str)
-                .map_or(false, |ext| ext == "py")
-        })
+        .filter(|file| file.path().extension().and_then(std::ffi::OsStr::to_str) == Some("py"))
         .map(|file| {
             file.path()
                 .file_stem()

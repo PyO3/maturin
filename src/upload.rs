@@ -562,13 +562,13 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
 
     eprintln!("🚀 Uploading {} packages", items.len());
 
+    let title_re = regex::Regex::new(r"<title>(.+?)</title>").unwrap();
     for i in items {
         let upload_result = upload(&registry, i);
 
         match upload_result {
             Ok(()) => (),
             Err(UploadError::AuthenticationError(msg)) => {
-                let title_re = regex::Regex::new(r"<title>(.+?)</title>").unwrap();
                 let title = title_re
                     .captures(&msg)
                     .and_then(|c| c.get(1))

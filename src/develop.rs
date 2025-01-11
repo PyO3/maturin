@@ -162,6 +162,18 @@ fn find_uv_python(python_path: &Path) -> Result<(PathBuf, Vec<&'static str>)> {
     }
 }
 
+/// Check if a virtualenv is created by uv by reading pyvenv.cfg
+fn is_uv_venv(venv_dir: &Path) -> bool {
+    let pyvenv_cfg = venv_dir.join("pyvenv.cfg");
+    if !pyvenv_cfg.exists() {
+        return false;
+    }
+    match fs::read_to_string(&pyvenv_cfg) {
+        Ok(content) => content.contains("\nuv = "),
+        Err(_) => false,
+    }
+}
+
 /// Install the crate as module in the current virtualenv
 #[derive(Debug, clap::Parser)]
 pub struct DevelopOptions {
@@ -312,7 +324,7 @@ fn configure_as_editable(
     python: &Path,
     install_backend: &InstallBackend,
 ) -> Result<()> {
-    println!("✏️  Setting installed package as editable");
+    println!("✏️ Setting installed package as editable");
     install_backend.check_supports_show_files(python)?;
     let mut cmd = install_backend.make_command(python);
     let cmd = cmd.args(["show", "--files", &build_context.metadata24.name]);
@@ -418,10 +430,24 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
         )?;
 
-    let install_backend = if uv {
-        let (uv_path, uv_args) = find_uv_python(&interpreter.executable)
-            .or_else(|_| find_uv_bin())
-            .context("Failed to find uv")?;
+    let uv_venv = is_uv_venv(venv_dir);
+    let uv_info = if uv || uv_venv {
+        match find_uv_python(&interpreter.executable).or_else(|_| find_uv_bin()) {
+            Ok(uv_info) => Some(Ok(uv_info)),
+            Err(e) => {
+                if uv {
+                    Some(Err(e))
+                } else {
+                    // Ignore error and try pip instead if it's a uv venv but `--uv` is not specified
+                    None
+                }
+            }
+        }
+    } else {
+        None
+    };
+    let install_backend = if let Some(uv_info) = uv_info {
+        let (uv_path, uv_args) = uv_info?;
         InstallBackend::Uv {
             path: uv_path,
             args: uv_args,

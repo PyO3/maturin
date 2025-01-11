@@ -65,6 +65,17 @@ def _additional_pep517_args() -> List[str]:
     return []
 
 
+def _get_env() -> Optional[Dict[str, str]]:
+    if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
+        from puccinialin import setup_rust
+
+        print("Rust not found, installing into a temporary directory")
+        extra_env = setup_rust()
+        return {**os.environ, **extra_env}
+    else:
+        return None
+
+
 # noinspection PyUnusedLocal
 def _build_wheel(
     wheel_directory: str,
@@ -97,7 +108,7 @@ def _build_wheel(
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
-    result = subprocess.run(command, stdout=subprocess.PIPE)
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=_get_env())
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
@@ -125,7 +136,7 @@ def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
-    result = subprocess.run(command, stdout=subprocess.PIPE)
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=_get_env())
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
@@ -138,9 +149,12 @@ def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any
 # noinspection PyUnusedLocal
 def get_requires_for_build_wheel(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
     if get_config().get("bindings") == "cffi":
-        return ["cffi"]
+        requirements = ["cffi"]
     else:
-        return []
+        requirements = []
+    if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
+        requirements += ["puccinialin"]
+    return requirements
 
 
 # noinspection PyUnusedLocal
@@ -158,7 +172,10 @@ get_requires_for_build_editable = get_requires_for_build_wheel
 
 # noinspection PyUnusedLocal
 def get_requires_for_build_sdist(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
-    return []
+    requirements = []
+    if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
+        requirements += ["puccinialin"]
+    return requirements
 
 
 # noinspection PyUnusedLocal
@@ -168,7 +185,7 @@ def prepare_metadata_for_build_wheel(
     print("Checking for Rust toolchain....")
     is_cargo_installed = False
     try:
-        output = subprocess.check_output(["cargo", "--version"]).decode("utf-8", "ignore")
+        output = subprocess.check_output(["cargo", "--version"], env=_get_env()).decode("utf-8", "ignore")
         if "cargo" in output:
             is_cargo_installed = True
     except (FileNotFoundError, SubprocessError):
@@ -200,7 +217,7 @@ def prepare_metadata_for_build_wheel(
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        _output = subprocess.check_output(command)
+        _output = subprocess.check_output(command, env=_get_env())
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f"Error running maturin: {e}\n")
         sys.exit(1)

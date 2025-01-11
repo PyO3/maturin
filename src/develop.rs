@@ -125,24 +125,6 @@ fn find_uv_bin() -> Result<(PathBuf, Vec<&'static str>)> {
     }
 }
 
-fn check_pip_exists(python_path: &Path, pip_path: Option<&PathBuf>) -> Result<()> {
-    let output = if let Some(pip_path) = pip_path {
-        Command::new(pip_path).args(["--version"]).output()?
-    } else {
-        Command::new(python_path)
-            .args(["-m", "pip", "--version"])
-            .output()?
-    };
-    if output.status.success() {
-        let version_str =
-            str::from_utf8(&output.stdout).context("`pip --version` didn't return utf8 output")?;
-        debug!(version = %version_str, "Found pip");
-        Ok(())
-    } else {
-        bail!("`pip --version` failed with status: {}", output.status);
-    }
-}
-
 /// Detect the Python uv package
 fn find_uv_python(python_path: &Path) -> Result<(PathBuf, Vec<&'static str>)> {
     let output = Command::new(python_path)
@@ -159,6 +141,24 @@ fn find_uv_python(python_path: &Path) -> Result<(PathBuf, Vec<&'static str>)> {
             python_path.display(),
             output.status
         );
+    }
+}
+
+fn check_pip_exists(python_path: &Path, pip_path: Option<&PathBuf>) -> Result<()> {
+    let output = if let Some(pip_path) = pip_path {
+        Command::new(pip_path).args(["--version"]).output()?
+    } else {
+        Command::new(python_path)
+            .args(["-m", "pip", "--version"])
+            .output()?
+    };
+    if output.status.success() {
+        let version_str =
+            str::from_utf8(&output.stdout).context("`pip --version` didn't return utf8 output")?;
+        debug!(version = %version_str, "Found pip");
+        Ok(())
+    } else {
+        bail!("`pip --version` failed with status: {}", output.status);
     }
 }
 
@@ -224,7 +224,8 @@ pub struct DevelopOptions {
 fn install_dependencies(
     build_context: &BuildContext,
     extras: &[String],
-    interpreter: &PythonInterpreter,
+    python: &Path,
+    venv_dir: &Path,
     install_backend: &InstallBackend,
 ) -> Result<()> {
     if !build_context.metadata24.requires_dist.is_empty() {
@@ -256,12 +257,17 @@ fn install_dependencies(
             pkg.to_string()
         }));
         let status = install_backend
-            .make_command(&interpreter.executable)
+            .make_command(python)
             .args(&args)
+            .env("VIRTUAL_ENV", venv_dir)
             .status()
-            .context("Failed to run pip install")?;
+            .with_context(|| format!("Failed to run {} install", install_backend.name()))?;
         if !status.success() {
-            bail!(r#"pip install finished with "{}""#, status)
+            bail!(
+                r#"{} install finished with "{}""#,
+                install_backend.name(),
+                status
+            )
         }
     }
     Ok(())
@@ -279,6 +285,7 @@ fn install_wheel(
     let output = cmd
         .args(["install", "--no-deps", "--force-reinstall"])
         .arg(dunce::simplified(wheel_filename))
+        .env("VIRTUAL_ENV", venv_dir)
         .output()
         .context(format!(
             "{} install failed (ran {:?} with {:?})",
@@ -460,7 +467,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         }
     };
 
-    install_dependencies(&build_context, &extras, &interpreter, &install_backend)?;
+    install_dependencies(&build_context, &extras, &python, venv_dir, &install_backend)?;
 
     let wheels = build_context.build_wheels()?;
     if !skip_install {

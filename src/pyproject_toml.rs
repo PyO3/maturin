@@ -707,11 +707,13 @@ mod tests {
         let inner_error = outer_error.source().unwrap();
 
         let expected = expect![[r#"
-            TOML parse error at line 7, column 17
-              |
-            7 | license-files = [ "license.txt",]
-              |                 ^^^^^^^^^^^^^^^^^
-            wanted string or table
+            TOML parse error at line 10, column 16
+               |
+            10 | dependencies = [ "packaging", "...",]
+               |                ^^^^^^^^^^^^^^^^^^^^^^
+            URL requirement must be preceded by a package name. Add the name of the package before the URL (e.g., `package_name @ /path/to/file`).
+            ...
+            ^^^
         "#]];
         expected.assert_eq(&inner_error.to_string());
     }

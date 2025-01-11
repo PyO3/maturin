@@ -10,7 +10,6 @@ use anyhow::ensure;
 use anyhow::{anyhow, bail, Context, Result};
 use cargo_options::heading;
 use fs_err as fs;
-use pep508_rs::{MarkerExpression, MarkerOperator, MarkerTree, MarkerValue};
 use regex::Regex;
 use std::path::Path;
 use std::path::PathBuf;
@@ -229,31 +228,23 @@ fn install_dependencies(
     install_backend: &InstallBackend,
 ) -> Result<()> {
     if !build_context.metadata24.requires_dist.is_empty() {
+        let mut extra_names = Vec::with_capacity(extras.len());
+        for extra in extras {
+            extra_names.push(
+                pep508_rs::ExtraName::new(extra.clone())
+                    .with_context(|| format!("invalid extra name: {extra}"))?,
+            );
+        }
         let mut args = vec!["install".to_string()];
         args.extend(build_context.metadata24.requires_dist.iter().map(|x| {
             let mut pkg = x.clone();
-            // Remove extra marker to make it installable with pip
-            // Keep in sync with `Metadata21::merge_pyproject_toml()`!
-            for extra in extras {
-                pkg.marker = pkg.marker.and_then(|marker| -> Option<MarkerTree> {
-                    match marker.clone() {
-                        MarkerTree::Expression(MarkerExpression {
-                            l_value: MarkerValue::Extra,
-                            operator: MarkerOperator::Equal,
-                            r_value: MarkerValue::QuotedString(extra_value),
-                        }) if &extra_value == extra => None,
-                        MarkerTree::And(and) => match &*and {
-                            [existing, MarkerTree::Expression(MarkerExpression {
-                                l_value: MarkerValue::Extra,
-                                operator: MarkerOperator::Equal,
-                                r_value: MarkerValue::QuotedString(extra_value),
-                            })] if extra_value == extra => Some(existing.clone()),
-                            _ => Some(marker),
-                        },
-                        _ => Some(marker),
-                    }
-                });
-            }
+            // Remove extra marker to make it installable with pip:
+            //
+            // * ` and extra == 'EXTRA_NAME'`
+            // * `; extra == 'EXTRA_NAME'`
+            //
+            // Keep in sync with `Metadata23::merge_pyproject_toml()`
+            pkg.marker = pkg.marker.simplify_extras(&extra_names);
             pkg.to_string()
         }));
         let status = install_backend

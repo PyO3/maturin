@@ -1541,7 +1541,7 @@ mod test {
         let bridge = BridgeModel::BindingsAbi3 {
             bindings: Bindings {
                 name: "pyo3".to_string(),
-                version: semver::Version::new(0, 23, 3),
+                version: semver::Version::new(0, 23, 4),
             },
             major: 3,
             minor: 7,

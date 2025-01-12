@@ -227,11 +227,10 @@ jobs:
 
           # abi3
           bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          # TODO: timeout
-          # bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+          bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
 
           # no-abi3
-          # bin/maturin build -i python3.12 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
+          bin/maturin build -i python3.12 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
     name: Test Emscripten

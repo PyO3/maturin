@@ -189,11 +189,11 @@ jobs:
       - run: rustup target add x86_64-unknown-linux-musl
       - run: sudo apt-get install musl-tools
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --target x86_64-unknown-linux-musl
+      - run: cargo build --target x86_64-unknown-linux-musl --release
       - uses: actions/upload-artifact@v4
         with:
           name: maturin-build
-          path: target/x86_64-unknown-linux-musl/debug/maturin
+          path: target/x86_64-unknown-linux-musl/release/maturin
 
   test-windows-cross:
     name: Test windows cross
@@ -227,11 +227,10 @@ jobs:
 
           # abi3
           bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-gnu
-          # TODO: timeout
-          # bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
+          bin/maturin build -m test-crates/pyo3-pure/Cargo.toml --target x86_64-pc-windows-msvc
 
           # no-abi3
-          # bin/maturin build -i python3.12 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
+          bin/maturin build -i python3.12 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
     name: Test Emscripten

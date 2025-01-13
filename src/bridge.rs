@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use crate::python_interpreter::{MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR};
+
 /// The name and version of the bindings crate
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bindings {
@@ -11,7 +13,7 @@ pub struct Bindings {
 
 impl Bindings {
     /// Returns the minimum python minor version supported
-    pub fn minimal_python_minor_version(&self) -> usize {
+    fn minimal_python_minor_version(&self) -> usize {
         use crate::python_interpreter::MINIMUM_PYTHON_MINOR;
 
         match self.name.as_str() {
@@ -30,7 +32,7 @@ impl Bindings {
     }
 
     /// Returns the minimum PyPy minor version supported
-    pub fn minimal_pypy_minor_version(&self) -> usize {
+    fn minimal_pypy_minor_version(&self) -> usize {
         use crate::python_interpreter::MINIMUM_PYPY_MINOR;
 
         match self.name.as_str() {
@@ -119,6 +121,34 @@ impl BridgeModel {
     /// Test whether this is bin bindings
     pub fn is_bin(&self) -> bool {
         matches!(self, BridgeModel::Bin(_))
+    }
+
+    /// Returns the minimum python minor version supported
+    pub fn minimal_python_minor_version(&self) -> usize {
+        match self {
+            BridgeModel::Bin(Some(bindings)) | BridgeModel::Bindings(bindings) => {
+                bindings.minimal_python_minor_version()
+            }
+            BridgeModel::BindingsAbi3 {
+                bindings,
+                minor: abi3_minor,
+                ..
+            } => {
+                let bindings_minor = bindings.minimal_python_minor_version();
+                bindings_minor.max(*abi3_minor as usize)
+            }
+            BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
+                MINIMUM_PYTHON_MINOR
+            }
+        }
+    }
+
+    /// Returns the minimum PyPy minor version supported
+    pub fn minimal_pypy_minor_version(&self) -> usize {
+        match self.bindings() {
+            Some(bindings) => bindings.minimal_pypy_minor_version(),
+            None => MINIMUM_PYPY_MINOR,
+        }
     }
 
     /// free-threaded Python support

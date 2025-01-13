@@ -732,12 +732,11 @@ impl PythonInterpreter {
         requires_python: Option<&VersionSpecifiers>,
         bridge: Option<&BridgeModel>,
     ) -> Vec<PythonInterpreter> {
-        let bindings = bridge.and_then(|bridge| bridge.bindings());
-        let min_python_minor = bindings
-            .map(|bindings| bindings.minimal_python_minor_version())
+        let min_python_minor = bridge
+            .map(|bridge| bridge.minimal_python_minor_version())
             .unwrap_or(MINIMUM_PYTHON_MINOR);
-        let min_pypy_minor = bindings
-            .map(|bindings| bindings.minimal_pypy_minor_version())
+        let min_pypy_minor = bridge
+            .map(|bridge| bridge.minimal_pypy_minor_version())
             .unwrap_or(MINIMUM_PYPY_MINOR);
         let supports_free_threaded = bridge
             .map(|bridge| bridge.supports_free_threaded())
@@ -794,18 +793,8 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
         requires_python: Option<&VersionSpecifiers>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = match bridge {
-            BridgeModel::Bindings(bindings) | BridgeModel::Bin(Some(bindings)) => {
-                bindings.minimal_python_minor_version()
-            }
-            _ => MINIMUM_PYTHON_MINOR,
-        };
-        let min_pypy_minor = match bridge {
-            BridgeModel::Bindings(bindings) | BridgeModel::Bin(Some(bindings)) => {
-                bindings.minimal_pypy_minor_version()
-            }
-            _ => MINIMUM_PYPY_MINOR,
-        };
+        let min_python_minor = bridge.minimal_python_minor_version();
+        let min_pypy_minor = bridge.minimal_pypy_minor_version();
         let executables = if target.is_windows() {
             // TOFIX: add PyPy support to Windows
             find_all_windows(target, min_python_minor, requires_python)?

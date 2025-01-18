@@ -39,6 +39,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - ubuntu-22.04-arm
           - macos-13
           - macos-14
           - windows-latest
@@ -57,6 +58,12 @@ jobs:
           # macOS M1 runner only have Python 3.11+
           - os: macos-14
             python-version: 3.9
+          # Quansight-Labs/setup-python@v5 doesn't' support Python 3.13t
+          - os: ubuntu-22.04-arm
+            python-version: 3.13t
+          # PyPy on ARM is not supported in setup-python action
+          - os: ubuntu-22.04-arm
+            python-version: pypy3.10
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: "1"

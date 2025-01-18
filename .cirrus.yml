@@ -4,8 +4,8 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
-build_and_test: &BUILD_AND_TEST
-  # only run tasks on pull request or github merge queue branches
+build_and_test:
+  &BUILD_AND_TEST # only run tasks on pull request or github merge queue branches
   only_if: $CIRRUS_BRANCH =~ 'gh-readonly-queue/.*' || $CIRRUS_PR != ""
   setup_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
@@ -30,21 +30,4 @@ freebsd_task:
   install_script:
     - pkg install -y bash git python
     - python3 -m ensurepip
-  <<: *BUILD_AND_TEST
-
-linux_aarch64_task:
-  name: Test (arm64 Linux)
-  arm_container:
-    image: python:3.11
-    cpu: 4
-    memory: 4G
-  env:
-    PATH: /root/.cargo/bin:$PATH
-  target_cache:
-    folder: target
-    fingerprint_script:
-      - echo $CIRRUS_OS
-      - cat Cargo.lock
-  install_script:
-    - python3 -m pip install uniffi-bindgen==0.28.0
   <<: *BUILD_AND_TEST

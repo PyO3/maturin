@@ -616,6 +616,12 @@ impl Target {
         self.os == Os::Hurd
     }
 
+    /// Returns true if we're building a binary for AIX
+    #[inline]
+    pub fn is_aix(&self) -> bool {
+        self.os == Os::Aix
+    }
+
     /// Returns true if the current platform's target env is Musl
     #[inline]
     pub fn is_musl_libc(&self) -> bool {

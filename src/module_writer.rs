@@ -793,6 +793,28 @@ fn handle_cffi_call_result(
     }
 }
 
+// Extract the shared object from a AIX big library archive
+fn unpack_big_archive(target: &Target, artifact: &Path, temp_dir_path: &Path) -> Result<PathBuf> {
+    // Newer rust generates archived dylibs on AIX, as shared
+    // libraries are typically archived on the platform.
+    if target.cross_compiling() {
+        bail!("can't unpack big archive format while cross_compiling")
+    }
+    debug!("Unpacking archive {}", artifact.display());
+    let mut ar_command = Command::new("ar");
+    ar_command
+        .current_dir(temp_dir_path)
+        .arg("-X64")
+        .arg("x")
+        .arg(artifact);
+    let status = ar_command.status().expect("Failed to run ar");
+    if !status.success() {
+        bail!(r#"ar finished with "{}": `{:?}`"#, status, ar_command,)
+    }
+    let unpacked_artifact = temp_dir_path.join(artifact.with_extension("so").file_name().unwrap());
+    Ok(unpacked_artifact)
+}
+
 /// Copies the shared library into the module, which is the only extra file needed with bindings
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
@@ -823,6 +845,28 @@ pub fn write_bindings_module(
         let python_interpreter =
             python_interpreter.expect("A python interpreter is required for non-abi3 build");
         python_interpreter.get_library_name(ext_name)
+    };
+
+    let artifact_is_big_ar =
+        target.is_aix() && artifact.extension().unwrap_or(OsStr::new(" ")) == OsStr::new("a");
+    let temp_dir = if artifact_is_big_ar {
+        Some(tempfile::tempdir()?)
+    } else {
+        None
+    };
+    let artifact_buff = if artifact_is_big_ar {
+        Some(unpack_big_archive(
+            target,
+            artifact,
+            temp_dir.as_ref().unwrap().path(),
+        )?)
+    } else {
+        None
+    };
+    let artifact = if artifact_is_big_ar {
+        artifact_buff.as_ref().unwrap()
+    } else {
+        artifact
     };
 
     if !editable {

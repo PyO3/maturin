@@ -1147,7 +1147,7 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
             let target_version = std::str::from_utf8(&output.stdout)
                 .unwrap()
                 .split('=')
-                .last()
+                .next_back()
                 .and_then(|v| v.trim().split_once('.'));
             if let Some((major, minor)) = target_version {
                 let major: u16 = major.parse().unwrap();

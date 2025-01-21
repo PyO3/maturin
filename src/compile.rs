@@ -443,14 +443,8 @@ fn cargo_build_command(
             fs::create_dir_all(&maturin_target_dir)?;
             // We don't want to rewrite the file every time as that will make cargo
             // trigger a rebuild of the project every time
-            let rewrite = if config_file.exists() {
-                std::fs::read_to_string(&config_file)
-                    .map(|previous| previous != pyo3_config)
-                    .unwrap_or(false)
-            } else {
-                true
-            };
-            if rewrite {
+            let existing_pyo3_config = fs::read_to_string(&config_file).unwrap_or_default()
+            if pyo3_config != existing_pyo3_config {
                 fs::write(&config_file, pyo3_config).with_context(|| {
                     format!(
                         "Failed to create pyo3 config file at '{}'",

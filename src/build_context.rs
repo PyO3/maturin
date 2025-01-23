@@ -637,7 +637,11 @@ impl BuildContext {
         .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
-        add_data(&mut writer, self.project_layout.data.as_deref())?;
+        add_data(
+            &mut writer,
+            &self.metadata24,
+            self.project_layout.data.as_deref(),
+        )?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, format!("cp{major}{min_minor}")))
     }
@@ -715,7 +719,11 @@ impl BuildContext {
         .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
-        add_data(&mut writer, self.project_layout.data.as_deref())?;
+        add_data(
+            &mut writer,
+            &self.metadata24,
+            self.project_layout.data.as_deref(),
+        )?;
         let wheel_path = writer.finish()?;
         Ok((
             wheel_path,
@@ -838,7 +846,11 @@ impl BuildContext {
         )?;
 
         self.add_pth(&mut writer)?;
-        add_data(&mut writer, self.project_layout.data.as_deref())?;
+        add_data(
+            &mut writer,
+            &self.metadata24,
+            self.project_layout.data.as_deref(),
+        )?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }
@@ -904,7 +916,11 @@ impl BuildContext {
         )?;
 
         self.add_pth(&mut writer)?;
-        add_data(&mut writer, self.project_layout.data.as_deref())?;
+        add_data(
+            &mut writer,
+            &self.metadata24,
+            self.project_layout.data.as_deref(),
+        )?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }
@@ -1009,7 +1025,11 @@ impl BuildContext {
         self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;
 
         self.add_pth(&mut writer)?;
-        add_data(&mut writer, self.project_layout.data.as_deref())?;
+        add_data(
+            &mut writer,
+            &self.metadata24,
+            self.project_layout.data.as_deref(),
+        )?;
         let wheel_path = writer.finish()?;
         Ok((wheel_path, "py3".to_string()))
     }

@@ -1485,7 +1485,11 @@ pub fn write_dist_info(
 /// to save or generate the data in other places
 ///
 /// See https://peps.python.org/pep-0427/#file-contents
-pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<()> {
+pub fn add_data(
+    writer: &mut impl ModuleWriter,
+    metadata24: &Metadata24,
+    data: Option<&Path>,
+) -> Result<()> {
     let possible_data_dir_names = ["data", "scripts", "headers", "purelib", "platlib"];
     if let Some(data) = data {
         for subdir in fs::read_dir(data).context("Failed to read data dir")? {
@@ -1513,7 +1517,9 @@ pub fn add_data(writer: &mut impl ModuleWriter, data: Option<&Path>) -> Result<(
                     let mode = file.metadata()?.permissions().mode();
                     #[cfg(not(unix))]
                     let mode = 0o644;
-                    let relative = file.path().strip_prefix(data.parent().unwrap()).unwrap();
+                    let relative = metadata24
+                        .get_data_dir()
+                        .join(file.path().strip_prefix(data).unwrap());
 
                     if file.path_is_symlink() {
                         // Copy the actual file contents, not the link, so that you can create a

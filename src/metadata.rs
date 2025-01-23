@@ -569,6 +569,15 @@ impl Metadata24 {
             &self.get_version_escaped()
         ))
     }
+
+    /// Returns the name of the .data directory as defined in the wheel specification
+    pub fn get_data_dir(&self) -> PathBuf {
+        PathBuf::from(format!(
+            "{}-{}.data",
+            &self.get_distribution_escaped(),
+            &self.get_version_escaped()
+        ))
+    }
 }
 
 /// Escape email addresses with display name if necessary

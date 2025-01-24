@@ -464,6 +464,7 @@ impl Target {
                 }
             }
             Arch::Riscv64 => PlatformTag::Manylinux { x: 2, y: 31 },
+            Arch::LoongArch64 => PlatformTag::Manylinux { x: 2, y: 36 },
             Arch::Armv5teL
             | Arch::Armv6L
             | Arch::Wasm32
@@ -474,8 +475,7 @@ impl Target {
             | Arch::Mips
             | Arch::Powerpc
             | Arch::Sparc64
-            | Arch::Sparcv9
-            | Arch::LoongArch64 => PlatformTag::Linux,
+            | Arch::Sparcv9 => PlatformTag::Linux,
         }
     }
 

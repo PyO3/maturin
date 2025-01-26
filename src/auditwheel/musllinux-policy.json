@@ -46,6 +46,8 @@
       "armv7l": {
       },
       "riscv64": {
+      },
+      "loongarch64": {
       }
     },
     "lib_whitelist": ["libc.so", "libz.so.1"],

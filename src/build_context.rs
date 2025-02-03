@@ -1229,19 +1229,13 @@ fn emscripten_version() -> Result<String> {
 }
 
 fn emcc_version() -> Result<String> {
-    use regex::bytes::Regex;
     use std::process::Command;
 
     let emcc = Command::new("emcc")
-        .arg("--version")
+        .arg("-dumpversion")
         .output()
         .context("Failed to run emcc to get the version")?;
-    let pattern = Regex::new(r"^emcc .+? (\d+\.\d+\.\d+).*").unwrap();
-    let caps = pattern
-        .captures(&emcc.stdout)
-        .context("Failed to parse emcc version")?;
-    let version = caps.get(1).context("Failed to parse emcc version")?;
-    Ok(String::from_utf8(version.as_bytes().to_vec())?)
+    Ok(String::from_utf8(emcc.stdout)?.trim().into())
 }
 
 #[cfg(test)]

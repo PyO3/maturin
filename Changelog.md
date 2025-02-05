@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.2]
+
+* Exclude packages not in the dependency tree when finding bindings in [#2426](https://github.com/PyO3/maturin/pull/2426)
+* Use uv automatically when running maturin develop inside uv-created virtualenv in [#2433](https://github.com/PyO3/maturin/pull/2433)
+* Consider abi3 minor version when resolving Python interpreters in [#2437](https://github.com/PyO3/maturin/pull/2437)
+* Handle archived dylibs on AIX in [#2442](https://github.com/PyO3/maturin/pull/2442)
+* Fix unnecessary rebuilds due to pyo3 config file modified time change in [#2446](https://github.com/PyO3/maturin/pull/2446)
+* Fix the name of the .data directory in the generated wheel in [#2449](https://github.com/PyO3/maturin/pull/2449)
+* Update minimal manylinux version for loongarch64 in [#2451](https://github.com/PyO3/maturin/pull/2451)
+
 ## [1.8.1]
 
 * Downgrade invalid version info in `pyproject.toml` error to warning in [#2417](https://github.com/PyO3/maturin/pull/2417)
@@ -1031,7 +1041,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.2...HEAD
+[1.8.2]: https://github.com/pyo3/maturin/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/pyo3/maturin/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/pyo3/maturin/compare/v1.7.8...v1.8.0
 [1.7.8]: https://github.com/pyo3/maturin/compare/v1.7.7...v1.7.8

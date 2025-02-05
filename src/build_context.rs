@@ -1235,7 +1235,10 @@ fn emcc_version() -> Result<String> {
         .arg("-dumpversion")
         .output()
         .context("Failed to run emcc to get the version")?;
-    Ok(String::from_utf8(emcc.stdout)?.trim().into())
+    let ver = String::from_utf8(emcc.stdout)?;
+    let mut trimmed = ver.trim();
+    trimmed = trimmed.strip_suffix("-git").unwrap_or(trimmed);
+    Ok(trimmed.into())
 }
 
 #[cfg(test)]

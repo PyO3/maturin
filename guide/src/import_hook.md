@@ -229,7 +229,7 @@ side-effects with imports (e.g. the project importer).
 
 1. Searches `sys.path` for an `.rs` file matching the import
   (e.g. for `import foo.bar`, the hook will look for `foo/bar.rs` at each search path).
-2. Creates a temporary Maturin project for the `.rs` file or re-uses the project if it already exists.
+2. Creates a temporary Maturin project for the `.rs` file or reuses the project if it already exists.
 3. Rebuilds the project if necessary.
 
 The above steps are a simplification as supporting `importlib.reload()` requires more complex logic.

@@ -1053,14 +1053,18 @@ fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
 
     let command = if has_uniffi_bindgen_target {
         let mut command = Command::new("cargo");
-        command.args(["run", "--bin", "uniffi-bindgen", "--manifest-path"]);
-        command.arg(manifest_path);
-        command.current_dir(crate_dir);
+        command
+            .args(["run", "--bin", "uniffi-bindgen", "--manifest-path"])
+            .arg(manifest_path)
+            .current_dir(crate_dir)
+            .env_remove("CARGO_BUILD_TARGET");
         command
     } else if has_uniffi_bindgen_workspace_package {
         let mut command = Command::new("cargo");
-        command.args(["run", "--bin", "uniffi-bindgen"]);
-        command.current_dir(cargo_metadata.workspace_root);
+        command
+            .args(["run", "--bin", "uniffi-bindgen"])
+            .current_dir(cargo_metadata.workspace_root)
+            .env_remove("CARGO_BUILD_TARGET");
         command
     } else {
         let mut command = Command::new("uniffi-bindgen");

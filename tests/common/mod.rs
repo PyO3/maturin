@@ -85,6 +85,7 @@ pub fn maybe_mock_cargo() {
 }
 
 /// Better error formatting
+#[track_caller]
 pub fn handle_result<T>(result: Result<T>) -> T {
     match result {
         Err(e) => {
@@ -199,6 +200,14 @@ pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathB
         .arg("--json")
         .output()
         .expect("Conda not available.");
+    if !output.status.success() {
+        panic!(
+            "Failed to create conda environment: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
     let result: CondaCreateResult = serde_json::from_slice(&output.stdout)?;
     if !result.success {
         bail!("Failed to create conda environment {}.", name);

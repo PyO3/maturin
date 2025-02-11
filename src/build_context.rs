@@ -1231,7 +1231,7 @@ fn emscripten_version() -> Result<String> {
 fn emcc_version() -> Result<String> {
     use std::process::Command;
 
-    let emcc = Command::new("emcc")
+    let emcc = Command::new(if cfg!(windows) { "emcc.bat" } else { "emcc" })
         .arg("-dumpversion")
         .output()
         .context("Failed to run emcc to get the version")?;

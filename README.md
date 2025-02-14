@@ -243,6 +243,7 @@ maturin itself is manylinux compliant when compiled for the musl target.
 - [roapi](https://github.com/roapi/roapi) - ROAPI automatically spins up read-only APIs for static datasets without requiring you to write a single line of code
 - [robyn](https://github.com/sansyrox/robyn) - A fast and extensible async python web server with a Rust runtime
 - [ruff](https://github.com/charliermarsh/ruff) - An extremely fast Python linter, written in Rust
+- [rnet](https://github.com/0x676e67/rnet) - Asynchronous Python HTTP Client with Black Magic
 - [tantivy-py](https://github.com/quickwit-oss/tantivy-py) - Python bindings for Tantivy
 - [watchfiles](https://github.com/samuelcolvin/watchfiles) - Simple, modern and high performance file watching and code reload in python
 - [wonnx](https://github.com/webonnx/wonnx/tree/master/wonnx-py) - Wonnx is a GPU-accelerated ONNX inference run-time written 100% in Rust

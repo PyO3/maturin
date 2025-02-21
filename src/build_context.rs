@@ -562,7 +562,7 @@ impl BuildContext {
 
                 let mut os = target.target_os().to_string().to_ascii_lowercase();
                 // See https://github.com/python/cpython/blob/46c8d915715aa2bd4d697482aa051fe974d440e1/Lib/sysconfig.py#L722-L730
-                if os.starts_with("sunos") {
+                if target.target_os() == Os::Solaris || target.target_os() == Os::Illumos {
                     // Solaris / Illumos
                     if let Some((major, other)) = release.split_once('_') {
                         let major_ver: u64 = major.parse().context("illumos major version is not a number")?;

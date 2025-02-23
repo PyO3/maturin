@@ -621,7 +621,7 @@ jobs:\n",
         if !self.skip_attestation {
             conf.push_str(
                 r#"      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'wheels-*/*'
 "#,
@@ -851,7 +851,7 @@ mod tests {
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v1
+                    uses: actions/attest-build-provenance@v2
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
@@ -1062,7 +1062,7 @@ mod tests {
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v1
+                    uses: actions/attest-build-provenance@v2
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
@@ -1544,7 +1544,7 @@ mod tests {
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v1
+                    uses: actions/attest-build-provenance@v2
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
@@ -1720,7 +1720,7 @@ mod tests {
                 steps:
                   - uses: actions/download-artifact@v4
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v1
+                    uses: actions/attest-build-provenance@v2
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI

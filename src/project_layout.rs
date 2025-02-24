@@ -255,52 +255,56 @@ impl ProjectResolver {
                 pyproject_file
             );
             let pyproject = PyProjectToml::new(&pyproject_file)?;
-            if let Some(path) = pyproject.manifest_path() {
-                debug!("Using cargo manifest path from pyproject.toml {:?}", path);
-                return Ok((
-                    path.normalize()
-                        .with_context(|| {
-                            format!("failed to normalize manifest path `{}`", path.display())
-                        })?
-                        .into_path_buf(),
-                    pyproject_file,
-                ));
-            } else {
-                // Detect src layout:
-                //
-                // my-project
-                // ├── README.md
-                // ├── pyproject.toml
-                // ├── src
-                // │   └── my_project
-                // │       ├── __init__.py
-                // │       └── bar.py
-                // └── rust
-                //     ├── Cargo.toml
-                //     └── src
-                //         └── lib.rs
-                let path = current_dir.join("rust").join("Cargo.toml");
-                if path.is_file() {
-                    debug!("Python first src-layout detected");
-                    if pyproject.python_source().is_some() {
-                        // python source directory is specified in pyproject.toml
-                        return Ok((path, pyproject_file));
-                    } else if let Some(project_name) = pyproject.project_name() {
-                        // Check if python source directory in `src/<project_name>`
-                        let import_name = project_name.replace('-', "_");
-                        let mut package_init = HashSet::new();
-                        package_init.insert(
-                            current_dir
-                                .join("src")
-                                .join(import_name)
-                                .join("__init__.py"),
-                        );
-                        for package in pyproject.python_packages().unwrap_or_default() {
-                            package_init
-                                .insert(current_dir.join("src").join(package).join("__init__.py"));
-                        }
-                        if package_init.iter().any(|x| x.is_file()) {
+            match pyproject.manifest_path() {
+                Some(path) => {
+                    debug!("Using cargo manifest path from pyproject.toml {:?}", path);
+                    return Ok((
+                        path.normalize()
+                            .with_context(|| {
+                                format!("failed to normalize manifest path `{}`", path.display())
+                            })?
+                            .into_path_buf(),
+                        pyproject_file,
+                    ));
+                }
+                _ => {
+                    // Detect src layout:
+                    //
+                    // my-project
+                    // ├── README.md
+                    // ├── pyproject.toml
+                    // ├── src
+                    // │   └── my_project
+                    // │       ├── __init__.py
+                    // │       └── bar.py
+                    // └── rust
+                    //     ├── Cargo.toml
+                    //     └── src
+                    //         └── lib.rs
+                    let path = current_dir.join("rust").join("Cargo.toml");
+                    if path.is_file() {
+                        debug!("Python first src-layout detected");
+                        if pyproject.python_source().is_some() {
+                            // python source directory is specified in pyproject.toml
                             return Ok((path, pyproject_file));
+                        } else if let Some(project_name) = pyproject.project_name() {
+                            // Check if python source directory in `src/<project_name>`
+                            let import_name = project_name.replace('-', "_");
+                            let mut package_init = HashSet::new();
+                            package_init.insert(
+                                current_dir
+                                    .join("src")
+                                    .join(import_name)
+                                    .join("__init__.py"),
+                            );
+                            for package in pyproject.python_packages().unwrap_or_default() {
+                                package_init.insert(
+                                    current_dir.join("src").join(package).join("__init__.py"),
+                                );
+                            }
+                            if package_init.iter().any(|x| x.is_file()) {
+                                return Ok((path, pyproject_file));
+                            }
                         }
                     }
                 }

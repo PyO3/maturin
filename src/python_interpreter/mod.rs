@@ -23,7 +23,7 @@ pub const MINIMUM_PYTHON_MINOR: usize = 7;
 pub const MINIMUM_PYPY_MINOR: usize = 8;
 /// Be liberal here to include preview versions
 pub const MAXIMUM_PYTHON_MINOR: usize = 13;
-pub const MAXIMUM_PYPY_MINOR: usize = 10;
+pub const MAXIMUM_PYPY_MINOR: usize = 11;
 
 /// Identifies conditions where we do not want to build wheels
 fn windows_interpreter_no_build(
@@ -1049,6 +1049,7 @@ mod tests {
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
+                "PyPy 3.11",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -1077,6 +1078,7 @@ mod tests {
                 "CPython 3.13t",
                 "PyPy 3.9",
                 "PyPy 3.10",
+                "PyPy 3.11",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -1100,6 +1102,7 @@ mod tests {
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
+                "PyPy 3.11",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -1119,6 +1122,7 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "PyPy 3.10",
+                "PyPy 3.11",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -1146,6 +1150,7 @@ mod tests {
                 "CPython 3.13t",
                 "PyPy 3.9",
                 "PyPy 3.10",
+                "PyPy 3.11",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);

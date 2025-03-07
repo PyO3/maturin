@@ -394,16 +394,19 @@ pub fn auditwheel_rs(
             }
             Err(err) => Err(err),
         }
-    } else if let Some(policy) = highest_policy {
-        Ok(policy)
     } else {
-        eprintln!(
-            "⚠️  Warning: No compatible platform tag found, using the linux tag instead. \
+        match highest_policy {
+            Some(policy) => Ok(policy),
+            _ => {
+                eprintln!(
+                    "⚠️  Warning: No compatible platform tag found, using the linux tag instead. \
             You won't be able to upload those wheels to PyPI."
-        );
+                );
 
-        // Fallback to linux
-        Ok(Policy::default())
+                // Fallback to linux
+                Ok(Policy::default())
+            }
+        }
     }?;
     Ok((policy, should_repair))
 }

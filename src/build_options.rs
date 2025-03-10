@@ -954,7 +954,7 @@ fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<(u8, u8)>> {
                 .collect::<Result<Vec<(u8, u8)>>>()
                 .context(format!("Bogus {lib} cargo features"))?
                 .into_iter()
-                .min();
+                .max();
             if abi3_selected && min_abi3_version.is_none() {
                 bail!(
                         "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \

@@ -265,6 +265,15 @@ Options:
   -m, --manifest-path <PATH>
           Path to Cargo.toml
 
+  -v, --verbose...
+          Use verbose output.
+
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
+          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+
+          You can configure fine-grained logging using the `RUST_LOG` environment variable.
+          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
   -o, --output <PATH>
           Output path
 
@@ -273,14 +282,14 @@ Options:
       --platform <platform>...
           Platform support
 
-          [default: linux windows macos]
+          [default: linux musllinux windows macos]
 
           Possible values:
           - all:        All
-          - linux:      Linux
+          - manylinux:  Manylinux
+          - musllinux:  Musllinux
           - windows:    Windows
           - macos:      macOS
-          - macosarm64: macOS(Arm64)
           - emscripten: Emscripten
 
       --pytest
@@ -289,8 +298,11 @@ Options:
       --zig
           Use zig to do cross compilation
 
+      --skip-attestation
+          Skip artifact attestation
+
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')
 ```
 
 ### Using PyPI's trusted publishing

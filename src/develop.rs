@@ -458,7 +458,9 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         }
     };
 
-    install_dependencies(&build_context, &extras, &python, venv_dir, &install_backend)?;
+    if !skip_install {
+        install_dependencies(&build_context, &extras, &python, venv_dir, &install_backend)?;
+    }
 
     let wheels = build_context.build_wheels()?;
     if !skip_install {

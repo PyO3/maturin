@@ -10,4 +10,8 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 top_level = { path = "../" }
-pyo3 = { version = "0.23.1", features = ["abi3", "abi3-py38", "extension-module"] }
+pyo3 = { version = "0.24.0", features = [
+    "abi3",
+    "abi3-py38",
+    "extension-module",
+] }

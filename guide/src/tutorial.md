@@ -138,7 +138,7 @@ use std::io;
 fn guess_the_number() {
     println!("Guess the number!");
 
-    let secret_number = rand::thread_rng().gen_range(1..101);
+    let secret_number = rand::rng().random_range(1..101);
 
     loop {
         println!("Please input your guess.");

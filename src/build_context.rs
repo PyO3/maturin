@@ -419,6 +419,14 @@ impl BuildContext {
         let artifact_dir = match self.bridge() {
             // cffi bindings that contains '.' in the module name will be split into directories
             BridgeModel::Cffi => self.module_name.split(".").collect::<PathBuf>(),
+            // For namespace packages the modules the modules resides resides at ${module_name}.so
+            // where periods are replaced with slashes so for example my.namespace.module would reside
+            // at my/namespace/module.so
+            _ if self.module_name.contains(".") => {
+                let mut path = self.module_name.split(".").collect::<PathBuf>();
+                path.pop();
+                path
+            }
             // For other bindings artifact .so file usually resides at ${module_name}/${module_name}.so
             _ => PathBuf::from(&self.module_name),
         };

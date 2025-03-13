@@ -2,12 +2,12 @@
 
 ## [1.8.3]
 
-* Fix relocating shared library for namespace modules [#2513](https://github.com/PyO3/maturin/pull/2513)
-* Don't install dependencies when running maturin develop --skip-install [#2504](https://github.com/PyO3/maturin/pull/2504)
-* Use emcc.bat to query version on Windows [#2478](https://github.com/PyO3/maturin/pull/2478)
-* Bump the attest-build-provenance version in the generated ci file [#2484](https://github.com/PyO3/maturin/pull/2478)
-* Fix platform tag on Solaris/Illumos [#2483](https://github.com/PyO3/maturin/pull/2483)
-* Fix cargo run uniffi-bindgen when cross compiling [#2476](https://github.com/PyO3/maturin/pull/2476)
+* Fix relocating shared library for namespace modules in [#2513](https://github.com/PyO3/maturin/pull/2513)
+* Don't install dependencies when running `maturin develop --skip-install` in [#2504](https://github.com/PyO3/maturin/pull/2504)
+* Use emcc.bat to query version on Windows in [#2478](https://github.com/PyO3/maturin/pull/2478)
+* Bump the attest-build-provenance version in the generated ci file in [#2484](https://github.com/PyO3/maturin/pull/2478)
+* Fix platform tag on Solaris/Illumos in [#2483](https://github.com/PyO3/maturin/pull/2483)
+* Fix cargo run uniffi-bindgen when cross compiling in [#2476](https://github.com/PyO3/maturin/pull/2476)
 
 ## [1.8.2]
 

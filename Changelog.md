@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.3]
+
+* Fix relocating shared library for namespace modules [#2513](https://github.com/PyO3/maturin/pull/2513)
+* Don't install dependencies when running maturin develop --skip-install [#2504](https://github.com/PyO3/maturin/pull/2504)
+* Use emcc.bat to query version on Windows [#2478](https://github.com/PyO3/maturin/pull/2478)
+* Bump the attest-build-provenance version in the generated ci file [#2484](https://github.com/PyO3/maturin/pull/2478)
+* Fix platform tag on Solaris/Illumos [#2483](https://github.com/PyO3/maturin/pull/2483)
+* Fix cargo run uniffi-bindgen when cross compiling [#2476](https://github.com/PyO3/maturin/pull/2476)
+
 ## [1.8.2]
 
 * Exclude packages not in the dependency tree when finding bindings in [#2426](https://github.com/PyO3/maturin/pull/2426)
@@ -1041,7 +1050,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.3...HEAD
+[1.8.3]: https://github.com/pyo3/maturin/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/pyo3/maturin/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/pyo3/maturin/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/pyo3/maturin/compare/v1.7.8...v1.8.0

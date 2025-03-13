@@ -70,7 +70,7 @@ fn rewrite_cargo_toml(
             } else {
                 let mut new_members = toml_edit::Array::new();
                 for member in members {
-                    if let toml_edit::Value::String(ref s) = member {
+                    if let toml_edit::Value::String(s) = member {
                         let member_path = s.value();
                         // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
                         let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);

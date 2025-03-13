@@ -44,13 +44,10 @@ impl PlatformTag {
     /// manylinux aliases
     pub fn aliases(&self) -> Vec<String> {
         match self {
-            PlatformTag::Manylinux { .. } => {
-                if let Some(policy) = Policy::from_name(&self.to_string()) {
-                    policy.aliases
-                } else {
-                    Vec::new()
-                }
-            }
+            PlatformTag::Manylinux { .. } => match Policy::from_name(&self.to_string()) {
+                Some(policy) => policy.aliases,
+                _ => Vec::new(),
+            },
             PlatformTag::Musllinux { .. } => Vec::new(),
             PlatformTag::Linux => Vec::new(),
         }

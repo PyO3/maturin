@@ -33,10 +33,10 @@ name = "guessing_game"
 crate-type = ["cdylib"]
 
 [dependencies]
-rand = "0.8.4"
+rand = "0.9.0"
 
 [dependencies.pyo3]
-version = "0.23.1"
+version = "0.24.0"
 # "abi3-py38" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.8
 features = ["abi3-py38"]
 ```

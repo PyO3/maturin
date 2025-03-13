@@ -313,6 +313,6 @@ To enable it, modify the `release` action in the generated GitHub workflow file:
 
 - remove `MATURIN_PYPI_TOKEN` from the `env` section to make maturin use trusted publishing
 - add `id-token: write` to the action's `permissions` (see [Configuring OpenID Connect in PyPI](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-pypi) from GitHub's documentation).
-- if `Environment name: release` was set in PyPI, add `environment: release`
+- if `Environment name: pypi` was set in PyPI, add `environment: pypi`
 
 Make sure to follow the steps listed in [PyPI's documentation](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) to set up your GitHub repository as a trusted publisher in the PyPI project settings before attempting to run the workflow.

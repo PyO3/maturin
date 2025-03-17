@@ -810,10 +810,7 @@ impl PythonInterpreter {
                 .map(|minor| format!("python3.{minor}"))
                 .collect();
             // Also try to find PyPy for cffi and pyo3 bindings
-            if *bridge == BridgeModel::Cffi
-                || bridge.is_bindings("pyo3")
-                || bridge.is_bindings("pyo3-ffi")
-            {
+            if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
                 executables.extend(
                     (min_pypy_minor..=MAXIMUM_PYPY_MINOR)
                         .filter(|minor| {
@@ -1024,7 +1021,7 @@ fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Bindings;
+    use crate::bridge::{PyO3, PyO3Crate};
     use expect_test::expect;
 
     use super::*;
@@ -1058,8 +1055,8 @@ mod tests {
         let pythons = PythonInterpreter::find_by_target(
             &target,
             None,
-            Some(&BridgeModel::Bindings(Bindings {
-                name: "pyo3".to_string(),
+            Some(&BridgeModel::PyO3(PyO3 {
+                crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
             })),
         )
@@ -1130,8 +1127,8 @@ mod tests {
         let pythons = PythonInterpreter::find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
-            Some(&BridgeModel::Bindings(Bindings {
-                name: "pyo3".to_string(),
+            Some(&BridgeModel::PyO3(PyO3 {
+                crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
             })),
         )

@@ -1,6 +1,6 @@
 use self::package_name_validations::{cargo_check_name, pypi_check_name};
 use crate::ci::GenerateCI;
-use crate::{Bindings, BridgeModel};
+use crate::{BridgeModel, PyO3};
 use anyhow::{bail, Context, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
@@ -53,8 +53,8 @@ impl ProjectGenerator<'_> {
             "bin" => BridgeModel::Bin(None),
             "cffi" => BridgeModel::Cffi,
             "uniffi" => BridgeModel::UniFfi,
-            _ => BridgeModel::Bindings(Bindings {
-                name: bindings.clone(),
+            _ => BridgeModel::PyO3(PyO3 {
+                crate_name: bindings.parse()?,
                 version: Version::new(0, 23, 1),
             }),
         };

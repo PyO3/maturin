@@ -1,12 +1,14 @@
-use std::{
-    fmt::{Display, Formatter},
-    str::FromStr,
+use std::{fmt, str::FromStr};
+
+use anyhow::Context;
+use serde::Deserialize;
+
+use crate::python_interpreter::{
+    MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
 };
 
-use crate::python_interpreter::{MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR};
-
 /// pyo3 binding crate
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PyO3Crate {
     /// pyo3
     PyO3,
@@ -24,8 +26,14 @@ impl PyO3Crate {
     }
 }
 
-impl Display for PyO3Crate {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for PyO3Crate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl fmt::Display for PyO3Crate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
@@ -42,6 +50,66 @@ impl FromStr for PyO3Crate {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct PyO3VersionMetadataRaw {
+    #[serde(rename = "min-version")]
+    pub min_version: String,
+    #[serde(rename = "max-version")]
+    pub max_version: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PyO3MetadataRaw {
+    pub cpython: PyO3VersionMetadataRaw,
+    pub pypy: PyO3VersionMetadataRaw,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PyO3VersionMetadata {
+    pub min_minor: usize,
+    pub max_minor: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PyO3Metadata {
+    pub cpython: PyO3VersionMetadata,
+    pub pypy: PyO3VersionMetadata,
+}
+
+impl TryFrom<PyO3VersionMetadataRaw> for PyO3VersionMetadata {
+    type Error = anyhow::Error;
+
+    fn try_from(raw: PyO3VersionMetadataRaw) -> Result<Self, Self::Error> {
+        let min_version = raw
+            .min_version
+            .rsplit('.')
+            .next()
+            .context("invalid min-version in pyo3-ffi metadata")?
+            .parse()?;
+        let max_version = raw
+            .max_version
+            .rsplit('.')
+            .next()
+            .context("invalid max-version in pyo3-ffi metadata")?
+            .parse()?;
+        Ok(Self {
+            min_minor: min_version,
+            max_minor: max_version,
+        })
+    }
+}
+
+impl TryFrom<PyO3MetadataRaw> for PyO3Metadata {
+    type Error = anyhow::Error;
+
+    fn try_from(raw: PyO3MetadataRaw) -> Result<Self, Self::Error> {
+        Ok(Self {
+            cpython: PyO3VersionMetadata::try_from(raw.cpython)?,
+            pypy: PyO3VersionMetadata::try_from(raw.pypy)?,
+        })
+    }
+}
+
 /// The name and version of the pyo3 bindings crate
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyO3 {
@@ -51,17 +119,19 @@ pub struct PyO3 {
     pub version: semver::Version,
     /// abi3 support
     pub abi3: Option<(u8, u8)>,
+    /// pyo3 metadata
+    pub metadata: Option<PyO3Metadata>,
 }
 
 impl PyO3 {
     /// Returns the minimum python minor version supported
     fn minimal_python_minor_version(&self) -> usize {
-        use crate::python_interpreter::MINIMUM_PYTHON_MINOR;
-
         let major_version = self.version.major;
         let minor_version = self.version.minor;
         // N.B. must check large minor versions first
-        let min_minor = if (major_version, minor_version) >= (0, 16) {
+        let min_minor = if let Some(metadata) = self.metadata.as_ref() {
+            metadata.cpython.min_minor
+        } else if (major_version, minor_version) >= (0, 16) {
             7
         } else {
             MINIMUM_PYTHON_MINOR
@@ -73,19 +143,39 @@ impl PyO3 {
         }
     }
 
+    /// Returns the maximum python minor version supported
+    fn maximal_python_minor_version(&self) -> usize {
+        // N.B. must check large minor versions first
+        if let Some(metadata) = self.metadata.as_ref() {
+            metadata.cpython.max_minor
+        } else {
+            MAXIMUM_PYTHON_MINOR
+        }
+    }
+
     /// Returns the minimum PyPy minor version supported
     fn minimal_pypy_minor_version(&self) -> usize {
-        use crate::python_interpreter::MINIMUM_PYPY_MINOR;
-
         let major_version = self.version.major;
         let minor_version = self.version.minor;
         // N.B. must check large minor versions first
-        if (major_version, minor_version) >= (0, 23) {
+        if let Some(metadata) = self.metadata.as_ref() {
+            metadata.pypy.min_minor
+        } else if (major_version, minor_version) >= (0, 23) {
             9
         } else if (major_version, minor_version) >= (0, 14) {
             7
         } else {
             MINIMUM_PYPY_MINOR
+        }
+    }
+
+    /// Returns the maximum PyPy minor version supported
+    fn maximal_pypy_minor_version(&self) -> usize {
+        // N.B. must check large minor versions first
+        if let Some(metadata) = self.metadata.as_ref() {
+            metadata.pypy.max_minor
+        } else {
+            MAXIMUM_PYPY_MINOR
         }
     }
 
@@ -141,13 +231,17 @@ impl BridgeModel {
 
     /// Returns the minimum python minor version supported
     pub fn minimal_python_minor_version(&self) -> usize {
-        match self {
-            BridgeModel::Bin(Some(bindings)) | BridgeModel::PyO3(bindings) => {
-                bindings.minimal_python_minor_version()
-            }
-            BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
-                MINIMUM_PYTHON_MINOR
-            }
+        match self.pyo3() {
+            Some(bindings) => bindings.minimal_python_minor_version(),
+            None => MINIMUM_PYTHON_MINOR,
+        }
+    }
+
+    /// Returns the maximum python minor version supported
+    pub fn maximum_python_minor_version(&self) -> usize {
+        match self.pyo3() {
+            Some(bindings) => bindings.maximal_python_minor_version(),
+            None => MAXIMUM_PYTHON_MINOR,
         }
     }
 
@@ -156,6 +250,16 @@ impl BridgeModel {
         match self.pyo3() {
             Some(bindings) => bindings.minimal_pypy_minor_version(),
             None => MINIMUM_PYPY_MINOR,
+        }
+    }
+
+    /// Returns the maximum PyPy minor version supported
+    pub fn maximum_pypy_minor_version(&self) -> usize {
+        use crate::python_interpreter::MAXIMUM_PYPY_MINOR;
+
+        match self.pyo3() {
+            Some(bindings) => bindings.maximal_pypy_minor_version(),
+            None => MAXIMUM_PYPY_MINOR,
         }
     }
 
@@ -179,8 +283,8 @@ impl BridgeModel {
     }
 }
 
-impl Display for BridgeModel {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for BridgeModel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BridgeModel::Bin(Some(bindings)) => write!(f, "{} bin", bindings.crate_name),
             BridgeModel::Bin(None) => write!(f, "bin"),

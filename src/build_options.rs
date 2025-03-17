@@ -584,6 +584,7 @@ impl BuildContextBuilder {
                 })
             }),
         )?;
+        debug!("Resolved bridge model: {:?}", bridge);
 
         if !bridge.is_bin() && project_layout.extension_name.contains('-') {
             bail!(
@@ -1011,23 +1012,39 @@ fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
 fn find_pyo3_bindings(
     deps: &HashMap<&str, &Node>,
     packages: &HashMap<&str, &cargo_metadata::Package>,
-) -> Option<PyO3> {
+) -> anyhow::Result<Option<PyO3>> {
+    use crate::bridge::PyO3MetadataRaw;
+
     if deps.get("pyo3").is_some() {
+        let pyo3_ffi = &packages["pyo3-ffi"];
+        let metadata =
+            match serde_json::from_value::<Option<PyO3MetadataRaw>>(pyo3_ffi.metadata.clone()) {
+                Ok(Some(metadata)) => Some(metadata.try_into()?),
+                Ok(None) | Err(_) => None,
+            };
         let version = packages["pyo3"].version.clone();
-        Some(PyO3 {
+        Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version,
             abi3: None,
-        })
+            metadata,
+        }))
     } else if deps.get("pyo3-ffi").is_some() {
-        let version = packages["pyo3-ffi"].version.clone();
-        Some(PyO3 {
+        let package = &packages["pyo3-ffi"];
+        let version = package.version.clone();
+        let metadata =
+            match serde_json::from_value::<Option<PyO3MetadataRaw>>(package.metadata.clone()) {
+                Ok(Some(metadata)) => Some(metadata.try_into()?),
+                Ok(None) | Err(_) => None,
+            };
+        Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3Ffi,
             version,
             abi3: None,
-        })
+            metadata,
+        }))
     } else {
-        None
+        Ok(None)
     }
 }
 
@@ -1111,13 +1128,13 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else if bindings == "uniffi" {
             BridgeModel::UniFfi
         } else if bindings == "bin" {
-            let bindings = find_pyo3_bindings(&deps, &packages);
+            let bindings = find_pyo3_bindings(&deps, &packages)?;
             BridgeModel::Bin(bindings)
         } else {
-            let bindings = find_pyo3_bindings(&deps, &packages).context("unknown binding type")?;
+            let bindings = find_pyo3_bindings(&deps, &packages)?.context("unknown binding type")?;
             BridgeModel::PyO3(bindings)
         }
-    } else if let Some(bindings) = find_pyo3_bindings(&deps, &packages) {
+    } else if let Some(bindings) = find_pyo3_bindings(&deps, &packages)? {
         if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
             BridgeModel::Bin(Some(bindings))
         } else {
@@ -1128,7 +1145,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     } else if targets.contains(&CrateType::CDyLib) {
         BridgeModel::Cffi
     } else if targets.contains(&CrateType::Bin) {
-        BridgeModel::Bin(find_pyo3_bindings(&deps, &packages))
+        BridgeModel::Bin(find_pyo3_bindings(&deps, &packages)?)
     } else {
         bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")
     };
@@ -1153,11 +1170,12 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             return if let Some((major, minor)) = has_abi3(&deps)? {
                 eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
-                let version = packages[lib_name].version.clone();
+                let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
-                    version,
+                    version: pyo3.version.clone(),
                     abi3: Some((major, minor)),
+                    metadata: pyo3.metadata.clone(),
                 };
                 Ok(BridgeModel::PyO3(bindings))
             } else {
@@ -1523,6 +1541,8 @@ mod test {
 
     #[test]
     fn test_find_bridge_pyo3_abi3() {
+        use crate::bridge::{PyO3Metadata, PyO3VersionMetadata};
+
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(Path::new("test-crates/pyo3-pure").join("Cargo.toml"))
             .exec()
@@ -1532,6 +1552,16 @@ mod test {
             crate_name: PyO3Crate::PyO3,
             version: semver::Version::new(0, 24, 0),
             abi3: Some((3, 7)),
+            metadata: Some(PyO3Metadata {
+                cpython: PyO3VersionMetadata {
+                    min_minor: 7,
+                    max_minor: 13,
+                },
+                pypy: PyO3VersionMetadata {
+                    min_minor: 9,
+                    max_minor: 11,
+                },
+            }),
         });
         assert_eq!(find_bridge(&pyo3_pure, None).unwrap(), bridge);
         assert_eq!(find_bridge(&pyo3_pure, Some("pyo3")).unwrap(), bridge);

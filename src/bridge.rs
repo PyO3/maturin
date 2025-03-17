@@ -1,33 +1,68 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 use crate::python_interpreter::{MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR};
 
-/// The name and version of the bindings crate
+/// pyo3 binding crate
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PyO3Crate {
+    /// pyo3
+    PyO3,
+    /// pyo3-ffi
+    PyO3Ffi,
+}
+
+impl PyO3Crate {
+    /// Returns the name of the crate as a string
+    pub fn as_str(&self) -> &str {
+        match self {
+            PyO3Crate::PyO3 => "pyo3",
+            PyO3Crate::PyO3Ffi => "pyo3-ffi",
+        }
+    }
+}
+
+impl Display for PyO3Crate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for PyO3Crate {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pyo3" => Ok(PyO3Crate::PyO3),
+            "pyo3-ffi" => Ok(PyO3Crate::PyO3Ffi),
+            _ => anyhow::bail!("unknown binding crate: {}", s),
+        }
+    }
+}
+
+/// The name and version of the pyo3 bindings crate
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Bindings {
-    /// The name of the bindings crate, `pyo3`, `rust-cpython` or `uniffi`
-    pub name: String,
-    /// bindings crate version
+pub struct PyO3 {
+    /// The name of the bindings crate, `pyo3` or `uniffi`
+    pub crate_name: PyO3Crate,
+    /// pyo3 bindings crate version
     pub version: semver::Version,
 }
 
-impl Bindings {
+impl PyO3 {
     /// Returns the minimum python minor version supported
     fn minimal_python_minor_version(&self) -> usize {
         use crate::python_interpreter::MINIMUM_PYTHON_MINOR;
 
-        match self.name.as_str() {
-            "pyo3" | "pyo3-ffi" => {
-                let major_version = self.version.major;
-                let minor_version = self.version.minor;
-                // N.B. must check large minor versions first
-                if (major_version, minor_version) >= (0, 16) {
-                    7
-                } else {
-                    MINIMUM_PYTHON_MINOR
-                }
-            }
-            _ => MINIMUM_PYTHON_MINOR,
+        let major_version = self.version.major;
+        let minor_version = self.version.minor;
+        // N.B. must check large minor versions first
+        if (major_version, minor_version) >= (0, 16) {
+            7
+        } else {
+            MINIMUM_PYTHON_MINOR
         }
     }
 
@@ -35,33 +70,23 @@ impl Bindings {
     fn minimal_pypy_minor_version(&self) -> usize {
         use crate::python_interpreter::MINIMUM_PYPY_MINOR;
 
-        match self.name.as_str() {
-            "pyo3" | "pyo3-ffi" => {
-                let major_version = self.version.major;
-                let minor_version = self.version.minor;
-                // N.B. must check large minor versions first
-                if (major_version, minor_version) >= (0, 23) {
-                    9
-                } else if (major_version, minor_version) >= (0, 14) {
-                    7
-                } else {
-                    MINIMUM_PYPY_MINOR
-                }
-            }
-            _ => MINIMUM_PYPY_MINOR,
+        let major_version = self.version.major;
+        let minor_version = self.version.minor;
+        // N.B. must check large minor versions first
+        if (major_version, minor_version) >= (0, 23) {
+            9
+        } else if (major_version, minor_version) >= (0, 14) {
+            7
+        } else {
+            MINIMUM_PYPY_MINOR
         }
     }
 
     /// free-threaded Python support
     fn supports_free_threaded(&self) -> bool {
-        match self.name.as_str() {
-            "pyo3" | "pyo3-ffi" => {
-                let major_version = self.version.major;
-                let minor_version = self.version.minor;
-                (major_version, minor_version) >= (0, 23)
-            }
-            _ => false,
-        }
+        let major_version = self.version.major;
+        let minor_version = self.version.minor;
+        (major_version, minor_version) >= (0, 23)
     }
 }
 
@@ -69,14 +94,14 @@ impl Bindings {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BridgeModel {
     /// A rust binary to be shipped a python package
-    Bin(Option<Bindings>),
-    /// A native module with pyo3 or rust-cpython bindings.
-    Bindings(Bindings),
+    Bin(Option<PyO3>),
+    /// A native module with pyo3 bindings.
+    PyO3(PyO3),
     /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
     /// for all cpython versions (pypy & graalpy still need multiple versions).
-    BindingsAbi3 {
+    PyO3Abi3 {
         /// The bindings crate
-        bindings: Bindings,
+        bindings: PyO3,
         /// Minimal abi3 major version
         major: u8,
         /// Minimal abi3 minor version
@@ -89,31 +114,30 @@ pub enum BridgeModel {
 }
 
 impl BridgeModel {
-    /// Returns the bindings
-    pub fn bindings(&self) -> Option<&Bindings> {
+    /// Returns the pyo3 bindings
+    pub fn pyo3(&self) -> Option<&PyO3> {
         match self {
             BridgeModel::Bin(Some(bindings)) => Some(bindings),
-            BridgeModel::Bindings(bindings) => Some(bindings),
-            BridgeModel::BindingsAbi3 { bindings, .. } => Some(bindings),
+            BridgeModel::PyO3(bindings) => Some(bindings),
+            BridgeModel::PyO3Abi3 { bindings, .. } => Some(bindings),
             _ => None,
         }
     }
 
-    /// Returns the name of the bindings crate
-    pub fn unwrap_bindings_name(&self) -> &str {
-        match self {
-            BridgeModel::Bindings(bindings) => &bindings.name,
-            BridgeModel::BindingsAbi3 { bindings, .. } => &bindings.name,
-            _ => panic!("Expected Bindings"),
-        }
+    /// Test whether this is using pyo3/pyo3-ffi
+    pub fn is_pyo3(&self) -> bool {
+        matches!(
+            self,
+            BridgeModel::PyO3(_) | BridgeModel::PyO3Abi3 { .. } | BridgeModel::Bin(Some(_))
+        )
     }
 
-    /// Test whether this is using a specific bindings crate
-    pub fn is_bindings(&self, name: &str) -> bool {
+    /// Test whether this is using a specific pyo3 crate
+    pub fn is_pyo3_crate(&self, name: PyO3Crate) -> bool {
         match self {
-            BridgeModel::Bin(Some(bindings)) => bindings.name == name,
-            BridgeModel::Bindings(bindings) => bindings.name == name,
-            BridgeModel::BindingsAbi3 { bindings, .. } => bindings.name == name,
+            BridgeModel::Bin(Some(bindings)) => bindings.crate_name == name,
+            BridgeModel::PyO3(bindings) => bindings.crate_name == name,
+            BridgeModel::PyO3Abi3 { bindings, .. } => bindings.crate_name == name,
             _ => false,
         }
     }
@@ -126,10 +150,10 @@ impl BridgeModel {
     /// Returns the minimum python minor version supported
     pub fn minimal_python_minor_version(&self) -> usize {
         match self {
-            BridgeModel::Bin(Some(bindings)) | BridgeModel::Bindings(bindings) => {
+            BridgeModel::Bin(Some(bindings)) | BridgeModel::PyO3(bindings) => {
                 bindings.minimal_python_minor_version()
             }
-            BridgeModel::BindingsAbi3 {
+            BridgeModel::PyO3Abi3 {
                 bindings,
                 minor: abi3_minor,
                 ..
@@ -145,7 +169,7 @@ impl BridgeModel {
 
     /// Returns the minimum PyPy minor version supported
     pub fn minimal_pypy_minor_version(&self) -> usize {
-        match self.bindings() {
+        match self.pyo3() {
             Some(bindings) => bindings.minimal_pypy_minor_version(),
             None => MINIMUM_PYPY_MINOR,
         }
@@ -155,8 +179,8 @@ impl BridgeModel {
     pub fn supports_free_threaded(&self) -> bool {
         match self {
             BridgeModel::Bin(Some(bindings))
-            | BridgeModel::Bindings(bindings)
-            | BridgeModel::BindingsAbi3 { bindings, .. } => bindings.supports_free_threaded(),
+            | BridgeModel::PyO3(bindings)
+            | BridgeModel::PyO3Abi3 { bindings, .. } => bindings.supports_free_threaded(),
             BridgeModel::Bin(None) => true,
             BridgeModel::Cffi | BridgeModel::UniFfi => false,
         }
@@ -166,10 +190,10 @@ impl BridgeModel {
 impl Display for BridgeModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            BridgeModel::Bin(Some(bindings)) => write!(f, "{} bin", bindings.name),
+            BridgeModel::Bin(Some(bindings)) => write!(f, "{} bin", bindings.crate_name),
             BridgeModel::Bin(None) => write!(f, "bin"),
-            BridgeModel::Bindings(bindings) => write!(f, "{}", bindings.name),
-            BridgeModel::BindingsAbi3 { bindings, .. } => write!(f, "{}", bindings.name),
+            BridgeModel::PyO3(bindings) => write!(f, "{}", bindings.crate_name),
+            BridgeModel::PyO3Abi3 { bindings, .. } => write!(f, "{}", bindings.crate_name),
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
         }

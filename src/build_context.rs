@@ -152,8 +152,8 @@ impl BuildContext {
         let wheels = match self.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
-            BridgeModel::Bindings { .. } => self.build_binding_wheels(&self.interpreter)?,
-            BridgeModel::BindingsAbi3 { major, minor, .. } => {
+            BridgeModel::PyO3 { .. } => self.build_binding_wheels(&self.interpreter)?,
+            BridgeModel::PyO3Abi3 { major, minor, .. } => {
                 let abi3_interps: Vec<_> = self
                     .interpreter
                     .iter()

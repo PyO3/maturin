@@ -1,10 +1,11 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
+use crate::bridge::PyO3Crate;
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
-use crate::{Bindings, BridgeModel, BuildContext, PythonInterpreter, Target};
+use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
 use cargo_metadata::{Metadata, Node};
@@ -17,11 +18,11 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use tracing::{debug, instrument};
 
-// This is used for BridgeModel::Bindings("pyo3-ffi") and BridgeModel::Bindings("pyo3").
+// This is used for `BridgeModel::PyO3`.
 // These should be treated almost identically but must be correctly identified
 // as one or the other in logs. pyo3-ffi is ordered first because it is newer
 // and more restrictive.
-const PYO3_BINDING_CRATES: [&str; 2] = ["pyo3-ffi", "pyo3"];
+const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3];
 
 /// Cargo options for the build process
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
@@ -216,22 +217,14 @@ impl BuildOptions {
         generate_import_lib: bool,
     ) -> Result<Vec<PythonInterpreter>> {
         match bridge {
-            BridgeModel::Bindings(Bindings {
-                name: binding_name, ..
-            })
-            | BridgeModel::Bin(Some(Bindings {
-                name: binding_name, ..
-            })) => {
+            BridgeModel::PyO3(PyO3 { .. }) | BridgeModel::Bin(Some(PyO3 { .. })) => {
                 let mut interpreters = Vec::new();
                 if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
-                    if !binding_name.starts_with("pyo3") {
-                        bail!("Only pyo3 bindings can be configured with PYO3_CONFIG_FILE");
-                    }
                     let interpreter_config =
                         InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
                             .context("Invalid PYO3_CONFIG_FILE")?;
                     interpreters.push(PythonInterpreter::from_config(interpreter_config));
-                } else if binding_name.starts_with("pyo3") && target.cross_compiling() {
+                } else if target.cross_compiling() {
                     if let Some(cross_lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR") {
                         let host_interpreters =
                             find_interpreter_in_host(bridge, interpreter, target, requires_python)?;
@@ -239,7 +232,7 @@ impl BuildOptions {
                         eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
                         // pyo3
                         env::set_var("PYO3_PYTHON", &host_python.executable);
-                        // rust-cpython, and legacy pyo3 versions
+                        // legacy pyo3 versions
                         env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
                         let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
@@ -330,12 +323,8 @@ impl BuildOptions {
                             );
                         }
                     }
-                } else if binding_name.starts_with("pyo3") {
-                    // Only pyo3/pyo3-ffi bindings supports bundled sysconfig interpreters
-                    interpreters = find_interpreter(bridge, interpreter, target, requires_python)?;
                 } else {
-                    interpreters =
-                        find_interpreter_in_host(bridge, interpreter, target, requires_python)?;
+                    interpreters = find_interpreter(bridge, interpreter, target, requires_python)?;
                 }
 
                 let interpreters_str = interpreters
@@ -354,7 +343,7 @@ impl BuildOptions {
                 Ok(vec![interpreter])
             }
             BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
-            BridgeModel::BindingsAbi3 { major, minor, .. } => {
+            BridgeModel::PyO3Abi3 { major, minor, .. } => {
                 let found_interpreters =
                     find_interpreter_in_host(bridge, interpreter, target, requires_python)
                         .or_else(|err| {
@@ -936,6 +925,7 @@ fn filter_cargo_targets(
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
 fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<(u8, u8)>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
+        let lib = lib.as_str();
         if let Some(pyo3_crate) = deps.get(lib) {
             // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
             // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
@@ -975,6 +965,7 @@ fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
         .as_ref()
         .context("Expected cargo to return metadata with resolve")?;
     for &lib in PYO3_BINDING_CRATES.iter().rev() {
+        let lib = lib.as_str();
         let pyo3_packages = resolve
             .nodes
             .iter()
@@ -995,26 +986,20 @@ fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
 }
 
 /// Tries to determine the bindings type from dependency
-fn find_bindings(
+fn find_pyo3_bindings(
     deps: &HashMap<&str, &Node>,
     packages: &HashMap<&str, &cargo_metadata::Package>,
-) -> Option<Bindings> {
+) -> Option<PyO3> {
     if deps.get("pyo3").is_some() {
         let version = packages["pyo3"].version.clone();
-        Some(Bindings {
-            name: "pyo3".to_string(),
+        Some(PyO3 {
+            crate_name: PyO3Crate::PyO3,
             version,
         })
     } else if deps.get("pyo3-ffi").is_some() {
         let version = packages["pyo3-ffi"].version.clone();
-        Some(Bindings {
-            name: "pyo3-ffi".to_string(),
-            version,
-        })
-    } else if deps.contains_key("uniffi") {
-        let version = packages["uniffi"].version.clone();
-        Some(Bindings {
-            name: "uniffi".to_string(),
+        Some(PyO3 {
+            crate_name: PyO3Crate::PyO3Ffi,
             version,
         })
     } else {
@@ -1102,53 +1087,37 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else if bindings == "uniffi" {
             BridgeModel::UniFfi
         } else if bindings == "bin" {
-            // uniffi bindings don't support bin
-            let bindings =
-                find_bindings(&deps, &packages).filter(|bindings| bindings.name != "uniffi");
+            let bindings = find_pyo3_bindings(&deps, &packages);
             BridgeModel::Bin(bindings)
         } else {
-            if !deps.contains_key(bindings) {
-                bail!(
-                    "The bindings crate {} was not found in the dependencies list",
-                    bindings
-                );
-            }
-
-            let version = packages[bindings].version.clone();
-            BridgeModel::Bindings(Bindings {
-                name: bindings.to_string(),
-                version,
-            })
+            let bindings = find_pyo3_bindings(&deps, &packages).context("unknown binding type")?;
+            BridgeModel::PyO3(bindings)
         }
-    } else if let Some(bindings) = find_bindings(&deps, &packages) {
+    } else if let Some(bindings) = find_pyo3_bindings(&deps, &packages) {
         if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
-            if bindings.name == "uniffi" {
-                // uniffi bindings don't support bin
-                BridgeModel::Bin(None)
-            } else {
-                BridgeModel::Bin(Some(bindings))
-            }
-        } else if bindings.name == "uniffi" {
-            BridgeModel::UniFfi
+            BridgeModel::Bin(Some(bindings))
         } else {
-            BridgeModel::Bindings(bindings)
+            BridgeModel::PyO3(bindings)
         }
+    } else if deps.contains_key("uniffi") {
+        BridgeModel::UniFfi
     } else if targets.contains(&CrateType::CDyLib) {
         BridgeModel::Cffi
     } else if targets.contains(&CrateType::Bin) {
-        BridgeModel::Bin(find_bindings(&deps, &packages))
+        BridgeModel::Bin(find_pyo3_bindings(&deps, &packages))
     } else {
         bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")
     };
 
-    if !(bridge.is_bindings("pyo3") || bridge.is_bindings("pyo3-ffi")) {
+    if !bridge.is_pyo3() {
         eprintln!("🔗 Found {bridge} bindings");
         return Ok(bridge);
     }
 
     for &lib in PYO3_BINDING_CRATES.iter() {
-        if !bridge.is_bin() && bridge.is_bindings(lib) {
-            let pyo3_node = deps[lib];
+        if !bridge.is_bin() && bridge.is_pyo3_crate(lib) {
+            let lib_name = lib.as_str();
+            let pyo3_node = deps[lib_name];
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
                 let version = cargo_metadata[&pyo3_node.id].version.to_string();
                 eprintln!(
@@ -1160,12 +1129,12 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 
             return if let Some((major, minor)) = has_abi3(&deps)? {
                 eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
-                let version = packages[lib].version.clone();
-                let bindings = Bindings {
-                    name: lib.to_string(),
+                let version = packages[lib_name].version.clone();
+                let bindings = PyO3 {
+                    crate_name: lib,
                     version,
                 };
-                Ok(BridgeModel::BindingsAbi3 {
+                Ok(BridgeModel::PyO3Abi3 {
                     bindings,
                     major,
                     minor,
@@ -1523,11 +1492,11 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_mixed, None),
-            Ok(BridgeModel::Bindings { .. })
+            Ok(BridgeModel::PyO3 { .. })
         ));
         assert!(matches!(
             find_bridge(&pyo3_mixed, Some("pyo3")),
-            Ok(BridgeModel::Bindings { .. })
+            Ok(BridgeModel::PyO3 { .. })
         ));
     }
 
@@ -1538,9 +1507,9 @@ mod test {
             .exec()
             .unwrap();
 
-        let bridge = BridgeModel::BindingsAbi3 {
-            bindings: Bindings {
-                name: "pyo3".to_string(),
+        let bridge = BridgeModel::PyO3Abi3 {
+            bindings: PyO3 {
+                crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 24, 0),
             },
             major: 3,
@@ -1567,7 +1536,7 @@ mod test {
 
         assert!(matches!(
             find_bridge(&pyo3_pure, None).unwrap(),
-            BridgeModel::Bindings { .. }
+            BridgeModel::PyO3 { .. }
         ));
     }
 

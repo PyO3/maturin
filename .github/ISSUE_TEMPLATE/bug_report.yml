@@ -42,7 +42,6 @@ body:
       label: What bindings you're using
       options:
         - "pyo3"
-        - "rust-cpython"
         - "cffi"
         - "uniffi"
         - "bin"
@@ -60,7 +59,7 @@ body:
     attributes:
       label: If on windows, have you checked that you aren't accidentally using unix path (those with the forward slash `/`)?
       options:
-        - label: 'Yes'
+        - label: "Yes"
           required: false
   - type: textarea
     id: reproduce

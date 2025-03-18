@@ -56,6 +56,7 @@ impl ProjectGenerator<'_> {
             _ => BridgeModel::PyO3(PyO3 {
                 crate_name: bindings.parse()?,
                 version: Version::new(0, 23, 1),
+                abi3: None,
             }),
         };
         let ci_config =

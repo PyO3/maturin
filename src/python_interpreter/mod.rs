@@ -1058,6 +1058,7 @@ mod tests {
             Some(&BridgeModel::PyO3(PyO3 {
                 crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
+                abi3: None,
             })),
         )
         .iter()
@@ -1130,6 +1131,7 @@ mod tests {
             Some(&BridgeModel::PyO3(PyO3 {
                 crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
+                abi3: None,
             })),
         )
         .iter()

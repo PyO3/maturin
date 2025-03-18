@@ -49,6 +49,8 @@ pub struct PyO3 {
     pub crate_name: PyO3Crate,
     /// pyo3 bindings crate version
     pub version: semver::Version,
+    /// abi3 support
+    pub abi3: Option<(u8, u8)>,
 }
 
 impl PyO3 {
@@ -59,10 +61,15 @@ impl PyO3 {
         let major_version = self.version.major;
         let minor_version = self.version.minor;
         // N.B. must check large minor versions first
-        if (major_version, minor_version) >= (0, 16) {
+        let min_minor = if (major_version, minor_version) >= (0, 16) {
             7
         } else {
             MINIMUM_PYTHON_MINOR
+        };
+        if let Some((_, abi3_minor)) = self.abi3.as_ref() {
+            min_minor.max(*abi3_minor as usize)
+        } else {
+            min_minor
         }
     }
 
@@ -97,16 +104,6 @@ pub enum BridgeModel {
     Bin(Option<PyO3>),
     /// A native module with pyo3 bindings.
     PyO3(PyO3),
-    /// `Bindings`, but specifically for pyo3 with feature flags that allow building a single wheel
-    /// for all cpython versions (pypy & graalpy still need multiple versions).
-    PyO3Abi3 {
-        /// The bindings crate
-        bindings: PyO3,
-        /// Minimal abi3 major version
-        major: u8,
-        /// Minimal abi3 minor version
-        minor: u8,
-    },
     /// A native module with c bindings, i.e. `#[no_mangle] extern "C" <some item>`
     Cffi,
     /// A native module generated from uniffi
@@ -119,17 +116,13 @@ impl BridgeModel {
         match self {
             BridgeModel::Bin(Some(bindings)) => Some(bindings),
             BridgeModel::PyO3(bindings) => Some(bindings),
-            BridgeModel::PyO3Abi3 { bindings, .. } => Some(bindings),
             _ => None,
         }
     }
 
     /// Test whether this is using pyo3/pyo3-ffi
     pub fn is_pyo3(&self) -> bool {
-        matches!(
-            self,
-            BridgeModel::PyO3(_) | BridgeModel::PyO3Abi3 { .. } | BridgeModel::Bin(Some(_))
-        )
+        matches!(self, BridgeModel::PyO3(_) | BridgeModel::Bin(Some(_)))
     }
 
     /// Test whether this is using a specific pyo3 crate
@@ -137,7 +130,6 @@ impl BridgeModel {
         match self {
             BridgeModel::Bin(Some(bindings)) => bindings.crate_name == name,
             BridgeModel::PyO3(bindings) => bindings.crate_name == name,
-            BridgeModel::PyO3Abi3 { bindings, .. } => bindings.crate_name == name,
             _ => false,
         }
     }
@@ -153,14 +145,6 @@ impl BridgeModel {
             BridgeModel::Bin(Some(bindings)) | BridgeModel::PyO3(bindings) => {
                 bindings.minimal_python_minor_version()
             }
-            BridgeModel::PyO3Abi3 {
-                bindings,
-                minor: abi3_minor,
-                ..
-            } => {
-                let bindings_minor = bindings.minimal_python_minor_version();
-                bindings_minor.max(*abi3_minor as usize)
-            }
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
                 MINIMUM_PYTHON_MINOR
             }
@@ -175,12 +159,20 @@ impl BridgeModel {
         }
     }
 
+    /// Is using abi3
+    pub fn is_abi3(&self) -> bool {
+        match self.pyo3() {
+            Some(pyo3) => pyo3.abi3.is_some(),
+            None => false,
+        }
+    }
+
     /// free-threaded Python support
     pub fn supports_free_threaded(&self) -> bool {
         match self {
-            BridgeModel::Bin(Some(bindings))
-            | BridgeModel::PyO3(bindings)
-            | BridgeModel::PyO3Abi3 { bindings, .. } => bindings.supports_free_threaded(),
+            BridgeModel::Bin(Some(bindings)) | BridgeModel::PyO3(bindings) => {
+                bindings.supports_free_threaded()
+            }
             BridgeModel::Bin(None) => true,
             BridgeModel::Cffi | BridgeModel::UniFfi => false,
         }
@@ -193,7 +185,6 @@ impl Display for BridgeModel {
             BridgeModel::Bin(Some(bindings)) => write!(f, "{} bin", bindings.crate_name),
             BridgeModel::Bin(None) => write!(f, "bin"),
             BridgeModel::PyO3(bindings) => write!(f, "{}", bindings.crate_name),
-            BridgeModel::PyO3Abi3 { bindings, .. } => write!(f, "{}", bindings.crate_name),
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
         }

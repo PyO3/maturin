@@ -217,124 +217,279 @@ impl BuildOptions {
         generate_import_lib: bool,
     ) -> Result<Vec<PythonInterpreter>> {
         match bridge {
-            BridgeModel::PyO3(PyO3 { .. }) | BridgeModel::Bin(Some(PyO3 { .. })) => {
-                let mut interpreters = Vec::new();
-                if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
-                    let interpreter_config =
-                        InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
-                            .context("Invalid PYO3_CONFIG_FILE")?;
-                    interpreters.push(PythonInterpreter::from_config(interpreter_config));
-                } else if target.cross_compiling() {
-                    if let Some(cross_lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR") {
-                        let host_interpreters =
-                            find_interpreter_in_host(bridge, interpreter, target, requires_python)?;
-                        let host_python = &host_interpreters[0];
-                        eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
-                        // pyo3
-                        env::set_var("PYO3_PYTHON", &host_python.executable);
-                        // legacy pyo3 versions
-                        env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
+            BridgeModel::PyO3(PyO3 { abi3, .. }) | BridgeModel::Bin(Some(PyO3 { abi3, .. })) => {
+                match abi3 {
+                    None => {
+                        let mut interpreters = Vec::new();
+                        if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
+                            let interpreter_config =
+                                InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
+                                    .context("Invalid PYO3_CONFIG_FILE")?;
+                            interpreters.push(PythonInterpreter::from_config(interpreter_config));
+                        } else if target.cross_compiling() {
+                            if let Some(cross_lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR") {
+                                let host_interpreters = find_interpreter_in_host(
+                                    bridge,
+                                    interpreter,
+                                    target,
+                                    requires_python,
+                                )?;
+                                let host_python = &host_interpreters[0];
+                                eprintln!(
+                                    "🐍 Using host {host_python} for cross-compiling preparation"
+                                );
+                                // pyo3
+                                env::set_var("PYO3_PYTHON", &host_python.executable);
+                                // legacy pyo3 versions
+                                env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
 
-                        let sysconfig_path = find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
-                        env::set_var(
-                            "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
-                            sysconfig_path.parent().unwrap(),
-                        );
+                                let sysconfig_path =
+                                    find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
+                                env::set_var(
+                                    "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
+                                    sysconfig_path.parent().unwrap(),
+                                );
 
-                        let sysconfig_data = parse_sysconfigdata(host_python, sysconfig_path)?;
-                        let major = sysconfig_data
-                            .get("version_major")
-                            .context("version_major is not defined")?
-                            .parse::<usize>()
-                            .context("Could not parse value of version_major")?;
-                        let minor = sysconfig_data
-                            .get("version_minor")
-                            .context("version_minor is not defined")?
-                            .parse::<usize>()
-                            .context("Could not parse value of version_minor")?;
-                        let abiflags = sysconfig_data
-                            .get("ABIFLAGS")
-                            .map(ToString::to_string)
-                            .unwrap_or_default();
-                        let gil_disabled = sysconfig_data
-                            .get("Py_GIL_DISABLED")
-                            .map(|x| x == "1")
-                            .unwrap_or_default();
-                        let ext_suffix = sysconfig_data
-                            .get("EXT_SUFFIX")
-                            .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
-                        let soabi = sysconfig_data.get("SOABI");
-                        let interpreter_kind = soabi
-                            .and_then(|tag| {
-                                if tag.starts_with("pypy") {
-                                    Some(InterpreterKind::PyPy)
-                                } else if tag.starts_with("cpython") {
-                                    Some(InterpreterKind::CPython)
-                                } else if tag.starts_with("graalpy") {
-                                    Some(InterpreterKind::GraalPy)
-                                } else {
-                                    None
+                                let sysconfig_data =
+                                    parse_sysconfigdata(host_python, sysconfig_path)?;
+                                let major = sysconfig_data
+                                    .get("version_major")
+                                    .context("version_major is not defined")?
+                                    .parse::<usize>()
+                                    .context("Could not parse value of version_major")?;
+                                let minor = sysconfig_data
+                                    .get("version_minor")
+                                    .context("version_minor is not defined")?
+                                    .parse::<usize>()
+                                    .context("Could not parse value of version_minor")?;
+                                let abiflags = sysconfig_data
+                                    .get("ABIFLAGS")
+                                    .map(ToString::to_string)
+                                    .unwrap_or_default();
+                                let gil_disabled = sysconfig_data
+                                    .get("Py_GIL_DISABLED")
+                                    .map(|x| x == "1")
+                                    .unwrap_or_default();
+                                let ext_suffix = sysconfig_data
+                                    .get("EXT_SUFFIX")
+                                    .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
+                                let soabi = sysconfig_data.get("SOABI");
+                                let interpreter_kind = soabi
+                                    .and_then(|tag| {
+                                        if tag.starts_with("pypy") {
+                                            Some(InterpreterKind::PyPy)
+                                        } else if tag.starts_with("cpython") {
+                                            Some(InterpreterKind::CPython)
+                                        } else if tag.starts_with("graalpy") {
+                                            Some(InterpreterKind::GraalPy)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .context("unsupported Python interpreter")?;
+                                interpreters.push(PythonInterpreter {
+                                    config: InterpreterConfig {
+                                        major,
+                                        minor,
+                                        interpreter_kind,
+                                        abiflags,
+                                        ext_suffix: ext_suffix.to_string(),
+                                        pointer_width: None,
+                                        gil_disabled,
+                                    },
+                                    executable: PathBuf::new(),
+                                    platform: None,
+                                    runnable: false,
+                                    implementation_name: interpreter_kind
+                                        .to_string()
+                                        .to_ascii_lowercase(),
+                                    soabi: soabi.cloned(),
+                                });
+                            } else {
+                                if interpreter.is_empty() && !self.find_interpreter {
+                                    bail!("Couldn't find any python interpreters. Please specify at least one with -i");
                                 }
-                            })
-                            .context("unsupported Python interpreter")?;
-                        interpreters.push(PythonInterpreter {
-                            config: InterpreterConfig {
-                                major,
-                                minor,
-                                interpreter_kind,
-                                abiflags,
-                                ext_suffix: ext_suffix.to_string(),
-                                pointer_width: None,
-                                gil_disabled,
-                            },
-                            executable: PathBuf::new(),
-                            platform: None,
-                            runnable: false,
-                            implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),
-                            soabi: soabi.cloned(),
-                        });
-                    } else {
-                        if interpreter.is_empty() && !self.find_interpreter {
-                            bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+                                for interp in interpreter {
+                                    // If `-i` looks like a file path, check if it's a valid interpreter
+                                    if interp.components().count() > 1
+                                        && PythonInterpreter::check_executable(
+                                            interp, target, bridge,
+                                        )?
+                                        .is_none()
+                                    {
+                                        bail!(
+                                            "{} is not a valid python interpreter",
+                                            interp.display()
+                                        );
+                                    }
+                                }
+                                interpreters = find_interpreter_in_sysconfig(
+                                    bridge,
+                                    interpreter,
+                                    target,
+                                    requires_python,
+                                )?;
+                                if interpreters.is_empty() {
+                                    bail!(
+                                        "Couldn't find any python interpreters from '{}'. Please check that both major and minor python version have been specified in -i/--interpreter.",
+                                        interpreter
+                                            .iter()
+                                            .map(|p| p.display().to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    );
+                                }
+                            }
+                        } else {
+                            interpreters =
+                                find_interpreter(bridge, interpreter, target, requires_python)?;
                         }
-                        for interp in interpreter {
-                            // If `-i` looks like a file path, check if it's a valid interpreter
-                            if interp.components().count() > 1
-                                && PythonInterpreter::check_executable(interp, target, bridge)?
-                                    .is_none()
-                            {
-                                bail!("{} is not a valid python interpreter", interp.display());
+
+                        let interpreters_str = interpreters
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<String>>()
+                            .join(", ");
+                        eprintln!("🐍 Found {interpreters_str}");
+
+                        Ok(interpreters)
+                    }
+                    Some((major, minor)) => {
+                        let found_interpreters =
+                            find_interpreter_in_host(bridge, interpreter, target, requires_python)
+                                .or_else(|err| {
+                                    // Can only use sysconfig-derived interpreter on windows if generating the import lib
+                                    if target.is_windows() && !generate_import_lib {
+                                        return Err(err.context("Need a Python interpreter to compile for Windows without PyO3's `generate-import-lib` feature"));
+                                    }
+
+                                    let interps =
+                                        find_interpreter_in_sysconfig(bridge,interpreter, target, requires_python)
+                                            .unwrap_or_default();
+                                    if interps.is_empty() && !self.interpreter.is_empty() {
+                                        // Print error when user supplied `--interpreter` option
+                                        Err(err)
+                                    } else {
+                                        Ok(interps)
+                                    }
+                                })?;
+
+                        if target.is_windows() {
+                            // On windows we might need a Python executable to locate a base prefix for
+                            // linker args, if we're not using PyO3's `generate-import-lib` feature.
+                            if env::var_os("PYO3_CROSS_LIB_DIR").is_some() {
+                                // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
+                                // when cross compiling, so we fake a python interpreter matching it
+                                eprintln!("⚠️  Cross-compiling is poorly supported");
+                                Ok(vec![PythonInterpreter {
+                                    config: InterpreterConfig {
+                                        major: *major as usize,
+                                        minor: *minor as usize,
+                                        interpreter_kind: InterpreterKind::CPython,
+                                        abiflags: "".to_string(),
+                                        ext_suffix: ".pyd".to_string(),
+                                        pointer_width: None,
+                                        gil_disabled: false,
+                                    },
+                                    executable: PathBuf::new(),
+                                    platform: None,
+                                    runnable: false,
+                                    implementation_name: "cpython".to_string(),
+                                    soabi: None,
+                                }])
+                            } else if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
+                                let interpreter_config = InterpreterConfig::from_pyo3_config(
+                                    config_file.as_ref(),
+                                    target,
+                                )
+                                .context("Invalid PYO3_CONFIG_FILE")?;
+                                Ok(vec![PythonInterpreter::from_config(interpreter_config)])
+                            } else if generate_import_lib {
+                                eprintln!("🐍 Not using a specific python interpreter (automatically generating windows import library)");
+                                let mut found_interpreters = found_interpreters;
+                                // fake a python interpreter if none directly found
+                                if found_interpreters.is_empty() {
+                                    found_interpreters.push(PythonInterpreter {
+                                        config: InterpreterConfig {
+                                            major: *major as usize,
+                                            minor: *minor as usize,
+                                            interpreter_kind: InterpreterKind::CPython,
+                                            abiflags: "".to_string(),
+                                            ext_suffix: ".pyd".to_string(),
+                                            pointer_width: None,
+                                            gil_disabled: false,
+                                        },
+                                        executable: PathBuf::new(),
+                                        platform: None,
+                                        runnable: false,
+                                        implementation_name: "cpython".to_string(),
+                                        soabi: None,
+                                    })
+                                }
+                                Ok(found_interpreters)
+                            } else {
+                                if found_interpreters.is_empty() {
+                                    bail!("Failed to find any python interpreter");
+                                }
+                                Ok(found_interpreters)
+                            }
+                        } else {
+                            eprintln!("🐍 Not using a specific python interpreter");
+                            if self.interpreter.is_empty() {
+                                // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
+                                // The python interpreter config doesn't matter, as it's not used for anything
+                                Ok(vec![PythonInterpreter {
+                                    config: InterpreterConfig {
+                                        major: *major as usize,
+                                        minor: *minor as usize,
+                                        interpreter_kind: InterpreterKind::CPython,
+                                        abiflags: "".to_string(),
+                                        ext_suffix: "".to_string(),
+                                        pointer_width: None,
+                                        gil_disabled: false,
+                                    },
+                                    executable: PathBuf::new(),
+                                    platform: None,
+                                    runnable: false,
+                                    implementation_name: "cpython".to_string(),
+                                    soabi: None,
+                                }])
+                            } else if target.cross_compiling() {
+                                let mut interps = Vec::with_capacity(found_interpreters.len());
+                                let mut pypys = Vec::new();
+                                for interp in found_interpreters {
+                                    if interp.interpreter_kind.is_pypy() {
+                                        pypys.push(PathBuf::from(format!(
+                                            "pypy{}.{}",
+                                            interp.major, interp.minor
+                                        )));
+                                    } else {
+                                        interps.push(interp);
+                                    }
+                                }
+                                // cross compiling to PyPy with abi3 feature enabled,
+                                // we cannot use host pypy so switch to bundled sysconfig instead
+                                if !pypys.is_empty() {
+                                    interps.extend(find_interpreter_in_sysconfig(
+                                        bridge,
+                                        &pypys,
+                                        target,
+                                        requires_python,
+                                    )?)
+                                }
+                                if interps.is_empty() {
+                                    bail!("Failed to find any python interpreter");
+                                }
+                                Ok(interps)
+                            } else {
+                                if found_interpreters.is_empty() {
+                                    bail!("Failed to find any python interpreter");
+                                }
+                                Ok(found_interpreters)
                             }
                         }
-                        interpreters = find_interpreter_in_sysconfig(
-                            bridge,
-                            interpreter,
-                            target,
-                            requires_python,
-                        )?;
-                        if interpreters.is_empty() {
-                            bail!(
-                                "Couldn't find any python interpreters from '{}'. Please check that both major and minor python version have been specified in -i/--interpreter.",
-                                interpreter
-                                    .iter()
-                                    .map(|p| p.display().to_string())
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            );
-                        }
                     }
-                } else {
-                    interpreters = find_interpreter(bridge, interpreter, target, requires_python)?;
                 }
-
-                let interpreters_str = interpreters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                eprintln!("🐍 Found {interpreters_str}");
-
-                Ok(interpreters)
             }
             BridgeModel::Cffi => {
                 let interpreter =
@@ -343,139 +498,6 @@ impl BuildOptions {
                 Ok(vec![interpreter])
             }
             BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
-            BridgeModel::PyO3Abi3 { major, minor, .. } => {
-                let found_interpreters =
-                    find_interpreter_in_host(bridge, interpreter, target, requires_python)
-                        .or_else(|err| {
-                            // Can only use sysconfig-derived interpreter on windows if generating the import lib
-                            if target.is_windows() && !generate_import_lib {
-                                return Err(err.context("Need a Python interpreter to compile for Windows without PyO3's `generate-import-lib` feature"));
-                            }
-
-                            let interps =
-                                find_interpreter_in_sysconfig(bridge,interpreter, target, requires_python)
-                                    .unwrap_or_default();
-                            if interps.is_empty() && !self.interpreter.is_empty() {
-                                // Print error when user supplied `--interpreter` option
-                                Err(err)
-                            } else {
-                                Ok(interps)
-                            }
-                        })?;
-
-                if target.is_windows() {
-                    // On windows we might need a Python executable to locate a base prefix for
-                    // linker args, if we're not using PyO3's `generate-import-lib` feature.
-                    if env::var_os("PYO3_CROSS_LIB_DIR").is_some() {
-                        // PYO3_CROSS_LIB_DIR should point to the `libs` directory inside base_prefix
-                        // when cross compiling, so we fake a python interpreter matching it
-                        eprintln!("⚠️  Cross-compiling is poorly supported");
-                        Ok(vec![PythonInterpreter {
-                            config: InterpreterConfig {
-                                major: *major as usize,
-                                minor: *minor as usize,
-                                interpreter_kind: InterpreterKind::CPython,
-                                abiflags: "".to_string(),
-                                ext_suffix: ".pyd".to_string(),
-                                pointer_width: None,
-                                gil_disabled: false,
-                            },
-                            executable: PathBuf::new(),
-                            platform: None,
-                            runnable: false,
-                            implementation_name: "cpython".to_string(),
-                            soabi: None,
-                        }])
-                    } else if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
-                        let interpreter_config =
-                            InterpreterConfig::from_pyo3_config(config_file.as_ref(), target)
-                                .context("Invalid PYO3_CONFIG_FILE")?;
-                        Ok(vec![PythonInterpreter::from_config(interpreter_config)])
-                    } else if generate_import_lib {
-                        eprintln!("🐍 Not using a specific python interpreter (automatically generating windows import library)");
-                        let mut found_interpreters = found_interpreters;
-                        // fake a python interpreter if none directly found
-                        if found_interpreters.is_empty() {
-                            found_interpreters.push(PythonInterpreter {
-                                config: InterpreterConfig {
-                                    major: *major as usize,
-                                    minor: *minor as usize,
-                                    interpreter_kind: InterpreterKind::CPython,
-                                    abiflags: "".to_string(),
-                                    ext_suffix: ".pyd".to_string(),
-                                    pointer_width: None,
-                                    gil_disabled: false,
-                                },
-                                executable: PathBuf::new(),
-                                platform: None,
-                                runnable: false,
-                                implementation_name: "cpython".to_string(),
-                                soabi: None,
-                            })
-                        }
-                        Ok(found_interpreters)
-                    } else {
-                        if found_interpreters.is_empty() {
-                            bail!("Failed to find any python interpreter");
-                        }
-                        Ok(found_interpreters)
-                    }
-                } else {
-                    eprintln!("🐍 Not using a specific python interpreter");
-                    if self.interpreter.is_empty() {
-                        // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
-                        // The python interpreter config doesn't matter, as it's not used for anything
-                        Ok(vec![PythonInterpreter {
-                            config: InterpreterConfig {
-                                major: *major as usize,
-                                minor: *minor as usize,
-                                interpreter_kind: InterpreterKind::CPython,
-                                abiflags: "".to_string(),
-                                ext_suffix: "".to_string(),
-                                pointer_width: None,
-                                gil_disabled: false,
-                            },
-                            executable: PathBuf::new(),
-                            platform: None,
-                            runnable: false,
-                            implementation_name: "cpython".to_string(),
-                            soabi: None,
-                        }])
-                    } else if target.cross_compiling() {
-                        let mut interps = Vec::with_capacity(found_interpreters.len());
-                        let mut pypys = Vec::new();
-                        for interp in found_interpreters {
-                            if interp.interpreter_kind.is_pypy() {
-                                pypys.push(PathBuf::from(format!(
-                                    "pypy{}.{}",
-                                    interp.major, interp.minor
-                                )));
-                            } else {
-                                interps.push(interp);
-                            }
-                        }
-                        // cross compiling to PyPy with abi3 feature enabled,
-                        // we cannot use host pypy so switch to bundled sysconfig instead
-                        if !pypys.is_empty() {
-                            interps.extend(find_interpreter_in_sysconfig(
-                                bridge,
-                                &pypys,
-                                target,
-                                requires_python,
-                            )?)
-                        }
-                        if interps.is_empty() {
-                            bail!("Failed to find any python interpreter");
-                        }
-                        Ok(interps)
-                    } else {
-                        if found_interpreters.is_empty() {
-                            bail!("Failed to find any python interpreter");
-                        }
-                        Ok(found_interpreters)
-                    }
-                }
-            }
         }
     }
 
@@ -995,12 +1017,14 @@ fn find_pyo3_bindings(
         Some(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version,
+            abi3: None,
         })
     } else if deps.get("pyo3-ffi").is_some() {
         let version = packages["pyo3-ffi"].version.clone();
         Some(PyO3 {
             crate_name: PyO3Crate::PyO3Ffi,
             version,
+            abi3: None,
         })
     } else {
         None
@@ -1133,12 +1157,9 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 let bindings = PyO3 {
                     crate_name: lib,
                     version,
+                    abi3: Some((major, minor)),
                 };
-                Ok(BridgeModel::PyO3Abi3 {
-                    bindings,
-                    major,
-                    minor,
-                })
+                Ok(BridgeModel::PyO3(bindings))
             } else {
                 eprintln!("🔗 Found {lib} bindings");
                 Ok(bridge)
@@ -1507,14 +1528,11 @@ mod test {
             .exec()
             .unwrap();
 
-        let bridge = BridgeModel::PyO3Abi3 {
-            bindings: PyO3 {
-                crate_name: PyO3Crate::PyO3,
-                version: semver::Version::new(0, 24, 0),
-            },
-            major: 3,
-            minor: 7,
-        };
+        let bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 24, 0),
+            abi3: Some((3, 7)),
+        });
         assert_eq!(find_bridge(&pyo3_pure, None).unwrap(), bridge);
         assert_eq!(find_bridge(&pyo3_pure, Some("pyo3")).unwrap(), bridge);
     }

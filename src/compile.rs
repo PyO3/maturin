@@ -196,10 +196,7 @@ fn cargo_build_command(
         BridgeModel::Bin(..) => {
             cargo_rustc.bin.push(compile_target.target.name.clone());
         }
-        BridgeModel::Cffi
-        | BridgeModel::UniFfi
-        | BridgeModel::PyO3 { .. }
-        | BridgeModel::PyO3Abi3 { .. } => {
+        BridgeModel::Cffi | BridgeModel::UniFfi | BridgeModel::PyO3 { .. } => {
             cargo_rustc.lib = true;
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
@@ -219,16 +216,17 @@ fn cargo_build_command(
 
     // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
     if target.is_macos() {
-        if let BridgeModel::PyO3 { .. } | BridgeModel::PyO3Abi3 { .. } = bridge_model {
+        if let BridgeModel::PyO3 { .. } = bridge_model {
             // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
             // non-existent library.
             // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
             let module_name = &context.module_name;
-            let so_filename = match bridge_model {
-                BridgeModel::PyO3Abi3 { .. } => format!("{module_name}.abi3.so"),
-                _ => python_interpreter
+            let so_filename = if bridge_model.is_abi3() {
+                format!("{module_name}.abi3.so")
+            } else {
+                python_interpreter
                     .expect("missing python interpreter for non-abi3 wheel build")
-                    .get_library_name(module_name),
+                    .get_library_name(module_name)
             };
             let macos_dylib_install_name =
                 format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
@@ -390,7 +388,7 @@ fn cargo_build_command(
         build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
     }
 
-    if let BridgeModel::PyO3Abi3 { .. } = bridge_model {
+    if bridge_model.is_abi3() {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);

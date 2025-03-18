@@ -282,12 +282,16 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 
             // Since afaik all other PEP 517 backends also return linux tagged wheels, we do so too
             let tags = match context.bridge() {
-                BridgeModel::PyO3(..) | BridgeModel::Bin(Some(..)) => {
-                    vec![context.interpreter[0].get_tag(&context, &[PlatformTag::Linux])?]
-                }
-                BridgeModel::PyO3Abi3 { major, minor, .. } => {
-                    let platform = context.get_platform_tag(&[PlatformTag::Linux])?;
-                    vec![format!("cp{major}{minor}-abi3-{platform}")]
+                BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => {
+                    match bindings.abi3 {
+                        Some((major, minor)) => {
+                            let platform = context.get_platform_tag(&[PlatformTag::Linux])?;
+                            vec![format!("cp{major}{minor}-abi3-{platform}")]
+                        }
+                        None => {
+                            vec![context.interpreter[0].get_tag(&context, &[PlatformTag::Linux])?]
+                        }
+                    }
                 }
                 BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
                     context.get_universal_tags(&[PlatformTag::Linux])?.1

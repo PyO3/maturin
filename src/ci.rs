@@ -169,14 +169,13 @@ impl GenerateCI {
         bridge_model: &BridgeModel,
         sdist: bool,
     ) -> Result<String> {
-        let is_abi3 = matches!(bridge_model, BridgeModel::PyO3Abi3 { .. });
+        let is_abi3 = bridge_model.is_abi3();
         let is_bin = bridge_model.is_bin();
         let setup_python = self.pytest
             || matches!(
                 bridge_model,
                 BridgeModel::Bin(Some(_))
                     | BridgeModel::PyO3 { .. }
-                    | BridgeModel::PyO3Abi3 { .. }
                     | BridgeModel::Cffi
                     | BridgeModel::UniFfi
             );
@@ -677,6 +676,7 @@ mod tests {
                 &BridgeModel::PyO3(PyO3 {
                     crate_name: PyO3Crate::PyO3,
                     version: Version::new(0, 23, 0),
+                    abi3: None,
                 }),
                 true,
             )
@@ -870,14 +870,11 @@ mod tests {
         let conf = GenerateCI::default()
             .generate_github(
                 "example",
-                &BridgeModel::PyO3Abi3 {
-                    bindings: PyO3 {
-                        crate_name: PyO3Crate::PyO3,
-                        version: Version::new(0, 23, 0),
-                    },
-                    major: 3,
-                    minor: 7,
-                },
+                &BridgeModel::PyO3(PyO3 {
+                    crate_name: PyO3Crate::PyO3,
+                    version: Version::new(0, 23, 0),
+                    abi3: Some((3, 7)),
+                }),
                 false,
             )
             .unwrap()
@@ -1084,14 +1081,11 @@ mod tests {
         }
         .generate_github(
             "example",
-            &BridgeModel::PyO3Abi3 {
-                bindings: PyO3 {
-                    crate_name: PyO3Crate::PyO3,
-                    version: Version::new(0, 23, 0),
-                },
-                major: 3,
-                minor: 7,
-            },
+            &BridgeModel::PyO3(PyO3 {
+                crate_name: PyO3Crate::PyO3,
+                version: Version::new(0, 23, 0),
+                abi3: Some((3, 7)),
+            }),
             false,
         )
         .unwrap()
@@ -1297,6 +1291,7 @@ mod tests {
                 &BridgeModel::PyO3(PyO3 {
                     crate_name: PyO3Crate::PyO3,
                     version: Version::new(0, 23, 0),
+                    abi3: None,
                 }),
                 true,
             )

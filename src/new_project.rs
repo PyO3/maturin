@@ -57,6 +57,7 @@ impl ProjectGenerator<'_> {
                 crate_name: bindings.parse()?,
                 version: Version::new(0, 23, 1),
                 abi3: None,
+                metadata: None,
             }),
         };
         let ci_config =

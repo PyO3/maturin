@@ -677,6 +677,7 @@ mod tests {
                     crate_name: PyO3Crate::PyO3,
                     version: Version::new(0, 23, 0),
                     abi3: None,
+                    metadata: None,
                 }),
                 true,
             )
@@ -874,6 +875,7 @@ mod tests {
                     crate_name: PyO3Crate::PyO3,
                     version: Version::new(0, 23, 0),
                     abi3: Some((3, 7)),
+                    metadata: None,
                 }),
                 false,
             )
@@ -1085,6 +1087,7 @@ mod tests {
                 crate_name: PyO3Crate::PyO3,
                 version: Version::new(0, 23, 0),
                 abi3: Some((3, 7)),
+                metadata: None,
             }),
             false,
         )
@@ -1292,6 +1295,7 @@ mod tests {
                     crate_name: PyO3Crate::PyO3,
                     version: Version::new(0, 23, 0),
                     abi3: None,
+                    metadata: None,
                 }),
                 true,
             )

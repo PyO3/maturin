@@ -96,9 +96,10 @@ fn windows_interpreter_no_build(
 /// platforms.
 fn find_all_windows(
     target: &Target,
-    min_python_minor: usize,
+    bridge: &BridgeModel,
     requires_python: Option<&VersionSpecifiers>,
 ) -> Result<Vec<String>> {
+    let min_python_minor = bridge.minimal_python_minor_version();
     let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
@@ -218,7 +219,7 @@ fn find_all_windows(
     }
 
     // Fallback to pythonX.Y for Microsoft Store versions
-    for minor in min_python_minor..=MAXIMUM_PYTHON_MINOR {
+    for minor in min_python_minor..=bridge.maximum_python_minor_version() {
         if !versions_found.contains(&(3, minor)) {
             let executable = format!("python3.{minor}.exe");
             if let Some(python_info) = windows_python_info(Path::new(&executable))? {
@@ -793,13 +794,12 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
         requires_python: Option<&VersionSpecifiers>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let min_python_minor = bridge.minimal_python_minor_version();
-        let min_pypy_minor = bridge.minimal_pypy_minor_version();
         let executables = if target.is_windows() {
             // TOFIX: add PyPy support to Windows
-            find_all_windows(target, min_python_minor, requires_python)?
+            find_all_windows(target, bridge, requires_python)?
         } else {
-            let mut executables: Vec<String> = (min_python_minor..=MAXIMUM_PYTHON_MINOR)
+            let mut executables: Vec<String> = (bridge.minimal_python_minor_version()
+                ..=bridge.maximum_python_minor_version())
                 .filter(|minor| {
                     requires_python
                         .map(|requires_python| {
@@ -812,7 +812,7 @@ impl PythonInterpreter {
             // Also try to find PyPy for cffi and pyo3 bindings
             if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
                 executables.extend(
-                    (min_pypy_minor..=MAXIMUM_PYPY_MINOR)
+                    (bridge.minimal_pypy_minor_version()..=bridge.maximum_pypy_minor_version())
                         .filter(|minor| {
                             requires_python
                                 .map(|requires_python| {
@@ -1059,6 +1059,7 @@ mod tests {
                 crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
                 abi3: None,
+                metadata: None,
             })),
         )
         .iter()
@@ -1132,6 +1133,7 @@ mod tests {
                 crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
                 abi3: None,
+                metadata: None,
             })),
         )
         .iter()

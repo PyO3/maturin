@@ -144,7 +144,7 @@ impl PyO3 {
     }
 
     /// Returns the maximum python minor version supported
-    fn maximal_python_minor_version(&self) -> usize {
+    fn maximum_python_minor_version(&self) -> usize {
         // N.B. must check large minor versions first
         if let Some(metadata) = self.metadata.as_ref() {
             metadata.cpython.max_minor
@@ -170,7 +170,7 @@ impl PyO3 {
     }
 
     /// Returns the maximum PyPy minor version supported
-    fn maximal_pypy_minor_version(&self) -> usize {
+    fn maximum_pypy_minor_version(&self) -> usize {
         // N.B. must check large minor versions first
         if let Some(metadata) = self.metadata.as_ref() {
             metadata.pypy.max_minor
@@ -240,7 +240,7 @@ impl BridgeModel {
     /// Returns the maximum python minor version supported
     pub fn maximum_python_minor_version(&self) -> usize {
         match self.pyo3() {
-            Some(bindings) => bindings.maximal_python_minor_version(),
+            Some(bindings) => bindings.maximum_python_minor_version(),
             None => MAXIMUM_PYTHON_MINOR,
         }
     }
@@ -258,7 +258,7 @@ impl BridgeModel {
         use crate::python_interpreter::MAXIMUM_PYPY_MINOR;
 
         match self.pyo3() {
-            Some(bindings) => bindings.maximal_pypy_minor_version(),
+            Some(bindings) => bindings.maximum_pypy_minor_version(),
             None => MAXIMUM_PYPY_MINOR,
         }
     }

@@ -244,6 +244,7 @@ maturin itself is manylinux compliant when compiled for the musl target.
 - [robyn](https://github.com/sansyrox/robyn) - A fast and extensible async python web server with a Rust runtime
 - [ruff](https://github.com/charliermarsh/ruff) - An extremely fast Python linter, written in Rust
 - [rnet](https://github.com/0x676e67/rnet) - Asynchronous Python HTTP Client with Black Magic
+- [rustpy-xlsxwriter](https://github.com/rahmadafandi/rustpy-xlsxwriter): A high-performance Python library for generating Excel files, utilizing the [rust_xlsxwriter](https://github.com/jmcnamara/rust_xlsxwriter) crate for efficient data handling.
 - [tantivy-py](https://github.com/quickwit-oss/tantivy-py) - Python bindings for Tantivy
 - [watchfiles](https://github.com/samuelcolvin/watchfiles) - Simple, modern and high performance file watching and code reload in python
 - [wonnx](https://github.com/webonnx/wonnx/tree/master/wonnx-py) - Wonnx is a GPU-accelerated ONNX inference run-time written 100% in Rust

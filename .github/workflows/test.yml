@@ -58,9 +58,6 @@ jobs:
           # macOS M1 runner only have Python 3.11+
           - os: macos-14
             python-version: 3.9
-          # Quansight-Labs/setup-python@v5 doesn't' support Python 3.13t
-          - os: ubuntu-22.04-arm
-            python-version: 3.13t
           # PyPy on ARM is not supported in setup-python action
           - os: ubuntu-22.04-arm
             python-version: pypy3.11
@@ -95,7 +92,7 @@ jobs:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
-      - uses: Quansight-Labs/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set PYTHON_VERSION env var

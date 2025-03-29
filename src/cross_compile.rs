@@ -130,7 +130,7 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
         bail!("Could not find _sysconfigdata*.py in {}", lib_dir.display());
     } else if sysconfig_paths.len() > 1 {
         bail!(
-            "Detected multiple possible python versions, please set the PYO3_PYTHON_VERSION \
+            "Detected multiple possible python versions, please set the PYO3_CROSS_PYTHON_VERSION \
             variable to the wanted version on your system or set the _PYTHON_SYSCONFIGDATA_NAME \
             variable to the wanted sysconfigdata file name\nsysconfigdata paths = {:?}",
             sysconfig_paths

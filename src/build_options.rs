@@ -782,7 +782,7 @@ fn resolve_interpreters(
     target: &Target,
     requires_python: Option<&VersionSpecifiers>,
     generate_import_lib: bool,
-) -> Result<Vec<PythonInterpreter>, anyhow::Error> {
+) -> Result<Vec<PythonInterpreter>> {
     let interpreter = if build_options.find_interpreter {
         // Auto-detect interpreters
         build_options.find_interpreters(
@@ -801,7 +801,15 @@ fn resolve_interpreters(
                     None => vec![target.get_python()],
                 }
             } else {
-                vec![target.get_python()]
+                let python = if bridge.is_pyo3() {
+                    std::env::var("PYO3_PYTHON")
+                        .ok()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| target.get_python())
+                } else {
+                    target.get_python()
+                };
+                vec![python]
             }
         } else {
             // XXX: False positive clippy warning

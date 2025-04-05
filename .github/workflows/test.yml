@@ -79,7 +79,7 @@ jobs:
       - name: sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
-          version: "v0.7.6"
+          version: "v0.10.0"
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - name: Install python packages
@@ -212,7 +212,7 @@ jobs:
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
-          version: "v0.7.6"
+          version: "v0.10.0"
       - uses: actions/setup-python@v5
         with:
           python-version: 3.12
@@ -436,7 +436,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
-          version: "v0.7.6"
+          version: "v0.10.0"
       - uses: actions/setup-python@v5
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:

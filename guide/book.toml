@@ -1,5 +1,5 @@
 [book]
-author = ["PyO3 Project and Contributors"]
+authors = ["PyO3 Project and Contributors"]
 language = "en"
 multilingual = false
 src = "src"

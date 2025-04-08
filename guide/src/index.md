@@ -40,6 +40,12 @@ Development of maturin is made possible by the following sponsors:
     </a>
   </div>
   <div>
+    <a rel="sponsored" target="_blank" href="https://labs.quansight.org/">
+      <img src="./assets/sponsors/quansightlabs.jpeg" alt="Quansight Labs" width="80" height="80" />
+      <span>Quansight Labs</span>
+    </a>
+  </div>
+  <div>
     <a rel="sponsored" target="_blank" href="https://www.rerun.io">
       <img src="./assets/sponsors/rerun.png" alt="Rerun" width="80" height="80" />
       <span>Rerun</span>

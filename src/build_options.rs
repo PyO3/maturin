@@ -1558,7 +1558,7 @@ mod test {
 
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version: semver::Version::new(0, 24, 0),
+            version: semver::Version::new(0, 24, 1),
             abi3: Some((3, 7)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {

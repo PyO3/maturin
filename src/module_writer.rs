@@ -153,7 +153,11 @@ impl PathWriter {
             record_file.display()
         ))?;
 
-        for (filename, hash, len) in self.record {
+        // Sort records for deterministic output
+        let mut sorted_records = self.record.clone();
+        sorted_records.sort_by(|(path_a, _, _), (path_b, _, _)| path_a.cmp(path_b));
+
+        for (filename, hash, len) in sorted_records {
             buffer
                 .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())
                 .context(format!(
@@ -389,7 +393,12 @@ impl WheelWriter {
         let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
         debug!("Adding {}", record_filename);
         self.zip.start_file(&record_filename, options)?;
-        for (filename, hash, len) in self.record {
+
+        // Sort records for deterministic output
+        let mut sorted_records = self.record.clone();
+        sorted_records.sort_by(|(path_a, _, _), (path_b, _, _)| path_a.cmp(path_b));
+
+        for (filename, hash, len) in sorted_records {
             self.zip
                 .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())?;
         }

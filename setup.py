@@ -11,6 +11,7 @@
 
 import os
 import shlex
+import shutil
 
 try:
     import tomllib
@@ -47,9 +48,18 @@ cargo_args = ["--no-default-features"]
 if os.getenv("MATURIN_SETUP_ARGS"):
     cargo_args = shlex.split(os.getenv("MATURIN_SETUP_ARGS", ""))
 
+if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
+    from puccinialin import setup_rust
+
+    print("Rust not found, installing into a temporary directory")
+    extra_env = setup_rust()
+    env = {**os.environ, **extra_env}
+else:
+    env = None
+
 setup(
     version=version,
     cmdclass={"bdist_wheel": bdist_wheel},
-    rust_extensions=[RustBin("maturin", args=cargo_args, cargo_manifest_args=["--locked"])],
+    rust_extensions=[RustBin("maturin", args=cargo_args, cargo_manifest_args=["--locked"], env=env)],
     zip_safe=False,
 )

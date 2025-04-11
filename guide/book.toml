@@ -1,7 +1,6 @@
 [book]
 authors = ["PyO3 Project and Contributors"]
 language = "en"
-multilingual = false
 src = "src"
 title = "Maturin User Guide"
 

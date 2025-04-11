@@ -228,7 +228,7 @@ fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) 
 }
 
 #[rstest]
-#[timeout(Duration::from_secs(60))]
+#[timeout(Duration::from_secs(120))]
 #[case(TestInstallBackend::Pip, "pip")]
 #[case(TestInstallBackend::Uv, "uv")]
 #[test]

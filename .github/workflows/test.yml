@@ -48,6 +48,9 @@ jobs:
           - "3.13"
           - "3.13t"
           - "pypy3.11"
+        include:
+          - os: windows-11-arm
+            python-version: "3.13"
         exclude:
           # Skip PyPy on macOS M1 runner because they are built for x86_64
           - os: macos-14
@@ -64,8 +67,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: "1"
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - name: Enable long paths
         if: startsWith(matrix.os, 'windows')
@@ -76,10 +77,16 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
-      - name: sccache Setup
+      - name: sccache setup
+        if: ${{ matrix.os != 'windows-11-arm' }}
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
           version: "v0.10.0"
+      - name: Enable sccache
+        if: ${{ matrix.os != 'windows-11-arm' }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - name: Install python packages
@@ -88,6 +95,7 @@ jobs:
           uv tool install twine
           uv tool install uniffi-bindgen==0.28.0
       - uses: conda-incubator/setup-miniconda@v3
+        if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           auto-activate-base: "false"
           activate-environment: ""
@@ -103,8 +111,17 @@ jobs:
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
       - uses: mlugg/setup-zig@v1
+        if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           version: 0.12.1
+      - name: Install rustup (Windows 11 ARM64) # rustup is currently missing from the windows-11-arm runner
+        if: matrix.os == 'windows-11-arm'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe" -OutFile rustup-init.exe
+          .\rustup-init.exe --default-toolchain none -y
+          "$env:USERPROFILE\.cargo\bin" | Out-File -Append -Encoding ascii $env:GITHUB_PATH
+          "CARGO_HOME=$env:USERPROFILE\.cargo" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:
@@ -169,6 +186,7 @@ jobs:
       #    # Check wheels with twine
       #    twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
       - name: test compiling with PYO3_CONFIG_FILE
+        if: ${{ matrix.os != 'windows-11-arm' }}
         shell: bash
         run: |
           set -ex

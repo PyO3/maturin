@@ -27,10 +27,8 @@ fn develop_pyo3_pure() {
 }
 
 #[test]
-#[ignore]
 fn develop_pyo3_pure_conda() {
-    // Only run on GitHub Actions for now
-    if env::var("GITHUB_ACTIONS").is_ok() {
+    if which("conda").is_ok() {
         handle_result(develop::test_develop(
             "test-crates/pyo3-pure",
             None,
@@ -362,8 +360,7 @@ fn integration_pyo3_mixed_src_layout() {
 #[test]
 #[cfg_attr(target_os = "macos", ignore)] // Don't run it on macOS, too slow
 fn integration_pyo3_pure_conda() {
-    // Only run on GitHub Actions for now
-    if env::var("GITHUB_ACTIONS").is_ok() {
+    if which("conda").is_ok() {
         handle_result(integration::test_integration_conda(
             "test-crates/pyo3-mixed",
             None,

@@ -1386,7 +1386,8 @@ fn maybe_free_threaded(python_ver: &str) -> (&str, &str) {
 /// We need to pass the global flags to cargo metadata
 /// (https://github.com/PyO3/maturin/issues/211 and https://github.com/PyO3/maturin/issues/472),
 /// but we can't pass all the extra args, as e.g. `--target` isn't supported, so this tries to
-/// extract the arguments for cargo metadata
+/// extract the arguments for cargo metadata or convert them to suitable forms
+/// instead.
 ///
 /// There are flags (without value) and options (with value). The options value be passed
 /// in the same string as its name or in the next one. For this naive parsing logic, we
@@ -1412,6 +1413,19 @@ pub(crate) fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Resul
     }
     if cargo_options.no_default_features {
         cargo_metadata_extra_args.push("--no-default-features".to_string());
+    }
+    // Target makes a difference during dependency resolving: cargo-fetch don't
+    // bother with unnecessary dependencies on the given triple, but without
+    // any target information supplied to cargo-metadata, it may consider them
+    // necessary, which could fail the build with --offline supplied at the
+    // same time.
+    //
+    // cargo-metadata does support --filter-platform to narrow the dependency
+    // graph since 1.40, thus let's convert --target to it to make sure
+    // cargo-metadata resolves the dependency as expected.
+    if let Some(target) = &cargo_options.target {
+        cargo_metadata_extra_args.push("--filter-platform".to_string());
+        cargo_metadata_extra_args.push(target.clone());
     }
     for opt in &cargo_options.unstable_flags {
         cargo_metadata_extra_args.push("-Z".to_string());
@@ -1661,6 +1675,8 @@ mod test {
                 "--features",
                 "c",
                 "--no-default-features",
+                "--filter-platform",
+                "x86_64-unknown-linux-musl",
             ]
         );
     }
@@ -1681,6 +1697,8 @@ mod test {
             "my-feature",
             "--features",
             "other-feature",
+            "--filter-platform",
+            "x86_64-unknown-linux-musl",
             "-Z",
             "unstable-options",
         ];

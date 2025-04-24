@@ -338,7 +338,7 @@ impl WheelWriter {
                 .normalize()
                 .with_context(|| {
                     format!(
-                        "failed to normalize python dir path `{}`",
+                        "python dir path `{}` does not exist or is invalid",
                         project_layout.python_dir.display()
                     )
                 })?

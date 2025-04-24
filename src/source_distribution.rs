@@ -490,7 +490,7 @@ fn add_cargo_package_files_to_sdist(
         .normalize()
         .with_context(|| {
             format!(
-                "failed to normalize manifest path `{}`",
+                "manifest path `{}` does not exist or is invalid",
                 manifest_path.display()
             )
         })?
@@ -516,7 +516,12 @@ fn add_cargo_package_files_to_sdist(
         let readme = abs_manifest_dir.join(readme);
         let abs_readme = readme
             .normalize()
-            .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
+            .with_context(|| {
+                format!(
+                    "readme path `{}` does not exist or is invalid",
+                    readme.display()
+                )
+            })?
             .into_path_buf();
         // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
         // higher up the file tree.
@@ -611,6 +616,7 @@ fn add_cargo_package_files_to_sdist(
     // Add python source files
     let mut python_packages = Vec::new();
     if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
+        trace!("Resolved python module: {}", python_module.display());
         python_packages.push(python_module.to_path_buf());
     }
     for package in &build_context.project_layout.python_packages {
@@ -618,6 +624,7 @@ fn add_cargo_package_files_to_sdist(
         if python_packages.iter().any(|p| *p == package_path) {
             continue;
         }
+        trace!("Resolved python package: {}", package_path.display());
         python_packages.push(package_path);
     }
 
@@ -689,7 +696,12 @@ fn add_path_dep(
         let readme = path_dep_manifest_dir.join(readme);
         let abs_readme = readme
             .normalize()
-            .with_context(|| format!("failed to normalize readme path `{}`", readme.display()))?
+            .with_context(|| {
+                format!(
+                    "readme path `{}` does not exist or is invalid",
+                    readme.display()
+                )
+            })?
             .into_path_buf();
         // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
         // higher up the file tree. See also [`rewrite_cargo_toml_readme`].
@@ -730,7 +742,7 @@ pub fn source_distribution(
         .normalize()
         .with_context(|| {
             format!(
-                "failed to normalize pyproject.toml path `{}`",
+                "pyproject.toml path `{}` does not exist or is invalid",
                 build_context.pyproject_toml_path.display()
             )
         })?
@@ -760,7 +772,7 @@ pub fn source_distribution(
         .normalize()
         .with_context(|| {
             format!(
-                "failed to normalize pyproject.toml path `{}`",
+                "pyproject.toml path `{}` does not exist or is invalid",
                 build_context.pyproject_toml_path.display()
             )
         })?

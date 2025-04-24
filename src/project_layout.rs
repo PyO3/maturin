@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 const PYPROJECT_TOML: &str = "pyproject.toml";
 
@@ -149,7 +149,7 @@ impl ProjectResolver {
                 .normalize()
                 .with_context(|| {
                     format!(
-                        "Failed to normalize python source path `{}`",
+                        "python source path `{}` does not exist or is invalid",
                         py_src.display()
                     )
                 })?
@@ -220,7 +220,12 @@ impl ProjectResolver {
         if let Some(path) = cargo_manifest_path {
             let path = path
                 .normalize()
-                .with_context(|| format!("failed to normalize manifest path `{}`", path.display()))?
+                .with_context(|| {
+                    format!(
+                        "manifest path `{}` does not exist or is invalid",
+                        path.display()
+                    )
+                })?
                 .into_path_buf();
             debug!(
                 "Using cargo manifest path from command line argument: {:?}",
@@ -260,7 +265,10 @@ impl ProjectResolver {
                 return Ok((
                     path.normalize()
                         .with_context(|| {
-                            format!("failed to normalize manifest path `{}`", path.display())
+                            format!(
+                                "manifest path `{}` does not exist or is invalid",
+                                path.display()
+                            )
                         })?
                         .into_path_buf(),
                     pyproject_file,
@@ -383,11 +391,21 @@ impl ProjectLayout {
                 module_name.to_string(),
             )
         };
+        // If no __init__.py exists, we can't treat it as python source module,
+        // it could be a Rust crate with the same name as the module.
+        let python_module = if !python_module.join("__init__.py").is_file()
+            && python_module.join("Cargo.toml").is_file()
+        {
+            debug!("No __init__.py file found in {}", python_module.display());
+            None
+        } else {
+            Some(python_module)
+        };
         debug!(
             project_root = %project_root.display(),
             python_dir = %python_root.display(),
             rust_module = %rust_module.display(),
-            python_module = %python_module.display(),
+            python_module = ?python_module,
             extension_name = %extension_name,
             module_name = %module_name,
             "Project layout resolved"
@@ -404,28 +422,40 @@ impl ProjectLayout {
             None
         };
 
-        if python_module.is_dir() {
-            eprintln!("🍹 Building a mixed python/rust project");
+        if let Some(python_module) = python_module {
+            if python_module.is_dir() {
+                eprintln!("🍹 Building a mixed python/rust project");
 
-            Ok(ProjectLayout {
-                project_root: project_root.to_path_buf(),
-                python_dir: python_root,
-                python_packages,
-                python_module: Some(python_module),
-                rust_module,
-                extension_name,
-                data,
-            })
-        } else {
-            if custom_python_source {
-                eprintln!(
-                    "⚠️ Warning: You specified the python source as {}, but the python module at \
-                    {} is missing. No python module will be included.",
-                    python_root.display(),
-                    python_module.display()
-                );
+                Ok(ProjectLayout {
+                    project_root: project_root.to_path_buf(),
+                    python_dir: python_root,
+                    python_packages,
+                    python_module: Some(python_module),
+                    rust_module,
+                    extension_name,
+                    data,
+                })
+            } else {
+                if custom_python_source {
+                    eprintln!(
+                        "⚠️ Warning: You specified the python source as {}, but the python module at \
+                        {} is missing. No python module will be included.",
+                        python_root.display(),
+                        python_module.display()
+                    );
+                }
+
+                Ok(ProjectLayout {
+                    project_root: project_root.to_path_buf(),
+                    python_dir: python_root,
+                    python_packages,
+                    python_module: None,
+                    rust_module: project_root.to_path_buf(),
+                    extension_name,
+                    data,
+                })
             }
-
+        } else {
             Ok(ProjectLayout {
                 project_root: project_root.to_path_buf(),
                 python_dir: python_root,

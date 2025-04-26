@@ -8,7 +8,6 @@ use crate::PythonInterpreter;
 use crate::Target;
 use anyhow::ensure;
 use anyhow::{anyhow, bail, Context, Result};
-use cargo_options::heading;
 use fs_err as fs;
 use regex::Regex;
 use std::path::Path;
@@ -184,9 +183,6 @@ pub struct DevelopOptions {
         value_parser = ["pyo3", "pyo3-ffi", "cffi", "uniffi", "bin"]
     )]
     pub bindings: Option<String>,
-    /// Pass --release to cargo
-    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS,)]
-    pub release: bool,
     /// Strip the library for minimum file size
     #[arg(long)]
     pub strip: bool,
@@ -368,7 +364,6 @@ fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
 pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let DevelopOptions {
         bindings,
-        release,
         strip,
         extras,
         skip_install,
@@ -408,7 +403,6 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     let build_context = build_options
         .into_build_context()
-        .release(release)
         .strip(strip)
         .editable(true)
         .build()?;

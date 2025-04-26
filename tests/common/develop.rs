@@ -59,7 +59,6 @@ pub fn test_develop(
     let manifest_file = package.join("Cargo.toml");
     let develop_options = DevelopOptions {
         bindings,
-        release: false,
         strip: false,
         extras: Vec::new(),
         skip_install: false,

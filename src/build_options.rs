@@ -36,8 +36,17 @@ pub struct CargoOptions {
     #[arg(short = 'j', long, value_name = "N", help_heading = heading::COMPILATION_OPTIONS)]
     pub jobs: Option<usize>,
 
+    /// Pass --release to cargo
+    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS,)]
+    pub release: bool,
+
     /// Build artifacts with the specified Cargo profile
-    #[arg(long, value_name = "PROFILE-NAME", help_heading = heading::COMPILATION_OPTIONS)]
+    #[arg(
+        long,
+        value_name = "PROFILE-NAME",
+        conflicts_with = "release",
+        help_heading = heading::COMPILATION_OPTIONS
+    )]
     pub profile: Option<String>,
 
     /// Space or comma separated list of features to activate
@@ -511,7 +520,6 @@ impl BuildOptions {
 #[derive(Debug)]
 pub struct BuildContextBuilder {
     build_options: BuildOptions,
-    release: bool,
     strip: bool,
     editable: bool,
     sdist_only: bool,
@@ -521,7 +529,6 @@ impl BuildContextBuilder {
     fn new(build_options: BuildOptions) -> Self {
         Self {
             build_options,
-            release: false,
             strip: false,
             editable: false,
             sdist_only: false,
@@ -529,7 +536,7 @@ impl BuildContextBuilder {
     }
 
     pub fn release(mut self, release: bool) -> Self {
-        self.release = release;
+        self.build_options.release = release;
         self
     }
 
@@ -551,11 +558,11 @@ impl BuildContextBuilder {
     pub fn build(self) -> Result<BuildContext> {
         let Self {
             build_options,
-            release,
             strip,
             editable,
             sdist_only,
         } = self;
+        let release = build_options.release;
         let ProjectResolver {
             project_layout,
             cargo_toml_path,
@@ -1478,7 +1485,7 @@ impl CargoOptions {
             args_from_pyproject.push("manifest-path");
         }
 
-        if self.profile.is_none() && tool_maturin.profile.is_some() {
+        if !self.release && self.profile.is_none() && tool_maturin.profile.is_some() {
             self.profile.clone_from(&tool_maturin.profile);
             args_from_pyproject.push("profile");
         }

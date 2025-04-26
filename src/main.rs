@@ -4,7 +4,6 @@
 //! Run with --help for usage information
 
 use anyhow::{bail, Context, Result};
-use cargo_options::heading;
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 #[cfg(feature = "cli-completion")]
@@ -61,9 +60,6 @@ enum Command {
     #[command(name = "build", alias = "b")]
     /// Build the crate into python packages
     Build {
-        /// Build artifacts in release mode, with optimizations
-        #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS)]
-        release: bool,
         /// Strip the library for minimum file size
         #[arg(long)]
         strip: bool,
@@ -377,13 +373,11 @@ fn run() -> Result<()> {
     match opt.command {
         Command::Build {
             build,
-            release,
             strip,
             sdist,
         } => {
             let build_context = build
                 .into_build_context()
-                .release(release)
                 .strip(strip)
                 .editable(false)
                 .build()?;

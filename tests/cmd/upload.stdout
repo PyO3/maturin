@@ -9,7 +9,7 @@ Arguments:
           The python packages to upload
 
 Options:
-  -r, --repository <REPOSITORY>
+      --repository <REPOSITORY>
           The repository (package index) to upload the package to. Should be a section in the config
           file.
           

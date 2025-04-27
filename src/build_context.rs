@@ -131,6 +131,8 @@ pub struct BuildContext {
     pub editable: bool,
     /// Cargo build options
     pub cargo_options: CargoOptions,
+    /// Zip compression level
+    pub compression_level: u16,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -631,6 +633,7 @@ impl BuildContext {
             &self.metadata24,
             &[tag.clone()],
             self.excludes(Format::Wheel)?,
+            self.compression_level,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -708,6 +711,7 @@ impl BuildContext {
             &self.metadata24,
             &[tag.clone()],
             self.excludes(Format::Wheel)?,
+            self.compression_level,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -830,6 +834,7 @@ impl BuildContext {
             &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
+            self.compression_level,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -901,6 +906,7 @@ impl BuildContext {
             &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
+            self.compression_level,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -999,6 +1005,7 @@ impl BuildContext {
             &metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
+            self.compression_level,
         )?;
 
         if self.project_layout.python_module.is_some() && self.target.is_wasi() {

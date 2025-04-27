@@ -190,6 +190,10 @@ pub struct BuildOptions {
     /// Cargo build options
     #[command(flatten)]
     pub cargo: CargoOptions,
+
+    /// Zip compresson level to use
+    #[arg(long, value_parser = clap::value_parser!(u16).range(0..=264), hide = true, default_value="6")]
+    pub compression_level: u16,
 }
 
 impl Deref for BuildOptions {
@@ -772,6 +776,7 @@ impl BuildContextBuilder {
             universal2,
             editable,
             cargo_options,
+            compression_level: build_options.compression_level,
         })
     }
 }

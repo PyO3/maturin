@@ -204,37 +204,13 @@ impl Metadata24 {
 
             if let Some(license) = &project.license {
                 match license {
-                    // TODO: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
+                    // FIXME: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
                     License::Spdx(license_expr) => self.license = Some(license_expr.clone()),
                     License::File { file } => {
                         let license_path = pyproject_dir.join(file);
                         self.license_files.push(license_path);
                     }
                     License::Text { text } => self.license = Some(text.clone()),
-                }
-            }
-
-            // Until PEP 639 is approved with metadata 2.3, we can assume a
-            // dynamic license-files (also awaiting full 2.2 metadata support)
-            // We're already emitting the License-Files metadata without issue.
-            // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
-            let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
-            let escaped_manifest_string = glob::Pattern::escape(pyproject_dir.to_str().unwrap());
-            let escaped_manifest_path = Path::new(&escaped_manifest_string);
-            for pattern in license_include_targets.iter() {
-                for license_path in
-                    glob::glob(&escaped_manifest_path.join(pattern).to_string_lossy())?
-                        .filter_map(Result::ok)
-                {
-                    if !license_path.is_file() {
-                        continue;
-                    }
-                    // if the pyproject.toml specified the license file,
-                    // then we won't list it as automatically included
-                    if !self.license_files.contains(&license_path) {
-                        eprintln!("📦 Including license file \"{}\"", license_path.display());
-                        self.license_files.push(license_path);
-                    }
                 }
             }
 

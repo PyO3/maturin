@@ -168,7 +168,7 @@ impl BuildContext {
                         .collect();
                     let mut built_wheels = Vec::new();
                     if !abi3_interps.is_empty() {
-                        built_wheels.extend(self.build_binding_wheel_abi3(
+                        built_wheels.extend(self.build_pyo3_wheel_abi3(
                             &abi3_interps,
                             *major,
                             *minor,
@@ -183,11 +183,11 @@ impl BuildContext {
                                 "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
                                 interp_names.iter().join(", ")
                             );
-                        built_wheels.extend(self.build_binding_wheels(&non_abi3_interps)?);
+                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps)?);
                     }
                     built_wheels
                 }
-                None => self.build_binding_wheels(&self.interpreter)?,
+                None => self.build_pyo3_wheels(&self.interpreter)?,
             },
             BridgeModel::Cffi => self.build_cffi_wheel()?,
             BridgeModel::UniFfi => self.build_uniffi_wheel()?,
@@ -658,7 +658,7 @@ impl BuildContext {
 
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
     /// for it
-    pub fn build_binding_wheel_abi3(
+    pub fn build_pyo3_wheel_abi3(
         &self,
         interpreters: &[PythonInterpreter],
         major: u8,
@@ -741,14 +741,14 @@ impl BuildContext {
         ))
     }
 
-    /// Builds wheels for a Cargo project for all given python versions.
+    /// Builds wheels for a pyo3 extension for all given python versions.
     /// Return type is the same as [BuildContext::build_wheels()]
     ///
     /// Defaults to 3.{5, 6, 7, 8, 9} if no python versions are given
     /// and silently ignores all non-existent python versions.
     ///
     /// Runs [auditwheel_rs()] if not deactivated
-    pub fn build_binding_wheels(
+    pub fn build_pyo3_wheels(
         &self,
         interpreters: &[PythonInterpreter],
     ) -> Result<Vec<BuiltWheelMetadata>> {

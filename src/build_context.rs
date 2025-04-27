@@ -614,7 +614,7 @@ impl BuildContext {
         Ok((tag, tags))
     }
 
-    fn write_binding_wheel_abi3(
+    fn write_pyo3_wheel_abi3(
         &self,
         artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
@@ -679,13 +679,8 @@ impl BuildContext {
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) = self.write_binding_wheel_abi3(
-            artifact,
-            &platform_tags,
-            external_libs,
-            major,
-            min_minor,
-        )?;
+        let (wheel_path, tag) =
+            self.write_pyo3_wheel_abi3(artifact, &platform_tags, external_libs, major, min_minor)?;
 
         eprintln!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -698,7 +693,7 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    fn write_binding_wheel(
+    fn write_pyo3_wheel(
         &self,
         python_interpreter: &PythonInterpreter,
         artifact: BuildArtifact,
@@ -765,12 +760,8 @@ impl BuildContext {
             } else {
                 self.platform_tag.clone()
             };
-            let (wheel_path, tag) = self.write_binding_wheel(
-                python_interpreter,
-                artifact,
-                &platform_tags,
-                external_libs,
-            )?;
+            let (wheel_path, tag) =
+                self.write_pyo3_wheel(python_interpreter, artifact, &platform_tags, external_libs)?;
             eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,

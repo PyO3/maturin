@@ -404,6 +404,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             target: target_triple,
             ..cargo_options
         },
+        compression_level: 6,
     };
 
     let build_context = build_options

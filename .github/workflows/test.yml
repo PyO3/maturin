@@ -114,14 +114,6 @@ jobs:
         if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           version: 0.12.1
-      - name: Install rustup (Windows 11 ARM64) # rustup is currently missing from the windows-11-arm runner
-        if: matrix.os == 'windows-11-arm'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe" -OutFile rustup-init.exe
-          .\rustup-init.exe --default-toolchain none -y
-          "$env:USERPROFILE\.cargo\bin" | Out-File -Append -Encoding ascii $env:GITHUB_PATH
-          "CARGO_HOME=$env:USERPROFILE\.cargo" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         id: rustup
         with:

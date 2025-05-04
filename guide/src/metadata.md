@@ -96,7 +96,7 @@ dependencies = ["flask~=1.1.0", "toml==0.10.0"]
 
 ## Add console scripts
 
-Pip allows adding so called console scripts, which are shell commands that execute some function in you program. You can add console scripts in a section `[project.scripts]`.
+Pip allows adding so called console scripts, which are shell commands that execute some function in your program. You can add console scripts in a section `[project.scripts]`.
 The keys are the script names while the values are the path to the function in the format `some.module.path:class.function`, where the `class` part is optional. The function is called with no arguments. Example:
 
 ```toml

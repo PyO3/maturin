@@ -811,12 +811,12 @@ impl BuildContext {
             return Ok(artifact);
         }
         // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns
-        let artifact_path = &artifact.path;
-        let maturin_build = artifact_path.parent().unwrap().join("maturin");
+        let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
         fs::create_dir_all(&maturin_build)?;
+        let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
         fs::copy(artifact_path, &new_artifact_path)?;
-        artifact.path = new_artifact_path;
+        artifact.path = new_artifact_path.normalize()?.into_path_buf();
         Ok(artifact)
     }
 

@@ -1103,7 +1103,7 @@ fn generate_uniffi_bindings(
     // when running uniffi-bindgen
     let binding_dir = target_dir
         .normalize()?
-        .join("maturin")
+        .join(env!("CARGO_PKG_NAME"))
         .join("uniffi")
         .join(module_name)
         .into_path_buf();

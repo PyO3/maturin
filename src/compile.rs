@@ -424,7 +424,7 @@ fn cargo_build_command(
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
             let pyo3_config = interpreter.pyo3_config_file();
-            let maturin_target_dir = context.target_dir.join("maturin");
+            let maturin_target_dir = context.target_dir.join(env!("CARGO_PKG_NAME"));
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
                 target_triple, interpreter.major, interpreter.minor

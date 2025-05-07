@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.4]
+
+* Fix broken `maturin develop` with latest uv in [#2584](https://github.com/PyO3/maturin/pull/2584)
+
 ## [1.8.3]
 
 * Fix relocating shared library for namespace modules in [#2513](https://github.com/PyO3/maturin/pull/2513)

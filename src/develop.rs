@@ -39,6 +39,18 @@ impl InstallBackend {
 
     fn version(&self, python_path: &Path) -> Result<semver::Version> {
         let mut cmd = self.make_command(python_path);
+
+        // Newer versions of uv no longer support `uv pip --version`, and instead
+        // require that we use `uv --version`. This is a workaround to get the
+        // version of the install backend for both old and new versions of uv.
+        cmd = match self {
+            InstallBackend::Pip { .. } => cmd,
+            InstallBackend::Uv { path, args } => {
+                let mut cmd = Command::new(path);
+                cmd.args(args);
+                cmd
+            }
+        };
         let output = cmd
             .arg("--version")
             .output()
@@ -50,7 +62,7 @@ impl InstallBackend {
         let stdout = str::from_utf8(&output.stdout)?;
         let re = match self {
             InstallBackend::Pip { .. } => Regex::new(r"pip ([\w\.]+).*"),
-            InstallBackend::Uv { .. } => Regex::new(r"uv-pip ([\w\.]+).*"),
+            InstallBackend::Uv { .. } => Regex::new(r"uv ([\w\.]+).*"),
         };
         if let Some(captures) = re.expect("regex should be valid").captures(stdout) {
             Ok(semver::Version::parse(&captures[1])

@@ -2,7 +2,7 @@
 [build-system]
 requires = ["setuptools", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust"]
 backend-path = ["maturin"]
-build-backend = "boostrap"
+build-backend = "bootstrap"
 
 [project]
 name = "maturin"

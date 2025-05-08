@@ -2,7 +2,7 @@
 
 ## [1.8.4]
 
-* Install a Rust toolchain into a temporary directory when building maturin itself or a package and a Rust toolchain is 
+* Install a Rust toolchain into a temporary directory when building maturin itself or a package and a Rust toolchain is
   missing. Set `MATURIN_NO_INSTALL_RUST` to disable this behavior. [#2421](https://github.com/PyO3/maturin/pull/2421)
 * Fix broken `maturin develop` with latest uv in [#2584](https://github.com/PyO3/maturin/pull/2584)
 * Add `PYO3_PYTHON` env var support in [#2534](https://github.com/PyO3/maturin/pull/2534)

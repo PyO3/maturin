@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased
-
-* Install a Rust toolchain into a temporary directory when building maturin itself or a package and a toolchain is missing [#2421](https://github.com/PyO3/maturin/pull/2421/files)
-
 ## [1.8.4]
 
+* Install a Rust toolchain into a temporary directory when building maturin itself or a package and a Rust toolchain is 
+  missing. Set `MATURIN_NO_INSTALL_RUST` to disable this behavior. [#2421](https://github.com/PyO3/maturin/pull/2421)
 * Fix broken `maturin develop` with latest uv in [#2584](https://github.com/PyO3/maturin/pull/2584)
+* Add `PYO3_PYTHON` env var support in [#2534](https://github.com/PyO3/maturin/pull/2534)
+* Sort RECORD file in wheel archives to make them deterministic in [#2550](https://github.com/PyO3/maturin/pull/2550)
+* Publish wheel for loongarch64 in [#2548](https://github.com/PyO3/maturin/pull/2548)
+* Add --compression-level option to build command in [#2572](https://github.com/PyO3/maturin/pull/2572)
 
 ## [1.8.3]
 
@@ -1058,7 +1060,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.3...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.4...HEAD
+[1.8.4]: https://github.com/pyo3/maturin/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/pyo3/maturin/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/pyo3/maturin/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/pyo3/maturin/compare/v1.8.0...v1.8.1

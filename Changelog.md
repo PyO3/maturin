@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased 
+## Unreleased
 
 * Install a Rust toolchain into a temporary directory when building maturin itself or a package and a toolchain is missing [#2421](https://github.com/PyO3/maturin/pull/2421/files)
 

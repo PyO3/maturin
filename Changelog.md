@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Install a Rust toolchain into a temporary directory when building maturin itself or a package and a toolchain is missing [#2421](https://github.com/PyO3/maturin/pull/2421/files)
+
 ## [1.8.4]
 
 * Fix broken `maturin develop` with latest uv in [#2584](https://github.com/PyO3/maturin/pull/2584)

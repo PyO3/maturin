@@ -1,7 +1,8 @@
 # Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
-requires = ["setuptools", "wheel>=0.36.2", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust>=1.4.0"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust"]
+backend-path = ["maturin"]
+build-backend = "bootstrap"
 
 [project]
 name = "maturin"
@@ -9,7 +10,7 @@ description = "Build and publish crates with pyo3, cffi and uniffi bindings as w
 authors = [{ name = "konstin", email = "konstin@mailbox.org" }]
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.7"
-license = {text = "MIT OR Apache-2.0"}
+license = { text = "MIT OR Apache-2.0" }
 classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Programming Language :: Rust",

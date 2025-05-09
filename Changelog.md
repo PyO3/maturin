@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.5]
+
+* Fix release CI build
+
 ## [1.8.4]
 
 * Install a Rust toolchain into a temporary directory when building maturin itself or a package and a Rust toolchain is
@@ -1060,7 +1064,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.4...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.5...HEAD
+[1.8.4]: https://github.com/pyo3/maturin/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/pyo3/maturin/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/pyo3/maturin/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/pyo3/maturin/compare/v1.8.1...v1.8.2

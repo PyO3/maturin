@@ -73,6 +73,10 @@ from Python.
 > **Note**: Maturin _does not_ automatically detect `cffi` bindings. You _must_
 > specify them via either command line with `-b cffi` or in `pyproject.toml`.
 
+Maturin automatically detect `cffi` bindings, but only if there is no pyo3
+dependency. You can specify `cffi` explicitly via either command line with
+`-b cffi` or in `pyproject.toml`.
+
 ## `bin`
 
 Maturin also supports distributing binary applications written in Rust as
@@ -80,8 +84,9 @@ Python packages using the `bin` bindings. Binaries are packaged into the wheel
 as "scripts" and are available on the user's `PATH` (e.g. in the `bin`
 directory of a virtual environment) once installed.
 
-> **Note**: Maturin _does not_ automatically detect `bin` bindings. You _must_
-> specify them via either command line with `-b bin` or in `pyproject.toml`.
+Maturin automatically detect `bin` bindings, but only if there
+is only a binary target and no pyo3 dependency or cdylib target. You can
+specify `bin` explicitly via either command line with `-b bin` or in `pyproject.toml`.
 
 ### Both binary and library?
 

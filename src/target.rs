@@ -1,3 +1,4 @@
+use crate::build_options::TargetTriple;
 use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::python_interpreter::InterpreterKind::{CPython, GraalPy, PyPy};
@@ -12,6 +13,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str;
+use std::str::FromStr;
 use target_lexicon::{Architecture, Environment, Triple};
 use tracing::error;
 
@@ -230,24 +232,35 @@ impl Target {
     /// for compilation
     ///
     /// Fails if the target triple isn't supported
-    pub fn from_target_triple(target_triple: Option<String>) -> Result<Self> {
+    pub fn from_target_triple(target_triple: Option<&TargetTriple>) -> Result<Self> {
+        let rustc_version = rustc_version_meta()?;
+
+        let triple = match &target_triple {
+            None => rustc_version.host.to_string(),
+            Some(TargetTriple::Universal2) => "aarch64-apple-darwin".to_string(),
+            Some(TargetTriple::Regular(target_triple)) => target_triple.clone(),
+        };
+
+        Self::from_triple(rustc_version, &triple, target_triple.is_some())
+    }
+
+    /// Convert a Rust target triple to a [`Target`].
+    pub fn from_resolved_target_triple(target_triple: &str) -> Result<Self> {
+        let rustc_version = rustc_version_meta()?;
+
+        Self::from_triple(rustc_version, target_triple, true)
+    }
+
+    fn from_triple(
+        rustc_version: VersionMeta,
+        target_triple: &str,
+        user_specified: bool,
+    ) -> Result<Self> {
         use target_lexicon::{
             ArmArchitecture, Mips32Architecture, Mips64Architecture, OperatingSystem,
         };
-
-        let rustc_version = rustc_version_meta()?;
-        let host_triple = &rustc_version.host;
-        let (platform, triple) = if let Some(ref target_triple) = target_triple {
-            let platform: Triple = target_triple
-                .parse()
-                .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
-            (platform, target_triple.to_string())
-        } else {
-            let platform: Triple = host_triple
-                .parse()
-                .map_err(|_| format_err!("Unknown target triple {}", host_triple))?;
-            (platform, host_triple.clone())
-        };
+        let platform = Triple::from_str(target_triple)
+            .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
 
         let os = match platform.operating_system {
             OperatingSystem::Linux => Os::Linux,
@@ -309,9 +322,9 @@ impl Target {
             os,
             arch,
             env: platform.environment,
-            triple,
+            triple: target_triple.to_string(),
             rustc_version,
-            user_specified: target_triple.is_some(),
+            user_specified,
             cross_compiling: false,
         };
         target.cross_compiling = is_cross_compiling(&target)?;
@@ -702,7 +715,7 @@ fn rustc_version_meta() -> Result<VersionMeta> {
     Ok(meta)
 }
 
-pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Option<String> {
+pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Option<TargetTriple> {
     match Command::new(python)
         .arg("-c")
         .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
@@ -712,9 +725,9 @@ pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Opti
             let platform = String::from_utf8_lossy(&output.stdout);
             if platform.contains("macos") {
                 if platform.contains("x86_64") && target.target_arch() != Arch::X86_64 {
-                    return Some("x86_64-apple-darwin".to_string());
+                    return Some(TargetTriple::Regular("x86_64-apple-darwin".to_string()));
                 } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
-                    return Some("aarch64-apple-darwin".to_string());
+                    return Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
                 }
             }
         }

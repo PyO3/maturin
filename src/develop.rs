@@ -388,8 +388,8 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         cargo_options,
         uv,
     } = develop_options;
-    let mut target_triple = cargo_options.target.as_ref().map(|x| x.to_string());
-    let target = Target::from_target_triple(cargo_options.target)?;
+    let mut target_triple = cargo_options.target.clone();
+    let target = Target::from_target_triple(cargo_options.target.as_ref())?;
     let python = target.get_venv_python(venv_dir);
 
     // check python platform and architecture

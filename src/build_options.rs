@@ -5,6 +5,7 @@ use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
+use crate::target::detect_arch_from_python;
 use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
@@ -16,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use std::str::FromStr;
 use tracing::{debug, instrument};
 
 // This is used for `BridgeModel::PyO3`.
@@ -23,6 +25,30 @@ use tracing::{debug, instrument};
 // as one or the other in logs. pyo3-ffi is ordered first because it is newer
 // and more restrictive.
 const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3];
+
+/// A Rust target triple or a virtual target triple.
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub enum TargetTriple {
+    /// The virtual `universal2-apple-darwin` target triple, build a fat binary of
+    /// `aarch64-apple-darwin` and `x86_64-apple-darwin`.
+    Universal2,
+    /// Any target triple supported by Rust.
+    ///
+    /// It's not guaranteed that the value exists, it's passed verbatim to Cargo.
+    Regular(String),
+}
+
+impl FromStr for TargetTriple {
+    // TODO: Use the never type once stabilized
+    type Err = String;
+
+    fn from_str(triple: &str) -> std::result::Result<Self, Self::Err> {
+        match triple {
+            "universal2-apple-darwin" => Ok(TargetTriple::Universal2),
+            triple => Ok(TargetTriple::Regular(triple.to_string())),
+        }
+    }
+}
 
 /// Cargo options for the build process
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
@@ -64,7 +90,7 @@ pub struct CargoOptions {
         env = "CARGO_BUILD_TARGET",
         help_heading = heading::COMPILATION_OPTIONS,
     )]
-    pub target: Option<String>,
+    pub target: Option<TargetTriple>,
 
     /// Directory for all generated artifacts
     #[arg(long, value_name = "DIRECTORY", help_heading = heading::COMPILATION_OPTIONS)]
@@ -192,7 +218,8 @@ pub struct BuildOptions {
     pub cargo: CargoOptions,
 
     /// Zip compresson level to use
-    #[arg(long, value_parser = clap::value_parser!(u16).range(0..=264), hide = true, default_value="6")]
+    #[arg(long, value_parser = clap::value_parser!(u16).range(0..=264), hide = true, default_value="6"
+    )]
     pub compression_level: u16,
 }
 
@@ -368,7 +395,7 @@ impl BuildOptions {
                                     }
 
                                     let interps =
-                                        find_interpreter_in_sysconfig(bridge,interpreter, target, requires_python)
+                                        find_interpreter_in_sysconfig(bridge, interpreter, target, requires_python)
                                             .unwrap_or_default();
                                     if interps.is_empty() && !self.interpreter.is_empty() {
                                         // Print error when user supplied `--interpreter` option
@@ -600,7 +627,7 @@ impl BuildContextBuilder {
 
         let mut target_triple = build_options.target.clone();
 
-        let mut universal2 = target_triple.as_deref() == Some("universal2-apple-darwin");
+        let mut universal2 = target_triple == Some(TargetTriple::Universal2);
         // Also try to determine universal2 from ARCHFLAGS environment variable
         if target_triple.is_none() {
             if let Ok(arch_flags) = env::var("ARCHFLAGS") {
@@ -617,8 +644,14 @@ impl BuildContextBuilder {
                     .collect();
                 match (arches.contains("x86_64"), arches.contains("arm64")) {
                     (true, true) => universal2 = true,
-                    (true, false) => target_triple = Some("x86_64-apple-darwin".to_string()),
-                    (false, true) => target_triple = Some("aarch64-apple-darwin".to_string()),
+                    (true, false) => {
+                        target_triple =
+                            Some(TargetTriple::Regular("x86_64-apple-darwin".to_string()))
+                    }
+                    (false, true) => {
+                        target_triple =
+                            Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()))
+                    }
                     (false, false) => {}
                 }
             };
@@ -626,16 +659,14 @@ impl BuildContextBuilder {
         if universal2 {
             // Ensure that target_triple is valid. This is necessary to properly
             // infer the platform tags when cross-compiling from Linux.
-            target_triple = Some("aarch64-apple-darwin".to_string());
+            target_triple = Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
         }
 
-        let mut target = Target::from_target_triple(target_triple)?;
+        let mut target = Target::from_target_triple(target_triple.as_ref())?;
         if !target.user_specified && !universal2 {
             if let Some(interpreter) = build_options.interpreter.first() {
-                if let Some(detected_target) =
-                    crate::target::detect_arch_from_python(interpreter, &target)
-                {
-                    target = Target::from_target_triple(Some(detected_target))?;
+                if let Some(detected_target) = detect_arch_from_python(interpreter, &target) {
+                    target = Target::from_target_triple(Some(&detected_target))?;
                 }
             }
         }
@@ -1429,8 +1460,20 @@ pub(crate) fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Resul
     // graph since 1.40, thus let's convert --target to it to make sure
     // cargo-metadata resolves the dependency as expected.
     if let Some(target) = &cargo_options.target {
-        cargo_metadata_extra_args.push("--filter-platform".to_string());
-        cargo_metadata_extra_args.push(target.clone());
+        match target {
+            TargetTriple::Universal2 => {
+                cargo_metadata_extra_args.extend([
+                    "--filter-platform".to_string(),
+                    "aarch64-apple-darwin".to_string(),
+                    "--filter-platform".to_string(),
+                    "x86_64-apple-darwin".to_string(),
+                ]);
+            }
+            TargetTriple::Regular(target) => {
+                cargo_metadata_extra_args.push("--filter-platform".to_string());
+                cargo_metadata_extra_args.push(target.clone());
+            }
+        }
     }
     for opt in &cargo_options.unstable_flags {
         cargo_metadata_extra_args.push("-Z".to_string());
@@ -1439,35 +1482,37 @@ pub(crate) fn extract_cargo_metadata_args(cargo_options: &CargoOptions) -> Resul
     Ok(cargo_metadata_extra_args)
 }
 
-impl From<CargoOptions> for cargo_options::Rustc {
-    fn from(cargo: CargoOptions) -> Self {
+impl CargoOptions {
+    /// Convert the Cargo options into a Cargo invocation.
+    pub fn into_rustc_options(self, target_triple: Option<String>) -> cargo_options::Rustc {
         cargo_options::Rustc {
             common: cargo_options::CommonOptions {
-                quiet: cargo.quiet,
-                jobs: cargo.jobs,
-                profile: cargo.profile,
-                features: cargo.features,
-                all_features: cargo.all_features,
-                no_default_features: cargo.no_default_features,
-                target: match cargo.target {
-                    Some(target) => vec![target],
-                    None => Vec::new(),
+                quiet: self.quiet,
+                jobs: self.jobs,
+                profile: self.profile,
+                features: self.features,
+                all_features: self.all_features,
+                no_default_features: self.no_default_features,
+                target: if let Some(target) = target_triple {
+                    vec![target]
+                } else {
+                    Vec::new()
                 },
-                target_dir: cargo.target_dir,
-                verbose: cargo.verbose,
-                color: cargo.color,
-                frozen: cargo.frozen,
-                locked: cargo.locked,
-                offline: cargo.offline,
-                config: cargo.config,
-                unstable_flags: cargo.unstable_flags,
-                timings: cargo.timings,
+                target_dir: self.target_dir,
+                verbose: self.verbose,
+                color: self.color,
+                frozen: self.frozen,
+                locked: self.locked,
+                offline: self.offline,
+                config: self.config,
+                unstable_flags: self.unstable_flags,
+                timings: self.timings,
                 ..Default::default()
             },
-            manifest_path: cargo.manifest_path,
-            ignore_rust_version: cargo.ignore_rust_version,
-            future_incompat_report: cargo.future_incompat_report,
-            args: cargo.args,
+            manifest_path: self.manifest_path,
+            ignore_rust_version: self.ignore_rust_version,
+            future_incompat_report: self.future_incompat_report,
+            args: self.args,
             ..Default::default()
         }
     }
@@ -1668,7 +1713,9 @@ mod test {
         let cargo_extra_args = CargoOptions {
             no_default_features: true,
             features: vec!["a".to_string(), "c".to_string()],
-            target: Some("x86_64-unknown-linux-musl".to_string()),
+            target: Some(TargetTriple::Regular(
+                "x86_64-unknown-linux-musl".to_string(),
+            )),
             ..Default::default()
         };
         let cargo_metadata_extra_args = extract_cargo_metadata_args(&cargo_extra_args).unwrap();
@@ -1691,7 +1738,9 @@ mod test {
         let args = CargoOptions {
             locked: true,
             features: vec!["my-feature".to_string(), "other-feature".to_string()],
-            target: Some("x86_64-unknown-linux-musl".to_string()),
+            target: Some(TargetTriple::Regular(
+                "x86_64-unknown-linux-musl".to_string(),
+            )),
             unstable_flags: vec!["unstable-options".to_string()],
             ..Default::default()
         };

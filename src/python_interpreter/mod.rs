@@ -1028,8 +1028,7 @@ mod tests {
 
     #[test]
     fn test_find_interpreter_by_target() {
-        let target =
-            Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap();
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
         let pythons = PythonInterpreter::find_by_target(&target, None, None)
             .iter()
             .map(ToString::to_string)

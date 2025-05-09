@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand};
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
     develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
-    PlatformTag, PythonInterpreter, Target,
+    PlatformTag, PythonInterpreter, Target, TargetTriple,
 };
 #[cfg(feature = "schemars")]
 use maturin::{generate_json_schema, GenerateJsonSchemaOptions};
@@ -95,7 +95,7 @@ enum Command {
     /// Search and list the available python installations
     ListPython {
         #[arg(long)]
-        target: Option<String>,
+        target: Option<TargetTriple>,
     },
     #[command(name = "develop", alias = "dev")]
     /// Install the crate as module in the current virtualenv
@@ -428,7 +428,7 @@ fn run() -> Result<()> {
         }
         Command::ListPython { target } => {
             let found = if target.is_some() {
-                let target = Target::from_target_triple(target)?;
+                let target = Target::from_target_triple(target.as_ref())?;
                 PythonInterpreter::find_by_target(&target, None, None)
             } else {
                 let target = Target::from_target_triple(None)?;
@@ -441,7 +441,7 @@ fn run() -> Result<()> {
             }
         }
         Command::Develop(develop_options) => {
-            let target = Target::from_target_triple(develop_options.cargo_options.target.clone())?;
+            let target = Target::from_target_triple(develop_options.cargo_options.target.as_ref())?;
             let venv_dir = detect_venv(&target)?;
             develop(develop_options, &venv_dir)?;
         }

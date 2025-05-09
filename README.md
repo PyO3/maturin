@@ -16,10 +16,13 @@ Check out the [User Guide](https://maturin.rs/)!
 
 ## Usage
 
-You can either download binaries from the [latest release](https://github.com/PyO3/maturin/releases/latest) or install it with [pipx](https://pypa.github.io/pipx/):
+You can either download binaries from the [latest release](https://github.com/PyO3/maturin/releases/latest) or install it with [pipx](https://pypa.github.io/pipx/) or [uv](https://github.com/astral-sh/uv):
 
 ```shell
+# pipx
 pipx install maturin
+# uv
+uv tool install maturin
 ```
 
 > [!NOTE]
@@ -30,10 +33,10 @@ There are four main commands:
 
 - `maturin new` creates a new cargo project with maturin configured.
 - `maturin publish` builds the crate into python packages and publishes them to pypi.
-- `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's possible to upload those with [twine](https://github.com/pypa/twine) or `maturin upload`.
+- `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's recommended to publish packages with [uv](https://github.com/astral-sh/uv) using `uv publish`.
 - `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 
-maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust or milksnake configuration.
+maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust configuration.
 You can even integrate it with testing tools such as [tox](https://tox.readthedocs.io/en/latest/).
 There are examples for the different bindings in the `test-crates` folder.
 
@@ -54,7 +57,7 @@ which requires the right compilers to be installed. Installing a wheel is much f
 
 When you publish a package to be installable with `pip install`, you upload it to [pypi](https://pypi.org/), the official package repository.
 For testing, you can use [test pypi](https://test.pypi.org/) instead, which you can use with `pip install --index-url https://test.pypi.org/simple/`.
-Note that for publishing for linux, [you need to use the manylinux docker container](#manylinux-and-auditwheel), while for publishing from your repository you can use the [PyO3/maturin-action github action](https://github.com/PyO3/maturin-action).
+Note that for [publishing for linux](#manylinux-and-auditwheel), you need to use the manylinux docker container or zig, while for publishing from your repository you can use the [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action.
 
 ## Mixed rust/python projects
 
@@ -124,7 +127,7 @@ When doing this also be sure to set the module name in your code to match the la
 ```rust
 #[pymodule]
 #[pyo3(name="_lib_name")]
-fn my_lib_name(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn my_lib_name(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MyPythonRustClass>()?;
     Ok(())
 }
@@ -140,10 +143,10 @@ To specify python dependencies, add a list `dependencies` in a `[project]` secti
 ```toml
 [project]
 name = "my-project"
-dependencies = ["flask~=1.1.0", "toml==0.10.0"]
+dependencies = ["flask~=1.1.0", "toml>=0.10.2,<0.11.0"]
 ```
 
-Pip allows adding so called console scripts, which are shell commands that execute some function in your program. You can add console scripts in a section `[project.scripts]`.
+You can add so called console scripts, which are shell commands that execute some function in your program in the `[project.scripts]` section.
 The keys are the script names while the values are the path to the function in the format `some.module.path:class.function`, where the `class` part is optional. The function is called with no arguments. Example:
 
 ```toml

@@ -422,7 +422,7 @@ mod test {
     fn test_well_known_sysconfigs_linux() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -431,7 +431,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-x86_64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("i686-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("i686-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -440,7 +440,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-i386-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -449,7 +449,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-aarch64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("armv7-unknown-linux-gnueabihf".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("armv7-unknown-linux-gnueabihf").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -458,7 +458,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-arm-linux-gnueabihf.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("arm-unknown-linux-gnueabihf".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("arm-unknown-linux-gnueabihf").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -467,7 +467,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-arm-linux-gnueabihf.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("powerpc64le-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("powerpc64le-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -479,7 +479,7 @@ mod test {
         );
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("powerpc-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("powerpc-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -488,7 +488,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-powerpc-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("mips64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("mips64-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -500,7 +500,7 @@ mod test {
         );
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("mips-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("mips-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -509,7 +509,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-mips-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("s390x-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -519,7 +519,7 @@ mod test {
 
         // PyPy
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -529,7 +529,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-x86_64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("i686-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("i686-unknown-linux-gnu").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -538,7 +538,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-x86-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-unknown-linux-gnu").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -547,7 +547,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-aarch64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("armv7-unknown-linux-gnueabihf".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("armv7-unknown-linux-gnueabihf").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -556,7 +556,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-arm-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("arm-unknown-linux-gnueabihf".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("arm-unknown-linux-gnueabihf").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -565,7 +565,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-arm-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("powerpc64le-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("powerpc64le-unknown-linux-gnu").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -574,7 +574,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-ppc_64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("s390x-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("s390x-unknown-linux-gnu").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -587,7 +587,7 @@ mod test {
     fn test_well_known_sysconfigs_macos() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-apple-darwin".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-apple-darwin").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -596,7 +596,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-darwin.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-apple-darwin".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-apple-darwin").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -605,7 +605,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310-darwin.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-apple-darwin".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-apple-darwin").unwrap(),
             InterpreterKind::CPython,
             (3, 7),
             "",
@@ -616,7 +616,7 @@ mod test {
 
         // PyPy
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-apple-darwin".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-apple-darwin").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -626,7 +626,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-darwin.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-apple-darwin".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-apple-darwin").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -639,7 +639,7 @@ mod test {
     fn test_well_known_sysconfigs_windows() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-pc-windows-msvc".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -648,7 +648,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cp310-win_amd64.pyd");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("i686-pc-windows-msvc".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("i686-pc-windows-msvc").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -657,7 +657,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cp310-win32.pyd");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-pc-windows-msvc".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-pc-windows-msvc").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -667,7 +667,7 @@ mod test {
 
         // PyPy
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-pc-windows-msvc".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
             "",
@@ -680,7 +680,7 @@ mod test {
     fn test_well_known_sysconfigs_freebsd() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-freebsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-freebsd").unwrap(),
             InterpreterKind::CPython,
             (3, 7),
             "",
@@ -690,7 +690,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-freebsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-freebsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -700,7 +700,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("i686-unknown-freebsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("i686-unknown-freebsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -709,7 +709,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-unknown-freebsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-unknown-freebsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -718,7 +718,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("armv7-unknown-freebsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("armv7-unknown-freebsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -731,7 +731,7 @@ mod test {
     fn test_well_known_sysconfigs_netbsd() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-netbsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-netbsd").unwrap(),
             InterpreterKind::CPython,
             (3, 7),
             "",
@@ -741,7 +741,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-netbsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-netbsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -754,7 +754,7 @@ mod test {
     fn test_well_known_sysconfigs_openbsd() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-openbsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-openbsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -763,7 +763,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("i686-unknown-openbsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("i686-unknown-openbsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -772,7 +772,7 @@ mod test {
         assert_eq!(sysconfig.ext_suffix, ".cpython-310.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("aarch64-unknown-openbsd".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("aarch64-unknown-openbsd").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -785,7 +785,7 @@ mod test {
     fn test_well_known_sysconfigs_emscripten() {
         // CPython
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("wasm32-unknown-emscripten".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("wasm32-unknown-emscripten").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -798,7 +798,7 @@ mod test {
     #[test]
     fn test_pyo3_config_file() {
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 10),
             "",
@@ -819,7 +819,7 @@ mod test {
     #[test]
     fn test_pyo3_config_file_free_threaded_python_3_13() {
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-linux-gnu".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
             InterpreterKind::CPython,
             (3, 13),
             "t",
@@ -841,7 +841,7 @@ mod test {
     #[test]
     fn test_pyo3_config_file_musl_python_3_11() {
         let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_target_triple(Some("x86_64-unknown-linux-musl".to_string())).unwrap(),
+            &Target::from_resolved_target_triple("x86_64-unknown-linux-musl").unwrap(),
             InterpreterKind::CPython,
             (3, 11),
             "",

@@ -68,12 +68,12 @@ fn compile_universal2(
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
     let mut aarch64_context = context.clone();
-    aarch64_context.target = Target::from_target_triple(Some("aarch64-apple-darwin".to_string()))?;
+    aarch64_context.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
 
     let aarch64_artifacts = compile_targets(&aarch64_context, python_interpreter, targets)
         .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
-    x86_64_context.target = Target::from_target_triple(Some("x86_64-apple-darwin".to_string()))?;
+    x86_64_context.target = Target::from_resolved_target_triple("x86_64-apple-darwin")?;
 
     let x86_64_artifacts = compile_targets(&x86_64_context, python_interpreter, targets)
         .context("Failed to build a x86_64 library through cargo")?;
@@ -159,7 +159,15 @@ fn cargo_build_command(
 ) -> Result<Command> {
     let target = &context.target;
 
-    let mut cargo_rustc: cargo_options::Rustc = context.cargo_options.clone().into();
+    let user_specified_target = if target.user_specified {
+        Some(target.target_triple().to_string())
+    } else {
+        None
+    };
+    let mut cargo_rustc = context
+        .cargo_options
+        .clone()
+        .into_rustc_options(user_specified_target);
     cargo_rustc.message_format = vec!["json-render-diagnostics".to_string()];
 
     // --release and --profile are conflicting options

@@ -485,7 +485,9 @@ impl BuildContext {
     /// Returns the platform part of the tag for the wheel name
     pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
         if let Ok(host_platform) = env::var("_PYTHON_HOST_PLATFORM") {
-            return Ok(host_platform.replace(['.', '-'], "_"));
+            let override_platform = host_platform.replace(['.', '-'], "_");
+            eprintln!("🚉 Overriding platform tag from _PYTHON_HOST_PLATFORM environment variable as {override_platform}.");
+            return Ok(override_platform);
         }
 
         let target = &self.target;

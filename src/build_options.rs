@@ -1,5 +1,5 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::bridge::PyO3Crate;
+use crate::bridge::{Abi3Version, PyO3Crate};
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
@@ -250,7 +250,7 @@ impl BuildOptions {
         match bridge {
             BridgeModel::PyO3(PyO3 { abi3, .. }) | BridgeModel::Bin(Some(PyO3 { abi3, .. })) => {
                 match abi3 {
-                    None => {
+                    None | Some(Abi3Version::CurrentPython) => {
                         let mut interpreters = Vec::new();
                         if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
                             let interpreter_config =
@@ -385,7 +385,7 @@ impl BuildOptions {
 
                         Ok(interpreters)
                     }
-                    Some((major, minor)) => {
+                    Some(Abi3Version::Version(major, minor)) => {
                         let found_interpreters =
                             find_interpreter_in_host(bridge, interpreter, target, requires_python)
                                 .or_else(|err| {
@@ -990,7 +990,7 @@ fn filter_cargo_targets(
 }
 
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
-fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<(u8, u8)>> {
+fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<Abi3Version>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
         let lib = lib.as_str();
         if let Some(pyo3_crate) = deps.get(lib) {
@@ -1012,13 +1012,11 @@ fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<(u8, u8)>> {
                 .context(format!("Bogus {lib} cargo features"))?
                 .into_iter()
                 .min();
-            if abi3_selected && min_abi3_version.is_none() {
-                bail!(
-                        "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
-                        maturin needs a minimum version feature to build abi3 wheels."
-                    )
+            match min_abi3_version {
+                Some((major, minor)) => return Ok(Some(Abi3Version::Version(major, minor))),
+                None if abi3_selected => return Ok(Some(Abi3Version::CurrentPython)),
+                None => {}
             }
-            return Ok(min_abi3_version);
         }
     }
     Ok(None)
@@ -1212,13 +1210,13 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 );
             }
 
-            return if let Some((major, minor)) = has_abi3(&deps)? {
-                eprintln!("🔗 Found {lib} bindings with abi3 support for Python ≥ {major}.{minor}");
+            return if let Some(abi3_version) = has_abi3(&deps)? {
+                eprintln!("🔗 Found {lib} bindings with abi3 support");
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
                     version: pyo3.version.clone(),
-                    abi3: Some((major, minor)),
+                    abi3: Some(abi3_version),
                     metadata: pyo3.metadata.clone(),
                 };
                 Ok(BridgeModel::PyO3(bindings))
@@ -1623,7 +1621,7 @@ mod test {
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version: semver::Version::new(0, 24, 1),
-            abi3: Some((3, 7)),
+            abi3: Some(Abi3Version::Version(3, 7)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {
                     min_minor: 7,

@@ -110,6 +110,16 @@ impl TryFrom<PyO3MetadataRaw> for PyO3Metadata {
     }
 }
 
+/// Python version to use as the abi3 target.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Abi3Version {
+    /// abi3 wheels will have a minimum Python version matching the version of
+    /// the current Python interpreter
+    CurrentPython,
+    /// abi3 wheels will have a fixed minimum Python version
+    Version(u8, u8),
+}
+
 /// The name and version of the pyo3 bindings crate
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyO3 {
@@ -118,7 +128,7 @@ pub struct PyO3 {
     /// pyo3 bindings crate version
     pub version: semver::Version,
     /// abi3 support
-    pub abi3: Option<(u8, u8)>,
+    pub abi3: Option<Abi3Version>,
     /// pyo3 metadata
     pub metadata: Option<PyO3Metadata>,
 }
@@ -136,7 +146,7 @@ impl PyO3 {
         } else {
             MINIMUM_PYTHON_MINOR
         };
-        if let Some((_, abi3_minor)) = self.abi3.as_ref() {
+        if let Some(Abi3Version::Version(_, abi3_minor)) = self.abi3.as_ref() {
             min_minor.max(*abi3_minor as usize)
         } else {
             min_minor

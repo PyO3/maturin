@@ -23,7 +23,7 @@
 
 #![deny(missing_docs)]
 
-pub use crate::bridge::{BridgeModel, PyO3, PyO3Crate};
+pub use crate::bridge::{Abi3Version, BridgeModel, PyO3, PyO3Crate};
 pub use crate::build_context::{BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::{BuildOptions, CargoOptions, TargetTriple};
 pub use crate::cargo_toml::CargoToml;

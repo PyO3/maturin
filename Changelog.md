@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.6]
+
+* Print a message when overriding platform tag from `_PYTHON_HOST_PLATFORM` in [#2594](https://github.com/PyO3/maturin/pull/2594)
+* Use the current python interpreter's version when the abi3 feature is set with no explicit version in [#2597](https://github.com/PyO3/maturin/pull/2597)
+
 ## [1.8.5]
 
 * Fix release CI build
@@ -1064,8 +1069,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.5...HEAD
-[1.8.4]: https://github.com/pyo3/maturin/compare/v1.8.4...v1.8.5
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.6...HEAD
+[1.8.6]: https://github.com/pyo3/maturin/compare/v1.8.5...v1.8.6
+[1.8.5]: https://github.com/pyo3/maturin/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/pyo3/maturin/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/pyo3/maturin/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/pyo3/maturin/compare/v1.8.1...v1.8.2

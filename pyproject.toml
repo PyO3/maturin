@@ -1,6 +1,10 @@
 # Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
-requires = ["setuptools", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust"]
+requires = [
+    "setuptools",
+    "tomli>=1.1.0 ; python_version<'3.11'",
+    "setuptools-rust>=1.11.0",
+]
 backend-path = ["maturin"]
 build-backend = "bootstrap"
 
@@ -18,17 +22,11 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = ["tomli>=1.1.0 ; python_version<'3.11'"]
-dynamic = [
-    "version"
-]
+dynamic = ["version"]
 
 [project.optional-dependencies]
-zig = [
-    "ziglang>=0.10.0,<0.13.0",
-]
-patchelf = [
-    "patchelf",
-]
+zig = ["ziglang>=0.10.0,<0.13.0"]
+patchelf = ["patchelf"]
 
 [project.urls]
 "Source Code" = "https://github.com/PyO3/maturin"

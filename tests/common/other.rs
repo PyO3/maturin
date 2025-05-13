@@ -350,3 +350,28 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
 
     Ok(())
 }
+
+pub fn abi3_without_version() -> Result<()> {
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-abi3-without-version/Cargo.toml",
+        "--quiet",
+        "--interpreter",
+        "python3",
+        "--target-dir",
+        "test-targets/wheels/abi3_without_version",
+    ];
+
+    let options = BuildOptions::try_parse_from(cli)?;
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
+    assert!(result.is_ok());
+
+    Ok(())
+}

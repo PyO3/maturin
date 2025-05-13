@@ -13,8 +13,8 @@ use clap::{Parser, Subcommand};
 #[cfg(feature = "scaffolding")]
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
-    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
-    PlatformTag, PythonInterpreter, Target, TargetTriple,
+    develop, write_dist_info, Abi3Version, BridgeModel, BuildOptions, CargoOptions, DevelopOptions,
+    PathWriter, PlatformTag, PythonInterpreter, Target, TargetTriple,
 };
 #[cfg(feature = "schemars")]
 use maturin::{generate_json_schema, GenerateJsonSchemaOptions};
@@ -284,9 +284,18 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             let tags = match context.bridge() {
                 BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => {
                     match bindings.abi3 {
-                        Some((major, minor)) => {
+                        Some(Abi3Version::Version(major, minor)) => {
                             let platform = context.get_platform_tag(&[PlatformTag::Linux])?;
                             vec![format!("cp{major}{minor}-abi3-{platform}")]
+                        }
+                        Some(Abi3Version::CurrentPython) => {
+                            let interp = &context.interpreter[0];
+                            let platform = context.get_platform_tag(&[PlatformTag::Linux])?;
+                            vec![format!(
+                                "cp{major}{minor}-abi3-{platform}",
+                                major = interp.major,
+                                minor = interp.minor
+                            )]
                         }
                         None => {
                             vec![context.interpreter[0].get_tag(&context, &[PlatformTag::Linux])?]

@@ -664,7 +664,7 @@ jobs:\n",
 #[cfg(test)]
 mod tests {
     use super::GenerateCI;
-    use crate::{bridge::PyO3Crate, BridgeModel, PyO3};
+    use crate::{bridge::PyO3Crate, Abi3Version, BridgeModel, PyO3};
     use expect_test::expect;
     use semver::Version;
 
@@ -874,7 +874,7 @@ mod tests {
                 &BridgeModel::PyO3(PyO3 {
                     crate_name: PyO3Crate::PyO3,
                     version: Version::new(0, 23, 0),
-                    abi3: Some((3, 7)),
+                    abi3: Some(Abi3Version::Version(3, 7)),
                     metadata: None,
                 }),
                 false,
@@ -1086,7 +1086,7 @@ mod tests {
             &BridgeModel::PyO3(PyO3 {
                 crate_name: PyO3Crate::PyO3,
                 version: Version::new(0, 23, 0),
-                abi3: Some((3, 7)),
+                abi3: Some(Abi3Version::Version(3, 7)),
                 metadata: None,
             }),
             false,

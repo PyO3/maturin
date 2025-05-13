@@ -537,7 +537,7 @@ fn integration_wasm_hello_world() {
 
 #[test]
 fn abi3_without_version() {
-    handle_result(errors::abi3_without_version())
+    handle_result(other::abi3_without_version())
 }
 
 #[test]

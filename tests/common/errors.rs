@@ -7,36 +7,6 @@ use std::path::Path;
 use std::process::Command;
 use std::str;
 
-pub fn abi3_without_version() -> Result<()> {
-    // The first argument is ignored by clap
-    let cli = vec![
-        "build",
-        "--manifest-path",
-        "test-crates/pyo3-abi3-without-version/Cargo.toml",
-        "--quiet",
-        "--target-dir",
-        "test-targets/wheels/abi3_without_version",
-    ];
-
-    let options = BuildOptions::try_parse_from(cli)?;
-    let result = options
-        .into_build_context()
-        .release(false)
-        .strip(cfg!(feature = "faster-tests"))
-        .editable(false)
-        .build();
-    if let Err(err) = result {
-        assert_eq!(err.to_string(),
-            "You have selected the `abi3` feature but not a minimum version (e.g. the `abi3-py36` feature). \
-            maturin needs a minimum version feature to build abi3 wheels."
-        );
-    } else {
-        bail!("Should have errored");
-    }
-
-    Ok(())
-}
-
 /// Check that you get a good error message if you forgot to set the extension-module feature
 pub fn pyo3_no_extension_module() -> Result<()> {
     // The first argument is ignored by clap

@@ -31,6 +31,8 @@ On macOS [maturin is in Homebrew](https://formulae.brew.sh/formula/maturin#defau
 brew install maturin
 ```
 
+*Note*: installing maturin with Homebrew will also install Rust with homebrew (as Rust is a dependency). If you previously installed Rust using [`rustup`](https://www.rust-lang.org/tools/install), then having Rust also installed with Homebrew can cause conflicts. Therefore, if you have installed Rust with `rustup` it's better to install maturin with another method.
+
 ### conda
 
 Installing from the `conda-forge` channel can be achieved by adding `conda-forge` to your conda channels with:

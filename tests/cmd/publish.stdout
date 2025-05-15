@@ -16,7 +16,7 @@ Options:
       --no-sdist
           Don't build a source distribution
 
-  -r, --repository <REPOSITORY>
+      --repository <REPOSITORY>
           The repository (package index) to upload the package to. Should be a section in the config
           file.
           
@@ -131,6 +131,9 @@ Options:
 Compilation Options:
   -j, --jobs <N>
           Number of parallel jobs, defaults to # of CPUs
+
+  -r, --release
+          Pass --release to cargo
 
       --profile <PROFILE-NAME>
           Build artifacts with the specified Cargo profile

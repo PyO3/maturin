@@ -416,7 +416,7 @@ impl Metadata24 {
         let metadata = Metadata24 {
             // name, version and metadata_version are added through metadata24::new()
             // Mapped from cargo metadata
-            summary: package.description.clone(),
+            summary: package.description.as_ref().map(|d| d.trim().into()),
             description,
             description_content_type,
             keywords: if package.keywords.is_empty() {
@@ -688,7 +688,9 @@ mod test {
             authors = ["konstin <konstin@mailbox.org>"]
             name = "info-project"
             version = "0.1.0"
-            description = "A test project"
+            description = """
+A test project
+            """
             homepage = "https://example.org"
             readme = "REPLACE_README_PATH"
             keywords = ["ffi", "test"]

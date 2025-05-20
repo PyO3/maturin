@@ -136,6 +136,22 @@ This can be done by adding `module-name = <package name>.<rust pymodule name>` t
 module-name = "my_project._my_project"
 ```
 
+Update the module name in `lib.rs` to match the expected module name:
+
+```diff
+#[pymodule]
+- fn my_project(...)
++ fn _my_project(...)
+```
+
+If you are using the `pyo3` bindings, you can alternatively add `#[pyo3(name = ...)]` to the `#[pymodule]` declaration:
+
+```diff
+#[pymodule]
++ #[pyo3(name = "_my_project")]
+fn my_project(...)
+```
+
 You can then import your Rust module inside your Python source as follows:
 
 ```python

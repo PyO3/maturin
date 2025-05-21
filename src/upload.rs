@@ -28,7 +28,7 @@ pub struct PublishOpt {
     /// The repository (package index) to upload the package to. Should be a section in the config file.
     ///
     /// Can also be set via MATURIN_REPOSITORY environment variable.
-    #[arg(short = 'r', long, env = "MATURIN_REPOSITORY", default_value = "pypi")]
+    #[arg(long, env = "MATURIN_REPOSITORY", default_value = "pypi")]
     repository: String,
     /// The URL of the registry where the wheels are uploaded to. This overrides --repository.
     ///

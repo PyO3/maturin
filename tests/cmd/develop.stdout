@@ -59,11 +59,11 @@ Options:
           Print help (see a summary with '-h')
 
 Compilation Options:
-  -r, --release
-          Pass --release to cargo
-
   -j, --jobs <N>
           Number of parallel jobs, defaults to # of CPUs
+
+  -r, --release
+          Pass --release to cargo
 
       --profile <PROFILE-NAME>
           Build artifacts with the specified Cargo profile

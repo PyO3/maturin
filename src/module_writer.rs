@@ -1098,6 +1098,7 @@ fn generate_uniffi_bindings(
     module_name: &str,
     target_os: Os,
     artifact: &Path,
+    library_mode: Option<bool>,
 ) -> Result<UniFfiBindings> {
     // `binding_dir` must use absolute path because we chdir to `crate_dir`
     // when running uniffi-bindgen
@@ -1109,11 +1110,15 @@ fn generate_uniffi_bindings(
         .into_path_buf();
     fs::create_dir_all(&binding_dir)?;
 
+    let forced_library_mode = library_mode.unwrap_or(false);
+    if forced_library_mode {
+        eprintln!("⚠️ Forced UniFFI library mode");
+    }
     let pattern = crate_dir.join("src").join("*.udl");
     let udls = glob::glob(pattern.to_str().unwrap())?
         .map(|p| p.unwrap())
         .collect::<Vec<_>>();
-    let is_library = if udls.is_empty() {
+    let is_library = if forced_library_mode || udls.is_empty() {
         true
     } else if udls.len() > 1 {
         bail!(
@@ -1213,11 +1218,19 @@ pub fn write_uniffi_module(
     editable: bool,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
+    let library_mode = pyproject_toml.and_then(|pyproject| pyproject.uniffi_force_library_mode());
     let UniFfiBindings {
         names: binding_names,
         cdylib,
         path: binding_dir,
-    } = generate_uniffi_bindings(crate_dir, target_dir, module_name, target_os, artifact)?;
+    } = generate_uniffi_bindings(
+        crate_dir,
+        target_dir,
+        module_name,
+        target_os,
+        artifact,
+        library_mode,
+    )?;
 
     let py_init = binding_names
         .iter()

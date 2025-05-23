@@ -162,6 +162,19 @@ fn develop_uniffi_pure() {
 }
 
 #[test]
+fn develop_uniffi_export_and_udl() {
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(develop::test_develop(
+            "test-crates/uniffi-export-and-udl",
+            None,
+            "develop-uniffi-export-and-udl",
+            false,
+            TestInstallBackend::Pip,
+        ));
+    }
+}
+
+#[test]
 fn develop_uniffi_pure_proc_macro() {
     handle_result(develop::test_develop(
         "test-crates/uniffi-pure-proc-macro",

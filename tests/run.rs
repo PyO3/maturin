@@ -401,6 +401,19 @@ fn integration_cffi_mixed() {
 }
 
 #[test]
+fn integration_uniffi_pure() {
+    if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
+        handle_result(integration::test_integration(
+            "test-crates/uniffi-pure",
+            None,
+            "integration-uniffi-pure",
+            false,
+            None,
+        ));
+    }
+}
+
+#[test]
 fn integration_uniffi_export_and_udl() {
     if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
         handle_result(integration::test_integration(

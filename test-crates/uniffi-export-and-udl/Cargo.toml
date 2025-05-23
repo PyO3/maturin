@@ -1,0 +1,16 @@
+[package]
+name = "uniffi-export-and-udl"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "uniffi_export_and_udl"
+crate-type = ["cdylib"]
+
+[dependencies]
+uniffi = "0.28.0"
+
+[build-dependencies]
+uniffi = { version = "0.28.0", features = ["build"] }

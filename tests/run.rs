@@ -401,12 +401,12 @@ fn integration_cffi_mixed() {
 }
 
 #[test]
-fn integration_uniffi_pure() {
+fn integration_uniffi_export_and_udl() {
     if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
         handle_result(integration::test_integration(
-            "test-crates/uniffi-pure",
+            "test-crates/uniffi-export-and-udl",
             None,
-            "integration-uniffi-pure",
+            "integration-uniffi-export-and-udl",
             false,
             None,
         ));

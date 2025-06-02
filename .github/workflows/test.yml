@@ -110,7 +110,7 @@ jobs:
           # remove -dev suffix
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
-      - uses: mlugg/setup-zig@v1
+      - uses: mlugg/setup-zig@v2
         if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           version: 0.12.1

@@ -3,6 +3,7 @@ use crate::auditwheel::{PlatformTag, Policy};
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
 use crate::compile::{warn_missing_py_init, CompileTarget};
+use crate::compression::CompressionOptions;
 use crate::module_writer::{
     add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
     write_uniffi_module, write_wasm_launcher, WheelWriter,
@@ -132,8 +133,8 @@ pub struct BuildContext {
     pub editable: bool,
     /// Cargo build options
     pub cargo_options: CargoOptions,
-    /// Zip compression level
-    pub compression_level: u16,
+    /// Compression options
+    pub compression: CompressionOptions,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -671,7 +672,7 @@ impl BuildContext {
             &self.metadata24,
             &[tag.clone()],
             self.excludes(Format::Wheel)?,
-            self.compression_level,
+            self.compression,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -749,7 +750,7 @@ impl BuildContext {
             &self.metadata24,
             &[tag.clone()],
             self.excludes(Format::Wheel)?,
-            self.compression_level,
+            self.compression,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -872,7 +873,7 @@ impl BuildContext {
             &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
-            self.compression_level,
+            self.compression,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -944,7 +945,7 @@ impl BuildContext {
             &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
-            self.compression_level,
+            self.compression,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -1043,7 +1044,7 @@ impl BuildContext {
             &metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
-            self.compression_level,
+            self.compression,
         )?;
 
         if self.project_layout.python_module.is_some() && self.target.is_wasi() {

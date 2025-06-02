@@ -28,6 +28,7 @@ pub use crate::build_context::{BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::{BuildOptions, CargoOptions, TargetTriple};
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{compile, BuildArtifact};
+pub use crate::compression::{CompressionMethod, CompressionOptions};
 pub use crate::develop::{develop, DevelopOptions};
 #[cfg(feature = "schemars")]
 pub use crate::generate_json_schema::{generate_json_schema, GenerateJsonSchemaOptions, Mode};
@@ -53,6 +54,7 @@ mod cargo_toml;
 /// Generate CI configuration
 pub mod ci;
 mod compile;
+mod compression;
 mod cross_compile;
 mod develop;
 mod generate_json_schema;

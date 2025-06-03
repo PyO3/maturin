@@ -262,9 +262,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.18.4"
+version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60f1954e4ffa0f4c47b3df5e6e9508706d8dcaa56152cd672dcee02930ba0326"
+checksum = "5bcb0c4a97fa5a34df0afd0fa2393d1b64b787be7c418efc8cce968abcd33b20"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -1295,9 +1295,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.167"
+version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09d6582e104315a817dff97f75133544b2e094ee22447d2acf4a74e189ba06fc"
+checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "libmimalloc-sys"

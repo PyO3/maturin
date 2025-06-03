@@ -61,6 +61,8 @@ zip = { version = "2.3.0", default-features = false, features = [
     "bzip2",
     "deflate",
     "time",
+    "zstd",
+    "lzma"
 ] }
 thiserror = "2.0.3"
 fs-err = "3.0.0"

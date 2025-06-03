@@ -60,6 +60,16 @@ Options:
       --uv
           Use `uv` to install packages instead of `pip`
 
+      --compression-method <COMPRESSION_METHOD>
+          Zip compresson method to use
+
+          [default: deflated]
+
+          Possible values:
+          - deflated: Deflate compression
+          - stored:   No compression
+          - zstd:     Zstandard compression
+
   -h, --help
           Print help (see a summary with '-h')
 

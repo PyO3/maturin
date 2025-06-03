@@ -71,6 +71,7 @@ pub fn test_develop(
             ..Default::default()
         },
         uv,
+        compression: Default::default(),
     };
     develop(develop_options, &venv_dir)?;
 

@@ -1,5 +1,6 @@
 use crate::auditwheel::AuditWheelMode;
 use crate::build_options::CargoOptions;
+use crate::compression::CompressionOptions;
 use crate::target::detect_arch_from_python;
 use crate::BuildContext;
 use crate::BuildOptions;
@@ -229,6 +230,10 @@ pub struct DevelopOptions {
     /// Use `uv` to install packages instead of `pip`
     #[arg(long)]
     pub uv: bool,
+
+    /// Wheel compression options
+    #[command(flatten)]
+    pub compression: CompressionOptions,
 }
 
 #[instrument(skip_all)]
@@ -387,7 +392,10 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         pip_path,
         cargo_options,
         uv,
+        compression,
     } = develop_options;
+    compression.validate();
+
     let mut target_triple = cargo_options.target.clone();
     let target = Target::from_target_triple(cargo_options.target.as_ref())?;
     let python = target.get_venv_python(venv_dir);
@@ -416,7 +424,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             target: target_triple,
             ..cargo_options
         },
-        compression_level: 6,
+        compression,
     };
 
     let build_context = build_options

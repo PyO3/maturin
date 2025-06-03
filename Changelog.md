@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.x]
+
+- Allow specifying compression method and level, in both `build` and `develop` modes, in [#2625](https://github.com/PyO3/maturin/pull/2625).
+
 ## [1.8.6]
 
 * Print a message when overriding platform tag from `_PYTHON_HOST_PLATFORM` in [#2594](https://github.com/PyO3/maturin/pull/2594)

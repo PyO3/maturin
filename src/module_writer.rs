@@ -1,4 +1,5 @@
 //! The wheel format is (mostly) specified in PEP 427
+use crate::compression::{CompressionMethod, CompressionOptions};
 use crate::project_layout::ProjectLayout;
 use crate::target::Os;
 use crate::{
@@ -239,7 +240,27 @@ pub struct WheelWriter {
     wheel_path: PathBuf,
     file_tracker: FileTracker,
     excludes: Override,
-    compression_level: u16,
+    compression: CompressionOptions,
+}
+impl CompressionOptions {
+    fn get_file_options(&self) -> zip::write::FileOptions<()> {
+        let method = if cfg!(feature = "faster-tests") {
+            // Unlike users which can use the develop subcommand, the tests have to go through
+            // packing a zip which pip than has to unpack. This makes this 2-3 times faster
+            CompressionMethod::Stored
+        } else {
+            self.compression_method
+        };
+
+        let mut options =
+            zip::write::SimpleFileOptions::default().compression_method(method.into());
+        // `zip` also has default compression levels, which should match our own, but we pass them
+        // explicitly to ensure consistency.
+        options = options.compression_level(Some(
+            self.compression_level.unwrap_or(method.default_level()),
+        ));
+        options
+    }
 }
 
 impl ModuleWriter for WheelWriter {
@@ -267,20 +288,11 @@ impl ModuleWriter for WheelWriter {
         // The zip standard mandates using unix style paths
         let target = target.to_str().unwrap().replace('\\', "/");
 
-        // Unlike users which can use the develop subcommand, the tests have to go through
-        // packing a zip which pip than has to unpack. This makes this 2-3 times faster
-        let compression_method = if cfg!(feature = "faster-tests") || self.compression_level == 0 {
-            zip::CompressionMethod::Stored
-        } else {
-            zip::CompressionMethod::Deflated
-        };
+        let mut options = self
+            .compression
+            .get_file_options()
+            .unix_permissions(permissions);
 
-        let mut options = zip::write::SimpleFileOptions::default()
-            .unix_permissions(permissions)
-            .compression_method(compression_method);
-        if self.compression_level != 0 {
-            options = options.compression_level(Some(self.compression_level as i64));
-        }
         let mtime = self.mtime().ok();
         if let Some(mtime) = mtime {
             options = options.last_modified_time(mtime);
@@ -306,7 +318,7 @@ impl WheelWriter {
         metadata24: &Metadata24,
         tags: &[String],
         excludes: Override,
-        compression_level: u16,
+        compression: CompressionOptions,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
@@ -324,7 +336,7 @@ impl WheelWriter {
             wheel_path,
             file_tracker: FileTracker::default(),
             excludes,
-            compression_level,
+            compression,
         };
 
         write_dist_info(&mut builder, metadata24, tags)?;
@@ -383,17 +395,7 @@ impl WheelWriter {
 
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
-        let compression_method = if cfg!(feature = "faster-tests") || self.compression_level == 0 {
-            zip::CompressionMethod::Stored
-        } else {
-            zip::CompressionMethod::Deflated
-        };
-
-        let mut options =
-            zip::write::SimpleFileOptions::default().compression_method(compression_method);
-        if self.compression_level != 0 {
-            options = options.compression_level(Some(self.compression_level as i64));
-        }
+        let mut options = self.compression.get_file_options();
         let mtime = self.mtime().ok();
         if let Some(mtime) = mtime {
             options = options.last_modified_time(mtime);

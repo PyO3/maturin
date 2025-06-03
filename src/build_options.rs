@@ -1,6 +1,7 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
 use crate::bridge::{Abi3Version, PyO3Crate};
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
+use crate::compression::CompressionOptions;
 use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
@@ -217,10 +218,9 @@ pub struct BuildOptions {
     #[command(flatten)]
     pub cargo: CargoOptions,
 
-    /// Zip compresson level to use
-    #[arg(long, value_parser = clap::value_parser!(u16).range(0..=264), hide = true, default_value="6"
-    )]
-    pub compression_level: u16,
+    /// Wheel compression options
+    #[command(flatten)]
+    pub compression: CompressionOptions,
 }
 
 impl Deref for BuildOptions {
@@ -587,6 +587,7 @@ impl BuildContextBuilder {
             editable,
             sdist_only,
         } = self;
+        build_options.compression.validate();
         let ProjectResolver {
             project_layout,
             cargo_toml_path,
@@ -807,7 +808,7 @@ impl BuildContextBuilder {
             universal2,
             editable,
             cargo_options,
-            compression_level: build_options.compression_level,
+            compression: build_options.compression,
         })
     }
 }

@@ -427,7 +427,7 @@ fn fun_with_abiflags(
     if message.interpreter == "pypy" || message.interpreter == "graalvm" {
         // pypy and graalpy do not specify abi flags
         Ok("".to_string())
-    } else if message.system == "windows" {
+    } else if message.system == "windows" && message.minor < 14 {
         if matches!(message.abiflags.as_deref(), Some("") | None) {
             // windows has a few annoying cases, but its abiflags in sysconfig always empty
             // python <= 3.7 has "m"
@@ -443,7 +443,7 @@ fn fun_with_abiflags(
                 Ok("".to_string())
             }
         } else {
-            bail!("A python 3 interpreter on Windows does not define abiflags in its sysconfig ಠ_ಠ")
+            bail!("A python 3 interpreter on Windows does not define abiflags in its sysconfig before Python 3.14 ಠ_ಠ")
         }
     } else if let Some(ref abiflags) = message.abiflags {
         if message.minor >= 8 {

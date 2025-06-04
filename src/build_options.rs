@@ -1402,8 +1402,8 @@ fn find_interpreter_in_sysconfig(
                 format!("Failed to find a {python_impl} {ver_major}.{ver_minor} interpreter in known sysconfig")
             })?;
         debug!(
-            "Found {} {}.{} in bundled sysconfig",
-            sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor,
+            "Found {} {}.{}{} in bundled sysconfig",
+            sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor, sysconfig.abiflags
         );
         interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
     }

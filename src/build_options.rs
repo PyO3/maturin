@@ -1621,12 +1621,12 @@ mod test {
 
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version: semver::Version::new(0, 24, 1),
+            version: semver::Version::new(0, 25, 0),
             abi3: Some(Abi3Version::Version(3, 7)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {
                     min_minor: 7,
-                    max_minor: 13,
+                    max_minor: 14,
                 },
                 pypy: PyO3VersionMetadata {
                     min_minor: 9,

@@ -1269,9 +1269,9 @@ fn find_interpreter(
     if !interpreter.is_empty() {
         let mut missing = Vec::new();
         for interp in interpreter {
-            match PythonInterpreter::check_executable(interp.clone(), target, bridge) {
-                Ok(Some(interp)) => found_interpreters.push(interp),
-                _ => missing.push(interp.clone()),
+            match PythonInterpreter::check_executable(interp.clone(), target, bridge)? {
+                Some(interp) => found_interpreters.push(interp),
+                None => missing.push(interp.clone()),
             }
         }
         if !missing.is_empty() {

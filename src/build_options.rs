@@ -1794,6 +1794,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_find_interpreter_path_version() {
         let regex = Regex::new(r"python\d\.\d+").unwrap();
         println!("{}", find_interpreter_version("python".to_string()));

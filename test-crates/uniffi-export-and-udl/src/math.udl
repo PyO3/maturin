@@ -1,0 +1,5 @@
+namespace math {};
+
+dictionary NumbersToAdd {
+  sequence<i32> numbers;
+};

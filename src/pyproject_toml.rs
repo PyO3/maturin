@@ -223,6 +223,8 @@ pub struct ToolMaturin {
     pub unstable_flags: Option<Vec<String>>,
     /// Additional rustc arguments
     pub rustc_args: Option<Vec<String>>,
+    /// Force library mode in UniFFI
+    pub uniffi_force_library_mode: Option<bool>,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -353,6 +355,11 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
         self.maturin()?.manifest_path.as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.uniffi-force-library-mode]` in pyproject.toml
+    pub fn uniffi_force_library_mode(&self) -> Option<bool> {
+        self.maturin()?.uniffi_force_library_mode
     }
 
     /// Warn about `build-system.requires` mismatching expectations.

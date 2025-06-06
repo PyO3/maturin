@@ -13,6 +13,7 @@ use cargo_metadata::{CrateType, PackageId, TargetKind};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -1330,6 +1331,37 @@ fn find_interpreter_in_host(
     Ok(interpreters)
 }
 
+fn find_interpreter_version(python: String) -> String {
+    let version_regex = Regex::new(r"Python (\d\.\d+)(.\d+)*").unwrap();
+
+    // if interpreter is a python interpreter that does not contain a version,
+    // try to find a python version by executing `<path> --version` and using the remaining name
+    // this is especially useful when using maturin for cross-compilation and input is an interpreter path
+    if python.ends_with("python") || python.ends_with("pypy") || python.ends_with("graalpy") {
+        let output_result = std::process::Command::new(&python)
+            .arg("--version")
+            .output();
+
+        if let Ok(output) = output_result {
+            if let Some(captures) = version_regex.captures(&String::from_utf8_lossy(&output.stdout))
+            {
+                if let Some(version) = captures.get(1) {
+                    let new_python = format!("{}{}", &python, version.as_str());
+                    let new_python_path = std::path::Path::new(&new_python);
+
+                    if let Some(new_python_name) = new_python_path
+                        .file_name()
+                        .and_then(|x| x.to_str().map(str::to_owned))
+                    {
+                        return new_python_name;
+                    }
+                }
+            }
+        }
+    }
+    python
+}
+
 /// Find python interpreters in the bundled sysconfig
 fn find_interpreter_in_sysconfig(
     bridge: &BridgeModel,
@@ -1345,8 +1377,10 @@ fn find_interpreter_in_sysconfig(
         ));
     }
     let mut interpreters = Vec::new();
+
     for interp in interpreter {
-        let python = interp.display().to_string();
+        let python = find_interpreter_version(interp.display().to_string());
+
         let (python_impl, python_ver, abiflags) = if let Some(ver) = python.strip_prefix("pypy") {
             (
                 InterpreterKind::PyPy,
@@ -1375,7 +1409,7 @@ fn find_interpreter_in_sysconfig(
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {
-                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.8' or 'pypy3.9') when cross-compiling, got path to interpreter: {}", python);
+                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.8' or 'pypy3.9') when cross-compiling, got path to interpreter that could not be used to resolve to a version: {}", python);
             } else {
                 bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
             }
@@ -1757,5 +1791,15 @@ mod test {
         ];
 
         assert_eq!(extract_cargo_metadata_args(&args).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_find_interpreter_path_version() {
+        let regex = Regex::new(r"python\d\.\d+").unwrap();
+        println!("{}", find_interpreter_version("python".to_string()));
+        assert_eq!(
+            regex.is_match_at(&find_interpreter_version("python".to_string()), 0),
+            true
+        );
     }
 }

@@ -1801,5 +1801,13 @@ mod test {
             regex.is_match_at(&find_interpreter_version("python".to_string()), 0),
             true
         );
+        println!(
+            "{}",
+            find_interpreter_version("/usr/bin/python".to_string())
+        );
+        assert_eq!(
+            regex.is_match_at(&find_interpreter_version("/usr/bin/python".to_string()), 0),
+            true
+        );
     }
 }

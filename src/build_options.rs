@@ -1269,9 +1269,9 @@ fn find_interpreter(
     if !interpreter.is_empty() {
         let mut missing = Vec::new();
         for interp in interpreter {
-            match PythonInterpreter::check_executable(interp.clone(), target, bridge) {
-                Ok(Some(interp)) => found_interpreters.push(interp),
-                _ => missing.push(interp.clone()),
+            match PythonInterpreter::check_executable(interp.clone(), target, bridge)? {
+                Some(interp) => found_interpreters.push(interp),
+                None => missing.push(interp.clone()),
             }
         }
         if !missing.is_empty() {
@@ -1402,8 +1402,8 @@ fn find_interpreter_in_sysconfig(
                 format!("Failed to find a {python_impl} {ver_major}.{ver_minor} interpreter in known sysconfig")
             })?;
         debug!(
-            "Found {} {}.{} in bundled sysconfig",
-            sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor,
+            "Found {} {}.{}{} in bundled sysconfig",
+            sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor, sysconfig.abiflags
         );
         interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
     }

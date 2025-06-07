@@ -3,6 +3,7 @@
 ## [1.8.x]
 
 - Allow specifying compression method and level, in both `build` and `develop` modes, in [#2625](https://github.com/PyO3/maturin/pull/2625).
+- Try to find out the interpreter version if the version was not given via `--interpreter` instead of failing immediately [#2634](https://github.com/PyO3/maturin/pull/2634).
 
 ## [1.8.6]
 

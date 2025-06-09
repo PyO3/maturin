@@ -1,8 +1,9 @@
 # Changelog
 
-## [1.8.x]
+## [1.8.7]
 
 - Allow specifying compression method and level, in both `build` and `develop` modes, in [#2625](https://github.com/PyO3/maturin/pull/2625).
+- Fix Windows free-threaded builds on Python 3.14 in [#2632](https://github.com/PyO3/maturin/pull/2632)
 
 ## [1.8.6]
 
@@ -1073,7 +1074,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.6...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.8.7...HEAD
+[1.8.7]: https://github.com/pyo3/maturin/compare/v1.8.6...v1.8.7
 [1.8.6]: https://github.com/pyo3/maturin/compare/v1.8.5...v1.8.6
 [1.8.5]: https://github.com/pyo3/maturin/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/pyo3/maturin/compare/v1.8.3...v1.8.4

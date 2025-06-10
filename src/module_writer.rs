@@ -1610,4 +1610,27 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn wheel_writer_no_compression() -> Result<(), Box<dyn std::error::Error>> {
+        let metadata = Metadata24::new("dummy".to_string(), Version::new([1, 0]));
+        let tmp_dir = TempDir::new()?;
+
+        let writer = WheelWriter::new(
+            "no compression",
+            tmp_dir.path(),
+            &metadata,
+            &[],
+            Override::empty(),
+            CompressionOptions {
+                compression_method: CompressionMethod::Stored,
+                ..Default::default()
+            },
+        )?;
+
+        writer.finish()?;
+        tmp_dir.close()?;
+
+        Ok(())
+    }
 }

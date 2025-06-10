@@ -255,10 +255,13 @@ impl CompressionOptions {
         let mut options =
             zip::write::SimpleFileOptions::default().compression_method(method.into());
         // `zip` also has default compression levels, which should match our own, but we pass them
-        // explicitly to ensure consistency.
-        options = options.compression_level(Some(
-            self.compression_level.unwrap_or(method.default_level()),
-        ));
+        // explicitly to ensure consistency. The exception is the `Stored` method, which must have
+        // a `compression_level` of `None`.
+        options = options.compression_level(if method == CompressionMethod::Stored {
+            None
+        } else {
+            Some(self.compression_level.unwrap_or(method.default_level()))
+        });
         options
     }
 }

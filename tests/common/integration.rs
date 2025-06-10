@@ -78,6 +78,7 @@ pub fn test_integration(
         .normalize()?
         .into_path_buf()
         .join("venvs");
+    fs_err::create_dir_all(&venvs_dir)?;
     let cffi_provider = "cffi-provider";
     let cffi_venv = venvs_dir.join(cffi_provider);
 

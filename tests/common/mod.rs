@@ -10,6 +10,7 @@ use std::{env, io, str};
 pub mod develop;
 pub mod errors;
 pub mod integration;
+pub mod metadata;
 pub mod other;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

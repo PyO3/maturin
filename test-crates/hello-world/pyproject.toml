@@ -1,3 +1,8 @@
+[project]
+name = "hello-world"
+version = "0.1.0"
+license-files = ["LICENSE", "licenses/*"]
+
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"

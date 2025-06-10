@@ -318,6 +318,7 @@ impl WheelWriter {
     pub fn new(
         tag: &str,
         wheel_dir: &Path,
+        pyproject_dir: &Path,
         metadata24: &Metadata24,
         tags: &[String],
         excludes: Override,
@@ -342,7 +343,7 @@ impl WheelWriter {
             compression,
         };
 
-        write_dist_info(&mut builder, metadata24, tags)?;
+        write_dist_info(&mut builder, pyproject_dir, metadata24, tags)?;
 
         Ok(builder)
     }
@@ -1456,6 +1457,7 @@ pub fn write_python_part(
 /// Creates the .dist-info directory and fills it with all metadata files except RECORD
 pub fn write_dist_info(
     writer: &mut impl ModuleWriter,
+    pyproject_dir: &Path,
     metadata24: &Metadata24,
     tags: &[String],
 ) -> Result<()> {
@@ -1497,10 +1499,7 @@ pub fn write_dist_info(
         let license_files_dir = dist_info_dir.join("licenses");
         writer.add_directory(&license_files_dir)?;
         for path in &metadata24.license_files {
-            let filename = path.file_name().with_context(|| {
-                format!("missing file name for license file {}", path.display())
-            })?;
-            writer.add_file(license_files_dir.join(filename), path)?;
+            writer.add_file(license_files_dir.join(path), pyproject_dir.join(path))?;
         }
     }
 

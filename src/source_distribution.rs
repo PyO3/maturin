@@ -621,7 +621,7 @@ fn add_cargo_package_files_to_sdist(
     }
     for package in &build_context.project_layout.python_packages {
         let package_path = build_context.project_layout.python_dir.join(package);
-        if python_packages.iter().any(|p| *p == package_path) {
+        if python_packages.contains(&package_path) {
             continue;
         }
         trace!("Resolved python package: {}", package_path.display());

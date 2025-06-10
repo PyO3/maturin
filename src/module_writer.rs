@@ -1378,7 +1378,7 @@ pub fn write_python_part(
     }
     for package in &project_layout.python_packages {
         let package_path = python_dir.join(package);
-        if python_packages.iter().any(|p| *p == package_path) {
+        if python_packages.contains(&package_path) {
             continue;
         }
         python_packages.push(package_path);

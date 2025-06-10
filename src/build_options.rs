@@ -1059,12 +1059,18 @@ fn find_pyo3_bindings(
     use crate::bridge::PyO3MetadataRaw;
 
     if deps.get("pyo3").is_some() {
-        let pyo3_ffi = &packages["pyo3-ffi"];
-        let metadata =
-            match serde_json::from_value::<Option<PyO3MetadataRaw>>(pyo3_ffi.metadata.clone()) {
-                Ok(Some(metadata)) => Some(metadata.try_into()?),
-                Ok(None) | Err(_) => None,
-            };
+        let pyo3_metadata = match packages.get("pyo3-ffi") {
+            Some(pyo3_ffi) => pyo3_ffi.metadata.clone(),
+            None => {
+                // Old versions of pyo3 does not depend on pyo3-ffi,
+                // thus does not have the metadata
+                serde_json::Value::Null
+            }
+        };
+        let metadata = match serde_json::from_value::<Option<PyO3MetadataRaw>>(pyo3_metadata) {
+            Ok(Some(metadata)) => Some(metadata.try_into()?),
+            Ok(None) | Err(_) => None,
+        };
         let version = packages["pyo3"].version.clone();
         Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3,

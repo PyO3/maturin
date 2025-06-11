@@ -65,8 +65,13 @@ fn metadata_hello_world_pep639() {
     hello_world-0.1.0.dist-info/licenses/LICENSE
     hello_world-0.1.0.dist-info/licenses/licenses/AUTHORS.txt
     ");
+    let metadata_path = Path::new("hello_world-0.1.0.dist-info")
+        .join("METADATA")
+        .to_str()
+        .unwrap()
+        .to_string();
     // Remove the README in the body of the email
-    let metadata = writer.contents["hello_world-0.1.0.dist-info/METADATA"]
+    let metadata = writer.contents[&metadata_path]
         .split_once("\n\n")
         .unwrap()
         .0;

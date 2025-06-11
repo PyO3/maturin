@@ -505,7 +505,8 @@ impl Metadata24 {
         let license_files: Vec<String> = self
             .license_files
             .iter()
-            .map(|path| path.display().to_string())
+            // Use a portable path to ensure the metadata is consistent between Unix and Windows.
+            .map(|path| path.display().to_string().replace("\\", "/"))
             .collect();
         add_vec("License-File", &license_files);
 

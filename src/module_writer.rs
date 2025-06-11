@@ -1621,6 +1621,7 @@ mod tests {
         let writer = WheelWriter::new(
             "no compression",
             tmp_dir.path(),
+            tmp_dir.path(),
             &metadata,
             &[],
             Override::empty(),

@@ -275,7 +275,7 @@ impl BuildContext {
                     )]
                 }
                 None => {
-                    vec![self.interpreter[0].get_tag(&self, &[PlatformTag::Linux])?]
+                    vec![self.interpreter[0].get_tag(self, &[PlatformTag::Linux])?]
                 }
             },
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {

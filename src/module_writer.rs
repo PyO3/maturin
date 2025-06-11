@@ -255,10 +255,13 @@ impl CompressionOptions {
         let mut options =
             zip::write::SimpleFileOptions::default().compression_method(method.into());
         // `zip` also has default compression levels, which should match our own, but we pass them
-        // explicitly to ensure consistency.
-        options = options.compression_level(Some(
-            self.compression_level.unwrap_or(method.default_level()),
-        ));
+        // explicitly to ensure consistency. The exception is the `Stored` method, which must have
+        // a `compression_level` of `None`.
+        options = options.compression_level(if method == CompressionMethod::Stored {
+            None
+        } else {
+            Some(self.compression_level.unwrap_or(method.default_level()))
+        });
         options
     }
 }
@@ -1605,6 +1608,29 @@ mod tests {
         assert!(!writer.file_tracker.0.is_empty());
         writer.add_bytes_with_permissions("yes", Some(Path::new("yes")), &[], perm)?;
         assert_eq!(writer.file_tracker.0.len(), 2);
+        writer.finish()?;
+        tmp_dir.close()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn wheel_writer_no_compression() -> Result<(), Box<dyn std::error::Error>> {
+        let metadata = Metadata24::new("dummy".to_string(), Version::new([1, 0]));
+        let tmp_dir = TempDir::new()?;
+
+        let writer = WheelWriter::new(
+            "no compression",
+            tmp_dir.path(),
+            &metadata,
+            &[],
+            Override::empty(),
+            CompressionOptions {
+                compression_method: CompressionMethod::Stored,
+                ..Default::default()
+            },
+        )?;
+
         writer.finish()?;
         tmp_dir.close()?;
 

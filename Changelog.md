@@ -2,8 +2,9 @@
 
 ## [1.8.7]
 
-- Allow specifying compression method and level, in both `build` and `develop` modes, in [#2625](https://github.com/PyO3/maturin/pull/2625).
-- Fix Windows free-threaded builds on Python 3.14 in [#2632](https://github.com/PyO3/maturin/pull/2632)
+* Allow specifying compression method and level, in both `build` and `develop` modes, in [#2625](https://github.com/PyO3/maturin/pull/2625).
+* Fix Windows free-threaded builds on Python 3.14 in [#2632](https://github.com/PyO3/maturin/pull/2632)
+* Add full PEP 639 support for `project.license` and `project.license-files`.
 
 ## [1.8.6]
 

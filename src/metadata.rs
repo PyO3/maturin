@@ -6,7 +6,7 @@ use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::{
     ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
 };
-use pyproject_toml::License;
+use pyproject_toml::{check_pep639_glob, License};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -14,6 +14,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str;
 use std::str::FromStr;
+use tracing::debug;
 
 /// The metadata required to generate the .dist-info directory
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -185,9 +186,9 @@ impl Metadata24 {
                     if let Some(readme_path) = file {
                         let readme_path = pyproject_dir.join(readme_path);
                         let description = Some(fs::read_to_string(&readme_path).context(format!(
-                                "Failed to read readme specified in pyproject.toml, which should be at {}",
-                                readme_path.display()
-                            ))?);
+                            "Failed to read readme specified in pyproject.toml, which should be at {}",
+                            readme_path.display()
+                        ))?);
                         self.description = description;
                     }
                     if let Some(description) = text {
@@ -207,33 +208,61 @@ impl Metadata24 {
                     // TODO: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
                     License::Spdx(license_expr) => self.license = Some(license_expr.clone()),
                     License::File { file } => {
-                        let license_path = pyproject_dir.join(file);
-                        self.license_files.push(license_path);
+                        self.license_files.push(file.to_path_buf());
                     }
                     License::Text { text } => self.license = Some(text.clone()),
                 }
             }
 
-            // Until PEP 639 is approved with metadata 2.3, we can assume a
-            // dynamic license-files (also awaiting full 2.2 metadata support)
-            // We're already emitting the License-Files metadata without issue.
-            // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
-            let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
-            let escaped_manifest_string = glob::Pattern::escape(pyproject_dir.to_str().unwrap());
-            let escaped_manifest_path = Path::new(&escaped_manifest_string);
-            for pattern in license_include_targets.iter() {
-                for license_path in
-                    glob::glob(&escaped_manifest_path.join(pattern).to_string_lossy())?
-                        .filter_map(Result::ok)
-                {
-                    if !license_path.is_file() {
-                        continue;
+            // Handle PEP 639 license-files field
+            if let Some(license_files) = &project.license_files {
+                // Safe on Windows and Unix as neither forward nor backwards slashes are escaped.
+                let escaped_pyproject_dir =
+                    PathBuf::from(glob::Pattern::escape(pyproject_dir.to_str().unwrap()));
+                for license_glob in license_files {
+                    check_pep639_glob(license_glob)?;
+                    for license_path in
+                        glob::glob(&escaped_pyproject_dir.join(license_glob).to_string_lossy())?
+                    {
+                        let license_path = license_path?;
+                        if !license_path.is_file() {
+                            continue;
+                        }
+                        let license_path = license_path
+                            .strip_prefix(pyproject_dir)
+                            .expect("matched path starts with glob root")
+                            .to_path_buf();
+                        if !self.license_files.contains(&license_path) {
+                            debug!("Including license file `{}`", license_path.display());
+                            self.license_files.push(license_path);
+                        }
                     }
-                    // if the pyproject.toml specified the license file,
-                    // then we won't list it as automatically included
-                    if !self.license_files.contains(&license_path) {
-                        eprintln!("📦 Including license file \"{}\"", license_path.display());
-                        self.license_files.push(license_path);
+                }
+            } else {
+                // Auto-discovery of license files for backwards compatibility
+                // license-files.globs = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"]
+                let license_include_targets = ["LICEN[CS]E*", "COPYING*", "NOTICE*", "AUTHORS*"];
+                let escaped_manifest_string =
+                    glob::Pattern::escape(pyproject_dir.to_str().unwrap());
+                let escaped_manifest_path = Path::new(&escaped_manifest_string);
+                for pattern in license_include_targets.iter() {
+                    for license_path in
+                        glob::glob(&escaped_manifest_path.join(pattern).to_string_lossy())?
+                            .filter_map(Result::ok)
+                    {
+                        if !license_path.is_file() {
+                            continue;
+                        }
+                        let license_path = license_path
+                            .strip_prefix(pyproject_dir)
+                            .expect("matched path starts with glob root")
+                            .to_path_buf();
+                        // if the pyproject.toml specified the license file,
+                        // then we won't list it as automatically included
+                        if !self.license_files.contains(&license_path) {
+                            eprintln!("📦 Including license file \"{}\"", license_path.display());
+                            self.license_files.push(license_path);
+                        }
                     }
                 }
             }
@@ -476,7 +505,8 @@ impl Metadata24 {
         let license_files: Vec<String> = self
             .license_files
             .iter()
-            .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
+            // Use a portable path to ensure the metadata is consistent between Unix and Windows.
+            .map(|path| path.display().to_string().replace("\\", "/"))
             .collect();
         add_vec("License-File", &license_files);
 
@@ -848,12 +878,12 @@ A test project
         assert_eq!(4, metadata.license_files.len());
 
         // Verify pyproject.toml license = {file = ...} worked
-        assert_eq!(metadata.license_files[0], manifest_dir.join("LICENCE.txt"));
+        assert_eq!(metadata.license_files[0], PathBuf::from("LICENCE.txt"));
 
         // Verify the default licenses were included
-        assert_eq!(metadata.license_files[1], manifest_dir.join("LICENSE"));
-        assert_eq!(metadata.license_files[2], manifest_dir.join("NOTICE.md"));
-        assert_eq!(metadata.license_files[3], manifest_dir.join("AUTHORS.txt"));
+        assert_eq!(metadata.license_files[1], PathBuf::from("LICENSE"));
+        assert_eq!(metadata.license_files[2], PathBuf::from("NOTICE.md"));
+        assert_eq!(metadata.license_files[3], PathBuf::from("AUTHORS.txt"));
     }
 
     #[test]

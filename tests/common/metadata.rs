@@ -57,7 +57,7 @@ fn metadata_hello_world_pep639() {
     )
     .unwrap();
 
-    assert_snapshot!(writer.files.join("\n"), @r"
+    assert_snapshot!(writer.files.join("\n").replace("\\", "/"), @r"
     hello_world-0.1.0.dist-info
     hello_world-0.1.0.dist-info/METADATA
     hello_world-0.1.0.dist-info/WHEEL

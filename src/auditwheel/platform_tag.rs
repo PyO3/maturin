@@ -23,6 +23,8 @@ pub enum PlatformTag {
     },
     /// Use the native linux tag
     Linux,
+    /// Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.
+    Pypi,
 }
 
 impl PlatformTag {
@@ -53,6 +55,7 @@ impl PlatformTag {
             }
             PlatformTag::Musllinux { .. } => Vec::new(),
             PlatformTag::Linux => Vec::new(),
+            PlatformTag::Pypi => Vec::new(),
         }
     }
 
@@ -73,12 +76,18 @@ impl PlatformTag {
         matches!(self, PlatformTag::Musllinux { .. })
     }
 
+    /// Is this the PyPI compatibility option
+    pub fn is_pypi(&self) -> bool {
+        matches!(self, PlatformTag::Pypi)
+    }
+
     /// Is it supported by Rust compiler and manylinux project
     pub fn is_supported(&self) -> bool {
         match self {
             PlatformTag::Manylinux { x, y } => (*x, *y) >= (2, 17),
             PlatformTag::Musllinux { .. } => true,
             PlatformTag::Linux => true,
+            PlatformTag::Pypi => true,
         }
     }
 }
@@ -89,6 +98,7 @@ impl fmt::Display for PlatformTag {
             PlatformTag::Manylinux { x, y } => write!(f, "manylinux_{x}_{y}"),
             PlatformTag::Musllinux { x, y } => write!(f, "musllinux_{x}_{y}"),
             PlatformTag::Linux => write!(f, "linux"),
+            PlatformTag::Pypi => write!(f, "pypi"),
         }
     }
 }
@@ -100,6 +110,7 @@ impl FromStr for PlatformTag {
         let value = value.to_ascii_lowercase();
         match value.as_str() {
             "off" | "linux" => Ok(PlatformTag::Linux),
+            "pypi" => Ok(PlatformTag::Pypi),
             "1" | "manylinux1" => Ok(PlatformTag::manylinux1()),
             "2010" | "manylinux2010" => Ok(PlatformTag::manylinux2010()),
             "2014" | "manylinux2014" => Ok(PlatformTag::manylinux2014()),

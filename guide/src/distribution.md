@@ -45,6 +45,8 @@ For portability reasons, native python modules on linux must only dynamically li
 The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://peps.python.org/pep-0599/#the-manylinux2014-policy)).
 If you want to publish widely usable wheels for linux pypi, **you need to use a manylinux docker image or [build with zig](#use-zig)**.
 
+If you are publishing to PyPI, you can use `--compatibility pypi` to allow only builds for targets that are accepted by PyPI, and reject builds for unsupported operating systems and architectures.
+
 The Rust compiler since version 1.64 [requires at least glibc 2.17](https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html), so you need to use at least manylinux2014.
 For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
 The [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action already takes care of this if you set e.g. `manylinux: 2014`.
@@ -83,17 +85,10 @@ Options:
           Build a source distribution
 
       --compatibility [<compatibility>...]
-          Control the platform tag on linux.
-
-          Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native
-          linux tag.
-
-          Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they
-          are separately validated by `auditwheel`.
+          Control platform tags. Use `pypi` to ensure PyPI compatibility, or specify platform-specific
+          tags like `manylinux2014`, `musllinux_1_2`, or `linux`.
 
           The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
-
-          This option is ignored on all non-linux platforms
 
   -i, --interpreter [<INTERPRETER>...]
           The python versions to build wheels for, given as the executables of interpreters such as `python3.9` or `/usr/bin/python3.8`

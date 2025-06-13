@@ -44,8 +44,8 @@ include = []
 exclude = []
 # Bindings type
 bindings = "pyo3"
-# Control the platform tag on linux
-compatibility = "manylinux2014"
+# Control the platform tag and PyPI compatibility
+compatibility = "pypi"
 # auditwheel mode, possible values are repair, check and skip
 auditwheel = "repair"
 # Don't check for manylinux compliance, deprecated in favor of auditwheel = "audit"

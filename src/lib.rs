@@ -63,6 +63,7 @@ mod module_writer;
 #[cfg(feature = "scaffolding")]
 mod new_project;
 mod project_layout;
+mod pypi_tags;
 pub mod pyproject_toml;
 mod python_interpreter;
 mod source_distribution;

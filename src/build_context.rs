@@ -9,6 +9,7 @@ use crate::module_writer::{
     write_uniffi_module, write_wasm_launcher, WheelWriter,
 };
 use crate::project_layout::ProjectLayout;
+use crate::pypi_tags::validate_wheel_filename_for_pypi;
 use crate::source_distribution::source_distribution;
 use crate::target::{Arch, Os};
 use crate::{
@@ -121,7 +122,7 @@ pub struct BuildContext {
     /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
     #[cfg(feature = "zig")]
     pub zig: bool,
-    /// Whether to use the the manylinux/musllinux or use the native linux tag (off)
+    /// Whether to use the manylinux/musllinux or use the native linux tag (off)
     pub platform_tag: Vec<PlatformTag>,
     /// The available python interpreter
     pub interpreter: Vec<PythonInterpreter>,
@@ -135,6 +136,8 @@ pub struct BuildContext {
     pub cargo_options: CargoOptions,
     /// Compression options
     pub compression: CompressionOptions,
+    /// Whether to validate wheels against PyPI platform tag rules
+    pub pypi_validation: bool,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -231,6 +234,21 @@ impl BuildContext {
             BridgeModel::Cffi => self.build_cffi_wheel()?,
             BridgeModel::UniFfi => self.build_uniffi_wheel()?,
         };
+
+        // Validate wheel filenames against PyPI platform tag rules if requested
+        if self.pypi_validation {
+            for wheel in &wheels {
+                let filename = wheel
+                    .0
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| anyhow!("Invalid wheel filename: {:?}", wheel.0))?;
+
+                if let Err(error) = validate_wheel_filename_for_pypi(filename) {
+                    bail!("PyPI validation failed: {}", error);
+                }
+            }
+        }
 
         Ok(wheels)
     }

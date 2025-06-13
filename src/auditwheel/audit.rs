@@ -320,7 +320,7 @@ pub fn auditwheel_rs(
                 policy
             })
             .collect(),
-        None => {
+        None | Some(PlatformTag::Pypi) => {
             let mut policies = get_default_platform_policies();
             for policy in &mut policies {
                 policy.fixup_musl_libc_so_name(target.target_arch());

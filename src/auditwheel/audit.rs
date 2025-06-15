@@ -322,7 +322,9 @@ pub fn auditwheel_rs(
                 policy
             })
             .collect(),
-        None => {
+        None | Some(PlatformTag::Pypi) => {
+            // Using the default for the `pypi` tag means we're correctly using manylinux where
+            // possible.
             let mut policies = get_default_platform_policies();
             for policy in &mut policies {
                 policy.fixup_musl_libc_so_name(target.target_arch());

@@ -349,8 +349,8 @@ fn cargo_build_command(
                 build.enable_zig_ar = true;
                 let zig_triple = if target.is_linux() && !target.is_musl_libc() {
                     match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
-                        Some(PlatformTag::Manylinux { x, y }) => {
-                            format!("{target_triple}.{x}.{y}")
+                        Some(PlatformTag::Manylinux { major, minor }) => {
+                            format!("{target_triple}.{major}.{minor}")
                         }
                         _ => target_triple.to_string(),
                     }

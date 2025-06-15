@@ -49,7 +49,7 @@ pub struct Policy {
 impl Default for Policy {
     fn default() -> Self {
         // defaults to linux
-        Policy::from_name("linux").unwrap()
+        Policy::from_tag(&PlatformTag::Linux).unwrap()
     }
 }
 
@@ -79,17 +79,22 @@ impl Policy {
         self.name.parse().expect("unknown platform tag")
     }
 
-    /// Get policy by it's platform tag name
-    pub fn from_name(name: &str) -> Option<Self> {
-        let policies = if name.starts_with("musllinux") {
-            &MUSLLINUX_POLICIES
-        } else {
-            &MANYLINUX_POLICIES
-        };
-        policies
-            .iter()
-            .find(|p| p.name == name || p.aliases.iter().any(|alias| alias == name))
-            .cloned()
+    /// Get policy by its platform tag
+    pub fn from_tag(tag: &PlatformTag) -> Option<Self> {
+        match tag {
+            PlatformTag::Manylinux { major, minor } => {
+                let name = format!("manylinux_{major}_{minor}");
+                MANYLINUX_POLICIES.iter().find(|p| p.name == name).cloned()
+            }
+            PlatformTag::Musllinux { major, minor } => {
+                let name = format!("musllinux_{major}_{minor}");
+                MUSLLINUX_POLICIES.iter().find(|p| p.name == name).cloned()
+            }
+            PlatformTag::Linux => MANYLINUX_POLICIES
+                .iter()
+                .find(|p| p.name == "linux")
+                .cloned(),
+        }
     }
 
     pub(crate) fn fixup_musl_libc_so_name(&mut self, target_arch: Arch) {
@@ -116,15 +121,20 @@ impl Policy {
 #[cfg(test)]
 mod test {
     use super::{Arch, Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
+    use crate::PlatformTag;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn test_load_policy() {
-        let linux = Policy::from_name("linux").unwrap();
+        let linux = Policy::from_tag(&PlatformTag::Linux).unwrap();
         assert!(linux.symbol_versions.is_empty());
         assert!(linux.lib_whitelist.is_empty());
 
-        let manylinux2010 = Policy::from_name("manylinux2010").unwrap();
+        let manylinux2010 = Policy::from_tag(&PlatformTag::Manylinux {
+            major: 2,
+            minor: 12,
+        })
+        .unwrap();
         assert!(manylinux2010.lib_whitelist.contains("libc.so.6"));
         let symbol_version = &manylinux2010.symbol_versions["x86_64"];
         assert_eq!(symbol_version["CXXABI"].len(), 4);
@@ -150,7 +160,7 @@ mod test {
 
     #[test]
     fn test_policy_musllinux_fixup_libc_so_name() {
-        let mut policy = Policy::from_name("musllinux_1_1").unwrap();
+        let mut policy = Policy::from_tag(&PlatformTag::Musllinux { major: 1, minor: 1 }).unwrap();
         policy.fixup_musl_libc_so_name(Arch::Aarch64);
         assert!(policy.lib_whitelist.contains("libc.musl-aarch64.so.1"));
     }

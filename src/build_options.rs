@@ -726,7 +726,7 @@ impl BuildContextBuilder {
                 .or(if use_zig {
                     if target.is_musl_libc() {
                         // Zig bundles musl 1.2
-                        Some(PlatformTag::Musllinux { x: 1, y: 2 })
+                        Some(PlatformTag::Musllinux { major: 1, minor: 2 })
                     } else {
                         // With zig we can compile to any glibc version that we want, so we pick the lowest
                         // one supported by the rust compiler
@@ -735,7 +735,7 @@ impl BuildContextBuilder {
                 } else {
                     // Defaults to musllinux_1_2 for musl target if it's not bin bindings
                     if target.is_musl_libc() && !bridge.is_bin() {
-                        Some(PlatformTag::Musllinux { x: 1, y: 2 })
+                        Some(PlatformTag::Musllinux { major: 1, minor: 2 })
                     } else {
                         None
                     }

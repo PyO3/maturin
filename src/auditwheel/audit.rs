@@ -56,7 +56,7 @@ pub enum AuditWheelError {
     UnsupportedArchitecture(Policy, String),
     /// This platform tag isn't defined by auditwheel yet
     #[error("{0} compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway")]
-    UndefinedPolicy(String),
+    UndefinedPolicy(PlatformTag),
     /// Failed to analyze external shared library dependencies of the wheel
     #[error("Failed to analyze external shared library dependencies of the wheel")]
     DependencyAnalysisError(#[source] lddtree::Error),
@@ -311,10 +311,12 @@ pub fn auditwheel_rs(
     // Find the highest possible policy, if any
     let platform_policies = match platform_tag {
         Some(PlatformTag::Manylinux { .. }) => MANYLINUX_POLICIES.clone(),
-        Some(PlatformTag::Musllinux { x, y }) => MUSLLINUX_POLICIES
+        Some(PlatformTag::Musllinux { major, minor }) => MUSLLINUX_POLICIES
             .clone()
             .into_iter()
-            .filter(|policy| policy.name == "linux" || policy.name == format!("musllinux_{x}_{y}"))
+            .filter(|policy| {
+                policy.name == "linux" || policy.name == format!("musllinux_{major}_{minor}")
+            })
             .map(|mut policy| {
                 policy.fixup_musl_libc_so_name(target.target_arch());
                 policy
@@ -362,8 +364,8 @@ pub fn auditwheel_rs(
     }
 
     let policy = if let Some(platform_tag) = platform_tag {
-        let tag = platform_tag.to_string();
-        let mut policy = Policy::from_name(&tag).ok_or(AuditWheelError::UndefinedPolicy(tag))?;
+        let mut policy = Policy::from_tag(&platform_tag)
+            .ok_or(AuditWheelError::UndefinedPolicy(platform_tag))?;
         policy.fixup_musl_libc_so_name(target.target_arch());
 
         if let Some(highest_policy) = highest_policy {

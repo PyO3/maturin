@@ -476,8 +476,14 @@ impl Target {
                     PlatformTag::manylinux2010()
                 }
             }
-            Arch::Riscv64 => PlatformTag::Manylinux { x: 2, y: 31 },
-            Arch::LoongArch64 => PlatformTag::Manylinux { x: 2, y: 36 },
+            Arch::Riscv64 => PlatformTag::Manylinux {
+                major: 2,
+                minor: 31,
+            },
+            Arch::LoongArch64 => PlatformTag::Manylinux {
+                major: 2,
+                minor: 36,
+            },
             Arch::Armv5teL
             | Arch::Armv6L
             | Arch::Wasm32

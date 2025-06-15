@@ -1,64 +1,27 @@
 # Distribution
 
-## Source Distribution
-
-Maturin supports building through `pyproject.toml`. To use it, create a `pyproject.toml` next to your `Cargo.toml` with the following content:
-
-```toml
-[build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
-```
-
-If a `pyproject.toml` with a `[build-system]` entry is present, maturin can build a source distribution of your package when `--sdist` is specified.
-The source distribution will contain the same files as `cargo package`. To only build a source distribution, use the `maturin sdist` command.
-
-You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and maturin.
-
-You can use the options `compatibility`, `skip-auditwheel`, `bindings`, `strip` and common Cargo build options such as `features` under `[tool.maturin]` the same way you would when running maturin directly.
-The `bindings` key is required for cffi and bin projects as those can't be automatically detected. Currently, all builds are in release mode (see [this thread](https://discuss.python.org/t/pep-517-debug-vs-release-builds/1924) for details).
-
-For a non-manylinux build with cffi bindings you could use the following:
-
-```toml
-[build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
-
-[tool.maturin]
-bindings = "cffi"
-compatibility = "linux"
-```
-
-`manylinux` option is also accepted as an alias of `compatibility` for backward compatibility with old version of maturin.
-
-To include arbitrary files in the sdist for use during compilation specify `include` as an array of `path` globs with `format` set to `sdist`:
-
-```toml
-[tool.maturin]
-include = [{ path = "path/**/*", format = "sdist" }]
-```
-
 ## Build Wheels
 
-For portability reasons, native python modules on linux must only dynamically link a set of very few libraries which are installed basically everywhere, hence the name manylinux.
-The pypa offers special docker images and a tool called [auditwheel](https://github.com/pypa/auditwheel/) to ensure compliance with the [manylinux rules](https://peps.python.org/pep-0599/#the-manylinux2014-policy)).
-If you want to publish widely usable wheels for linux pypi, **you need to use a manylinux docker image or [build with zig](#use-zig)**.
+When building Rust binary or library, it's possible to depend on libraries and symbols only available on the build machine.
+To ensure the wheels are portable, native python modules on linux must only dynamically link a set of libraries and symbols called manylinux and musllinux.
+The pypa offers special docker images to ensure compliance with the [manylinux rules](https://peps.python.org/pep-0599/#the-manylinux2014-policy).
+If you want to publish linux wheels on pypi, **you need to use a manylinux docker image or [build with zig](#use-zig)**.
 
 The Rust compiler since version 1.64 [requires at least glibc 2.17](https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html), so you need to use at least manylinux2014.
 For publishing, we recommend enforcing the same manylinux version as the image with the manylinux flag, e.g. use `--manylinux 2014` if you are building in `quay.io/pypa/manylinux2014_x86_64`.
 The [PyO3/maturin-action](https://github.com/PyO3/maturin-action) github action already takes care of this if you set e.g. `manylinux: 2014`.
 
-maturin contains a reimplementation of auditwheel automatically checks the generated library and gives the wheel the proper platform tag.
+If you are publishing to PyPI, you can use `--compatibility pypi` to allow only builds for targets that are accepted by PyPI, and reject builds for unsupported operating systems and architectures.
+
+maturin can check the generated library for manylinux compliance (an auditwheel reimplementation) and gives the wheel the proper platform tag.
 
 - If your system's glibc is too new, it will assign the `linux` tag.
 - If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf),
-  it can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
+  which can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
 
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 
-For full manylinux compliance you need to compile in a CentOS docker container. The [pyo3/maturin](https://ghcr.io/pyo3/maturin) image is based on the manylinux2014 image,
-and passes arguments to the `maturin` binary. You can use it like this:
+The [pyo3/maturin](https://ghcr.io/pyo3/maturin) image is based on the manylinux2014 image, and passes arguments to the `maturin` binary. You can use it like this:
 
 ```
 docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --release  # or other maturin arguments
@@ -83,17 +46,10 @@ Options:
           Build a source distribution
 
       --compatibility [<compatibility>...]
-          Control the platform tag on linux.
-
-          Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`) and `linux` for the native
-          linux tag.
-
-          Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they
-          are separately validated by `auditwheel`.
+          Control platform tags. Use `pypi` to ensure PyPI compatibility, or specify platform-specific
+          tags like `manylinux2014`, `musllinux_1_2`, or `linux`.
 
           The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
-
-          This option is ignored on all non-linux platforms
 
   -i, --interpreter [<INTERPRETER>...]
           The python versions to build wheels for, given as the executables of interpreters such as `python3.9` or `/usr/bin/python3.8`
@@ -201,6 +157,45 @@ Manifest Options:
 
       --offline
           Run without accessing the network
+```
+
+## Source Distribution
+
+Maturin supports building through `pyproject.toml`. To use it, create a `pyproject.toml` next to your `Cargo.toml` with the following content:
+
+```toml
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+```
+
+If a `pyproject.toml` with a `[build-system]` entry is present, maturin can build a source distribution of your package when `--sdist` is specified.
+The source distribution will contain the same files as `cargo package`. To only build a source distribution, use the `maturin sdist` command.
+
+You can then e.g. install your package with `pip install .`. With `pip install . -v` you can see the output of cargo and maturin.
+
+You can use the options `compatibility`, `skip-auditwheel`, `bindings`, `strip` and common Cargo build options such as `features` under `[tool.maturin]` the same way you would when running maturin directly.
+The `bindings` key is required for cffi and bin projects as those can't be automatically detected. Currently, all builds are in release mode (see [this thread](https://discuss.python.org/t/pep-517-debug-vs-release-builds/1924) for details).
+
+For a non-manylinux build with cffi bindings you could use the following:
+
+```toml
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "cffi"
+compatibility = "linux"
+```
+
+`manylinux` option is also accepted as an alias of `compatibility` for backward compatibility with old version of maturin.
+
+To include arbitrary files in the sdist for use during compilation specify `include` as an array of `path` globs with `format` set to `sdist`:
+
+```toml
+[tool.maturin]
+include = [{ path = "path/**/*", format = "sdist" }]
 ```
 
 ### Cross Compiling

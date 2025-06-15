@@ -581,6 +581,16 @@ fn warn_on_missing_python_source() {
 }
 
 #[test]
+fn pypi_compatibility_unsupported_target() {
+    handle_result(errors::pypi_compatibility_unsupported_target())
+}
+
+#[test]
+fn pypi_compatibility_mixed_tags() {
+    handle_result(errors::pypi_compatibility_mixed_tags())
+}
+
+#[test]
 #[cfg_attr(not(target_os = "linux"), ignore)]
 fn musl() {
     let ran = handle_result(other::test_musl());

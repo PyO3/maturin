@@ -6,7 +6,7 @@ use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
-use crate::target::detect_arch_from_python;
+use crate::target::{detect_arch_from_python, is_arch_supported_by_pypi};
 use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
@@ -157,19 +157,21 @@ pub struct CargoOptions {
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {
-    /// Control the platform tag on linux.
+    /// Control the platform tag and PyPI compatibility.
     ///
-    /// Options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`)
-    /// or `musllinux` tags (for example `musllinux_1_2`)
-    /// and `linux` for the native linux tag.
+    /// This options offers both fine-grained control over the linux libc tag and a more automatic
+    /// PyPI-compatibility option.
     ///
-    /// Note that `manylinux1` and `manylinux2010` is unsupported by the rust compiler.
+    /// The `pypi` option applies on all platforms and ensure that only tags that can be uploaded to
+    /// PyPI are used. The linux-specific options are `manylinux` tags (for example
+    /// `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`),
+    /// and `linux` for the native linux tag. They are ignored on non-linux platforms.
+    ///
+    /// Note that `manylinux1` and `manylinux2010` are unsupported by the rust compiler.
     /// Wheels with the native `linux` tag will be rejected by pypi,
     /// unless they are separately validated by `auditwheel`.
     ///
-    /// The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
-    ///
-    /// This option is ignored on all non-linux platforms
+    /// The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched.
     #[arg(
         id = "compatibility",
         long = "compatibility",
@@ -711,6 +713,10 @@ impl BuildContextBuilder {
             } else {
                 AuditWheelMode::Repair
             });
+
+        // Check if PyPI validation is needed before we move platform_tag
+        let pypi_validation = matches!(&build_options.platform_tag[..], [PlatformTag::Pypi]);
+
         let platform_tags = if build_options.platform_tag.is_empty() {
             #[cfg(feature = "zig")]
             let use_zig = build_options.zig;
@@ -745,8 +751,19 @@ impl BuildContextBuilder {
             } else {
                 Vec::new()
             }
-        } else {
+        } else if let [PlatformTag::Pypi] = &build_options.platform_tag[..] {
+            // Avoid building for architectures we already know aren't allowed on PyPI
+            if !is_arch_supported_by_pypi(&target) {
+                bail!("Target {} architecture is not supported by PyPI", target);
+            }
+            // The defaults are already targeting PyPI: manylinux on linux,
+            // and the native tag on windows and mac
+            Vec::new()
+        } else if build_options.platform_tag.iter().all(|tag| !tag.is_pypi()) {
+            // All non-PyPI tags - use as-is
             build_options.platform_tag
+        } else {
+            bail!("The 'pypi' compatibility option cannot be combined with other platform tags");
         };
 
         for platform_tag in &platform_tags {
@@ -809,6 +826,7 @@ impl BuildContextBuilder {
             editable,
             cargo_options,
             compression: build_options.compression,
+            pypi_validation,
         })
     }
 }

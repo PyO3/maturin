@@ -17,6 +17,11 @@ use std::str::FromStr;
 use target_lexicon::{Architecture, Environment, Triple};
 use tracing::error;
 
+mod legacy_py;
+mod pypi_tags;
+
+pub use pypi_tags::{is_arch_supported_by_pypi, validate_wheel_filename_for_pypi};
+
 pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
 
 /// All supported operating system

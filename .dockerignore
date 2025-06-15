@@ -1,13 +1,13 @@
 **/.pytest_cache
 **/.tox
 **/__pycache__
-**/target
 **/venv*
 .dockerignore
 .git
 .idea
 .travis.yml
 .venv
+/target
 Dockerfile*
 appveyor.yml
 ci

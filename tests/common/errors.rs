@@ -143,3 +143,89 @@ pub fn warn_on_missing_python_source() -> Result<()> {
     assert!(str::from_utf8(&output.stderr)?.contains("Warning: You specified the python source as"));
     Ok(())
 }
+
+/// Check the `--compatibility pypi` error for unsupported targets.
+///
+/// Regression test for <https://github.com/astral-sh/uv/pull/14006>,
+/// where uv tried to upload a wheel with platform tag `manylinux_2_31_riscv64`
+/// but PyPI rejected it because RISC-V is not in PyPI's allowed architectures.
+pub fn pypi_compatibility_unsupported_target() -> Result<()> {
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "-m",
+        "test-crates/pyo3-mixed/Cargo.toml",
+        "--compatibility",
+        "pypi",
+        "--target",
+        "riscv64gc-unknown-linux-gnu", // Unsupported by PyPI
+        "--target-dir",
+        "test-crates/targets/pypi_compatibility_unsupported_target",
+        "--out",
+        "test-crates/targets/pypi_compatibility_unsupported_target",
+        "-i",
+        "python3.12", // Add interpreter to bypass interpreter detection
+    ];
+    let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
+
+    if let Err(err) = result {
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains(
+                "Target riscv64gc-unknown-linux-gnu architecture is not supported by PyPI"
+            ),
+            "{err_string}",
+        );
+    } else {
+        bail!("Should have errored");
+    }
+
+    Ok(())
+}
+
+/// Test that --compatibility pypi cannot be combined with other platform tags
+pub fn pypi_compatibility_mixed_tags() -> Result<()> {
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "-m",
+        "test-crates/pyo3-mixed/Cargo.toml",
+        "--compatibility",
+        "pypi",
+        "--compatibility",
+        "manylinux2014", // Should fail when combined with pypi
+        "--target-dir",
+        "test-crates/targets/pypi_compatibility_mixed_tags",
+        "--out",
+        "test-crates/targets/pypi_compatibility_mixed_tags",
+        "-i",
+        "python3.12", // Add interpreter to bypass interpreter detection
+    ];
+    let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
+    let result = options
+        .into_build_context()
+        .release(false)
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build();
+
+    if let Err(err) = result {
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains(
+                "The 'pypi' compatibility option cannot be combined with other platform tags"
+            ),
+            "{err_string}",
+        );
+    } else {
+        bail!("Should have errored");
+    }
+
+    Ok(())
+}

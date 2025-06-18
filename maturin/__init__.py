@@ -21,13 +21,13 @@ import sys
 from subprocess import SubprocessError
 from typing import Any, Dict, Mapping, List, Optional
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore
-
 
 def get_config() -> Dict[str, str]:
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib  # type: ignore
+
     with open("pyproject.toml", "rb") as fp:
         pyproject_toml = tomllib.load(fp)
     return pyproject_toml.get("tool", {}).get("maturin", {})

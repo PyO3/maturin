@@ -386,6 +386,14 @@ jobs:\n",
             }
             if is_abi3 {
                 // build free-threaded wheel for python3.13t
+                if matches!(platform, Platform::Windows) {
+                    conf.push_str(
+                        "      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.13t\n",
+                    );
+                    conf.push_str("          architecture: ${{ matrix.platform.target }}\n");
+                }
                 conf.push_str(&format!(
                     "      - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
@@ -1002,6 +1010,10 @@ mod tests {
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.13t
+                      architecture: ${{ matrix.platform.target }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1214,6 +1226,10 @@ mod tests {
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+                  - uses: actions/setup-python@v5
+                    with:
+                      python-version: 3.13t
+                      architecture: ${{ matrix.platform.target }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:

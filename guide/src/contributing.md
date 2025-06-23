@@ -100,3 +100,23 @@ There are some optional hacks that can speed up the tests (over 80s to 17s on my
 1. By running `cargo build --release --manifest-path test-crates/cargo-mock/Cargo.toml` you can activate a cargo cache avoiding to rebuild the pyo3 test crates with every python version.
 2. Delete `target/test-cache` to clear the cache (e.g. after changing a test crate) or remove `test-crates/cargo-mock/target/release/cargo` to deactivate it.
 3. By running the tests with the `faster-tests` feature, binaries are stripped and wheels are only stored and not compressed.
+
+## Releasing
+
+_These instructions are a work in progress_
+
+Update the changelog:
+
+```
+git cliff -u --prepend Changelog.md
+```
+
+Update the version in `Cargo.toml` and run:
+
+```
+cargo check
+```
+
+Create a PR a release PR.
+
+After the release PR merged, update main, create a git tag and push the tag.

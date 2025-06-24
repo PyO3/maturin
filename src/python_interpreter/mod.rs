@@ -455,7 +455,31 @@ fn fun_with_abiflags(
             Ok(abiflags.to_string())
         }
     } else {
-        bail!("A python 3 interpreter on Linux or macOS must define abiflags in its sysconfig ಠ_ಠ")
+        // Check if this might be a Windows Python that wasn't detected correctly
+        if matches!(message.abiflags.as_deref(), Some("") | None) && target.get_python_os() == "windows" {
+            // Handle as Windows Python
+            if message.minor <= 7 {
+                Ok("m".to_string())
+            } else if message.gil_disabled {
+                ensure!(
+                    message.minor >= 13,
+                    "gil_disabled is only available in python 3.13+ ಠ_ಠ"
+                );
+                Ok("t".to_string())
+            } else {
+                Ok("".to_string())
+            }
+        } else {
+            // Provide more context in the error message
+            bail!(
+                "A python 3 interpreter on {} must define abiflags in its sysconfig. \
+                 (detected system: '{}', target: '{:?}', abiflags: {:?}) ಠ_ಠ",
+                if message.system == "windows" { "Windows" } else { "Linux or macOS" },
+                message.system,
+                target,
+                message.abiflags
+            )
+        }
     }
 }
 

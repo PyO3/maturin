@@ -2,6 +2,7 @@ use crate::PyProjectToml;
 use anyhow::{bail, format_err, Context, Result};
 use fs_err as fs;
 use indexmap::IndexMap;
+use normpath::PathExt;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::{
     ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
@@ -199,6 +200,22 @@ impl Metadata24 {
                 None => {}
             }
 
+            // Make sure existing license files from `Cargo.toml` are relative to the project root
+            let license_files = std::mem::take(&mut self.license_files);
+            for license_file in license_files {
+                let license_path = license_file
+                    .strip_prefix(pyproject_dir)
+                    .with_context(|| {
+                        format!(
+                            "license file `{}` exists outside of the project root `{}`",
+                            license_file.display(),
+                            pyproject_dir.display()
+                        )
+                    })?
+                    .to_path_buf();
+                self.license_files.push(license_path);
+            }
+
             if let Some(requires_python) = &project.requires_python {
                 self.requires_python = Some(requires_python.clone());
             }
@@ -260,7 +277,7 @@ impl Metadata24 {
                         // if the pyproject.toml specified the license file,
                         // then we won't list it as automatically included
                         if !self.license_files.contains(&license_path) {
-                            eprintln!("📦 Including license file \"{}\"", license_path.display());
+                            eprintln!("📦 Including license file `{}`", license_path.display());
                             self.license_files.push(license_path);
                         }
                     }
@@ -428,7 +445,14 @@ impl Metadata24 {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
         let license_files = if let Some(license_file) = package.license_file.as_ref() {
-            vec![manifest_path.as_ref().join(license_file)]
+            let license_path = manifest_path.as_ref().join(license_file).normalize()?;
+            if !license_path.is_file() {
+                bail!(
+                    "license file `{license_file}` specified in `{}` is not a file",
+                    manifest_path.as_ref().display()
+                );
+            }
+            vec![license_path.into_path_buf()]
         } else {
             Vec::new()
         };

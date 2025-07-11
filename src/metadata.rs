@@ -1041,14 +1041,6 @@ A test project
             .merge_pyproject_toml(crate_path, &pyproject_toml)
             .unwrap();
 
-        // These fields should NOT be set because they are not in dynamic list
-        // But currently they are set (this is the bug)
-        eprintln!("Summary: {:?}", metadata.summary);
-        eprintln!("Author: {:?}", metadata.author);
-        eprintln!("Keywords: {:?}", metadata.keywords);
-        eprintln!("Project URLs: {:?}", metadata.project_url);
-
-        // This is what we expect after the fix:
         // Currently these assertions will fail, proving the bug exists
         assert_eq!(
             metadata.summary, None,

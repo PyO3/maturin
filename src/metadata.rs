@@ -986,7 +986,7 @@ A test project
     }
 
     #[test]
-    fn test_issue_2544_respect_pyproject_dynamic() {
+    fn test_issue_2544_respect_pyproject_dynamic_without_dynamic_fields() {
         let temp_dir = TempDir::new().unwrap();
         let crate_path = temp_dir.path();
         let manifest_path = crate_path.join("Cargo.toml");
@@ -1041,7 +1041,6 @@ A test project
             .merge_pyproject_toml(crate_path, &pyproject_toml)
             .unwrap();
 
-        // Currently these assertions will fail, proving the bug exists
         assert_eq!(
             metadata.summary, None,
             "summary should be None when not in dynamic list"

@@ -25,7 +25,7 @@ use tracing::{debug, trace};
 /// foo = { path = "path/to/foo" }
 /// ```
 #[derive(Debug, Clone)]
-struct PathDependency {
+pub struct PathDependency {
     /// `Cargo.toml` path of the path dependency
     manifest_path: PathBuf,
     /// workspace root of the path dependency
@@ -370,8 +370,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                     .exec()
                     .with_context(|| {
                         format!(
-                            "Failed to resolve workspace root for {} at '{}'",
-                            dep_id, dep_manifest_path
+                            "Failed to resolve workspace root for {dep_id} at '{dep_manifest_path}'"
                         )
                     })?;
 
@@ -481,7 +480,7 @@ fn add_cargo_package_files_to_sdist(
             name,
             path_dep,
         )
-        .with_context(|| format!("Failed to add path dependency {}", name))?;
+        .with_context(|| format!("Failed to add path dependency {name}"))?;
     }
 
     debug!("Adding the main crate {}", manifest_path.display());

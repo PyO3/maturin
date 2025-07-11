@@ -219,7 +219,7 @@ fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) 
     handle_result(develop::test_develop(
         "test-crates/hello-world",
         None,
-        format!("develop-hello-world-{}", name).as_str(),
+        format!("develop-hello-world-{name}").as_str(),
         false,
         backend,
     ));
@@ -246,7 +246,7 @@ fn develop_pyo3_ffi_pure(#[case] backend: TestInstallBackend, #[case] name: &str
     handle_result(develop::test_develop(
         "test-crates/pyo3-ffi-pure",
         None,
-        format!("develop-pyo3-ffi-pure-{}", name).as_str(),
+        format!("develop-pyo3-ffi-pure-{name}").as_str(),
         false,
         backend,
     ));

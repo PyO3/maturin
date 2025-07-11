@@ -437,15 +437,14 @@ fn run() -> Result<()> {
             let cargo_metadata_result = cargo_metadata::MetadataCommand::new()
                 .cargo_path("cargo")
                 .manifest_path(
-                    &manifest_path
-                        .as_ref()
-                        .map(|p| p.as_path())
+                    manifest_path.as_deref()
                         .unwrap_or_else(|| std::path::Path::new("Cargo.toml")),
                 )
                 .verbose(true)
                 .exec();
 
             let has_path_deps = cargo_metadata_result
+                .ok()
                 .and_then(|metadata| find_path_deps(&metadata).ok())
                 .map(|path_deps| !path_deps.is_empty())
                 .unwrap_or(false); // If we can't get metadata, don't force all features

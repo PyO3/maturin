@@ -306,26 +306,8 @@ fn add_crate_to_source_distribution(
     Ok(())
 }
 
-/// Check if the crate has any local path dependencies
-pub fn has_path_dependencies(cargo_metadata: &Metadata) -> bool {
-    let Some(root) = cargo_metadata.root_package() else {
-        return false;
-    };
-
-    let mut stack: Vec<&cargo_metadata::Package> = vec![root];
-    while let Some(top) = stack.pop() {
-        // Check if this package has any path dependencies
-        for dependency in &top.dependencies {
-            if dependency.path.is_some() {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 /// Finds all path dependencies of the crate
-fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
+pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
     let root = cargo_metadata
         .root_package()
         .context("Expected the dependency graph to have a root package")?;
@@ -875,28 +857,5 @@ where
         Some(final_path)
     } else {
         None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::Path;
-
-    #[test]
-    fn test_has_path_dependencies() {
-        // Test with a project that has path dependencies
-        let pyo3_mixed_with_path_dep = cargo_metadata::MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/sdist_with_path_dep").join("Cargo.toml"))
-            .exec()
-            .unwrap();
-        assert!(has_path_dependencies(&pyo3_mixed_with_path_dep));
-
-        // Test with a project that has no path dependencies
-        let pyo3_pure = cargo_metadata::MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/pyo3-pure").join("Cargo.toml"))
-            .exec()
-            .unwrap();
-        assert!(!has_path_dependencies(&pyo3_pure));
     }
 }

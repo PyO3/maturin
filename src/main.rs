@@ -5,7 +5,6 @@
 
 use anyhow::{bail, Context, Result};
 use cargo_options::heading;
-use cargo_metadata;
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 #[cfg(feature = "cli-completion")]
@@ -14,7 +13,7 @@ use clap::{Parser, Subcommand};
 #[cfg(feature = "scaffolding")]
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
-    develop, has_path_dependencies, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
+    develop, find_path_deps, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
     PythonInterpreter, Target, TargetTriple,
 };
 #[cfg(feature = "schemars")]
@@ -442,7 +441,8 @@ fn run() -> Result<()> {
                 .exec();
                 
             let has_path_deps = cargo_metadata_result
-                .map(|metadata| has_path_dependencies(&metadata))
+                .and_then(|metadata| find_path_deps(&metadata).ok())
+                .map(|path_deps| !path_deps.is_empty())
                 .unwrap_or(false); // If we can't get metadata, don't force all features
             
             let build_options = BuildOptions {

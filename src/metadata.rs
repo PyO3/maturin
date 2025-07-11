@@ -681,6 +681,7 @@ mod test {
     use expect_test::{expect, Expect};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use tempfile::TempDir;
 
     fn assert_metadata_from_cargo_toml(
         readme: &str,
@@ -947,5 +948,74 @@ A test project
             let expected = format!("{expected_name} <{email}>");
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn test_issue_2544_respect_pyproject_dynamic() {
+        let temp_dir = TempDir::new().unwrap();
+        let crate_path = temp_dir.path();
+        let manifest_path = crate_path.join("Cargo.toml");
+        let pyproject_path = crate_path.join("pyproject.toml");
+
+        // Create basic src structure
+        fs::create_dir(crate_path.join("src")).unwrap();
+        fs::write(crate_path.join("src/lib.rs"), "").unwrap();
+
+        // Write Cargo.toml with metadata that should NOT be included
+        // because pyproject.toml doesn't declare them as dynamic
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            name = "test-package"
+            version = "0.1.0"
+            description = "Description from Cargo.toml - should not appear"
+            authors = ["author from cargo.toml <author@example.com>"]
+            keywords = ["cargo", "toml", "keyword"]
+            repository = "https://github.com/example/repo"
+            
+            [lib]
+            crate-type = ["cdylib"]
+            "#
+        );
+        fs::write(&manifest_path, cargo_toml).unwrap();
+
+        // Write pyproject.toml WITHOUT declaring the fields as dynamic
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "test-package"
+            version = "0.1.0"
+            # Note: no description, authors, keywords, urls in dynamic list
+            # dynamic = []  # Not specified, so defaults to empty
+            "#
+        );
+        fs::write(&pyproject_path, pyproject_toml_content).unwrap();
+
+        // Load metadata as maturin does
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(&manifest_path)
+            .exec()
+            .unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
+        let pyproject_toml = PyProjectToml::new(&pyproject_path).unwrap();
+        metadata.merge_pyproject_toml(crate_path, &pyproject_toml).unwrap();
+
+        // These fields should NOT be set because they are not in dynamic list
+        // But currently they are set (this is the bug)
+        eprintln!("Summary: {:?}", metadata.summary);
+        eprintln!("Author: {:?}", metadata.author);
+        eprintln!("Keywords: {:?}", metadata.keywords);
+        eprintln!("Project URLs: {:?}", metadata.project_url);
+
+        // This is what we expect after the fix:
+        // Currently these assertions will fail, proving the bug exists
+        assert_eq!(metadata.summary, None, "summary should be None when not in dynamic list");
+        assert_eq!(metadata.author, None, "author should be None when not in dynamic list");
+        assert_eq!(metadata.keywords, None, "keywords should be None when not in dynamic list");
+        assert!(metadata.project_url.is_empty(), "project_url should be empty when not in dynamic list");
     }
 }

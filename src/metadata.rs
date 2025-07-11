@@ -1007,7 +1007,7 @@ A test project
             authors = ["author from cargo.toml <author@example.com>"]
             keywords = ["cargo", "toml", "keyword"]
             repository = "https://github.com/example/repo"
-            
+
             [lib]
             crate-type = ["cdylib"]
             "#
@@ -1089,7 +1089,7 @@ A test project
             authors = ["author from cargo.toml <author@example.com>"]
             keywords = ["cargo", "toml", "keyword"]
             repository = "https://github.com/example/repo"
-            
+
             [lib]
             crate-type = ["cdylib"]
             "#

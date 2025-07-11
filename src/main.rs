@@ -437,7 +437,8 @@ fn run() -> Result<()> {
             let cargo_metadata_result = cargo_metadata::MetadataCommand::new()
                 .cargo_path("cargo")
                 .manifest_path(
-                    manifest_path.as_deref()
+                    manifest_path
+                        .as_deref()
                         .unwrap_or_else(|| std::path::Path::new("Cargo.toml")),
                 )
                 .verbose(true)

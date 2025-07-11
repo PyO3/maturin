@@ -13,8 +13,8 @@ use clap::{Parser, Subcommand};
 #[cfg(feature = "scaffolding")]
 use maturin::{ci::GenerateCI, init_project, new_project, GenerateProjectOptions};
 use maturin::{
-    develop, write_dist_info, BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter,
-    PythonInterpreter, Target, TargetTriple,
+    develop, find_path_deps, write_dist_info, BridgeModel, BuildOptions, CargoOptions,
+    DevelopOptions, PathWriter, PythonInterpreter, Target, TargetTriple,
 };
 #[cfg(feature = "schemars")]
 use maturin::{generate_json_schema, GenerateJsonSchemaOptions};
@@ -433,13 +433,29 @@ fn run() -> Result<()> {
             develop(develop_options, &venv_dir)?;
         }
         Command::SDist { manifest_path, out } => {
+            // Get cargo metadata to check for path dependencies
+            let cargo_metadata_result = cargo_metadata::MetadataCommand::new()
+                .cargo_path("cargo")
+                .manifest_path(
+                    manifest_path
+                        .as_deref()
+                        .unwrap_or_else(|| std::path::Path::new("Cargo.toml")),
+                )
+                .verbose(true)
+                .exec();
+
+            let has_path_deps = cargo_metadata_result
+                .ok()
+                .and_then(|metadata| find_path_deps(&metadata).ok())
+                .map(|path_deps| !path_deps.is_empty())
+                .unwrap_or(false); // If we can't get metadata, don't force all features
             let build_options = BuildOptions {
                 out,
                 cargo: CargoOptions {
                     manifest_path,
-                    // Enable all features to ensure all optional path dependencies are packaged
-                    // into source distribution
-                    all_features: true,
+                    // Only enable all features when we have local path dependencies
+                    // to ensure they are packaged into source distribution
+                    all_features: has_path_deps,
                     ..Default::default()
                 },
                 ..Default::default()

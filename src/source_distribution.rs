@@ -25,7 +25,7 @@ use tracing::{debug, trace};
 /// foo = { path = "path/to/foo" }
 /// ```
 #[derive(Debug, Clone)]
-struct PathDependency {
+pub struct PathDependency {
     /// `Cargo.toml` path of the path dependency
     manifest_path: PathBuf,
     /// workspace root of the path dependency
@@ -307,7 +307,7 @@ fn add_crate_to_source_distribution(
 }
 
 /// Finds all path dependencies of the crate
-fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
+pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
     let root = cargo_metadata
         .root_package()
         .context("Expected the dependency graph to have a root package")?;

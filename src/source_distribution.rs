@@ -370,8 +370,7 @@ fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDepen
                     .exec()
                     .with_context(|| {
                         format!(
-                            "Failed to resolve workspace root for {} at '{}'",
-                            dep_id, dep_manifest_path
+                            "Failed to resolve workspace root for {dep_id} at '{dep_manifest_path}'"
                         )
                     })?;
 
@@ -481,7 +480,7 @@ fn add_cargo_package_files_to_sdist(
             name,
             path_dep,
         )
-        .with_context(|| format!("Failed to add path dependency {}", name))?;
+        .with_context(|| format!("Failed to add path dependency {name}"))?;
     }
 
     debug!("Adding the main crate {}", manifest_path.display());

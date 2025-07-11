@@ -379,10 +379,7 @@ impl PyProjectToml {
                     if !version_specifier.contains(&self_version) {
                         eprintln!(
                             "⚠️  Warning: You specified {requires_maturin} in pyproject.toml under \
-                            `build-system.requires`, but the current {maturin} version is {version}",
-                            requires_maturin = requires_maturin,
-                            maturin = maturin,
-                            version = self_version,
+                            `build-system.requires`, but the current {maturin} version is {self_version}",
                         );
                         return false;
                     }

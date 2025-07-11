@@ -1037,7 +1037,9 @@ A test project
             .unwrap();
         let mut metadata = Metadata24::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(&pyproject_path).unwrap();
-        metadata.merge_pyproject_toml(crate_path, &pyproject_toml).unwrap();
+        metadata
+            .merge_pyproject_toml(crate_path, &pyproject_toml)
+            .unwrap();
 
         // These fields should NOT be set because they are not in dynamic list
         // But currently they are set (this is the bug)
@@ -1048,10 +1050,22 @@ A test project
 
         // This is what we expect after the fix:
         // Currently these assertions will fail, proving the bug exists
-        assert_eq!(metadata.summary, None, "summary should be None when not in dynamic list");
-        assert_eq!(metadata.author, None, "author should be None when not in dynamic list");
-        assert_eq!(metadata.keywords, None, "keywords should be None when not in dynamic list");
-        assert!(metadata.project_url.is_empty(), "project_url should be empty when not in dynamic list");
+        assert_eq!(
+            metadata.summary, None,
+            "summary should be None when not in dynamic list"
+        );
+        assert_eq!(
+            metadata.author, None,
+            "author should be None when not in dynamic list"
+        );
+        assert_eq!(
+            metadata.keywords, None,
+            "keywords should be None when not in dynamic list"
+        );
+        assert!(
+            metadata.project_url.is_empty(),
+            "project_url should be empty when not in dynamic list"
+        );
     }
 
     #[test]
@@ -1105,12 +1119,23 @@ A test project
             .unwrap();
         let mut metadata = Metadata24::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
         let pyproject_toml = PyProjectToml::new(&pyproject_path).unwrap();
-        metadata.merge_pyproject_toml(crate_path, &pyproject_toml).unwrap();
+        metadata
+            .merge_pyproject_toml(crate_path, &pyproject_toml)
+            .unwrap();
 
         // These fields SHOULD be set because they are in dynamic list
-        assert_eq!(metadata.summary, Some("Description from Cargo.toml - should appear".to_string()));
-        assert_eq!(metadata.author, Some("author from cargo.toml <author@example.com>".to_string()));
+        assert_eq!(
+            metadata.summary,
+            Some("Description from Cargo.toml - should appear".to_string())
+        );
+        assert_eq!(
+            metadata.author,
+            Some("author from cargo.toml <author@example.com>".to_string())
+        );
         assert_eq!(metadata.keywords, Some("cargo,toml,keyword".to_string()));
-        assert_eq!(metadata.project_url.get("Source Code"), Some(&"https://github.com/example/repo".to_string()));
+        assert_eq!(
+            metadata.project_url.get("Source Code"),
+            Some(&"https://github.com/example/repo".to_string())
+        );
     }
 }

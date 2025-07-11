@@ -147,6 +147,41 @@ impl Metadata24 {
                 bail!("`project.dynamic` must not specify `name` in pyproject.toml");
             }
 
+            // According to PEP 621, build backends must not add metadata fields
+            // that are not declared in the dynamic list. Clear fields from Cargo.toml
+            // that are not in the dynamic list.
+            if !dynamic.contains("description") {
+                self.summary = None;
+            }
+            if !dynamic.contains("authors") {
+                self.author = None;
+                self.author_email = None;
+            }
+            if !dynamic.contains("maintainers") {
+                self.maintainer = None;
+                self.maintainer_email = None;
+            }
+            if !dynamic.contains("keywords") {
+                self.keywords = None;
+            }
+            if !dynamic.contains("urls") {
+                self.project_url.clear();
+            }
+            if !dynamic.contains("license") {
+                self.license = None;
+                // Don't clear license_files as they may come from auto-discovery
+            }
+            if !dynamic.contains("classifiers") {
+                self.classifiers.clear();
+            }
+            if !dynamic.contains("readme") {
+                self.description = None;
+                self.description_content_type = None;
+            }
+            if !dynamic.contains("requires-python") {
+                self.requires_python = None;
+            }
+
             self.name.clone_from(&project.name);
 
             let version_ok = pyproject_toml.warn_invalid_version_info();
@@ -1017,5 +1052,65 @@ A test project
         assert_eq!(metadata.author, None, "author should be None when not in dynamic list");
         assert_eq!(metadata.keywords, None, "keywords should be None when not in dynamic list");
         assert!(metadata.project_url.is_empty(), "project_url should be empty when not in dynamic list");
+    }
+
+    #[test]
+    fn test_issue_2544_respect_pyproject_dynamic_with_dynamic_fields() {
+        let temp_dir = TempDir::new().unwrap();
+        let crate_path = temp_dir.path();
+        let manifest_path = crate_path.join("Cargo.toml");
+        let pyproject_path = crate_path.join("pyproject.toml");
+
+        // Create basic src structure
+        fs::create_dir(crate_path.join("src")).unwrap();
+        fs::write(crate_path.join("src/lib.rs"), "").unwrap();
+
+        // Write Cargo.toml with metadata
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            name = "test-package"
+            version = "0.1.0"
+            description = "Description from Cargo.toml - should appear"
+            authors = ["author from cargo.toml <author@example.com>"]
+            keywords = ["cargo", "toml", "keyword"]
+            repository = "https://github.com/example/repo"
+            
+            [lib]
+            crate-type = ["cdylib"]
+            "#
+        );
+        fs::write(&manifest_path, cargo_toml).unwrap();
+
+        // Write pyproject.toml WITH fields declared as dynamic
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "test-package"
+            version = "0.1.0"
+            # Fields declared as dynamic - should come from Cargo.toml
+            dynamic = ["description", "authors", "keywords", "urls"]
+            "#
+        );
+        fs::write(&pyproject_path, pyproject_toml_content).unwrap();
+
+        // Load metadata as maturin does
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(&manifest_path)
+            .exec()
+            .unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
+        let pyproject_toml = PyProjectToml::new(&pyproject_path).unwrap();
+        metadata.merge_pyproject_toml(crate_path, &pyproject_toml).unwrap();
+
+        // These fields SHOULD be set because they are in dynamic list
+        assert_eq!(metadata.summary, Some("Description from Cargo.toml - should appear".to_string()));
+        assert_eq!(metadata.author, Some("author from cargo.toml <author@example.com>".to_string()));
+        assert_eq!(metadata.keywords, Some("cargo,toml,keyword".to_string()));
+        assert_eq!(metadata.project_url.get("Source Code"), Some(&"https://github.com/example/repo".to_string()));
     }
 }

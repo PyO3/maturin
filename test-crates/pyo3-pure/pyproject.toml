@@ -25,6 +25,7 @@ maintainers = [
     {name = "messense", email = "messense@icloud.com"}
 ]
 license = { file = "LICENSE" }
+dynamic = ["license"]  # Allow license from Cargo.toml to be used
 
 [project.optional-dependencies]
 test = [

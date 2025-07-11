@@ -9,7 +9,7 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 requires-python = ">=3.6"
-dynamic = ["version"]
+dynamic = ["version", "description"]  # Allow description from Cargo.toml to be used
 
 [project.scripts]
 get_42 = "pyo3_mixed_py_subdir:get_42"

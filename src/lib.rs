@@ -30,7 +30,6 @@ pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{compile, BuildArtifact};
 pub use crate::compression::{CompressionMethod, CompressionOptions};
 pub use crate::develop::{develop, DevelopOptions};
-pub use crate::source_distribution::find_path_deps;
 #[cfg(feature = "schemars")]
 pub use crate::generate_json_schema::{generate_json_schema, GenerateJsonSchemaOptions, Mode};
 pub use crate::metadata::{Metadata24, WheelMetadata};
@@ -41,6 +40,7 @@ pub use crate::module_writer::{
 pub use crate::new_project::{init_project, new_project, GenerateProjectOptions};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
+pub use crate::source_distribution::find_path_deps;
 #[cfg(feature = "upload")]
 pub use crate::upload::{upload, upload_ui, PublishOpt, Registry, UploadError};
 pub use auditwheel::PlatformTag;

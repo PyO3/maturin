@@ -67,7 +67,7 @@ impl InstallBackend {
         };
         if let Some(captures) = re.expect("regex should be valid").captures(stdout) {
             Ok(semver::Version::parse(&captures[1])
-                .with_context(|| format!("failed to parse semver from {:?}", stdout))?)
+                .with_context(|| format!("failed to parse semver from {stdout:?}"))?)
         } else {
             bail!("failed to parse version from {:?}", stdout);
         }
@@ -321,7 +321,7 @@ fn install_wheel(
         );
     }
     if let Err(err) = configure_as_editable(build_context, python, install_backend) {
-        eprintln!("⚠️ Warning: failed to set package as editable: {}", err);
+        eprintln!("⚠️ Warning: failed to set package as editable: {err}");
     }
     Ok(())
 }

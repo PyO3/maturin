@@ -225,7 +225,7 @@ fn resolve_pypi_cred(
             return Ok(("__token__".to_string(), token));
         }
         Ok(None) => {}
-        Err(e) => eprintln!("⚠️ Warning: Failed to resolve PyPI token via OIDC: {}", e),
+        Err(e) => eprintln!("⚠️ Warning: Failed to resolve PyPI token via OIDC: {e}"),
     }
 
     if let Some((username, password)) =

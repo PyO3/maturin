@@ -301,23 +301,20 @@ mod package_name_validations {
         }
         if ["core", "std", "alloc", "proc_macro", "proc-macro"].contains(&name) {
             eprintln!(
-                "⚠️  Warning: the name `{}` is part of Rust's standard library\n\
+                "⚠️  Warning: the name `{name}` is part of Rust's standard library\n\
                 It is recommended to use a different name to avoid problems.",
-                name,
             );
         }
         if is_windows_reserved(name) {
             eprintln!(
-                "⚠️  Warning: the name `{}` is a reserved Windows filename\n\
+                "⚠️  Warning: the name `{name}` is a reserved Windows filename\n\
                 This package will not work on Windows platforms.",
-                name
             );
         }
         if is_non_ascii_name(name) {
             eprintln!(
-                "⚠️  Warning: the name `{}` contains non-ASCII characters\n\
+                "⚠️  Warning: the name `{name}` contains non-ASCII characters\n\
                 Non-ASCII crate names are not supported by Rust.",
-                name
             );
         }
         let name_in_lowercase = name.to_lowercase();

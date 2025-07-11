@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "license-test"
 license = { file = "LICENCE.txt" }
-dynamic = ["version"]
+dynamic = ["version", "license"]  # Allow license from Cargo.toml to be used
 
 [tool.maturin]
 bindings = "bin"

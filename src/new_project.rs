@@ -308,13 +308,13 @@ mod package_name_validations {
         if is_windows_reserved(name) {
             eprintln!(
                 "⚠️  Warning: the name `{name}` is a reserved Windows filename\n\
-                This package will not work on Windows platforms."
+                This package will not work on Windows platforms.",
             );
         }
         if is_non_ascii_name(name) {
             eprintln!(
                 "⚠️  Warning: the name `{name}` contains non-ASCII characters\n\
-                Non-ASCII crate names are not supported by Rust."
+                Non-ASCII crate names are not supported by Rust.",
             );
         }
         let name_in_lowercase = name.to_lowercase();

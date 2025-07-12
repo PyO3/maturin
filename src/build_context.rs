@@ -345,12 +345,19 @@ impl BuildContext {
                 artifact,
                 Some(musllinux[0]),
                 &self.target,
+                &self.manifest_path,
                 allow_linking_libpython,
             );
         }
 
         let tag = others.first().or_else(|| musllinux.first()).copied();
-        get_policy_and_libs(artifact, tag, &self.target, allow_linking_libpython)
+        get_policy_and_libs(
+            artifact,
+            tag,
+            &self.target,
+            &self.manifest_path,
+            allow_linking_libpython,
+        )
     }
 
     /// Add library search paths in Cargo target directory rpath when building in editable mode

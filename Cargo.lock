@@ -1484,6 +1484,7 @@ dependencies = [
  "regex",
  "rstest",
  "rustc_version",
+ "rustflags",
  "rustls",
  "rustls-pemfile",
  "rustversion",

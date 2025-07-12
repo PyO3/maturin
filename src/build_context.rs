@@ -362,7 +362,9 @@ impl BuildContext {
                     continue;
                 }
                 if let Err(err) = (|| -> Result<()> {
-                    let mut patcher = ElfPatcher::new(&artifact.path)?;
+                    let file_data =
+                        fs_err::read(&artifact.path).context("Failed to read ELF file")?;
+                    let mut patcher = ElfPatcher::new(file_data)?;
                     patcher.modify_rpath(|mut old_rpaths| {
                         for path in &artifact.linked_paths {
                             if !old_rpaths.contains(path) {
@@ -371,7 +373,7 @@ impl BuildContext {
                         }
                         old_rpaths
                     })?;
-                    patcher.save()
+                    patcher.save(&artifact.path)
                 })() {
                     eprintln!(
                         "⚠️ Warning: Failed to set rpath for {}: {}",
@@ -454,15 +456,17 @@ impl BuildContext {
             fs::set_permissions(&dest_path, perms)?;
 
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
-                let mut patcher = ElfPatcher::new(&dest_path)?;
+                let file_data = fs_err::read(&dest_path).context("Failed to read ELF file")?;
+                let mut patcher = ElfPatcher::new(file_data)?;
                 patcher.set_soname(&new_soname)?;
                 patcher.remove_rpath()?;
                 patcher.set_rpath(&libs_dir)?;
-                patcher.save()?;
+                patcher.save(&dest_path)?;
             } else {
-                let mut patcher = ElfPatcher::new(&dest_path)?;
+                let file_data = fs_err::read(&dest_path).context("Failed to read ELF file")?;
+                let mut patcher = ElfPatcher::new(file_data)?;
                 patcher.set_soname(&new_soname)?;
-                patcher.save()?;
+                patcher.save(&dest_path)?;
             }
             soname_map.insert(
                 lib.name.clone(),
@@ -483,9 +487,10 @@ impl BuildContext {
                 })
                 .collect::<Vec<_>>();
             if !replacements.is_empty() {
-                let mut patcher = ElfPatcher::new(&artifact.path)?;
+                let file_data = fs_err::read(&artifact.path).context("Failed to read ELF file")?;
+                let mut patcher = ElfPatcher::new(file_data)?;
                 patcher.replace_needed(&replacements[..])?;
-                patcher.save()?;
+                patcher.save(&artifact.path)?;
             }
         }
 
@@ -501,9 +506,10 @@ impl BuildContext {
                 }
             }
             if !replacements.is_empty() {
-                let mut patcher = ElfPatcher::new(path)?;
+                let file_data = fs_err::read(path).context("Failed to read ELF file")?;
+                let mut patcher = ElfPatcher::new(file_data)?;
                 patcher.replace_needed(&replacements[..])?;
-                patcher.save()?;
+                patcher.save(path)?;
             }
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }
@@ -531,7 +537,8 @@ impl BuildContext {
             _ => PathBuf::from(&self.module_name),
         };
         for artifact in artifacts {
-            let mut patcher = ElfPatcher::new(&artifact.path)?;
+            let file_data = fs_err::read(&artifact.path).context("Failed to read ELF file")?;
+            let mut patcher = ElfPatcher::new(file_data)?;
             patcher.modify_rpath(|mut new_rpaths| {
                 // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
                 // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
@@ -539,7 +546,7 @@ impl BuildContext {
                 new_rpaths.push(new_rpath.to_str().unwrap().to_string());
                 new_rpaths
             })?;
-            patcher.save()?;
+            patcher.save(&artifact.path)?;
         }
         Ok(())
     }

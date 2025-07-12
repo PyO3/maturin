@@ -4,10 +4,73 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 
-/// Verify arwen is available (no version requirement as it's a library)
-pub fn verify_patchelf() -> Result<()> {
-    // Since we're using arwen as a library, there's no external tool to verify
-    // This function now serves as a compatibility shim and always succeeds
+/// Efficiently get rpath, modify it with a closure, and then set the result
+pub fn modify_rpath<F>(file: impl AsRef<Path>, modifier: F) -> Result<()>
+where
+    F: FnOnce(Vec<String>) -> Vec<String>,
+{
+    let file_path = file.as_ref();
+
+    // Get the old rpath using goblin (we could parse once and use both goblin and arwen, but this is simpler)
+    let old_rpaths = get_rpath(file_path)?;
+
+    // Apply the modifier function
+    let new_rpaths = modifier(old_rpaths);
+    let new_rpath = new_rpaths.join(":");
+
+    // Set the new rpath using arwen
+    let file_data = fs_err::read(file_path).context("Failed to read ELF file")?;
+    let mut container = ElfContainer::parse(&file_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+    // First remove existing rpath
+    container
+        .remove_runpath()
+        .map_err(|e| anyhow::anyhow!("Failed to remove existing rpath: {}", e))?;
+
+    // Then set the new rpath
+    container
+        .set_runpath(&new_rpath)
+        .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
+
+    // Write the modified file back
+    fs_err::write(file_path, &container.data).context("Failed to write modified ELF file")?;
+
+    Ok(())
+}
+
+/// Set soname and rpath in a single operation
+pub fn set_soname_and_rpath<S1: AsRef<OsStr>, S2: AsRef<OsStr>>(
+    file: impl AsRef<Path>,
+    soname: &S1,
+    rpath: &S2,
+) -> Result<()> {
+    let file_path = file.as_ref();
+    let file_data = fs_err::read(file_path).context("Failed to read ELF file")?;
+
+    let mut container = ElfContainer::parse(&file_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+    // Set soname
+    let soname_str = soname.as_ref().to_string_lossy();
+    container
+        .set_soname(&soname_str)
+        .map_err(|e| anyhow::anyhow!("Failed to set soname: {}", e))?;
+
+    // Remove existing rpath
+    container
+        .remove_runpath()
+        .map_err(|e| anyhow::anyhow!("Failed to remove existing rpath: {}", e))?;
+
+    // Set new rpath
+    let rpath_str = rpath.as_ref().to_string_lossy();
+    container
+        .set_runpath(&rpath_str)
+        .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
+
+    // Write the modified file back
+    fs_err::write(file_path, &container.data).context("Failed to write modified ELF file")?;
+
     Ok(())
 }
 

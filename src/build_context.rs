@@ -367,15 +367,14 @@ impl BuildContext {
                 if artifact.linked_paths.is_empty() {
                     continue;
                 }
-                let old_rpaths = patchelf::get_rpath(&artifact.path)?;
-                let mut new_rpaths = old_rpaths.clone();
-                for path in &artifact.linked_paths {
-                    if !old_rpaths.contains(path) {
-                        new_rpaths.push(path.to_string());
+                if let Err(err) = patchelf::modify_rpath(&artifact.path, |mut old_rpaths| {
+                    for path in &artifact.linked_paths {
+                        if !old_rpaths.contains(path) {
+                            old_rpaths.push(path.to_string());
+                        }
                     }
-                }
-                let new_rpath = new_rpaths.join(":");
-                if let Err(err) = patchelf::set_rpath(&artifact.path, &new_rpath) {
+                    old_rpaths
+                }) {
                     eprintln!(
                         "⚠️ Warning: Failed to set rpath for {}: {}",
                         artifact.path.display(),
@@ -411,8 +410,6 @@ impl BuildContext {
             }
             bail!("Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries.");
         }
-
-        patchelf::verify_patchelf()?;
 
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
@@ -458,9 +455,10 @@ impl BuildContext {
             perms.set_readonly(false);
             fs::set_permissions(&dest_path, perms)?;
 
-            patchelf::set_soname(&dest_path, &new_soname)?;
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
-                patchelf::set_rpath(&dest_path, &libs_dir)?;
+                patchelf::set_soname_and_rpath(&dest_path, &new_soname, &libs_dir)?;
+            } else {
+                patchelf::set_soname(&dest_path, &new_soname)?;
             }
             soname_map.insert(
                 lib.name.clone(),
@@ -525,13 +523,13 @@ impl BuildContext {
             _ => PathBuf::from(&self.module_name),
         };
         for artifact in artifacts {
-            let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
-            // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
-            // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
-            let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
-            new_rpaths.push(new_rpath.to_str().unwrap().to_string());
-            let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&artifact.path, &new_rpath)?;
+            patchelf::modify_rpath(&artifact.path, |mut new_rpaths| {
+                // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
+                // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
+                let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
+                new_rpaths.push(new_rpath.to_str().unwrap().to_string());
+                new_rpaths
+            })?;
         }
         Ok(())
     }

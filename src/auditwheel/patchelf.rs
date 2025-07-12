@@ -1,30 +1,13 @@
 use anyhow::{bail, Context, Result};
+use arwen::elf::ElfContainer;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
-use std::process::Command;
 
-static MISSING_PATCHELF_ERROR: &str = "Failed to execute 'patchelf', did you install it? Hint: Try `pip install maturin[patchelf]` (or just `pip install patchelf`)";
-
-/// Verify patchelf version
+/// Verify arwen is available (no version requirement as it's a library)
 pub fn verify_patchelf() -> Result<()> {
-    let output = Command::new("patchelf")
-        .arg("--version")
-        .output()
-        .context(MISSING_PATCHELF_ERROR)?;
-    let version = String::from_utf8(output.stdout)
-        .context("Failed to parse patchelf version")?
-        .trim()
-        .to_string();
-    let version = version.strip_prefix("patchelf").unwrap_or(&version).trim();
-    let semver = version.parse::<semver::Version>().context(
-        "Failed to parse patchelf version, auditwheel repair requires patchelf >= 0.14.0.",
-    )?;
-    if semver < semver::Version::new(0, 14, 0) {
-        bail!(
-            "patchelf {} found. auditwheel repair requires patchelf >= 0.14.0.",
-            version
-        );
-    }
+    // Since we're using arwen as a library, there's no external tool to verify
+    // This function now serves as a compatibility shim and always succeeds
     Ok(())
 }
 
@@ -33,64 +16,89 @@ pub fn replace_needed<O: AsRef<OsStr>, N: AsRef<OsStr>>(
     file: impl AsRef<Path>,
     old_new_pairs: &[(O, N)],
 ) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
+    let file_path = file.as_ref();
+    let file_data = fs_err::read(file_path).context("Failed to read ELF file")?;
+
+    let mut container = ElfContainer::parse(&file_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+    // Convert old_new_pairs to HashMap<String, String> as expected by arwen
+    let mut replacements = HashMap::new();
     for (old, new) in old_new_pairs {
-        cmd.arg("--replace-needed").arg(old).arg(new);
+        let old_str = old.as_ref().to_string_lossy().to_string();
+        let new_str = new.as_ref().to_string_lossy().to_string();
+        replacements.insert(old_str, new_str);
     }
-    cmd.arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --replace-needed failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+
+    container
+        .replace_needed(&replacements)
+        .map_err(|e| anyhow::anyhow!("Failed to replace needed libraries: {}", e))?;
+
+    // Write the modified file back
+    fs_err::write(file_path, &container.data).context("Failed to write modified ELF file")?;
+
     Ok(())
 }
 
 /// Change `SONAME` of a dynamic library
 pub fn set_soname<S: AsRef<OsStr>>(file: impl AsRef<Path>, soname: &S) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--set-soname").arg(soname).arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --set-soname failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let file_path = file.as_ref();
+    let file_data = fs_err::read(file_path).context("Failed to read ELF file")?;
+
+    let mut container = ElfContainer::parse(&file_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+    let soname_str = soname.as_ref().to_string_lossy();
+    container
+        .set_soname(&soname_str)
+        .map_err(|e| anyhow::anyhow!("Failed to set soname: {}", e))?;
+
+    // Write the modified file back
+    fs_err::write(file_path, &container.data).context("Failed to write modified ELF file")?;
+
     Ok(())
 }
 
 /// Remove a `RPATH` from executables and libraries
 pub fn remove_rpath(file: impl AsRef<Path>) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--remove-rpath").arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --remove-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let file_path = file.as_ref();
+    let file_data = fs_err::read(file_path).context("Failed to read ELF file")?;
+
+    let mut container = ElfContainer::parse(&file_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+    container
+        .remove_runpath()
+        .map_err(|e| anyhow::anyhow!("Failed to remove rpath: {}", e))?;
+
+    // Write the modified file back
+    fs_err::write(file_path, &container.data).context("Failed to write modified ELF file")?;
+
     Ok(())
 }
 
 /// Change the `RPATH` of executables and libraries
 pub fn set_rpath<S: AsRef<OsStr>>(file: impl AsRef<Path>, rpath: &S) -> Result<()> {
-    remove_rpath(&file)?;
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--force-rpath")
-        .arg("--set-rpath")
-        .arg(rpath)
-        .arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --set-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let file_path = file.as_ref();
+    let file_data = fs_err::read(file_path).context("Failed to read ELF file")?;
+
+    let mut container = ElfContainer::parse(&file_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+    // First remove existing rpath
+    container
+        .remove_runpath()
+        .map_err(|e| anyhow::anyhow!("Failed to remove existing rpath: {}", e))?;
+
+    // Then set the new rpath
+    let rpath_str = rpath.as_ref().to_string_lossy();
+    container
+        .set_runpath(&rpath_str)
+        .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
+
+    // Write the modified file back
+    fs_err::write(file_path, &container.data).context("Failed to write modified ELF file")?;
+
     Ok(())
 }
 

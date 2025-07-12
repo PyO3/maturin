@@ -12,7 +12,7 @@ pub struct ElfPatcher {
 }
 
 impl ElfPatcher {
-    /// Create a new ElfPatcher by reading the ELF file
+    /// Create a new ElfPatcher by reading and parsing the ELF file
     pub fn new(file: impl AsRef<Path>) -> Result<Self> {
         let file_path = file.as_ref().to_path_buf();
         let file_data = fs_err::read(&file_path).context("Failed to read ELF file")?;
@@ -125,53 +125,6 @@ impl ElfPatcher {
     pub fn save(&self) -> Result<()> {
         fs_err::write(&self.file_path, &self.file_data).context("Failed to write modified ELF file")
     }
-}
-
-/// Efficiently get rpath, modify it with a closure, and then set the result
-pub fn modify_rpath<F>(file: impl AsRef<Path>, modifier: F) -> Result<()>
-where
-    F: FnOnce(Vec<String>) -> Vec<String>,
-{
-    ElfPatcher::new(file)?.modify_rpath(modifier)?.save()
-}
-
-/// Set soname and rpath in a single operation
-pub fn set_soname_and_rpath<S1: AsRef<OsStr>, S2: AsRef<OsStr>>(
-    file: impl AsRef<Path>,
-    soname: &S1,
-    rpath: &S2,
-) -> Result<()> {
-    ElfPatcher::new(file)?
-        .set_soname(soname)?
-        .remove_rpath()?
-        .set_rpath(rpath)?
-        .save()
-}
-
-/// Replace a declared dependency on a dynamic library with another one (`DT_NEEDED`)
-pub fn replace_needed<O: AsRef<OsStr>, N: AsRef<OsStr>>(
-    file: impl AsRef<Path>,
-    old_new_pairs: &[(O, N)],
-) -> Result<()> {
-    ElfPatcher::new(file)?.replace_needed(old_new_pairs)?.save()
-}
-
-/// Change `SONAME` of a dynamic library
-pub fn set_soname<S: AsRef<OsStr>>(file: impl AsRef<Path>, soname: &S) -> Result<()> {
-    ElfPatcher::new(file)?.set_soname(soname)?.save()
-}
-
-/// Remove a `RPATH` from executables and libraries
-pub fn remove_rpath(file: impl AsRef<Path>) -> Result<()> {
-    ElfPatcher::new(file)?.remove_rpath()?.save()
-}
-
-/// Change the `RPATH` of executables and libraries
-pub fn set_rpath<S: AsRef<OsStr>>(file: impl AsRef<Path>, rpath: &S) -> Result<()> {
-    ElfPatcher::new(file)?
-        .remove_rpath()?
-        .set_rpath(rpath)?
-        .save()
 }
 
 /// Get the `RPATH` of executables and libraries

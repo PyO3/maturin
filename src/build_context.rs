@@ -1,4 +1,5 @@
-use crate::auditwheel::{get_policy_and_libs, patchelf, relpath, AuditWheelMode};
+use crate::auditwheel::patchelf::ElfPatcher;
+use crate::auditwheel::{get_policy_and_libs, relpath, AuditWheelMode};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
@@ -367,14 +368,18 @@ impl BuildContext {
                 if artifact.linked_paths.is_empty() {
                     continue;
                 }
-                if let Err(err) = patchelf::modify_rpath(&artifact.path, |mut old_rpaths| {
-                    for path in &artifact.linked_paths {
-                        if !old_rpaths.contains(path) {
-                            old_rpaths.push(path.to_string());
+                if let Err(err) = (|| -> Result<()> {
+                    let mut patcher = ElfPatcher::new(&artifact.path)?;
+                    patcher.modify_rpath(|mut old_rpaths| {
+                        for path in &artifact.linked_paths {
+                            if !old_rpaths.contains(path) {
+                                old_rpaths.push(path.to_string());
+                            }
                         }
-                    }
-                    old_rpaths
-                }) {
+                        old_rpaths
+                    })?;
+                    patcher.save()
+                })() {
                     eprintln!(
                         "⚠️ Warning: Failed to set rpath for {}: {}",
                         artifact.path.display(),
@@ -456,9 +461,15 @@ impl BuildContext {
             fs::set_permissions(&dest_path, perms)?;
 
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
-                patchelf::set_soname_and_rpath(&dest_path, &new_soname, &libs_dir)?;
+                let mut patcher = ElfPatcher::new(&dest_path)?;
+                patcher.set_soname(&new_soname)?;
+                patcher.remove_rpath()?;
+                patcher.set_rpath(&libs_dir)?;
+                patcher.save()?;
             } else {
-                patchelf::set_soname(&dest_path, &new_soname)?;
+                let mut patcher = ElfPatcher::new(&dest_path)?;
+                patcher.set_soname(&new_soname)?;
+                patcher.save()?;
             }
             soname_map.insert(
                 lib.name.clone(),
@@ -479,7 +490,9 @@ impl BuildContext {
                 })
                 .collect::<Vec<_>>();
             if !replacements.is_empty() {
-                patchelf::replace_needed(&artifact.path, &replacements[..])?;
+                let mut patcher = ElfPatcher::new(&artifact.path)?;
+                patcher.replace_needed(&replacements[..])?;
+                patcher.save()?;
             }
         }
 
@@ -495,7 +508,9 @@ impl BuildContext {
                 }
             }
             if !replacements.is_empty() {
-                patchelf::replace_needed(path, &replacements[..])?;
+                let mut patcher = ElfPatcher::new(path)?;
+                patcher.replace_needed(&replacements[..])?;
+                patcher.save()?;
             }
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }
@@ -523,13 +538,15 @@ impl BuildContext {
             _ => PathBuf::from(&self.module_name),
         };
         for artifact in artifacts {
-            patchelf::modify_rpath(&artifact.path, |mut new_rpaths| {
+            let mut patcher = ElfPatcher::new(&artifact.path)?;
+            patcher.modify_rpath(|mut new_rpaths| {
                 // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
                 // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
                 let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
                 new_rpaths.push(new_rpath.to_str().unwrap().to_string());
                 new_rpaths
             })?;
+            patcher.save()?;
         }
         Ok(())
     }

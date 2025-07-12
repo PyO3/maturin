@@ -89,6 +89,7 @@ same-file = "1.0.6"
 time = "0.3.17"
 url = "2.5.0"
 unicode-xid = { version = "0.2.4", optional = true }
+arwen = "0.0.2"
 
 # cli
 clap = { version = "4.0.0", features = [

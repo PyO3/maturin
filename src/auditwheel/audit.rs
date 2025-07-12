@@ -280,7 +280,7 @@ fn get_default_platform_policies() -> Vec<Policy> {
 /// manylinux/musllinux compliance.
 ///
 /// If `platform_tag`, is None, it returns the the highest matching manylinux/musllinux policy
-/// and whether we need to repair with patchelf,, or `linux` if nothing else matches.
+/// and whether we need to repair with arwen, or `linux` if nothing else matches.
 /// It will error for bogus cases, e.g. if libpython is linked.
 ///
 /// If a specific manylinux/musllinux version is given, compliance is checked and a warning printed if

@@ -16,8 +16,7 @@ If you are publishing to PyPI, you can use `--compatibility pypi` to allow only 
 maturin can check the generated library for manylinux compliance (an auditwheel reimplementation) and gives the wheel the proper platform tag.
 
 - If your system's glibc is too new, it will assign the `linux` tag.
-- If you link other shared libraries, maturin will try to bundle them within the wheel, note that this requires [patchelf](https://github.com/NixOS/patchelf),
-  which can be installed along with maturin from PyPI: `pip install maturin[patchelf]`.
+- If you link other shared libraries, maturin will try to bundle them within the wheel.
 
 You can also manually disable those checks and directly use native linux target with `--manylinux off`.
 

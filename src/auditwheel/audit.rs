@@ -9,7 +9,7 @@ use goblin::elf::{sym::STT_FUNC, Elf};
 use lddtree::Library;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustflags::{from_encoded, Flag};
+use rustflags;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
@@ -529,8 +529,8 @@ fn extract_rustflags_library_paths(manifest_path: &Path, target: &Target) -> Opt
     let encoded = rustflags.encode().ok()?;
 
     let mut library_paths = Vec::new();
-    for flag in from_encoded(encoded.as_ref()) {
-        if let Flag::LibrarySearchPath { kind: _, path } = flag {
+    for flag in rustflags::from_encoded(encoded.as_ref()) {
+        if let rustflags::Flag::LibrarySearchPath { kind: _, path } = flag {
             library_paths.push(path);
         }
     }

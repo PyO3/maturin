@@ -433,6 +433,21 @@ impl BuildContext {
             bail!("Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries.");
         }
 
+        // Cache for file data to avoid reading the same files multiple times
+        let mut file_cache: HashMap<PathBuf, Vec<u8>> = HashMap::new();
+
+        // Helper function to get cached file data
+        let get_file_data =
+            |cache: &mut HashMap<PathBuf, Vec<u8>>, path: &Path| -> Result<Vec<u8>> {
+                if let Some(cached_data) = cache.get(path) {
+                    Ok(cached_data.clone())
+                } else {
+                    let data = fs::read(path)?;
+                    cache.insert(path.to_path_buf(), data.clone());
+                    Ok(data)
+                }
+            };
+
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
         let mut libs_dir = self
@@ -477,12 +492,12 @@ impl BuildContext {
             perms.set_readonly(false);
             fs::set_permissions(&dest_path, perms)?;
 
-            if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
-                // Read file and parse ELF container once
-                let file_data = fs::read(&dest_path)?;
-                let mut container = ElfContainer::parse(&file_data)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+            // Get cached file data and create ELF container for this library
+            let file_data = get_file_data(&mut file_cache, &dest_path)?;
+            let mut container = ElfContainer::parse(&file_data)
+                .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
 
+            if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
                 // Apply changes
                 container
                     .set_soname(&new_soname)
@@ -494,23 +509,16 @@ impl BuildContext {
                 container
                     .set_runpath(&libs_dir_str)
                     .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
-
-                // Write back to file
-                fs::write(&dest_path, &container.data)?;
             } else {
-                // Read file and parse ELF container once
-                let file_data = fs::read(&dest_path)?;
-                let mut container = ElfContainer::parse(&file_data)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
-
                 // Apply changes
                 container
                     .set_soname(&new_soname)
                     .map_err(|e| anyhow::anyhow!("Failed to set soname: {}", e))?;
-
-                // Write back to file
-                fs::write(&dest_path, &container.data)?;
             }
+
+            // Write back to file and update cache
+            fs::write(&dest_path, &container.data)?;
+            file_cache.insert(dest_path.clone(), container.data.clone());
             soname_map.insert(
                 lib.name.clone(),
                 (new_soname.clone(), dest_path.clone(), lib.needed.clone()),
@@ -530,8 +538,8 @@ impl BuildContext {
                 })
                 .collect::<Vec<_>>();
             if !replacements.is_empty() {
-                // Read file and parse ELF container once
-                let file_data = fs::read(&artifact.path)?;
+                // Get cached file data and create ELF container for this artifact
+                let file_data = get_file_data(&mut file_cache, &artifact.path)?;
                 let mut container = ElfContainer::parse(&file_data)
                     .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
 
@@ -546,8 +554,9 @@ impl BuildContext {
                     .replace_needed(&replacement_map)
                     .map_err(|e| anyhow::anyhow!("Failed to replace needed libraries: {}", e))?;
 
-                // Write back to file
+                // Write back to file and update cache
                 fs::write(&artifact.path, &container.data)?;
+                file_cache.insert(artifact.path.clone(), container.data.clone());
             }
         }
 
@@ -563,8 +572,8 @@ impl BuildContext {
                 }
             }
             if !replacements.is_empty() {
-                // Read file and parse ELF container once
-                let file_data = fs::read(path)?;
+                // Get cached file data and create ELF container for this library file
+                let file_data = get_file_data(&mut file_cache, path)?;
                 let mut container = ElfContainer::parse(&file_data)
                     .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
 
@@ -579,8 +588,9 @@ impl BuildContext {
                     .replace_needed(&replacement_map)
                     .map_err(|e| anyhow::anyhow!("Failed to replace needed libraries: {}", e))?;
 
-                // Write back to file
+                // Write back to file and update cache
                 fs::write(path, &container.data)?;
+                file_cache.insert(path.to_path_buf(), container.data.clone());
             }
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }
@@ -608,8 +618,8 @@ impl BuildContext {
             _ => PathBuf::from(&self.module_name),
         };
         for artifact in artifacts {
-            // Read file and parse ELF container once
-            let file_data = fs::read(&artifact.path)?;
+            // Get cached file data and create ELF container for this artifact
+            let file_data = get_file_data(&mut file_cache, &artifact.path)?;
             let mut container = ElfContainer::parse(&file_data)
                 .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
 
@@ -630,8 +640,9 @@ impl BuildContext {
                 .set_runpath(&new_rpath_str)
                 .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
 
-            // Write back to file
+            // Write back to file and update cache
             fs::write(&artifact.path, &container.data)?;
+            file_cache.insert(artifact.path.clone(), container.data.clone());
         }
         Ok(())
     }

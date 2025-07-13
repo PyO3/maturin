@@ -9,7 +9,6 @@ use goblin::elf::{sym::STT_FUNC, Elf};
 use lddtree::Library;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustflags;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Read;

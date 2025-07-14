@@ -387,11 +387,81 @@ impl BuildContext {
         Ok(())
     }
 
+    /// Prepare modified artifacts when external libs are present
+    /// Returns a map from original artifact paths to modified artifact paths and the temp directory
+    fn prepare_modified_artifacts(
+        &self,
+        artifacts: &[&BuildArtifact],
+        ext_libs: &[Vec<Library>],
+    ) -> Result<(std::collections::HashMap<PathBuf, PathBuf>, Option<tempfile::TempDir>)> {
+        use std::collections::{BTreeMap, HashSet};
+        
+        if self.editable || ext_libs.iter().all(|libs| libs.is_empty()) {
+            return Ok((std::collections::HashMap::new(), None));
+        }
+
+        patchelf::verify_patchelf()?;
+
+        let temp_dir = tempfile::tempdir()?;
+        let mut soname_map = BTreeMap::new();
+        for lib in ext_libs.iter().flatten() {
+            let lib_path = lib.realpath.clone().with_context(|| {
+                format!(
+                    "Cannot repair wheel, because required library {} could not be located.",
+                    lib.path.display()
+                )
+            })?;
+            // Generate a new soname with a short hash
+            let short_hash = &hash_file(&lib_path)?[..8];
+            let (file_stem, file_ext) = lib.name.split_once('.').unwrap();
+            let new_soname = if !file_stem.ends_with(&format!("-{short_hash}")) {
+                format!("{file_stem}-{short_hash}.{file_ext}")
+            } else {
+                format!("{file_stem}.{file_ext}")
+            };
+
+            soname_map.insert(
+                lib.name.clone(),
+                new_soname.clone(),
+            );
+        }
+
+        // Create modified copies of artifacts that need modification
+        let mut modified_artifacts = std::collections::HashMap::new();
+        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+            let artifact_deps: HashSet<_> = artifact_ext_libs.iter().map(|lib| &lib.name).collect();
+            let replacements = soname_map
+                .iter()
+                .filter_map(|(k, v)| {
+                    if artifact_deps.contains(k) {
+                        Some((k, v.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            
+            if !replacements.is_empty() {
+                // Create a copy of the artifact in the temp directory
+                let artifact_name = artifact.path.file_name().unwrap();
+                let temp_artifact_path = temp_dir.path().join(artifact_name);
+                fs::copy(&artifact.path, &temp_artifact_path)?;
+                
+                // Modify the copy, not the original
+                patchelf::replace_needed(&temp_artifact_path, &replacements[..])?;
+                modified_artifacts.insert(artifact.path.clone(), temp_artifact_path);
+            }
+        }
+
+        Ok((modified_artifacts, Some(temp_dir)))
+    }
+
     fn add_external_libs(
         &self,
         writer: &mut WheelWriter,
         artifacts: &[&BuildArtifact],
         ext_libs: &[Vec<Library>],
+        modified_artifact_paths: &std::collections::HashMap<PathBuf, PathBuf>,
     ) -> Result<()> {
         if self.editable {
             return self.add_rpath(artifacts);
@@ -468,20 +538,34 @@ impl BuildContext {
             );
         }
 
-        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
-            let artifact_deps: HashSet<_> = artifact_ext_libs.iter().map(|lib| &lib.name).collect();
-            let replacements = soname_map
-                .iter()
-                .filter_map(|(k, v)| {
-                    if artifact_deps.contains(k) {
-                        Some((k, v.0.clone()))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            if !replacements.is_empty() {
-                patchelf::replace_needed(&artifact.path, &replacements[..])?;
+        // Create modified copies of artifacts instead of modifying the originals
+        // NOTE: For bin bindings, this is now handled in prepare_modified_artifacts
+        // This code path is primarily for extension modules
+        let mut modified_artifacts = Vec::new();
+        if !self.bridge().is_bin() {
+            for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+                let artifact_deps: HashSet<_> = artifact_ext_libs.iter().map(|lib| &lib.name).collect();
+                let replacements = soname_map
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        if artifact_deps.contains(k) {
+                            Some((k, v.0.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                
+                if !replacements.is_empty() {
+                    // Create a copy of the artifact in the temp directory
+                    let artifact_name = artifact.path.file_name().unwrap();
+                    let temp_artifact_path = temp_dir.path().join(artifact_name);
+                    fs::copy(&artifact.path, &temp_artifact_path)?;
+                    
+                    // Modify the copy, not the original
+                    patchelf::replace_needed(&temp_artifact_path, &replacements[..])?;
+                    modified_artifacts.push((artifact, temp_artifact_path));
+                }
             }
         }
 
@@ -524,14 +608,27 @@ impl BuildContext {
             // For other bindings artifact .so file usually resides at ${module_name}/${module_name}.so
             _ => PathBuf::from(&self.module_name),
         };
+        
+        // Build a map of modified artifacts for rpath updates
+        let modified_artifact_map: std::collections::HashMap<_, _> = modified_artifact_paths
+            .iter()
+            .map(|(orig, modified)| (orig.as_path(), modified.as_path()))
+            .collect();
+        
         for artifact in artifacts {
-            let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
+            // Use the modified artifact path if it exists, otherwise use the original
+            let artifact_path = modified_artifact_map
+                .get(artifact.path.as_path())
+                .copied()
+                .unwrap_or(&artifact.path);
+                
+            let mut new_rpaths = patchelf::get_rpath(artifact_path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
             let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&artifact.path, &new_rpath)?;
+            patchelf::set_rpath(artifact_path, &new_rpath)?;
         }
         Ok(())
     }
@@ -728,7 +825,7 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             self.compression,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs], &std::collections::HashMap::new())?;
 
         write_bindings_module(
             &mut writer,
@@ -807,7 +904,7 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             self.compression,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs], &std::collections::HashMap::new())?;
 
         write_bindings_module(
             &mut writer,
@@ -931,7 +1028,7 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             self.compression,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs], &std::collections::HashMap::new())?;
 
         write_cffi_module(
             &mut writer,
@@ -1004,7 +1101,7 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             self.compression,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs], &std::collections::HashMap::new())?;
 
         write_uniffi_module(
             &mut writer,
@@ -1120,14 +1217,32 @@ impl BuildContext {
         }
 
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());
-        for (artifact, bin_name) in &artifacts_and_files {
+        for (artifact, _bin_name) in &artifacts_and_files {
             artifacts_ref.push(*artifact);
-            write_bin(&mut writer, &artifact.path, &self.metadata24, bin_name)?;
+        }
+        
+        // If we have external libs, create modified artifacts first
+        let mut modified_artifact_paths = std::collections::HashMap::new();
+        let _temp_dir; // Keep temp dir alive
+        if !ext_libs.iter().all(|libs| libs.is_empty()) && !matches!(self.auditwheel, AuditWheelMode::Skip) {
+            // Pre-process external libs to create modified artifacts
+            let (paths, temp_dir) = self.prepare_modified_artifacts(&artifacts_ref, ext_libs)?;
+            modified_artifact_paths = paths;
+            _temp_dir = temp_dir;
+        }
+        
+        for (artifact, bin_name) in &artifacts_and_files {
+            // Use modified artifact path if available, otherwise use original
+            let artifact_path = modified_artifact_paths
+                .get(&artifact.path)
+                .unwrap_or(&artifact.path);
+            
+            write_bin(&mut writer, artifact_path, &self.metadata24, bin_name)?;
             if self.target.is_wasi() {
                 write_wasm_launcher(&mut writer, &self.metadata24, bin_name)?;
             }
         }
-        self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;
+        self.add_external_libs(&mut writer, &artifacts_ref, ext_libs, &modified_artifact_paths)?;
 
         self.add_pth(&mut writer)?;
         add_data(

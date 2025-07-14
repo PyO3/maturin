@@ -68,5 +68,7 @@ pub mod pyproject_toml;
 mod python_interpreter;
 mod source_distribution;
 mod target;
+#[cfg(test)]
+mod test_external_libs;
 #[cfg(feature = "upload")]
 mod upload;

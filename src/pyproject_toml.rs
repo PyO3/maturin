@@ -681,7 +681,7 @@ mod tests {
     fn test_gh_1615() {
         let source = indoc!(
             r#"[build-system]
-            requires = [ "maturin>=0.14", "numpy", "wheel", "patchelf",]
+            requires = [ "maturin>=0.14", "numpy", "wheel",]
             build-backend = "maturin"
 
             [project]

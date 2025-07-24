@@ -14,7 +14,11 @@ description = "Build and publish crates with pyo3, cffi and uniffi bindings as w
 authors = [{ name = "konstin", email = "konstin@mailbox.org" }]
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.7"
-license = { text = "MIT OR Apache-2.0" }
+license = "MIT OR Apache-2.0"
+license-files = [
+    "license-mit",
+    "license-apache",
+]
 classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Programming Language :: Rust",

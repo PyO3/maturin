@@ -1,0 +1,6 @@
+import uniffi_export_and_udl
+
+
+def test_add():
+    struct = uniffi_export_and_udl.NumbersToAdd(numbers=[1, 2, 3])
+    assert uniffi_export_and_udl.add(struct.numbers[0], struct.numbers[1]) == 3

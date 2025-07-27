@@ -78,6 +78,7 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
 /// Validates that a wheel platform tag is allowed by PyPI.
 ///
 /// Based on PyPI warehouse platform tag validation logic.
+///
 fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     // Covers old Windows and old manylinux tags.
     if ALLOWED_PLATFORMS.contains(&platform_tag) {
@@ -96,6 +97,17 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     if let Some(captures) = LINUX_PLATFORM_RE.captures(platform_tag) {
         let libc = captures.name("libc").unwrap().as_str();
         let arch = captures.name("arch").unwrap().as_str();
+        // please see https://github.com/pypi/warehouse/pull/18390
+        if arch == "riscv64" && libc == "many" {
+            let parts: Vec<&str> = platform_tag.split('_').collect();
+            let major: u8 = parts[1].parse().expect("parse major failed");
+            let minor: u8 = parts[2].parse().expect("parse minor failed");
+            // pypi now support manylinux_2_39_riscv64
+            if major == 2 && minor >= 39 {
+                return true;
+            }
+            return false;
+        }
 
         return match libc {
             "musl" => MUSLLINUX_ARCHES.contains(&arch),
@@ -171,6 +183,7 @@ mod tests {
             ("manylinux2014_x86_64", true),
             ("manylinux_2_17_aarch64", true),
             ("manylinux_2_17_riscv64", false),
+            ("manylinux_2_39_riscv64", true),
             // musllinux platforms
             ("musllinux_1_1_x86_64", true),
             ("musllinux_1_1_riscv64", false),
@@ -222,12 +235,12 @@ mod tests {
             ("x86_64-unknown-linux-gnu", true),
             ("aarch64-linux-android", true),
             ("armv7-linux-androideabi", true),
-            ("riscv64gc-unknown-linux-gnu", false), // Unsupported
-            ("x86_64-unknown-freebsd", false),      // Now unsupported (no lazy validation)
-            ("powerpc64-unknown-linux-gnu", true),  // PPC64 on Linux is supported
-            ("s390x-unknown-linux-gnu", true),      // s390x on Linux is supported
-            ("wasm32-unknown-emscripten", false),   // Emscripten is unsupported
-            ("i686-pc-windows-msvc", true),         // i686 Windows is supported
+            ("riscv64gc-unknown-linux-gnu", true),
+            ("x86_64-unknown-freebsd", false), // Now unsupported (no lazy validation)
+            ("powerpc64-unknown-linux-gnu", true), // PPC64 on Linux is supported
+            ("s390x-unknown-linux-gnu", true), // s390x on Linux is supported
+            ("wasm32-unknown-emscripten", false), // Emscripten is unsupported
+            ("i686-pc-windows-msvc", true),    // i686 Windows is supported
         ];
 
         for (triple, expected) in targets {

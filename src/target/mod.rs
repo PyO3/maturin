@@ -483,7 +483,7 @@ impl Target {
             }
             Arch::Riscv64 => PlatformTag::Manylinux {
                 major: 2,
-                minor: 31,
+                minor: 39, // 2_39 is the minimum version supported uploaded to PyPI
             },
             Arch::LoongArch64 => PlatformTag::Manylinux {
                 major: 2,

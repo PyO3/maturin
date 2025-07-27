@@ -158,7 +158,7 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
         "--compatibility",
         "pypi",
         "--target",
-        "riscv64gc-unknown-linux-gnu", // Unsupported by PyPI
+        "riscv32gc-unknown-linux-gnu", // Unsupported by PyPI
         "--target-dir",
         "test-crates/targets/pypi_compatibility_unsupported_target",
         "--out",
@@ -178,7 +178,7 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
         let err_string = err.to_string();
         assert!(
             err_string.contains(
-                "Target riscv64gc-unknown-linux-gnu architecture is not supported by PyPI"
+                "Target riscv32gc-unknown-linux-gnu architecture is not supported by PyPI"
             ),
             "{err_string}",
         );

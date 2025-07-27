@@ -55,7 +55,7 @@ pub struct Metadata24 {
     pub maintainer: Option<String>,
     pub maintainer_email: Option<String>,
     pub license: Option<String>,
-    // https://peps.python.org/pep-0639/#license-file-multiple-use
+    pub license_expression: Option<String>,
     pub license_files: Vec<PathBuf>,
     pub classifiers: Vec<String>,
     pub requires_dist: Vec<Requirement>,
@@ -90,6 +90,7 @@ impl Metadata24 {
             maintainer: None,
             maintainer_email: None,
             license: None,
+            license_expression: None,
             license_files: vec![],
             classifiers: vec![],
             requires_dist: vec![],
@@ -257,8 +258,11 @@ impl Metadata24 {
 
             if let Some(license) = &project.license {
                 match license {
-                    // TODO: switch to License-Expression core metadata, see https://peps.python.org/pep-0639/#add-license-expression-field
-                    License::Spdx(license_expr) => self.license = Some(license_expr.clone()),
+                    // PEP 639
+                    License::Spdx(license_expr) => {
+                        self.license_expression = Some(license_expr.clone())
+                    }
+                    // Deprecated by PEP 639
                     License::File { file } => {
                         self.license_files.push(file.to_path_buf());
                     }
@@ -583,6 +587,9 @@ impl Metadata24 {
         add_option("Author-email", &self.author_email);
         add_option("Maintainer", &self.maintainer);
         add_option("Maintainer-email", &self.maintainer_email);
+        // PEP 639
+        add_option("License-Expression", &self.license_expression);
+        // Deprecated by PEP 639
         add_option("License", &self.license.as_deref().map(fold_header));
         add_option(
             "Requires-Python",
@@ -916,6 +923,23 @@ A test project
             metadata.description_content_type.unwrap(),
             "text/markdown; charset=UTF-8; variant=GFM"
         );
+    }
+
+    #[test]
+    fn test_pep639() {
+        let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(manifest_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(&manifest_dir, &cargo_metadata).unwrap();
+        let pyproject_toml = PyProjectToml::new(manifest_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&manifest_dir, &pyproject_toml)
+            .unwrap();
+
+        assert_eq!(metadata.license_expression.as_ref().unwrap(), "MIT");
+        assert_eq!(metadata.license.as_ref(), None);
     }
 
     #[test]

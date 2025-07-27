@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [1.9.2]
+
+* Fix PEP 639 implementation, use `License-Expression` over `License`.
+
 ## [1.9.1]
 
 * Fix absolute license file path from `Cargo.toml` in [#2667](https://github.com/PyO3/maturin/pull/2667)

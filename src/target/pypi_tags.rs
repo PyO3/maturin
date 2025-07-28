@@ -97,17 +97,6 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     if let Some(captures) = LINUX_PLATFORM_RE.captures(platform_tag) {
         let libc = captures.name("libc").unwrap().as_str();
         let arch = captures.name("arch").unwrap().as_str();
-        // please see https://github.com/pypi/warehouse/pull/18390
-        if arch == "riscv64" && libc == "many" {
-            let parts: Vec<&str> = platform_tag.split('_').collect();
-            let major: u8 = parts[1].parse().expect("parse major failed");
-            let minor: u8 = parts[2].parse().expect("parse minor failed");
-            // pypi now support manylinux_2_39_riscv64
-            if major == 2 && minor >= 39 {
-                return true;
-            }
-            return false;
-        }
 
         return match libc {
             "musl" => MUSLLINUX_ARCHES.contains(&arch),

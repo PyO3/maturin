@@ -425,7 +425,7 @@ jobs:
 
           # --find-interpreter
           bin/maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
-          
+
   test-bootstrap:
     name: Test Bootstrap
     runs-on: ${{ matrix.os }}

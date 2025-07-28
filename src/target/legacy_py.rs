@@ -57,7 +57,7 @@ pub(super) static IOS_ARCHES: &[&str] = &["arm64", "x86_64"];
 pub(super) static ANDROID_ARCHES: &[&str] = &["armeabi_v7a", "arm64_v8a", "x86", "x86_64"];
 
 pub(super) static MANYLINUX_ARCHES: &[&str] = &[
-    "x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x", "ppc64",
+    "x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x", "ppc64", "riscv64",
 ];
 
 pub(super) static MUSLLINUX_ARCHES: &[&str] =

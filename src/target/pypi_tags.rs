@@ -78,6 +78,7 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
 /// Validates that a wheel platform tag is allowed by PyPI.
 ///
 /// Based on PyPI warehouse platform tag validation logic.
+///
 fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     // Covers old Windows and old manylinux tags.
     if ALLOWED_PLATFORMS.contains(&platform_tag) {
@@ -170,7 +171,8 @@ mod tests {
             // manylinux platforms
             ("manylinux2014_x86_64", true),
             ("manylinux_2_17_aarch64", true),
-            ("manylinux_2_17_riscv64", false),
+            ("manylinux_2_17_riscv64", true),
+            ("manylinux_2_39_riscv64", true),
             // musllinux platforms
             ("musllinux_1_1_x86_64", true),
             ("musllinux_1_1_riscv64", false),
@@ -222,12 +224,12 @@ mod tests {
             ("x86_64-unknown-linux-gnu", true),
             ("aarch64-linux-android", true),
             ("armv7-linux-androideabi", true),
-            ("riscv64gc-unknown-linux-gnu", false), // Unsupported
-            ("x86_64-unknown-freebsd", false),      // Now unsupported (no lazy validation)
-            ("powerpc64-unknown-linux-gnu", true),  // PPC64 on Linux is supported
-            ("s390x-unknown-linux-gnu", true),      // s390x on Linux is supported
-            ("wasm32-unknown-emscripten", false),   // Emscripten is unsupported
-            ("i686-pc-windows-msvc", true),         // i686 Windows is supported
+            ("riscv64gc-unknown-linux-gnu", true),
+            ("x86_64-unknown-freebsd", false), // Now unsupported (no lazy validation)
+            ("powerpc64-unknown-linux-gnu", true), // PPC64 on Linux is supported
+            ("s390x-unknown-linux-gnu", true), // s390x on Linux is supported
+            ("wasm32-unknown-emscripten", false), // Emscripten is unsupported
+            ("i686-pc-windows-msvc", true),    // i686 Windows is supported
         ];
 
         for (triple, expected) in targets {

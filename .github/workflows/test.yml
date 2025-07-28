@@ -389,6 +389,11 @@ jobs:
             abi: cp310-cp310
             python: python3.10
             container: ghcr.io/rust-cross/manylinux_2_36-cross:loongarch64
+          - target: riscv64gc-unknown-linux-gnu
+            abi: cp310-cp310
+            python: python3.10
+            container: ghcr.io/rust-cross/manylinux_2_39-cross:riscv64
+            extra-args: --manylinux 2_39
           # PyPy
           - target: aarch64-unknown-linux-gnu
             abi: pp310-pypy310_pp73
@@ -408,57 +413,19 @@ jobs:
         run: |
           set -ex
           # Use bundled sysconfig
-          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
 
           # Use PYO3_CROSS_LIB_DIR
           export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          bin/maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
+          bin/maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
           unset PYO3_CROSS_LIB_DIR
 
           # Test abi3
-          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml
+          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml ${{ matrix.platform.extra-args }}
 
           # --find-interpreter
-          bin/maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml
-  test-riscv64-compile:
-    name: Test Cross Compile
-    needs: build-maturin
-    runs-on: ubuntu-latest
-    container: ${{ matrix.platform.container }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: riscv64gc-unknown-linux-gnu
-            abi: cp310-cp310
-            python: python3.10
-            container: ghcr.io/rust-cross/manylinux_2_39-cross:riscv64
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: maturin-build
-          path: bin
-      - run: chmod +x bin/maturin
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
-      - name: Build wheels
-        run: |
-          set -ex
-          # Use bundled sysconfig
-          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml --manylinux 2_39
-
-          # Use PYO3_CROSS_LIB_DIR
-          export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          bin/maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml --manylinux 2_39
-          unset PYO3_CROSS_LIB_DIR
-
-          # Test abi3
-          bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-pure/Cargo.toml --manylinux 2_39
-
-          # --find-interpreter
-          bin/maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml --manylinux 2_39
+          bin/maturin build --find-interpreter --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
+          
   test-bootstrap:
     name: Test Bootstrap
     runs-on: ${{ matrix.os }}

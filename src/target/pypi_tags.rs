@@ -171,7 +171,7 @@ mod tests {
             // manylinux platforms
             ("manylinux2014_x86_64", true),
             ("manylinux_2_17_aarch64", true),
-            ("manylinux_2_17_riscv64", false),
+            ("manylinux_2_17_riscv64", true),
             ("manylinux_2_39_riscv64", true),
             // musllinux platforms
             ("musllinux_1_1_x86_64", true),

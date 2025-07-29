@@ -785,6 +785,14 @@ pub fn source_distribution(
         if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
             writer.add_file(root_dir.join(file), pyproject_dir.join(file))?;
         }
+        if let Some(license_files) = &project.license_files {
+            for license_file in license_files {
+                writer.add_file(
+                    root_dir.join(license_file),
+                    pyproject_dir.join(license_file),
+                )?;
+            }
+        }
     }
 
     let mut include = |pattern| -> Result<()> {

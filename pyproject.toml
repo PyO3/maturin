@@ -1,7 +1,7 @@
 # Workaround to bootstrap maturin on non-manylinux platforms
 [build-system]
 requires = [
-    "setuptools",
+    "setuptools>=77.0.0",
     "tomli>=1.1.0 ; python_version<'3.11'",
     "setuptools-rust>=1.11.0",
 ]

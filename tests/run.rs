@@ -648,6 +648,7 @@ fn workspace_members_non_local_dep_sdist() {
         edition = "2021"
         description = "Implements a dummy function (get_fortytwo.DummyClass.get_42()) in rust"
         license = "MIT"
+        readme = "README.md"
 
         [dependencies]
         pyo3 = { version = "0.25.0", features = [

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Fix adding `project.license-files` to source distributions.
+
 ## [1.9.2]
 
 * Fix PEP 639 implementation, use `License-Expression` over `License`.

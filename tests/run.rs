@@ -936,6 +936,30 @@ fn workspace_inheritance_sdist() {
 }
 
 #[test]
+fn workspace_license_files() {
+    handle_result(other::test_source_distribution(
+        "test-crates/hello-world",
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "hello_world-0.1.0/Cargo.lock",
+                "hello_world-0.1.0/Cargo.toml",
+                "hello_world-0.1.0/LICENSE",
+                "hello_world-0.1.0/PKG-INFO",
+                "hello_world-0.1.0/README.md",
+                "hello_world-0.1.0/check_installed/check_installed.py",
+                "hello_world-0.1.0/licenses/AUTHORS.txt",
+                "hello_world-0.1.0/pyproject.toml",
+                "hello_world-0.1.0/src/bin/foo.rs",
+                "hello_world-0.1.0/src/main.rs",
+            }
+        "#]],
+        None,
+        "sdist-hello-world",
+    ))
+}
+
+#[test]
 fn abi3_python_interpreter_args() {
     handle_result(other::abi3_python_interpreter_args());
 }

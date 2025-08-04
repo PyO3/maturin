@@ -502,17 +502,8 @@ fn add_cargo_package_files_to_sdist(
         .unwrap()
         .strip_prefix(&sdist_root)
         .unwrap();
-    add_crate_to_source_distribution(
-        writer,
-        manifest_path,
-        root_dir.join(relative_main_crate_manifest_dir),
-        None,
-        &known_path_deps,
-        true,
-        false,
-    )?;
     // Handle possible relative readme field in Cargo.toml
-    if let Some(readme) = main_crate.readme.as_ref() {
+    let readme_path = if let Some(readme) = main_crate.readme.as_ref() {
         let readme = abs_manifest_dir.join(readme);
         let abs_readme = readme
             .normalize()
@@ -531,7 +522,19 @@ fn add_cargo_package_files_to_sdist(
                 .join(readme.file_name().unwrap()),
             &abs_readme,
         )?;
-    }
+        Some(abs_readme)
+    } else {
+        None
+    };
+    add_crate_to_source_distribution(
+        writer,
+        manifest_path,
+        root_dir.join(relative_main_crate_manifest_dir),
+        readme_path.as_deref(),
+        &known_path_deps,
+        true,
+        false,
+    )?;
 
     // Add Cargo.lock file and workspace Cargo.toml
     let manifest_cargo_lock_path = abs_manifest_dir.join("Cargo.lock");

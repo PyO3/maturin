@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Fix adding `project.license-files` to source distributions.
+* Fix relative Readme rewrite of the root crate in source distributions.
 
 ## [1.9.2]
 

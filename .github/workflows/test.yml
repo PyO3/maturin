@@ -392,8 +392,8 @@ jobs:
           - target: riscv64gc-unknown-linux-gnu
             abi: cp310-cp310
             python: python3.10
-            container: ghcr.io/rust-cross/manylinux_2_39-cross:riscv64
-            extra-args: --manylinux 2_39
+            container: ghcr.io/rust-cross/manylinux_2_31-cross:riscv64
+            extra-args: --manylinux 2_31
           # PyPy
           - target: aarch64-unknown-linux-gnu
             abi: pp310-pypy310_pp73

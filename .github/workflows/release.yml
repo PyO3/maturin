@@ -169,8 +169,8 @@ jobs:
             image: "manylinux_2_36-cross:loongarch64"
             compatibility: "manylinux_2_36"
           - target: "riscv64gc-unknown-linux-gnu"
-            image: "manylinux_2_39-cross:riscv64"
-            compatibility: "manylinux_2_39"
+            image: "manylinux_2_31-cross:riscv64"
+            compatibility: "manylinux_2_31"
     container:
       image: docker://ghcr.io/rust-cross/${{ matrix.platform.image }}
       env:

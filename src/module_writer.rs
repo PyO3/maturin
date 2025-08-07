@@ -243,7 +243,7 @@ pub struct WheelWriter {
     compression: CompressionOptions,
 }
 impl CompressionOptions {
-    fn get_file_options(&self) -> zip::write::FileOptions<()> {
+    fn get_file_options(&self) -> zip::write::FileOptions<'_, ()> {
         let method = if cfg!(feature = "faster-tests") {
             // Unlike users which can use the develop subcommand, the tests have to go through
             // packing a zip which pip than has to unpack. This makes this 2-3 times faster

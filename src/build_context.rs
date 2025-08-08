@@ -1,4 +1,5 @@
-use crate::auditwheel::{get_policy_and_libs, patchelf, relpath, AuditWheelMode};
+use crate::auditwheel::patchelf::get_rpath;
+use crate::auditwheel::{get_policy_and_libs, relpath, AuditWheelMode};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
@@ -17,6 +18,7 @@ use crate::{
     PyProjectToml, PythonInterpreter, Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
+use arwen::elf::ElfContainer;
 use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -27,7 +29,7 @@ use normpath::PathExt;
 use pep508_rs::Requirement;
 use platform_info::*;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -367,15 +369,34 @@ impl BuildContext {
                 if artifact.linked_paths.is_empty() {
                     continue;
                 }
-                let old_rpaths = patchelf::get_rpath(&artifact.path)?;
-                let mut new_rpaths = old_rpaths.clone();
-                for path in &artifact.linked_paths {
-                    if !old_rpaths.contains(path) {
-                        new_rpaths.push(path.to_string());
+                if let Err(err) = (|| -> Result<()> {
+                    // Read file and parse ELF container once
+                    let file_data = fs::read(&artifact.path)?;
+                    let mut container = ElfContainer::parse(&file_data)
+                        .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+                    // Get old rpath and modify it
+                    let old_rpaths = get_rpath(&artifact.path)?;
+                    let mut new_rpaths = old_rpaths;
+                    for path in &artifact.linked_paths {
+                        if !new_rpaths.contains(path) {
+                            new_rpaths.push(path.to_string());
+                        }
                     }
-                }
-                let new_rpath = new_rpaths.join(":");
-                if let Err(err) = patchelf::set_rpath(&artifact.path, &new_rpath) {
+                    let new_rpath = new_rpaths.join(":");
+
+                    // Apply changes
+                    container
+                        .remove_runpath()
+                        .map_err(|e| anyhow::anyhow!("Failed to remove existing rpath: {}", e))?;
+                    container
+                        .set_runpath(&new_rpath)
+                        .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
+
+                    // Write back to file
+                    fs::write(&artifact.path, &container.data)?;
+                    Ok(())
+                })() {
                     eprintln!(
                         "⚠️ Warning: Failed to set rpath for {}: {}",
                         artifact.path.display(),
@@ -412,7 +433,20 @@ impl BuildContext {
             bail!("Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries.");
         }
 
-        patchelf::verify_patchelf()?;
+        // Cache for file data to avoid reading the same files multiple times
+        let mut file_cache: HashMap<PathBuf, Vec<u8>> = HashMap::new();
+
+        // Helper function to get cached file data
+        let get_file_data =
+            |cache: &mut HashMap<PathBuf, Vec<u8>>, path: &Path| -> Result<Vec<u8>> {
+                if let Some(cached_data) = cache.get(path) {
+                    Ok(cached_data.clone())
+                } else {
+                    let data = fs::read(path)?;
+                    cache.insert(path.to_path_buf(), data.clone());
+                    Ok(data)
+                }
+            };
 
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
@@ -458,10 +492,33 @@ impl BuildContext {
             perms.set_readonly(false);
             fs::set_permissions(&dest_path, perms)?;
 
-            patchelf::set_soname(&dest_path, &new_soname)?;
+            // Get cached file data and create ELF container for this library
+            let file_data = get_file_data(&mut file_cache, &dest_path)?;
+            let mut container = ElfContainer::parse(&file_data)
+                .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
-                patchelf::set_rpath(&dest_path, &libs_dir)?;
+                // Apply changes
+                container
+                    .set_soname(&new_soname)
+                    .map_err(|e| anyhow::anyhow!("Failed to set soname: {}", e))?;
+                container
+                    .remove_runpath()
+                    .map_err(|e| anyhow::anyhow!("Failed to remove rpath: {}", e))?;
+                let libs_dir_str = libs_dir.to_string_lossy();
+                container
+                    .set_runpath(&libs_dir_str)
+                    .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
+            } else {
+                // Apply changes
+                container
+                    .set_soname(&new_soname)
+                    .map_err(|e| anyhow::anyhow!("Failed to set soname: {}", e))?;
             }
+
+            // Write back to file and update cache
+            fs::write(&dest_path, &container.data)?;
+            file_cache.insert(dest_path.clone(), container.data.clone());
             soname_map.insert(
                 lib.name.clone(),
                 (new_soname.clone(), dest_path.clone(), lib.needed.clone()),
@@ -481,7 +538,25 @@ impl BuildContext {
                 })
                 .collect::<Vec<_>>();
             if !replacements.is_empty() {
-                patchelf::replace_needed(&artifact.path, &replacements[..])?;
+                // Get cached file data and create ELF container for this artifact
+                let file_data = get_file_data(&mut file_cache, &artifact.path)?;
+                let mut container = ElfContainer::parse(&file_data)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+                // Convert replacements to HashMap<String, String> as expected by arwen
+                let mut replacement_map = HashMap::new();
+                for (old, new) in &replacements {
+                    replacement_map.insert((*old).clone(), new.clone());
+                }
+
+                // Apply changes
+                container
+                    .replace_needed(&replacement_map)
+                    .map_err(|e| anyhow::anyhow!("Failed to replace needed libraries: {}", e))?;
+
+                // Write back to file and update cache
+                fs::write(&artifact.path, &container.data)?;
+                file_cache.insert(artifact.path.clone(), container.data.clone());
             }
         }
 
@@ -497,7 +572,25 @@ impl BuildContext {
                 }
             }
             if !replacements.is_empty() {
-                patchelf::replace_needed(path, &replacements[..])?;
+                // Get cached file data and create ELF container for this library file
+                let file_data = get_file_data(&mut file_cache, path)?;
+                let mut container = ElfContainer::parse(&file_data)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+                // Convert replacements to HashMap<String, String> as expected by arwen
+                let mut replacement_map = HashMap::new();
+                for (old, new) in &replacements {
+                    replacement_map.insert((*old).clone(), new.clone());
+                }
+
+                // Apply changes
+                container
+                    .replace_needed(&replacement_map)
+                    .map_err(|e| anyhow::anyhow!("Failed to replace needed libraries: {}", e))?;
+
+                // Write back to file and update cache
+                fs::write(path, &container.data)?;
+                file_cache.insert(path.to_path_buf(), container.data.clone());
             }
             writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
         }
@@ -525,13 +618,31 @@ impl BuildContext {
             _ => PathBuf::from(&self.module_name),
         };
         for artifact in artifacts {
-            let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
+            // Get cached file data and create ELF container for this artifact
+            let file_data = get_file_data(&mut file_cache, &artifact.path)?;
+            let mut container = ElfContainer::parse(&file_data)
+                .map_err(|e| anyhow::anyhow!("Failed to parse ELF file: {}", e))?;
+
+            // Get old rpath and modify it
+            let old_rpaths = get_rpath(&artifact.path)?;
+            let mut new_rpaths = old_rpaths;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
-            let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&artifact.path, &new_rpath)?;
+            let new_rpath_str = new_rpaths.join(":");
+
+            // Apply changes
+            container
+                .remove_runpath()
+                .map_err(|e| anyhow::anyhow!("Failed to remove existing rpath: {}", e))?;
+            container
+                .set_runpath(&new_rpath_str)
+                .map_err(|e| anyhow::anyhow!("Failed to set rpath: {}", e))?;
+
+            // Write back to file and update cache
+            fs::write(&artifact.path, &container.data)?;
+            file_cache.insert(artifact.path.clone(), container.data.clone());
         }
         Ok(())
     }

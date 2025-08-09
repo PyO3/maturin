@@ -624,7 +624,14 @@ impl BuildContext {
                 }
             }
             // FreeBSD
-            (Os::FreeBsd, _)
+            | (Os::FreeBsd, _) => {
+                format!(
+                    "{}_{}_{}",
+                    target.target_os().to_string().to_ascii_lowercase(),
+                    target.get_platform_release()?.to_ascii_lowercase(),
+                    target.target_arch().machine(),
+                )
+            }
             // NetBSD
             | (Os::NetBsd, _)
             // OpenBSD

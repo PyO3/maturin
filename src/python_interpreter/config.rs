@@ -14,6 +14,15 @@ use std::path::Path;
 const PYPY_ABI_TAG: &str = "pp73";
 const GRAALPY_ABI_TAG: &str = "graalpy230_310_native";
 
+fn graalpy_version_for_python_version(major: usize, minor: usize) -> Option<(usize, usize)> {
+    match (major, minor) {
+        (3, 10) => Some((24, 0)),
+        (3, 11) => Some((24, 2)),
+        (3, 12..) => Some((25 + (minor - 12) * 2, 0)),
+        (_, _) => None,
+    }
+}
+
 /// Some of the sysconfigdata of Python interpreter we care about
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 pub struct InterpreterConfig {
@@ -92,6 +101,20 @@ impl InterpreterConfig {
                     gil_disabled,
                 })
             }
+            (Os::Linux, GraalPy) => {
+                let (graalpy_major, graalpy_minor) =
+                    graalpy_version_for_python_version(major, minor)?;
+                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-linux.so");
+                Some(Self {
+                    major,
+                    minor,
+                    interpreter_kind: GraalPy,
+                    abiflags: String::new(),
+                    ext_suffix,
+                    pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
+                })
+            }
             (Os::Macos, CPython) => {
                 let abiflags = if python_version < (3, 8) {
                     "m".to_string()
@@ -116,6 +139,20 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: PyPy,
+                    abiflags: String::new(),
+                    ext_suffix,
+                    pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
+                })
+            }
+            (Os::Macos, GraalPy) => {
+                let (graalpy_major, graalpy_minor) =
+                    graalpy_version_for_python_version(major, minor)?;
+                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-darwin.so");
+                Some(Self {
+                    major,
+                    minor,
+                    interpreter_kind: GraalPy,
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),

@@ -12,7 +12,6 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 const PYPY_ABI_TAG: &str = "pp73";
-const GRAALPY_ABI_TAG: &str = "graalpy230_310_native";
 
 fn graalpy_version_for_python_version(major: usize, minor: usize) -> Option<(usize, usize)> {
     match (major, minor) {
@@ -356,7 +355,11 @@ impl InterpreterConfig {
                 }
             }
             InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| PYPY_ABI_TAG.to_string()),
-            InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| GRAALPY_ABI_TAG.to_string()),
+            InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| {
+                let (graalpy_major, graalpy_minor) =
+                    graalpy_version_for_python_version(major, minor).unwrap_or((23, 0));
+                format!("graalpy{graalpy_major}{graalpy_minor}_{major}{minor}_native")
+            }),
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
         let ext_suffix = if target.is_linux() || target.is_macos() || target.is_hurd() {

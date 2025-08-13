@@ -325,7 +325,7 @@ impl fmt::Display for InterpreterKind {
         match *self {
             InterpreterKind::CPython => write!(f, "CPython"),
             InterpreterKind::PyPy => write!(f, "PyPy"),
-            InterpreterKind::GraalPy => write!(f, "GraalPy"),
+            InterpreterKind::GraalPy => write!(f, "GraalVM"),
         }
     }
 }

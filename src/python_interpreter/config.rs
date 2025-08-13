@@ -12,7 +12,21 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 const PYPY_ABI_TAG: &str = "pp73";
-const GRAALPY_ABI_TAG: &str = "graalpy230_310_native";
+
+fn graalpy_version_for_python_version(major: usize, minor: usize) -> Option<(usize, usize)> {
+    match (major, minor) {
+        (3, 10) => Some((24, 0)),
+        (3, 11) => Some((24, 2)),
+        // Since 25.0, GraalPy should only change the major release number for feature releases.
+        // Additionally, it promises that only the autumn (oddly-numbered) releases are
+        // allowed to break ABI compatibility, so only those can change the Python version.
+        // The even-numbered releases will report the ABI version of the previous release.
+        // So assuming that GraalPy doesn't fall terribly behind on updating Python version,
+        // the version used in the ABI should follow this formula
+        (3, 12..) => Some((25 + (minor - 12) * 2, 0)),
+        (_, _) => None,
+    }
+}
 
 /// Some of the sysconfigdata of Python interpreter we care about
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
@@ -92,6 +106,20 @@ impl InterpreterConfig {
                     gil_disabled,
                 })
             }
+            (Os::Linux, GraalPy) => {
+                let (graalpy_major, graalpy_minor) =
+                    graalpy_version_for_python_version(major, minor)?;
+                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-linux.so");
+                Some(Self {
+                    major,
+                    minor,
+                    interpreter_kind: GraalPy,
+                    abiflags: String::new(),
+                    ext_suffix,
+                    pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
+                })
+            }
             (Os::Macos, CPython) => {
                 let abiflags = if python_version < (3, 8) {
                     "m".to_string()
@@ -116,6 +144,20 @@ impl InterpreterConfig {
                     major,
                     minor,
                     interpreter_kind: PyPy,
+                    abiflags: String::new(),
+                    ext_suffix,
+                    pointer_width: Some(target.pointer_width()),
+                    gil_disabled,
+                })
+            }
+            (Os::Macos, GraalPy) => {
+                let (graalpy_major, graalpy_minor) =
+                    graalpy_version_for_python_version(major, minor)?;
+                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-darwin.so");
+                Some(Self {
+                    major,
+                    minor,
+                    interpreter_kind: GraalPy,
                     abiflags: String::new(),
                     ext_suffix,
                     pointer_width: Some(target.pointer_width()),
@@ -319,7 +361,11 @@ impl InterpreterConfig {
                 }
             }
             InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| PYPY_ABI_TAG.to_string()),
-            InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| GRAALPY_ABI_TAG.to_string()),
+            InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| {
+                let (graalpy_major, graalpy_minor) =
+                    graalpy_version_for_python_version(major, minor).unwrap_or((23, 0));
+                format!("graalpy{graalpy_major}{graalpy_minor}_{major}{minor}_native")
+            }),
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
         let ext_suffix = if target.is_linux() || target.is_macos() || target.is_hurd() {

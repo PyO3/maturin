@@ -17,6 +17,12 @@ fn graalpy_version_for_python_version(major: usize, minor: usize) -> Option<(usi
     match (major, minor) {
         (3, 10) => Some((24, 0)),
         (3, 11) => Some((24, 2)),
+        // Since 25.0, GraalPy should only change the major release number for feature releases.
+        // Additionally, it promises that only the autumn (oddly-numbered) releases are
+        // allowed to break ABI compatibility, so only those can change the Python version.
+        // The even-numbered releases will report the ABI version of the previous release.
+        // So assuming that GraalPy doesn't fall terribly behind on updating Python version,
+        // the version used in the ABI should follow this formula
         (3, 12..) => Some((25 + (minor - 12) * 2, 0)),
         (_, _) => None,
     }

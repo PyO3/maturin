@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Add a `use-base-python` option to `pyproject.toml` with the same behaviour as `MATURIN_PEP517_USE_BASE_PYTHON`.
+
 ## [1.9.3]
 
 * Fix adding `project.license-files` to source distributions.

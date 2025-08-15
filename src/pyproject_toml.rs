@@ -223,6 +223,13 @@ pub struct ToolMaturin {
     pub unstable_flags: Option<Vec<String>>,
     /// Additional rustc arguments
     pub rustc_args: Option<Vec<String>>,
+    /// Use base Python executable instead of venv Python executable in PEP 517 build.
+    //
+    // This can help avoid unnecessary rebuilds, as the Python executable does not change
+    // every time. It should not be set when the sdist build requires packages installed
+    // in venv.
+    #[serde(default)]
+    pub use_base_python: bool,
 }
 
 /// A pyproject.toml as specified in PEP 517

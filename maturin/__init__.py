@@ -50,7 +50,7 @@ def get_maturin_pep517_args(config_settings: Optional[Mapping[str, Any]] = None)
 
 def _get_sys_executable() -> str:
     executable = sys.executable
-    if os.getenv("MATURIN_PEP517_USE_BASE_PYTHON") in {"1", "true"}:
+    if os.getenv("MATURIN_PEP517_USE_BASE_PYTHON") in {"1", "true"} or get_config().get("use-base-python"):
         # Use the base interpreter path when running inside a venv to avoid recompilation
         # when switching between venvs
         base_executable = getattr(sys, "_base_executable")

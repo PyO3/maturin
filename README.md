@@ -229,6 +229,7 @@ maturin itself is manylinux compliant when compiled for the musl target.
 
 ## Examples
 
+- [agg-python-bindings](https://pypi.org/project/agg-python-bindings) - A Python Library that binds to Asciinema Agg terminal record renderer and Avt terminal emulator
 - [ballista-python](https://github.com/apache/arrow-ballista-python) - A Python library that binds to Apache Arrow distributed query engine Ballista
 - [bleuscore](https://github.com/shenxiangzhuang/bleuscore) - A BLEU score calculation library, written in pure Rust
 - [chardetng-py](https://github.com/john-parton/chardetng-py) - Python binding for the chardetng character encoding detector.

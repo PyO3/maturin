@@ -59,6 +59,13 @@ strip = true
 # Source distribution generator,
 # supports cargo (default) and git.
 sdist-generator = "cargo"
+# Use base Python executable instead of venv Python executable in PEP 517 build.
+#
+# This can help avoid unnecessary rebuilds, as the Python executable does not change
+# every time. It should not be set when the sdist build requires packages installed
+# in venv. This can also be set with the `MATURIN_PEP517_USE_BASE_PYTHON` environment
+# variable.
+use-base-python = false
 ```
 
 The `[tool.maturin.include]` and `[tool.maturin.exclude]` configuration are

@@ -202,6 +202,11 @@
       "items": {
         "type": "string"
       }
+    },
+    "use-base-python": {
+      "description": "Use base Python executable instead of venv Python executable in PEP 517 build.",
+      "default": false,
+      "type": "boolean"
     }
   },
   "definitions": {

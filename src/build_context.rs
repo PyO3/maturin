@@ -731,7 +731,7 @@ impl BuildContext {
             &self.out,
             &self.project_layout.project_root,
             &self.metadata24,
-            &[tag.clone()],
+            std::slice::from_ref(&tag),
             self.excludes(Format::Wheel)?,
             self.compression,
         )?;
@@ -810,7 +810,7 @@ impl BuildContext {
             &self.out,
             &self.project_layout.project_root,
             &self.metadata24,
-            &[tag.clone()],
+            std::slice::from_ref(&tag),
             self.excludes(Format::Wheel)?,
             self.compression,
         )?;

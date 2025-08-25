@@ -411,6 +411,11 @@ fn cargo_build_command(
         }
     }
 
+    // Set PYO3_BUILD_EXTENSION_MODULE when building pyo3 extension modules
+    if bridge_model.is_pyo3() && !bridge_model.is_bin() {
+        build_command.env("PYO3_BUILD_EXTENSION_MODULE", "1");
+    }
+
     // Setup `PYO3_CONFIG_FILE` if we are cross compiling for pyo3 bindings
     if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling

@@ -378,7 +378,7 @@ impl Target {
         Ok(release)
     }
 
-    /// Returns the name python uses in `sys.platform` for this architecture.
+    /// Returns the name python uses in `platform.machine()` for this architecture.
     pub fn get_python_arch(&self) -> &str {
         match self.arch {
             Arch::Aarch64 => "aarch64",

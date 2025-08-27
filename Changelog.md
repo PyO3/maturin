@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## [1.9.4]
 
 * Add a `use-base-python` option to `pyproject.toml` with the same behaviour as `MATURIN_PEP517_USE_BASE_PYTHON`.
+* Add builtin sysconfigs for GraalPy
+* Fix calculation of platform tag for FreeBSD
 
 ## [1.9.3]
 
@@ -1096,7 +1098,10 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.4...HEAD
+[1.9.4]: https://github.com/pyo3/maturin/compare/v1.9.3...v1.9.4
+[1.9.3]: https://github.com/pyo3/maturin/compare/v1.9.2...v1.9.3
+[1.9.2]: https://github.com/pyo3/maturin/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/pyo3/maturin/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/pyo3/maturin/compare/v1.8.7...v1.9.0
 [1.8.7]: https://github.com/pyo3/maturin/compare/v1.8.6...v1.8.7

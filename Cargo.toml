@@ -105,7 +105,7 @@ cargo-xwin = { version = "0.18.6", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
-tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.11.0", default-features = false, optional = true }

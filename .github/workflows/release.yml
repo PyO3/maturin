@@ -232,7 +232,7 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             ./*.tar.gz
@@ -269,7 +269,7 @@ jobs:
           pattern: binaries-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             ./*.tar.gz

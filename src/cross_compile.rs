@@ -155,7 +155,7 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Result<Vec<PathBuf
             Ok(f) if starts_with(f, "_sysconfigdata") && ends_with(f, "py") => vec![f.path()],
             Ok(f) if starts_with(f, "build") && f.path().is_dir() => {
                 search_lib_dir(f.path(), target)?
-            },
+            }
             Ok(f) if starts_with(f, "lib.") => {
                 let name = f.file_name();
                 // check if right target os

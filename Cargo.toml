@@ -109,7 +109,7 @@ tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.11.0", default-features = false, optional = true }
-console = { version = "0.15.4", optional = true }
+console = { version = "0.16.0", optional = true }
 minijinja = { version = "2.5.0", optional = true }
 
 # upload

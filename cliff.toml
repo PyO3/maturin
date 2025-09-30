@@ -24,6 +24,7 @@ conventional_commits = false
 filter_unconventional = false
 commit_parsers = [
     { field = "github.pr_labels", pattern = "internal", skip = true },
+    { field = "github.pr_labels", pattern = "dependencies", skip = true },
     { message = ".*pre-commit autoupdate.*", skip = true },
     { message = ".*", group = "Other" },
 ]

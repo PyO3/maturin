@@ -108,7 +108,7 @@ _These instructions are a work in progress_
 Update the changelog:
 
 ```
-git cliff -u --prepend Changelog.md
+git cliff -u --prepend Changelog.md --github-token <token>
 ```
 
 Update the version in `Cargo.toml` and run:

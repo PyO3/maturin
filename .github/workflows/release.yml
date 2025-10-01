@@ -237,7 +237,7 @@ jobs:
           subject-path: |
             ./*.tar.gz
             ./*.whl
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: startsWith(github.ref, 'refs/tags/')
         with:
           python-version: "3.10"

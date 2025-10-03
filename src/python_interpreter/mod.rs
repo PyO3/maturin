@@ -49,7 +49,9 @@ fn windows_interpreter_no_build(
 
     // There can be 32-bit installations on a 64-bit machine, but we can't link
     // those for 64-bit targets
-    if (platform == "win32" && target.pointer_width() == 64) || (platform != "win32" && target.pointer_width() == 32) {
+    if (platform == "win32" && target.pointer_width() == 64)
+        || (platform != "win32" && target.pointer_width() == 32)
+    {
         eprintln!(
             "👽 {major}.{minor} reports {platform}, which does not match the target architecture. Skipping."
         );
@@ -152,7 +154,7 @@ fn find_all_windows(
                     let executable = capture.get(6).unwrap().as_str();
                     let executable_path = Path::new(&executable);
                     // Skip non-existing paths
-                    if !executable_path.exists(){
+                    if !executable_path.exists() {
                         continue;
                     }
                     if let Some(python_info) = windows_python_info(executable_path)? {

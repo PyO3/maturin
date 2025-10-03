@@ -47,23 +47,22 @@ fn windows_interpreter_no_build(
         }
     }
 
-    // There can be 32-bit installations on a 64-bit machine, but we can't link
-    // those for 64-bit targets
-    if (platform == "win32" && target.pointer_width() == 64)
-        || (platform != "win32" && target.pointer_width() == 32)
-    {
-        eprintln!(
-            "👽 {major}.{minor} reports {platform}, which does not match the target architecture. Skipping."
-        );
-        return true;
-    }
+    let python_arch = match platform.as_str() {
+        "win32" => Arch::X86,
+        "win-amd64" => Arch::X86_64,
+        "win-arm64" => Arch::Aarch64,
+        _ => {
+            eprintln!("⚠️  Warning: {major}.{minor} reports unknown platform '{platform}'. This may fail to build.");
+            // false => build it anyway
+            return false;
+        }
+    };
 
-    // Skip mismatching architectures
-    if (platform == "win-arm64" && target.target_arch() != Arch::Aarch64)
-        || (platform == "win-amd64" && target.target_arch() == Arch::Aarch64)
-    {
+    let target_arch = target.target_arch();
+
+    if python_arch != target.target_arch() {
         eprintln!(
-            "👽 {major}.{minor} is installed for {platform}, while the target is not. Skipping."
+            "👽 {major}.{minor} reports a platform '{platform}' (architecture '{python_arch}'), while the Rust target is '{target_arch}'. Skipping."
         );
         return true;
     }

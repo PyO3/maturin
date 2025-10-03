@@ -60,7 +60,7 @@ fn windows_interpreter_no_build(
 
     // Skip mismatching architectures
     if (platform == "win-arm64" && target.target_arch() != Arch::Aarch64)
-        || (platform == "win-amd64" && target.target_arch() != Arch::X86_64)
+        || (platform == "win-amd64" && target.target_arch() == Arch::Aarch64)
     {
         eprintln!(
             "👽 {major}.{minor} is installed for {platform}, while the target is not. Skipping."

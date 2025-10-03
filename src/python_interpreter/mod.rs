@@ -1193,4 +1193,137 @@ mod tests {
             assert_eq!(calculate_abi_tag(ext_suffix).as_deref(), expected);
         }
     }
+
+    #[test]
+    fn test_windows_interpreter_no_build() {
+        use pep440_rs::VersionSpecifiers;
+        use std::str::FromStr;
+
+        // Test cases for different scenarios
+        let target_x64 = Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap();
+        let target_x86 = Target::from_resolved_target_triple("i686-pc-windows-msvc").unwrap();
+        let target_arm64 = Target::from_resolved_target_triple("aarch64-pc-windows-msvc").unwrap();
+
+        // Test Python 2.x should be rejected
+        assert!(windows_interpreter_no_build(
+            2,
+            7,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test Python 3.x but below minimum version
+        assert!(windows_interpreter_no_build(
+            3,
+            6,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test valid Python version with matching platform and architecture
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test 32-bit Python on 64-bit target (should be rejected)
+        assert!(windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win32".to_string(),
+            7,
+            None
+        ));
+
+        // Test 32-bit Python on 32-bit target (should be accepted)
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x86,
+            "win32".to_string(),
+            7,
+            None
+        ));
+
+        // Test mismatched architectures
+        assert!(windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win-arm64".to_string(),
+            7,
+            None
+        ));
+
+        assert!(windows_interpreter_no_build(
+            3,
+            10,
+            &target_arm64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test correct architecture matches
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_arm64,
+            "win-arm64".to_string(),
+            7,
+            None
+        ));
+
+        // Test requires-python constraints
+        let requires_python = VersionSpecifiers::from_str(">=3.8,<3.12").unwrap();
+
+        // Should reject Python 3.7 due to requires-python
+        assert!(windows_interpreter_no_build(
+            3,
+            7,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            Some(&requires_python)
+        ));
+
+        // Should accept Python 3.10 within requires-python range
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            Some(&requires_python)
+        ));
+
+        // Should reject Python 3.12 due to requires-python upper bound
+        assert!(windows_interpreter_no_build(
+            3,
+            12,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            Some(&requires_python)
+        ));
+
+        // Test edge case with unknown platform (should not match any specific architecture)
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "unknown-platform".to_string(),
+            7,
+            None
+        ));
+    }
 }

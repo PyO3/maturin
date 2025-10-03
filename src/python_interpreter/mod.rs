@@ -1,5 +1,6 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
+use crate::target::Arch;
 use crate::{BridgeModel, BuildContext, Target};
 use anyhow::{bail, ensure, format_err, Context, Result};
 use pep440_rs::{Version, VersionSpecifiers};
@@ -30,7 +31,7 @@ fn windows_interpreter_no_build(
     major: usize,
     minor: usize,
     target: &Target,
-    arch: Arch,
+    platform: String,
     min_python_minor: usize,
     requires_python: Option<&VersionSpecifiers>,
 ) -> bool {
@@ -48,9 +49,9 @@ fn windows_interpreter_no_build(
 
     // There can be 32-bit installations on a 64-bit machine, but we can't link
     // those for 64-bit targets
-    if (arch == Arch::X86_32 && target.pointer_width() == 64) || (arch != Arch::X86_32 && target.pointer_width() == 32) {
+    if (platform == "win32" && target.pointer_width() == 64) || (platform != "win32" && target.pointer_width() == 32) {
         eprintln!(
-            "👽 {major}.{minor} reports {arch}, which does not match the target architecture. Skipping."
+            "👽 {major}.{minor} reports {platform}, which does not match the target architecture. Skipping."
         );
         return true;
     }
@@ -65,6 +66,12 @@ fn windows_interpreter_no_build(
         return true;
     }
     false
+}
+
+struct WindowsPythonInfo {
+    major: usize,
+    minor: usize,
+    platform: String, // e.g. win32, win-amd64, win-arm64
 }
 
 /// On windows regular Python installs are supported along with environments
@@ -143,38 +150,43 @@ fn find_all_windows(
                     .context("Expected a digit for minor version")?;
                 if !versions_found.contains(&(major, minor)) {
                     let executable = capture.get(6).unwrap().as_str();
-                    let python_info = windows_python_info(Path::new(executable))?;
-
-                    if windows_interpreter_no_build(
-                        major,
-                        minor,
-                        target,
-                        python_info,
-                        min_python_minor,
-                        requires_python,
-                    ) {
+                    let executable_path = Path::new(&executable);
+                    // Skip non-existing paths
+                    if !executable_path.exists(){
                         continue;
                     }
+                    if let Some(python_info) = windows_python_info(executable_path)? {
+                        if windows_interpreter_no_build(
+                            major,
+                            minor,
+                            target,
+                            python_info.platform,
+                            min_python_minor,
+                            requires_python,
+                        ) {
+                            continue;
+                        }
 
-                    let output = Command::new(executable).args(["-c", code]).output();
-                    let output = match output {
-                        Ok(output) => output,
-                        Err(err) => {
+                        let output = Command::new(executable).args(["-c", code]).output();
+                        let output = match output {
+                            Ok(output) => output,
+                            Err(err) => {
+                                eprintln!(
+                                    "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                                );
+                                continue;
+                            }
+                        };
+                        let path = str::from_utf8(&output.stdout).unwrap().trim();
+                        if !output.status.success() || path.trim().is_empty() {
                             eprintln!(
-                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                                "⚠️  Warning: couldn't determine the path to python for `{executable}`"
                             );
                             continue;
                         }
-                    };
-                    let path = str::from_utf8(&output.stdout).unwrap().trim();
-                    if !output.status.success() || path.trim().is_empty() {
-                        eprintln!(
-                            "⚠️  Warning: couldn't determine the path to python for `{executable}`"
-                        );
-                        continue;
+                        interpreter.push(path.to_string());
+                        versions_found.insert((major, minor));
                     }
-                    interpreter.push(path.to_string());
-                    versions_found.insert((major, minor));
                 }
             }
         }
@@ -210,7 +222,7 @@ fn find_all_windows(
                     python_info.major,
                     python_info.minor,
                     target,
-                    python_info.pointer_width.unwrap(),
+                    python_info.platform,
                     min_python_minor,
                     requires_python,
                 ) {
@@ -231,7 +243,7 @@ fn find_all_windows(
                     python_info.major,
                     python_info.minor,
                     target,
-                    python_info.arch,
+                    python_info.platform,
                     min_python_minor,
                     requires_python,
                 ) {
@@ -251,17 +263,10 @@ fn find_all_windows(
     Ok(interpreter)
 }
 
-struct WindowsPythonInfo {
-    major: usize,
-    minor: usize,
-    pointer_width: Option<usize>,
-    arch: Arch,
-}
-
 fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
     let python_info = Command::new(executable)
         .arg("-c")
-        .arg("import sys; print(sys.version)")
+        .arg("import sys, sysconfig; print(sysconfig.get_platform(), sys.version_info.major, sys.version_info.minor)")
         .output();
 
     let python_info = match python_info {
@@ -280,29 +285,24 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
     };
 
     let version_info = str::from_utf8(&python_info.stdout).unwrap();
-    let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
-    if let Some(capture) = expr.captures(version_info) {
-        let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
-        let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
-        let pointer_width = if version_info.contains("64 bit (AMD64)") {
-            64
-        } else {
-            32
-        };
-        let arch = if version_info.contains("ARM64") {
-            Arch::Aarch64
-        } else {
-            Arch::X86_64
-        };
-        Ok(Some(WindowsPythonInfo {
-            major,
-            minor,
-            pointer_width: Some(pointer_width),
-            arch,
-        }))
-    } else {
-        Ok(None)
-    }
+
+    // Split into 3 segments: platform, major, minor by spaces
+    let segments: Vec<&str> = version_info.split_whitespace().collect();
+    let platform = segments.get(0).unwrap_or(&"unknown").to_string();
+    let major = segments
+        .get(1)
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let minor = segments
+        .get(2)
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+
+    Ok(Some(WindowsPythonInfo {
+        major,
+        minor,
+        platform,
+    }))
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, clap::ValueEnum)]

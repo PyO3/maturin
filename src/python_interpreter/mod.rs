@@ -290,7 +290,7 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
 
     // Split into 3 segments: platform, major, minor by spaces
     let segments: Vec<&str> = version_info.split_whitespace().collect();
-    let platform = segments.get(0).unwrap_or(&"unknown").to_string();
+    let platform = segments.first().unwrap_or(&"unknown").to_string();
     let major = segments
         .get(1)
         .and_then(|s| s.parse::<usize>().ok())

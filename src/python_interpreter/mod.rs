@@ -288,8 +288,16 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
 
     let version_info = str::from_utf8(&python_info.stdout).unwrap();
 
-    // Split into 3 segments: platform, major, minor by spaces
-    let segments: Vec<&str> = version_info.split_whitespace().collect();
+    // Split into 3 segments: major, minor, platform by spaces
+    let segments: Vec<&str> = version_info.splitn(3, ' ').collect();
+    let [major, minor, platform] = pieces.as_slice() else {
+        bail!(
+            "Unexpected output for Python version info from {}: '{}'",
+            executable.display(),
+            version_info
+        );
+    };
+    // can then parse each substring
     let platform = segments.first().unwrap_or(&"unknown").to_string();
     let major = segments
         .get(1)

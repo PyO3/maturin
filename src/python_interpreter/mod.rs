@@ -47,11 +47,7 @@ fn windows_interpreter_no_build(
     }
 
     // Platform can be either win32, win-amd64 or win-arm64
-    let pointer_width = if platform.ends_with("64") {
-        64
-    } else {
-        32
-    };
+    let pointer_width = if platform.ends_with("64") { 64 } else { 32 };
 
     // There can be 32-bit installations on a 64-bit machine, but we can't link
     // those for 64-bit targets
@@ -152,7 +148,9 @@ fn find_all_windows(
                 if !versions_found.contains(&(major, minor)) {
                     let executable = capture.get(6).unwrap().as_str();
 
-                    let platform_output = Command::new(executable).args(["-c", platform_code]).output();
+                    let platform_output = Command::new(executable)
+                        .args(["-c", platform_code])
+                        .output();
                     let platform_output = match platform_output {
                         Ok(platform_output) => platform_output,
                         Err(err) => {

@@ -268,7 +268,7 @@ fn find_all_windows(
 fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
     let python_info = Command::new(executable)
         .arg("-c")
-        .arg("import sys, sysconfig; print(sysconfig.get_platform(), sys.version_info.major, sys.version_info.minor)")
+        .arg("import sys, sysconfig; print(sys.version_info.major, sys.version_info.minor, sysconfig.get_platform())")
         .output();
 
     let python_info = match python_info {

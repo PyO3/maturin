@@ -234,7 +234,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     // Create environments to build against, prepended with "A" to ensure that integration
     // tests are executed with these environments
     let mut interpreters = Vec::new();
-    for minor in 7..=10 {
+    for minor in 9..=12 {
         let (_, venv_python) = create_conda_env(&format!("A-maturin-env-3{minor}"), 3, minor)?;
         interpreters.push(venv_python);
     }

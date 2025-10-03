@@ -289,7 +289,7 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
 
     // Split into 3 segments: major, minor, platform by spaces
     let segments: Vec<&str> = version_info.splitn(3, ' ').collect();
-    let [major, minor, platform] = pieces.as_slice() else {
+    let [major, minor, platform] = segments.as_slice() else {
         bail!(
             "Unexpected output for Python version info from {}: '{}'",
             executable.display(),
@@ -297,20 +297,13 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
         );
     };
     // can then parse each substring
-    let platform = segments.first().unwrap_or(&"unknown").to_string();
-    let major = segments
-        .get(1)
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(0);
-    let minor = segments
-        .get(2)
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(0);
+    let major = major.parse::<usize>().ok().unwrap_or(0);
+    let minor = minor.parse::<usize>().ok().unwrap_or(0);
 
     Ok(Some(WindowsPythonInfo {
         major,
         minor,
-        platform,
+        platform: platform.to_string(),
     }))
 }
 

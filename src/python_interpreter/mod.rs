@@ -53,7 +53,7 @@ fn windows_interpreter_no_build(
     // those for 64-bit targets
     if pointer_width != target.pointer_width() {
         eprintln!(
-            "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is {target.pointer_width()}-bit. Skipping."
+            "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is not. Skipping."
         );
         return true;
     }
@@ -63,7 +63,7 @@ fn windows_interpreter_no_build(
         || (platform.contains("amd") && !target.is_x86_64())
     {
         eprintln!(
-            "👽 {major}.{minor} is installed for {platform}, while the target is {target}. Skipping."
+            "👽 {major}.{minor} is installed for {platform}, while the target is not. Skipping."
         );
         return true;
     }

@@ -29,8 +29,8 @@ pub const MAXIMUM_PYPY_MINOR: usize = 11;
 fn windows_interpreter_no_build(
     major: usize,
     minor: usize,
-    target_width: usize,
-    pointer_width: usize,
+    target: &Target,
+    platform: String,
     min_python_minor: usize,
     requires_python: Option<&VersionSpecifiers>,
 ) -> bool {
@@ -46,11 +46,28 @@ fn windows_interpreter_no_build(
         }
     }
 
+    // Platform can be either win32, win-amd64 or win-arm64
+    let pointer_width = if platform.ends_with("64") {
+        64
+    } else {
+        32
+    };
+
     // There can be 32-bit installations on a 64-bit machine, but we can't link
     // those for 64-bit targets
-    if pointer_width != target_width {
+    if pointer_width != target.pointer_width() {
         eprintln!(
-            "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is {target_width}-bit. Skipping."
+            "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is {target.pointer_width()}-bit. Skipping."
+        );
+        return true;
+    }
+
+    // Skip mismatching architectures
+    if (platform.contains("arm") && !target.is_aarch64())
+        || (platform.contains("amd") && !target.is_x86_64())
+    {
+        eprintln!(
+            "👽 {major}.{minor} is installed for {platform}, while the target is {target}. Skipping."
         );
         return true;
     }
@@ -101,6 +118,7 @@ fn find_all_windows(
 ) -> Result<Vec<String>> {
     let min_python_minor = bridge.minimal_python_minor_version();
     let code = "import sys; print(sys.executable or '')";
+    let platform_code = "import sysconfig; print(sysconfig.get_platform() or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
 
@@ -132,26 +150,37 @@ fn find_all_windows(
                     .parse::<usize>()
                     .context("Expected a digit for minor version")?;
                 if !versions_found.contains(&(major, minor)) {
-                    let pointer_width = capture
-                        .get(5)
-                        .map(|m| m.as_str())
-                        .filter(|m| !m.is_empty())
-                        .unwrap_or("64")
-                        .parse::<usize>()
-                        .context("Expected a digit for pointer width")?;
+                    let executable = capture.get(6).unwrap().as_str();
+
+                    let platform_output = Command::new(executable).args(["-c", platform_code]).output();
+                    let platform_output = match platform_output {
+                        Ok(platform_output) => platform_output,
+                        Err(err) => {
+                            eprintln!(
+                                "⚠️  Warning: failed to determine the platform to python for `{executable}`: {err}"
+                            );
+                            continue;
+                        }
+                    };
+                    let platform = str::from_utf8(&platform_output.stdout).unwrap().trim();
+                    if !platform_output.status.success() || platform.trim().is_empty() {
+                        eprintln!(
+                            "⚠️  Warning: couldn't determine the platform to python for `{executable}`"
+                        );
+                        continue;
+                    }
 
                     if windows_interpreter_no_build(
                         major,
                         minor,
-                        target.pointer_width(),
-                        pointer_width,
+                        target,
+                        platform,
                         min_python_minor,
                         requires_python,
                     ) {
                         continue;
                     }
 
-                    let executable = capture.get(6).unwrap().as_str();
                     let output = Command::new(executable).args(["-c", code]).output();
                     let output = match output {
                         Ok(output) => output,

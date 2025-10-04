@@ -1,5 +1,6 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
+use crate::target::Arch;
 use crate::{BridgeModel, BuildContext, Target};
 use anyhow::{bail, ensure, format_err, Context, Result};
 use pep440_rs::{Version, VersionSpecifiers};
@@ -29,8 +30,8 @@ pub const MAXIMUM_PYPY_MINOR: usize = 11;
 fn windows_interpreter_no_build(
     major: usize,
     minor: usize,
-    target_width: usize,
-    pointer_width: usize,
+    target: &Target,
+    platform: String,
     min_python_minor: usize,
     requires_python: Option<&VersionSpecifiers>,
 ) -> bool {
@@ -46,15 +47,32 @@ fn windows_interpreter_no_build(
         }
     }
 
-    // There can be 32-bit installations on a 64-bit machine, but we can't link
-    // those for 64-bit targets
-    if pointer_width != target_width {
+    let python_arch = match platform.as_str() {
+        "win32" => Arch::X86,
+        "win-amd64" => Arch::X86_64,
+        "win-arm64" => Arch::Aarch64,
+        _ => {
+            eprintln!("⚠️  Warning: {major}.{minor} reports unknown platform '{platform}'. This may fail to build.");
+            // false => build it anyway
+            return false;
+        }
+    };
+
+    let target_arch = target.target_arch();
+
+    if python_arch != target.target_arch() {
         eprintln!(
-            "👽 {major}.{minor} is installed as {pointer_width}-bit, while the target is {target_width}-bit. Skipping."
+            "👽 {major}.{minor} reports a platform '{platform}' (architecture '{python_arch}'), while the Rust target is '{target_arch}'. Skipping."
         );
         return true;
     }
     false
+}
+
+struct WindowsPythonInfo {
+    major: usize,
+    minor: usize,
+    platform: String, // e.g. win32, win-amd64, win-arm64
 }
 
 /// On windows regular Python installs are supported along with environments
@@ -132,45 +150,44 @@ fn find_all_windows(
                     .parse::<usize>()
                     .context("Expected a digit for minor version")?;
                 if !versions_found.contains(&(major, minor)) {
-                    let pointer_width = capture
-                        .get(5)
-                        .map(|m| m.as_str())
-                        .filter(|m| !m.is_empty())
-                        .unwrap_or("64")
-                        .parse::<usize>()
-                        .context("Expected a digit for pointer width")?;
-
-                    if windows_interpreter_no_build(
-                        major,
-                        minor,
-                        target.pointer_width(),
-                        pointer_width,
-                        min_python_minor,
-                        requires_python,
-                    ) {
+                    let executable = capture.get(6).unwrap().as_str();
+                    let executable_path = Path::new(&executable);
+                    // Skip non-existing paths
+                    if !executable_path.exists() {
                         continue;
                     }
+                    if let Some(python_info) = windows_python_info(executable_path)? {
+                        if windows_interpreter_no_build(
+                            major,
+                            minor,
+                            target,
+                            python_info.platform,
+                            min_python_minor,
+                            requires_python,
+                        ) {
+                            continue;
+                        }
 
-                    let executable = capture.get(6).unwrap().as_str();
-                    let output = Command::new(executable).args(["-c", code]).output();
-                    let output = match output {
-                        Ok(output) => output,
-                        Err(err) => {
+                        let output = Command::new(executable).args(["-c", code]).output();
+                        let output = match output {
+                            Ok(output) => output,
+                            Err(err) => {
+                                eprintln!(
+                                    "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                                );
+                                continue;
+                            }
+                        };
+                        let path = str::from_utf8(&output.stdout).unwrap().trim();
+                        if !output.status.success() || path.trim().is_empty() {
                             eprintln!(
-                                "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
+                                "⚠️  Warning: couldn't determine the path to python for `{executable}`"
                             );
                             continue;
                         }
-                    };
-                    let path = str::from_utf8(&output.stdout).unwrap().trim();
-                    if !output.status.success() || path.trim().is_empty() {
-                        eprintln!(
-                            "⚠️  Warning: couldn't determine the path to python for `{executable}`"
-                        );
-                        continue;
+                        interpreter.push(path.to_string());
+                        versions_found.insert((major, minor));
                     }
-                    interpreter.push(path.to_string());
-                    versions_found.insert((major, minor));
                 }
             }
         }
@@ -205,8 +222,8 @@ fn find_all_windows(
                 if windows_interpreter_no_build(
                     python_info.major,
                     python_info.minor,
-                    target.pointer_width(),
-                    python_info.pointer_width.unwrap(),
+                    target,
+                    python_info.platform,
                     min_python_minor,
                     requires_python,
                 ) {
@@ -226,8 +243,8 @@ fn find_all_windows(
                 if windows_interpreter_no_build(
                     python_info.major,
                     python_info.minor,
-                    target.pointer_width(),
-                    python_info.pointer_width.unwrap(),
+                    target,
+                    python_info.platform,
                     min_python_minor,
                     requires_python,
                 ) {
@@ -247,16 +264,10 @@ fn find_all_windows(
     Ok(interpreter)
 }
 
-struct WindowsPythonInfo {
-    major: usize,
-    minor: usize,
-    pointer_width: Option<usize>,
-}
-
 fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
     let python_info = Command::new(executable)
         .arg("-c")
-        .arg("import sys; print(sys.version)")
+        .arg("import sys, sysconfig; print(sys.version_info.major, sys.version_info.minor, sysconfig.get_platform())")
         .output();
 
     let python_info = match python_info {
@@ -275,23 +286,25 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
     };
 
     let version_info = str::from_utf8(&python_info.stdout).unwrap();
-    let expr = Regex::new(r"(\d).(\d).(\d+)").unwrap();
-    if let Some(capture) = expr.captures(version_info) {
-        let major = capture.get(1).unwrap().as_str().parse::<usize>().unwrap();
-        let minor = capture.get(2).unwrap().as_str().parse::<usize>().unwrap();
-        let pointer_width = if version_info.contains("64 bit (AMD64)") {
-            64
-        } else {
-            32
-        };
-        Ok(Some(WindowsPythonInfo {
-            major,
-            minor,
-            pointer_width: Some(pointer_width),
-        }))
-    } else {
-        Ok(None)
-    }
+
+    // Split into 3 segments: major, minor, platform by spaces
+    let segments: Vec<&str> = version_info.splitn(3, ' ').collect();
+    let [major, minor, platform] = segments.as_slice() else {
+        bail!(
+            "Unexpected output for Python version info from {}: '{}'",
+            executable.display(),
+            version_info
+        );
+    };
+    // can then parse each substring
+    let major = major.parse::<usize>().ok().unwrap_or(0);
+    let minor = minor.parse::<usize>().ok().unwrap_or(0);
+
+    Ok(Some(WindowsPythonInfo {
+        major,
+        minor,
+        platform: platform.to_string(),
+    }))
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, clap::ValueEnum)]
@@ -1179,5 +1192,138 @@ mod tests {
         for (ext_suffix, expected) in cases {
             assert_eq!(calculate_abi_tag(ext_suffix).as_deref(), expected);
         }
+    }
+
+    #[test]
+    fn test_windows_interpreter_no_build() {
+        use pep440_rs::VersionSpecifiers;
+        use std::str::FromStr;
+
+        // Test cases for different scenarios
+        let target_x64 = Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap();
+        let target_x86 = Target::from_resolved_target_triple("i686-pc-windows-msvc").unwrap();
+        let target_arm64 = Target::from_resolved_target_triple("aarch64-pc-windows-msvc").unwrap();
+
+        // Test Python 2.x should be rejected
+        assert!(windows_interpreter_no_build(
+            2,
+            7,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test Python 3.x but below minimum version
+        assert!(windows_interpreter_no_build(
+            3,
+            6,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test valid Python version with matching platform and architecture
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test 32-bit Python on 64-bit target (should be rejected)
+        assert!(windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win32".to_string(),
+            7,
+            None
+        ));
+
+        // Test 32-bit Python on 32-bit target (should be accepted)
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x86,
+            "win32".to_string(),
+            7,
+            None
+        ));
+
+        // Test mismatched architectures
+        assert!(windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win-arm64".to_string(),
+            7,
+            None
+        ));
+
+        assert!(windows_interpreter_no_build(
+            3,
+            10,
+            &target_arm64,
+            "win-amd64".to_string(),
+            7,
+            None
+        ));
+
+        // Test correct architecture matches
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_arm64,
+            "win-arm64".to_string(),
+            7,
+            None
+        ));
+
+        // Test requires-python constraints
+        let requires_python = VersionSpecifiers::from_str(">=3.8,<3.12").unwrap();
+
+        // Should reject Python 3.7 due to requires-python
+        assert!(windows_interpreter_no_build(
+            3,
+            7,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            Some(&requires_python)
+        ));
+
+        // Should accept Python 3.10 within requires-python range
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            Some(&requires_python)
+        ));
+
+        // Should reject Python 3.12 due to requires-python upper bound
+        assert!(windows_interpreter_no_build(
+            3,
+            12,
+            &target_x64,
+            "win-amd64".to_string(),
+            7,
+            Some(&requires_python)
+        ));
+
+        // Test edge case with unknown platform (should not match any specific architecture)
+        assert!(!windows_interpreter_no_build(
+            3,
+            10,
+            &target_x64,
+            "unknown-platform".to_string(),
+            7,
+            None
+        ));
     }
 }

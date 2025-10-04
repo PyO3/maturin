@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.5]
+
+* Add builtin sysconfig for FreeBSD 14.2 amd64
+* Fix issue searching lib dir containing Python 3.14 `build-details.json`
+* Fix detection of compatible interpreters on Windows ARM64
+
 ## [1.9.4]
 
 * Add a `use-base-python` option to `pyproject.toml` with the same behaviour as `MATURIN_PEP517_USE_BASE_PYTHON`.
@@ -1098,7 +1104,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.4...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.5...HEAD
+[1.9.5]: https://github.com/pyo3/maturin/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/pyo3/maturin/compare/v1.9.3...v1.9.4
 [1.9.3]: https://github.com/pyo3/maturin/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/pyo3/maturin/compare/v1.9.1...v1.9.2

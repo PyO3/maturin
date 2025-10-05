@@ -47,7 +47,7 @@ fn windows_interpreter_no_build(
         }
     }
 
-    let python_arch = match platform.as_str() {
+    let python_arch = match platform.as_str().trim() {
         "win32" => Arch::X86,
         "win-amd64" => Arch::X86_64,
         "win-arm64" => Arch::Aarch64,
@@ -285,7 +285,7 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
         }
     };
 
-    let version_info = str::from_utf8(&python_info.stdout).unwrap();
+    let version_info = str::from_utf8(&python_info.stdout).unwrap().trim();
 
     // Split into 3 segments: major, minor, platform by spaces
     let segments: Vec<&str> = version_info.splitn(3, ' ').collect();

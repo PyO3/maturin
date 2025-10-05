@@ -285,7 +285,7 @@ fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
         }
     };
 
-    let version_info = str::from_utf8(&python_info.stdout).unwrap();
+    let version_info = str::from_utf8(&python_info.stdout).unwrap().trim();
 
     // Split into 3 segments: major, minor, platform by spaces
     let segments: Vec<&str> = version_info.splitn(3, ' ').collect();

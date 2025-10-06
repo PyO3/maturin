@@ -26,55 +26,6 @@ pub const MINIMUM_PYPY_MINOR: usize = 8;
 pub const MAXIMUM_PYTHON_MINOR: usize = 13;
 pub const MAXIMUM_PYPY_MINOR: usize = 11;
 
-/// Identifies conditions where we do not want to build wheels
-fn windows_interpreter_no_build(
-    major: usize,
-    minor: usize,
-    target: &Target,
-    platform: String,
-    min_python_minor: usize,
-    requires_python: Option<&VersionSpecifiers>,
-) -> bool {
-    // Only python 3 with supported major versions
-    if major != 3 || minor < min_python_minor {
-        return true;
-    }
-
-    // From requires-python in pyproject.toml
-    if let Some(requires_python) = requires_python {
-        if !requires_python.contains(&Version::new([major as u64, minor as u64])) {
-            return true;
-        }
-    }
-
-    let python_arch = match platform.as_str().trim() {
-        "win32" => Arch::X86,
-        "win-amd64" => Arch::X86_64,
-        "win-arm64" => Arch::Aarch64,
-        _ => {
-            eprintln!("⚠️  Warning: {major}.{minor} reports unknown platform '{platform}'. This may fail to build.");
-            // false => build it anyway
-            return false;
-        }
-    };
-
-    let target_arch = target.target_arch();
-
-    if python_arch != target.target_arch() {
-        eprintln!(
-            "👽 {major}.{minor} reports a platform '{platform}' (architecture '{python_arch}'), while the Rust target is '{target_arch}'. Skipping."
-        );
-        return true;
-    }
-    false
-}
-
-struct WindowsPythonInfo {
-    major: usize,
-    minor: usize,
-    platform: String, // e.g. win32, win-amd64, win-arm64
-}
-
 /// On windows regular Python installs are supported along with environments
 /// being managed by `conda`.
 ///
@@ -116,11 +67,30 @@ fn find_all_windows(
     target: &Target,
     bridge: &BridgeModel,
     requires_python: Option<&VersionSpecifiers>,
-) -> Result<Vec<String>> {
+) -> Result<Vec<PythonInterpreter>> {
     let min_python_minor = bridge.minimal_python_minor_version();
-    let code = "import sys; print(sys.executable or '')";
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
+
+    macro_rules! maybe_add_interp {
+        ($executable:expr) => {
+            PythonInterpreter::check_executable($executable, target, bridge).map(|interp| {
+                if let Some(interp) = interp {
+                    let major = interp.major;
+                    let minor = interp.minor;
+                    if major == 3
+                        && minor >= min_python_minor
+                        && !versions_found.contains(&(major, minor))
+                        && requires_python
+                            .is_none_or(|r| r.contains(&Version::new([3, minor as u64])))
+                    {
+                        interpreter.push(interp);
+                        versions_found.insert((major, minor));
+                    }
+                }
+            })
+        };
+    }
 
     // If Python is installed from Python.org it should include the "python launcher"
     // which is used to find the installed interpreters
@@ -156,38 +126,7 @@ fn find_all_windows(
                     if !executable_path.exists() {
                         continue;
                     }
-                    if let Some(python_info) = windows_python_info(executable_path)? {
-                        if windows_interpreter_no_build(
-                            major,
-                            minor,
-                            target,
-                            python_info.platform,
-                            min_python_minor,
-                            requires_python,
-                        ) {
-                            continue;
-                        }
-
-                        let output = Command::new(executable).args(["-c", code]).output();
-                        let output = match output {
-                            Ok(output) => output,
-                            Err(err) => {
-                                eprintln!(
-                                    "⚠️  Warning: failed to determine the path to python for `{executable}`: {err}"
-                                );
-                                continue;
-                            }
-                        };
-                        let path = str::from_utf8(&output.stdout).unwrap().trim();
-                        if !output.status.success() || path.trim().is_empty() {
-                            eprintln!(
-                                "⚠️  Warning: couldn't determine the path to python for `{executable}`"
-                            );
-                            continue;
-                        }
-                        interpreter.push(path.to_string());
-                        versions_found.insert((major, minor));
-                    }
+                    maybe_add_interp!(executable_path)?;
                 }
             }
         }
@@ -218,20 +157,7 @@ fn find_all_windows(
             } else {
                 Path::new(&path).join("python")
             };
-            if let Some(python_info) = windows_python_info(&executable)? {
-                if windows_interpreter_no_build(
-                    python_info.major,
-                    python_info.minor,
-                    target,
-                    python_info.platform,
-                    min_python_minor,
-                    requires_python,
-                ) {
-                    continue;
-                }
-                interpreter.push(String::from(executable.to_str().unwrap()));
-                versions_found.insert((python_info.major, python_info.minor));
-            }
+            maybe_add_interp!(executable.as_path())?;
         }
     }
 
@@ -239,20 +165,7 @@ fn find_all_windows(
     for minor in min_python_minor..=bridge.maximum_python_minor_version() {
         if !versions_found.contains(&(3, minor)) {
             let executable = format!("python3.{minor}.exe");
-            if let Some(python_info) = windows_python_info(Path::new(&executable))? {
-                if windows_interpreter_no_build(
-                    python_info.major,
-                    python_info.minor,
-                    target,
-                    python_info.platform,
-                    min_python_minor,
-                    requires_python,
-                ) {
-                    continue;
-                }
-                interpreter.push(executable);
-                versions_found.insert((3, minor));
-            }
+            maybe_add_interp!(Path::new(&executable))?;
         }
     }
 
@@ -262,49 +175,6 @@ fn find_all_windows(
         );
     };
     Ok(interpreter)
-}
-
-fn windows_python_info(executable: &Path) -> Result<Option<WindowsPythonInfo>> {
-    let python_info = Command::new(executable)
-        .arg("-c")
-        .arg("import sys, sysconfig; print(sys.version_info.major, sys.version_info.minor, sysconfig.get_platform())")
-        .output();
-
-    let python_info = match python_info {
-        Ok(python_info) => python_info,
-        Err(err) => {
-            if err.kind() == io::ErrorKind::NotFound {
-                // python executable not found
-                return Ok(None);
-            } else {
-                bail!(
-                    "Error getting Python version info from {}",
-                    executable.display()
-                );
-            }
-        }
-    };
-
-    let version_info = str::from_utf8(&python_info.stdout).unwrap().trim();
-
-    // Split into 3 segments: major, minor, platform by spaces
-    let segments: Vec<&str> = version_info.splitn(3, ' ').collect();
-    let [major, minor, platform] = segments.as_slice() else {
-        bail!(
-            "Unexpected output for Python version info from {}: '{}'",
-            executable.display(),
-            version_info
-        );
-    };
-    // can then parse each substring
-    let major = major.parse::<usize>().ok().unwrap_or(0);
-    let minor = minor.parse::<usize>().ok().unwrap_or(0);
-
-    Ok(Some(WindowsPythonInfo {
-        major,
-        minor,
-        platform: platform.to_string(),
-    }))
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, clap::ValueEnum)]
@@ -644,9 +514,15 @@ impl PythonInterpreter {
                             let mut metadata_py = tempfile::NamedTempFile::new()?;
                             write!(metadata_py, "{GET_INTERPRETER_METADATA}")?;
                             let mut cmd = Command::new("cmd");
+                            let suffix = match target.target_arch() {
+                                Arch::X86 => "-32",
+                                Arch::X86_64 => "-64",
+                                Arch::Aarch64 => "-arm64",
+                                _ => "",
+                            };
                             cmd.arg("/c")
                                 .arg("py")
-                                .arg(format!("-{}-{}", ver, target.pointer_width()))
+                                .arg(format!("-{ver}{suffix}"))
                                 .arg(metadata_py.path())
                                 .env("PYTHONNOUSERSITE", "1");
                             let output = cmd.output();
@@ -691,6 +567,41 @@ impl PythonInterpreter {
             executable.as_ref().display()
         ))?;
 
+        let executable = message
+            .executable
+            .map(PathBuf::from)
+            .unwrap_or_else(|| executable.as_ref().to_path_buf());
+
+        if target.is_windows() {
+            'windows_arch_check: {
+                // on windows we must check the architecture, because three different architectures
+                // can all run on the same hardware
+                let python_arch = match message.platform.as_str().trim() {
+                    "win32" => Arch::X86,
+                    "win-amd64" => Arch::X86_64,
+                    "win-arm64" => Arch::Aarch64,
+                    _ => {
+                        eprintln!(
+                            "⚠️  Warning: '{}' reports unknown platform. This may fail to build.",
+                            executable.display()
+                        );
+                        break 'windows_arch_check;
+                    }
+                };
+
+                if python_arch != target.target_arch() {
+                    eprintln!(
+                        "👽 '{}' reports a platform '{platform}' (architecture '{python_arch}'), while the Rust target is '{target_arch}'. Skipping.",
+                        executable.display(),
+                        platform = message.platform,
+                        python_arch = python_arch,
+                        target_arch = target.target_arch(),
+                    );
+                    return Ok(None);
+                }
+            }
+        }
+
         let platform = if message.platform.starts_with("macosx") {
             // We don't use platform from sysconfig on macOS
             None
@@ -698,10 +609,6 @@ impl PythonInterpreter {
             Some(message.platform.to_lowercase().replace(['-', '.'], "_"))
         };
 
-        let executable = message
-            .executable
-            .map(PathBuf::from)
-            .unwrap_or_else(|| executable.as_ref().to_path_buf());
         debug!(
             "Found {} interpreter at {}",
             interpreter,
@@ -807,37 +714,38 @@ impl PythonInterpreter {
         bridge: &BridgeModel,
         requires_python: Option<&VersionSpecifiers>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let executables = if target.is_windows() {
+        if target.is_windows() {
             // TOFIX: add PyPy support to Windows
-            find_all_windows(target, bridge, requires_python)?
-        } else {
-            let mut executables: Vec<String> = (bridge.minimal_python_minor_version()
-                ..=bridge.maximum_python_minor_version())
-                .filter(|minor| {
-                    requires_python
-                        .map(|requires_python| {
-                            requires_python.contains(&Version::new([3, *minor as u64]))
-                        })
-                        .unwrap_or(true)
-                })
-                .map(|minor| format!("python3.{minor}"))
-                .collect();
-            // Also try to find PyPy for cffi and pyo3 bindings
-            if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
-                executables.extend(
-                    (bridge.minimal_pypy_minor_version()..=bridge.maximum_pypy_minor_version())
-                        .filter(|minor| {
-                            requires_python
-                                .map(|requires_python| {
-                                    requires_python.contains(&Version::new([3, *minor as u64]))
-                                })
-                                .unwrap_or(true)
-                        })
-                        .map(|minor| format!("pypy3.{minor}")),
-                );
-            }
-            executables
+            return find_all_windows(target, bridge, requires_python);
         };
+
+        let mut executables: Vec<String> = (bridge.minimal_python_minor_version()
+            ..=bridge.maximum_python_minor_version())
+            .filter(|minor| {
+                requires_python
+                    .map(|requires_python| {
+                        requires_python.contains(&Version::new([3, *minor as u64]))
+                    })
+                    .unwrap_or(true)
+            })
+            .map(|minor| format!("python3.{minor}"))
+            .collect();
+
+        // Also try to find PyPy for cffi and pyo3 bindings
+        if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
+            executables.extend(
+                (bridge.minimal_pypy_minor_version()..=bridge.maximum_pypy_minor_version())
+                    .filter(|minor| {
+                        requires_python
+                            .map(|requires_python| {
+                                requires_python.contains(&Version::new([3, *minor as u64]))
+                            })
+                            .unwrap_or(true)
+                    })
+                    .map(|minor| format!("pypy3.{minor}")),
+            );
+        }
+
         let mut available_versions = Vec::new();
         for executable in executables {
             if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)?

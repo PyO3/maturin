@@ -3,6 +3,12 @@
 This guide can help you upgrade code through breaking changes from one maturin version to the next.
 For a detailed list of all changes, see the [CHANGELOG](changelog.md).
 
+## From 1.9.5 to 1.9.6
+
+### Editable installs default to debug builds
+
+Editable installs (`pip install -e .`) now default to the `dev` (debug) profile instead of `release` to speed up development workflows. The `maturin develop` command is unaffected. To restore the old behavior, you can explicitly set `profile = "release"` in the `[tool.maturin]` section of your `pyproject.toml`.
+
 ## From 0.14.* to 0.15
 
 ### Build with `--no-default-features` by default when bootstrapping from sdist

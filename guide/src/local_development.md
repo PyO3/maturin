@@ -151,3 +151,8 @@ maturin develop
 
 Then Python source code changes will take effect immediately because the interpreter looks
 for the modules directly in the project source tree.
+
+By default, editable installs use the `dev` (debug) profile for faster development cycles.
+If you explicitly need a `release` build in editable mode, you can set the profile in
+`pyproject.toml` (`[tool.maturin] profile = "release"`), which overrides this default
+behavior.

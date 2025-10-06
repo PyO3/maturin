@@ -679,41 +679,6 @@ impl BuildContextBuilder {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
-        let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
-        let interpreter = if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
-            // We don't need a python interpreter to build sdist only
-            Vec::new()
-        } else {
-            resolve_interpreters(
-                &build_options,
-                &bridge,
-                &target,
-                metadata24.requires_python.as_ref(),
-                generate_import_lib,
-            )?
-        };
-
-        if cargo_options.args.is_empty() {
-            // if not supplied on command line, try pyproject.toml
-            let tool_maturin = pyproject.and_then(|p| p.maturin());
-            if let Some(args) = tool_maturin.and_then(|x| x.rustc_args.as_ref()) {
-                cargo_options.args.extend(args.iter().cloned());
-                pyproject_toml_maturin_options.push("rustc-args");
-            }
-        }
-
-        let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
-        let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
-            || build_options.skip_auditwheel;
-        let auditwheel = build_options
-            .auditwheel
-            .or_else(|| pyproject.and_then(|x| x.auditwheel()))
-            .unwrap_or(if skip_auditwheel {
-                AuditWheelMode::Skip
-            } else {
-                AuditWheelMode::Repair
-            });
-
         // Check if PyPI validation is needed before we move platform_tag
         let pypi_validation = matches!(&build_options.platform_tag[..], [PlatformTag::Pypi]);
 
@@ -761,10 +726,45 @@ impl BuildContextBuilder {
             Vec::new()
         } else if build_options.platform_tag.iter().all(|tag| !tag.is_pypi()) {
             // All non-PyPI tags - use as-is
-            build_options.platform_tag
+            build_options.platform_tag.clone()
         } else {
             bail!("The 'pypi' compatibility option cannot be combined with other platform tags");
         };
+
+        let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
+        let interpreter = if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
+            // We don't need a python interpreter to build sdist only
+            Vec::new()
+        } else {
+            resolve_interpreters(
+                &build_options,
+                &bridge,
+                &target,
+                metadata24.requires_python.as_ref(),
+                generate_import_lib,
+            )?
+        };
+
+        if cargo_options.args.is_empty() {
+            // if not supplied on command line, try pyproject.toml
+            let tool_maturin = pyproject.and_then(|p| p.maturin());
+            if let Some(args) = tool_maturin.and_then(|x| x.rustc_args.as_ref()) {
+                cargo_options.args.extend(args.iter().cloned());
+                pyproject_toml_maturin_options.push("rustc-args");
+            }
+        }
+
+        let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
+        let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
+            || build_options.skip_auditwheel;
+        let auditwheel = build_options
+            .auditwheel
+            .or_else(|| pyproject.and_then(|x| x.auditwheel()))
+            .unwrap_or(if skip_auditwheel {
+                AuditWheelMode::Skip
+            } else {
+                AuditWheelMode::Repair
+            });
 
         for platform_tag in &platform_tags {
             if !platform_tag.is_supported() {

@@ -974,3 +974,23 @@ fn pyo3_source_date_epoch() {
         "pyo3_source_date_epoch",
     ))
 }
+
+#[test]
+fn pep517_editable_install_is_debug() {
+    handle_result(other::test_pep517_editable_install_is_debug());
+}
+
+#[test]
+fn pep517_install_is_release() {
+    handle_result(other::test_pep517_install_is_release());
+}
+
+#[test]
+fn pep517_editable_release_override() {
+    handle_result(other::test_pep517_editable_release_override());
+}
+
+#[test]
+fn pep517_regular_dev_override() {
+    handle_result(other::test_pep517_regular_dev_override());
+}

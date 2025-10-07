@@ -100,7 +100,7 @@ jobs:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set PYTHON_VERSION env var
@@ -223,7 +223,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
           version: "v0.10.0"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
       - uses: actions/download-artifact@v5
@@ -255,11 +255,11 @@ jobs:
       NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         id: setup-python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
       - uses: dtolnay/rust-toolchain@nightly
@@ -277,7 +277,7 @@ jobs:
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Run tests
@@ -342,7 +342,7 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Login to GitHub Container Registry
@@ -456,7 +456,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
           version: "v0.10.0"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:
           python-version: "3.10"

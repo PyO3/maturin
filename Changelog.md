@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.6]
+
+* Fix regressions to interpreter platform detection on Windows from 1.9.5
+* Further fixes to interpreter detection for Windows ARM64
+
 ## [1.9.5]
 
 * Add builtin sysconfig for FreeBSD 14.2 amd64
@@ -1104,7 +1109,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.5...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.6...HEAD
+[1.9.6]: https://github.com/pyo3/maturin/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/pyo3/maturin/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/pyo3/maturin/compare/v1.9.3...v1.9.4
 [1.9.3]: https://github.com/pyo3/maturin/compare/v1.9.2...v1.9.3

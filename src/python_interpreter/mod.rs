@@ -545,6 +545,18 @@ impl PythonInterpreter {
             .context(err_msg)
             .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 
+        Self::from_metadata_message(executable, target, bridge, message)
+    }
+
+    /// Configure a `PythonInterpreter` from the metadata message.
+    ///
+    /// Returns `None` if the interpreter is not suitable to use (e.g. too old or wrong architecture)
+    fn from_metadata_message(
+        executable: impl AsRef<Path>,
+        target: &Target,
+        bridge: &BridgeModel,
+        message: InterpreterMetadataMessage,
+    ) -> Result<Option<PythonInterpreter>> {
         if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
             debug!(
                 "Skipping outdated python interpreter '{}'",
@@ -1103,135 +1115,140 @@ mod tests {
     }
 
     #[test]
-    fn test_windows_interpreter_no_build() {
-        use pep440_rs::VersionSpecifiers;
-        use std::str::FromStr;
-
+    fn test_interpreter_from_metadata_windows() {
         // Test cases for different scenarios
         let target_x64 = Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap();
         let target_x86 = Target::from_resolved_target_triple("i686-pc-windows-msvc").unwrap();
         let target_arm64 = Target::from_resolved_target_triple("aarch64-pc-windows-msvc").unwrap();
 
+        let bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 26, 0),
+            abi3: None,
+            metadata: None,
+        });
+
+        let message = |major, minor, platform: &str| InterpreterMetadataMessage {
+            major,
+            minor,
+            interpreter: "cpython".to_string(),
+            implementation_name: "CPython".to_string(),
+            abiflags: None,
+            ext_suffix: Some(".pyd".to_string()),
+            platform: platform.to_string(),
+            executable: None,
+            soabi: None,
+            gil_disabled: false,
+            system: "windows".to_string(),
+        };
+
         // Test Python 2.x should be rejected
-        assert!(windows_interpreter_no_build(
-            2,
-            7,
-            &target_x64,
-            "win-amd64".to_string(),
-            7,
-            None
-        ));
+        assert_eq!(
+            PythonInterpreter::from_metadata_message(
+                "python2.7",
+                &target_x64,
+                &bridge,
+                message(2, 7, "win-amd64"),
+            )
+            .unwrap_err()
+            .to_string(),
+            "Failed to get information from the python interpreter at python2.7"
+        );
 
         // Test Python 3.x but below minimum version
-        assert!(windows_interpreter_no_build(
-            3,
-            6,
-            &target_x64,
-            "win-amd64".to_string(),
-            7,
-            None
-        ));
+        assert_eq!(
+            PythonInterpreter::from_metadata_message(
+                "python3.6",
+                &target_x64,
+                &bridge,
+                message(3, 6, "win-amd64"),
+            )
+            .unwrap_err()
+            .to_string(),
+            "Failed to get information from the python interpreter at python3.6"
+        );
 
         // Test valid Python version with matching platform and architecture
-        assert!(!windows_interpreter_no_build(
-            3,
-            10,
-            &target_x64,
-            "win-amd64".to_string(),
-            7,
-            None
-        ));
-
-        // Test 32-bit Python on 64-bit target (should be rejected)
-        assert!(windows_interpreter_no_build(
-            3,
-            10,
-            &target_x64,
-            "win32".to_string(),
-            7,
-            None
-        ));
-
-        // Test 32-bit Python on 32-bit target (should be accepted)
-        assert!(!windows_interpreter_no_build(
-            3,
-            10,
-            &target_x86,
-            "win32".to_string(),
-            7,
-            None
-        ));
+        for (target, platform) in &[
+            (&target_x86, "win32"),
+            (&target_x64, "win-amd64"),
+            (&target_arm64, "win-arm64"),
+        ] {
+            assert_eq!(
+                PythonInterpreter::from_metadata_message(
+                    "python3.10",
+                    target,
+                    &bridge,
+                    message(3, 10, platform),
+                )
+                .unwrap()
+                .unwrap(),
+                PythonInterpreter {
+                    config: InterpreterConfig {
+                        major: 3,
+                        minor: 10,
+                        interpreter_kind: InterpreterKind::CPython,
+                        abiflags: "".to_string(),
+                        ext_suffix: ".pyd".to_string(),
+                        pointer_width: None,
+                        gil_disabled: false,
+                    },
+                    executable: PathBuf::from("python3.10"),
+                    platform: Some(platform.replace("-", "_")),
+                    runnable: true,
+                    implementation_name: "CPython".to_string(),
+                    soabi: None,
+                }
+            );
+        }
 
         // Test mismatched architectures
-        assert!(windows_interpreter_no_build(
-            3,
-            10,
-            &target_x64,
-            "win-arm64".to_string(),
-            7,
-            None
-        ));
+        for (target, platform) in &[
+            (&target_x86, "win-amd64"),
+            (&target_x86, "win-arm64"),
+            (&target_x64, "win32"),
+            (&target_x64, "win-arm64"),
+            (&target_arm64, "win32"),
+            (&target_arm64, "win-amd64"),
+        ] {
+            assert_eq!(
+                PythonInterpreter::from_metadata_message(
+                    "python3.10",
+                    target,
+                    &bridge,
+                    message(3, 10, platform),
+                )
+                .unwrap(),
+                None
+            );
+        }
 
-        assert!(windows_interpreter_no_build(
-            3,
-            10,
-            &target_arm64,
-            "win-amd64".to_string(),
-            7,
-            None
-        ));
-
-        // Test correct architecture matches
-        assert!(!windows_interpreter_no_build(
-            3,
-            10,
-            &target_arm64,
-            "win-arm64".to_string(),
-            7,
-            None
-        ));
-
-        // Test requires-python constraints
-        let requires_python = VersionSpecifiers::from_str(">=3.8,<3.12").unwrap();
-
-        // Should reject Python 3.7 due to requires-python
-        assert!(windows_interpreter_no_build(
-            3,
-            7,
-            &target_x64,
-            "win-amd64".to_string(),
-            7,
-            Some(&requires_python)
-        ));
-
-        // Should accept Python 3.10 within requires-python range
-        assert!(!windows_interpreter_no_build(
-            3,
-            10,
-            &target_x64,
-            "win-amd64".to_string(),
-            7,
-            Some(&requires_python)
-        ));
-
-        // Should reject Python 3.12 due to requires-python upper bound
-        assert!(windows_interpreter_no_build(
-            3,
-            12,
-            &target_x64,
-            "win-amd64".to_string(),
-            7,
-            Some(&requires_python)
-        ));
-
-        // Test edge case with unknown platform (should not match any specific architecture)
-        assert!(!windows_interpreter_no_build(
-            3,
-            10,
-            &target_x64,
-            "unknown-platform".to_string(),
-            7,
-            None
-        ));
+        // Test edge case with unknown platform (should not match any specific architecture, build anyway)
+        assert_eq!(
+            PythonInterpreter::from_metadata_message(
+                "python3.10",
+                &target_x64,
+                &bridge,
+                message(3, 10, "unknown-platform"),
+            )
+            .unwrap()
+            .unwrap(),
+            PythonInterpreter {
+                config: InterpreterConfig {
+                    major: 3,
+                    minor: 10,
+                    interpreter_kind: InterpreterKind::CPython,
+                    abiflags: "".to_string(),
+                    ext_suffix: ".pyd".to_string(),
+                    pointer_width: None,
+                    gil_disabled: false,
+                },
+                executable: PathBuf::from("python3.10"),
+                platform: Some("unknown_platform".to_string()),
+                runnable: true,
+                implementation_name: "CPython".to_string(),
+                soabi: None,
+            }
+        );
     }
 }

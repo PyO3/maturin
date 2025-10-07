@@ -81,8 +81,9 @@ fn find_all_windows(
                     if major == 3
                         && minor >= min_python_minor
                         && !versions_found.contains(&(major, minor))
-                        && requires_python
-                            .is_none_or(|r| r.contains(&Version::new([3, minor as u64])))
+                        && requires_python.map_or(true, |requires_python| {
+                            requires_python.contains(&Version::new([major as u64, minor as u64]))
+                        })
                     {
                         interpreter.push(interp);
                         versions_found.insert((major, minor));

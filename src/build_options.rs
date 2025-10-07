@@ -374,8 +374,13 @@ impl BuildOptions {
                                 }
                             }
                         } else {
-                            interpreters =
-                                find_interpreter(bridge, interpreter, target, requires_python)?;
+                            interpreters = find_interpreter(
+                                bridge,
+                                interpreter,
+                                target,
+                                requires_python,
+                                generate_import_lib,
+                            )?;
                         }
 
                         let interpreters_str = interpreters
@@ -1288,6 +1293,7 @@ fn find_interpreter(
     interpreter: &[PathBuf],
     target: &Target,
     requires_python: Option<&VersionSpecifiers>,
+    generate_import_lib: bool,
 ) -> Result<Vec<PythonInterpreter>> {
     let mut found_interpreters = Vec::new();
     if !interpreter.is_empty() {
@@ -1301,6 +1307,16 @@ fn find_interpreter(
         if !missing.is_empty() {
             let sysconfig_interps =
                 find_interpreter_in_sysconfig(bridge, &missing, target, requires_python)?;
+
+            // Can only use sysconfig-derived interpreter on windows if generating the import lib
+            if !sysconfig_interps.is_empty() && target.is_windows() && !generate_import_lib {
+                let found = sysconfig_interps
+                    .iter()
+                    .map(|i| format!("{} {}.{}", i.interpreter_kind, i.major, i.minor))
+                    .collect::<Vec<_>>();
+                bail!("Interpreters {found:?} were found in maturin's bundled sysconfig, but compiling for Windows without an interpreter requires PyO3's `generate-import-lib` feature");
+            }
+
             found_interpreters.extend(sysconfig_interps);
         }
     } else {

@@ -480,6 +480,12 @@ impl Metadata24 {
         };
         let name = package.name.clone();
         let mut project_url = IndexMap::new();
+        if let Some(homepage) = package.homepage.as_ref() {
+            project_url.insert("Homepage".to_string(), homepage.clone());
+        }
+        if let Some(documentation) = package.documentation.as_ref() {
+            project_url.insert("Documentation".to_string(), documentation.clone());
+        }
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }

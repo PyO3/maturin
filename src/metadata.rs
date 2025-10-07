@@ -814,6 +814,7 @@ A test project
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
+            Project-URL: Homepage, https://example.org
 
             # Some test package
 

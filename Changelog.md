@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Fix generated WHEEL Tag metadata to be spec compliant.
+
 ## [1.9.6]
 
 * Fix regressions to interpreter platform detection on Windows from 1.9.5

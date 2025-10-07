@@ -591,6 +591,13 @@ impl FileTracker {
     }
 }
 
+fn expand_compressed_tag(tag: &str) -> impl Iterator<Item = String> + use<'_> {
+    tag.split('-')
+        .map(|component| component.split('.'))
+        .multi_cartesian_product()
+        .map(|components| components.join("-"))
+}
+
 fn wheel_file(tags: &[String]) -> Result<String> {
     let mut wheel_file = format!(
         "Wheel-Version: 1.0
@@ -601,8 +608,20 @@ Root-Is-Purelib: false
         version = env!("CARGO_PKG_VERSION"),
     );
 
+    // N.B.: Tags should be in expanded form in this metadata (See:
+    // https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-contents
+    // items 7 and 11); so we do that expansion here if needed.
+    //
+    // It might make sense to reify a Tag struct in the code base and then, when a compressed tag
+    // set needs to be rendered, render a single string at that time. As things stand though, this
+    // is the only place in the codebase that needs reified tags (compressed tag sets expanded); so
+    // we do the expansion here.
+    //
+    // See: https://github.com/PyO3/maturin/issues/2761
     for tag in tags {
-        writeln!(wheel_file, "Tag: {tag}")?;
+        for expanded_tag in expand_compressed_tag(tag) {
+            writeln!(wheel_file, "Tag: {expanded_tag}")?;
+        }
     }
 
     Ok(wheel_file)
@@ -1633,6 +1652,31 @@ mod tests {
 
         writer.finish()?;
         tmp_dir.close()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn wheel_file_compressed_tags() -> Result<(), Box<dyn std::error::Error>> {
+        let expected = format!(
+            "Wheel-Version: 1.0
+Generator: {name} ({version})
+Root-Is-Purelib: false
+Tag: py2-none-any
+Tag: py3-none-any
+Tag: pre-expanded-tag
+Tag: cp37-abi3-manylinux_2_17_x86_64
+Tag: cp37-abi3-manylinux2014_x86_64
+",
+            name = env!("CARGO_PKG_NAME"),
+            version = env!("CARGO_PKG_VERSION"),
+        );
+        let actual = wheel_file(&[
+            "py2.py3-none-any".to_string(),
+            "pre-expanded-tag".to_string(),
+            "cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64".to_string(),
+        ])?;
+        assert_eq!(expected, actual);
 
         Ok(())
     }

@@ -32,6 +32,9 @@ categories = [
 edition = "2021"
 rust-version = "1.74"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("xwin"))'] }
+
 [[bin]]
 name = "maturin"
 

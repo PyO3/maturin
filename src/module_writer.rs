@@ -591,7 +591,7 @@ impl FileTracker {
     }
 }
 
-fn expand_compressed_tag(tag: &str) -> impl Iterator<Item = String> + use<'_> {
+fn expand_compressed_tag(tag: &str) -> impl Iterator<Item = String> + '_ {
     tag.split('-')
         .map(|component| component.split('.'))
         .multi_cartesian_product()

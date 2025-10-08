@@ -480,6 +480,12 @@ impl Metadata24 {
         };
         let name = package.name.clone();
         let mut project_url = IndexMap::new();
+        if let Some(homepage) = package.homepage.as_ref() {
+            project_url.insert("Homepage".to_string(), homepage.clone());
+        }
+        if let Some(documentation) = package.documentation.as_ref() {
+            project_url.insert("Documentation".to_string(), documentation.clone());
+        }
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
@@ -808,6 +814,7 @@ A test project
             Author: konstin <konstin@mailbox.org>
             Author-email: konstin <konstin@mailbox.org>
             Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
+            Project-URL: Homepage, https://example.org
 
             # Some test package
 

@@ -296,7 +296,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
         } => {
             let build_context = build_options
                 .into_build_context()
-                .release(true)
+                .release(!editable)
                 .strip(strip)
                 .editable(editable)
                 .build()?;

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Fix panic when building sdist for crates with path dependencies from parent workspaces.
 * Fix generated WHEEL Tag metadata to be spec compliant.
 
 ## [1.9.6]

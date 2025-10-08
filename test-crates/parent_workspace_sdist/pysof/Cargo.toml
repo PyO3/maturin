@@ -1,0 +1,16 @@
+[workspace]
+# pysof is its own workspace to support maturin sdist building
+members = ["."]
+resolver = "2"
+
+[package]
+name = "pysof"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25.0", features = ["extension-module"] }
+shared_crate = { path = "../shared_crate" }

@@ -222,3 +222,5 @@ opt-level = 3
 opt-level = 3
 
 
+[patch.crates-io]
+fs4 = { git = "https://github.com/Kreijstal/fs4-rs", branch = "cygwin" }

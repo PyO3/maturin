@@ -23,7 +23,7 @@ const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
 pub const MINIMUM_PYPY_MINOR: usize = 8;
 /// Be liberal here to include preview versions
-pub const MAXIMUM_PYTHON_MINOR: usize = 13;
+pub const MAXIMUM_PYTHON_MINOR: usize = 14;
 pub const MAXIMUM_PYPY_MINOR: usize = 11;
 
 /// On windows regular Python installs are supported along with environments
@@ -976,6 +976,7 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
+                "CPython 3.14",
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
@@ -1007,7 +1008,9 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
+                "CPython 3.14",
                 "CPython 3.13t",
+                "CPython 3.14t",
                 "PyPy 3.9",
                 "PyPy 3.10",
                 "PyPy 3.11",
@@ -1031,6 +1034,7 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
+                "CPython 3.14",
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
@@ -1053,6 +1057,7 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
+                "CPython 3.14",
                 "PyPy 3.10",
                 "PyPy 3.11",
             ]
@@ -1081,7 +1086,9 @@ mod tests {
                 "CPython 3.11",
                 "CPython 3.12",
                 "CPython 3.13",
+                "CPython 3.14",
                 "CPython 3.13t",
+                "CPython 3.14t",
                 "PyPy 3.9",
                 "PyPy 3.10",
                 "PyPy 3.11",

@@ -718,13 +718,19 @@ fn add_path_dep(
     // Handle different workspace manifest
     if path_dep.workspace_root != workspace_root {
         let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
-        let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
-            .strip_prefix(sdist_root)
-            .unwrap();
-        writer.add_file(
-            root_dir.join(relative_path_dep_workspace_manifest),
-            &path_dep_workspace_manifest,
-        )?;
+        // Only include the workspace manifest if it's inside the sdist root
+        // This can fail if a path dependency belongs to a parent workspace
+        if let Ok(relative_path_dep_workspace_manifest) = path_dep_workspace_manifest.strip_prefix(sdist_root) {
+            writer.add_file(
+                root_dir.join(relative_path_dep_workspace_manifest),
+                &path_dep_workspace_manifest,
+            )?;
+        } else {
+            debug!(
+                "Skipping workspace manifest at {} (outside sdist root)",
+                path_dep_workspace_manifest.display()
+            );
+        }
     }
     Ok(())
 }

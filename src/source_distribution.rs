@@ -720,7 +720,9 @@ fn add_path_dep(
         let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
         // Only include the workspace manifest if it's inside the sdist root
         // This can fail if a path dependency belongs to a parent workspace
-        if let Ok(relative_path_dep_workspace_manifest) = path_dep_workspace_manifest.strip_prefix(sdist_root) {
+        if let Ok(relative_path_dep_workspace_manifest) =
+            path_dep_workspace_manifest.strip_prefix(sdist_root)
+        {
             writer.add_file(
                 root_dir.join(relative_path_dep_workspace_manifest),
                 &path_dep_workspace_manifest,

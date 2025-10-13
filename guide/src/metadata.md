@@ -74,9 +74,11 @@ When the `[project]` section is not present, maturin will populate metadata from
 * `license` - From `package.license` in Cargo.toml
 * `project_url` - From various URLs in Cargo.toml (like repository, homepage, etc.)
 
-When the `[project]` section is present, maturin will merge metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
+When the `[project]` section is present in `pyproject.toml`, it must contain at least the `name` field.
+Maturin will then merge metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
 Per specification, maturin is not allowed to populate fields that are not present in `project.dynamic` list when the `[project]` section is present.
-For example, to use the Rust crate version as the Python package version, you need to add `version` to the `project.dynamic` list and so forth:
+For example, to use the Rust crate version as the Python package version, you need to add `version` to the `project.dynamic` list.
+To use `package.homepage` from `Cargo.toml`, add `urls` to `project.dynamic` and so forth:
 
 ```toml
 [project]

@@ -43,6 +43,7 @@ pub enum Os {
     Wasi,
     Aix,
     Hurd,
+    Cygwin,
 }
 
 impl fmt::Display for Os {
@@ -63,6 +64,7 @@ impl fmt::Display for Os {
             Os::Wasi => write!(f, "Wasi"),
             Os::Aix => write!(f, "AIX"),
             Os::Hurd => write!(f, "Hurd"),
+            Os::Cygwin => write!(f, "Cygwin"),
         }
     }
 }
@@ -209,6 +211,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
         Os::Aix => vec![Arch::Powerpc64],
         Os::Hurd => vec![Arch::X86, Arch::X86_64],
+        Os::Cygwin => vec![Arch::X86, Arch::X86_64],
     }
 }
 
@@ -283,6 +286,7 @@ impl Target {
             OperatingSystem::Wasi | OperatingSystem::WasiP1 | OperatingSystem::WasiP2 => Os::Wasi,
             OperatingSystem::Aix => Os::Aix,
             OperatingSystem::Hurd => Os::Hurd,
+            OperatingSystem::Cygwin => Os::Cygwin,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -463,6 +467,7 @@ impl Target {
             Os::Wasi => "wasi",
             Os::Aix => "aix",
             Os::Hurd => "gnu",
+            Os::Cygwin => "cygwin",
         }
     }
 
@@ -558,7 +563,8 @@ impl Target {
             | Os::Emscripten
             | Os::Wasi
             | Os::Aix
-            | Os::Hurd => true,
+            | Os::Hurd
+            | Os::Cygwin => true,
         }
     }
 

@@ -32,6 +32,9 @@ categories = [
 edition = "2021"
 rust-version = "1.74"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("xwin"))'] }
+
 [[bin]]
 name = "maturin"
 
@@ -101,7 +104,7 @@ clap_complete_command = { version = "0.6.1", optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.20.0", default-features = false, optional = true }
-cargo-xwin = { version = "0.18.6", default-features = false, optional = true }
+#cargo-xwin = { version = "0.18.6", default-features = false, optional = true }
 
 # log
 tracing = "0.1.36"
@@ -119,10 +122,11 @@ dirs = { version = "5.0.0", optional = true }
 multipart = { version = "0.18.0", features = [
     "client",
 ], default-features = false, optional = true }
-ureq = { version = "2.9.4", features = [
+ureq = { version = "3.1.2", features = [
     "gzip",
     "json",
     "socks-proxy",
+    "rustls-no-provider",
 ], default-features = false, optional = true }
 native-tls = { version = "0.2.8", optional = true }
 rustls = { version = "0.23", default-features = false, features = [
@@ -130,6 +134,7 @@ rustls = { version = "0.23", default-features = false, features = [
     "std",
     "tls12",
 ], optional = true }
+rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }
 rustls-pemfile = { version = "2.1.0", optional = true }
 keyring = { version = "2.3.2", default-features = false, features = [
     "linux-no-secret-service",
@@ -142,7 +147,7 @@ pretty_assertions = { version = "1.3.0", optional = true }
 
 [dev-dependencies]
 expect-test = "1.4.1"
-fs4 = { version = "0.12.0", features = ["fs-err3"] }
+fs4 = { version = "0.13.1", features = ["fs-err3"] }
 indoc = "2.0.3"
 insta = "1.34.0"
 pretty_assertions = "1.3.0"
@@ -176,21 +181,22 @@ password-storage = ["upload", "keyring"]
 
 rustls = [
     "dep:rustls",
-    "ureq?/tls",
-    "cargo-xwin?/rustls-tls",
+    "dep:rustls-rustcrypto",
+    "ureq?/rustls-no-provider",
+    #"cargo-xwin?/rustls-tls",
     "dep:rustls-pemfile",
 ]
 native-tls = [
     "dep:native-tls",
     "ureq?/native-tls",
-    "cargo-xwin?/native-tls",
+    #"cargo-xwin?/native-tls",
     "dep:rustls-pemfile",
 ]
 
 # cross compile using zig or xwin
-cross-compile = ["zig", "xwin"]
+cross-compile = ["zig"]
 zig = ["cargo-zigbuild"]
-xwin = ["cargo-xwin"]
+#xwin = ["cargo-xwin"]
 
 # project scaffolding
 scaffolding = ["dialoguer", "console", "minijinja", "unicode-xid"]
@@ -214,3 +220,7 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.msi]
 opt-level = 3
+
+
+[patch.crates-io]
+fs4 = { git = "https://github.com/Kreijstal/fs4-rs", branch = "cygwin" }

@@ -293,11 +293,19 @@ fn fun_with_abiflags(
         && target.get_python_os() != message.system
         && !target.cross_compiling()
     {
-        bail!(
-            "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
-            message.system,
-            target,
-        )
+        // Special case for Cygwin: Python from MSYS2 reports "msys_nt-*" as platform.system()
+        // but the Rust target is "cygwin"
+        let is_cygwin_msys_match = target.get_python_os() == "cygwin"
+            && (message.system.to_lowercase().starts_with("msys")
+                || message.system.eq_ignore_ascii_case("cygwin"));
+
+        if !is_cygwin_msys_match {
+            bail!(
+                "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
+                message.system,
+                target,
+            )
+        }
     }
 
     if message.major != 3 || message.minor < 7 {

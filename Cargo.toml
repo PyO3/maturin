@@ -77,7 +77,7 @@ pyproject-toml = { version = "0.13.5", features = ["pep639-glob"] }
 python-pkginfo = "0.6.5"
 textwrap = "0.16.1"
 ignore = "0.4.20"
-itertools = "0.12.1"
+itertools = "0.14.0"
 lddtree = "0.3.7"
 cc = "1.0.88"
 dunce = "1.0.2"

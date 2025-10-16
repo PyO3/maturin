@@ -47,6 +47,10 @@ jobs:
           - "3.9"
           - "3.13"
           - "3.13t"
+          - "3.14"
+          - "3.14t"
+          - "3.15-dev"
+          - "3.15t-dev"
           - "pypy3.11"
         include:
           - os: windows-11-arm
@@ -103,6 +107,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          freethreaded: true
       - name: Set PYTHON_VERSION env var
         shell: bash
         run: |

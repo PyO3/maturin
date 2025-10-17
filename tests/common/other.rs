@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use expect_test::Expect;
 use flate2::read::GzDecoder;
@@ -9,9 +9,13 @@ use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::str;
 use tar::Archive;
 use time::OffsetDateTime;
 use zip::ZipArchive;
+
+use crate::common::{check_installed, create_virtualenv};
 
 /// Tries to compile a sample crate (pyo3-pure) for musl,
 /// given that rustup and the the musl target are installed
@@ -374,4 +378,138 @@ pub fn abi3_without_version() -> Result<()> {
     assert!(result.is_ok());
 
     Ok(())
+}
+
+fn test_pep517_install(
+    venv_name: &str,
+    editable: bool,
+    release: bool,
+    profile: Option<&str>,
+) -> Result<()> {
+    // 1. Build maturin itself into a wheel
+    let manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+    let build_options = BuildOptions {
+        cargo: CargoOptions {
+            manifest_path: Some(manifest_path),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options.into_build_context().release(true).build()?;
+    let maturin_wheels = build_context.build_wheels()?;
+    let maturin_wheel = &maturin_wheels[0].0;
+
+    // 2. Create a venv and install our maturin wheel into it
+    let (_venv_dir, python) = create_virtualenv(venv_name, None)?;
+    let output = Command::new(&python)
+        .args(["-m", "pip", "install", "--upgrade", "pip"])
+        .output()?;
+    if !output.status.success() {
+        bail!(
+            "Failed to upgrade pip: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+    let output = Command::new(&python)
+        .args(["-m", "pip", "install"])
+        .arg(maturin_wheel)
+        .output()?;
+    if !output.status.success() {
+        bail!(
+            "Failed to install local maturin wheel: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
+    // 3. Create a temporary project with the specified profile
+    let tmp_dir = tempfile::tempdir()?;
+    let package_dir = tmp_dir.path();
+    let base_package_dir = Path::new("test-crates/pyo3-pure");
+    // Use fs_extra to copy directories
+    let mut options = fs_extra::dir::CopyOptions::new();
+    options.overwrite = true;
+    options.content_only = true;
+    fs_extra::dir::copy(base_package_dir, package_dir, &options)?;
+
+    if let Some(profile) = profile {
+        let pyproject_toml_path = package_dir.join("pyproject.toml");
+        let mut pyproject_toml = fs_err::read_to_string(&pyproject_toml_path)?;
+        pyproject_toml = pyproject_toml.replace(
+            "[tool.maturin]",
+            &format!("[tool.maturin]\nprofile = \"{}\"", profile),
+        );
+        fs_err::write(&pyproject_toml_path, pyproject_toml)?;
+    }
+
+    // 4. Run pip install with --no-build-isolation and a modified PATH
+    let mut pip_args = vec!["-m", "pip", "install", "-v"];
+    if editable {
+        pip_args.push("-e");
+    }
+    pip_args.extend(&[".", "--no-deps", "--no-build-isolation"]);
+
+    let venv_bin_path = python.parent().unwrap().to_path_buf();
+    let existing_path = std::env::var_os("PATH").unwrap();
+    let new_path = std::env::join_paths(
+        vec![venv_bin_path]
+            .into_iter()
+            .chain(std::env::split_paths(&existing_path)),
+    )?;
+
+    let output = Command::new(&python)
+        .args(&pip_args)
+        .current_dir(package_dir)
+        .env("PATH", new_path)
+        .output()?;
+
+    // 5. Assertions
+    if !output.status.success() {
+        bail!(
+            "pip install failed: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
+    let stderr = str::from_utf8(&output.stderr)?;
+    if release {
+        assert!(stderr.contains("Finished `release` profile [optimized]"));
+        assert!(
+            !stderr.contains("Finished `dev` profile [unoptimized + debuginfo]"),
+            "Install should not use debug profile.\n---Stderr was ---\n{}\n",
+            stderr
+        );
+    } else {
+        assert!(stderr.contains("Finished `dev` profile [unoptimized + debuginfo]"));
+        assert!(
+            !stderr.contains("Finished `release` profile [optimized]"),
+            "Editable install should not use release profile.\n---Stderr was ---\n{}\n",
+            stderr
+        );
+    }
+
+    check_installed(package_dir, &python)?;
+
+    Ok(())
+}
+
+pub fn test_pep517_editable_install_is_debug() -> Result<()> {
+    test_pep517_install("pep517-editable-debug", true, false, None)
+}
+
+pub fn test_pep517_install_is_release() -> Result<()> {
+    test_pep517_install("pep517-release", false, true, None)
+}
+
+pub fn test_pep517_editable_release_override() -> Result<()> {
+    test_pep517_install("pep517-editable-release", true, true, Some("release"))
+}
+
+pub fn test_pep517_regular_dev_override() -> Result<()> {
+    test_pep517_install("pep517-regular-dev", false, false, Some("dev"))
 }

@@ -8,7 +8,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.25.0", features = ["extension-module"] }
+pyo3 = { version = "0.26.0", features = ["extension-module"] }
 
 [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
 some_path_dep = { path = "../some_path_dep" }

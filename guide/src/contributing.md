@@ -50,7 +50,7 @@ Ready to contribute? Here's how to setup maturin for local development.
    ```bash
    $ cargo test
    ```
-   Note that in order to run tests you need to install `virtualenv` (`pip install virtualenv`).
+   Note that in order to run tests you need to install `virtualenv` (`pip install virtualenv`) and add WebAssembly compilation target (`rustup target add wasm32-wasip1`).
 6. make sure your changes are well formatted and pass the linting checks by
    installing [pre-commit](https://pre-commit.com/) and running
    ```bash

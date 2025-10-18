@@ -1196,10 +1196,7 @@ fn generate_uniffi_bindings(
     }
 
     // uniffi bindings hardcoded the extension filenames
-    let cdylib_name = match cdylib_name {
-        Some(name) => name,
-        None => format!("uniffi_{py_binding_name}"),
-    };
+    let cdylib_name = cdylib_name.unwrap_or(py_binding_name);
     let cdylib = match target_os {
         Os::Macos => format!("lib{cdylib_name}.dylib"),
         Os::Windows => format!("{cdylib_name}.dll"),

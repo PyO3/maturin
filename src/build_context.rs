@@ -1354,7 +1354,7 @@ fn emcc_version() -> Result<String> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::macosx_deployment_target;
     use pretty_assertions::assert_eq;
 

@@ -1626,7 +1626,7 @@ impl CargoOptions {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use cargo_metadata::MetadataCommand;
     use pretty_assertions::assert_eq;
     use std::path::Path;

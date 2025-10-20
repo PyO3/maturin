@@ -113,8 +113,6 @@ pub struct BuildContext {
     /// The directory to store the built wheels in. Defaults to a new "wheels"
     /// directory in the project's target directory
     pub out: PathBuf,
-    /// Build artifacts in release mode, with optimizations
-    pub release: bool,
     /// Strip the library for minimum file size
     pub strip: bool,
     /// Checking the linked libraries for manylinux/musllinux compliance

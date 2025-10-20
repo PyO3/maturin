@@ -24,7 +24,6 @@ pub fn pyo3_no_extension_module() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build()?
@@ -62,7 +61,6 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();
@@ -100,7 +98,6 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build()?
@@ -169,7 +166,6 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();
@@ -210,7 +206,6 @@ pub fn pypi_compatibility_mixed_tags() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();

@@ -1232,12 +1232,15 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             let lib_name = lib.as_str();
             let pyo3_node = deps[lib_name];
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
-                let version = cargo_metadata[&pyo3_node.id].version.to_string();
-                eprintln!(
-                    "⚠️  Warning: You're building a library without activating {lib}'s \
-                     `extension-module` feature. \
-                     See https://pyo3.rs/v{version}/building-and-distribution.html#the-extension-module-feature"
-                );
+                let version = &cargo_metadata[&pyo3_node.id].version;
+                if (version.major, version.minor) < (0, 26) {
+                    // pyo3 0.26+ will use the `PYO3_BUILD_EXTENSION_MODULE` env var instead
+                    eprintln!(
+                        "⚠️  Warning: You're building a library without activating {lib}'s \
+                        `extension-module` feature. \
+                        See https://pyo3.rs/v{version}/building-and-distribution.html#the-extension-module-feature"
+                    );
+                }
             }
 
             return if let Some(abi3_version) = has_abi3(&deps)? {

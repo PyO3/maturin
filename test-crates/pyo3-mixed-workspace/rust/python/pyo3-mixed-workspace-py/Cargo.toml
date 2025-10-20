@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 pyo3-mixed-workspace = { path = "../../pyo3-mixed-workspace" }
-pyo3 = { version = "0.25.0", features = [
+pyo3 = { version = "0.26.0", features = [
     "extension-module",
     "generate-import-lib",
 ] }

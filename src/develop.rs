@@ -198,7 +198,7 @@ pub struct DevelopOptions {
     )]
     pub bindings: Option<String>,
     /// Pass --release to cargo
-    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS,)]
+    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
     pub release: bool,
     /// Strip the library for minimum file size
     #[arg(long)]

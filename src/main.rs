@@ -62,7 +62,7 @@ enum Command {
     /// Build the crate into python packages
     Build {
         /// Build artifacts in release mode, with optimizations
-        #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS)]
+        #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
         release: bool,
         /// Strip the library for minimum file size
         #[arg(long)]
@@ -78,7 +78,7 @@ enum Command {
     /// Build and publish the crate as python packages to pypi
     Publish {
         /// Do not pass --release to cargo
-        #[arg(long)]
+        #[arg(long, conflicts_with = "profile")]
         debug: bool,
         /// Do not strip the library for minimum file size
         #[arg(long = "no-strip")]

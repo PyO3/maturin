@@ -70,7 +70,6 @@ pub fn test_musl() -> Result<bool> {
 
     let build_context = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build()?;
@@ -114,7 +113,6 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 
     let build_context = options
         .into_build_context()
-        .release(false)
         .strip(false)
         .editable(false)
         .build()?;
@@ -149,7 +147,6 @@ pub fn test_source_distribution(
 
     let mut build_context = build_options
         .into_build_context()
-        .release(false)
         .strip(false)
         .editable(false)
         .sdist_only(true)
@@ -225,7 +222,6 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
 
     let build_context = build_options
         .into_build_context()
-        .release(false)
         .strip(false)
         .editable(false)
         .build()?;
@@ -286,7 +282,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();
@@ -303,7 +298,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();
@@ -324,7 +318,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .release(false)
             .strip(cfg!(feature = "faster-tests"))
             .editable(false)
             .build();
@@ -341,7 +334,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .release(false)
             .strip(cfg!(feature = "faster-tests"))
             .editable(false)
             .build();
@@ -367,7 +359,6 @@ pub fn abi3_without_version() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();

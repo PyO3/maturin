@@ -549,7 +549,6 @@ impl BuildOptions {
 #[derive(Debug)]
 pub struct BuildContextBuilder {
     build_options: BuildOptions,
-    release: bool,
     strip: bool,
     editable: bool,
     sdist_only: bool,
@@ -559,16 +558,10 @@ impl BuildContextBuilder {
     fn new(build_options: BuildOptions) -> Self {
         Self {
             build_options,
-            release: false,
             strip: false,
             editable: false,
             sdist_only: false,
         }
-    }
-
-    pub fn release(mut self, release: bool) -> Self {
-        self.release = release;
-        self
     }
 
     pub fn strip(mut self, strip: bool) -> Self {
@@ -589,7 +582,6 @@ impl BuildContextBuilder {
     pub fn build(self) -> Result<BuildContext> {
         let Self {
             build_options,
-            release,
             strip,
             editable,
             sdist_only,
@@ -819,7 +811,6 @@ impl BuildContextBuilder {
             manifest_path: cargo_toml_path,
             target_dir,
             out: wheel_dir,
-            release,
             strip,
             auditwheel,
             #[cfg(feature = "zig")]

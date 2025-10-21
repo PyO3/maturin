@@ -170,11 +170,6 @@ fn cargo_build_command(
         .into_rustc_options(user_specified_target);
     cargo_rustc.message_format = vec!["json-render-diagnostics".to_string()];
 
-    // --release and --profile are conflicting options
-    if context.release && cargo_rustc.profile.is_none() {
-        cargo_rustc.release = true;
-    }
-
     // Add `--crate-type cdylib` if available
     if compile_target
         .target

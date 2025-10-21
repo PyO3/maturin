@@ -273,12 +273,16 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
         } => {
             assert_eq!(build_options.interpreter.len(), 1);
-            let context = build_options
+            let mut context = build_options
                 .into_build_context()
-                .release(true)
                 .strip(strip)
                 .editable(false)
                 .build()?;
+
+            // TBD: does `--profile release` do anything here?
+            if context.cargo_options.profile.is_none() {
+                context.cargo_options.profile = Some("release".to_string());
+            }
 
             let mut writer = PathWriter::from_path(metadata_directory);
             write_dist_info(
@@ -294,12 +298,14 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip,
             editable,
         } => {
-            let build_context = build_options
+            let mut build_context = build_options
                 .into_build_context()
-                .release(true)
                 .strip(strip)
                 .editable(editable)
                 .build()?;
+            if build_context.cargo_options.profile.is_none() {
+                build_context.cargo_options.profile = Some("release".to_string());
+            }
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
@@ -321,7 +327,6 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             };
             let build_context = build_options
                 .into_build_context()
-                .release(false)
                 .strip(false)
                 .editable(false)
                 .sdist_only(true)
@@ -363,14 +368,17 @@ fn run() -> Result<()> {
 
     match opt.command {
         Command::Build {
-            build,
+            mut build,
             release,
             strip,
             sdist,
         } => {
+            // set profile to release if specified; `--release` and `--profile` are mutually exclusive
+            if release {
+                build.profile = Some("release".to_string());
+            }
             let build_context = build
                 .into_build_context()
-                .release(release)
                 .strip(strip)
                 .editable(false)
                 .build()?;
@@ -384,20 +392,34 @@ fn run() -> Result<()> {
         }
         #[cfg(feature = "upload")]
         Command::Publish {
-            build,
+            mut build,
             mut publish,
             debug,
             no_strip,
             no_sdist,
         } => {
-            let build_context = build
+            // set profile to dev if specified; `--debug` and `--profile` are mutually exclusive
+            //
+            // do it here to take precedence over pyproject.toml profile setting
+            if debug {
+                build.profile = Some("dev".to_string());
+            }
+
+            let mut build_context = build
                 .into_build_context()
-                .release(!debug)
                 .strip(!no_strip)
                 .editable(false)
                 .build()?;
 
-            if !build_context.release {
+            // ensure profile always set when publishing
+            // (respect pyproject.toml if set)
+            // don't need to check `debug` here, set above to take precedence if set
+            let profile = build_context
+                .cargo_options
+                .profile
+                .get_or_insert_with(|| "release".to_string());
+
+            if profile == "dev" {
                 eprintln!("⚠️  Warning: You're publishing debug wheels");
             }
 
@@ -462,7 +484,6 @@ fn run() -> Result<()> {
             };
             let build_context = build_options
                 .into_build_context()
-                .release(false)
                 .strip(false)
                 .editable(false)
                 .sdist_only(true)

@@ -1,4 +1,3 @@
-msrv = "1.74.0"
 
 disallowed-types = [
     "std::fs::DirEntry",

@@ -30,7 +30,7 @@ categories = [
     "command-line-utilities",
 ]
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.83"
 
 [[bin]]
 name = "maturin"
@@ -58,7 +58,7 @@ tar = "0.4.38"
 tempfile = "3.2.0"
 toml = "0.8.10"
 toml_edit = "0.22.6"
-zip = { version = "2.3.0", default-features = false, features = [
+zip = { version = "6.0.0", default-features = false, features = [
     "bzip2",
     "deflate",
     "time",
@@ -74,7 +74,7 @@ semver = "1.0.22"
 target-lexicon = "0.13.0"
 indexmap = "2.2.3"
 pyproject-toml = { version = "0.13.5", features = ["pep639-glob"] }
-python-pkginfo = "0.6.5"
+python-pkginfo = "0.6.6"
 textwrap = "0.16.1"
 ignore = "0.4.20"
 itertools = "0.14.0"

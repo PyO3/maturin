@@ -563,7 +563,7 @@ pub fn relpath(to: &Path, from: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::auditwheel::audit::relpath;
     use crate::Target;
     use pretty_assertions::assert_eq;

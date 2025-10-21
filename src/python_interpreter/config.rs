@@ -459,7 +459,7 @@ suppress_build_script_link_lines=false"#,
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use expect_test::expect;
     use pretty_assertions::assert_eq;

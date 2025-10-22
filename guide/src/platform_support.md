@@ -33,10 +33,10 @@ supported by [manylinux](https://github.com/pypa/manylinux).
 
 ## Python Support
 
-CPython 3.8 to 3.10 are supported and tested on CI, though the entire 3.x series should work.
+CPython 3.8 to 3.14 are supported and tested on CI, though the entire 3.x series should work.
 This will be changed as new python versions are released and others have their end of life.
 
-PyPy 3.6 and later also works, as does GraalPy 23.0 and later.
+PyPy 3.8 and later also works, as does GraalPy 23.0 and later.
 
 ## Manylinux/Musllinux
 

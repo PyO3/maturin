@@ -1,8 +1,8 @@
 import json
 import platform
+import struct
 import sys
 import sysconfig
-import struct
 
 if platform.python_implementation() == "PyPy":
     # Workaround for PyPy 3.6 on windows:

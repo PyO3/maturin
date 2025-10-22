@@ -38,7 +38,7 @@ build:
   os: "ubuntu-20.04"
   tools:
     python: "3.9"
-    rust: "1.55"
+    rust: "1.86"
 
 python:
   install:

@@ -1358,29 +1358,25 @@ mod tests {
 
     #[test]
     fn test_macosx_deployment_target() {
-        let rustc_ver = rustc_version::version().unwrap();
-        let rustc_ver = (rustc_ver.major, rustc_ver.minor);
-        let x86_64_minor = if rustc_ver >= (1, 74) { 12 } else { 7 };
-        let universal2_minor = if rustc_ver >= (1, 74) { 12 } else { 9 };
         assert_eq!(
             macosx_deployment_target(None, false).unwrap(),
-            ((10, x86_64_minor), (11, 0))
+            ((10, 12), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(None, true).unwrap(),
-            ((10, universal2_minor), (11, 0))
+            ((10, 12), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("10.6"), false).unwrap(),
-            ((10, x86_64_minor), (11, 0))
+            ((10, 12), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("10.6"), true).unwrap(),
-            ((10, universal2_minor), (11, 0))
+            ((10, 12), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("10.9"), false).unwrap(),
-            ((10, universal2_minor), (11, 0))
+            ((10, 12), (11, 0))
         );
         assert_eq!(
             macosx_deployment_target(Some("11.0.0"), false).unwrap(),

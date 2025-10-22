@@ -913,7 +913,6 @@ fn workspace_with_path_dep_git_sdist_generator() {
     ))
 }
 
-#[rustversion::since(1.64)]
 #[test]
 fn workspace_inheritance_sdist() {
     handle_result(other::test_source_distribution(

@@ -1,4 +1,3 @@
-use crate::target::RUST_1_64_0;
 #[cfg(feature = "zig")]
 use crate::PlatformTag;
 use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
@@ -177,12 +176,8 @@ fn cargo_build_command(
         .iter()
         .any(|crate_type| LIB_CRATE_TYPES.contains(crate_type))
     {
-        // `--crate-type` is stable since Rust 1.64.0
-        // See https://github.com/rust-lang/cargo/pull/10838
-        if target.rustc_version.semver >= RUST_1_64_0 {
-            debug!("Setting crate_type to cdylib for Rust >= 1.64.0");
-            cargo_rustc.crate_type = vec!["cdylib".to_string()];
-        }
+        debug!("Setting crate_type to cdylib");
+        cargo_rustc.crate_type = vec!["cdylib".to_string()];
     }
 
     let target_triple = target.target_triple();

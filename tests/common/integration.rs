@@ -160,13 +160,9 @@ pub fn test_integration(
             && !build_context.target.is_musl_libc()
             && build_context.target.get_minimum_manylinux_tag() != PlatformTag::Linux
         {
-            let rustc_ver = rustc_version::version()?;
             let python_arch = build_context.target.get_python_arch();
-            let file_suffix = if rustc_ver >= semver::Version::new(1, 64, 0) {
-                format!("manylinux_2_17_{python_arch}.manylinux2014_{python_arch}.whl")
-            } else {
-                format!("manylinux_2_12_{python_arch}.manylinux2010_{python_arch}.whl")
-            };
+            let file_suffix =
+                format!("manylinux_2_17_{python_arch}.manylinux2014_{python_arch}.whl");
             assert!(filename.to_string_lossy().ends_with(&file_suffix))
         }
         let mut venv_name = if supported_version == "py3" {

@@ -22,8 +22,6 @@ mod pypi_tags;
 
 pub use pypi_tags::{is_arch_supported_by_pypi, validate_wheel_filename_for_pypi};
 
-pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
-
 /// All supported operating system
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -469,18 +467,13 @@ impl Target {
     /// Returns the oldest possible Manylinux tag for this architecture
     pub fn get_minimum_manylinux_tag(&self) -> PlatformTag {
         match self.arch {
-            Arch::Aarch64 | Arch::Armv7L | Arch::Powerpc64 | Arch::Powerpc64Le | Arch::S390X => {
-                PlatformTag::manylinux2014()
-            }
-            Arch::X86 | Arch::X86_64 => {
-                // rustc 1.64.0 bumps glibc requirement to 2.17
-                // see https://blog.rust-lang.org/2022/08/01/Increasing-glibc-kernel-requirements.html
-                if self.rustc_version.semver >= RUST_1_64_0 {
-                    PlatformTag::manylinux2014()
-                } else {
-                    PlatformTag::manylinux2010()
-                }
-            }
+            Arch::Aarch64
+            | Arch::Armv7L
+            | Arch::Powerpc64
+            | Arch::Powerpc64Le
+            | Arch::S390X
+            | Arch::X86
+            | Arch::X86_64 => PlatformTag::manylinux2014(),
             Arch::Riscv64 => PlatformTag::Manylinux {
                 major: 2,
                 minor: 31,

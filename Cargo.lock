@@ -1469,7 +1469,6 @@ dependencies = [
  "rustflags",
  "rustls",
  "rustls-pemfile",
- "rustversion",
  "same-file",
  "schemars",
  "semver",

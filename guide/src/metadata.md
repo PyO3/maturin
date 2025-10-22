@@ -123,17 +123,3 @@ You can also specify [trove classifiers](https://pypi.org/classifiers/) under `p
 name = "my-project"
 classifiers = ["Programming Language :: Python"]
 ```
-
-## Add SPDX license expressions
-
-A practical string value for the license key has been purposefully left out by PEP 621
-to allow for a future PEP to specify support for
-[SPDX](https://spdx.org/licenses/) expressions.
-
-To use SPDX license expressions, you can specify it in `Cargo.toml` instead:
-
-```toml
-[package]
-name = "my-project"
-license = "MIT OR Apache-2.0"
-```

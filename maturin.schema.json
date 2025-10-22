@@ -381,7 +381,7 @@
       "description": "Decides how to handle manylinux and musllinux compliance",
       "oneOf": [
         {
-          "description": "Use the manylinux_x_y tag",
+          "description": "Use the `manylinux_<major>_<minor>` tag",
           "type": "object",
           "required": [
             "Manylinux"
@@ -390,17 +390,17 @@
             "Manylinux": {
               "type": "object",
               "required": [
-                "x",
-                "y"
+                "major",
+                "minor"
               ],
               "properties": {
-                "x": {
+                "major": {
                   "description": "GLIBC version major",
                   "type": "integer",
                   "format": "uint16",
                   "minimum": 0.0
                 },
-                "y": {
+                "minor": {
                   "description": "GLIBC version minor",
                   "type": "integer",
                   "format": "uint16",
@@ -412,7 +412,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Use the musllinux_x_y tag",
+          "description": "Use the `musllinux_<major>_<minor>` tag",
           "type": "object",
           "required": [
             "Musllinux"
@@ -421,17 +421,17 @@
             "Musllinux": {
               "type": "object",
               "required": [
-                "x",
-                "y"
+                "major",
+                "minor"
               ],
               "properties": {
-                "x": {
+                "major": {
                   "description": "musl libc version major",
                   "type": "integer",
                   "format": "uint16",
                   "minimum": 0.0
                 },
-                "y": {
+                "minor": {
                   "description": "musl libc version minor",
                   "type": "integer",
                   "format": "uint16",
@@ -447,6 +447,13 @@
           "type": "string",
           "enum": [
             "Linux"
+          ]
+        },
+        {
+          "description": "Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.",
+          "type": "string",
+          "enum": [
+            "Pypi"
           ]
         }
       ]

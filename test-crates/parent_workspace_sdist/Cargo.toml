@@ -1,0 +1,4 @@
+[workspace]
+members = ["shared_crate"]
+exclude = ["pysof"]
+resolver = "2"

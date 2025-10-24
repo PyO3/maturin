@@ -396,8 +396,8 @@ jobs:
             extra-args: --manylinux 2_31
           # PyPy
           - target: aarch64-unknown-linux-gnu
-            abi: pp310-pypy310_pp73
-            python: pypy3.10
+            abi: pp311-pypy311_pp73
+            python: pypy3.11
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v5

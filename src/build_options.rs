@@ -1409,7 +1409,7 @@ fn find_interpreter_in_sysconfig(
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {
-                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.8' or 'pypy3.9') when cross-compiling, got path to interpreter: {}", python);
+                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, got path to interpreter: {}", python);
             } else {
                 bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
             }
@@ -1655,7 +1655,7 @@ mod tests {
 
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version: semver::Version::new(0, 26, 0),
+            version: semver::Version::new(0, 27, 1),
             abi3: Some(Abi3Version::Version(3, 7)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {
@@ -1663,7 +1663,7 @@ mod tests {
                     max_minor: 14,
                 },
                 pypy: PyO3VersionMetadata {
-                    min_minor: 9,
+                    min_minor: 11,
                     max_minor: 11,
                 },
             }),

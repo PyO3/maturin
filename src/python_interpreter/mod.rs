@@ -407,7 +407,7 @@ impl PythonInterpreter {
                 }
                 InterpreterKind::PyPy => {
                     // pypy uses its version as part of the ABI, e.g.
-                    // pypy 3.7 7.3 => numpy-1.20.1-pp37-pypy37_pp73-manylinux2014_x86_64.whl
+                    // pypy 3.11 7.3 => numpy-1.20.1-pp311-pypy311_pp73-manylinux2014_x86_64.whl
                     format!(
                         "pp{major}{minor}-{abi_tag}-{platform}",
                         major = self.major,

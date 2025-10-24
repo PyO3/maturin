@@ -1663,7 +1663,7 @@ mod tests {
                     max_minor: 14,
                 },
                 pypy: PyO3VersionMetadata {
-                    min_minor: 9,
+                    min_minor: 11,
                     max_minor: 11,
                 },
             }),

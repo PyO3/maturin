@@ -61,7 +61,7 @@ Options:
           Use `uv` to install packages instead of `pip`
 
       --compression-method <COMPRESSION_METHOD>
-          Zip compresson method to use
+          Zip compression method to use
 
           [default: deflated]
 

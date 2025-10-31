@@ -37,7 +37,7 @@
 ## [1.9.0]
 
 * Add full PEP 639 support for `project.license` and `project.license-files` in [#2647](https://github.com/PyO3/maturin/pull/2647).
-* Add `--compatiblity pypi` to only build wheels with platform tags that can also be uploaded to PyPI. This blocks e.g. building for riscv64, which is supported by manylinux, but not by PyPI.
+* Add `--compatibility pypi` to only build wheels with platform tags that can also be uploaded to PyPI. This blocks e.g. building for riscv64, which is supported by manylinux, but not by PyPI.
 
 ## [1.8.7]
 

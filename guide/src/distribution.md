@@ -102,7 +102,7 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
       --compression-method <COMPRESSION_METHOD>
-          Zip compresson method to use
+          Zip compression method to use
 
           [default: deflated]
 

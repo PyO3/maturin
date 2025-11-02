@@ -350,7 +350,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                         .find(|package| &package.id == dep_id)
                         .unwrap()
                         .name;
-                    &package.name == dep_name
+                    *dep_name == package.name
                 })
                 .unwrap();
             if let Some(path) = &dependency.path {

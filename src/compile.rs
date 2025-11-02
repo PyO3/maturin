@@ -7,6 +7,7 @@ use cargo_metadata::CrateType;
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use normpath::PathExt;
+use pep508_rs::PackageName;
 use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
@@ -682,7 +683,10 @@ fn pyo3_version(cargo_metadata: &cargo_metadata::Metadata) -> Option<(u64, u64, 
         .iter()
         .filter_map(|pkg| {
             let name = &pkg.name;
-            if name == "pyo3" || name == "pyo3-ffi" {
+            if name == &PackageName::new("pyo3".to_string()).expect("known good packagename")
+                || name
+                    == &PackageName::new("pyo3-ffi".to_string()).expect("known good packagename")
+            {
                 Some((name.as_ref(), pkg))
             } else {
                 None

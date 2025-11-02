@@ -126,13 +126,13 @@ jobs:
           cd -
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.target }}
           path: dist
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.target }}
           path: |
@@ -201,12 +201,12 @@ jobs:
       - name: Upload wheel artifacts
         # loongarch64 is not allowed to publish to pypi currently, see https://github.com/pypi/warehouse/blob/348117529910181cb8c14e9b5fb00fcf4dbaf07c/warehouse/forklift/legacy.py#L114-L185
         if: matrix.platform.target != 'loongarch64-unknown-linux-gnu'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.platform.target }}
           path: target/release/maturin-${{ matrix.platform.target }}.tar.gz

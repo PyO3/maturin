@@ -874,7 +874,11 @@ pub fn write_bindings_module(
     let ext_name = &project_layout.extension_name;
     let so_filename = if is_abi3 {
         if target.is_unix() {
-            format!("{ext_name}.abi3.so")
+            if target.is_cygwin() {
+                format!("{ext_name}.abi3.dll")
+            } else {
+                format!("{ext_name}.abi3.so")
+            }
         } else {
             match python_interpreter {
                 Some(python_interpreter) if python_interpreter.is_windows_debug() => {

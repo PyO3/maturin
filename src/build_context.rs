@@ -662,6 +662,14 @@ impl BuildContext {
             (Os::Wasi, Arch::Wasm32) => {
                 "any".to_string()
             }
+            // Cygwin
+            (Os::Cygwin, _) => {
+                format!(
+                    "{}_{}",
+                    target.target_os().to_string().to_ascii_lowercase(),
+                    target.get_platform_arch()?,
+                )
+            }
             // osname_release_machine fallback for any POSIX system
             (_, _) => {
                 let info = PlatformInfo::new()

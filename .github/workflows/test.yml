@@ -88,7 +88,7 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - name: Install python packages
         run: |
           uv tool install virtualenv
@@ -269,7 +269,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv tool install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
@@ -449,7 +449,7 @@ jobs:
               - 'MANIFEST.in'
               - 'Cargo.toml'
               - '.github/workflows/test.yml'
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}

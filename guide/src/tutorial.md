@@ -49,6 +49,13 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 ```
 
+If you are using pyo3 0.26 or earlier you need to enable the `extension-module` feature of pyo3 to skip linking against libpython.so (this is automatically done in pyo3 0.27):
+
+```toml
+[tool.maturin]
+features = ["pyo3/extension-module"]
+```
+
 ### Use `maturin new`
 
 New projects can also be quickly created using the `maturin new` command:

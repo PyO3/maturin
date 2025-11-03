@@ -41,17 +41,12 @@ version = "0.27.0"
 features = ["abi3-py38"]
 ```
 
-Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements
-and enable the `extension-module` feature of pyo3.
+Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements.
 
 ```toml
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
-
-[tool.maturin]
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
-features = ["pyo3/extension-module"]
 ```
 
 ### Use `maturin new`

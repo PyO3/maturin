@@ -653,7 +653,6 @@ fn workspace_members_non_local_dep_sdist() {
         [dependencies]
         pyo3 = { version = "0.27.0", features = [
             "abi3-py37",
-            "extension-module",
             "generate-import-lib",
         ] }
 
@@ -720,7 +719,7 @@ fn lib_with_target_path_dep_sdist() {
         crate-type = ["cdylib"]
 
         [dependencies]
-        pyo3 = { version = "0.27.0", features = ["extension-module"] }
+        pyo3 = "0.27.0"
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }

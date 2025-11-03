@@ -5,7 +5,7 @@ authors = ["konstin <konstin@mailbox.org>"]
 edition = "2021"
 
 [dependencies]
-pyo3 = { version = "0.27.0", features = ["abi3", "extension-module"] }
+pyo3 = { version = "0.27.0", features = ["abi3"] }
 
 [lib]
 name = "pyo3_abi3_without_version"

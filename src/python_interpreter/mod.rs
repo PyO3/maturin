@@ -292,6 +292,8 @@ fn fun_with_abiflags(
     if bridge != &BridgeModel::Cffi
         && target.get_python_os() != message.system
         && !target.cross_compiling()
+        && !(target.get_python_os() == "cygwin"
+            && message.system.to_lowercase().starts_with("cygwin"))
     {
         bail!(
             "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",

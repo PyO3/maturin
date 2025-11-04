@@ -267,8 +267,6 @@ fn add_crate_to_source_distribution(
         })
         .collect();
 
-    writer.add_directory(prefix)?;
-
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
 
     let readme_name = readme
@@ -425,8 +423,6 @@ fn add_git_tracked_files_to_sdist(
     }
 
     let prefix = prefix.as_ref();
-    writer.add_directory(prefix)?;
-
     let file_paths = str::from_utf8(&output.stdout)
         .context("git printed invalid utf-8 ಠ_ಠ")?
         .split('\0')
@@ -647,9 +643,7 @@ fn add_cargo_package_files_to_sdist(
                 continue;
             }
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-            if source.is_dir() {
-                writer.add_directory(target)?;
-            } else {
+            if !source.is_dir() {
                 writer.add_file(target, &source)?;
             }
         }
@@ -826,9 +820,7 @@ pub fn source_distribution(
             .filter_map(Result::ok)
         {
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-            if source.is_dir() {
-                writer.add_directory(target)?;
-            } else {
+            if !source.is_dir() {
                 writer.add_file(target, source)?;
             }
         }

@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Fix generated WHEEL Tag metadata to be spec compliant.
+* Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl
 
 ## [1.9.6]
 

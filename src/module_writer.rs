@@ -40,9 +40,6 @@ use zip::{self, DateTime, ZipWriter};
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
-    /// Adds a directory relative to the module base path
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()>;
-
     /// Adds a file with bytes as content in target relative to the module base path.
     ///
     /// For generated files, `source` is `None`.
@@ -179,13 +176,6 @@ impl PathWriter {
 }
 
 impl ModuleWriter for PathWriter {
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        let target = self.base_path.join(path);
-        debug!("Adding directory {}", target.display());
-        fs::create_dir_all(target)?;
-        Ok(())
-    }
-
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
@@ -198,6 +188,11 @@ impl ModuleWriter for PathWriter {
         if !self.file_tracker.add_file(target.as_ref(), source)? {
             // Ignore duplicate files.
             return Ok(());
+        }
+
+        if let Some(parent_dir) = path.parent() {
+            fs::create_dir_all(parent_dir)
+                .with_context(|| format!("Failed to create directory {}", parent_dir.display()))?;
         }
 
         // We only need to set the executable bit on unix
@@ -267,10 +262,6 @@ impl CompressionOptions {
 }
 
 impl ModuleWriter for WheelWriter {
-    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<()> {
-        Ok(()) // We don't need to create directories in zip archives
-    }
-
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
@@ -435,10 +426,6 @@ pub struct SDistWriter {
 }
 
 impl ModuleWriter for SDistWriter {
-    fn add_directory(&mut self, _path: impl AsRef<Path>) -> Result<()> {
-        Ok(())
-    }
-
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
@@ -943,7 +930,6 @@ pub fn write_bindings_module(
         }
     } else {
         let module = PathBuf::from(ext_name);
-        writer.add_directory(&module)?;
         // Reexport the shared library as if it were the top level module
         writer.add_bytes(
             module.join("__init__.py"),
@@ -1020,12 +1006,8 @@ pub fn write_cffi_module(
             .strip_prefix(python_module.parent().unwrap())
             .unwrap();
         module = relative.join(&project_layout.extension_name);
-        if !editable {
-            writer.add_directory(&module)?;
-        }
     } else {
         module = PathBuf::from(module_name);
-        writer.add_directory(&module)?;
         let type_stub = project_layout
             .rust_module
             .join(format!("{module_name}.pyi"));
@@ -1287,12 +1269,8 @@ pub fn write_uniffi_module(
             .strip_prefix(python_module.parent().unwrap())
             .unwrap();
         module = relative.join(&project_layout.extension_name);
-        if !editable {
-            writer.add_directory(&module)?;
-        }
     } else {
         module = PathBuf::from(module_name);
-        writer.add_directory(&module)?;
         let type_stub = project_layout
             .rust_module
             .join(format!("{module_name}.pyi"));
@@ -1330,8 +1308,6 @@ pub fn write_bin(
         &metadata.version
     ))
     .join("scripts");
-
-    writer.add_directory(&data_dir)?;
 
     // We can't use add_file since we need to mark the file as executable
     writer.add_file_with_permissions(data_dir.join(bin_name), artifact, 0o755)?;
@@ -1424,9 +1400,7 @@ pub fn write_python_part(
                 continue;
             }
             let relative = absolute.strip_prefix(python_dir).unwrap();
-            if absolute.is_dir() {
-                writer.add_directory(relative)?;
-            } else {
+            if !absolute.is_dir() {
                 // Ignore native libraries from develop, if any
                 if let Some(extension) = relative.extension() {
                     if extension.to_string_lossy() == "so" {
@@ -1460,9 +1434,7 @@ pub fn write_python_part(
                     .filter_map(Result::ok)
                 {
                     let target = source.strip_prefix(pyproject_dir)?.to_path_buf();
-                    if source.is_dir() {
-                        writer.add_directory(target)?;
-                    } else {
+                    if !source.is_dir() {
                         #[cfg(unix)]
                         let mode = source.metadata()?.permissions().mode();
                         #[cfg(not(unix))]
@@ -1485,8 +1457,6 @@ pub fn write_dist_info(
     tags: &[String],
 ) -> Result<()> {
     let dist_info_dir = metadata24.get_dist_info_dir();
-
-    writer.add_directory(&dist_info_dir)?;
 
     writer.add_bytes(
         dist_info_dir.join("METADATA"),
@@ -1520,7 +1490,6 @@ pub fn write_dist_info(
 
     if !metadata24.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("licenses");
-        writer.add_directory(&license_files_dir)?;
         for path in &metadata24.license_files {
             writer.add_file(license_files_dir.join(path), pyproject_dir.join(path))?;
         }
@@ -1582,7 +1551,7 @@ pub fn add_data(
                     } else if file.path().is_file() {
                         writer.add_file_with_permissions(relative, file.path(), mode)?;
                     } else if file.path().is_dir() {
-                        writer.add_directory(relative)?;
+                        // Intentionally ignored
                     } else {
                         bail!("Can't handle data dir entry {}", file.path().display());
                     }

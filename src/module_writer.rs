@@ -53,6 +53,12 @@ pub trait ModuleWriter {
         bytes: &[u8],
     ) -> Result<()> {
         debug!("Adding {}", target.as_ref().display());
+
+        if let Some(parent_dir) = target.as_ref().parent() {
+            self.add_directory(parent_dir)
+                .with_context(|| format!("Failed to create directory {}", parent_dir.display()))?;
+        }
+
         // 0o644 is the default from the zip crate
         self.add_bytes_with_permissions(target, source, bytes, 0o644)
     }
@@ -85,6 +91,11 @@ pub trait ModuleWriter {
         let target = target.as_ref();
         let source = source.as_ref();
         debug!("Adding {} from {}", target.display(), source.display());
+
+        if let Some(parent_dir) = target.parent() {
+            self.add_directory(parent_dir)
+                .with_context(|| format!("Failed to create directory {}", parent_dir.display()))?;
+        }
 
         let read_failed_context = format!("Failed to read {}", source.display());
         let mut file = File::open(source).context(read_failed_context.clone())?;
@@ -181,8 +192,10 @@ impl PathWriter {
 impl ModuleWriter for PathWriter {
     fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()> {
         let target = self.base_path.join(path);
-        debug!("Adding directory {}", target.display());
-        fs::create_dir_all(target)?;
+        if !target.exists() {
+            debug!("Adding directory {}", target.display());
+            fs::create_dir_all(target)?;
+        }
         Ok(())
     }
 
@@ -1388,6 +1401,10 @@ if __name__ == '__main__':
     let launcher_path = Path::new(&metadata.get_distribution_escaped())
         .join(bin_name.replace('-', "_"))
         .with_extension("py");
+
+    if let Some(parent_dir) = launcher_path.parent() {
+        writer.add_directory(parent_dir)?;
+    }
     writer.add_bytes_with_permissions(&launcher_path, None, entrypoint_script.as_bytes(), 0o755)?;
     Ok(())
 }

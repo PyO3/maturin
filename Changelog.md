@@ -3,6 +3,7 @@
 ## Unreleased
 
 * Fix generated WHEEL Tag metadata to be spec compliant.
+* Ensure parent directory is created before attempting to write a file in ModuleWriter
 
 ## [1.9.6]
 

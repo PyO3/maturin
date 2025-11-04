@@ -1,18 +1,27 @@
+use anyhow::Context;
 use anyhow::Result;
 use insta::assert_snapshot;
+use itertools::Itertools;
 use maturin::{write_dist_info, BuildOptions, CargoOptions, ModuleWriter};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 
 #[derive(Default)]
 struct MockWriter {
+    directories: HashSet<String>,
     files: Vec<String>,
     contents: HashMap<String, String>,
 }
 
 impl ModuleWriter for MockWriter {
     fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        self.files.push(path.as_ref().to_string_lossy().to_string());
+        let mut dir: String = "".into();
+        for component in path.as_ref().components() {
+            dir.push_str(&component.as_os_str().to_string_lossy());
+            self.directories.insert(dir.clone());
+            dir.push(MAIN_SEPARATOR);
+        }
         Ok(())
     }
 
@@ -23,10 +32,18 @@ impl ModuleWriter for MockWriter {
         bytes: &[u8],
         _permissions: u32,
     ) -> Result<()> {
-        self.files
-            .push(target.as_ref().to_string_lossy().to_string());
+        let target = target.as_ref();
+        if let Some(parent_dir) = target.parent() {
+            self.directories
+                .get(parent_dir.to_string_lossy().as_ref())
+                .with_context(|| {
+                    format!("Parent directory does not exist: {}", parent_dir.display())
+                })?;
+        }
+
+        self.files.push(target.to_string_lossy().to_string());
         self.contents.insert(
-            target.as_ref().to_string_lossy().into(),
+            target.to_string_lossy().into(),
             std::str::from_utf8(bytes).unwrap().to_string(),
         );
         Ok(())
@@ -58,12 +75,15 @@ fn metadata_hello_world_pep639() {
     .unwrap();
 
     assert_snapshot!(writer.files.join("\n").replace("\\", "/"), @r"
-    hello_world-0.1.0.dist-info
     hello_world-0.1.0.dist-info/METADATA
     hello_world-0.1.0.dist-info/WHEEL
-    hello_world-0.1.0.dist-info/licenses
     hello_world-0.1.0.dist-info/licenses/LICENSE
     hello_world-0.1.0.dist-info/licenses/licenses/AUTHORS.txt
+    ");
+    assert_snapshot!(writer.directories.iter().sorted().join("\n").replace("\\", "/"), @r"
+    hello_world-0.1.0.dist-info
+    hello_world-0.1.0.dist-info/licenses
+    hello_world-0.1.0.dist-info/licenses/licenses
     ");
     let metadata_path = Path::new("hello_world-0.1.0.dist-info")
         .join("METADATA")

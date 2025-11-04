@@ -21,15 +21,12 @@ tests = [
 ]
 {% endif -%}
 
-{% if bindings in ["bin", "cffi", "pyo3"] or mixed_non_src -%}
+{% if bindings in ["bin", "cffi"] or mixed_non_src -%}
 [tool.maturin]
 {% if bindings == "cffi" or bindings == "bin" -%}
 bindings = "{{ bindings }}"
 {% endif -%}
 {% if mixed_non_src -%}
 python-source = "python"
-{% endif -%}
-{% if bindings == "pyo3" -%}
-features = ["pyo3/extension-module"]
 {% endif -%}
 {% endif -%}

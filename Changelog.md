@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.
 * Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl
 

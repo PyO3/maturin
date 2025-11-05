@@ -454,7 +454,7 @@ fn cargo_build_command(
         }
     }
 
-    if let Some(lib_dir) = env::var_os("MATURIN_PYTHON_SYSCONFIGDATA_DIR") {
+    if let Some(lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR") {
         build_command.env("PYO3_CROSS_LIB_DIR", lib_dir);
     }
 

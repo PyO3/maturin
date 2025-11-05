@@ -454,6 +454,10 @@ suppress_build_script_link_lines=false"#,
         if let Some(pointer_width) = self.pointer_width {
             write!(content, "\npointer_width={pointer_width}").unwrap();
         }
+        if let Ok(lib_dir) = std::env::var("PYO3_CROSS_LIB_DIR") {
+            write!(content, "\nlib_dir={}", lib_dir).unwrap();
+            write!(content, "\nlibs=python{}.{}", self.major, self.minor).unwrap();
+        }
         content
     }
 }

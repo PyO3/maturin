@@ -758,3 +758,24 @@ pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Opti
     }
     None
 }
+
+pub(crate) fn detect_target_from_cross_python(python: &PathBuf) -> Option<TargetTriple> {
+    match Command::new(python)
+        .arg("-c")
+        .arg("import sys, sysconfig; print(sysconfig.get_platform(), end='') if getattr(sys, 'cross_compiling', False) else ''")
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let platform = String::from_utf8_lossy(&output.stdout);
+            if platform.ends_with("-arm64-iphoneos") {
+                return Some(TargetTriple::Regular("aarch64-apple-ios".to_string()));
+            } else if platform.ends_with("-arm64-iphonesimulator") {
+                return Some(TargetTriple::Regular("aarch64-apple-ios-sim".to_string()));
+            } else if platform.ends_with("-x86_64-iphonesimulator") {
+                return Some(TargetTriple::Regular("x86_64-apple-ios".to_string()));
+            }
+        }
+        _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
+    }
+    None
+}

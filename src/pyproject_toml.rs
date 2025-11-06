@@ -205,6 +205,8 @@ pub struct ToolMaturin {
     // Some customizable cargo options
     /// Build artifacts with the specified Cargo profile
     pub profile: Option<String>,
+    /// Same as `profile` but for "editable" builds
+    pub editable_profile: Option<String>,
     /// Space or comma separated list of features to activate
     pub features: Option<Vec<String>>,
     /// Activate all available features

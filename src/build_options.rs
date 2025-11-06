@@ -601,6 +601,7 @@ impl BuildContextBuilder {
         } = ProjectResolver::resolve(
             build_options.manifest_path.clone(),
             build_options.cargo.clone(),
+            editable,
         )?;
         let pyproject = pyproject_toml.as_ref();
 
@@ -1553,7 +1554,11 @@ impl CargoOptions {
 
 impl CargoOptions {
     /// Merge options from pyproject.toml
-    pub fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
+    pub fn merge_with_pyproject_toml(
+        &mut self,
+        tool_maturin: ToolMaturin,
+        editable_install: bool,
+    ) -> Vec<&'static str> {
         let mut args_from_pyproject = Vec::new();
 
         if self.manifest_path.is_none() && tool_maturin.manifest_path.is_some() {
@@ -1561,9 +1566,16 @@ impl CargoOptions {
             args_from_pyproject.push("manifest-path");
         }
 
-        if self.profile.is_none() && tool_maturin.profile.is_some() {
-            self.profile.clone_from(&tool_maturin.profile);
-            args_from_pyproject.push("profile");
+        if self.profile.is_none() {
+            let (tool_profile, source_variable) = if editable_install {
+                (tool_maturin.editable_profile.as_ref(), "editable-profile")
+            } else {
+                (tool_maturin.profile.as_ref(), "profile")
+            };
+            if let Some(tool_profile) = tool_profile {
+                self.profile = Some(tool_profile.clone());
+                args_from_pyproject.push(source_variable);
+            }
         }
 
         if let Some(features) = tool_maturin.features {

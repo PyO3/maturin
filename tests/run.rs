@@ -13,6 +13,8 @@ use std::time::Duration;
 use time::macros::datetime;
 use which::which;
 
+use crate::common::pep517;
+
 mod common;
 
 #[test]
@@ -972,4 +974,40 @@ fn pyo3_source_date_epoch() {
         vec![datetime!(1980-01-01 0:00 UTC)],
         "pyo3_source_date_epoch",
     ))
+}
+
+#[test]
+fn pep517_default_profile() {
+    let output = handle_result(pep517::test_pep517(
+        "test-crates/pyo3-pure",
+        "pep517-pyo3-pure",
+        false,
+        false,
+    ));
+
+    assert!(
+        std::str::from_utf8(&output.stderr)
+            .unwrap()
+            .contains("Finished `release` profile"),
+        "Output was: {}",
+        std::str::from_utf8(&output.stderr).unwrap()
+    );
+}
+
+#[test]
+fn pep517_editable_profile() {
+    let output = handle_result(pep517::test_pep517(
+        "test-crates/pyo3-pure",
+        "pep517-pyo3-pure-editable",
+        false,
+        true,
+    ));
+
+    assert!(
+        std::str::from_utf8(&output.stderr)
+            .unwrap()
+            .contains("Finished `dev` profile"),
+        "Output was: {}",
+        std::str::from_utf8(&output.stderr).unwrap()
+    );
 }

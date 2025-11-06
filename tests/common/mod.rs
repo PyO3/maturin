@@ -12,6 +12,7 @@ pub mod errors;
 pub mod integration;
 pub mod metadata;
 pub mod other;
+pub mod pep517;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TestInstallBackend {

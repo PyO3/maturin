@@ -1567,11 +1567,15 @@ impl CargoOptions {
         }
 
         if self.profile.is_none() {
-            let (tool_profile, source_variable) = if editable_install {
-                (tool_maturin.editable_profile.as_ref(), "editable-profile")
-            } else {
-                (tool_maturin.profile.as_ref(), "profile")
-            };
+            // For `maturin` v1 compatibility, `editable-profile` falls back to `profile` if unset.
+            // TODO: on `maturin` v2, consider defaulting to "dev" profile for editable installs,
+            // and potentially remove this fallback behavior.
+            let (tool_profile, source_variable) =
+                if editable_install && tool_maturin.editable_profile.is_some() {
+                    (tool_maturin.editable_profile.as_ref(), "editable-profile")
+                } else {
+                    (tool_maturin.profile.as_ref(), "profile")
+                };
             if let Some(tool_profile) = tool_profile {
                 self.profile = Some(tool_profile.clone());
                 args_from_pyproject.push(source_variable);

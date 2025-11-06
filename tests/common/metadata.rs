@@ -11,11 +11,6 @@ struct MockWriter {
 }
 
 impl ModuleWriter for MockWriter {
-    fn add_directory(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        self.files.push(path.as_ref().to_string_lossy().to_string());
-        Ok(())
-    }
-
     fn add_bytes_with_permissions(
         &mut self,
         target: impl AsRef<Path>,
@@ -58,10 +53,8 @@ fn metadata_hello_world_pep639() {
     .unwrap();
 
     assert_snapshot!(writer.files.join("\n").replace("\\", "/"), @r"
-    hello_world-0.1.0.dist-info
     hello_world-0.1.0.dist-info/METADATA
     hello_world-0.1.0.dist-info/WHEEL
-    hello_world-0.1.0.dist-info/licenses
     hello_world-0.1.0.dist-info/licenses/LICENSE
     hello_world-0.1.0.dist-info/licenses/licenses/AUTHORS.txt
     ");

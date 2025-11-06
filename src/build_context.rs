@@ -422,7 +422,6 @@ impl BuildContext {
             .unwrap_or_else(|| self.module_name.clone().into());
         libs_dir.push(".libs");
         let libs_dir = PathBuf::from(libs_dir);
-        writer.add_directory(&libs_dir)?;
 
         let temp_dir = tempfile::tempdir()?;
         let mut soname_map = BTreeMap::new();

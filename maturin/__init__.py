@@ -58,22 +58,6 @@ def _get_sys_executable() -> str:
     return executable
 
 
-def _get_maturin_executable() -> str:
-    """Locates the maturin executable within the current Python environment.
-
-    Falls back to 'maturin' in PATH if not found.
-    """
-
-    # e.g. with `pip install --no-build-isolation <package>` seems like the
-    # path may not contain the maturin from that "pip" installation, so we
-    # try to find it next to sys.executable
-    installed_maturin = os.path.join(os.path.dirname(sys.executable), "maturin")
-    if os.path.exists(installed_maturin):
-        return installed_maturin
-
-    return "maturin"
-
-
 def _additional_pep517_args() -> List[str]:
     # Support building for 32-bit Python on x64 Windows
     if platform.system().lower() == "windows" and platform.machine().lower() == "amd64":
@@ -104,7 +88,7 @@ def _build_wheel(
     # PEP 517 specifies that only `sys.executable` points to the correct
     # python interpreter
     base_command = [
-        _get_maturin_executable(),
+        "maturin",
         "pep517",
         "build-wheel",
         "-i",
@@ -150,7 +134,7 @@ def build_wheel(
 
 # noinspection PyUnusedLocal
 def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any]] = None) -> str:
-    command = [_get_maturin_executable(), "pep517", "write-sdist", "--sdist-directory", sdist_directory]
+    command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
@@ -218,7 +202,7 @@ def prepare_metadata_for_build_wheel(
         sys.exit(1)
 
     command = [
-        _get_maturin_executable(),
+        "maturin",
         "pep517",
         "write-dist-info",
         "--metadata-directory",

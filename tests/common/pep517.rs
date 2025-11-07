@@ -1,9 +1,8 @@
 use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
 use anyhow::Result;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
-use tempfile::tempdir;
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// pip install to install it and checks it is working
@@ -25,39 +24,6 @@ pub fn test_pep517(
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
 
-    let build_dir = tempdir().unwrap();
-
-    // install maturin in the venv
-    let output = Command::new(&python)
-        .args([
-            "-m",
-            "pip",
-            "install",
-            env!("CARGO_MANIFEST_DIR"),
-            // ensure that each `maturin` build for the bdist is within an isolated dir
-            // this ensures tests do not race with each other
-            // the Rust `target/` dir is still reused and will have Cargo's locking
-            "--config-settings=--global-option=build",
-            format!(
-                "--config-settings=--global-option=--build-base={}",
-                build_dir.path().display()
-            )
-            .as_str(),
-        ])
-        .env("SETUPTOOLS_RUST_CARGO_PROFILE", "dev")
-        .output()?;
-
-    // drop(build_dir);
-
-    if !output.status.success() {
-        panic!(
-            "Failed to install maturin: {}\n---stdout:\n{}---stderr:\n{}",
-            output.status,
-            str::from_utf8(&output.stdout)?,
-            str::from_utf8(&output.stderr)?
-        );
-    }
-
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "pip", "install", "-vvv", "--no-build-isolation"]);
 
@@ -75,6 +41,18 @@ pub fn test_pep517(
         ),
     );
 
+    // Building with `--no-build-isolation` means that `maturin` needs to be on PATH _and_
+    // importable
+
+    // Hack PATH to include maturin binary directory
+    let maturin_exe = Path::new(env!("CARGO_BIN_EXE_maturin"));
+    let bin_dir = maturin_exe.parent();
+    cmd.env("PATH", insert_path("PATH", bin_dir.unwrap()));
+
+    // Hack PYTHONPATH to include the root of the repository
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    cmd.env("PYTHONPATH", insert_path("PYTHONPATH", repo_root));
+
     let output = cmd.output()?;
     if !output.status.success() {
         panic!(
@@ -88,4 +66,14 @@ pub fn test_pep517(
 
     check_installed(package, &python)?;
     Ok(output)
+}
+
+fn insert_path(env_var: &str, new_path: &Path) -> String {
+    let old_path = std::env::var_os(env_var).unwrap_or_default();
+    let mut paths = std::env::split_paths(&old_path).collect::<Vec<PathBuf>>();
+    paths.insert(0, new_path.to_path_buf());
+    std::env::join_paths(paths)
+        .expect("Expected to be able to re-join PATH")
+        .into_string()
+        .expect("PATH is not valid utf8")
 }

@@ -53,8 +53,10 @@ jobs:
           # TODO: Tests are getting stuck
           - os: ubuntu-latest
             python-version: pypy3.11
-          # macOS M1 runner only have Python 3.11+
+          # macOS and windows arm only have Python 3.11+
           - os: macos-latest
+            python-version: 3.9
+          - os: windows-11-arm
             python-version: 3.9
           # PyPy does not have ARM builds for linux or windows
           - os: ubuntu-22.04-arm

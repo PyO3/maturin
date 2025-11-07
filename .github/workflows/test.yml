@@ -97,7 +97,8 @@ jobs:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
-      - uses: actions/setup-python@v6
+      - id: setup-python
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set PYTHON_VERSION env var
@@ -133,7 +134,7 @@ jobs:
 
       - name: Set MATURIN_TEST_PYTHON
         shell: bash
-        run: echo "MATURIN_TEST_PYTHON=${{ contains(matrix.python-version, 'pypy') && 'pypy3' || format('python{0}', matrix.python-version)  }}" >> $GITHUB_ENV
+        run: echo "MATURIN_TEST_PYTHON=${{ steps.setup-python.outputs.python-path }}" >> $GITHUB_ENV
       # To save cache disk space
       - name: Disable debuginfo on Windows
         if: startsWith(matrix.os, 'windows')

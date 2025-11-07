@@ -454,7 +454,7 @@ impl Target {
             Os::Windows => "windows",
             Os::Linux => "linux",
             Os::Macos => "darwin",
-            Os::Ios => "darwin",
+            Os::Ios => "ios",
             Os::FreeBsd => "freebsd",
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
@@ -602,6 +602,12 @@ impl Target {
     #[inline]
     pub fn is_macos(&self) -> bool {
         self.os == Os::Macos
+    }
+
+    /// Returns true if the current platform is iOS
+    #[inline]
+    pub fn is_ios(&self) -> bool {
+        self.os == Os::Ios
     }
 
     /// Returns true if the current platform is windows

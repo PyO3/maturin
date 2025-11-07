@@ -3,6 +3,7 @@
 ## Unreleased
 
 * When building `abi3` wheels on non-Windows platforms that aren't cross-compiling, the `sysconfigdata` of the interpreter used to run maturin will now be used, rather than a dummy interpreter.
+* Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.
 * Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl
 

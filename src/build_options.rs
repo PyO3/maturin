@@ -667,7 +667,13 @@ impl BuildContextBuilder {
         let mut target = Target::from_target_triple(target_triple.as_ref())?;
         if !target.user_specified && !universal2 {
             if let Some(interpreter) = build_options.interpreter.first() {
-                if let Some(detected_target) = detect_arch_from_python(interpreter, &target) {
+                // If there's an explicitly provided interpreter, check to see
+                // if it's a cross-compiling interpreter; otherwise, check to
+                // see if an target change is required.
+                if let Some(detected_target) = detect_target_from_cross_python(interpreter) {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                } else if let Some(detected_target) = detect_arch_from_python(interpreter, &target)
+                {
                     target = Target::from_target_triple(Some(&detected_target))?;
                 }
             } else {

@@ -24,6 +24,20 @@ pub fn test_pep517(
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
 
+    // Install `tomli` into the virtualenv (runtime dependency of `maturin`'s pep517 builds for
+    // Python <3.11)
+    let mut cmd = Command::new(&python);
+    cmd.args(["-m", "pip", "install", "tomli"]);
+    let output = cmd.output()?;
+    if !output.status.success() {
+        panic!(
+            "Failed to install tomli: {}\n---stdout:\n{}---stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "pip", "install", "-vvv", "--no-build-isolation"]);
 

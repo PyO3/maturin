@@ -443,6 +443,12 @@ impl ModuleWriter for SDistWriter {
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()> {
+        if let Some(source) = source {
+            if self.exclude(source) {
+                return Ok(());
+            }
+        }
+
         let target = target.as_ref();
         if self.exclude(target) {
             return Ok(());

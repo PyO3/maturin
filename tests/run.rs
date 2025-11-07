@@ -988,7 +988,7 @@ fn pep517_default_profile() {
     assert!(
         std::str::from_utf8(&output.stderr)
             .unwrap()
-            .contains("Finished `release` profile"),
+            .contains("`release` profile [optimized]"),
         "Output was: {}",
         std::str::from_utf8(&output.stderr).unwrap()
     );
@@ -1006,7 +1006,7 @@ fn pep517_editable_profile() {
     assert!(
         std::str::from_utf8(&output.stderr)
             .unwrap()
-            .contains("Finished `dev` profile"),
+            .contains("`dev` profile [unoptimized + debuginfo]"),
         "Output was: {}",
         std::str::from_utf8(&output.stderr).unwrap()
     );

@@ -6,7 +6,9 @@ use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
-use crate::target::{detect_arch_from_python, is_arch_supported_by_pypi};
+use crate::target::{
+    detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
+};
 use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
@@ -665,7 +667,22 @@ impl BuildContextBuilder {
         let mut target = Target::from_target_triple(target_triple.as_ref())?;
         if !target.user_specified && !universal2 {
             if let Some(interpreter) = build_options.interpreter.first() {
-                if let Some(detected_target) = detect_arch_from_python(interpreter, &target) {
+                // If there's an explicitly provided interpreter, check to see
+                // if it's a cross-compiling interpreter; otherwise, check to
+                // see if an target change is required.
+                if let Some(detected_target) = detect_target_from_cross_python(interpreter) {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                } else if let Some(detected_target) = detect_arch_from_python(interpreter, &target)
+                {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                }
+            } else {
+                // If there's no explicit user-provided target or interpreter,
+                // check the interpreter; if the interpreter identifies as a
+                // cross compiler, set the target based on the platform reported
+                // by the interpreter.
+                if let Some(detected_target) = detect_target_from_cross_python(&target.get_python())
+                {
                     target = Target::from_target_triple(Some(&detected_target))?;
                 }
             }

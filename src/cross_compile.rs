@@ -1,3 +1,4 @@
+use crate::target::Os;
 use crate::{PythonInterpreter, Target};
 use anyhow::{bail, Result};
 use fs_err::{self as fs, DirEntry};
@@ -29,6 +30,13 @@ pub fn is_cross_compiling(target: &Target) -> Result<bool> {
     }
     if target_triple.ends_with("windows-gnu") && host.ends_with("windows-msvc") {
         // Not cross-compiling to compile for Windows GNU from Windows MSVC host
+        return Ok(false);
+    }
+
+    if target.target_os() == Os::Ios {
+        // Not cross-compiling to compile for iOS. There's no on-device compilation,
+        // so compilation will always be in a "fake" cross-platform venv with a
+        // working python/sysconfig that can interrogated.
         return Ok(false);
     }
 

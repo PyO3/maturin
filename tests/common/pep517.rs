@@ -36,7 +36,7 @@ pub fn test_pep517(
             env!("CARGO_MANIFEST_DIR"),
             // ensure that each `maturin` build for the bdist is within an isolated dir
             // this ensures tests do not race with each other
-            // the Rust `target/` dir is still re-used and will have Cargo's locking
+            // the Rust `target/` dir is still reused and will have Cargo's locking
             "--config-settings=--global-option=build",
             format!(
                 "--config-settings=--global-option=--build-base={}",

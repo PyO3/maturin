@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Allow iOS cross-platform virtual environments, such as those used by cibuildwheel, to imply an iOS target.
 * Fix generated WHEEL Tag metadata to be spec compliant.
 * Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl
 

@@ -38,6 +38,16 @@ use tempfile::{tempdir, TempDir};
 use tracing::{debug, instrument};
 use zip::{self, DateTime, ZipWriter};
 
+/// A deterministic, arbitrary, non-zero timestamp that use used as `mtime`
+/// of headers when writing sdists.
+///
+/// This value, copied from the tar crate, corresponds to _Jul 23, 2006_,
+/// which is the date of the first commit for what would become Rust.
+///
+/// This value is used instead of unix epoch 0 because some tools do not handle
+/// the 0 value properly (See rust-lang/cargo#9512).
+const SDIST_DETERMINISTIC_TIMESTAMP: u64 = 1153704088;
+
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
     /// Adds a file with bytes as content in target relative to the module base path.
@@ -446,6 +456,7 @@ impl ModuleWriter for SDistWriter {
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
+        header.set_mtime(SDIST_DETERMINISTIC_TIMESTAMP);
         header.set_cksum();
         self.tar
             .append_data(&mut header, target, bytes)
@@ -453,28 +464,6 @@ impl ModuleWriter for SDistWriter {
                 "Failed to add {} bytes to sdist as {}",
                 bytes.len(),
                 target.display()
-            ))?;
-        Ok(())
-    }
-
-    fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        let source = source.as_ref();
-        if self.exclude(source) {
-            return Ok(());
-        }
-        let target = target.as_ref();
-        if !self.file_tracker.add_file(target, Some(source))? {
-            // Ignore duplicate files.
-            return Ok(());
-        }
-
-        debug!("Adding {} from {}", target.display(), source.display());
-        self.tar
-            .append_path_with_name(source, target)
-            .context(format!(
-                "Failed to add file from {} to sdist as {}",
-                source.display(),
-                target.display(),
             ))?;
         Ok(())
     }
@@ -498,7 +487,8 @@ impl SDistWriter {
             .into_path_buf();
 
         let enc = GzEncoder::new(Vec::new(), Compression::default());
-        let tar = tar::Builder::new(enc);
+        let mut tar = tar::Builder::new(enc);
+        tar.mode(tar::HeaderMode::Deterministic);
 
         Ok(Self {
             tar,

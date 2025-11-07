@@ -454,7 +454,7 @@ impl Target {
             Os::Windows => "windows",
             Os::Linux => "linux",
             Os::Macos => "darwin",
-            Os::Ios => "darwin",
+            Os::Ios => "ios",
             Os::FreeBsd => "freebsd",
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
@@ -602,6 +602,12 @@ impl Target {
     #[inline]
     pub fn is_macos(&self) -> bool {
         self.os == Os::Macos
+    }
+
+    /// Returns true if the current platform is iOS
+    #[inline]
+    pub fn is_ios(&self) -> bool {
+        self.os == Os::Ios
     }
 
     /// Returns true if the current platform is windows
@@ -752,6 +758,27 @@ pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Opti
                 } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
                     return Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
                 }
+            }
+        }
+        _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
+    }
+    None
+}
+
+pub(crate) fn detect_target_from_cross_python(python: &PathBuf) -> Option<TargetTriple> {
+    match Command::new(python)
+        .arg("-c")
+        .arg("import sys, sysconfig; print(sysconfig.get_platform(), end='') if getattr(sys, 'cross_compiling', False) else ''")
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let platform = String::from_utf8_lossy(&output.stdout);
+            if platform.ends_with("-arm64-iphoneos") {
+                return Some(TargetTriple::Regular("aarch64-apple-ios".to_string()));
+            } else if platform.ends_with("-arm64-iphonesimulator") {
+                return Some(TargetTriple::Regular("aarch64-apple-ios-sim".to_string()));
+            } else if platform.ends_with("-x86_64-iphonesimulator") {
+                return Some(TargetTriple::Regular("x86_64-apple-ios".to_string()));
             }
         }
         _ => eprintln!("⚠️  Warning: Failed to determine python platform"),

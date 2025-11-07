@@ -422,7 +422,6 @@ impl BuildContext {
             .unwrap_or_else(|| self.module_name.clone().into());
         libs_dir.push(".libs");
         let libs_dir = PathBuf::from(libs_dir);
-        writer.add_directory(&libs_dir)?;
 
         let temp_dir = tempfile::tempdir()?;
         let mut soname_map = BTreeMap::new();
@@ -620,6 +619,21 @@ impl BuildContext {
                 } else {
                     format!("macosx_{x86_64_tag}_x86_64")
                 }
+            }
+            // iOS (simulator and device)
+            (Os::Ios, Arch::X86_64) | (Os::Ios, Arch::Aarch64) => {
+                let arch = if target.target_arch() == Arch::Aarch64 {
+                    "arm64"
+                } else {
+                    "x86_64"
+                };
+                let abi = if self.target.target_triple().ends_with("-sim") {
+                    "iphonesimulator"
+                } else {
+                    "iphoneos"
+                };
+                let (min_sdk_major, min_sdk_minor) = iphoneos_deployment_target(env::var("IPHONEOS_DEPLOYMENT_TARGET").ok().as_deref())?;
+                format!("ios_{min_sdk_major}_{min_sdk_minor}_{arch}_{abi}")
             }
             // FreeBSD
             | (Os::FreeBsd, _) => {
@@ -1257,6 +1271,23 @@ fn macosx_deployment_target(
     ))
 }
 
+/// Get the iOS deployment target version
+fn iphoneos_deployment_target(deploy_target: Option<&str>) -> Result<(u16, u16)> {
+    let (major, minor) = if let Some(deploy_target) = deploy_target {
+        let err_ctx = "IPHONEOS_DEPLOYMENT_TARGET is invalid";
+        let mut parts = deploy_target.split('.');
+        let major = parts.next().context(err_ctx)?;
+        let major: u16 = major.parse().context(err_ctx)?;
+        let minor = parts.next().context(err_ctx)?;
+        let minor: u16 = minor.parse().context(err_ctx)?;
+        (major, minor)
+    } else {
+        (13, 0)
+    };
+
+    Ok((major, minor))
+}
+
 #[inline]
 fn python_macosx_target_version(version: (u16, u16)) -> (u16, u16) {
     let (major, minor) = version;
@@ -1361,7 +1392,7 @@ fn emcc_version() -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::macosx_deployment_target;
+    use super::{iphoneos_deployment_target, macosx_deployment_target};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -1398,5 +1429,27 @@ mod tests {
             macosx_deployment_target(Some("11.1"), false).unwrap(),
             ((11, 0), (11, 0))
         );
+    }
+
+    #[test]
+    fn test_iphoneos_deployment_target() {
+        // Use default when no value is provided
+        assert_eq!(iphoneos_deployment_target(None).unwrap(), (13, 0));
+
+        // Valid version strings
+        assert_eq!(iphoneos_deployment_target(Some("13.0")).unwrap(), (13, 0));
+        assert_eq!(iphoneos_deployment_target(Some("14.5")).unwrap(), (14, 5));
+        assert_eq!(iphoneos_deployment_target(Some("15.0")).unwrap(), (15, 0));
+        // Extra parts are ignored
+        assert_eq!(iphoneos_deployment_target(Some("14.5.1")).unwrap(), (14, 5));
+
+        // Invalid formats
+        assert!(iphoneos_deployment_target(Some("invalid")).is_err());
+        assert!(iphoneos_deployment_target(Some("13")).is_err());
+        assert!(iphoneos_deployment_target(Some("13.")).is_err());
+        assert!(iphoneos_deployment_target(Some(".0")).is_err());
+        assert!(iphoneos_deployment_target(Some("abc.def")).is_err());
+        assert!(iphoneos_deployment_target(Some("13.abc")).is_err());
+        assert!(iphoneos_deployment_target(Some("")).is_err());
     }
 }

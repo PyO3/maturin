@@ -471,66 +471,64 @@ impl BuildOptions {
                                 }
                                 Ok(found_interpreters)
                             }
-                        } else {
-                            if target.cross_compiling() {
-                                let mut interps = Vec::with_capacity(found_interpreters.len());
-                                let mut pypys = Vec::new();
-                                for interp in found_interpreters {
-                                    if interp.interpreter_kind.is_pypy() {
-                                        pypys.push(PathBuf::from(format!(
-                                            "pypy{}.{}",
-                                            interp.major, interp.minor
-                                        )));
-                                    } else {
-                                        interps.push(interp);
-                                    }
+                        } else if target.cross_compiling() {
+                            let mut interps = Vec::with_capacity(found_interpreters.len());
+                            let mut pypys = Vec::new();
+                            for interp in found_interpreters {
+                                if interp.interpreter_kind.is_pypy() {
+                                    pypys.push(PathBuf::from(format!(
+                                        "pypy{}.{}",
+                                        interp.major, interp.minor
+                                    )));
+                                } else {
+                                    interps.push(interp);
                                 }
-                                // cross compiling to PyPy with abi3 feature enabled,
-                                // we cannot use host pypy so switch to bundled sysconfig instead
-                                if !pypys.is_empty() {
-                                    interps.extend(find_interpreter_in_sysconfig(
-                                        bridge,
-                                        &pypys,
-                                        target,
-                                        requires_python,
-                                    )?)
-                                }
-                                if interps.is_empty() {
-                                    bail!("Failed to find any python interpreter");
-                                }
-                                Ok(interps)
-                            } else if !found_interpreters.is_empty() {
-                                let interpreters_str = found_interpreters
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect::<Vec<String>>()
-                                    .join(", ");
-                                eprintln!("🐍 Found {interpreters_str}");
-
-                                Ok(found_interpreters)
-                            } else if self.interpreter.is_empty() {
-                                eprintln!("🐍 Not using a specific python interpreter");
-                                // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
-                                // The python interpreter config doesn't matter, as it's not used for anything
-                                Ok(vec![PythonInterpreter {
-                                    config: InterpreterConfig {
-                                        major: *major as usize,
-                                        minor: *minor as usize,
-                                        interpreter_kind: InterpreterKind::CPython,
-                                        abiflags: "".to_string(),
-                                        ext_suffix: "".to_string(),
-                                        pointer_width: None,
-                                        gil_disabled: false,
-                                    },
-                                    executable: PathBuf::new(),
-                                    platform: None,
-                                    runnable: false,
-                                    implementation_name: "cpython".to_string(),
-                                    soabi: None,
-                                }])
-                            } else {
+                            }
+                            // cross compiling to PyPy with abi3 feature enabled,
+                            // we cannot use host pypy so switch to bundled sysconfig instead
+                            if !pypys.is_empty() {
+                                interps.extend(find_interpreter_in_sysconfig(
+                                    bridge,
+                                    &pypys,
+                                    target,
+                                    requires_python,
+                                )?)
+                            }
+                            if interps.is_empty() {
                                 bail!("Failed to find any python interpreter");
                             }
+                            Ok(interps)
+                        } else if !found_interpreters.is_empty() {
+                            let interpreters_str = found_interpreters
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<String>>()
+                                .join(", ");
+                            eprintln!("🐍 Found {interpreters_str}");
+
+                            Ok(found_interpreters)
+                        } else if self.interpreter.is_empty() {
+                            eprintln!("🐍 Not using a specific python interpreter");
+                            // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
+                            // The python interpreter config doesn't matter, as it's not used for anything
+                            Ok(vec![PythonInterpreter {
+                                config: InterpreterConfig {
+                                    major: *major as usize,
+                                    minor: *minor as usize,
+                                    interpreter_kind: InterpreterKind::CPython,
+                                    abiflags: "".to_string(),
+                                    ext_suffix: "".to_string(),
+                                    pointer_width: None,
+                                    gil_disabled: false,
+                                },
+                                executable: PathBuf::new(),
+                                platform: None,
+                                runnable: false,
+                                implementation_name: "cpython".to_string(),
+                                soabi: None,
+                            }])
+                        } else {
+                            bail!("Failed to find any python interpreter");
                         }
                     }
                 }

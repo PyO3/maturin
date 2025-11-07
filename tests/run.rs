@@ -13,7 +13,7 @@ use std::time::Duration;
 use time::macros::datetime;
 use which::which;
 
-use crate::common::pep517;
+use crate::common::{find_subslice, pep517};
 
 mod common;
 
@@ -986,9 +986,7 @@ fn pep517_default_profile() {
     ));
 
     assert!(
-        std::str::from_utf8(&output.stderr)
-            .unwrap()
-            .contains("`release` profile [optimized]"),
+        find_subslice(&output.stderr, b"`release` profile [optimized]").is_some(),
         "Output was: {}",
         std::str::from_utf8(&output.stderr).unwrap()
     );
@@ -1004,9 +1002,7 @@ fn pep517_editable_profile() {
     ));
 
     assert!(
-        std::str::from_utf8(&output.stderr)
-            .unwrap()
-            .contains("`dev` profile [unoptimized + debuginfo]"),
+        find_subslice(&output.stderr, b"`dev` profile [unoptimized + debuginfo]").is_some(),
         "Output was: {}",
         std::str::from_utf8(&output.stderr).unwrap()
     );

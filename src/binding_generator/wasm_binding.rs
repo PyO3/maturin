@@ -4,7 +4,6 @@ use anyhow::Result;
 
 use crate::Metadata24;
 use crate::ModuleWriter;
-use crate::module_writer::ModuleWriterExt;
 
 /// Adds a wrapper script that start the wasm binary through wasmtime.
 ///
@@ -52,10 +51,9 @@ if __name__ == '__main__':
     "#
     );
 
-    // We can't use add_file since we want to mark the file as executable
     let launcher_path = Path::new(&metadata.get_distribution_escaped())
         .join(bin_name.replace('-', "_"))
         .with_extension("py");
-    writer.add_bytes_with_permissions(&launcher_path, None, entrypoint_script.as_bytes(), 0o755)?;
+    writer.add_data(&launcher_path, None, entrypoint_script.as_bytes(), true)?;
     Ok(())
 }

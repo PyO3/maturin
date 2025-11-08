@@ -45,21 +45,6 @@ pub trait ModuleWriter {
 
 /// Extension trait with convenience methods for interacting with a [ModuleWriter]
 pub trait ModuleWriterExt: ModuleWriter {
-    /// Adds a file with bytes as content in target relative to the module base path while setting
-    /// the given unix permissions
-    ///
-    /// For generated files, `source` is `None`.
-    fn add_bytes_with_permissions(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: Option<&Path>,
-        bytes: &[u8],
-        permissions: u32,
-    ) -> Result<()> {
-        debug!("Adding {}", target.as_ref().display());
-        self.add_data(target, source, bytes, permission_is_executable(permissions))
-    }
-
     /// Copies the source file to the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
         self.add_file_with_permissions(target, source, 0o644)

@@ -83,7 +83,7 @@ pub fn write_cffi_module(
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
-            writer.add_file(module.join("__init__.pyi"), type_stub)?;
+            writer.add_file_with_permissions(module.join("__init__.pyi"), type_stub, false)?;
             writer.add_empty_file(module.join("py.typed"))?;
         }
     };

@@ -302,7 +302,7 @@ fn add_crate_to_source_distribution(
     }
 
     for (target, source) in target_source {
-        writer.add_file(prefix.join(target), source)?;
+        writer.add_file_with_permissions(prefix.join(target), source, false)?;
     }
 
     Ok(())
@@ -432,7 +432,7 @@ fn add_git_tracked_files_to_sdist(
         .filter(|s| !s.is_empty())
         .map(Path::new);
     for source in file_paths {
-        writer.add_file(prefix.join(source), pyproject_dir.join(source))?;
+        writer.add_file_with_permissions(prefix.join(source), pyproject_dir.join(source), false)?;
     }
     Ok(())
 }
@@ -515,11 +515,12 @@ fn add_cargo_package_files_to_sdist(
             .into_path_buf();
         // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
         // higher up the file tree.
-        writer.add_file(
+        writer.add_file_with_permissions(
             root_dir
                 .join(relative_main_crate_manifest_dir)
                 .join(readme.file_name().unwrap()),
             &abs_readme,
+            false,
         )?;
         Some(abs_readme)
     } else {
@@ -557,7 +558,11 @@ fn add_cargo_package_files_to_sdist(
                 pyproject_root
             };
         let relative_cargo_lock = cargo_lock_path.strip_prefix(project_root).unwrap();
-        writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path)?;
+        writer.add_file_with_permissions(
+            root_dir.join(relative_cargo_lock),
+            &cargo_lock_path,
+            false,
+        )?;
         if use_workspace_cargo_lock {
             let relative_workspace_cargo_toml = relative_cargo_lock.with_file_name("Cargo.toml");
             let mut deps_to_keep = known_path_deps.clone();
@@ -614,7 +619,11 @@ fn add_cargo_package_files_to_sdist(
             false,
         )?;
     } else {
-        writer.add_file(root_dir.join("pyproject.toml"), pyproject_toml_path)?;
+        writer.add_file_with_permissions(
+            root_dir.join("pyproject.toml"),
+            pyproject_toml_path,
+            false,
+        )?;
     }
 
     // Add python source files
@@ -649,7 +658,7 @@ fn add_cargo_package_files_to_sdist(
             }
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
             if !source.is_dir() {
-                writer.add_file(target, &source)?;
+                writer.add_file_with_permissions(target, &source, false)?;
             }
         }
     }
@@ -707,11 +716,12 @@ fn add_path_dep(
             .into_path_buf();
         // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
         // higher up the file tree. See also [`rewrite_cargo_toml_readme`].
-        writer.add_file(
+        writer.add_file_with_permissions(
             root_dir
                 .join(relative_path_dep_manifest_dir)
                 .join(readme.file_name().unwrap()),
             &abs_readme,
+            false,
         )?;
     }
     // Handle different workspace manifest
@@ -720,9 +730,10 @@ fn add_path_dep(
         let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
             .strip_prefix(sdist_root)
             .unwrap();
-        writer.add_file(
+        writer.add_file_with_permissions(
             root_dir.join(relative_path_dep_workspace_manifest),
             &path_dep_workspace_manifest,
+            false,
         )?;
     }
     Ok(())
@@ -795,10 +806,18 @@ pub fn source_distribution(
     // Add readme, license
     if let Some(project) = pyproject.project.as_ref() {
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
-            writer.add_file(root_dir.join(readme), pyproject_dir.join(readme))?;
+            writer.add_file_with_permissions(
+                root_dir.join(readme),
+                pyproject_dir.join(readme),
+                false,
+            )?;
         }
         if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
-            writer.add_file(root_dir.join(file), pyproject_dir.join(file))?;
+            writer.add_file_with_permissions(
+                root_dir.join(file),
+                pyproject_dir.join(file),
+                false,
+            )?;
         }
         if let Some(license_files) = &project.license_files {
             // Safe on Windows and Unix as neither forward nor backwards slashes are escaped.
@@ -820,9 +839,10 @@ pub fn source_distribution(
                         .to_path_buf();
                     if seen.insert(license_path.clone()) {
                         debug!("Including license file `{}`", license_path.display());
-                        writer.add_file(
+                        writer.add_file_with_permissions(
                             root_dir.join(&license_path),
                             pyproject_dir.join(&license_path),
+                            false,
                         )?;
                     }
                 }
@@ -838,7 +858,7 @@ pub fn source_distribution(
         {
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
             if !source.is_dir() {
-                writer.add_file(target, source)?;
+                writer.add_file_with_permissions(target, source, false)?;
             }
         }
         Ok(())

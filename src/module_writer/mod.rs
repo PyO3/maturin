@@ -45,11 +45,6 @@ pub trait ModuleWriter {
 
 /// Extension trait with convenience methods for interacting with a [ModuleWriter]
 pub trait ModuleWriterExt: ModuleWriter {
-    /// Copies the source file to the target path relative to the module base path
-    fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        self.add_file_with_permissions(target, source, false)
-    }
-
     /// Copies the source file the target path relative to the module base path while setting
     /// the given unix permissions
     fn add_file_with_permissions(
@@ -279,7 +274,11 @@ pub fn write_dist_info(
     if !metadata24.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("licenses");
         for path in &metadata24.license_files {
-            writer.add_file(license_files_dir.join(path), pyproject_dir.join(path))?;
+            writer.add_file_with_permissions(
+                license_files_dir.join(path),
+                pyproject_dir.join(path),
+                false,
+            )?;
         }
     }
 

@@ -101,7 +101,7 @@ pub fn write_cffi_module(
             cffi_declarations.as_bytes(),
             false,
         )?;
-        writer.add_file_with_permissions(module.join(&cffi_module_file_name), artifact, 0o755)?;
+        writer.add_file_with_permissions(module.join(&cffi_module_file_name), artifact, true)?;
     }
 
     Ok(())

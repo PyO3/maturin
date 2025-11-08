@@ -500,7 +500,7 @@ impl BuildContext {
             if !replacements.is_empty() {
                 patchelf::replace_needed(path, &replacements[..])?;
             }
-            writer.add_file_with_permissions(libs_dir.join(new_soname), path, 0o755)?;
+            writer.add_file_with_permissions(libs_dir.join(new_soname), path, true)?;
         }
 
         eprintln!(

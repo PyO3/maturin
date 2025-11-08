@@ -47,7 +47,7 @@ pub trait ModuleWriter {
 pub trait ModuleWriterExt: ModuleWriter {
     /// Copies the source file to the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        self.add_file_with_permissions(target, source, 0o644)
+        self.add_file_with_permissions(target, source, false)
     }
 
     /// Copies the source file the target path relative to the module base path while setting
@@ -56,21 +56,16 @@ pub trait ModuleWriterExt: ModuleWriter {
         &mut self,
         target: impl AsRef<Path>,
         source: impl AsRef<Path>,
-        permissions: u32,
+        executable: bool,
     ) -> Result<()> {
         let target = target.as_ref();
         let source = source.as_ref();
         debug!("Adding {} from {}", target.display(), source.display());
 
         let file =
-            File::open(source).with_context(|| format!("Failed to read {}", source.display()))?;
-        self.add_data(
-            target,
-            Some(source),
-            file,
-            permission_is_executable(permissions),
-        )
-        .with_context(|| format!("Failed to write to {}", target.display()))?;
+            File::open(source).with_context(|| format!("Failed to open {}", source.display()))?;
+        self.add_data(target, Some(source), file, executable)
+            .with_context(|| format!("Failed to write to {}", target.display()))?;
         Ok(())
     }
 
@@ -130,7 +125,7 @@ pub fn write_python_part(
             #[cfg(not(unix))]
             let mode = 0o644;
             writer
-                .add_file_with_permissions(relative, &absolute, mode)
+                .add_file_with_permissions(relative, &absolute, permission_is_executable(mode))
                 .context(format!("File to add file from {}", absolute.display()))?;
         }
     }
@@ -155,7 +150,11 @@ pub fn write_python_part(
                         let mode = source.metadata()?.permissions().mode();
                         #[cfg(not(unix))]
                         let mode = 0o644;
-                        writer.add_file_with_permissions(target, source, mode)?;
+                        writer.add_file_with_permissions(
+                            target,
+                            source,
+                            permission_is_executable(mode),
+                        )?;
                     }
                 }
             }
@@ -213,10 +212,14 @@ pub fn add_data(
                         writer.add_file_with_permissions(
                             relative,
                             source.parent().unwrap(),
-                            mode,
+                            permission_is_executable(mode),
                         )?;
                     } else if file.path().is_file() {
-                        writer.add_file_with_permissions(relative, file.path(), mode)?;
+                        writer.add_file_with_permissions(
+                            relative,
+                            file.path(),
+                            permission_is_executable(mode),
+                        )?;
                     } else if file.path().is_dir() {
                         // Intentionally ignored
                     } else {

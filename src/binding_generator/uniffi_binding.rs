@@ -255,7 +255,7 @@ pub fn write_uniffi_module(
                 binding_dir.join(binding).with_extension("py"),
             )?;
         }
-        writer.add_file_with_permissions(module.join(cdylib), artifact, 0o755)?;
+        writer.add_file_with_permissions(module.join(cdylib), artifact, true)?;
     }
 
     Ok(())

@@ -84,17 +84,23 @@ pub fn write_cffi_module(
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(module.join("py.typed"), None, b"")?;
+            writer.add_empty_file(module.join("py.typed"))?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(
+        writer.add_data(
             module.join("__init__.py"),
             None,
             cffi_init_file(&cffi_module_file_name).as_bytes(),
+            false,
         )?;
-        writer.add_bytes(module.join("ffi.py"), None, cffi_declarations.as_bytes())?;
+        writer.add_data(
+            module.join("ffi.py"),
+            None,
+            cffi_declarations.as_bytes(),
+            false,
+        )?;
         writer.add_file_with_permissions(module.join(&cffi_module_file_name), artifact, 0o755)?;
     }
 

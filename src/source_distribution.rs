@@ -1,4 +1,4 @@
-use crate::module_writer::ModuleWriterExt;
+use crate::module_writer::{ModuleWriter, ModuleWriterExt};
 use crate::pyproject_toml::SdistGenerator;
 use crate::{BuildContext, PyProjectToml, SDistWriter, pyproject_toml::Format};
 use anyhow::{Context, Result, bail};
@@ -284,18 +284,20 @@ fn add_crate_to_source_distribution(
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
         rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
-        writer.add_bytes(
+        writer.add_data(
             cargo_toml_path,
             Some(manifest_path),
             document.to_string().as_bytes(),
+            false,
         )?;
     } else if !skip_cargo_toml {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
-        writer.add_bytes(
+        writer.add_data(
             cargo_toml_path,
             Some(manifest_path),
             document.to_string().as_bytes(),
+            false,
         )?;
     }
 
@@ -581,10 +583,11 @@ fn add_cargo_package_files_to_sdist(
                 workspace_manifest_path.as_std_path(),
                 &deps_to_keep,
             )?;
-            writer.add_bytes(
+            writer.add_data(
                 root_dir.join(relative_workspace_cargo_toml),
                 Some(workspace_manifest_path.as_std_path()),
                 document.to_string().as_bytes(),
+                false,
             )?;
         }
     } else if cargo_lock_required {
@@ -604,10 +607,11 @@ fn add_cargo_package_files_to_sdist(
             pyproject_toml_path,
             &relative_main_crate_manifest_dir.join("Cargo.toml"),
         )?;
-        writer.add_bytes(
+        writer.add_data(
             root_dir.join("pyproject.toml"),
             Some(pyproject_toml_path),
             rewritten_pyproject_toml.as_bytes(),
+            false,
         )?;
     } else {
         writer.add_file(root_dir.join("pyproject.toml"), pyproject_toml_path)?;
@@ -849,10 +853,11 @@ pub fn source_distribution(
         }
     }
 
-    writer.add_bytes(
+    writer.add_data(
         root_dir.join("PKG-INFO"),
         None,
         metadata24.to_file_contents()?.as_bytes(),
+        false,
     )?;
 
     let source_distribution_path = writer.finish()?;

@@ -45,20 +45,6 @@ pub trait ModuleWriter {
 
 /// Extension trait with convenience methods for interacting with a [ModuleWriter]
 pub trait ModuleWriterExt: ModuleWriter {
-    /// Adds a file with bytes as content in target relative to the module base path.
-    ///
-    /// For generated files, `source` is `None`.
-    fn add_bytes(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: Option<&Path>,
-        bytes: &[u8],
-    ) -> Result<()> {
-        debug!("Adding {}", target.as_ref().display());
-        // 0o644 is the default from the zip crate
-        self.add_bytes_with_permissions(target, source, bytes, 0o644)
-    }
-
     /// Adds a file with bytes as content in target relative to the module base path while setting
     /// the given unix permissions
     ///
@@ -101,6 +87,11 @@ pub trait ModuleWriterExt: ModuleWriter {
         )
         .with_context(|| format!("Failed to write to {}", target.display()))?;
         Ok(())
+    }
+
+    /// Add an empty file to the target path
+    fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
+        self.add_data(target, None, b"".as_slice(), false)
     }
 }
 
@@ -264,16 +255,18 @@ pub fn write_dist_info(
 ) -> Result<()> {
     let dist_info_dir = metadata24.get_dist_info_dir();
 
-    writer.add_bytes(
+    writer.add_data(
         dist_info_dir.join("METADATA"),
         None,
         metadata24.to_file_contents()?.as_bytes(),
+        false,
     )?;
 
-    writer.add_bytes(
+    writer.add_data(
         dist_info_dir.join("WHEEL"),
         None,
         wheel_file(tags)?.as_bytes(),
+        false,
     )?;
 
     let mut entry_points = String::new();
@@ -287,10 +280,11 @@ pub fn write_dist_info(
         entry_points.push_str(&entry_points_txt(entry_type, scripts));
     }
     if !entry_points.is_empty() {
-        writer.add_bytes(
+        writer.add_data(
             dist_info_dir.join("entry_points.txt"),
             None,
             entry_points.as_bytes(),
+            false,
         )?;
     }
 

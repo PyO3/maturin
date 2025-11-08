@@ -243,12 +243,12 @@ pub fn write_uniffi_module(
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
             writer.add_file(module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(module.join("py.typed"), None, b"")?;
+            writer.add_empty_file(module.join("py.typed"))?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes())?;
+        writer.add_data(module.join("__init__.py"), None, py_init.as_bytes(), false)?;
         for binding in binding_names.iter() {
             writer.add_file(
                 module.join(binding).with_extension("py"),

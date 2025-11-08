@@ -126,7 +126,7 @@ pub fn write_bindings_module(
     } else {
         let module = PathBuf::from(ext_name);
         // Reexport the shared library as if it were the top level module
-        writer.add_bytes(
+        writer.add_data(
             module.join("__init__.py"),
             None,
             format!(
@@ -137,12 +137,13 @@ if hasattr({ext_name}, "__all__"):
     __all__ = {ext_name}.__all__"#
             )
             .as_bytes(),
+            false,
         )?;
         let type_stub = project_layout.rust_module.join(format!("{ext_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {ext_name}.pyi");
             writer.add_file(module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(module.join("py.typed"), None, b"")?;
+            writer.add_empty_file(module.join("py.typed"))?;
         }
         writer.add_file_with_permissions(module.join(so_filename), artifact, 0o755)?;
     }

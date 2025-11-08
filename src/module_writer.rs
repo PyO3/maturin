@@ -433,6 +433,7 @@ pub struct SDistWriter {
     path: PathBuf,
     file_tracker: FileTracker,
     excludes: Override,
+    mtime: u64,
 }
 
 impl ModuleWriter for SDistWriter {
@@ -462,7 +463,7 @@ impl ModuleWriter for SDistWriter {
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
-        header.set_mtime(SDIST_DETERMINISTIC_TIMESTAMP);
+        header.set_mtime(self.mtime);
         header.set_cksum();
         self.tar
             .append_data(&mut header, target, bytes)
@@ -481,6 +482,7 @@ impl SDistWriter {
         wheel_dir: impl AsRef<Path>,
         metadata24: &Metadata24,
         excludes: Override,
+        mtime_override: Option<u64>,
     ) -> Result<Self, io::Error> {
         let path = wheel_dir
             .as_ref()
@@ -501,6 +503,7 @@ impl SDistWriter {
             path,
             file_tracker: FileTracker::default(),
             excludes,
+            mtime: mtime_override.unwrap_or(SDIST_DETERMINISTIC_TIMESTAMP),
         })
     }
 
@@ -1575,7 +1578,7 @@ mod tests {
 
         // No excludes
         let tmp_dir = TempDir::new()?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty())?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty(), None)?;
         assert!(writer.file_tracker.0.is_empty());
         writer.add_bytes_with_permissions("test", Some(Path::new("test")), &[], perm)?;
         assert_eq!(writer.file_tracker.0.len(), 1);
@@ -1587,7 +1590,7 @@ mod tests {
         let mut excludes = OverrideBuilder::new(&tmp_dir);
         excludes.add("test*")?;
         excludes.add("!test2")?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?)?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?, None)?;
         writer.add_bytes_with_permissions("test1", Some(Path::new("test1")), &[], perm)?;
         writer.add_bytes_with_permissions("test3", Some(Path::new("test3")), &[], perm)?;
         assert!(writer.file_tracker.0.is_empty());

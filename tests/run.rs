@@ -977,6 +977,26 @@ fn pyo3_source_date_epoch() {
 }
 
 #[test]
+fn sdist_no_source_date_epoch() {
+    env::remove_var("SOURCE_DATE_EPOCH");
+    handle_result(other::check_sdist_mtimes(
+        "test-crates/pyo3-mixed-include-exclude",
+        1153704088,
+        "sdist_no_source_date_epoch",
+    ))
+}
+
+#[test]
+fn sdist_source_date_epoch() {
+    env::set_var("SOURCE_DATE_EPOCH", "1");
+    handle_result(other::check_sdist_mtimes(
+        "test-crates/pyo3-mixed-include-exclude",
+        1,
+        "sdist_source_date_epoch",
+    ))
+}
+
+#[test]
 fn pep517_default_profile() {
     let output = handle_result(pep517::test_pep517(
         "test-crates/pyo3-pure",

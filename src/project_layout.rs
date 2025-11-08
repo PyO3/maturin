@@ -62,6 +62,7 @@ impl ProjectResolver {
     pub fn resolve(
         cargo_manifest_path: Option<PathBuf>,
         mut cargo_options: CargoOptions,
+        editable_install: bool,
     ) -> Result<Self> {
         let (manifest_file, pyproject_file) =
             Self::resolve_manifest_paths(cargo_manifest_path, &cargo_options)?;
@@ -102,7 +103,7 @@ impl ProjectResolver {
         let tool_maturin = pyproject.and_then(|p| p.maturin());
 
         let pyproject_toml_maturin_options = if let Some(tool_maturin) = tool_maturin {
-            cargo_options.merge_with_pyproject_toml(tool_maturin.clone())
+            cargo_options.merge_with_pyproject_toml(tool_maturin.clone(), editable_install)
         } else {
             Vec::new()
         };

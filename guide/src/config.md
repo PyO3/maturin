@@ -12,6 +12,10 @@ You can configure maturin in `tool.maturin` section of [`pyproject.toml`](https:
 [tool.maturin]
 # Build artifacts with the specified Cargo profile
 profile = "release"
+# For "editable" builds, use the specified Cargo profile,
+# e.g. to use "dev" builds for local development
+# (uses `profile` if this key is not set)
+editable-profile = "release"
 # List of features to activate
 features = ["foo", "bar"]
 # Activate all available features

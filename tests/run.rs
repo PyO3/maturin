@@ -7,6 +7,7 @@ use common::{
 use expect_test::expect;
 use maturin::pyproject_toml::SdistGenerator;
 use rstest::rstest;
+use serial_test::serial;
 use std::env;
 use std::path::Path;
 use std::time::Duration;
@@ -967,6 +968,7 @@ fn abi3_python_interpreter_args() {
 }
 
 #[test]
+#[serial(source_date_epoch_env)]
 fn pyo3_source_date_epoch() {
     env::set_var("SOURCE_DATE_EPOCH", "0");
     handle_result(other::check_wheel_mtimes(
@@ -977,6 +979,7 @@ fn pyo3_source_date_epoch() {
 }
 
 #[test]
+#[serial(source_date_epoch_env)]
 fn sdist_no_source_date_epoch() {
     env::remove_var("SOURCE_DATE_EPOCH");
     handle_result(other::check_sdist_mtimes(
@@ -987,6 +990,7 @@ fn sdist_no_source_date_epoch() {
 }
 
 #[test]
+#[serial(source_date_epoch_env)]
 fn sdist_source_date_epoch() {
     env::set_var("SOURCE_DATE_EPOCH", "1");
     handle_result(other::check_sdist_mtimes(

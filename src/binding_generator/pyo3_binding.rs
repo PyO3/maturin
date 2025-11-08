@@ -121,7 +121,7 @@ pub fn write_bindings_module(
                 .rust_module
                 .strip_prefix(python_module.parent().unwrap())
                 .unwrap();
-            writer.add_file_with_permissions(relative.join(&so_filename), artifact, true)?;
+            writer.add_file(relative.join(&so_filename), artifact, true)?;
         }
     } else {
         let module = PathBuf::from(ext_name);
@@ -142,10 +142,10 @@ if hasattr({ext_name}, "__all__"):
         let type_stub = project_layout.rust_module.join(format!("{ext_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {ext_name}.pyi");
-            writer.add_file_with_permissions(module.join("__init__.pyi"), type_stub, false)?;
+            writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
             writer.add_empty_file(module.join("py.typed"))?;
         }
-        writer.add_file_with_permissions(module.join(so_filename), artifact, true)?;
+        writer.add_file(module.join(so_filename), artifact, true)?;
     }
 
     Ok(())

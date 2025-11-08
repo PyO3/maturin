@@ -32,6 +32,6 @@ pub fn write_bin(
     .join("scripts");
 
     // We can't use add_file since we need to mark the file as executable
-    writer.add_file_with_permissions(data_dir.join(bin_name), artifact, true)?;
+    writer.add_file(data_dir.join(bin_name), artifact, true)?;
     Ok(())
 }

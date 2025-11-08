@@ -47,7 +47,7 @@ pub trait ModuleWriter {
 pub trait ModuleWriterExt: ModuleWriter {
     /// Copies the source file the target path relative to the module base path while setting
     /// the given unix permissions
-    fn add_file_with_permissions(
+    fn add_file(
         &mut self,
         target: impl AsRef<Path>,
         source: impl AsRef<Path>,
@@ -120,7 +120,7 @@ pub fn write_python_part(
             #[cfg(not(unix))]
             let mode = 0o644;
             writer
-                .add_file_with_permissions(relative, &absolute, permission_is_executable(mode))
+                .add_file(relative, &absolute, permission_is_executable(mode))
                 .context(format!("File to add file from {}", absolute.display()))?;
         }
     }
@@ -145,11 +145,7 @@ pub fn write_python_part(
                         let mode = source.metadata()?.permissions().mode();
                         #[cfg(not(unix))]
                         let mode = 0o644;
-                        writer.add_file_with_permissions(
-                            target,
-                            source,
-                            permission_is_executable(mode),
-                        )?;
+                        writer.add_file(target, source, permission_is_executable(mode))?;
                     }
                 }
             }
@@ -204,17 +200,13 @@ pub fn add_data(
                         // Copy the actual file contents, not the link, so that you can create a
                         // data directory by joining different data sources
                         let source = fs::read_link(file.path())?;
-                        writer.add_file_with_permissions(
+                        writer.add_file(
                             relative,
                             source.parent().unwrap(),
                             permission_is_executable(mode),
                         )?;
                     } else if file.path().is_file() {
-                        writer.add_file_with_permissions(
-                            relative,
-                            file.path(),
-                            permission_is_executable(mode),
-                        )?;
+                        writer.add_file(relative, file.path(), permission_is_executable(mode))?;
                     } else if file.path().is_dir() {
                         // Intentionally ignored
                     } else {
@@ -274,7 +266,7 @@ pub fn write_dist_info(
     if !metadata24.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("licenses");
         for path in &metadata24.license_files {
-            writer.add_file_with_permissions(
+            writer.add_file(
                 license_files_dir.join(path),
                 pyproject_dir.join(path),
                 false,

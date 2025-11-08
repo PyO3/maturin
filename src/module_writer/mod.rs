@@ -1,5 +1,5 @@
 use std::fmt::Write as _;
-use std::io::Read as _;
+use std::io::Read;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
@@ -30,6 +30,21 @@ pub use wheel_writer::WheelWriter;
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
+    /// Adds a file with data as content in target relative to the module base path while setting
+    /// the appropriate unix permissions
+    ///
+    /// For generated files, `source` is `None`.
+    fn add_data(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: Option<&Path>,
+        data: impl Read,
+        executable: bool,
+    ) -> Result<()>;
+}
+
+/// Extension trait with convenience methods for interacting with a [ModuleWriter]
+pub trait ModuleWriterExt: ModuleWriter {
     /// Adds a file with bytes as content in target relative to the module base path.
     ///
     /// For generated files, `source` is `None`.
@@ -54,7 +69,10 @@ pub trait ModuleWriter {
         source: Option<&Path>,
         bytes: &[u8],
         permissions: u32,
-    ) -> Result<()>;
+    ) -> Result<()> {
+        debug!("Adding {}", target.as_ref().display());
+        self.add_data(target, source, bytes, permission_is_executable(permissions))
+    }
 
     /// Copies the source file to the target path relative to the module base path
     fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
@@ -73,15 +91,21 @@ pub trait ModuleWriter {
         let source = source.as_ref();
         debug!("Adding {} from {}", target.display(), source.display());
 
-        let read_failed_context = format!("Failed to read {}", source.display());
-        let mut file = File::open(source).context(read_failed_context.clone())?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).context(read_failed_context)?;
-        self.add_bytes_with_permissions(target, Some(source), &buffer, permissions)
-            .context(format!("Failed to write to {}", target.display()))?;
+        let file =
+            File::open(source).with_context(|| format!("Failed to read {}", source.display()))?;
+        self.add_data(
+            target,
+            Some(source),
+            file,
+            permission_is_executable(permissions),
+        )
+        .with_context(|| format!("Failed to write to {}", target.display()))?;
         Ok(())
     }
 }
+
+/// This blanket impl makes it impossible to overwrite the methods in [ModuleWriterExt]
+impl<T: ModuleWriter> ModuleWriterExt for T {}
 
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(
@@ -326,6 +350,26 @@ fn entry_points_txt(
         .fold(format!("[{entry_type}]\n"), |text, (k, v)| {
             text + k + "=" + v + "\n"
         })
+}
+
+#[inline]
+fn permission_is_executable(mode: u32) -> bool {
+    (0o100 & mode) == 0o100
+}
+
+#[cfg(unix)]
+#[inline]
+fn default_permission(executable: bool) -> u32 {
+    match executable {
+        true => 0o755,
+        false => 0o644,
+    }
+}
+
+#[cfg(not(unix))]
+#[inline]
+fn default_permission(_executable: bool) -> u32 {
+    0o644
 }
 
 #[cfg(test)]

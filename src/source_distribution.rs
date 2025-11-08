@@ -1,4 +1,4 @@
-use crate::module_writer::ModuleWriter;
+use crate::module_writer::ModuleWriterExt;
 use crate::pyproject_toml::SdistGenerator;
 use crate::{BuildContext, PyProjectToml, SDistWriter, pyproject_toml::Format};
 use anyhow::{Context, Result, bail};

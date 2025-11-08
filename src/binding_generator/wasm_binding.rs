@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use crate::Metadata24;
 use crate::ModuleWriter;
+use crate::module_writer::ModuleWriterExt;
 
 /// Adds a wrapper script that start the wasm binary through wasmtime.
 ///

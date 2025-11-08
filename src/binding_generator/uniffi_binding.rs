@@ -14,6 +14,7 @@ use tracing::debug;
 
 use crate::ModuleWriter;
 use crate::PyProjectToml;
+use crate::module_writer::ModuleWriterExt;
 use crate::module_writer::write_python_part;
 use crate::project_layout::ProjectLayout;
 use crate::target::Os;

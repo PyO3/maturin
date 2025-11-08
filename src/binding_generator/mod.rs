@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use crate::Metadata24;
 use crate::ModuleWriter;
+use crate::module_writer::ModuleWriterExt;
 
 mod cffi_binding;
 mod pyo3_binding;

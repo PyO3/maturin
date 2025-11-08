@@ -1,4 +1,5 @@
-use std::io::Write as _;
+use std::io;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -13,6 +14,7 @@ use fs_err::OpenOptions;
 use fs_err::os::unix::fs::OpenOptionsExt as _;
 
 use super::ModuleWriter;
+use super::default_permission;
 use super::util::FileTracker;
 
 /// A [ModuleWriter] that adds the module somewhere in the filesystem, e.g. in a virtualenv
@@ -32,12 +34,12 @@ impl PathWriter {
 }
 
 impl ModuleWriter for PathWriter {
-    fn add_bytes_with_permissions(
+    fn add_data(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
-        bytes: &[u8],
-        #[cfg_attr(target_os = "windows", allow(unused_variables))] permissions: u32,
+        mut data: impl Read,
+        #[cfg_attr(target_os = "windows", allow(unused_variables))] executable: bool,
     ) -> Result<()> {
         let path = self.base_path.join(&target);
 
@@ -59,7 +61,7 @@ impl ModuleWriter for PathWriter {
                     .create(true)
                     .write(true)
                     .truncate(true)
-                    .mode(permissions)
+                    .mode(default_permission(executable))
                     .open(&path)
             }
             #[cfg(target_os = "windows")]
@@ -67,10 +69,10 @@ impl ModuleWriter for PathWriter {
                 File::create(&path)
             }
         }
-        .context(format!("Failed to create a file at {}", path.display()))?;
+        .with_context(|| format!("Failed to create a file at {}", path.display()))?;
 
-        file.write_all(bytes)
-            .context(format!("Failed to write to file at {}", path.display()))?;
+        io::copy(&mut data, &mut file)
+            .with_context(|| format!("Failed to write to file at {}", path.display()))?;
 
         Ok(())
     }

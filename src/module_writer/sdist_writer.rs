@@ -1,4 +1,5 @@
 use std::io;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -13,6 +14,7 @@ use normpath::PathExt as _;
 use crate::Metadata24;
 
 use super::ModuleWriter;
+use super::default_permission;
 use super::util::FileTracker;
 
 /// A deterministic, arbitrary, non-zero timestamp that use used as `mtime`
@@ -35,12 +37,12 @@ pub struct SDistWriter {
 }
 
 impl ModuleWriter for SDistWriter {
-    fn add_bytes_with_permissions(
+    fn add_data(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
-        bytes: &[u8],
-        permissions: u32,
+        mut data: impl Read,
+        executable: bool,
     ) -> Result<()> {
         if let Some(source) = source {
             if self.exclude(source) {
@@ -58,19 +60,24 @@ impl ModuleWriter for SDistWriter {
             return Ok(());
         }
 
+        let mut buffer = Vec::new();
+        data.read_to_end(&mut buffer)
+            .with_context(|| format!("Failed to read data into buffer for {}", target.display()))?;
+
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Regular);
-        header.set_size(bytes.len() as u64);
-        header.set_mode(permissions);
+        header.set_size(buffer.len() as u64);
+        header.set_mode(default_permission(executable));
         header.set_mtime(self.mtime);
-        header.set_cksum();
         self.tar
-            .append_data(&mut header, target, bytes)
-            .context(format!(
-                "Failed to add {} bytes to sdist as {}",
-                bytes.len(),
-                target.display()
-            ))?;
+            .append_data(&mut header, target, buffer.as_slice())
+            .with_context(|| {
+                format!(
+                    "Failed to add {} bytes to sdist as {}",
+                    buffer.len(),
+                    target.display()
+                )
+            })?;
         Ok(())
     }
 }
@@ -121,6 +128,7 @@ impl SDistWriter {
 
 #[cfg(test)]
 mod tests {
+    use std::io::empty;
     use std::path::Path;
 
     use ignore::overrides::Override;
@@ -137,13 +145,12 @@ mod tests {
     // The mechanism is the same for wheel_writer
     fn sdist_writer_excludes() -> Result<(), Box<dyn std::error::Error>> {
         let metadata = Metadata24::new("dummy".to_string(), Version::new([1, 0]));
-        let perm = 0o777;
 
         // No excludes
         let tmp_dir = TempDir::new()?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty(), None)?;
         assert!(writer.file_tracker.files.is_empty());
-        writer.add_bytes_with_permissions("test", Some(Path::new("test")), &[], perm)?;
+        writer.add_data("test", Some(Path::new("test")), empty(), true)?;
         assert_eq!(writer.file_tracker.files.len(), 1);
         writer.finish()?;
         tmp_dir.close()?;
@@ -154,12 +161,12 @@ mod tests {
         excludes.add("test*")?;
         excludes.add("!test2")?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?, None)?;
-        writer.add_bytes_with_permissions("test1", Some(Path::new("test1")), &[], perm)?;
-        writer.add_bytes_with_permissions("test3", Some(Path::new("test3")), &[], perm)?;
+        writer.add_data("test1", Some(Path::new("test1")), empty(), true)?;
+        writer.add_data("test3", Some(Path::new("test3")), empty(), true)?;
         assert!(writer.file_tracker.files.is_empty());
-        writer.add_bytes_with_permissions("test2", Some(Path::new("test2")), &[], perm)?;
+        writer.add_data("test2", Some(Path::new("test2")), empty(), true)?;
         assert!(!writer.file_tracker.files.is_empty());
-        writer.add_bytes_with_permissions("yes", Some(Path::new("yes")), &[], perm)?;
+        writer.add_data("yes", Some(Path::new("yes")), empty(), true)?;
         assert_eq!(writer.file_tracker.files.len(), 2);
         writer.finish()?;
         tmp_dir.close()?;

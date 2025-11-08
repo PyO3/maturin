@@ -1,5 +1,6 @@
 use std::env;
 use std::io;
+use std::io::Read;
 use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
@@ -7,13 +8,9 @@ use std::path::PathBuf;
 use anyhow::Context as _;
 use anyhow::Result;
 use anyhow::anyhow;
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use fs_err::File;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
-use sha2::Digest as _;
-use sha2::Sha256;
 use tracing::debug;
 use zip::DateTime;
 use zip::ZipWriter;
@@ -23,7 +20,9 @@ use crate::Metadata24;
 use crate::project_layout::ProjectLayout;
 
 use super::ModuleWriter;
+use super::default_permission;
 use super::util::FileTracker;
+use super::util::StreamSha256;
 use super::write_dist_info;
 
 /// A glorified zip builder, mostly useful for writing the record file of a wheel
@@ -38,12 +37,12 @@ pub struct WheelWriter {
 }
 
 impl ModuleWriter for WheelWriter {
-    fn add_bytes_with_permissions(
+    fn add_data(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
-        bytes: &[u8],
-        permissions: u32,
+        mut data: impl Read,
+        executable: bool,
     ) -> Result<()> {
         let target = target.as_ref();
         if self.exclude(target) {
@@ -61,18 +60,20 @@ impl ModuleWriter for WheelWriter {
         let mut options = self
             .compression
             .get_file_options()
-            .unix_permissions(permissions);
+            .unix_permissions(default_permission(executable));
 
-        let mtime = self.mtime().ok();
-        if let Some(mtime) = mtime {
+        if let Ok(mtime) = self.mtime() {
             options = options.last_modified_time(mtime);
         }
 
         self.zip.start_file(target.clone(), options)?;
-        self.zip.write_all(bytes)?;
+        let mut writer = StreamSha256::new(&mut self.zip);
 
-        let hash = URL_SAFE_NO_PAD.encode(Sha256::digest(bytes));
-        self.record.push((target, hash, bytes.len()));
+        io::copy(&mut data, &mut writer)
+            .with_context(|| format!("Failed to write to zip archive for {target}"))?;
+
+        let (hash, length) = writer.finalize()?;
+        self.record.push((target, hash, length));
 
         Ok(())
     }
@@ -136,7 +137,7 @@ impl WheelWriter {
                 let name = metadata24.get_distribution_escaped();
                 let target = format!("{name}.pth");
                 debug!("Adding {} from {}", target, python_path);
-                self.add_bytes(target, None, python_path.as_bytes())?;
+                self.add_data(target, None, python_path.as_bytes(), false)?;
             } else {
                 eprintln!(
                     "⚠️ source code path contains non-Unicode sequences, editable installs may not work."

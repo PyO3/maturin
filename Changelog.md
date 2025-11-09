@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased
+## [1.10.0]
 
+* Add `tool.maturin.editable-profile` option to override profile for editable package installations.
+* Add support for Cygwin.
 * Allow iOS cross-platform virtual environments, such as those used by cibuildwheel, to imply an iOS target.
 * Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.
+* Fix incorrect warning about missing `extension-module` feature on PyO3 0.26+.
 * Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl
 * Ensure that sdist builds are reproducible
 
@@ -1117,7 +1120,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.6...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/pyo3/maturin/compare/v1.9.6...v1.10.0
 [1.9.6]: https://github.com/pyo3/maturin/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/pyo3/maturin/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/pyo3/maturin/compare/v1.9.3...v1.9.4

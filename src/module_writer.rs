@@ -38,6 +38,16 @@ use tempfile::{tempdir, TempDir};
 use tracing::{debug, instrument};
 use zip::{self, DateTime, ZipWriter};
 
+/// A deterministic, arbitrary, non-zero timestamp that use used as `mtime`
+/// of headers when writing sdists.
+///
+/// This value, copied from the tar crate, corresponds to _Jul 23, 2006_,
+/// which is the date of the first commit for what would become Rust.
+///
+/// This value is used instead of unix epoch 0 because some tools do not handle
+/// the 0 value properly (See rust-lang/cargo#9512).
+const SDIST_DETERMINISTIC_TIMESTAMP: u64 = 1153704088;
+
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
     /// Adds a file with bytes as content in target relative to the module base path.
@@ -423,6 +433,7 @@ pub struct SDistWriter {
     path: PathBuf,
     file_tracker: FileTracker,
     excludes: Override,
+    mtime: u64,
 }
 
 impl ModuleWriter for SDistWriter {
@@ -433,6 +444,12 @@ impl ModuleWriter for SDistWriter {
         bytes: &[u8],
         permissions: u32,
     ) -> Result<()> {
+        if let Some(source) = source {
+            if self.exclude(source) {
+                return Ok(());
+            }
+        }
+
         let target = target.as_ref();
         if self.exclude(target) {
             return Ok(());
@@ -446,6 +463,7 @@ impl ModuleWriter for SDistWriter {
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
+        header.set_mtime(self.mtime);
         header.set_cksum();
         self.tar
             .append_data(&mut header, target, bytes)
@@ -453,28 +471,6 @@ impl ModuleWriter for SDistWriter {
                 "Failed to add {} bytes to sdist as {}",
                 bytes.len(),
                 target.display()
-            ))?;
-        Ok(())
-    }
-
-    fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        let source = source.as_ref();
-        if self.exclude(source) {
-            return Ok(());
-        }
-        let target = target.as_ref();
-        if !self.file_tracker.add_file(target, Some(source))? {
-            // Ignore duplicate files.
-            return Ok(());
-        }
-
-        debug!("Adding {} from {}", target.display(), source.display());
-        self.tar
-            .append_path_with_name(source, target)
-            .context(format!(
-                "Failed to add file from {} to sdist as {}",
-                source.display(),
-                target.display(),
             ))?;
         Ok(())
     }
@@ -486,6 +482,7 @@ impl SDistWriter {
         wheel_dir: impl AsRef<Path>,
         metadata24: &Metadata24,
         excludes: Override,
+        mtime_override: Option<u64>,
     ) -> Result<Self, io::Error> {
         let path = wheel_dir
             .as_ref()
@@ -498,13 +495,15 @@ impl SDistWriter {
             .into_path_buf();
 
         let enc = GzEncoder::new(Vec::new(), Compression::default());
-        let tar = tar::Builder::new(enc);
+        let mut tar = tar::Builder::new(enc);
+        tar.mode(tar::HeaderMode::Deterministic);
 
         Ok(Self {
             tar,
             path,
             file_tracker: FileTracker::default(),
             excludes,
+            mtime: mtime_override.unwrap_or(SDIST_DETERMINISTIC_TIMESTAMP),
         })
     }
 
@@ -1579,7 +1578,7 @@ mod tests {
 
         // No excludes
         let tmp_dir = TempDir::new()?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty())?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty(), None)?;
         assert!(writer.file_tracker.0.is_empty());
         writer.add_bytes_with_permissions("test", Some(Path::new("test")), &[], perm)?;
         assert_eq!(writer.file_tracker.0.len(), 1);
@@ -1591,7 +1590,7 @@ mod tests {
         let mut excludes = OverrideBuilder::new(&tmp_dir);
         excludes.add("test*")?;
         excludes.add("!test2")?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?)?;
+        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?, None)?;
         writer.add_bytes_with_permissions("test1", Some(Path::new("test1")), &[], perm)?;
         writer.add_bytes_with_permissions("test3", Some(Path::new("test3")), &[], perm)?;
         assert!(writer.file_tracker.0.is_empty());

@@ -57,6 +57,13 @@
         "null"
       ]
     },
+    "editable-profile": {
+      "description": "Same as `profile` but for \"editable\" builds",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "exclude": {
       "description": "Exclude files matching the given glob pattern(s)",
       "type": [

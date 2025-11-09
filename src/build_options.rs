@@ -6,7 +6,9 @@ use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
-use crate::target::{detect_arch_from_python, is_arch_supported_by_pypi};
+use crate::target::{
+    detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
+};
 use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
@@ -605,6 +607,7 @@ impl BuildContextBuilder {
         } = ProjectResolver::resolve(
             build_options.manifest_path.clone(),
             build_options.cargo.clone(),
+            editable,
         )?;
         let pyproject = pyproject_toml.as_ref();
 
@@ -669,7 +672,22 @@ impl BuildContextBuilder {
         let mut target = Target::from_target_triple(target_triple.as_ref())?;
         if !target.user_specified && !universal2 {
             if let Some(interpreter) = build_options.interpreter.first() {
-                if let Some(detected_target) = detect_arch_from_python(interpreter, &target) {
+                // If there's an explicitly provided interpreter, check to see
+                // if it's a cross-compiling interpreter; otherwise, check to
+                // see if an target change is required.
+                if let Some(detected_target) = detect_target_from_cross_python(interpreter) {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                } else if let Some(detected_target) = detect_arch_from_python(interpreter, &target)
+                {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                }
+            } else {
+                // If there's no explicit user-provided target or interpreter,
+                // check the interpreter; if the interpreter identifies as a
+                // cross compiler, set the target based on the platform reported
+                // by the interpreter.
+                if let Some(detected_target) = detect_target_from_cross_python(&target.get_python())
+                {
                     target = Target::from_target_triple(Some(&detected_target))?;
                 }
             }
@@ -1557,7 +1575,11 @@ impl CargoOptions {
 
 impl CargoOptions {
     /// Merge options from pyproject.toml
-    pub fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
+    pub fn merge_with_pyproject_toml(
+        &mut self,
+        tool_maturin: ToolMaturin,
+        editable_install: bool,
+    ) -> Vec<&'static str> {
         let mut args_from_pyproject = Vec::new();
 
         if self.manifest_path.is_none() && tool_maturin.manifest_path.is_some() {
@@ -1565,9 +1587,20 @@ impl CargoOptions {
             args_from_pyproject.push("manifest-path");
         }
 
-        if self.profile.is_none() && tool_maturin.profile.is_some() {
-            self.profile.clone_from(&tool_maturin.profile);
-            args_from_pyproject.push("profile");
+        if self.profile.is_none() {
+            // For `maturin` v1 compatibility, `editable-profile` falls back to `profile` if unset.
+            // TODO: on `maturin` v2, consider defaulting to "dev" profile for editable installs,
+            // and potentially remove this fallback behavior.
+            let (tool_profile, source_variable) =
+                if editable_install && tool_maturin.editable_profile.is_some() {
+                    (tool_maturin.editable_profile.as_ref(), "editable-profile")
+                } else {
+                    (tool_maturin.profile.as_ref(), "profile")
+                };
+            if let Some(tool_profile) = tool_profile {
+                self.profile = Some(tool_profile.clone());
+                args_from_pyproject.push(source_variable);
+            }
         }
 
         if let Some(features) = tool_maturin.features {

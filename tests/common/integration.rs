@@ -82,7 +82,11 @@ pub fn test_integration(
     let cffi_provider = "cffi-provider";
     let cffi_venv = venvs_dir.join(cffi_provider);
 
-    if let Some(interp) = python_interp.as_ref() {
+    // on PyPy, we should use the bundled cffi
+    if let Some(interp) = python_interp
+        .as_ref()
+        .filter(|interp| interp.contains("pypy"))
+    {
         cli.push("--interpreter".into());
         cli.push(interp.into());
     } else {

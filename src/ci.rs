@@ -150,7 +150,7 @@ impl GenerateCI {
             pyproject_toml,
             project_layout,
             ..
-        } = ProjectResolver::resolve(self.manifest_path.clone(), cargo_options)?;
+        } = ProjectResolver::resolve(self.manifest_path.clone(), cargo_options, false)?;
         let pyproject = pyproject_toml.as_ref();
         let bridge = find_bridge(&cargo_metadata, pyproject.and_then(|x| x.bindings()))?;
         let project_name = pyproject

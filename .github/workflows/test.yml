@@ -545,6 +545,7 @@ jobs:
       - test-downstream
       - check
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Result
         run: |

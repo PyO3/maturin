@@ -4,12 +4,14 @@
 
 * Add `tool.maturin.editable-profile` option to override profile for editable package installations.
 * Add support for Cygwin.
+* When building `abi3` wheels on non-Windows platforms that aren't cross-compiling, the `sysconfigdata` of the interpreter used to run maturin will now be used, rather than a dummy interpreter.
 * Allow iOS cross-platform virtual environments, such as those used by cibuildwheel, to imply an iOS target.
 * Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.
 * Fix incorrect warning about missing `extension-module` feature on PyO3 0.26+.
-* Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl
-* Ensure that sdist builds are reproducible
+* Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl.
+* Clear out uid/gid and set deterministic mtime for files in sdist.
+* Always use "library" mode to build uniffi bindings.
 
 ## [1.9.6]
 

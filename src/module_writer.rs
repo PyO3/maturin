@@ -1119,21 +1119,6 @@ fn generate_uniffi_bindings(
         .into_path_buf();
     fs::create_dir_all(&binding_dir)?;
 
-    let pattern = crate_dir.join("src").join("*.udl");
-    let udls = glob::glob(pattern.to_str().unwrap())?
-        .map(|p| p.unwrap())
-        .collect::<Vec<_>>();
-    let is_library = if udls.is_empty() {
-        true
-    } else if udls.len() > 1 {
-        bail!(
-            "Multiple UDL files found in {}",
-            crate_dir.join("src").display()
-        );
-    } else {
-        false
-    };
-
     let mut cmd = uniffi_bindgen_command(crate_dir)?;
     cmd.args([
         "generate",
@@ -1152,25 +1137,17 @@ fn generate_uniffi_bindings(
             .bindings
             .get("python")
             .and_then(|py| py.cdylib_name.clone());
-        if !is_library {
-            cmd.arg("--config");
-            cmd.arg(config_file);
-        }
+
+        // TODO: is this needed? `uniffi-bindgen` uses `uniffi.toml` by default,
+        // `uniffi_bindgen_command` sets cwd to the crate (workspace) root, so maybe
+        // we don't need to pass the config file explicitly?
+        cmd.arg("--config");
+        cmd.arg(config_file);
     }
 
-    let py_binding_name = if is_library {
-        cmd.arg("--library");
-        cmd.arg(artifact);
-        let file_stem = artifact.file_stem().unwrap().to_str().unwrap();
-        file_stem
-            .strip_prefix("lib")
-            .unwrap_or(file_stem)
-            .to_string()
-    } else {
-        let udl = &udls[0];
-        cmd.arg(udl);
-        udl.file_stem().unwrap().to_str().unwrap().to_string()
-    };
+    cmd.arg("--library");
+    cmd.arg(artifact);
+
     debug!("Running {:?}", cmd);
     let mut child = cmd.spawn().context(
         "Failed to run uniffi-bindgen, did you install it? Try `pip install uniffi-bindgen`",
@@ -1180,15 +1157,16 @@ fn generate_uniffi_bindings(
         bail!("Command {:?} failed", cmd);
     }
 
-    // uniffi bindings hardcoded the extension filenames
-    let cdylib_name = match cdylib_name {
-        Some(name) => name,
-        None => format!("uniffi_{py_binding_name}"),
-    };
-    let cdylib = match target_os {
-        Os::Macos => format!("lib{cdylib_name}.dylib"),
-        Os::Windows => format!("{cdylib_name}.dll"),
-        _ => format!("lib{cdylib_name}.so"),
+    // Name of the cdylib is either from uniffi.toml or derived from the library
+    let cdylib = match cdylib_name {
+        // this logic should match with uniffi's expected names, e.g.
+        // https://github.com/mozilla/uniffi-rs/blob/86a34083dd18bdd33f420c602b4fad624cc1e404/uniffi_bindgen/src/bindings/python/templates/NamespaceLibraryTemplate.py#L14-L37
+        Some(cdylib_name) => match target_os {
+            Os::Macos => format!("lib{cdylib_name}.dylib"),
+            Os::Windows => format!("{cdylib_name}.dll"),
+            _ => format!("lib{cdylib_name}.so"),
+        },
+        None => artifact.file_name().unwrap().to_str().unwrap().to_string(),
     };
 
     let py_bindings = fs::read_dir(&binding_dir)?

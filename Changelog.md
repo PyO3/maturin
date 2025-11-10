@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* When building `abi3` wheels on non-Windows platforms that aren't cross-compiling, the `sysconfigdata` of the interpreter used to run maturin will now be used, rather than a dummy interpreter.
 * Allow iOS cross-platform virtual environments, such as those used by cibuildwheel, to imply an iOS target.
 * Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.

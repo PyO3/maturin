@@ -2,9 +2,7 @@
 use crate::compression::{CompressionMethod, CompressionOptions};
 use crate::project_layout::ProjectLayout;
 use crate::target::Os;
-use crate::{
-    pyproject_toml::Format, BridgeModel, Metadata24, PyProjectToml, PythonInterpreter, Target,
-};
+use crate::{pyproject_toml::Format, Metadata24, PyProjectToml, PythonInterpreter, Target};
 use anyhow::{anyhow, bail, Context, Result};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -106,82 +104,16 @@ pub trait ModuleWriter {
 /// A [ModuleWriter] that adds the module somewhere in the filesystem, e.g. in a virtualenv
 pub struct PathWriter {
     base_path: PathBuf,
-    record: Vec<(String, String, usize)>,
     file_tracker: FileTracker,
 }
 
 impl PathWriter {
-    /// Creates a [ModuleWriter] that adds the module to the current virtualenv
-    pub fn venv(target: &Target, venv_dir: &Path, bridge: &BridgeModel) -> Result<Self> {
-        let interpreter =
-            PythonInterpreter::check_executable(target.get_venv_python(venv_dir), target, bridge)?
-                .ok_or_else(|| {
-                    anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
-                })?;
-
-        let base_path = interpreter.get_venv_site_package(venv_dir, target);
-
-        Ok(PathWriter {
-            base_path,
-            record: Vec::new(),
-            file_tracker: FileTracker::default(),
-        })
-    }
-
     /// Writes the module to the given path
     pub fn from_path(path: impl AsRef<Path>) -> Self {
         Self {
             base_path: path.as_ref().to_path_buf(),
-            record: Vec::new(),
             file_tracker: FileTracker::default(),
         }
-    }
-
-    /// Removes a directory relative to the base path if it exists.
-    ///
-    /// This is to clean up the contents of an older develop call
-    pub fn delete_dir(&self, relative: impl AsRef<Path>) -> Result<()> {
-        let absolute = self.base_path.join(relative);
-        if absolute.exists() {
-            fs::remove_dir_all(&absolute)
-                .context(format!("Failed to remove {}", absolute.display()))?;
-        }
-
-        Ok(())
-    }
-
-    /// Writes the RECORD file after everything else has been written
-    pub fn write_record(self, metadata24: &Metadata24) -> Result<()> {
-        let record_file = self
-            .base_path
-            .join(metadata24.get_dist_info_dir())
-            .join("RECORD");
-        let mut buffer = File::create(&record_file).context(format!(
-            "Failed to create a file at {}",
-            record_file.display()
-        ))?;
-
-        // Sort records for deterministic output
-        let mut sorted_records = self.record.clone();
-        sorted_records.sort_by(|(path_a, _, _), (path_b, _, _)| path_a.cmp(path_b));
-
-        for (filename, hash, len) in sorted_records {
-            buffer
-                .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())
-                .context(format!(
-                    "Failed to write to file at {}",
-                    record_file.display()
-                ))?;
-        }
-        // Write the record for the RECORD file itself
-        buffer
-            .write_all(format!("{},,\n", record_file.display()).as_bytes())
-            .context(format!(
-                "Failed to write to file at {}",
-                record_file.display()
-            ))?;
-
-        Ok(())
     }
 }
 
@@ -225,13 +157,6 @@ impl ModuleWriter for PathWriter {
 
         file.write_all(bytes)
             .context(format!("Failed to write to file at {}", path.display()))?;
-
-        let hash = URL_SAFE_NO_PAD.encode(Sha256::digest(bytes));
-        self.record.push((
-            target.as_ref().to_str().unwrap().to_owned(),
-            hash,
-            bytes.len(),
-        ));
 
         Ok(())
     }

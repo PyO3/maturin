@@ -1493,6 +1493,7 @@ dependencies = [
  "url",
  "which",
  "wild",
+ "xz2",
  "zip 6.0.0",
 ]
 

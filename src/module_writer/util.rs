@@ -101,8 +101,8 @@ where
     W: Write,
 {
     fn write(&mut self, buf: &[u8]) -> Result<usize, IoError> {
-        self.hasher.update(buf);
         let written = self.inner.write(buf)?;
+        self.hasher.update(&buf[..written]);
         self.bytes_written += written;
         Ok(written)
     }

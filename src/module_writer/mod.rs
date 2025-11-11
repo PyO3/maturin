@@ -1,4 +1,5 @@
 use std::fmt::Write as _;
+use std::io;
 use std::io::Read;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
@@ -66,7 +67,7 @@ pub trait ModuleWriterExt: ModuleWriter {
 
     /// Add an empty file to the target path
     fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
-        self.add_data(target, None, b"".as_slice(), false)
+        self.add_data(target, None, io::empty(), false)
     }
 }
 

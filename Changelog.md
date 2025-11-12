@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.10.2]
+
+* Fix panic when building sdist for crates with path dependencies from parent workspaces.
+
 ## [1.10.1]
 
 * Fix wrong dependency on Homebrew liblzma on macOS by static linking liblama

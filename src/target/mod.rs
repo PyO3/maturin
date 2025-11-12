@@ -97,6 +97,7 @@ pub enum Arch {
     Sparc64,
     Sparcv9,
     LoongArch64,
+    Sw_64,
 }
 
 impl fmt::Display for Arch {
@@ -122,6 +123,7 @@ impl fmt::Display for Arch {
             Arch::Sparc64 => write!(f, "sparc64"),
             Arch::Sparcv9 => write!(f, "sparcv9"),
             Arch::LoongArch64 => write!(f, "loongarch64"),
+            Arch::Sw_64 => write!(f, "sw_64"),
         }
     }
 }
@@ -147,6 +149,7 @@ impl Arch {
             Arch::Wasm32 => "wasm32",
             Arch::S390X => "s390x",
             Arch::LoongArch64 => "loongarch64",
+            Arch::Sw_64 => "sw_64",
         }
     }
 }
@@ -173,6 +176,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Mips,
             Arch::Sparc64,
             Arch::LoongArch64,
+            Arch::Sw_64,
         ],
         Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
         Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
@@ -320,6 +324,7 @@ impl Target {
             Architecture::Sparc64 => Arch::Sparc64,
             Architecture::Sparcv9 => Arch::Sparcv9,
             Architecture::LoongArch64 => Arch::LoongArch64,
+            Architecture::Sw_64 => Arch::Sw_64,
             unsupported => bail!("The architecture {} is not supported", unsupported),
         };
 
@@ -404,6 +409,7 @@ impl Target {
             Arch::Sparc64 => "sparc64",
             Arch::Sparcv9 => "sparcv9",
             Arch::LoongArch64 => "loongarch64",
+            Arch::Sw_64 => "sw_64",
         }
     }
 
@@ -521,7 +527,8 @@ impl Target {
             | Arch::Mips64
             | Arch::Sparc64
             | Arch::Sparcv9
-            | Arch::LoongArch64 => 64,
+            | Arch::LoongArch64
+            | Arch::Sw_64 => 64,
             Arch::Armv5teL
             | Arch::Armv6L
             | Arch::Armv7L

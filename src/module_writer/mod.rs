@@ -331,19 +331,12 @@ fn permission_is_executable(mode: u32) -> bool {
     (0o100 & mode) == 0o100
 }
 
-#[cfg(unix)]
 #[inline]
 fn default_permission(executable: bool) -> u32 {
     match executable {
         true => 0o755,
         false => 0o644,
     }
-}
-
-#[cfg(not(unix))]
-#[inline]
-fn default_permission(_executable: bool) -> u32 {
-    0o644
 }
 
 #[cfg(test)]

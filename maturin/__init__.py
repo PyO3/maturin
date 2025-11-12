@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 maturin's implementation of the PEP 517 interface. Calls maturin through subprocess
 

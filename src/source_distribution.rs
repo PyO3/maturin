@@ -10,13 +10,14 @@ use normpath::PathExt as _;
 use path_slash::PathExt as _;
 use pyproject_toml::check_pep639_glob;
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::ffi::OsStr;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 use toml_edit::DocumentMut;
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 /// Path dependency information.
 /// It may be in a different workspace than the root crate.
@@ -267,8 +268,6 @@ fn add_crate_to_source_distribution(
         })
         .collect();
 
-    writer.add_directory(prefix)?;
-
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
 
     let readme_name = readme
@@ -425,8 +424,6 @@ fn add_git_tracked_files_to_sdist(
     }
 
     let prefix = prefix.as_ref();
-    writer.add_directory(prefix)?;
-
     let file_paths = str::from_utf8(&output.stdout)
         .context("git printed invalid utf-8 ಠ_ಠ")?
         .split('\0')
@@ -647,9 +644,7 @@ fn add_cargo_package_files_to_sdist(
                 continue;
             }
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-            if source.is_dir() {
-                writer.add_directory(target)?;
-            } else {
+            if !source.is_dir() {
                 writer.add_file(target, &source)?;
             }
         }
@@ -758,8 +753,20 @@ pub fn source_distribution(
             )
         })?
         .into_path_buf();
+
+    let source_date_epoch: Option<u64> =
+        env::var("SOURCE_DATE_EPOCH")
+            .ok()
+            .and_then(|var| match var.parse() {
+                Err(_) => {
+                    warn!("SOURCE_DATE_EPOCH is malformed, ignoring");
+                    None
+                }
+                Ok(val) => Some(val),
+            });
+
     let metadata24 = &build_context.metadata24;
-    let mut writer = SDistWriter::new(&build_context.out, metadata24, excludes)?;
+    let mut writer = SDistWriter::new(&build_context.out, metadata24, excludes, source_date_epoch)?;
     let root_dir = PathBuf::from(format!(
         "{}-{}",
         &metadata24.get_distribution_escaped(),
@@ -834,9 +841,7 @@ pub fn source_distribution(
             .filter_map(Result::ok)
         {
             let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-            if source.is_dir() {
-                writer.add_directory(target)?;
-            } else {
+            if !source.is_dir() {
                 writer.add_file(target, source)?;
             }
         }

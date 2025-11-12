@@ -6,7 +6,9 @@ use crate::cross_compile::{find_sysconfigdata, parse_sysconfigdata};
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::ToolMaturin;
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
-use crate::target::{detect_arch_from_python, is_arch_supported_by_pypi};
+use crate::target::{
+    detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
+};
 use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
 use anyhow::{bail, format_err, Context, Result};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
@@ -471,60 +473,64 @@ impl BuildOptions {
                                 }
                                 Ok(found_interpreters)
                             }
-                        } else {
-                            eprintln!("🐍 Not using a specific python interpreter");
-                            if self.interpreter.is_empty() {
-                                // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
-                                // The python interpreter config doesn't matter, as it's not used for anything
-                                Ok(vec![PythonInterpreter {
-                                    config: InterpreterConfig {
-                                        major: *major as usize,
-                                        minor: *minor as usize,
-                                        interpreter_kind: InterpreterKind::CPython,
-                                        abiflags: "".to_string(),
-                                        ext_suffix: "".to_string(),
-                                        pointer_width: None,
-                                        gil_disabled: false,
-                                    },
-                                    executable: PathBuf::new(),
-                                    platform: None,
-                                    runnable: false,
-                                    implementation_name: "cpython".to_string(),
-                                    soabi: None,
-                                }])
-                            } else if target.cross_compiling() {
-                                let mut interps = Vec::with_capacity(found_interpreters.len());
-                                let mut pypys = Vec::new();
-                                for interp in found_interpreters {
-                                    if interp.interpreter_kind.is_pypy() {
-                                        pypys.push(PathBuf::from(format!(
-                                            "pypy{}.{}",
-                                            interp.major, interp.minor
-                                        )));
-                                    } else {
-                                        interps.push(interp);
-                                    }
+                        } else if target.cross_compiling() {
+                            let mut interps = Vec::with_capacity(found_interpreters.len());
+                            let mut pypys = Vec::new();
+                            for interp in found_interpreters {
+                                if interp.interpreter_kind.is_pypy() {
+                                    pypys.push(PathBuf::from(format!(
+                                        "pypy{}.{}",
+                                        interp.major, interp.minor
+                                    )));
+                                } else {
+                                    interps.push(interp);
                                 }
-                                // cross compiling to PyPy with abi3 feature enabled,
-                                // we cannot use host pypy so switch to bundled sysconfig instead
-                                if !pypys.is_empty() {
-                                    interps.extend(find_interpreter_in_sysconfig(
-                                        bridge,
-                                        &pypys,
-                                        target,
-                                        requires_python,
-                                    )?)
-                                }
-                                if interps.is_empty() {
-                                    bail!("Failed to find any python interpreter");
-                                }
-                                Ok(interps)
-                            } else {
-                                if found_interpreters.is_empty() {
-                                    bail!("Failed to find any python interpreter");
-                                }
-                                Ok(found_interpreters)
                             }
+                            // cross compiling to PyPy with abi3 feature enabled,
+                            // we cannot use host pypy so switch to bundled sysconfig instead
+                            if !pypys.is_empty() {
+                                interps.extend(find_interpreter_in_sysconfig(
+                                    bridge,
+                                    &pypys,
+                                    target,
+                                    requires_python,
+                                )?)
+                            }
+                            if interps.is_empty() {
+                                bail!("Failed to find any python interpreter");
+                            }
+                            Ok(interps)
+                        } else if !found_interpreters.is_empty() {
+                            let interpreters_str = found_interpreters
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<String>>()
+                                .join(", ");
+                            eprintln!("🐍 Found {interpreters_str}");
+
+                            Ok(found_interpreters)
+                        } else if self.interpreter.is_empty() {
+                            eprintln!("🐍 Not using a specific python interpreter");
+                            // Fake one to make `BuildContext::build_wheels` happy for abi3 when no cpython/pypy found on host
+                            // The python interpreter config doesn't matter, as it's not used for anything
+                            Ok(vec![PythonInterpreter {
+                                config: InterpreterConfig {
+                                    major: *major as usize,
+                                    minor: *minor as usize,
+                                    interpreter_kind: InterpreterKind::CPython,
+                                    abiflags: "".to_string(),
+                                    ext_suffix: "".to_string(),
+                                    pointer_width: None,
+                                    gil_disabled: false,
+                                },
+                                executable: PathBuf::new(),
+                                platform: None,
+                                runnable: false,
+                                implementation_name: "cpython".to_string(),
+                                soabi: None,
+                            }])
+                        } else {
+                            bail!("Failed to find any python interpreter");
                         }
                     }
                 }
@@ -549,7 +555,6 @@ impl BuildOptions {
 #[derive(Debug)]
 pub struct BuildContextBuilder {
     build_options: BuildOptions,
-    release: bool,
     strip: bool,
     editable: bool,
     sdist_only: bool,
@@ -559,16 +564,10 @@ impl BuildContextBuilder {
     fn new(build_options: BuildOptions) -> Self {
         Self {
             build_options,
-            release: false,
             strip: false,
             editable: false,
             sdist_only: false,
         }
-    }
-
-    pub fn release(mut self, release: bool) -> Self {
-        self.release = release;
-        self
     }
 
     pub fn strip(mut self, strip: bool) -> Self {
@@ -589,7 +588,6 @@ impl BuildContextBuilder {
     pub fn build(self) -> Result<BuildContext> {
         let Self {
             build_options,
-            release,
             strip,
             editable,
             sdist_only,
@@ -609,6 +607,7 @@ impl BuildContextBuilder {
         } = ProjectResolver::resolve(
             build_options.manifest_path.clone(),
             build_options.cargo.clone(),
+            editable,
         )?;
         let pyproject = pyproject_toml.as_ref();
 
@@ -673,7 +672,22 @@ impl BuildContextBuilder {
         let mut target = Target::from_target_triple(target_triple.as_ref())?;
         if !target.user_specified && !universal2 {
             if let Some(interpreter) = build_options.interpreter.first() {
-                if let Some(detected_target) = detect_arch_from_python(interpreter, &target) {
+                // If there's an explicitly provided interpreter, check to see
+                // if it's a cross-compiling interpreter; otherwise, check to
+                // see if an target change is required.
+                if let Some(detected_target) = detect_target_from_cross_python(interpreter) {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                } else if let Some(detected_target) = detect_arch_from_python(interpreter, &target)
+                {
+                    target = Target::from_target_triple(Some(&detected_target))?;
+                }
+            } else {
+                // If there's no explicit user-provided target or interpreter,
+                // check the interpreter; if the interpreter identifies as a
+                // cross compiler, set the target based on the platform reported
+                // by the interpreter.
+                if let Some(detected_target) = detect_target_from_cross_python(&target.get_python())
+                {
                     target = Target::from_target_triple(Some(&detected_target))?;
                 }
             }
@@ -819,7 +833,6 @@ impl BuildContextBuilder {
             manifest_path: cargo_toml_path,
             target_dir,
             out: wheel_dir,
-            release,
             strip,
             auditwheel,
             #[cfg(feature = "zig")]
@@ -1232,12 +1245,15 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             let lib_name = lib.as_str();
             let pyo3_node = deps[lib_name];
             if !pyo3_node.features.contains(&"extension-module".to_string()) {
-                let version = cargo_metadata[&pyo3_node.id].version.to_string();
-                eprintln!(
-                    "⚠️  Warning: You're building a library without activating {lib}'s \
-                     `extension-module` feature. \
-                     See https://pyo3.rs/v{version}/building-and-distribution.html#the-extension-module-feature"
-                );
+                let version = &cargo_metadata[&pyo3_node.id].version;
+                if (version.major, version.minor) < (0, 26) {
+                    // pyo3 0.26+ will use the `PYO3_BUILD_EXTENSION_MODULE` env var instead
+                    eprintln!(
+                        "⚠️  Warning: You're building a library without activating {lib}'s \
+                        `extension-module` feature. \
+                        See https://pyo3.rs/v{version}/building-and-distribution.html#the-extension-module-feature"
+                    );
+                }
             }
 
             return if let Some(abi3_version) = has_abi3(&deps)? {
@@ -1415,7 +1431,7 @@ fn find_interpreter_in_sysconfig(
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {
-                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.8' or 'pypy3.9') when cross-compiling, got path to interpreter: {}", python);
+                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, got path to interpreter: {}", python);
             } else {
                 bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
             }
@@ -1559,7 +1575,11 @@ impl CargoOptions {
 
 impl CargoOptions {
     /// Merge options from pyproject.toml
-    pub fn merge_with_pyproject_toml(&mut self, tool_maturin: ToolMaturin) -> Vec<&'static str> {
+    pub fn merge_with_pyproject_toml(
+        &mut self,
+        tool_maturin: ToolMaturin,
+        editable_install: bool,
+    ) -> Vec<&'static str> {
         let mut args_from_pyproject = Vec::new();
 
         if self.manifest_path.is_none() && tool_maturin.manifest_path.is_some() {
@@ -1567,9 +1587,20 @@ impl CargoOptions {
             args_from_pyproject.push("manifest-path");
         }
 
-        if self.profile.is_none() && tool_maturin.profile.is_some() {
-            self.profile.clone_from(&tool_maturin.profile);
-            args_from_pyproject.push("profile");
+        if self.profile.is_none() {
+            // For `maturin` v1 compatibility, `editable-profile` falls back to `profile` if unset.
+            // TODO: on `maturin` v2, consider defaulting to "dev" profile for editable installs,
+            // and potentially remove this fallback behavior.
+            let (tool_profile, source_variable) =
+                if editable_install && tool_maturin.editable_profile.is_some() {
+                    (tool_maturin.editable_profile.as_ref(), "editable-profile")
+                } else {
+                    (tool_maturin.profile.as_ref(), "profile")
+                };
+            if let Some(tool_profile) = tool_profile {
+                self.profile = Some(tool_profile.clone());
+                args_from_pyproject.push(source_variable);
+            }
         }
 
         if let Some(features) = tool_maturin.features {
@@ -1626,7 +1657,7 @@ impl CargoOptions {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use cargo_metadata::MetadataCommand;
     use pretty_assertions::assert_eq;
     use std::path::Path;
@@ -1661,7 +1692,7 @@ mod test {
 
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version: semver::Version::new(0, 25, 0),
+            version: semver::Version::new(0, 27, 1),
             abi3: Some(Abi3Version::Version(3, 7)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {
@@ -1669,7 +1700,7 @@ mod test {
                     max_minor: 14,
                 },
                 pypy: PyO3VersionMetadata {
-                    min_minor: 9,
+                    min_minor: 11,
                     max_minor: 11,
                 },
             }),

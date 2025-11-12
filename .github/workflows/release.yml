@@ -91,7 +91,7 @@ jobs:
 
       - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage,static
 
       - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
@@ -99,10 +99,11 @@ jobs:
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           MACOSX_DEPLOYMENT_TARGET: "10.12"
         run: |
+          set -euo pipefail
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage
+          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage,static
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
@@ -126,13 +127,13 @@ jobs:
           cd -
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.target }}
           path: dist
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.target }}
           path: |
@@ -201,12 +202,12 @@ jobs:
       - name: Upload wheel artifacts
         # loongarch64 is not allowed to publish to pypi currently, see https://github.com/pypi/warehouse/blob/348117529910181cb8c14e9b5fb00fcf4dbaf07c/warehouse/forklift/legacy.py#L114-L185
         if: matrix.platform.target != 'loongarch64-unknown-linux-gnu'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.platform.target }}
           path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
@@ -227,7 +228,7 @@ jobs:
       url: ${{ steps.set_url.outputs.env_url }}
     needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           pattern: wheels-*
           merge-multiple: true
@@ -264,7 +265,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           pattern: binaries-*
           merge-multiple: true

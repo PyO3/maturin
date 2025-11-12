@@ -4,7 +4,10 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-pyo3-ffi = { version = "0.18.1", features = ["abi3-py37", "extension-module"] }
+pyo3-ffi = { version = "0.27.0", features = ["abi3-py39"] }
+
+[build-dependencies]
+pyo3-build-config = "0.27.0"
 
 [lib]
 name = "pyo3_ffi_pure"

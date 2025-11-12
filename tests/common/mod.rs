@@ -12,6 +12,7 @@ pub mod errors;
 pub mod integration;
 pub mod metadata;
 pub mod other;
+pub mod pep517;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TestInstallBackend {
@@ -221,4 +222,14 @@ pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathB
 /// Path to the python interpreter for testing
 pub fn test_python_path() -> Option<String> {
     env::var("MATURIN_TEST_PYTHON").ok()
+}
+
+/// Find index of subslice in a larger slice
+pub fn find_subslice<T: PartialEq>(haystack: &[T], needle: &[T]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }

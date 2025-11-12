@@ -7,11 +7,14 @@ use common::{
 use expect_test::expect;
 use maturin::pyproject_toml::SdistGenerator;
 use rstest::rstest;
+use serial_test::serial;
 use std::env;
 use std::path::Path;
 use std::time::Duration;
 use time::macros::datetime;
 use which::which;
+
+use crate::common::{find_subslice, pep517};
 
 mod common;
 
@@ -651,9 +654,8 @@ fn workspace_members_non_local_dep_sdist() {
         readme = "README.md"
 
         [dependencies]
-        pyo3 = { version = "0.25.0", features = [
+        pyo3 = { version = "0.27.0", features = [
             "abi3-py37",
-            "extension-module",
             "generate-import-lib",
         ] }
 
@@ -720,7 +722,7 @@ fn lib_with_target_path_dep_sdist() {
         crate-type = ["cdylib"]
 
         [dependencies]
-        pyo3 = { version = "0.25.0", features = ["extension-module"] }
+        pyo3 = "0.27.0"
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }
@@ -992,6 +994,7 @@ fn abi3_python_interpreter_args() {
 }
 
 #[test]
+#[serial(source_date_epoch_env)]
 fn pyo3_source_date_epoch() {
     env::set_var("SOURCE_DATE_EPOCH", "0");
     handle_result(other::check_wheel_mtimes(
@@ -999,4 +1002,58 @@ fn pyo3_source_date_epoch() {
         vec![datetime!(1980-01-01 0:00 UTC)],
         "pyo3_source_date_epoch",
     ))
+}
+
+#[test]
+#[serial(source_date_epoch_env)]
+fn sdist_no_source_date_epoch() {
+    env::remove_var("SOURCE_DATE_EPOCH");
+    handle_result(other::check_sdist_mtimes(
+        "test-crates/pyo3-mixed-include-exclude",
+        1153704088,
+        "sdist_no_source_date_epoch",
+    ))
+}
+
+#[test]
+#[serial(source_date_epoch_env)]
+fn sdist_source_date_epoch() {
+    env::set_var("SOURCE_DATE_EPOCH", "1");
+    handle_result(other::check_sdist_mtimes(
+        "test-crates/pyo3-mixed-include-exclude",
+        1,
+        "sdist_source_date_epoch",
+    ))
+}
+
+#[test]
+fn pep517_default_profile() {
+    let output = handle_result(pep517::test_pep517(
+        "test-crates/pyo3-pure",
+        "pep517-pyo3-pure",
+        false,
+        false,
+    ));
+
+    assert!(
+        find_subslice(&output.stderr, b"`release` profile [optimized]").is_some(),
+        "Output was: {}",
+        std::str::from_utf8(&output.stderr).unwrap()
+    );
+}
+
+#[test]
+fn pep517_editable_profile() {
+    let output = handle_result(pep517::test_pep517(
+        "test-crates/pyo3-pure",
+        "pep517-pyo3-pure-editable",
+        false,
+        true,
+    ));
+
+    assert!(
+        find_subslice(&output.stderr, b"`dev` profile [unoptimized + debuginfo]").is_some(),
+        "Output was: {}",
+        std::str::from_utf8(&output.stderr).unwrap()
+    );
 }

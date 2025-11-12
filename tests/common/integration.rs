@@ -82,7 +82,11 @@ pub fn test_integration(
     let cffi_provider = "cffi-provider";
     let cffi_venv = venvs_dir.join(cffi_provider);
 
-    if let Some(interp) = python_interp.as_ref() {
+    // on PyPy, we should use the bundled cffi
+    if let Some(interp) = python_interp
+        .as_ref()
+        .filter(|interp| interp.contains("pypy"))
+    {
         cli.push("--interpreter".into());
         cli.push(interp.into());
     } else {
@@ -132,7 +136,6 @@ pub fn test_integration(
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build()?;
@@ -260,7 +263,6 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
 
     let build_context = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build()?;

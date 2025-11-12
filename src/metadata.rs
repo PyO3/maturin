@@ -723,7 +723,7 @@ fn fold_header(text: &str) -> String {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use cargo_metadata::MetadataCommand;
     use expect_test::{expect, Expect};

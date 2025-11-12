@@ -40,29 +40,28 @@ jobs:
         os:
           - ubuntu-latest
           - ubuntu-22.04-arm
-          - macos-13
-          - macos-14
+          - macos-15-intel
+          - macos-latest
           - windows-latest
+          - windows-11-arm
         python-version:
           - "3.9"
-          - "3.13"
-          - "3.13t"
+          - "3.14"
+          - "3.14t"
           - "pypy3.11"
-        include:
-          - os: windows-11-arm
-            python-version: "3.13"
         exclude:
-          # Skip PyPy on macOS M1 runner because they are built for x86_64
-          - os: macos-14
-            python-version: pypy3.11
           # TODO: Tests are getting stuck
           - os: ubuntu-latest
             python-version: pypy3.11
-          # macOS M1 runner only have Python 3.11+
-          - os: macos-14
+          # macOS and windows arm only have Python 3.11+
+          - os: macos-latest
             python-version: 3.9
-          # PyPy on ARM is not supported in setup-python action
+          - os: windows-11-arm
+            python-version: 3.9
+          # PyPy does not have ARM builds for linux or windows
           - os: ubuntu-22.04-arm
+            python-version: pypy3.11
+          - os: windows-11-arm
             python-version: pypy3.11
     runs-on: ${{ matrix.os }}
     env:
@@ -88,7 +87,7 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - name: Install python packages
         run: |
           uv tool install virtualenv
@@ -100,7 +99,8 @@ jobs:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
-      - uses: actions/setup-python@v6
+      - id: setup-python
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set PYTHON_VERSION env var
@@ -134,12 +134,10 @@ jobs:
           echo "CXX=${bindir}/clang++" >> "${GITHUB_ENV}"
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
 
-      # Caching
-      - name: Set MATURIN_TEST_PYTHON for PyPy
+      - name: Set MATURIN_TEST_PYTHON
         shell: bash
-        if: contains(matrix.python-version, 'pypy')
-        run: echo "MATURIN_TEST_PYTHON=pypy3" >> $GITHUB_ENV
-      # To save disk space
+        run: echo "MATURIN_TEST_PYTHON=${{ steps.setup-python.outputs.python-path }}" >> $GITHUB_ENV
+      # To save cache disk space
       - name: Disable debuginfo on Windows
         if: startsWith(matrix.os, 'windows')
         run: echo "RUSTFLAGS="-C debuginfo=0"" >> $GITHUB_ENV
@@ -204,7 +202,7 @@ jobs:
       - run: sudo apt-get install musl-tools
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --target x86_64-unknown-linux-musl --release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: maturin-build
           path: target/x86_64-unknown-linux-musl/release/maturin
@@ -226,7 +224,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.12
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: maturin-build
           path: bin
@@ -259,7 +257,7 @@ jobs:
         id: setup-python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - uses: dtolnay/rust-toolchain@nightly
@@ -269,7 +267,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv tool install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
@@ -277,7 +275,7 @@ jobs:
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Run tests
@@ -323,7 +321,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: maturin-build
           path: bin
@@ -396,12 +394,12 @@ jobs:
             extra-args: --manylinux 2_31
           # PyPy
           - target: aarch64-unknown-linux-gnu
-            abi: pp310-pypy310_pp73
-            python: pypy3.10
+            abi: pp311-pypy311_pp73
+            python: pypy3.11
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: maturin-build
           path: bin
@@ -435,7 +433,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-14, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
@@ -449,7 +447,7 @@ jobs:
               - 'MANIFEST.in'
               - 'Cargo.toml'
               - '.github/workflows/test.yml'
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
@@ -473,7 +471,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - name: Upload wheel artifacts
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ runner.os }}
           path: dist
@@ -483,7 +481,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@1.74.0
+      - uses: dtolnay/rust-toolchain@1.83.0
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
@@ -547,6 +545,7 @@ jobs:
       - test-downstream
       - check
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Result
         run: |

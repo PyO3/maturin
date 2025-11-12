@@ -17,7 +17,7 @@ maturin automatically detects pyo3 bindings when it's added as a dependency in `
 pyo3 bindings has `Py_LIMITED_API`/abi3 support, enable the `abi3` feature of the `pyo3` crate to use it:
 
 ```toml
-pyo3 = { version = "0.25", features = ["abi3"] }
+pyo3 = { version = "0.27.0", features = ["abi3"] }
 ```
 
 You may additionally specify a minimum Python version by using the `abi3-pyXX`

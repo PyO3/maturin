@@ -9,7 +9,7 @@ import nox
 PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.23.4")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
-MSRV = "1.74.0"
+MSRV = "1.83.0"
 
 
 def append_to_github_env(name: str, value: str):

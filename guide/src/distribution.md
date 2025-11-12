@@ -102,7 +102,7 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
       --compression-method <COMPRESSION_METHOD>
-          Zip compresson method to use
+          Zip compression method to use
 
           [default: deflated]
 
@@ -230,7 +230,7 @@ or providing any Windows Python library files.
 
 ```toml
 [dependencies]
-pyo3 = { version = "0.25.0", features = ["extension-module", "generate-import-lib"] }
+pyo3 = { version = "0.27.0", features = ["generate-import-lib"] }
 ```
 
 It uses an external [`python3-dll-a`](https://docs.rs/python3-dll-a/latest/python3_dll_a/) crate to

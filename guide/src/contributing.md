@@ -50,7 +50,7 @@ Ready to contribute? Here's how to setup maturin for local development.
    ```bash
    $ cargo test
    ```
-   Note that in order to run tests you need to install `virtualenv` (`pip install virtualenv`).
+   Note that in order to run tests you need to install `virtualenv` (`pip install virtualenv`) and add WebAssembly compilation target (`rustup target add wasm32-wasip1`).
 6. make sure your changes are well formatted and pass the linting checks by
    installing [pre-commit](https://pre-commit.com/) and running
    ```bash
@@ -67,7 +67,7 @@ Ready to contribute? Here's how to setup maturin for local development.
    ```
 8. Submit a pull request through the [GitHub website](https://github.com/PyO3/maturin/pulls).
 
-We provide a pre-configured [dev container](https://containers.dev/) that could be used in [Github Codespaces](https://github.com/features/codespaces), [VSCode](https://code.visualstudio.com/), [JetBrains](https://www.jetbrains.com/remote-development/gateway/), [JuptyerLab](https://jupyterlab.readthedocs.io/en/stable/).
+We provide a pre-configured [dev container](https://containers.dev/) that could be used in [Github Codespaces](https://github.com/features/codespaces), [VSCode](https://code.visualstudio.com/), [JetBrains](https://www.jetbrains.com/remote-development/gateway/), [JupyterLab](https://jupyterlab.readthedocs.io/en/stable/).
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/pyo3/maturin?quickstart=1&machine=standardLinux32gb)
 

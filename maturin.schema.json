@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ToolMaturin",
   "description": "The `[tool.maturin]` section of a pyproject.toml",
   "type": "object",
@@ -15,7 +15,7 @@
       "description": "Audit wheel mode",
       "anyOf": [
         {
-          "$ref": "#/definitions/AuditWheelMode"
+          "$ref": "#/$defs/AuditWheelMode"
         },
         {
           "type": "null"
@@ -33,7 +33,7 @@
       "description": "Platform compatibility",
       "anyOf": [
         {
-          "$ref": "#/definitions/PlatformTag"
+          "$ref": "#/$defs/PlatformTag"
         },
         {
           "type": "null"
@@ -57,6 +57,13 @@
         "null"
       ]
     },
+    "editable-profile": {
+      "description": "Same as `profile` but for \"editable\" builds",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "exclude": {
       "description": "Exclude files matching the given glob pattern(s)",
       "type": [
@@ -64,7 +71,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/GlobPattern"
+        "$ref": "#/$defs/GlobPattern"
       }
     },
     "features": {
@@ -91,7 +98,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/GlobPattern"
+        "$ref": "#/$defs/GlobPattern"
       }
     },
     "locked": {
@@ -158,30 +165,26 @@
     },
     "sdist-generator": {
       "description": "Source distribution generator",
-      "default": "cargo",
-      "allOf": [
-        {
-          "$ref": "#/definitions/SdistGenerator"
-        }
-      ]
+      "$ref": "#/$defs/SdistGenerator",
+      "default": "cargo"
     },
     "skip-auditwheel": {
       "description": "Skip audit wheel",
-      "default": false,
-      "type": "boolean"
+      "type": "boolean",
+      "default": false
     },
     "strip": {
       "description": "Strip the final binary",
-      "default": false,
-      "type": "boolean"
+      "type": "boolean",
+      "default": false
     },
     "target": {
       "description": "Target configuration",
-      "default": {},
       "type": "object",
       "additionalProperties": {
-        "$ref": "#/definitions/TargetConfig"
-      }
+        "$ref": "#/$defs/TargetConfig"
+      },
+      "default": {}
     },
     "targets": {
       "description": "Cargo compile targets",
@@ -190,7 +193,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/CargoTarget"
+        "$ref": "#/$defs/CargoTarget"
       }
     },
     "unstable-flags": {
@@ -205,34 +208,28 @@
     },
     "use-base-python": {
       "description": "Use base Python executable instead of venv Python executable in PEP 517 build.",
-      "default": false,
-      "type": "boolean"
+      "type": "boolean",
+      "default": false
     }
   },
-  "definitions": {
+  "$defs": {
     "AuditWheelMode": {
       "description": "Auditwheel mode",
       "oneOf": [
         {
           "description": "Audit and repair wheel for manylinux compliance",
           "type": "string",
-          "enum": [
-            "repair"
-          ]
+          "const": "repair"
         },
         {
           "description": "Check wheel for manylinux compliance, but do not repair",
           "type": "string",
-          "enum": [
-            "check"
-          ]
+          "const": "check"
         },
         {
           "description": "Don't check for manylinux compliance",
           "type": "string",
-          "enum": [
-            "skip"
-          ]
+          "const": "skip"
         }
       ]
     },
@@ -242,59 +239,44 @@
         {
           "description": "Binary executable target",
           "type": "string",
-          "enum": [
-            "bin"
-          ]
+          "const": "bin"
         },
         {
           "description": "Dynamic system library target",
           "type": "string",
-          "enum": [
-            "cdylib"
-          ]
+          "const": "cdylib"
         },
         {
           "description": "Dynamic Rust library target",
           "type": "string",
-          "enum": [
-            "dylib"
-          ]
+          "const": "dylib"
         },
         {
           "description": "Rust library",
           "type": "string",
-          "enum": [
-            "lib"
-          ]
+          "const": "lib"
         },
         {
           "description": "Rust library for use as an intermediate target",
           "type": "string",
-          "enum": [
-            "rlib"
-          ]
+          "const": "rlib"
         },
         {
           "description": "Static library",
           "type": "string",
-          "enum": [
-            "staticlib"
-          ]
+          "const": "staticlib"
         }
       ]
     },
     "CargoTarget": {
       "description": "Cargo compile target",
       "type": "object",
-      "required": [
-        "name"
-      ],
       "properties": {
         "kind": {
           "description": "Kind of target (\"bin\", \"cdylib\")",
           "anyOf": [
             {
-              "$ref": "#/definitions/CargoCrateType"
+              "$ref": "#/$defs/CargoCrateType"
             },
             {
               "type": "null"
@@ -305,7 +287,10 @@
           "description": "Name as given in the `Cargo.toml` or generated from the file name",
           "type": "string"
         }
-      }
+      },
+      "required": [
+        "name"
+      ]
     },
     "Format": {
       "description": "The target format for the include or exclude [GlobPattern].\n\nSee [Formats].",
@@ -313,16 +298,12 @@
         {
           "description": "Source distribution",
           "type": "string",
-          "enum": [
-            "sdist"
-          ]
+          "const": "sdist"
         },
         {
           "description": "Wheel",
           "type": "string",
-          "enum": [
-            "wheel"
-          ]
+          "const": "wheel"
         }
       ]
     },
@@ -331,17 +312,13 @@
       "anyOf": [
         {
           "description": "A single [Format] value",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Format"
-            }
-          ]
+          "$ref": "#/$defs/Format"
         },
         {
           "description": "Multiple [Format] values",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Format"
+            "$ref": "#/$defs/Format"
           }
         }
       ]
@@ -356,24 +333,20 @@
         {
           "description": "A glob `path` with a `format` key to specify one or more [Format] values",
           "type": "object",
-          "required": [
-            "format",
-            "path"
-          ],
           "properties": {
             "format": {
               "description": "One or more [Format] values",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Formats"
-                }
-              ]
+              "$ref": "#/$defs/Formats"
             },
             "path": {
               "description": "A glob",
               "type": "string"
             }
-          }
+          },
+          "required": [
+            "path",
+            "format"
+          ]
         }
       ]
     },
@@ -381,73 +354,80 @@
       "description": "Decides how to handle manylinux and musllinux compliance",
       "oneOf": [
         {
-          "description": "Use the manylinux_x_y tag",
+          "description": "Use the `manylinux_<major>_<minor>` tag",
           "type": "object",
-          "required": [
-            "Manylinux"
-          ],
           "properties": {
             "Manylinux": {
               "type": "object",
-              "required": [
-                "x",
-                "y"
-              ],
               "properties": {
-                "x": {
+                "major": {
                   "description": "GLIBC version major",
                   "type": "integer",
                   "format": "uint16",
-                  "minimum": 0.0
+                  "maximum": 65535,
+                  "minimum": 0
                 },
-                "y": {
+                "minor": {
                   "description": "GLIBC version minor",
                   "type": "integer",
                   "format": "uint16",
-                  "minimum": 0.0
+                  "maximum": 65535,
+                  "minimum": 0
                 }
-              }
+              },
+              "required": [
+                "major",
+                "minor"
+              ]
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "required": [
+            "Manylinux"
+          ]
         },
         {
-          "description": "Use the musllinux_x_y tag",
+          "description": "Use the `musllinux_<major>_<minor>` tag",
           "type": "object",
-          "required": [
-            "Musllinux"
-          ],
           "properties": {
             "Musllinux": {
               "type": "object",
-              "required": [
-                "x",
-                "y"
-              ],
               "properties": {
-                "x": {
+                "major": {
                   "description": "musl libc version major",
                   "type": "integer",
                   "format": "uint16",
-                  "minimum": 0.0
+                  "maximum": 65535,
+                  "minimum": 0
                 },
-                "y": {
+                "minor": {
                   "description": "musl libc version minor",
                   "type": "integer",
                   "format": "uint16",
-                  "minimum": 0.0
+                  "maximum": 65535,
+                  "minimum": 0
                 }
-              }
+              },
+              "required": [
+                "major",
+                "minor"
+              ]
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "required": [
+            "Musllinux"
+          ]
         },
         {
           "description": "Use the native linux tag",
           "type": "string",
-          "enum": [
-            "Linux"
-          ]
+          "const": "Linux"
+        },
+        {
+          "description": "Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.",
+          "type": "string",
+          "const": "Pypi"
         }
       ]
     },
@@ -457,16 +437,12 @@
         {
           "description": "Use `cargo package --list`",
           "type": "string",
-          "enum": [
-            "cargo"
-          ]
+          "const": "cargo"
         },
         {
           "description": "Use `git ls-files`",
           "type": "string",
-          "enum": [
-            "git"
-          ]
+          "const": "git"
         }
       ]
     },

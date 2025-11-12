@@ -43,6 +43,7 @@ pub enum Os {
     Wasi,
     Aix,
     Hurd,
+    Cygwin,
 }
 
 impl fmt::Display for Os {
@@ -63,6 +64,7 @@ impl fmt::Display for Os {
             Os::Wasi => write!(f, "Wasi"),
             Os::Aix => write!(f, "AIX"),
             Os::Hurd => write!(f, "Hurd"),
+            Os::Cygwin => write!(f, "Cygwin"),
         }
     }
 }
@@ -209,6 +211,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
         Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
         Os::Aix => vec![Arch::Powerpc64],
         Os::Hurd => vec![Arch::X86, Arch::X86_64],
+        Os::Cygwin => vec![Arch::X86, Arch::X86_64],
     }
 }
 
@@ -283,6 +286,7 @@ impl Target {
             OperatingSystem::Wasi | OperatingSystem::WasiP1 | OperatingSystem::WasiP2 => Os::Wasi,
             OperatingSystem::Aix => Os::Aix,
             OperatingSystem::Hurd => Os::Hurd,
+            OperatingSystem::Cygwin => Os::Cygwin,
             unsupported => bail!("The operating system {:?} is not supported", unsupported),
         };
 
@@ -450,7 +454,7 @@ impl Target {
             Os::Windows => "windows",
             Os::Linux => "linux",
             Os::Macos => "darwin",
-            Os::Ios => "darwin",
+            Os::Ios => "ios",
             Os::FreeBsd => "freebsd",
             Os::NetBsd => "netbsd",
             Os::OpenBsd => "openbsd",
@@ -463,6 +467,7 @@ impl Target {
             Os::Wasi => "wasi",
             Os::Aix => "aix",
             Os::Hurd => "gnu",
+            Os::Cygwin => "cygwin",
         }
     }
 
@@ -558,7 +563,8 @@ impl Target {
             | Os::Emscripten
             | Os::Wasi
             | Os::Aix
-            | Os::Hurd => true,
+            | Os::Hurd
+            | Os::Cygwin => true,
         }
     }
 
@@ -598,6 +604,12 @@ impl Target {
         self.os == Os::Macos
     }
 
+    /// Returns true if the current platform is iOS
+    #[inline]
+    pub fn is_ios(&self) -> bool {
+        self.os == Os::Ios
+    }
+
     /// Returns true if the current platform is windows
     #[inline]
     pub fn is_windows(&self) -> bool {
@@ -608,6 +620,12 @@ impl Target {
     #[inline]
     pub fn is_msvc(&self) -> bool {
         self.env == Environment::Msvc
+    }
+
+    /// Returns true if the current platform is cygwin
+    #[inline]
+    pub fn is_cygwin(&self) -> bool {
+        self.os == Os::Cygwin
     }
 
     /// Returns true if the current platform is illumos
@@ -740,6 +758,27 @@ pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Opti
                 } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
                     return Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
                 }
+            }
+        }
+        _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
+    }
+    None
+}
+
+pub(crate) fn detect_target_from_cross_python(python: &PathBuf) -> Option<TargetTriple> {
+    match Command::new(python)
+        .arg("-c")
+        .arg("import sys, sysconfig; print(sysconfig.get_platform(), end='') if getattr(sys, 'cross_compiling', False) else ''")
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let platform = String::from_utf8_lossy(&output.stdout);
+            if platform.ends_with("-arm64-iphoneos") {
+                return Some(TargetTriple::Regular("aarch64-apple-ios".to_string()));
+            } else if platform.ends_with("-arm64-iphonesimulator") {
+                return Some(TargetTriple::Regular("aarch64-apple-ios-sim".to_string()));
+            } else if platform.ends_with("-x86_64-iphonesimulator") {
+                return Some(TargetTriple::Regular("x86_64-apple-ios".to_string()));
             }
         }
         _ => eprintln!("⚠️  Warning: Failed to determine python platform"),

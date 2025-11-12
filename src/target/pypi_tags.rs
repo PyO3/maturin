@@ -225,6 +225,9 @@ mod tests {
             ("aarch64-linux-android", true),
             ("armv7-linux-androideabi", true),
             ("riscv64gc-unknown-linux-gnu", true),
+            ("aarch64-apple-ios", true),
+            ("aarch64-apple-ios-sim", true),
+            ("x86_64-apple-ios", true),
             ("x86_64-unknown-freebsd", false), // Now unsupported (no lazy validation)
             ("powerpc64-unknown-linux-gnu", true), // PPC64 on Linux is supported
             ("s390x-unknown-linux-gnu", true), // s390x on Linux is supported

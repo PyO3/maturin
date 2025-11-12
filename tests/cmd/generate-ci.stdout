@@ -29,8 +29,6 @@ Options:
 
       --platform <platform>...
           Platform support
-          
-          [default: linux musllinux windows macos]
 
           Possible values:
           - all:        All
@@ -39,6 +37,8 @@ Options:
           - windows:    Windows
           - macos:      macOS
           - emscripten: Emscripten
+          
+          [default: linux musllinux windows macos]
 
       --pytest
           Enable pytest

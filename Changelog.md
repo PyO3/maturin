@@ -1,9 +1,25 @@
 # Changelog
 
-## Unreleased
+## [1.10.2]
 
 * Fix panic when building sdist for crates with path dependencies from parent workspaces.
+
+## [1.10.1]
+
+* Fix wrong dependency on Homebrew liblzma on macOS by static linking liblama
+
+## [1.10.0]
+
+* Add `tool.maturin.editable-profile` option to override profile for editable package installations.
+* Add support for Cygwin.
+* When building `abi3` wheels on non-Windows platforms that aren't cross-compiling, the `sysconfigdata` of the interpreter used to run maturin will now be used, rather than a dummy interpreter.
+* Allow iOS cross-platform virtual environments, such as those used by cibuildwheel, to imply an iOS target.
+* Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.
+* Fix incorrect warning about missing `extension-module` feature on PyO3 0.26+.
+* Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl.
+* Clear out uid/gid and set deterministic mtime for files in sdist.
+* Always use "library" mode to build uniffi bindings.
 
 ## [1.9.6]
 
@@ -38,7 +54,7 @@
 ## [1.9.0]
 
 * Add full PEP 639 support for `project.license` and `project.license-files` in [#2647](https://github.com/PyO3/maturin/pull/2647).
-* Add `--compatiblity pypi` to only build wheels with platform tags that can also be uploaded to PyPI. This blocks e.g. building for riscv64, which is supported by manylinux, but not by PyPI.
+* Add `--compatibility pypi` to only build wheels with platform tags that can also be uploaded to PyPI. This blocks e.g. building for riscv64, which is supported by manylinux, but not by PyPI.
 
 ## [1.8.7]
 
@@ -1114,7 +1130,9 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.6...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/pyo3/maturin/compare/v1.10.0...v1.10.1
+[1.10.0]: https://github.com/pyo3/maturin/compare/v1.9.6...v1.10.0
 [1.9.6]: https://github.com/pyo3/maturin/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/pyo3/maturin/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/pyo3/maturin/compare/v1.9.3...v1.9.4

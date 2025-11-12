@@ -198,7 +198,7 @@ pub struct DevelopOptions {
     )]
     pub bindings: Option<String>,
     /// Pass --release to cargo
-    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS,)]
+    #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
     pub release: bool,
     /// Strip the library for minimum file size
     #[arg(long)]
@@ -390,11 +390,16 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         extras,
         skip_install,
         pip_path,
-        cargo_options,
+        mut cargo_options,
         uv,
         compression,
     } = develop_options;
     compression.validate();
+
+    // set profile to release if specified; `--release` and `--profile` are mutually exclusive
+    if release {
+        cargo_options.profile = Some("release".to_string());
+    }
 
     let mut target_triple = cargo_options.target.clone();
     let target = Target::from_target_triple(cargo_options.target.as_ref())?;
@@ -429,7 +434,6 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     let build_context = build_options
         .into_build_context()
-        .release(release)
         .strip(strip)
         .editable(true)
         .build()?;
@@ -504,7 +508,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::path::PathBuf;
 
     use super::parse_direct_url_path;

@@ -74,14 +74,24 @@ When the `[project]` section is not present, maturin will populate metadata from
 * `license` - From `package.license` in Cargo.toml
 * `project_url` - From various URLs in Cargo.toml (like repository, homepage, etc.)
 
-When the `[project]` section is present, maturin will merge metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
+When the `[project]` section is present in `pyproject.toml`, it must contain at least the `name` field.
+Maturin will then merge metadata from `Cargo.toml` and `pyproject.toml`, `pyproject.toml` takes precedence over `Cargo.toml`.
 Per specification, maturin is not allowed to populate fields that are not present in `project.dynamic` list when the `[project]` section is present.
-For example, to use the Rust crate version as the Python package version, you need to add `version` to the `project.dynamic` list:
+For example, to use the Rust crate version as the Python package version, you need to add `version` to the `project.dynamic` list.
+To use `package.homepage` from `Cargo.toml`, add `urls` to `project.dynamic` and so forth:
 
 ```toml
 [project]
 name = "my-awesome-project"
-dynamic = ["version"]
+dynamic = [
+    "version",
+    "description",
+    "readme",
+    "urls",
+    "authors",
+    "license",
+    "keywords",
+]
 ```
 
 ## Add Python dependencies
@@ -112,18 +122,4 @@ You can also specify [trove classifiers](https://pypi.org/classifiers/) under `p
 [project]
 name = "my-project"
 classifiers = ["Programming Language :: Python"]
-```
-
-## Add SPDX license expressions
-
-A practical string value for the license key has been purposefully left out by PEP 621
-to allow for a future PEP to specify support for
-[SPDX](https://spdx.org/licenses/) expressions.
-
-To use SPDX license expressions, you can specify it in `Cargo.toml` instead:
-
-```toml
-[package]
-name = "my-project"
-license = "MIT OR Apache-2.0"
 ```

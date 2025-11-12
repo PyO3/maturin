@@ -85,14 +85,14 @@ Options:
       --compression-method <COMPRESSION_METHOD>
           Zip compression method. Only Stored and Deflated are currently compatible with all package
           managers
-          
-          [default: deflated]
 
           Possible values:
           - deflated: Deflate compression (levels 0-9, default 6)
           - stored:   No compression
           - bzip2:    BZIP2 compression (levels 0-9, default 6)
           - zstd:     Zstandard compression (supported from Python 3.14; levels -7-22, default 3)
+          
+          [default: deflated]
 
       --compression-level <COMPRESSION_LEVEL>
           Zip compression level. Defaults to method default

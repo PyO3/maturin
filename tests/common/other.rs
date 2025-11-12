@@ -70,7 +70,6 @@ pub fn test_musl() -> Result<bool> {
 
     let build_context = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build()?;
@@ -114,7 +113,6 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 
     let build_context = options
         .into_build_context()
-        .release(false)
         .strip(false)
         .editable(false)
         .build()?;
@@ -124,13 +122,11 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
     Ok(())
 }
 
-pub fn test_source_distribution(
+pub fn build_source_distribution(
     package: impl AsRef<Path>,
     sdist_generator: SdistGenerator,
-    expected_files: Expect,
-    expected_cargo_toml: Option<(&Path, Expect)>,
     unique_name: &str,
-) -> Result<()> {
+) -> Result<Archive<GzDecoder<File>>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
     let sdist_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
@@ -149,7 +145,6 @@ pub fn test_source_distribution(
 
     let mut build_context = build_options
         .into_build_context()
-        .release(false)
         .strip(false)
         .editable(false)
         .sdist_only(true)
@@ -175,7 +170,18 @@ pub fn test_source_distribution(
 
     let tar_gz = fs_err::File::open(path)?;
     let tar = GzDecoder::new(tar_gz);
-    let mut archive = Archive::new(tar);
+    let archive = Archive::new(tar);
+    Ok(archive)
+}
+
+pub fn test_source_distribution(
+    package: impl AsRef<Path>,
+    sdist_generator: SdistGenerator,
+    expected_files: Expect,
+    expected_cargo_toml: Option<(&Path, Expect)>,
+    unique_name: &str,
+) -> Result<()> {
+    let mut archive = build_source_distribution(package, sdist_generator, unique_name)?;
     let mut files = BTreeSet::new();
     let mut file_count = 0;
     let mut cargo_toml = None;
@@ -207,6 +213,31 @@ pub fn test_source_distribution(
     Ok(())
 }
 
+pub fn check_sdist_mtimes(
+    package: impl AsRef<Path>,
+    expected_mtime: u64,
+    unique_name: &str,
+) -> Result<()> {
+    let mut archive = build_source_distribution(package, SdistGenerator::Cargo, unique_name)?;
+
+    for entry in archive.entries()? {
+        let entry = entry?;
+        let filename = entry.header().path()?;
+        let mtime = entry.header().mtime()?;
+
+        assert_eq!(
+            mtime,
+            expected_mtime,
+            "File {} has an mtime of {} instead of {}",
+            filename.display(),
+            mtime,
+            expected_mtime
+        );
+    }
+
+    Ok(())
+}
+
 fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<ZipArchive<File>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
     let wheel_directory = Path::new("test-crates").join("wheels").join(unique_name);
@@ -225,7 +256,6 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
 
     let build_context = build_options
         .into_build_context()
-        .release(false)
         .strip(false)
         .editable(false)
         .build()?;
@@ -286,7 +316,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();
@@ -303,7 +332,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();
@@ -324,7 +352,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .release(false)
             .strip(cfg!(feature = "faster-tests"))
             .editable(false)
             .build();
@@ -341,7 +368,6 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .release(false)
             .strip(cfg!(feature = "faster-tests"))
             .editable(false)
             .build();
@@ -367,7 +393,6 @@ pub fn abi3_without_version() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .release(false)
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
         .build();

@@ -1,11 +1,11 @@
 use super::musllinux::{find_musl_libc, get_musl_version};
-use super::policy::{Policy, MANYLINUX_POLICIES, MUSLLINUX_POLICIES};
-use crate::auditwheel::{find_external_libs, PlatformTag};
+use super::policy::{MANYLINUX_POLICIES, MUSLLINUX_POLICIES, Policy};
+use crate::auditwheel::{PlatformTag, find_external_libs};
 use crate::compile::BuildArtifact;
 use crate::target::Target;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use fs_err::File;
-use goblin::elf::{sym::STT_FUNC, Elf};
+use goblin::elf::{Elf, sym::STT_FUNC};
 use lddtree::Library;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -32,19 +32,19 @@ pub enum AuditWheelError {
     /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
     /// libraries.
     #[error(
-    "Your library links libpython ({0}), which libraries must not do. Have you forgotten to activate the extension-module feature?",
+        "Your library links libpython ({0}), which libraries must not do. Have you forgotten to activate the extension-module feature?"
     )]
     LinksLibPythonError(String),
     /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
     /// libraries.
     #[error(
-    "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}",
+        "Your library is not {0} compliant because it links the following forbidden libraries: {1:?}"
     )]
     LinksForbiddenLibrariesError(Policy, Vec<String>),
     /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
     /// libraries.
     #[error(
-    "Your library is not {0} compliant because of the presence of too-recent versioned symbols: {1:?}. Consider building in a manylinux docker container",
+        "Your library is not {0} compliant because of the presence of too-recent versioned symbols: {1:?}. Consider building in a manylinux docker container"
     )]
     VersionedSymbolTooNewError(Policy, Vec<String>),
     /// The elf file isn't manylinux/musllinux compatible. Contains the list of offending
@@ -55,7 +55,9 @@ pub enum AuditWheelError {
     #[error("Your library is not {0} compliant because it has unsupported architecture: {1}")]
     UnsupportedArchitecture(Policy, String),
     /// This platform tag isn't defined by auditwheel yet
-    #[error("{0} compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway")]
+    #[error(
+        "{0} compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway"
+    )]
     UndefinedPolicy(PlatformTag),
     /// Failed to analyze external shared library dependencies of the wheel
     #[error("Failed to analyze external shared library dependencies of the wheel")]
@@ -564,8 +566,8 @@ pub fn relpath(to: &Path, from: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use crate::auditwheel::audit::relpath;
     use crate::Target;
+    use crate::auditwheel::audit::relpath;
     use pretty_assertions::assert_eq;
     use std::path::Path;
 
@@ -623,12 +625,16 @@ rustflags = ["-L", "dependency=/usr/local/lib", "-L", "/some/other/path", "-C", 
 
         if let Some(paths) = paths {
             assert_eq!(paths.len(), 2);
-            assert!(paths
-                .iter()
-                .any(|p| p.to_string_lossy() == "/usr/local/lib"));
-            assert!(paths
-                .iter()
-                .any(|p| p.to_string_lossy() == "/some/other/path"));
+            assert!(
+                paths
+                    .iter()
+                    .any(|p| p.to_string_lossy() == "/usr/local/lib")
+            );
+            assert!(
+                paths
+                    .iter()
+                    .any(|p| p.to_string_lossy() == "/some/other/path")
+            );
         } else {
             // It's possible that rustflags parsing fails in some environments,
             // so we just verify the function doesn't panic

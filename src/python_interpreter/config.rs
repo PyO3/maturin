@@ -2,9 +2,9 @@ use super::{
     InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
     MINIMUM_PYTHON_MINOR,
 };
-use crate::target::{Arch, Os};
 use crate::Target;
-use anyhow::{format_err, Context, Result};
+use crate::target::{Arch, Os};
+use anyhow::{Context, Result, format_err};
 use fs_err as fs;
 use serde::Deserialize;
 use std::fmt::Write as _;
@@ -109,7 +109,9 @@ impl InterpreterConfig {
             (Os::Linux, GraalPy) => {
                 let (graalpy_major, graalpy_minor) =
                     graalpy_version_for_python_version(major, minor)?;
-                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-linux.so");
+                let ext_suffix = format!(
+                    ".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-linux.so"
+                );
                 Some(Self {
                     major,
                     minor,
@@ -153,7 +155,9 @@ impl InterpreterConfig {
             (Os::Macos, GraalPy) => {
                 let (graalpy_major, graalpy_minor) =
                     graalpy_version_for_python_version(major, minor)?;
-                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-darwin.so");
+                let ext_suffix = format!(
+                    ".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-darwin.so"
+                );
                 Some(Self {
                     major,
                     minor,

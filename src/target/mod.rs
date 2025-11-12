@@ -1,9 +1,9 @@
+use crate::PlatformTag;
 use crate::build_options::TargetTriple;
 use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::python_interpreter::InterpreterKind::{CPython, GraalPy, PyPy};
-use crate::PlatformTag;
-use anyhow::{anyhow, bail, format_err, Result};
+use anyhow::{Result, anyhow, bail, format_err};
 use platform_info::*;
 use rustc_version::VersionMeta;
 use serde::Deserialize;

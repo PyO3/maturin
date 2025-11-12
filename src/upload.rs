@@ -2,9 +2,9 @@
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
 use crate::build_context::hash_file;
-use anyhow::{bail, Context, Result};
-use base64::engine::general_purpose::STANDARD;
+use anyhow::{Context, Result, bail};
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use bytesize::ByteSize;
 use configparser::ini::Ini;
 use fs_err as fs;

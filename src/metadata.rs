@@ -1,5 +1,5 @@
 use crate::PyProjectToml;
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{Context, Result, bail, format_err};
 use fs_err as fs;
 use indexmap::IndexMap;
 use normpath::PathExt;
@@ -7,7 +7,7 @@ use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::{
     ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
 };
-use pyproject_toml::{check_pep639_glob, License};
+use pyproject_toml::{License, check_pep639_glob};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -218,7 +218,9 @@ impl Metadata24 {
                     content_type,
                 }) => {
                     if file.is_some() && text.is_some() {
-                        bail!("file and text fields of 'project.readme' are mutually-exclusive, only one of them should be specified");
+                        bail!(
+                            "file and text fields of 'project.readme' are mutually-exclusive, only one of them should be specified"
+                        );
                     }
                     if let Some(readme_path) = file {
                         let readme_path = pyproject_dir.join(readme_path);
@@ -726,7 +728,7 @@ fn fold_header(text: &str) -> String {
 mod tests {
     use super::*;
     use cargo_metadata::MetadataCommand;
-    use expect_test::{expect, Expect};
+    use expect_test::{Expect, expect};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;

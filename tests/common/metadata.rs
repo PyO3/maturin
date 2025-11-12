@@ -1,6 +1,6 @@
 use anyhow::Result;
 use insta::assert_snapshot;
-use maturin::{write_dist_info, BuildOptions, CargoOptions, ModuleWriter};
+use maturin::{BuildOptions, CargoOptions, ModuleWriter, write_dist_info};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 

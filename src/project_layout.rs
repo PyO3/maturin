@@ -1,6 +1,6 @@
-use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
+use crate::build_options::{CargoOptions, extract_cargo_metadata_args};
 use crate::{CargoToml, Metadata24, PyProjectToml};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{Context, Result, bail, format_err};
 use cargo_metadata::{Metadata, MetadataCommand};
 use normpath::PathExt as _;
 use std::collections::HashSet;

@@ -1,8 +1,8 @@
-use crate::target::RUST_1_64_0;
 #[cfg(feature = "zig")]
 use crate::PlatformTag;
+use crate::target::RUST_1_64_0;
 use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};

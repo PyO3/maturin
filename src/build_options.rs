@@ -10,7 +10,7 @@ use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
 use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{Context, Result, bail, format_err};
 use cargo_metadata::{CrateType, PackageId, TargetKind};
 use cargo_metadata::{Metadata, Node};
 use cargo_options::heading;
@@ -274,16 +274,19 @@ impl BuildOptions {
                                     "🐍 Using host {host_python} for cross-compiling preparation"
                                 );
                                 // pyo3
-                                env::set_var("PYO3_PYTHON", &host_python.executable);
-                                // legacy pyo3 versions
-                                env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
+                                unsafe {
+                                    env::set_var("PYO3_PYTHON", &host_python.executable);
+                                    env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable)
+                                };
 
                                 let sysconfig_path =
                                     find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
-                                env::set_var(
-                                    "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
-                                    sysconfig_path.parent().unwrap(),
-                                );
+                                unsafe {
+                                    env::set_var(
+                                        "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
+                                        sysconfig_path.parent().unwrap(),
+                                    )
+                                };
 
                                 let sysconfig_data =
                                     parse_sysconfigdata(host_python, sysconfig_path)?;
@@ -342,7 +345,9 @@ impl BuildOptions {
                                 });
                             } else {
                                 if interpreter.is_empty() && !self.find_interpreter {
-                                    bail!("Couldn't find any python interpreters. Please specify at least one with -i");
+                                    bail!(
+                                        "Couldn't find any python interpreters. Please specify at least one with -i"
+                                    );
                                 }
                                 for interp in interpreter {
                                     // If `-i` looks like a file path, check if it's a valid interpreter
@@ -445,7 +450,9 @@ impl BuildOptions {
                                 .context("Invalid PYO3_CONFIG_FILE")?;
                                 Ok(vec![PythonInterpreter::from_config(interpreter_config)])
                             } else if generate_import_lib {
-                                eprintln!("🐍 Not using a specific python interpreter (automatically generating windows import library)");
+                                eprintln!(
+                                    "🐍 Not using a specific python interpreter (automatically generating windows import library)"
+                                );
                                 let mut found_interpreters = found_interpreters;
                                 // fake a python interpreter if none directly found
                                 if found_interpreters.is_empty() {
@@ -642,11 +649,7 @@ impl BuildContextBuilder {
                     .split("-arch")
                     .filter_map(|x| {
                         let x = x.trim();
-                        if x.is_empty() {
-                            None
-                        } else {
-                            Some(x)
-                        }
+                        if x.is_empty() { None } else { Some(x) }
                     })
                     .collect();
                 match (arches.contains("x86_64"), arches.contains("arm64")) {
@@ -817,7 +820,9 @@ impl BuildContextBuilder {
         let compile_targets =
             filter_cargo_targets(&cargo_metadata, bridge, config_targets.as_deref())?;
         if compile_targets.is_empty() {
-            bail!("No Cargo targets to build, please check your bindings configuration in pyproject.toml.");
+            bail!(
+                "No Cargo targets to build, please check your bindings configuration in pyproject.toml."
+            );
         }
 
         let crate_name = cargo_toml.package.name;
@@ -1219,20 +1224,29 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
             let bindings = find_pyo3_bindings(&deps, &packages)?.context("unknown binding type")?;
             BridgeModel::PyO3(bindings)
         }
-    } else if let Some(bindings) = find_pyo3_bindings(&deps, &packages)? {
-        if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
-            BridgeModel::Bin(Some(bindings))
-        } else {
-            BridgeModel::PyO3(bindings)
-        }
-    } else if deps.contains_key("uniffi") {
-        BridgeModel::UniFfi
-    } else if targets.contains(&CrateType::CDyLib) {
-        BridgeModel::Cffi
-    } else if targets.contains(&CrateType::Bin) {
-        BridgeModel::Bin(find_pyo3_bindings(&deps, &packages)?)
     } else {
-        bail!("Couldn't detect the binding type; Please specify them with --bindings/-b")
+        match find_pyo3_bindings(&deps, &packages)? {
+            Some(bindings) => {
+                if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
+                    BridgeModel::Bin(Some(bindings))
+                } else {
+                    BridgeModel::PyO3(bindings)
+                }
+            }
+            _ => {
+                if deps.contains_key("uniffi") {
+                    BridgeModel::UniFfi
+                } else if targets.contains(&CrateType::CDyLib) {
+                    BridgeModel::Cffi
+                } else if targets.contains(&CrateType::Bin) {
+                    BridgeModel::Bin(find_pyo3_bindings(&deps, &packages)?)
+                } else {
+                    bail!(
+                        "Couldn't detect the binding type; Please specify them with --bindings/-b"
+                    )
+                }
+            }
+        }
     };
 
     if !bridge.is_pyo3() {
@@ -1330,7 +1344,9 @@ fn find_interpreter(
                     .iter()
                     .map(|i| format!("{} {}.{}", i.interpreter_kind, i.major, i.minor))
                     .collect::<Vec<_>>();
-                bail!("Interpreters {found:?} were found in maturin's bundled sysconfig, but compiling for Windows without an interpreter requires PyO3's `generate-import-lib` feature");
+                bail!(
+                    "Interpreters {found:?} were found in maturin's bundled sysconfig, but compiling for Windows without an interpreter requires PyO3's `generate-import-lib` feature"
+                );
             }
 
             found_interpreters.extend(sysconfig_interps);
@@ -1343,7 +1359,10 @@ fn find_interpreter(
     if found_interpreters.is_empty() {
         if interpreter.is_empty() {
             if let Some(requires_python) = requires_python {
-                bail!("Couldn't find any python interpreters with version {}. Please specify at least one with -i", requires_python);
+                bail!(
+                    "Couldn't find any python interpreters with version {}. Please specify at least one with -i",
+                    requires_python
+                );
             } else {
                 bail!("Couldn't find any python interpreters. Please specify at least one with -i");
             }
@@ -1378,7 +1397,10 @@ fn find_interpreter_in_host(
 
     if interpreters.is_empty() {
         if let Some(requires_python) = requires_python {
-            bail!("Couldn't find any python interpreters with {}. Please specify at least one with -i", requires_python);
+            bail!(
+                "Couldn't find any python interpreters with {}. Please specify at least one with -i",
+                requires_python
+            );
         } else {
             bail!("Couldn't find any python interpreters. Please specify at least one with -i");
         }
@@ -1431,9 +1453,15 @@ fn find_interpreter_in_sysconfig(
         } else {
             // if interpreter not known
             if std::path::Path::new(&python).is_file() {
-                bail!("Python interpreter should be a kind of interpreter (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, got path to interpreter: {}", python);
+                bail!(
+                    "Python interpreter should be a kind of interpreter (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, got path to interpreter: {}",
+                    python
+                );
             } else {
-                bail!("Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)", python);
+                bail!(
+                    "Unsupported Python interpreter for cross-compilation: {}; supported interpreters are pypy, graalpy, and python (cpython)",
+                    python
+                );
             }
         };
         if python_ver.is_empty() {

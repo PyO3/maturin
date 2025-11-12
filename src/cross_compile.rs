@@ -1,6 +1,6 @@
 use crate::target::Os;
 use crate::{PythonInterpreter, Target};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use fs_err::{self as fs, DirEntry};
 use normpath::PathExt as _;
 use std::collections::HashMap;

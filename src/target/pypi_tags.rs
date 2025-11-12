@@ -24,7 +24,7 @@ use crate::target::legacy_py::{
     MUSLLINUX_ARCHES, WINDOWS_ARCHES,
 };
 use crate::target::{Os, Target};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use target_lexicon::Environment;
 
 /// Check for target architectures that we know aren't supported by PyPI to error early.

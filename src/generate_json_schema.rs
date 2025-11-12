@@ -3,7 +3,7 @@
 use fs_err as fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use pretty_assertions::StrComparison;
 use schemars::schema_for;
 
@@ -46,7 +46,9 @@ pub fn generate_json_schema(args: GenerateJsonSchemaOptions) -> Result<()> {
                 println!("Up-to-date: {filename}");
             } else {
                 let comparison = StrComparison::new(&current, &schema_string);
-                bail!("{filename} changed, please run `cargo run --features schemars -- generate-json-schema`:\n{comparison}",);
+                bail!(
+                    "{filename} changed, please run `cargo run --features schemars -- generate-json-schema`:\n{comparison}",
+                );
             }
         }
         Mode::Write => {

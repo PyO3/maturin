@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::ffi::OsStr;
 use std::path::Path;
 use std::process::Command;

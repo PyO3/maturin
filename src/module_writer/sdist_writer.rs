@@ -37,7 +37,7 @@ pub struct SDistWriter {
 }
 
 impl ModuleWriter for SDistWriter {
-    fn add_data(
+    fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
@@ -150,7 +150,7 @@ mod tests {
         let tmp_dir = TempDir::new()?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty(), None)?;
         assert!(writer.file_tracker.files.is_empty());
-        writer.add_data("test", Some(Path::new("test")), empty(), true)?;
+        writer.add_bytes("test", Some(Path::new("test")), empty(), true)?;
         assert_eq!(writer.file_tracker.files.len(), 1);
         writer.finish()?;
         tmp_dir.close()?;
@@ -161,12 +161,12 @@ mod tests {
         excludes.add("test*")?;
         excludes.add("!test2")?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?, None)?;
-        writer.add_data("test1", Some(Path::new("test1")), empty(), true)?;
-        writer.add_data("test3", Some(Path::new("test3")), empty(), true)?;
+        writer.add_bytes("test1", Some(Path::new("test1")), empty(), true)?;
+        writer.add_bytes("test3", Some(Path::new("test3")), empty(), true)?;
         assert!(writer.file_tracker.files.is_empty());
-        writer.add_data("test2", Some(Path::new("test2")), empty(), true)?;
+        writer.add_bytes("test2", Some(Path::new("test2")), empty(), true)?;
         assert!(!writer.file_tracker.files.is_empty());
-        writer.add_data("yes", Some(Path::new("yes")), empty(), true)?;
+        writer.add_bytes("yes", Some(Path::new("yes")), empty(), true)?;
         assert_eq!(writer.file_tracker.files.len(), 2);
         writer.finish()?;
         tmp_dir.close()?;

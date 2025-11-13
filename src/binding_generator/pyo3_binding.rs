@@ -126,7 +126,7 @@ pub fn write_bindings_module(
     } else {
         let module = PathBuf::from(ext_name);
         // Reexport the shared library as if it were the top level module
-        writer.add_data(
+        writer.add_bytes(
             module.join("__init__.py"),
             None,
             format!(

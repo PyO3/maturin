@@ -11,7 +11,7 @@ struct MockWriter {
 }
 
 impl ModuleWriter for MockWriter {
-    fn add_data(
+    fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         _source: Option<&Path>,

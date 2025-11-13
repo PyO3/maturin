@@ -37,7 +37,7 @@ pub struct WheelWriter {
 }
 
 impl ModuleWriter for WheelWriter {
-    fn add_data(
+    fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
@@ -137,7 +137,7 @@ impl WheelWriter {
                 let name = metadata24.get_distribution_escaped();
                 let target = format!("{name}.pth");
                 debug!("Adding {} from {}", target, python_path);
-                self.add_data(target, None, python_path.as_bytes(), false)?;
+                self.add_bytes(target, None, python_path.as_bytes(), false)?;
             } else {
                 eprintln!(
                     "⚠️ source code path contains non-Unicode sequences, editable installs may not work."

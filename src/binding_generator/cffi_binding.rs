@@ -89,13 +89,13 @@ pub fn write_cffi_module(
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_data(
+        writer.add_bytes(
             module.join("__init__.py"),
             None,
             cffi_init_file(&cffi_module_file_name).as_bytes(),
             false,
         )?;
-        writer.add_data(
+        writer.add_bytes(
             module.join("ffi.py"),
             None,
             cffi_declarations.as_bytes(),

@@ -54,6 +54,6 @@ if __name__ == '__main__':
     let launcher_path = Path::new(&metadata.get_distribution_escaped())
         .join(bin_name.replace('-', "_"))
         .with_extension("py");
-    writer.add_data(&launcher_path, None, entrypoint_script.as_bytes(), true)?;
+    writer.add_bytes(&launcher_path, None, entrypoint_script.as_bytes(), true)?;
     Ok(())
 }

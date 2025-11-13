@@ -35,7 +35,7 @@ pub trait ModuleWriter {
     /// the appropriate unix permissions
     ///
     /// For generated files, `source` is `None`.
-    fn add_data(
+    fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
@@ -60,14 +60,14 @@ pub trait ModuleWriterExt: ModuleWriter {
 
         let file =
             File::open(source).with_context(|| format!("Failed to open {}", source.display()))?;
-        self.add_data(target, Some(source), file, executable)
+        self.add_bytes(target, Some(source), file, executable)
             .with_context(|| format!("Failed to write to {}", target.display()))?;
         Ok(())
     }
 
     /// Add an empty file to the target path
     fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
-        self.add_data(target, None, io::empty(), false)
+        self.add_bytes(target, None, io::empty(), false)
     }
 }
 
@@ -231,14 +231,14 @@ pub fn write_dist_info(
 ) -> Result<()> {
     let dist_info_dir = metadata24.get_dist_info_dir();
 
-    writer.add_data(
+    writer.add_bytes(
         dist_info_dir.join("METADATA"),
         None,
         metadata24.to_file_contents()?.as_bytes(),
         false,
     )?;
 
-    writer.add_data(
+    writer.add_bytes(
         dist_info_dir.join("WHEEL"),
         None,
         wheel_file(tags)?.as_bytes(),
@@ -256,7 +256,7 @@ pub fn write_dist_info(
         entry_points.push_str(&entry_points_txt(entry_type, scripts));
     }
     if !entry_points.is_empty() {
-        writer.add_data(
+        writer.add_bytes(
             dist_info_dir.join("entry_points.txt"),
             None,
             entry_points.as_bytes(),

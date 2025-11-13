@@ -284,7 +284,7 @@ fn add_crate_to_source_distribution(
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
         rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
-        writer.add_data(
+        writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),
             document.to_string().as_bytes(),
@@ -293,7 +293,7 @@ fn add_crate_to_source_distribution(
     } else if !skip_cargo_toml {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
-        writer.add_data(
+        writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),
             document.to_string().as_bytes(),
@@ -584,7 +584,7 @@ fn add_cargo_package_files_to_sdist(
                 workspace_manifest_path.as_std_path(),
                 &deps_to_keep,
             )?;
-            writer.add_data(
+            writer.add_bytes(
                 root_dir.join(relative_workspace_cargo_toml),
                 Some(workspace_manifest_path.as_std_path()),
                 document.to_string().as_bytes(),
@@ -608,7 +608,7 @@ fn add_cargo_package_files_to_sdist(
             pyproject_toml_path,
             &relative_main_crate_manifest_dir.join("Cargo.toml"),
         )?;
-        writer.add_data(
+        writer.add_bytes(
             root_dir.join("pyproject.toml"),
             Some(pyproject_toml_path),
             rewritten_pyproject_toml.as_bytes(),
@@ -857,7 +857,7 @@ pub fn source_distribution(
         }
     }
 
-    writer.add_data(
+    writer.add_bytes(
         root_dir.join("PKG-INFO"),
         None,
         metadata24.to_file_contents()?.as_bytes(),

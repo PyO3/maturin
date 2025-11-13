@@ -248,7 +248,7 @@ pub fn write_uniffi_module(
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_data(module.join("__init__.py"), None, py_init.as_bytes(), false)?;
+        writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes(), false)?;
         for binding in binding_names.iter() {
             writer.add_file(
                 module.join(binding).with_extension("py"),

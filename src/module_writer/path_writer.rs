@@ -34,7 +34,7 @@ impl PathWriter {
 }
 
 impl ModuleWriter for PathWriter {
-    fn add_data(
+    fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,

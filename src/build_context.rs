@@ -627,7 +627,7 @@ impl BuildContext {
                 } else {
                     "x86_64"
                 };
-                let abi = if self.target.target_triple().ends_with("-sim") {
+                let abi = if target.target_arch() == Arch::X86_64 || self.target.target_triple().ends_with("-sim") {
                     "iphonesimulator"
                 } else {
                     "iphoneos"

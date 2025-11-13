@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Fix tagging for iOS x86_64 simulator wheels.
+
 ## [1.10.1]
 
 * Fix wrong dependency on Homebrew liblzma on macOS by static linking liblama

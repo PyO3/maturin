@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use fs_err as fs;
 use maturin::Target;
 use normpath::PathExt as _;
@@ -80,7 +80,7 @@ pub fn maybe_mock_cargo() {
             path_split.insert(0, mock_cargo_path);
             let new_path =
                 env::join_paths(path_split).expect("Expected to be able to re-join PATH");
-            env::set_var("PATH", new_path);
+            unsafe { env::set_var("PATH", new_path) };
         }
     }
     drop(handle);

@@ -1,7 +1,7 @@
 //! A pyproject.toml as specified in PEP 517
 
-use crate::auditwheel::AuditWheelMode;
 use crate::PlatformTag;
+use crate::auditwheel::AuditWheelMode;
 use anyhow::{Context, Result};
 use fs_err as fs;
 use pep440_rs::Version;
@@ -80,7 +80,7 @@ impl GlobPattern {
     pub fn targets(&self, format: Format) -> Option<&str> {
         match self {
             // Not specified defaults to both
-            Self::Path(ref glob) => Some(glob),
+            Self::Path(glob) => Some(glob),
             Self::WithFormat {
                 path,
                 format: formats,
@@ -447,11 +447,15 @@ impl PyProjectToml {
             .as_ref()
             .is_some_and(|d| d.iter().any(|s| s == "version"));
         if has_static_version && has_dynamic_version {
-            eprintln!("⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
+            eprintln!(
+                "⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml"
+            );
             return false;
         }
         if !has_static_version && !has_dynamic_version {
-            eprintln!("⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
+            eprintln!(
+                "⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list"
+            );
             return false;
         }
         true
@@ -461,8 +465,8 @@ impl PyProjectToml {
 #[cfg(test)]
 mod tests {
     use crate::{
-        pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
         PyProjectToml,
+        pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
     };
     use expect_test::expect;
     use fs_err as fs;

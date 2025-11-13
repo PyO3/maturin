@@ -1,12 +1,12 @@
 use crate::common::{
     check_installed, create_named_virtualenv, create_virtualenv, maybe_mock_cargo, test_python_path,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 #[cfg(feature = "zig")]
 use cargo_zigbuild::Zig;
 use clap::Parser;
-use fs4::fs_err3::FileExt;
 use fs_err::File;
+use fs4::fs_err3::FileExt;
 use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
@@ -27,10 +27,12 @@ pub fn test_integration(
     maybe_mock_cargo();
 
     // Pass CARGO_BIN_EXE_maturin for testing purpose
-    env::set_var(
-        "CARGO_BIN_EXE_cargo-zigbuild",
-        env!("CARGO_BIN_EXE_maturin"),
-    );
+    unsafe {
+        env::set_var(
+            "CARGO_BIN_EXE_cargo-zigbuild",
+            env!("CARGO_BIN_EXE_maturin"),
+        )
+    };
 
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 

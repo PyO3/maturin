@@ -1,7 +1,7 @@
 use crate::module_writer::ModuleWriter;
 use crate::pyproject_toml::SdistGenerator;
-use crate::{pyproject_toml::Format, BuildContext, PyProjectToml, SDistWriter};
-use anyhow::{bail, Context, Result};
+use crate::{BuildContext, PyProjectToml, SDistWriter, pyproject_toml::Format};
+use anyhow::{Context, Result, bail};
 use cargo_metadata::camino::Utf8Path;
 use cargo_metadata::{Metadata, MetadataCommand, PackageId};
 use fs_err as fs;
@@ -72,7 +72,7 @@ fn rewrite_cargo_toml(
             } else {
                 let mut new_members = toml_edit::Array::new();
                 for member in members {
-                    if let toml_edit::Value::String(ref s) = member {
+                    if let toml_edit::Value::String(s) = member {
                         let member_path = s.value();
                         // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
                         let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);
@@ -889,9 +889,5 @@ where
             break;
         }
     }
-    if found {
-        Some(final_path)
-    } else {
-        None
-    }
+    if found { Some(final_path) } else { None }
 }

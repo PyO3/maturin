@@ -2,7 +2,7 @@ pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
 use crate::target::Arch;
 use crate::{BridgeModel, BuildContext, Target};
-use anyhow::{bail, ensure, format_err, Context, Result};
+use anyhow::{Context, Result, bail, ensure, format_err};
 use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
@@ -329,7 +329,9 @@ fn fun_with_abiflags(
                 Ok("".to_string())
             }
         } else {
-            bail!("A python 3 interpreter on Windows does not define abiflags in its sysconfig before Python 3.14 ಠ_ಠ")
+            bail!(
+                "A python 3 interpreter on Windows does not define abiflags in its sysconfig before Python 3.14 ಠ_ಠ"
+            )
         }
     } else if let Some(ref abiflags) = message.abiflags {
         if message.minor >= 8 {

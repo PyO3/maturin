@@ -1,11 +1,11 @@
 use self::package_name_validations::{cargo_check_name, pypi_check_name};
 use crate::ci::GenerateCI;
 use crate::{BridgeModel, PyO3};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::{Select, theme::ColorfulTheme};
 use fs_err as fs;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use semver::Version;
 use std::path::Path;
 

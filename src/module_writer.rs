@@ -2,20 +2,20 @@
 use crate::compression::{CompressionMethod, CompressionOptions};
 use crate::project_layout::ProjectLayout;
 use crate::target::Os;
-use crate::{pyproject_toml::Format, Metadata24, PyProjectToml, PythonInterpreter, Target};
-use anyhow::{anyhow, bail, Context, Result};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use crate::{Metadata24, PyProjectToml, PythonInterpreter, Target, pyproject_toml::Format};
+use anyhow::{Context, Result, anyhow, bail};
 use base64::Engine;
-use flate2::write::GzEncoder;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use flate2::Compression;
+use flate2::write::GzEncoder;
 use fs_err as fs;
-#[cfg(unix)]
-use fs_err::os::unix::fs::OpenOptionsExt;
 use fs_err::File;
 #[cfg(unix)]
 use fs_err::OpenOptions;
-use ignore::overrides::Override;
+#[cfg(unix)]
+use fs_err::os::unix::fs::OpenOptionsExt;
 use ignore::WalkBuilder;
+use ignore::overrides::Override;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use normpath::PathExt as _;
@@ -32,7 +32,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use tracing::{debug, instrument};
 use zip::{self, DateTime, ZipWriter};
 
@@ -297,7 +297,9 @@ impl WheelWriter {
                 debug!("Adding {} from {}", target, python_path);
                 self.add_bytes(target, None, python_path.as_bytes())?;
             } else {
-                eprintln!("⚠️ source code path contains non-Unicode sequences, editable installs may not work.");
+                eprintln!(
+                    "⚠️ source code path contains non-Unicode sequences, editable installs may not work."
+                );
             }
         }
         Ok(())

@@ -1,22 +1,22 @@
-use crate::auditwheel::{get_policy_and_libs, patchelf, relpath, AuditWheelMode};
+use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
-use crate::compile::{warn_missing_py_init, CompileTarget};
+use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
 use crate::module_writer::{
-    add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
-    write_uniffi_module, write_wasm_launcher, WheelWriter,
+    WheelWriter, add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
+    write_uniffi_module, write_wasm_launcher,
 };
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::target::{Arch, Os};
 use crate::{
-    compile, pyproject_toml::Format, BridgeModel, BuildArtifact, Metadata24, ModuleWriter,
-    PyProjectToml, PythonInterpreter, Target,
+    BridgeModel, BuildArtifact, Metadata24, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
+    compile, pyproject_toml::Format,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -399,7 +399,9 @@ impl BuildContext {
         }
 
         if matches!(self.auditwheel, AuditWheelMode::Check) {
-            eprintln!("🖨️ Your library is not manylinux/musllinux compliant because it requires copying the following libraries:");
+            eprintln!(
+                "🖨️ Your library is not manylinux/musllinux compliant because it requires copying the following libraries:"
+            );
             for lib in ext_libs.iter().flatten() {
                 if let Some(path) = lib.realpath.as_ref() {
                     eprintln!("    {} => {}", lib.name, path.display())
@@ -407,7 +409,9 @@ impl BuildContext {
                     eprintln!("    {} => not found", lib.name)
                 };
             }
-            bail!("Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries.");
+            bail!(
+                "Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries."
+            );
         }
 
         patchelf::verify_patchelf()?;
@@ -573,7 +577,9 @@ impl BuildContext {
     pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
         if let Ok(host_platform) = env::var("_PYTHON_HOST_PLATFORM") {
             let override_platform = host_platform.replace(['.', '-'], "_");
-            eprintln!("🚉 Overriding platform tag from _PYTHON_HOST_PLATFORM environment variable as {override_platform}.");
+            eprintln!(
+                "🚉 Overriding platform tag from _PYTHON_HOST_PLATFORM environment variable as {override_platform}."
+            );
             return Ok(override_platform);
         }
 

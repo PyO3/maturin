@@ -1,8 +1,8 @@
 use crate::common::{
-    check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo, TestInstallBackend,
+    TestInstallBackend, check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo,
 };
 use anyhow::Result;
-use maturin::{develop, CargoOptions, DevelopOptions};
+use maturin::{CargoOptions, DevelopOptions, develop};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;

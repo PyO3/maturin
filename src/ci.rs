@@ -672,7 +672,7 @@ jobs:\n",
 #[cfg(test)]
 mod tests {
     use super::GenerateCI;
-    use crate::{bridge::PyO3Crate, Abi3Version, BridgeModel, PyO3};
+    use crate::{Abi3Version, BridgeModel, PyO3, bridge::PyO3Crate};
     use expect_test::expect;
     use semver::Version;
 
@@ -1299,12 +1299,12 @@ mod tests {
 
     #[test]
     fn test_generate_github_zig_pytest() {
-        let gen = GenerateCI {
+        let r#gen = GenerateCI {
             zig: true,
             pytest: true,
             ..Default::default()
         };
-        let conf = gen
+        let conf = r#gen
             .generate_github(
                 "example",
                 &BridgeModel::PyO3(PyO3 {

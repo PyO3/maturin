@@ -1,14 +1,14 @@
-use crate::auditwheel::AuditWheelMode;
-use crate::build_options::CargoOptions;
-use crate::compression::CompressionOptions;
-use crate::target::detect_arch_from_python;
 use crate::BuildContext;
 use crate::BuildOptions;
 use crate::PlatformTag;
 use crate::PythonInterpreter;
 use crate::Target;
+use crate::auditwheel::AuditWheelMode;
+use crate::build_options::CargoOptions;
+use crate::compression::CompressionOptions;
+use crate::target::detect_arch_from_python;
 use anyhow::ensure;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use cargo_options::heading;
 use fs_err as fs;
 use regex::Regex;
@@ -65,11 +65,12 @@ impl InstallBackend {
             InstallBackend::Pip { .. } => Regex::new(r"pip ([\w\.]+).*"),
             InstallBackend::Uv { .. } => Regex::new(r"uv ([\w\.]+).*"),
         };
-        if let Some(captures) = re.expect("regex should be valid").captures(stdout) {
-            Ok(semver::Version::parse(&captures[1])
-                .with_context(|| format!("failed to parse semver from {stdout:?}"))?)
-        } else {
-            bail!("failed to parse version from {:?}", stdout);
+        match re.expect("regex should be valid").captures(stdout) {
+            Some(captures) => Ok(semver::Version::parse(&captures[1])
+                .with_context(|| format!("failed to parse semver from {stdout:?}"))?),
+            _ => {
+                bail!("failed to parse version from {:?}", stdout);
+            }
         }
     }
 
@@ -444,8 +445,10 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         .as_ref()
         .is_some_and(|p| !p.warn_invalid_version_info())
     {
-        bail!("Cannot build without valid version information. \
-               You need to specify either `project.version` or `project.dynamic = [\"version\"]` in pyproject.toml.");
+        bail!(
+            "Cannot build without valid version information. \
+               You need to specify either `project.version` or `project.dynamic = [\"version\"]` in pyproject.toml."
+        );
     }
 
     let interpreter =
@@ -531,7 +534,9 @@ Files:
   my_project-0.1.0+abc123de.dist-info/entry_points.txt
   my_project.pth
 ";
-        let expected_path = PathBuf::from("/foo bar/venv/lib/pythonABC/site-packages/my_project-0.1.0+abc123de.dist-info/direct_url.json");
+        let expected_path = PathBuf::from(
+            "/foo bar/venv/lib/pythonABC/site-packages/my_project-0.1.0+abc123de.dist-info/direct_url.json",
+        );
         assert_eq!(
             parse_direct_url_path(example_with_direct_url).unwrap(),
             Some(expected_path)
@@ -575,7 +580,9 @@ Files:\r
   my_project.pth\r
 ";
 
-        let expected_path = PathBuf::from("C:\\foo bar\\venv\\Lib\\site-packages\\my_project-0.1.0+abc123de.dist-info\\direct_url.json");
+        let expected_path = PathBuf::from(
+            "C:\\foo bar\\venv\\Lib\\site-packages\\my_project-0.1.0+abc123de.dist-info\\direct_url.json",
+        );
         assert_eq!(
             parse_direct_url_path(example_with_direct_url_windows).unwrap(),
             Some(expected_path)

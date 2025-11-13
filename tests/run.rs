@@ -1,8 +1,8 @@
 //! To speed up the tests, they are tests all collected in a single module
 
 use common::{
-    develop, errors, handle_result, integration, other, test_python_implementation,
-    TestInstallBackend,
+    TestInstallBackend, develop, errors, handle_result, integration, other,
+    test_python_implementation,
 };
 use expect_test::expect;
 use maturin::pyproject_toml::SdistGenerator;
@@ -526,16 +526,18 @@ fn integration_wasm_hello_world() {
         format!("integration-wasm-hello-world-py3-wasm32-wasip1-{python_implementation}");
 
     // Make sure we're actually running wasm
-    assert!(Path::new("test-crates")
-        .join("venvs")
-        .join(venv_name)
-        .join(if cfg!(target_os = "windows") {
-            "Scripts"
-        } else {
-            "bin"
-        })
-        .join("hello-world.wasm")
-        .is_file())
+    assert!(
+        Path::new("test-crates")
+            .join("venvs")
+            .join(venv_name)
+            .join(if cfg!(target_os = "windows") {
+                "Scripts"
+            } else {
+                "bin"
+            })
+            .join("hello-world.wasm")
+            .is_file()
+    )
 }
 
 #[test]
@@ -970,7 +972,7 @@ fn abi3_python_interpreter_args() {
 #[test]
 #[serial(source_date_epoch_env)]
 fn pyo3_source_date_epoch() {
-    env::set_var("SOURCE_DATE_EPOCH", "0");
+    unsafe { env::set_var("SOURCE_DATE_EPOCH", "0") };
     handle_result(other::check_wheel_mtimes(
         "test-crates/pyo3-mixed-include-exclude",
         vec![datetime!(1980-01-01 0:00 UTC)],
@@ -981,7 +983,7 @@ fn pyo3_source_date_epoch() {
 #[test]
 #[serial(source_date_epoch_env)]
 fn sdist_no_source_date_epoch() {
-    env::remove_var("SOURCE_DATE_EPOCH");
+    unsafe { env::remove_var("SOURCE_DATE_EPOCH") };
     handle_result(other::check_sdist_mtimes(
         "test-crates/pyo3-mixed-include-exclude",
         1153704088,
@@ -992,7 +994,7 @@ fn sdist_no_source_date_epoch() {
 #[test]
 #[serial(source_date_epoch_env)]
 fn sdist_source_date_epoch() {
-    env::set_var("SOURCE_DATE_EPOCH", "1");
+    unsafe { env::set_var("SOURCE_DATE_EPOCH", "1") };
     handle_result(other::check_sdist_mtimes(
         "test-crates/pyo3-mixed-include-exclude",
         1,

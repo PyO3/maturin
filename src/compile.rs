@@ -454,7 +454,6 @@ fn cargo_build_command(
         }
     }
 
-
     // Set default macOS deployment target version for non-editable builds
     if !context.editable && target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
         use crate::build_context::rustc_macosx_target_version;

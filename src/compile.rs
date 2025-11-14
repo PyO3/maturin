@@ -454,9 +454,6 @@ fn cargo_build_command(
         }
     }
 
-    if let Some(lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR") {
-        build_command.env("PYO3_CROSS_LIB_DIR", lib_dir);
-    }
 
     // Set default macOS deployment target version for non-editable builds
     if !context.editable && target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {

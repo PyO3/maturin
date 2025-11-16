@@ -102,35 +102,36 @@ pub fn write_python_part(
         python_packages.push(package_path);
     }
 
-    for package in python_packages {
-        for absolute in WalkBuilder::new(&project_layout.project_root)
-            .hidden(false)
-            .parents(false)
-            .git_global(false)
-            .git_exclude(false)
-            .build()
+    for absolute in WalkBuilder::new(&project_layout.project_root)
+        .hidden(false)
+        .parents(false)
+        .git_global(false)
+        .git_exclude(false)
+        .build()
+    {
+        let absolute = absolute?.into_path();
+        if !python_packages
+            .iter()
+            .any(|package| absolute.starts_with(package))
         {
-            let absolute = absolute?.into_path();
-            if !absolute.starts_with(package.as_path()) {
-                continue;
-            }
-            let relative = absolute.strip_prefix(python_dir).unwrap();
-            if !absolute.is_dir() {
-                // Ignore native libraries from develop, if any
-                if let Some(extension) = relative.extension() {
-                    if extension.to_string_lossy() == "so" {
-                        debug!("Ignoring native library {}", relative.display());
-                        continue;
-                    }
+            continue;
+        }
+        let relative = absolute.strip_prefix(python_dir).unwrap();
+        if !absolute.is_dir() {
+            // Ignore native libraries from develop, if any
+            if let Some(extension) = relative.extension() {
+                if extension.to_string_lossy() == "so" {
+                    debug!("Ignoring native library {}", relative.display());
+                    continue;
                 }
-                #[cfg(unix)]
-                let mode = absolute.metadata()?.permissions().mode();
-                #[cfg(not(unix))]
-                let mode = 0o644;
-                writer
-                    .add_file_with_permissions(relative, &absolute, mode)
-                    .context(format!("File to add file from {}", absolute.display()))?;
             }
+            #[cfg(unix)]
+            let mode = absolute.metadata()?.permissions().mode();
+            #[cfg(not(unix))]
+            let mode = 0o644;
+            writer
+                .add_file_with_permissions(relative, &absolute, mode)
+                .context(format!("File to add file from {}", absolute.display()))?;
         }
     }
 

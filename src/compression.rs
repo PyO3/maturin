@@ -85,4 +85,26 @@ impl CompressionOptions {
             compression_level: Some(method.default_level()),
         }
     }
+
+    pub(crate) fn get_file_options(&self) -> zip::write::FileOptions<'_, ()> {
+        let method = if cfg!(feature = "faster-tests") {
+            // Unlike users which can use the develop subcommand, the tests have to go through
+            // packing a zip which pip than has to unpack. This makes this 2-3 times faster
+            CompressionMethod::Stored
+        } else {
+            self.compression_method
+        };
+
+        let mut options =
+            zip::write::SimpleFileOptions::default().compression_method(method.into());
+        // `zip` also has default compression levels, which should match our own, but we pass them
+        // explicitly to ensure consistency. The exception is the `Stored` method, which must have
+        // a `compression_level` of `None`.
+        options = options.compression_level(if method == CompressionMethod::Stored {
+            None
+        } else {
+            Some(self.compression_level.unwrap_or(method.default_level()))
+        });
+        options
+    }
 }

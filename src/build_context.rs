@@ -1,13 +1,13 @@
 use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
+use crate::binding_generator::{
+    write_bin, write_bindings_module, write_cffi_module, write_uniffi_module, write_wasm_launcher,
+};
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
 use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
-use crate::module_writer::{
-    WheelWriter, add_data, write_bin, write_bindings_module, write_cffi_module, write_python_part,
-    write_uniffi_module, write_wasm_launcher,
-};
+use crate::module_writer::{WheelWriter, add_data, write_python_part};
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;

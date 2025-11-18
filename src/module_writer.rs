@@ -388,6 +388,7 @@ impl ModuleWriter for SDistWriter {
         }
 
         let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Regular);
         header.set_size(bytes.len() as u64);
         header.set_mode(permissions);
         header.set_mtime(self.mtime);

@@ -47,6 +47,7 @@ pub use auditwheel::PlatformTag;
 pub use target::Target;
 
 mod auditwheel;
+mod binding_generator;
 mod bridge;
 mod build_context;
 mod build_options;

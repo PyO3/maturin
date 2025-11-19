@@ -54,7 +54,7 @@ impl FileTracker {
                     Ok(false)
                 } else {
                     bail!(
-                        "File {} was already added from {}, can't added it from {}",
+                        "File {} was already added from {}, can't add it from {}",
                         target.display(),
                         previous_source.display(),
                         source.display()

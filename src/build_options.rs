@@ -281,13 +281,6 @@ impl BuildOptions {
 
                                 let sysconfig_path =
                                     find_sysconfigdata(cross_lib_dir.as_ref(), target)?;
-                                unsafe {
-                                    env::set_var(
-                                        "MATURIN_PYTHON_SYSCONFIGDATA_DIR",
-                                        sysconfig_path.parent().unwrap(),
-                                    )
-                                };
-
                                 let sysconfig_data =
                                     parse_sysconfigdata(host_python, sysconfig_path)?;
                                 let major = sysconfig_data

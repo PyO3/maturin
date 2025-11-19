@@ -11,7 +11,6 @@ See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/referenc
 
 * `VIRTUAL_ENV`: Path to a Python virtual environment
 * `CONDA_PREFIX`: Path to a conda environment
-* `MATURIN_PYTHON_SYSCONFIGDATA_DIR`: Path to a directory containing a `sysconfigdata*.py` file
 * `_PYTHON_SYSCONFIGDATA_NAME`: Name of a `sysconfigdata*.py` file
 * `MATURIN_PYPI_TOKEN`: PyPI token for uploading wheels
 * `MATURIN_PASSWORD`: PyPI password for uploading wheels

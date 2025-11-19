@@ -43,7 +43,7 @@ anyhow = "1.0.80"
 base64 = "0.22.0"
 glob = "0.3.0"
 cargo-config2 = "0.1.24"
-cargo_metadata = "0.19.0"
+cargo_metadata = "0.20.0"
 cargo-options = "0.7.2"
 cbindgen = { version = "0.29.0", default-features = false }
 flate2 = "1.0.18"
@@ -101,7 +101,7 @@ clap_complete_command = { version = "0.6.1", optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.20.0", default-features = false, optional = true }
-cargo-xwin = { version = "0.18.6", default-features = false, optional = true }
+cargo-xwin = { version = "0.19.2", default-features = false, optional = true }
 xz2 = { version = "0.1", optional = true }
 
 # log
@@ -109,14 +109,14 @@ tracing = "0.1.36"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 # project scaffolding, maturin new/init/generate-ci
-dialoguer = { version = "0.11.0", default-features = false, optional = true }
+dialoguer = { version = "0.12.0", default-features = false, optional = true }
 console = { version = "0.16.0", optional = true }
 minijinja = { version = "2.5.0", optional = true }
 
 # upload
 bytesize = { version = "2.2.0", optional = true }
 configparser = { version = "3.0.3", optional = true }
-dirs = { version = "5.0.0", optional = true }
+dirs = { version = "6.0.0", optional = true }
 multipart = { version = "0.18.0", features = [
     "client",
 ], default-features = false, optional = true }
@@ -152,7 +152,7 @@ rustversion = "1.0.9"
 serial_test = { version ="3.2.0", default-features = false }
 time = { version = "0.3.34", features = ["macros"] }
 trycmd = "0.15.0"
-which = "7.0.0"
+which = "8.0.0"
 
 [features]
 default = ["full", "rustls"]

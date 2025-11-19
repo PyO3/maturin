@@ -2,7 +2,10 @@
 
 ## Unreleased
 
+## [1.10.2]
+
 * Fix tagging for iOS x86_64 simulator wheels.
+* Set entry type when adding to the tar file.
 
 ## [1.10.1]
 
@@ -1130,7 +1133,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.10.2...HEAD
+[1.10.2]: https://github.com/pyo3/maturin/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/pyo3/maturin/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/pyo3/maturin/compare/v1.9.6...v1.10.0
 [1.9.6]: https://github.com/pyo3/maturin/compare/v1.9.5...v1.9.6

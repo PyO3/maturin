@@ -536,7 +536,7 @@ impl Metadata24 {
             license: package.license.clone(),
             license_files,
             project_url,
-            ..Metadata24::new(name, version)
+            ..Metadata24::new(name.to_string(), version)
         };
         Ok(metadata)
     }

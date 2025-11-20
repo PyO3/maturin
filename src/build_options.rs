@@ -946,16 +946,16 @@ fn filter_cargo_targets(
     config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
 ) -> Result<Vec<CompileTarget>> {
     let root_pkg = cargo_metadata.root_package().unwrap();
-    let resolved_features = cargo_metadata
+    let resolved_features: Vec<String> = cargo_metadata
         .resolve
         .as_ref()
-        .and_then(|resolve| resolve.nodes.iter().find(|node| node.id == root_pkg.id))
-        .map(|node| node.features.clone())
+        .and_then(|resolve| resolve.nodes.iter().find(|&node| node.id == root_pkg.id))
+        .map(|node| node.features.iter().map(|f| f.to_string()).collect())
         .unwrap_or_default();
     let mut targets: Vec<_> = root_pkg
         .targets
         .iter()
-        .filter(|target| match bridge {
+        .filter(|&target| match bridge {
             BridgeModel::Bin(_) => {
                 let is_bin = target.is_bin();
                 if target.required_features.is_empty() {
@@ -1028,15 +1028,19 @@ fn filter_cargo_targets(
 fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<Abi3Version>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
         let lib = lib.as_str();
-        if let Some(pyo3_crate) = deps.get(lib) {
+        if let Some(&pyo3_crate) = deps.get(lib) {
             // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
             // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-            let abi3_selected = pyo3_crate.features.iter().any(|x| x == "abi3");
+            let abi3_selected = pyo3_crate
+                .features
+                .iter()
+                .map(AsRef::as_ref)
+                .any(|x| x == "abi3");
 
             let min_abi3_version = pyo3_crate
                 .features
                 .iter()
-                .filter(|x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
+                .filter(|&x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
                 .map(|x| {
                     Ok((
                         (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
@@ -1072,10 +1076,11 @@ fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
             .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
             .collect::<Vec<_>>();
         match pyo3_packages.as_slice() {
-            [pyo3_crate] => {
+            &[pyo3_crate] => {
                 let generate_import_lib = pyo3_crate
                     .features
                     .iter()
+                    .map(AsRef::as_ref)
                     .any(|x| x == "generate-import-lib" || x == "generate-abi3-import-lib");
                 return Ok(generate_import_lib);
             }
@@ -1176,9 +1181,9 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         .packages
         .iter()
         .filter_map(|pkg| {
-            let name = &pkg.name;
+            let name = pkg.name.as_ref();
             if name == "pyo3" || name == "pyo3-ffi" || name == "cpython" || name == "uniffi" {
-                Some((name.as_ref(), pkg))
+                Some((name, pkg))
             } else {
                 None
             }
@@ -1251,7 +1256,12 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         if !bridge.is_bin() && bridge.is_pyo3_crate(lib) {
             let lib_name = lib.as_str();
             let pyo3_node = deps[lib_name];
-            if !pyo3_node.features.contains(&"extension-module".to_string()) {
+            if !pyo3_node
+                .features
+                .iter()
+                .map(AsRef::as_ref)
+                .any(|f| f == "extension-module")
+            {
                 let version = &cargo_metadata[&pyo3_node.id].version;
                 if (version.major, version.minor) < (0, 26) {
                     // pyo3 0.26+ will use the `PYO3_BUILD_EXTENSION_MODULE` env var instead

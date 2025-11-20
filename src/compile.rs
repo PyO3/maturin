@@ -532,7 +532,7 @@ fn compile_target(
                 };
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
-                if crate_name == &context.crate_name {
+                if crate_name.as_ref() == context.crate_name {
                     let tuples = artifact
                         .target
                         .crate_types
@@ -677,9 +677,9 @@ fn pyo3_version(cargo_metadata: &cargo_metadata::Metadata) -> Option<(u64, u64, 
         .packages
         .iter()
         .filter_map(|pkg| {
-            let name = &pkg.name;
+            let name = pkg.name.as_ref();
             if name == "pyo3" || name == "pyo3-ffi" {
-                Some((name.as_ref(), pkg))
+                Some((name, pkg))
             } else {
                 None
             }

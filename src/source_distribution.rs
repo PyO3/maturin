@@ -343,7 +343,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
             let dependency = top
                 .dependencies
                 .iter()
-                .find(|package| {
+                .find(|&package| {
                     // Package ids are opaque and there seems to be no way to query their name.
                     let dep_name = &cargo_metadata
                         .packages
@@ -351,7 +351,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                         .find(|package| &package.id == dep_id)
                         .unwrap()
                         .name;
-                    &package.name == dep_name
+                    package.name == dep_name.as_ref()
                 })
                 .unwrap();
             if let Some(path) = &dependency.path {

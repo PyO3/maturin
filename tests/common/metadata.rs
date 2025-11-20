@@ -11,19 +11,20 @@ struct MockWriter {
 }
 
 impl ModuleWriter for MockWriter {
-    fn add_bytes_with_permissions(
+    fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         _source: Option<&Path>,
-        bytes: &[u8],
-        _permissions: u32,
+        mut data: impl std::io::Read,
+        _executable: bool,
     ) -> Result<()> {
-        self.files
-            .push(target.as_ref().to_string_lossy().to_string());
-        self.contents.insert(
-            target.as_ref().to_string_lossy().into(),
-            std::str::from_utf8(bytes).unwrap().to_string(),
-        );
+        let target = target.as_ref().to_string_lossy().to_string();
+        let mut buffer = String::new();
+        data.read_to_string(&mut buffer)?;
+
+        self.files.push(target.clone());
+        self.contents.insert(target, buffer);
+
         Ok(())
     }
 }

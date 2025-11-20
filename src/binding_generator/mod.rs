@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use crate::Metadata24;
 use crate::ModuleWriter;
+use crate::module_writer::ModuleWriterExt;
 
 mod cffi_binding;
 mod pyo3_binding;
@@ -31,6 +32,6 @@ pub fn write_bin(
     .join("scripts");
 
     // We can't use add_file since we need to mark the file as executable
-    writer.add_file_with_permissions(data_dir.join(bin_name), artifact, 0o755)?;
+    writer.add_file(data_dir.join(bin_name), artifact, true)?;
     Ok(())
 }

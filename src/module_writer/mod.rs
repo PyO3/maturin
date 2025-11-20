@@ -1,5 +1,6 @@
 use std::fmt::Write as _;
-use std::io::Read as _;
+use std::io;
+use std::io::Read;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
@@ -30,58 +31,48 @@ pub use wheel_writer::WheelWriter;
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriter {
-    /// Adds a file with bytes as content in target relative to the module base path.
+    /// Adds a file with data as content in target relative to the module base path while setting
+    /// the appropriate unix permissions
     ///
     /// For generated files, `source` is `None`.
     fn add_bytes(
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
-        bytes: &[u8],
-    ) -> Result<()> {
-        debug!("Adding {}", target.as_ref().display());
-        // 0o644 is the default from the zip crate
-        self.add_bytes_with_permissions(target, source, bytes, 0o644)
-    }
-
-    /// Adds a file with bytes as content in target relative to the module base path while setting
-    /// the given unix permissions
-    ///
-    /// For generated files, `source` is `None`.
-    fn add_bytes_with_permissions(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: Option<&Path>,
-        bytes: &[u8],
-        permissions: u32,
+        data: impl Read,
+        executable: bool,
     ) -> Result<()>;
+}
 
-    /// Copies the source file to the target path relative to the module base path
-    fn add_file(&mut self, target: impl AsRef<Path>, source: impl AsRef<Path>) -> Result<()> {
-        self.add_file_with_permissions(target, source, 0o644)
-    }
-
+/// Extension trait with convenience methods for interacting with a [ModuleWriter]
+pub trait ModuleWriterExt: ModuleWriter {
     /// Copies the source file the target path relative to the module base path while setting
     /// the given unix permissions
-    fn add_file_with_permissions(
+    fn add_file(
         &mut self,
         target: impl AsRef<Path>,
         source: impl AsRef<Path>,
-        permissions: u32,
+        executable: bool,
     ) -> Result<()> {
         let target = target.as_ref();
         let source = source.as_ref();
         debug!("Adding {} from {}", target.display(), source.display());
 
-        let read_failed_context = format!("Failed to read {}", source.display());
-        let mut file = File::open(source).context(read_failed_context.clone())?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).context(read_failed_context)?;
-        self.add_bytes_with_permissions(target, Some(source), &buffer, permissions)
-            .context(format!("Failed to write to {}", target.display()))?;
+        let file =
+            File::open(source).with_context(|| format!("Failed to open {}", source.display()))?;
+        self.add_bytes(target, Some(source), file, executable)
+            .with_context(|| format!("Failed to write to {}", target.display()))?;
         Ok(())
     }
+
+    /// Add an empty file to the target path
+    fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
+        self.add_bytes(target, None, io::empty(), false)
+    }
 }
+
+/// This blanket impl makes it impossible to overwrite the methods in [ModuleWriterExt]
+impl<T: ModuleWriter> ModuleWriterExt for T {}
 
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(
@@ -130,7 +121,7 @@ pub fn write_python_part(
             #[cfg(not(unix))]
             let mode = 0o644;
             writer
-                .add_file_with_permissions(relative, &absolute, mode)
+                .add_file(relative, &absolute, permission_is_executable(mode))
                 .context(format!("File to add file from {}", absolute.display()))?;
         }
     }
@@ -155,7 +146,7 @@ pub fn write_python_part(
                         let mode = source.metadata()?.permissions().mode();
                         #[cfg(not(unix))]
                         let mode = 0o644;
-                        writer.add_file_with_permissions(target, source, mode)?;
+                        writer.add_file(target, source, permission_is_executable(mode))?;
                     }
                 }
             }
@@ -210,13 +201,13 @@ pub fn add_data(
                         // Copy the actual file contents, not the link, so that you can create a
                         // data directory by joining different data sources
                         let source = fs::read_link(file.path())?;
-                        writer.add_file_with_permissions(
+                        writer.add_file(
                             relative,
                             source.parent().unwrap(),
-                            mode,
+                            permission_is_executable(mode),
                         )?;
                     } else if file.path().is_file() {
-                        writer.add_file_with_permissions(relative, file.path(), mode)?;
+                        writer.add_file(relative, file.path(), permission_is_executable(mode))?;
                     } else if file.path().is_dir() {
                         // Intentionally ignored
                     } else {
@@ -244,12 +235,14 @@ pub fn write_dist_info(
         dist_info_dir.join("METADATA"),
         None,
         metadata24.to_file_contents()?.as_bytes(),
+        false,
     )?;
 
     writer.add_bytes(
         dist_info_dir.join("WHEEL"),
         None,
         wheel_file(tags)?.as_bytes(),
+        false,
     )?;
 
     let mut entry_points = String::new();
@@ -267,13 +260,18 @@ pub fn write_dist_info(
             dist_info_dir.join("entry_points.txt"),
             None,
             entry_points.as_bytes(),
+            false,
         )?;
     }
 
     if !metadata24.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("licenses");
         for path in &metadata24.license_files {
-            writer.add_file(license_files_dir.join(path), pyproject_dir.join(path))?;
+            writer.add_file(
+                license_files_dir.join(path),
+                pyproject_dir.join(path),
+                false,
+            )?;
         }
     }
 
@@ -326,6 +324,19 @@ fn entry_points_txt(
         .fold(format!("[{entry_type}]\n"), |text, (k, v)| {
             text + k + "=" + v + "\n"
         })
+}
+
+#[inline]
+fn permission_is_executable(mode: u32) -> bool {
+    (0o100 & mode) == 0o100
+}
+
+#[inline]
+fn default_permission(executable: bool) -> u32 {
+    match executable {
+        true => 0o755,
+        false => 0o644,
+    }
 }
 
 #[cfg(test)]

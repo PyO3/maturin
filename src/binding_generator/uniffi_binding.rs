@@ -14,6 +14,7 @@ use tracing::debug;
 
 use crate::ModuleWriter;
 use crate::PyProjectToml;
+use crate::module_writer::ModuleWriterExt;
 use crate::module_writer::write_python_part;
 use crate::project_layout::ProjectLayout;
 use crate::target::Os;
@@ -241,20 +242,21 @@ pub fn write_uniffi_module(
             .join(format!("{module_name}.pyi"));
         if type_stub.exists() {
             eprintln!("📖 Found type stub file at {module_name}.pyi");
-            writer.add_file(module.join("__init__.pyi"), type_stub)?;
-            writer.add_bytes(module.join("py.typed"), None, b"")?;
+            writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
+            writer.add_empty_file(module.join("py.typed"))?;
         }
     };
 
     if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes())?;
+        writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes(), false)?;
         for binding in binding_names.iter() {
             writer.add_file(
                 module.join(binding).with_extension("py"),
                 binding_dir.join(binding).with_extension("py"),
+                false,
             )?;
         }
-        writer.add_file_with_permissions(module.join(cdylib), artifact, 0o755)?;
+        writer.add_file(module.join(cdylib), artifact, true)?;
     }
 
     Ok(())

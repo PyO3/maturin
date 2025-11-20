@@ -1,4 +1,3 @@
-use std::env;
 use std::io;
 use std::io::Read;
 use std::io::Write as _;
@@ -7,15 +6,13 @@ use std::path::PathBuf;
 
 use anyhow::Context as _;
 use anyhow::Result;
-use anyhow::anyhow;
 use fs_err::File;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
 use tracing::debug;
-use zip::DateTime;
 use zip::ZipWriter;
+use zip::write::SimpleFileOptions;
 
-use crate::CompressionOptions;
 use crate::Metadata24;
 use crate::project_layout::ProjectLayout;
 
@@ -33,7 +30,7 @@ pub struct WheelWriter {
     wheel_path: PathBuf,
     file_tracker: FileTracker,
     excludes: Override,
-    compression: CompressionOptions,
+    file_options: SimpleFileOptions,
 }
 
 impl ModuleWriter for WheelWriter {
@@ -57,15 +54,9 @@ impl ModuleWriter for WheelWriter {
         // The zip standard mandates using unix style paths
         let target = target.to_str().unwrap().replace('\\', "/");
 
-        let mut options = self
-            .compression
-            .get_file_options()
+        let options = self
+            .file_options
             .unix_permissions(default_permission(executable));
-
-        if let Ok(mtime) = self.mtime() {
-            options = options.last_modified_time(mtime);
-        }
-
         self.zip.start_file(target.clone(), options)?;
         let mut writer = StreamSha256::new(&mut self.zip);
 
@@ -90,7 +81,7 @@ impl WheelWriter {
         metadata24: &Metadata24,
         tags: &[String],
         excludes: Override,
-        compression: CompressionOptions,
+        file_options: SimpleFileOptions,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
             "{}-{}-{}.whl",
@@ -108,7 +99,7 @@ impl WheelWriter {
             wheel_path,
             file_tracker: FileTracker::default(),
             excludes,
-            compression,
+            file_options,
         };
 
         write_dist_info(&mut builder, pyproject_dir, metadata24, tags)?;
@@ -152,29 +143,11 @@ impl WheelWriter {
         self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
-    /// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
-    /// Note that the earliest timestamp a zip file can represent is 1980-01-01
-    fn mtime(&self) -> Result<DateTime> {
-        let epoch: i64 = env::var("SOURCE_DATE_EPOCH")?.parse()?;
-        let dt = time::OffsetDateTime::from_unix_timestamp(epoch)?;
-        let min_dt = time::Date::from_calendar_date(1980, time::Month::January, 1)
-            .unwrap()
-            .midnight()
-            .assume_offset(time::UtcOffset::UTC);
-        let dt = dt.max(min_dt);
-
-        let dt = DateTime::try_from(dt).map_err(|_| anyhow!("Failed to build zip DateTime"))?;
-        Ok(dt)
-    }
-
     /// Creates the record file and finishes the zip
     pub fn finish(mut self) -> Result<PathBuf, io::Error> {
-        let mut options = self.compression.get_file_options();
-        let mtime = self.mtime().ok();
-        if let Some(mtime) = mtime {
-            options = options.last_modified_time(mtime);
-        }
-
+        let options = self
+            .file_options
+            .unix_permissions(default_permission(false));
         let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
         debug!("Adding {}", record_filename);
         self.zip.start_file(&record_filename, options)?;
@@ -212,6 +185,10 @@ mod tests {
     fn wheel_writer_no_compression() -> Result<(), Box<dyn std::error::Error>> {
         let metadata = Metadata24::new("dummy".to_string(), Version::new([1, 0]));
         let tmp_dir = TempDir::new()?;
+        let compression_options = CompressionOptions {
+            compression_method: CompressionMethod::Stored,
+            ..Default::default()
+        };
 
         let writer = WheelWriter::new(
             "no compression",
@@ -220,10 +197,7 @@ mod tests {
             &metadata,
             &[],
             Override::empty(),
-            CompressionOptions {
-                compression_method: CompressionMethod::Stored,
-                ..Default::default()
-            },
+            compression_options.get_file_options(),
         )?;
 
         writer.finish()?;

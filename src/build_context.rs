@@ -33,6 +33,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tracing::instrument;
+use zip::DateTime;
 
 /// Insert wasm launcher scripts as entrypoints and the wasmtime dependency
 fn bin_wasi_helper(
@@ -752,6 +753,10 @@ impl BuildContext {
         let platform = self.get_platform_tag(platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
 
+        let file_options = self
+            .compression
+            .get_file_options()
+            .last_modified_time(zip_mtime());
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
@@ -759,7 +764,7 @@ impl BuildContext {
             &self.metadata24,
             std::slice::from_ref(&tag),
             self.excludes(Format::Wheel)?,
-            self.compression,
+            file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -831,6 +836,10 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(self, platform_tags)?;
 
+        let file_options = self
+            .compression
+            .get_file_options()
+            .last_modified_time(zip_mtime());
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
@@ -838,7 +847,7 @@ impl BuildContext {
             &self.metadata24,
             std::slice::from_ref(&tag),
             self.excludes(Format::Wheel)?,
-            self.compression,
+            file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -955,6 +964,10 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
+        let file_options = self
+            .compression
+            .get_file_options()
+            .last_modified_time(zip_mtime());
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
@@ -962,7 +975,7 @@ impl BuildContext {
             &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
-            self.compression,
+            file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -1028,6 +1041,10 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
+        let file_options = self
+            .compression
+            .get_file_options()
+            .last_modified_time(zip_mtime());
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
@@ -1035,7 +1052,7 @@ impl BuildContext {
             &self.metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
-            self.compression,
+            file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
@@ -1128,6 +1145,10 @@ impl BuildContext {
             self.metadata24.clone()
         };
 
+        let file_options = self
+            .compression
+            .get_file_options()
+            .last_modified_time(zip_mtime());
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
@@ -1135,7 +1156,7 @@ impl BuildContext {
             &metadata24,
             &tags,
             self.excludes(Format::Wheel)?,
-            self.compression,
+            file_options,
         )?;
 
         if self.project_layout.python_module.is_some() && self.target.is_wasi() {
@@ -1394,6 +1415,21 @@ fn emcc_version() -> Result<String> {
     let mut trimmed = ver.trim();
     trimmed = trimmed.strip_suffix("-git").unwrap_or(trimmed);
     Ok(trimmed.into())
+}
+
+/// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
+/// Note that the earliest timestamp a zip file can represent is 1980-01-01
+fn zip_mtime() -> DateTime {
+    let res = env::var("SOURCE_DATE_EPOCH")
+        .context("") // Only using context() to unify the error types
+        .and_then(|epoch| {
+            let epoch: i64 = epoch.parse()?;
+            let dt = time::OffsetDateTime::from_unix_timestamp(epoch)?;
+            let dt = DateTime::try_from(dt)?;
+            Ok(dt)
+        });
+
+    res.unwrap_or_default()
 }
 
 #[cfg(test)]

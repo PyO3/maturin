@@ -52,6 +52,13 @@ impl ModuleWriter for SDistWriter {
 
         let target = target.as_ref();
         if self.exclude(target) {
+            eprintln!(
+                "⚠️ Warning: {} was excluded from the archive by the target path in the archive instead of the source path on the filesystem",
+                target.display(),
+            );
+            eprintln!(
+                "           This behavior is deprecated and will be removed in future versions of maturin"
+            );
             return Ok(());
         }
 

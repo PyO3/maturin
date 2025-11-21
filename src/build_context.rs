@@ -386,11 +386,37 @@ impl BuildContext {
         Ok(())
     }
 
+    /// Copy artifacts to target/maturin/auditwheel directory for modification
+    /// Returns the paths to the copied artifacts  
+    fn copy_artifacts_to_auditwheel(&self, artifacts: &[&BuildArtifact]) -> Result<Vec<PathBuf>> {
+        if self.editable {
+            // Return original paths for editable builds
+            return Ok(artifacts.iter().map(|a| a.path.clone()).collect());
+        }
+
+        let auditwheel_dir = self
+            .target_dir
+            .join(env!("CARGO_PKG_NAME"))
+            .join("auditwheel");
+        fs::create_dir_all(&auditwheel_dir)?;
+
+        let mut copied_paths = Vec::new();
+        for artifact in artifacts {
+            let artifact_name = artifact.path.file_name().unwrap();
+            let copied_path = auditwheel_dir.join(artifact_name);
+            fs::copy(&artifact.path, &copied_path)?;
+            copied_paths.push(copied_path);
+        }
+
+        Ok(copied_paths)
+    }
+
     fn add_external_libs(
         &self,
         writer: &mut WheelWriter,
         artifacts: &[&BuildArtifact],
         ext_libs: &[Vec<Library>],
+        artifact_paths: &[PathBuf],
     ) -> Result<()> {
         if self.editable {
             return self.add_rpath(artifacts);
@@ -470,7 +496,12 @@ impl BuildContext {
             );
         }
 
-        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+        // Modify artifacts in-place since they're already copied to auditwheel directory
+        for (artifact_path, artifact_ext_libs) in artifact_paths.iter().zip(ext_libs) {
+            if artifact_ext_libs.is_empty() {
+                continue;
+            }
+
             let artifact_deps: HashSet<_> = artifact_ext_libs.iter().map(|lib| &lib.name).collect();
             let replacements = soname_map
                 .iter()
@@ -482,8 +513,10 @@ impl BuildContext {
                     }
                 })
                 .collect::<Vec<_>>();
+
             if !replacements.is_empty() {
-                patchelf::replace_needed(&artifact.path, &replacements[..])?;
+                // Modify artifact in-place since it's already copied to auditwheel directory
+                patchelf::replace_needed(artifact_path, &replacements[..])?;
             }
         }
 
@@ -526,14 +559,16 @@ impl BuildContext {
             // For other bindings artifact .so file usually resides at ${module_name}/${module_name}.so
             _ => PathBuf::from(&self.module_name),
         };
-        for artifact in artifacts {
-            let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
+
+        // Update rpath for artifacts
+        for artifact_path in artifact_paths {
+            let mut new_rpaths = patchelf::get_rpath(artifact_path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
             let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&artifact.path, &new_rpath)?;
+            patchelf::set_rpath(artifact_path, &new_rpath)?;
         }
         Ok(())
     }
@@ -766,7 +801,12 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(
+            &mut writer,
+            &[&artifact],
+            &[ext_libs],
+            &[artifact.path.clone()],
+        )?;
 
         write_bindings_module(
             &mut writer,
@@ -849,7 +889,12 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(
+            &mut writer,
+            &[&artifact],
+            &[ext_libs],
+            &[artifact.path.clone()],
+        )?;
 
         write_bindings_module(
             &mut writer,
@@ -977,7 +1022,12 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(
+            &mut writer,
+            &[&artifact],
+            &[ext_libs],
+            &[artifact.path.clone()],
+        )?;
 
         write_cffi_module(
             &mut writer,
@@ -1054,7 +1104,12 @@ impl BuildContext {
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(
+            &mut writer,
+            &[&artifact],
+            &[ext_libs],
+            &[artifact.path.clone()],
+        )?;
 
         write_uniffi_module(
             &mut writer,
@@ -1174,14 +1229,22 @@ impl BuildContext {
         }
 
         let mut artifacts_ref = Vec::with_capacity(artifacts.len());
-        for (artifact, bin_name) in &artifacts_and_files {
+        for (artifact, _bin_name) in &artifacts_and_files {
             artifacts_ref.push(*artifact);
-            write_bin(&mut writer, &artifact.path, &self.metadata24, bin_name)?;
+        }
+
+        // Copy artifacts to auditwheel directory if needed
+        let artifact_paths = self.copy_artifacts_to_auditwheel(&artifacts_ref)?;
+
+        for ((_artifact, bin_name), artifact_path) in
+            artifacts_and_files.iter().zip(artifact_paths.iter())
+        {
+            write_bin(&mut writer, artifact_path, &self.metadata24, bin_name)?;
             if self.target.is_wasi() {
                 write_wasm_launcher(&mut writer, &self.metadata24, bin_name)?;
             }
         }
-        self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;
+        self.add_external_libs(&mut writer, &artifacts_ref, ext_libs, &artifact_paths)?;
 
         self.add_pth(&mut writer)?;
         add_data(

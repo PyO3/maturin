@@ -20,7 +20,7 @@ See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/referenc
 
 * `PYO3_CROSS_PYTHON_VERSION`: Python version to use for cross compilation
 * `PYO3_CROSS_LIB_DIR`: This variable can be set to the directory containing the target's libpython DSO and the associated `_sysconfigdata*.py` file for Unix-like targets, or the Python DLL import libraries for the Windows target.This variable can be set to the directory containing the target's libpython DSO and the associated _sysconfigdata*.py file for Unix-like targets, or the Python DLL import libraries for the Windows target.
-* `PYO3_CONFIG_FILE`: Path to a [pyo3 config file](https://pyo3.rs/latest/building_and_distribution.html#advanced-config-files)
+* `PYO3_CONFIG_FILE`: Path to a [pyo3 config file](https://pyo3.rs/latest/building-and-distribution.html#advanced-config-files)
 
 ## Networking environment variables
 

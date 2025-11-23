@@ -27,8 +27,6 @@ use super::write_dist_info;
 pub struct WheelWriter {
     zip: ZipWriter<File>,
     record: BTreeMap<PathBuf, (String, usize)>,
-    record_file: PathBuf,
-    wheel_path: PathBuf,
     file_tracker: FileTracker,
     excludes: Override,
     file_options: SimpleFileOptions,
@@ -88,13 +86,11 @@ impl WheelWriter {
             tag
         ));
 
-        let file = File::create(&wheel_path)?;
+        let file = File::create(wheel_path)?;
 
         let mut builder = WheelWriter {
             zip: ZipWriter::new(file),
             record: BTreeMap::new(),
-            record_file: metadata24.get_dist_info_dir().join("RECORD"),
-            wheel_path,
             file_tracker: FileTracker::default(),
             excludes,
             file_options,
@@ -142,22 +138,23 @@ impl WheelWriter {
     }
 
     /// Creates the record file and finishes the zip
-    pub fn finish(mut self) -> Result<PathBuf, io::Error> {
+    pub fn finish(mut self, metadata24: &Metadata24) -> Result<PathBuf, io::Error> {
         let options = self
             .file_options
             .unix_permissions(default_permission(false));
-        debug!("Adding {}", &self.record_file.display());
-        self.zip.start_file_from_path(&self.record_file, options)?;
+        let record_filename = metadata24.get_dist_info_dir().join("RECORD");
+        debug!("Adding {}", record_filename.display());
+        self.zip.start_file_from_path(&record_filename, options)?;
 
         for (filename, (hash, len)) in self.record {
             let filename = filename.to_string_lossy();
             writeln!(self.zip, "{filename},sha256={hash},{len}")?;
         }
         // Write the record for the RECORD file itself
-        writeln!(self.zip, "{},,", self.record_file.display())?;
+        writeln!(self.zip, "{},,", record_filename.display())?;
 
-        self.zip.finish()?;
-        Ok(self.wheel_path)
+        let file = self.zip.finish()?;
+        Ok(file.into_path())
     }
 }
 
@@ -192,7 +189,7 @@ mod tests {
             compression_options.get_file_options(),
         )?;
 
-        writer.finish()?;
+        writer.finish(&metadata)?;
         tmp_dir.close()?;
 
         Ok(())

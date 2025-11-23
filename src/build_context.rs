@@ -786,7 +786,7 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish()?;
+        let wheel_path = writer.finish(&self.metadata24)?;
         Ok((wheel_path, format!("cp{major}{min_minor}")))
     }
 
@@ -869,7 +869,7 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish()?;
+        let wheel_path = writer.finish(&self.metadata24)?;
         Ok((
             wheel_path,
             format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
@@ -998,7 +998,7 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish()?;
+        let wheel_path = writer.finish(&self.metadata24)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
@@ -1074,7 +1074,7 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish()?;
+        let wheel_path = writer.finish(&self.metadata24)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
@@ -1189,7 +1189,7 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish()?;
+        let wheel_path = writer.finish(&self.metadata24)?;
         Ok((wheel_path, "py3".to_string()))
     }
 

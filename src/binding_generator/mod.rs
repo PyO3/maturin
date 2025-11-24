@@ -24,7 +24,7 @@ mod pyo3_binding;
 mod uniffi_binding;
 mod wasm_binding;
 
-pub use cffi_binding::write_cffi_module;
+pub use cffi_binding::CffiBindingGenerator;
 pub use pyo3_binding::Pyo3BindingGenerator;
 pub use uniffi_binding::write_uniffi_module;
 pub use wasm_binding::write_wasm_launcher;
@@ -143,7 +143,11 @@ pub fn generate_binding(
                     let target = base_path.join(target);
                     fs::create_dir_all(target.parent().unwrap())?;
                     debug!("Generating file {}", target.display());
-                    let mut file = File::options().create(true).truncate(true).open(&target)?;
+                    let mut file = File::options()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(&target)?;
                     file.write_all(data.as_slice())?;
                 }
             }

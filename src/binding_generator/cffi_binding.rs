@@ -10,101 +10,73 @@ use std::str;
 
 use anyhow::Context as _;
 use anyhow::Result;
+use anyhow::anyhow;
 use anyhow::bail;
 use fs_err as fs;
-use fs_err::File;
 use tempfile::TempDir;
 use tempfile::tempdir;
 use tracing::debug;
 
-use crate::ModuleWriter;
-use crate::PyProjectToml;
-use crate::Target;
-use crate::module_writer::ModuleWriterExt;
-use crate::module_writer::write_python_part;
-use crate::project_layout::ProjectLayout;
+use crate::BuildArtifact;
+use crate::BuildContext;
+use crate::PythonInterpreter;
 use crate::target::Os;
 
-/// Creates the cffi module with the shared library, the cffi declarations and the cffi loader
-#[allow(clippy::too_many_arguments)]
-pub fn write_cffi_module(
-    writer: &mut impl ModuleWriter,
-    target: &Target,
-    project_layout: &ProjectLayout,
-    crate_dir: &Path,
-    target_dir: &Path,
-    module_name: &str,
-    artifact: &Path,
-    python: &Path,
-    editable: bool,
-    pyproject_toml: Option<&PyProjectToml>,
-) -> Result<()> {
-    let cffi_declarations = generate_cffi_declarations(crate_dir, target_dir, python)?;
+use super::BindingGenerator;
+use super::GeneratorOutput;
 
-    if !editable {
-        write_python_part(writer, project_layout, pyproject_toml)
-            .context("Failed to add the python module to the package")?;
+/// A generator for producing Cffi bindings.
+#[derive(Default)]
+pub struct CffiBindingGenerator {}
+
+impl BindingGenerator for CffiBindingGenerator {
+    fn generate_bindings(
+        &self,
+        context: &BuildContext,
+        interpreter: Option<&PythonInterpreter>,
+        _artifact: &BuildArtifact,
+        module: &Path,
+        _temp_dir: &TempDir,
+    ) -> Result<GeneratorOutput> {
+        let cffi_module_file_name = {
+            let extension_name = &context.project_layout.extension_name;
+            // https://cffi.readthedocs.io/en/stable/embedding.html#issues-about-using-the-so
+            match context.target.target_os() {
+                Os::Macos => format!("lib{extension_name}.dylib"),
+                Os::Windows => format!("{extension_name}.dll"),
+                _ => format!("lib{extension_name}.so"),
+            }
+        };
+        let base_path = if context.project_layout.python_module.is_some() {
+            module.join(&context.project_layout.extension_name)
+        } else {
+            module.to_path_buf()
+        };
+        let artifact_target = base_path.join(&cffi_module_file_name);
+
+        let mut additional_files = HashMap::new();
+        additional_files.insert(
+            base_path.join("__init__.py"),
+            cffi_init_file(&cffi_module_file_name).into(),
+        );
+        additional_files.insert(
+            base_path.join("ffi.py"),
+            generate_cffi_declarations(
+                context.manifest_path.parent().unwrap(),
+                &context.target_dir,
+                &interpreter
+                    .ok_or_else(|| anyhow!("A python interpreter is required for cffi builds but one was not provided"))?
+                    .executable,
+            )?
+            .into(),
+        );
+
+        Ok(GeneratorOutput {
+            artifact_target,
+            artifact_source_override: None,
+            additional_files: Some(additional_files),
+        })
     }
-
-    let cffi_module_file_name = {
-        let extension_name = &project_layout.extension_name;
-        // https://cffi.readthedocs.io/en/stable/embedding.html#issues-about-using-the-so
-        match target.target_os() {
-            Os::Macos => format!("lib{extension_name}.dylib"),
-            Os::Windows => format!("{extension_name}.dll"),
-            _ => format!("lib{extension_name}.so"),
-        }
-    };
-    let module;
-    if let Some(python_module) = &project_layout.python_module {
-        if editable {
-            let base_path = python_module.join(&project_layout.extension_name);
-            fs::create_dir_all(&base_path)?;
-            let target = base_path.join(&cffi_module_file_name);
-            fs::copy(artifact, &target).context(format!(
-                "Failed to copy {} to {}",
-                artifact.display(),
-                target.display()
-            ))?;
-            File::create(base_path.join("__init__.py"))?
-                .write_all(cffi_init_file(&cffi_module_file_name).as_bytes())?;
-            File::create(base_path.join("ffi.py"))?.write_all(cffi_declarations.as_bytes())?;
-        }
-
-        let relative = project_layout
-            .rust_module
-            .strip_prefix(python_module.parent().unwrap())
-            .unwrap();
-        module = relative.join(&project_layout.extension_name);
-    } else {
-        module = PathBuf::from(module_name);
-        let type_stub = project_layout
-            .rust_module
-            .join(format!("{module_name}.pyi"));
-        if type_stub.exists() {
-            eprintln!("📖 Found type stub file at {module_name}.pyi");
-            writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
-            writer.add_empty_file(module.join("py.typed"))?;
-        }
-    };
-
-    if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(
-            module.join("__init__.py"),
-            None,
-            cffi_init_file(&cffi_module_file_name).as_bytes(),
-            false,
-        )?;
-        writer.add_bytes(
-            module.join("ffi.py"),
-            None,
-            cffi_declarations.as_bytes(),
-            false,
-        )?;
-        writer.add_file(module.join(&cffi_module_file_name), artifact, true)?;
-    }
-
-    Ok(())
 }
 
 /// Glue code that exposes `lib`.

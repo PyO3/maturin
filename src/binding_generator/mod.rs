@@ -1,11 +1,22 @@
+use std::collections::HashMap;
+use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 
+use anyhow::Context as _;
 use anyhow::Result;
+use fs_err as fs;
+use fs_err::File;
+use tempfile::TempDir;
+use tempfile::tempdir;
 
+use crate::BuildArtifact;
+use crate::BuildContext;
 use crate::Metadata24;
 use crate::ModuleWriter;
+use crate::PythonInterpreter;
 use crate::module_writer::ModuleWriterExt;
+use crate::module_writer::write_python_part;
 
 mod cffi_binding;
 mod pyo3_binding;
@@ -17,23 +28,147 @@ pub use pyo3_binding::write_bindings_module;
 pub use uniffi_binding::write_uniffi_module;
 pub use wasm_binding::write_wasm_launcher;
 
-// Every binding generator ultimately has to install the following:
-// 1. The python files (if any)
-// 2. The artifact
-// 3. Additional files
-// 4. Type stubs (if any/pure rust only)
-//
-// Additionally, the above are installed to 2 potential locations:
-// 1. The archive
-// 2. The filesystem
-//
-// For editable installs:
-// If the project is pure rust, the wheel is built as normal and installed
-// If the project has python, the artifact is installed into the project and a pth is written to the archive
-//
-// So the full matrix comes down to:
-// 1. editable, has python => install to fs, write pth to archive
-// 2. everything else => install to archive/build as normal
+pub trait BindingGenerator {
+    fn generate_bindings(
+        &self,
+        context: &BuildContext,
+        interpreter: Option<&PythonInterpreter>,
+        artifact: &BuildArtifact,
+        module: &Path,
+        temp_dir: &TempDir,
+    ) -> Result<GeneratorOutput>;
+}
+
+pub struct GeneratorOutput {
+    /// The path, relative to the archive root, where the built artifact/module
+    /// should be installed
+    artifact_target: PathBuf,
+
+    /// In some cases, the source path of the artifact is altered
+    /// (e.g. when the build output is an archive which needs to be unpacked)
+    artifact_source_override: Option<PathBuf>,
+
+    /// Additional files to be installed (e.g. __init__.py)
+    /// The provided PathBuf should be relative to the archive root
+    additional_files: Option<HashMap<PathBuf, Vec<u8>>>,
+}
+
+/// Every binding generator ultimately has to install the following:
+/// 1. The python files (if any)
+/// 2. The artifact
+/// 3. Additional files
+/// 4. Type stubs (if any/pure rust only)
+///
+/// Additionally, the above are installed to 2 potential locations:
+/// 1. The archive
+/// 2. The filesystem
+///
+/// For editable installs:
+/// If the project is pure rust, the wheel is built as normal and installed
+/// If the project has python, the artifact is installed into the project and a pth is written to the archive
+///
+/// So the full matrix comes down to:
+/// 1. editable, has python => install to fs, write pth to archive
+/// 2. everything else => install to archive/build as normal
+///
+/// Note: Writing the pth to the archive is handled by [BuildContext], not here
+pub fn generate_binding(
+    writer: &mut impl ModuleWriter,
+    generator: &impl BindingGenerator,
+    context: &BuildContext,
+    interpreter: Option<&PythonInterpreter>,
+    artifact: &BuildArtifact,
+) -> Result<()> {
+    // 1. Install the python files
+    if !context.editable {
+        write_python_part(
+            writer,
+            &context.project_layout,
+            context.pyproject_toml.as_ref(),
+        )?;
+    }
+
+    let base_path = context
+        .project_layout
+        .python_module
+        .as_ref()
+        .map(|python_module| python_module.parent().unwrap().to_path_buf());
+
+    let module = match &base_path {
+        Some(base_path) => context
+            .project_layout
+            .rust_module
+            .strip_prefix(base_path)
+            .unwrap()
+            .to_path_buf(),
+        None => PathBuf::from(&context.project_layout.extension_name),
+    };
+
+    let temp_dir = tempdir()?;
+    let GeneratorOutput {
+        artifact_target,
+        artifact_source_override,
+        additional_files,
+    } = generator.generate_bindings(context, interpreter, artifact, &module, &temp_dir)?;
+
+    match (context.editable, &base_path) {
+        (true, Some(base_path)) => {
+            let target = base_path.join(&artifact_target);
+            fs::create_dir_all(target.parent().unwrap())?;
+            // Remove existing so file to avoid triggering SIGSEV in running process
+            // See https://github.com/PyO3/maturin/issues/758
+            let _ = fs::remove_file(&target);
+            let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
+
+            // 2. Install the artifact
+            fs::copy(&source, &target).with_context(|| {
+                format!(
+                    "Failed to copy {} to {}",
+                    source.display(),
+                    target.display()
+                )
+            })?;
+
+            // 3. Install additional files
+            if let Some(additional_files) = additional_files {
+                for (target, data) in additional_files {
+                    let target = base_path.join(target);
+                    fs::create_dir_all(target.parent().unwrap())?;
+                    let mut file = File::options().create(true).truncate(true).open(&target)?;
+                    file.write_all(data.as_slice())?;
+                }
+            }
+        }
+        _ => {
+            // 2. Install the artifact
+            let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
+            writer.add_file(artifact_target, source, true)?;
+
+            // 3. Install additional files
+            if let Some(additional_files) = additional_files {
+                for (target, data) in additional_files {
+                    writer.add_bytes(target, None, data.as_slice(), false)?;
+                }
+            }
+        }
+    }
+
+    // 4. Install type stubs
+    if context.project_layout.python_module.is_none() {
+        let ext_name = &context.project_layout.extension_name;
+        let type_stub = context
+            .project_layout
+            .rust_module
+            .join(format!("{ext_name}.pyi"));
+        if type_stub.exists() {
+            eprintln!("📖 Found type stub file at {ext_name}.pyi");
+            writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
+            writer.add_empty_file(module.join("py.typed"))?;
+        }
+    }
+
+    Ok(())
+}
 
 /// Adds a data directory with a scripts directory with the binary inside it
 pub fn write_bin(

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io;
 use std::io::Read;
 use std::io::Write as _;
@@ -25,9 +26,7 @@ use super::write_dist_info;
 /// A glorified zip builder, mostly useful for writing the record file of a wheel
 pub struct WheelWriter {
     zip: ZipWriter<File>,
-    record: Vec<(String, String, usize)>,
-    record_file: PathBuf,
-    wheel_path: PathBuf,
+    record: BTreeMap<PathBuf, (String, usize)>,
     file_tracker: FileTracker,
     excludes: Override,
     file_options: SimpleFileOptions,
@@ -51,20 +50,17 @@ impl ModuleWriter for WheelWriter {
             return Ok(());
         }
 
-        // The zip standard mandates using unix style paths
-        let target = target.to_str().unwrap().replace('\\', "/");
-
         let options = self
             .file_options
             .unix_permissions(default_permission(executable));
-        self.zip.start_file(target.clone(), options)?;
+        self.zip.start_file_from_path(target, options)?;
         let mut writer = StreamSha256::new(&mut self.zip);
 
         io::copy(&mut data, &mut writer)
-            .with_context(|| format!("Failed to write to zip archive for {target}"))?;
+            .with_context(|| format!("Failed to write to zip archive for {target:?}"))?;
 
         let (hash, length) = writer.finalize()?;
-        self.record.push((target, hash, length));
+        self.record.insert(target.to_path_buf(), (hash, length));
 
         Ok(())
     }
@@ -90,13 +86,11 @@ impl WheelWriter {
             tag
         ));
 
-        let file = File::create(&wheel_path)?;
+        let file = File::create(wheel_path)?;
 
         let mut builder = WheelWriter {
             zip: ZipWriter::new(file),
-            record: Vec::new(),
-            record_file: metadata24.get_dist_info_dir().join("RECORD"),
-            wheel_path,
+            record: BTreeMap::new(),
             file_tracker: FileTracker::default(),
             excludes,
             file_options,
@@ -144,28 +138,23 @@ impl WheelWriter {
     }
 
     /// Creates the record file and finishes the zip
-    pub fn finish(mut self) -> Result<PathBuf, io::Error> {
+    pub fn finish(mut self, metadata24: &Metadata24) -> Result<PathBuf, io::Error> {
         let options = self
             .file_options
             .unix_permissions(default_permission(false));
-        let record_filename = self.record_file.to_str().unwrap().replace('\\', "/");
-        debug!("Adding {}", record_filename);
-        self.zip.start_file(&record_filename, options)?;
+        let record_filename = metadata24.get_dist_info_dir().join("RECORD");
+        debug!("Adding {}", record_filename.display());
+        self.zip.start_file_from_path(&record_filename, options)?;
 
-        // Sort records for deterministic output
-        let mut sorted_records = self.record.clone();
-        sorted_records.sort_by(|(path_a, _, _), (path_b, _, _)| path_a.cmp(path_b));
-
-        for (filename, hash, len) in sorted_records {
-            self.zip
-                .write_all(format!("{filename},sha256={hash},{len}\n").as_bytes())?;
+        for (filename, (hash, len)) in self.record {
+            let filename = filename.to_string_lossy();
+            writeln!(self.zip, "{filename},sha256={hash},{len}")?;
         }
         // Write the record for the RECORD file itself
-        self.zip
-            .write_all(format!("{record_filename},,\n").as_bytes())?;
+        writeln!(self.zip, "{},,", record_filename.display())?;
 
-        self.zip.finish()?;
-        Ok(self.wheel_path)
+        let file = self.zip.finish()?;
+        Ok(file.into_path())
     }
 }
 
@@ -200,7 +189,7 @@ mod tests {
             compression_options.get_file_options(),
         )?;
 
-        writer.finish()?;
+        writer.finish(&metadata)?;
         tmp_dir.close()?;
 
         Ok(())

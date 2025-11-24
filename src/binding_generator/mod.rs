@@ -17,6 +17,24 @@ pub use pyo3_binding::write_bindings_module;
 pub use uniffi_binding::write_uniffi_module;
 pub use wasm_binding::write_wasm_launcher;
 
+// Every binding generator ultimately has to install the following:
+// 1. The python files (if any)
+// 2. The artifact
+// 3. Additional files
+// 4. Type stubs (if any/pure rust only)
+//
+// Additionally, the above are installed to 2 potential locations:
+// 1. The archive
+// 2. The filesystem
+//
+// For editable installs:
+// If the project is pure rust, the wheel is built as normal and installed
+// If the project has python, the artifact is installed into the project and a pth is written to the archive
+//
+// So the full matrix comes down to:
+// 1. editable, has python => install to fs, write pth to archive
+// 2. everything else => install to archive/build as normal
+
 /// Adds a data directory with a scripts directory with the binary inside it
 pub fn write_bin(
     writer: &mut impl ModuleWriter,

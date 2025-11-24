@@ -14,6 +14,7 @@ use fs_err::OpenOptions;
 use fs_err::os::unix::fs::OpenOptionsExt as _;
 
 use super::ModuleWriter;
+#[cfg(target_family = "unix")]
 use super::default_permission;
 use super::util::FileTracker;
 

@@ -24,7 +24,7 @@ mod uniffi_binding;
 mod wasm_binding;
 
 pub use cffi_binding::write_cffi_module;
-pub use pyo3_binding::write_bindings_module;
+pub use pyo3_binding::Pyo3BindingGenerator;
 pub use uniffi_binding::write_uniffi_module;
 pub use wasm_binding::write_wasm_launcher;
 
@@ -125,7 +125,7 @@ pub fn generate_binding(
                 format!(
                     "Failed to copy {} to {}",
                     source.display(),
-                    target.display()
+                    target.display(),
                 )
             })?;
 

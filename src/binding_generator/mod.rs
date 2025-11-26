@@ -9,6 +9,7 @@ use fs_err as fs;
 use fs_err::File;
 use tempfile::TempDir;
 use tempfile::tempdir;
+use tracing::debug;
 
 use crate::BuildArtifact;
 use crate::BuildContext;
@@ -28,7 +29,11 @@ pub use pyo3_binding::Pyo3BindingGenerator;
 pub use uniffi_binding::write_uniffi_module;
 pub use wasm_binding::write_wasm_launcher;
 
-pub trait BindingGenerator {
+///A trait to generate the binding files to be included in the built module
+///
+/// This trait is used to generate the support files necessary to build a python
+/// module for any [crate::BridgeModel]
+pub(crate) trait BindingGenerator {
     fn generate_bindings(
         &self,
         context: &BuildContext,
@@ -39,7 +44,8 @@ pub trait BindingGenerator {
     ) -> Result<GeneratorOutput>;
 }
 
-pub struct GeneratorOutput {
+#[derive(Debug)]
+pub(crate) struct GeneratorOutput {
     /// The path, relative to the archive root, where the built artifact/module
     /// should be installed
     artifact_target: PathBuf,
@@ -114,6 +120,7 @@ pub fn generate_binding(
     match (context.editable, &base_path) {
         (true, Some(base_path)) => {
             let target = base_path.join(&artifact_target);
+            debug!("Removing previously built module {}", target.display());
             fs::create_dir_all(target.parent().unwrap())?;
             // Remove existing so file to avoid triggering SIGSEV in running process
             // See https://github.com/PyO3/maturin/issues/758
@@ -121,6 +128,7 @@ pub fn generate_binding(
             let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
 
             // 2. Install the artifact
+            debug!("Installing {} from {}", target.display(), source.display());
             fs::copy(&source, &target).with_context(|| {
                 format!(
                     "Failed to copy {} to {}",
@@ -134,6 +142,7 @@ pub fn generate_binding(
                 for (target, data) in additional_files {
                     let target = base_path.join(target);
                     fs::create_dir_all(target.parent().unwrap())?;
+                    debug!("Generating file {}", target.display());
                     let mut file = File::options().create(true).truncate(true).open(&target)?;
                     file.write_all(data.as_slice())?;
                 }
@@ -142,11 +151,17 @@ pub fn generate_binding(
         _ => {
             // 2. Install the artifact
             let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
+            debug!(
+                "Adding to archive {} from {}",
+                artifact_target.display(),
+                source.display()
+            );
             writer.add_file(artifact_target, source, true)?;
 
             // 3. Install additional files
             if let Some(additional_files) = additional_files {
                 for (target, data) in additional_files {
+                    debug!("Generating archive entry {}", target.display());
                     writer.add_bytes(target, None, data.as_slice(), false)?;
                 }
             }

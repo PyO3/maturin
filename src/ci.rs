@@ -301,7 +301,7 @@ jobs:\n",
             // job steps
             conf.push_str(
                 "    steps:
-      - uses: actions/checkout@v4\n",
+      - uses: actions/checkout@v6\n",
             );
 
             // install pyodide-build for emscripten
@@ -414,7 +414,7 @@ jobs:\n",
             };
             conf.push_str(&format!(
                 "      - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: {artifact_name}
           path: dist
@@ -576,7 +576,7 @@ jobs:\n",
                 r#"  sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -586,7 +586,7 @@ jobs:\n",
             ));
             conf.push_str(
                 "      - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-sdist
           path: dist
@@ -622,13 +622,13 @@ jobs:\n",
         }
         conf.push_str(
             r#"    steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
 "#,
         );
         if !self.skip_attestation {
             conf.push_str(
                 r#"      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: 'wheels-*/*'
 "#,
@@ -729,7 +729,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -741,7 +741,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
@@ -760,7 +760,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: armv7
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -772,7 +772,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
@@ -787,7 +787,7 @@ mod tests {
                       - runner: windows-latest
                         target: x86
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -799,7 +799,7 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
@@ -814,7 +814,7 @@ mod tests {
                       - runner: macos-14
                         target: aarch64
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -825,7 +825,7 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
@@ -833,14 +833,14 @@ mod tests {
               sdist:
                 runs-on: ubuntu-latest
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build sdist
                     uses: PyO3/maturin-action@v1
                     with:
                       command: sdist
                       args: --out dist
                   - name: Upload sdist
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-sdist
                       path: dist
@@ -858,9 +858,9 @@ mod tests {
                   # Used to generate artifact attestation
                   attestations: write
                 steps:
-                  - uses: actions/download-artifact@v4
+                  - uses: actions/download-artifact@v6
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v2
+                    uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
@@ -927,7 +927,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -946,7 +946,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
@@ -965,7 +965,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: armv7
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -984,7 +984,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
@@ -999,7 +999,7 @@ mod tests {
                       - runner: windows-latest
                         target: x86
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1021,7 +1021,7 @@ mod tests {
                       args: --release --out dist -i python3.13t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
@@ -1036,7 +1036,7 @@ mod tests {
                       - runner: macos-14
                         target: aarch64
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1053,7 +1053,7 @@ mod tests {
                       args: --release --out dist -i python3.13t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
@@ -1071,9 +1071,9 @@ mod tests {
                   # Used to generate artifact attestation
                   attestations: write
                 steps:
-                  - uses: actions/download-artifact@v4
+                  - uses: actions/download-artifact@v6
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v2
+                    uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
@@ -1143,7 +1143,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1162,7 +1162,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
@@ -1181,7 +1181,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: armv7
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1200,7 +1200,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
@@ -1215,7 +1215,7 @@ mod tests {
                       - runner: windows-latest
                         target: x86
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1237,7 +1237,7 @@ mod tests {
                       args: --release --out dist -i python3.13t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
@@ -1252,7 +1252,7 @@ mod tests {
                       - runner: macos-14
                         target: aarch64
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1269,7 +1269,7 @@ mod tests {
                       args: --release --out dist -i python3.13t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
@@ -1285,7 +1285,7 @@ mod tests {
                   # Used to upload release artifacts
                   contents: write
                 steps:
-                  - uses: actions/download-artifact@v4
+                  - uses: actions/download-artifact@v6
                   - name: Publish to PyPI
                     if: ${{ startsWith(github.ref, 'refs/tags/') }}
                     uses: PyO3/maturin-action@v1
@@ -1355,7 +1355,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1367,7 +1367,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
@@ -1411,7 +1411,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: armv7
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1423,7 +1423,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
@@ -1468,7 +1468,7 @@ mod tests {
                       - runner: windows-latest
                         target: x86
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1480,7 +1480,7 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
@@ -1505,7 +1505,7 @@ mod tests {
                       - runner: macos-14
                         target: aarch64
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - uses: actions/setup-python@v5
                     with:
                       python-version: 3.x
@@ -1516,7 +1516,7 @@ mod tests {
                       args: --release --out dist --find-interpreter
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
@@ -1532,14 +1532,14 @@ mod tests {
               sdist:
                 runs-on: ubuntu-latest
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build sdist
                     uses: PyO3/maturin-action@v1
                     with:
                       command: sdist
                       args: --out dist
                   - name: Upload sdist
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-sdist
                       path: dist
@@ -1557,9 +1557,9 @@ mod tests {
                   # Used to generate artifact attestation
                   attestations: write
                 steps:
-                  - uses: actions/download-artifact@v4
+                  - uses: actions/download-artifact@v6
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v2
+                    uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI
@@ -1617,7 +1617,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: ppc64le
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1626,7 +1626,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
@@ -1645,7 +1645,7 @@ mod tests {
                       - runner: ubuntu-22.04
                         target: armv7
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1654,7 +1654,7 @@ mod tests {
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-musllinux-${{ matrix.platform.target }}
                       path: dist
@@ -1669,7 +1669,7 @@ mod tests {
                       - runner: windows-latest
                         target: x86
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1677,7 +1677,7 @@ mod tests {
                       args: --release --out dist
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
@@ -1692,7 +1692,7 @@ mod tests {
                       - runner: macos-14
                         target: aarch64
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1700,7 +1700,7 @@ mod tests {
                       args: --release --out dist
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
@@ -1708,14 +1708,14 @@ mod tests {
               sdist:
                 runs-on: ubuntu-latest
                 steps:
-                  - uses: actions/checkout@v4
+                  - uses: actions/checkout@v6
                   - name: Build sdist
                     uses: PyO3/maturin-action@v1
                     with:
                       command: sdist
                       args: --out dist
                   - name: Upload sdist
-                    uses: actions/upload-artifact@v4
+                    uses: actions/upload-artifact@v5
                     with:
                       name: wheels-sdist
                       path: dist
@@ -1733,9 +1733,9 @@ mod tests {
                   # Used to generate artifact attestation
                   attestations: write
                 steps:
-                  - uses: actions/download-artifact@v4
+                  - uses: actions/download-artifact@v6
                   - name: Generate artifact attestation
-                    uses: actions/attest-build-provenance@v2
+                    uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
                   - name: Publish to PyPI

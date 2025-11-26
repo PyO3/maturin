@@ -74,6 +74,7 @@ impl fmt::Display for Platform {
 struct MatrixPlatform {
     runner: &'static str,
     target: &'static str,
+    python_arch: Option<&'static str>,
 }
 
 /// Generate CI configuration
@@ -251,6 +252,7 @@ jobs:\n",
                     .map(|target| MatrixPlatform {
                         runner: "ubuntu-22.04",
                         target,
+                        python_arch: None,
                     })
                     .collect(),
                 Platform::Musllinux => ["x86_64", "x86", "aarch64", "armv7"]
@@ -258,30 +260,43 @@ jobs:\n",
                     .map(|target| MatrixPlatform {
                         runner: "ubuntu-22.04",
                         target,
+                        python_arch: None,
                     })
                     .collect(),
-                Platform::Windows => ["x64", "x86"]
+                Platform::Windows => ["x64", "x86", "aarch64"]
                     .into_iter()
                     .map(|target| MatrixPlatform {
-                        runner: "windows-latest",
+                        runner: if target == "aarch64" {
+                            "windows-11-arm"
+                        } else {
+                            "windows-latest"
+                        },
                         target,
+                        python_arch: if target == "aarch64" {
+                            Some("arm64")
+                        } else {
+                            Some(target)
+                        },
                     })
                     .collect(),
                 Platform::Macos => {
                     vec![
                         MatrixPlatform {
-                            runner: "macos-13",
+                            runner: "macos-15-intel",
                             target: "x86_64",
+                            python_arch: None,
                         },
                         MatrixPlatform {
-                            runner: "macos-14",
+                            runner: "macos-latest",
                             target: "aarch64",
+                            python_arch: None,
                         },
                     ]
                 }
                 Platform::Emscripten => vec![MatrixPlatform {
                     runner: "ubuntu-22.04",
                     target: "wasm32-unknown-emscripten",
+                    python_arch: None,
                 }],
                 _ => Vec::new(),
             };
@@ -297,6 +312,9 @@ jobs:\n",
                     "          - runner: {}\n            target: {}\n",
                     target.runner, target.target,
                 ));
+                if let Some(python_arch) = target.python_arch {
+                    conf.push_str(&format!("            python_arch: {}\n", python_arch));
+                }
             }
             // job steps
             conf.push_str(
@@ -324,7 +342,7 @@ jobs:\n",
           actions-cache-folder: emsdk-cache\n",
                 );
                 conf.push_str(
-                    "      - uses: actions/setup-python@v5
+                    "      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}\n",
                 );
@@ -333,13 +351,20 @@ jobs:\n",
             } else {
                 // setup python on demand
                 if setup_python {
-                    conf.push_str(
-                        "      - uses: actions/setup-python@v5
+                    let python_ver = if matches!(platform, Platform::Windows) {
+                        "3.13"
+                    } else {
+                        "3.x"
+                    };
+                    conf.push_str(&format!(
+                        "      - uses: actions/setup-python@v6
         with:
-          python-version: 3.x\n",
-                    );
+          python-version: {python_ver}\n",
+                    ));
                     if matches!(platform, Platform::Windows) {
-                        conf.push_str("          architecture: ${{ matrix.platform.target }}\n");
+                        conf.push_str(
+                            "          architecture: ${{ matrix.platform.python_arch }}\n",
+                        );
                     }
                 }
             }
@@ -385,21 +410,21 @@ jobs:\n",
                 conf.push_str(&format!("          {maturin_action_args}\n"));
             }
             if is_abi3 {
-                // build free-threaded wheel for python3.13t
+                // build free-threaded wheel for python3.14t
                 if matches!(platform, Platform::Windows) {
                     conf.push_str(
-                        "      - uses: actions/setup-python@v5
+                        "      - uses: actions/setup-python@v6
         with:
-          python-version: 3.13t\n",
+          python-version: 3.14t\n",
                     );
-                    conf.push_str("          architecture: ${{ matrix.platform.target }}\n");
+                    conf.push_str("          architecture: ${{ matrix.platform.python_arch }}\n");
                 }
                 conf.push_str(&format!(
                     "      - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{{{ matrix.platform.target }}}}
-          args: --release --out dist{maturin_args} -i python3.13t
+          args: --release --out dist{maturin_args} -i python3.14t
           sccache: ${{{{ !startsWith(github.ref, 'refs/tags/') }}}}
 "
                 ));
@@ -507,7 +532,6 @@ jobs:\n",
                     Platform::Windows => {
                         conf.push_str(&format!(
                             "      - name: pytest
-        if: ${{{{ !startsWith(matrix.platform.target, 'aarch64') }}}}
         shell: bash
         run: |
           set -e
@@ -536,7 +560,7 @@ jobs:\n",
                         conf.push_str(
                             "      - uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '22'
 ",
                         );
                         conf.push_str(&format!(
@@ -730,7 +754,7 @@ mod tests {
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -761,7 +785,7 @@ mod tests {
                         target: armv7
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -784,14 +808,19 @@ mod tests {
                     platform:
                       - runner: windows-latest
                         target: x64
+                        python_arch: x64
                       - runner: windows-latest
                         target: x86
+                        python_arch: x86
+                      - runner: windows-11-arm
+                        target: aarch64
+                        python_arch: arm64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
-                      python-version: 3.x
-                      architecture: ${{ matrix.platform.target }}
+                      python-version: 3.13
+                      architecture: ${{ matrix.platform.python_arch }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -809,13 +838,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-13
+                      - runner: macos-15-intel
                         target: x86_64
-                      - runner: macos-14
+                      - runner: macos-latest
                         target: aarch64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -928,7 +957,7 @@ mod tests {
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -942,7 +971,7 @@ mod tests {
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
@@ -966,7 +995,7 @@ mod tests {
                         target: armv7
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -980,7 +1009,7 @@ mod tests {
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
@@ -996,29 +1025,34 @@ mod tests {
                     platform:
                       - runner: windows-latest
                         target: x64
+                        python_arch: x64
                       - runner: windows-latest
                         target: x86
+                        python_arch: x86
+                      - runner: windows-11-arm
+                        target: aarch64
+                        python_arch: arm64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
-                      python-version: 3.x
-                      architecture: ${{ matrix.platform.target }}
+                      python-version: 3.13
+                      architecture: ${{ matrix.platform.python_arch }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
-                      python-version: 3.13t
-                      architecture: ${{ matrix.platform.target }}
+                      python-version: 3.14t
+                      architecture: ${{ matrix.platform.python_arch }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v5
@@ -1031,13 +1065,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-13
+                      - runner: macos-15-intel
                         target: x86_64
-                      - runner: macos-14
+                      - runner: macos-latest
                         target: aarch64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1050,7 +1084,7 @@ mod tests {
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v5
@@ -1144,7 +1178,7 @@ mod tests {
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1158,7 +1192,7 @@ mod tests {
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: auto
                   - name: Upload wheels
@@ -1182,7 +1216,7 @@ mod tests {
                         target: armv7
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1196,7 +1230,7 @@ mod tests {
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                       manylinux: musllinux_1_2
                   - name: Upload wheels
@@ -1212,29 +1246,34 @@ mod tests {
                     platform:
                       - runner: windows-latest
                         target: x64
+                        python_arch: x64
                       - runner: windows-latest
                         target: x86
+                        python_arch: x86
+                      - runner: windows-11-arm
+                        target: aarch64
+                        python_arch: arm64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
-                      python-version: 3.x
-                      architecture: ${{ matrix.platform.target }}
+                      python-version: 3.13
+                      architecture: ${{ matrix.platform.python_arch }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
                       args: --release --out dist
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
-                      python-version: 3.13t
-                      architecture: ${{ matrix.platform.target }}
+                      python-version: 3.14t
+                      architecture: ${{ matrix.platform.python_arch }}
                   - name: Build free-threaded wheels
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v5
@@ -1247,13 +1286,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-13
+                      - runner: macos-15-intel
                         target: x86_64
-                      - runner: macos-14
+                      - runner: macos-latest
                         target: aarch64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1266,7 +1305,7 @@ mod tests {
                     uses: PyO3/maturin-action@v1
                     with:
                       target: ${{ matrix.platform.target }}
-                      args: --release --out dist -i python3.13t
+                      args: --release --out dist -i python3.14t
                       sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
                   - name: Upload wheels
                     uses: actions/upload-artifact@v5
@@ -1356,7 +1395,7 @@ mod tests {
                         target: ppc64le
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1412,7 +1451,7 @@ mod tests {
                         target: armv7
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1465,14 +1504,19 @@ mod tests {
                     platform:
                       - runner: windows-latest
                         target: x64
+                        python_arch: x64
                       - runner: windows-latest
                         target: x86
+                        python_arch: x86
+                      - runner: windows-11-arm
+                        target: aarch64
+                        python_arch: arm64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
-                      python-version: 3.x
-                      architecture: ${{ matrix.platform.target }}
+                      python-version: 3.13
+                      architecture: ${{ matrix.platform.python_arch }}
                   - name: Build wheels
                     uses: PyO3/maturin-action@v1
                     with:
@@ -1485,7 +1529,6 @@ mod tests {
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
                   - name: pytest
-                    if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
                     shell: bash
                     run: |
                       set -e
@@ -1500,13 +1543,13 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-13
+                      - runner: macos-15-intel
                         target: x86_64
-                      - runner: macos-14
+                      - runner: macos-latest
                         target: aarch64
                 steps:
                   - uses: actions/checkout@v6
-                  - uses: actions/setup-python@v5
+                  - uses: actions/setup-python@v6
                     with:
                       python-version: 3.x
                   - name: Build wheels
@@ -1666,8 +1709,13 @@ mod tests {
                     platform:
                       - runner: windows-latest
                         target: x64
+                        python_arch: x64
                       - runner: windows-latest
                         target: x86
+                        python_arch: x86
+                      - runner: windows-11-arm
+                        target: aarch64
+                        python_arch: arm64
                 steps:
                   - uses: actions/checkout@v6
                   - name: Build wheels
@@ -1687,9 +1735,9 @@ mod tests {
                 strategy:
                   matrix:
                     platform:
-                      - runner: macos-13
+                      - runner: macos-15-intel
                         target: x86_64
-                      - runner: macos-14
+                      - runner: macos-latest
                         target: aarch64
                 steps:
                   - uses: actions/checkout@v6

@@ -659,14 +659,17 @@ jobs:\n",
             );
         }
         conf.push_str(
+            r#"      - name: Install uv
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: astral-sh/setup-uv@v7
+"#,
+        );
+        conf.push_str(
             r#"      - name: Publish to PyPI
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        uses: PyO3/maturin-action@v1
+        run: uv publish 'wheels-*/*'
         env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        with:
-          command: upload
-          args: --non-interactive --skip-existing wheels-*/*
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 "#,
         );
         if platforms.contains(&Platform::Emscripten) {
@@ -892,14 +895,14 @@ mod tests {
                     uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
+                  - name: Install uv
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+                    uses: astral-sh/setup-uv@v7
                   - name: Publish to PyPI
                     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-                    uses: PyO3/maturin-action@v1
+                    run: uv publish 'wheels-*/*'
                     env:
-                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-                    with:
-                      command: upload
-                      args: --non-interactive --skip-existing wheels-*/*"#]];
+                      UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}"#]];
         expected.assert_eq(&conf);
     }
 
@@ -1110,14 +1113,14 @@ mod tests {
                     uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
+                  - name: Install uv
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+                    uses: astral-sh/setup-uv@v7
                   - name: Publish to PyPI
                     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-                    uses: PyO3/maturin-action@v1
+                    run: uv publish 'wheels-*/*'
                     env:
-                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-                    with:
-                      command: upload
-                      args: --non-interactive --skip-existing wheels-*/*"#]];
+                      UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}"#]];
         expected.assert_eq(&conf);
     }
 
@@ -1325,14 +1328,14 @@ mod tests {
                   contents: write
                 steps:
                   - uses: actions/download-artifact@v6
+                  - name: Install uv
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+                    uses: astral-sh/setup-uv@v7
                   - name: Publish to PyPI
                     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-                    uses: PyO3/maturin-action@v1
+                    run: uv publish 'wheels-*/*'
                     env:
-                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-                    with:
-                      command: upload
-                      args: --non-interactive --skip-existing wheels-*/*"#]];
+                      UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}"#]];
         expected.assert_eq(&conf);
     }
 
@@ -1605,14 +1608,14 @@ mod tests {
                     uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
+                  - name: Install uv
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+                    uses: astral-sh/setup-uv@v7
                   - name: Publish to PyPI
                     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-                    uses: PyO3/maturin-action@v1
+                    run: uv publish 'wheels-*/*'
                     env:
-                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-                    with:
-                      command: upload
-                      args: --non-interactive --skip-existing wheels-*/*"#]];
+                      UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}"#]];
         expected.assert_eq(&conf);
     }
 
@@ -1786,14 +1789,14 @@ mod tests {
                     uses: actions/attest-build-provenance@v3
                     with:
                       subject-path: 'wheels-*/*'
+                  - name: Install uv
+                    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+                    uses: astral-sh/setup-uv@v7
                   - name: Publish to PyPI
                     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-                    uses: PyO3/maturin-action@v1
+                    run: uv publish 'wheels-*/*'
                     env:
-                      MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-                    with:
-                      command: upload
-                      args: --non-interactive --skip-existing wheels-*/*"#]];
+                      UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}"#]];
         expected.assert_eq(&conf);
     }
 }

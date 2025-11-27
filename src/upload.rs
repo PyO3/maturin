@@ -66,6 +66,17 @@ impl PublishOpt {
     /// Set to non interactive mode if we're running on CI
     pub fn non_interactive_on_ci(&mut self) {
         if !self.non_interactive && env::var("CI").map(|v| v == "true").unwrap_or_default() {
+            let msg = "⚠️  Warning: The maturin upload and publish commands are deprecated and will be removed in the future. For more information see: https://github.com/PyO3/maturin/issues/2334";
+            eprintln!("{msg}");
+
+            if env::var("GITHUB_ACTIONS")
+                .map(|v| v == "true")
+                .unwrap_or_default()
+            {
+                // Also emit a warning annotation on the GH action
+                println!("::warning::{msg}");
+            }
+
             eprintln!("🎛️ Running in non-interactive mode on CI");
             self.non_interactive = true;
         }

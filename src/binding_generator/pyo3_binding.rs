@@ -13,6 +13,8 @@ use crate::BuildArtifact;
 use crate::BuildContext;
 use crate::PythonInterpreter;
 use crate::Target;
+use crate::archive_source::ArchiveSource;
+use crate::archive_source::GeneratedSourceData;
 
 use super::BindingGenerator;
 use super::GeneratorOutput;
@@ -80,9 +82,8 @@ impl BindingGenerator for Pyo3BindingGenerator {
             Some(_) => None,
             None => {
                 let mut files = HashMap::new();
-                files.insert(
-                    module.join("__init__.py"),
-                    format!(
+                let source = GeneratedSourceData {
+                    data: format!(
                         r#"from .{ext_name} import *
 
 __doc__ = {ext_name}.__doc__
@@ -90,7 +91,9 @@ if hasattr({ext_name}, "__all__"):
     __all__ = {ext_name}.__all__"#
                     )
                     .into(),
-                );
+                    executable: false,
+                };
+                files.insert(module.join("__init__.py"), ArchiveSource::Generated(source));
                 Some(files)
             }
         };

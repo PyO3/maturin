@@ -10,7 +10,6 @@ use std::{env, io, str};
 pub mod develop;
 pub mod errors;
 pub mod integration;
-pub mod metadata;
 pub mod other;
 pub mod pep517;
 

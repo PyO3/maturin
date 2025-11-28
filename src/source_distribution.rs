@@ -1,6 +1,5 @@
-use crate::module_writer::{ModuleWriter, ModuleWriterExt};
 use crate::pyproject_toml::SdistGenerator;
-use crate::{BuildContext, PyProjectToml, SDistWriter, pyproject_toml::Format};
+use crate::{BuildContext, ModuleWriter, PyProjectToml, SDistWriter, pyproject_toml::Format};
 use anyhow::{Context, Result, bail};
 use cargo_metadata::camino::Utf8Path;
 use cargo_metadata::{Metadata, MetadataCommand, PackageId};

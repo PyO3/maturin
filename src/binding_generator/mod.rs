@@ -20,7 +20,7 @@ use crate::BuildContext;
 use crate::ModuleWriter;
 use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
-use crate::module_writer::ModuleWriterExt;
+use crate::module_writer::ModuleWriterInternal;
 #[cfg(unix)]
 use crate::module_writer::default_permission;
 use crate::module_writer::write_python_part;
@@ -85,7 +85,7 @@ pub(crate) struct GeneratorOutput {
 ///
 /// Note: Writing the pth to the archive is handled by [BuildContext], not here
 pub fn generate_binding<A>(
-    writer: &mut impl ModuleWriter,
+    writer: &mut impl ModuleWriterInternal,
     generator: &mut impl BindingGenerator,
     context: &BuildContext,
     interpreter: Option<&PythonInterpreter>,
@@ -187,19 +187,7 @@ where
                 if let Some(additional_files) = additional_files {
                     for (target, source) in additional_files {
                         debug!("Generating archive entry {}", target.display());
-                        match source {
-                            ArchiveSource::Generated(source) => {
-                                writer.add_bytes(
-                                    target,
-                                    None,
-                                    source.data.as_slice(),
-                                    source.executable,
-                                )?;
-                            }
-                            ArchiveSource::File(source) => {
-                                writer.add_file(target, source.path, source.executable)?;
-                            }
-                        }
+                        writer.add_entry(target, source)?;
                     }
                 }
             }

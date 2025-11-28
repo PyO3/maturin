@@ -57,13 +57,13 @@ impl BindingGenerator for CffiBindingGenerator {
         let artifact_target = base_path.join(&cffi_module_file_name);
 
         let mut additional_files = HashMap::new();
-        let source = GeneratedSourceData {
-            data: cffi_init_file(&cffi_module_file_name).into(),
-            executable: false,
-        };
         additional_files.insert(
             base_path.join("__init__.py"),
-            ArchiveSource::Generated(source),
+            ArchiveSource::Generated(GeneratedSourceData {
+                data: cffi_init_file(&cffi_module_file_name).into(),
+                path: None,
+                executable: false,
+            }),
         );
 
         let declarations = generate_cffi_declarations(
@@ -77,11 +77,14 @@ impl BindingGenerator for CffiBindingGenerator {
                 })?
                 .executable,
         )?;
-        let source = GeneratedSourceData {
-            data: declarations.into(),
-            executable: false,
-        };
-        additional_files.insert(base_path.join("ffi.py"), ArchiveSource::Generated(source));
+        additional_files.insert(
+            base_path.join("ffi.py"),
+            ArchiveSource::Generated(GeneratedSourceData {
+                data: declarations.into(),
+                path: None,
+                executable: false,
+            }),
+        );
 
         Ok(GeneratorOutput {
             artifact_target,

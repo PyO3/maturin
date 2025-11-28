@@ -60,13 +60,13 @@ impl BindingGenerator for UniFfiBindingGenerator {
             .map(|name| format!("from .{name} import *  # NOQA\n"))
             .collect::<Vec<String>>()
             .join("");
-        let source = GeneratedSourceData {
-            data: py_init.into(),
-            executable: false,
-        };
         additional_files.insert(
             base_path.join("__init__.py"),
-            ArchiveSource::Generated(source),
+            ArchiveSource::Generated(GeneratedSourceData {
+                data: py_init.into(),
+                path: None,
+                executable: false,
+            }),
         );
 
         for binding in binding_names {

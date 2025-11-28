@@ -1,7 +1,8 @@
 use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::binding_generator::{
-    write_bin, write_bindings_module, write_cffi_module, write_uniffi_module, write_wasm_launcher,
+    Pyo3BindingGenerator, generate_binding, write_bin, write_cffi_module, write_uniffi_module,
+    write_wasm_launcher,
 };
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
@@ -768,15 +769,13 @@ impl BuildContext {
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        write_bindings_module(
+        let generator = Pyo3BindingGenerator::new(true);
+        generate_binding(
             &mut writer,
-            &self.project_layout,
-            &artifact.path,
+            &generator,
+            self,
             self.interpreter.first(),
-            true,
-            &self.target,
-            self.editable,
-            self.pyproject_toml.as_ref(),
+            &artifact,
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -851,15 +850,13 @@ impl BuildContext {
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        write_bindings_module(
+        let generator = Pyo3BindingGenerator::new(false);
+        generate_binding(
             &mut writer,
-            &self.project_layout,
-            &artifact.path,
+            &generator,
+            self,
             Some(python_interpreter),
-            false,
-            &self.target,
-            self.editable,
-            self.pyproject_toml.as_ref(),
+            &artifact,
         )
         .context("Failed to add the files to the wheel")?;
 

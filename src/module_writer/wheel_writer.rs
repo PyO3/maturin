@@ -30,6 +30,7 @@ pub struct WheelWriter {
     file_tracker: FileTracker,
     excludes: Override,
     file_options: SimpleFileOptions,
+    target_exclusion_warning_emitted: bool,
 }
 
 impl ModuleWriter for WheelWriter {
@@ -48,13 +49,15 @@ impl ModuleWriter for WheelWriter {
 
         let target = target.as_ref();
         if self.exclude(target) {
-            eprintln!(
-                "⚠️ Warning: {} was excluded from the archive by the target path in the archive instead of the source path on the filesystem",
-                target.display(),
-            );
-            eprintln!(
-                "           This behavior is deprecated and will be removed in future versions of maturin"
-            );
+            if !self.target_exclusion_warning_emitted {
+                self.target_exclusion_warning_emitted = true;
+                eprintln!(
+                    "⚠️ Warning: A file was excluded from the archive by the target path in the archive\n\
+                     ⚠️ instead of the source path on the filesystem. This behavior is deprecated and\n\
+                     ⚠️ will be removed in future versions of maturin.",
+                );
+            }
+            debug!("Excluded file {target:?} from archive by target path");
             return Ok(());
         }
 
@@ -107,6 +110,7 @@ impl WheelWriter {
             file_tracker: FileTracker::default(),
             excludes,
             file_options,
+            target_exclusion_warning_emitted: false,
         };
 
         write_dist_info(&mut builder, pyproject_dir, metadata24, tags)?;

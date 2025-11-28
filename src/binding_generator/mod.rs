@@ -28,7 +28,7 @@ mod wasm_binding;
 
 pub use cffi_binding::CffiBindingGenerator;
 pub use pyo3_binding::Pyo3BindingGenerator;
-pub use uniffi_binding::write_uniffi_module;
+pub use uniffi_binding::UniFfiBindingGenerator;
 pub use wasm_binding::write_wasm_launcher;
 
 ///A trait to generate the binding files to be included in the built module

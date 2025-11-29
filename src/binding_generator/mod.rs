@@ -8,6 +8,8 @@ use anyhow::Context as _;
 use anyhow::Result;
 use fs_err as fs;
 use fs_err::File;
+#[cfg(unix)]
+use fs_err::os::unix::fs::OpenOptionsExt as _;
 use tempfile::TempDir;
 use tempfile::tempdir;
 use tracing::debug;
@@ -19,6 +21,7 @@ use crate::ModuleWriter;
 use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
 use crate::module_writer::ModuleWriterExt;
+use crate::module_writer::default_permission;
 use crate::module_writer::write_python_part;
 
 mod cffi_binding;
@@ -145,11 +148,14 @@ pub fn generate_binding(
                     let target = base_path.join(target);
                     fs::create_dir_all(target.parent().unwrap())?;
                     debug!("Generating file {}", target.display());
-                    let mut file = File::options()
-                        .write(true)
-                        .create(true)
-                        .truncate(true)
-                        .open(&target)?;
+                    let mut options = File::options();
+                    options.write(true).create(true).truncate(true);
+                    #[cfg(unix)]
+                    {
+                        options.mode(default_permission(source.executable()));
+                    }
+
+                    let mut file = options.open(&target)?;
                     match source {
                         ArchiveSource::Generated(source) => file.write_all(&source.data)?,
                         ArchiveSource::File(source) => {

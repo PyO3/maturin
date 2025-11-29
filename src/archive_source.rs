@@ -6,6 +6,15 @@ pub(crate) enum ArchiveSource {
     File(FileSourceData),
 }
 
+impl ArchiveSource {
+    pub(crate) fn executable(&self) -> bool {
+        match self {
+            Self::Generated(source) => source.executable,
+            Self::File(source) => source.executable,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct GeneratedSourceData {
     pub(crate) data: Vec<u8>,

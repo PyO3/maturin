@@ -28,7 +28,7 @@ pub struct UniFfiBindingGenerator {}
 
 impl BindingGenerator for UniFfiBindingGenerator {
     fn generate_bindings(
-        &self,
+        &mut self,
         context: &BuildContext,
         _interpreter: Option<&PythonInterpreter>,
         artifact: &BuildArtifact,

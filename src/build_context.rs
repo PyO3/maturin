@@ -1,14 +1,14 @@
 use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::binding_generator::{
-    CffiBindingGenerator, Pyo3BindingGenerator, UniFfiBindingGenerator, generate_binding,
-    write_bin, write_wasm_launcher,
+    BinBindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator, UniFfiBindingGenerator,
+    generate_binding,
 };
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
 use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
-use crate::module_writer::{ModuleWriterExt, WheelWriter, add_data, write_python_part};
+use crate::module_writer::{ModuleWriterExt, WheelWriter, add_data};
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
@@ -22,70 +22,17 @@ use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
 use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
-use indexmap::IndexMap;
 use lddtree::Library;
 use normpath::PathExt;
-use pep508_rs::Requirement;
 use platform_info::*;
 use sha2::{Digest, Sha256};
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use tracing::instrument;
 use zip::DateTime;
-
-/// Insert wasm launcher scripts as entrypoints and the wasmtime dependency
-fn bin_wasi_helper(
-    artifacts_and_files: &[(&BuildArtifact, String)],
-    mut metadata24: Metadata24,
-) -> Result<Metadata24> {
-    eprintln!("⚠️  Warning: wasi support is experimental");
-    // escaped can contain [\w\d.], but i don't know how we'd handle dots correctly here
-    if metadata24.get_distribution_escaped().contains('.') {
-        bail!(
-            "Can't build wasm wheel if there is a dot in the name ('{}')",
-            metadata24.get_distribution_escaped()
-        )
-    }
-    if !metadata24.entry_points.is_empty() {
-        bail!("You can't define entrypoints yourself for a binary project");
-    }
-
-    let mut console_scripts = IndexMap::new();
-    for (_, bin_name) in artifacts_and_files {
-        let base_name = bin_name
-            .strip_suffix(".wasm")
-            .context("No .wasm suffix in wasi binary")?;
-        console_scripts.insert(
-            base_name.to_string(),
-            format!(
-                "{}.{}:main",
-                metadata24.get_distribution_escaped(),
-                base_name.replace('-', "_")
-            ),
-        );
-    }
-
-    metadata24
-        .entry_points
-        .insert("console_scripts".to_string(), console_scripts);
-
-    // Add our wasmtime default version if the user didn't provide one
-    if !metadata24
-        .requires_dist
-        .iter()
-        .any(|requirement| requirement.name.as_ref() == "wasmtime")
-    {
-        // Having the wasmtime version hardcoded is not ideal, it's easy enough to overwrite
-        metadata24
-            .requires_dist
-            .push(Requirement::from_str("wasmtime>=11.0.0,<12.0.0").unwrap());
-    }
-
-    Ok(metadata24)
-}
 
 /// Contains all the metadata required to build the crate
 #[derive(Clone)]
@@ -361,9 +308,13 @@ impl BuildContext {
     }
 
     /// Add library search paths in Cargo target directory rpath when building in editable mode
-    fn add_rpath(&self, artifacts: &[&BuildArtifact]) -> Result<()> {
+    fn add_rpath<A>(&self, artifacts: &[A]) -> Result<()>
+    where
+        A: Borrow<BuildArtifact>,
+    {
         if self.editable && self.target.is_linux() && !artifacts.is_empty() {
             for artifact in artifacts {
+                let artifact = artifact.borrow();
                 if artifact.linked_paths.is_empty() {
                     continue;
                 }
@@ -387,12 +338,15 @@ impl BuildContext {
         Ok(())
     }
 
-    fn add_external_libs(
+    fn add_external_libs<A>(
         &self,
         writer: &mut WheelWriter,
-        artifacts: &[&BuildArtifact],
+        artifacts: &[A],
         ext_libs: &[Vec<Library>],
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        A: Borrow<BuildArtifact>,
+    {
         if self.editable {
             return self.add_rpath(artifacts);
         }
@@ -472,6 +426,7 @@ impl BuildContext {
         }
 
         for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+            let artifact = artifact.borrow();
             let artifact_deps: HashSet<_> = artifact_ext_libs.iter().map(|lib| &lib.name).collect();
             let replacements = soname_map
                 .iter()
@@ -528,6 +483,7 @@ impl BuildContext {
             _ => PathBuf::from(&self.module_name),
         };
         for artifact in artifacts {
+            let artifact = artifact.borrow();
             let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
@@ -761,21 +717,19 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.project_layout.project_root,
             &self.metadata24,
-            std::slice::from_ref(&tag),
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let generator = Pyo3BindingGenerator::new(true);
+        let mut generator = Pyo3BindingGenerator::new(true);
         generate_binding(
             &mut writer,
-            &generator,
+            &mut generator,
             self,
             self.interpreter.first(),
-            &artifact,
+            &[&artifact],
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -785,7 +739,11 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish(&self.metadata24)?;
+        let wheel_path = writer.finish(
+            &self.metadata24,
+            &self.project_layout.project_root,
+            std::slice::from_ref(&tag),
+        )?;
         Ok((wheel_path, format!("cp{major}{min_minor}")))
     }
 
@@ -842,21 +800,19 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.project_layout.project_root,
             &self.metadata24,
-            std::slice::from_ref(&tag),
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let generator = Pyo3BindingGenerator::new(false);
+        let mut generator = Pyo3BindingGenerator::new(false);
         generate_binding(
             &mut writer,
-            &generator,
+            &mut generator,
             self,
             Some(python_interpreter),
-            &artifact,
+            &[&artifact],
         )
         .context("Failed to add the files to the wheel")?;
 
@@ -866,7 +822,11 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish(&self.metadata24)?;
+        let wheel_path = writer.finish(
+            &self.metadata24,
+            &self.project_layout.project_root,
+            std::slice::from_ref(&tag),
+        )?;
         Ok((
             wheel_path,
             format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
@@ -968,21 +928,19 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.project_layout.project_root,
             &self.metadata24,
-            &tags,
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let generator = CffiBindingGenerator::default();
+        let mut generator = CffiBindingGenerator::default();
         generate_binding(
             &mut writer,
-            &generator,
+            &mut generator,
             self,
             self.interpreter.first(),
-            &artifact,
+            &[&artifact],
         )?;
 
         self.add_pth(&mut writer)?;
@@ -991,7 +949,8 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish(&self.metadata24)?;
+        let wheel_path =
+            writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
@@ -1041,21 +1000,19 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.project_layout.project_root,
             &self.metadata24,
-            &tags,
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let generator = UniFfiBindingGenerator::default();
+        let mut generator = UniFfiBindingGenerator::default();
         generate_binding(
             &mut writer,
-            &generator,
+            &mut generator,
             self,
             self.interpreter.first(),
-            &artifact,
+            &[&artifact],
         )?;
 
         self.add_pth(&mut writer)?;
@@ -1064,7 +1021,8 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish(&self.metadata24)?;
+        let wheel_path =
+            writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
@@ -1093,6 +1051,27 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: &[Vec<Library>],
     ) -> Result<BuiltWheelMetadata> {
+        if !self.metadata24.scripts.is_empty() {
+            bail!("Defining scripts and working with a binary doesn't mix well");
+        }
+
+        if self.target.is_wasi() {
+            eprintln!("⚠️  Warning: wasi support is experimental");
+            // escaped can contain [\w\d.], but i don't know how we'd handle dots correctly here
+            if self.metadata24.get_distribution_escaped().contains('.') {
+                bail!(
+                    "Can't build wasm wheel if there is a dot in the name ('{}')",
+                    self.metadata24.get_distribution_escaped()
+                )
+            }
+
+            if self.project_layout.python_module.is_some() {
+                // TODO: Can we have python code and the wasm launchers coexisting
+                // without clashes?
+                bail!("Sorry, adding python code to a wasm binary is currently not supported")
+            }
+        }
+
         let (tag, tags) = match (self.bridge(), python_interpreter) {
             (BridgeModel::Bin(None), _) => self.get_universal_tags(platform_tags)?,
             (BridgeModel::Bin(Some(..)), Some(python_interpreter)) => {
@@ -1102,39 +1081,7 @@ impl BuildContext {
             _ => unreachable!(),
         };
 
-        if !self.metadata24.scripts.is_empty() {
-            bail!("Defining scripts and working with a binary doesn't mix well");
-        }
-
-        let mut artifacts_and_files = Vec::new();
-        for artifact in artifacts {
-            // I wouldn't know of any case where this would be the wrong (and neither do
-            // I know a better alternative)
-            let bin_name = artifact
-                .path
-                .file_name()
-                .context("Couldn't get the filename from the binary produced by cargo")?
-                .to_str()
-                .context("binary produced by cargo has non-utf8 filename")?
-                .to_string();
-
-            // From https://packaging.python.org/en/latest/specifications/entry-points/
-            // > The name may contain any characters except =, but it cannot start or end with any
-            // > whitespace character, or start with [. For new entry points, it is recommended to
-            // > use only letters, numbers, underscores, dots and dashes (regex [\w.-]+).
-            // All of these rules are already enforced by cargo:
-            // https://github.com/rust-lang/cargo/blob/58a961314437258065e23cb6316dfc121d96fb71/src/cargo/util/restricted_names.rs#L39-L84
-            // i.e. we don't need to do any bin name validation here anymore
-
-            artifacts_and_files.push((artifact, bin_name))
-        }
-
-        let metadata24 = if self.target.is_wasi() {
-            bin_wasi_helper(&artifacts_and_files, self.metadata24.clone())?
-        } else {
-            self.metadata24.clone()
-        };
-
+        let mut metadata24 = self.metadata24.clone();
         let file_options = self
             .compression
             .get_file_options()
@@ -1142,36 +1089,22 @@ impl BuildContext {
         let mut writer = WheelWriter::new(
             &tag,
             &self.out,
-            &self.project_layout.project_root,
             &metadata24,
-            &tags,
             self.excludes(Format::Wheel)?,
             file_options,
         )?;
 
-        if self.project_layout.python_module.is_some() && self.target.is_wasi() {
-            // TODO: Can we have python code and the wasm launchers coexisting
-            // without clashes?
-            bail!("Sorry, adding python code to a wasm binary is currently not supported")
-        }
-        if !self.editable {
-            write_python_part(
-                &mut writer,
-                &self.project_layout,
-                self.pyproject_toml.as_ref(),
-            )
-            .context("Failed to add the python module to the package")?;
-        }
+        self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 
-        let mut artifacts_ref = Vec::with_capacity(artifacts.len());
-        for (artifact, bin_name) in &artifacts_and_files {
-            artifacts_ref.push(*artifact);
-            write_bin(&mut writer, &artifact.path, &self.metadata24, bin_name)?;
-            if self.target.is_wasi() {
-                write_wasm_launcher(&mut writer, &self.metadata24, bin_name)?;
-            }
-        }
-        self.add_external_libs(&mut writer, &artifacts_ref, ext_libs)?;
+        let mut generator = BinBindingGenerator::new(&mut metadata24);
+        generate_binding(
+            &mut writer,
+            &mut generator,
+            self,
+            self.interpreter.first(),
+            artifacts,
+        )
+        .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -1179,7 +1112,7 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
-        let wheel_path = writer.finish(&self.metadata24)?;
+        let wheel_path = writer.finish(&metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 

@@ -35,7 +35,7 @@ pub use cffi_binding::CffiBindingGenerator;
 pub use pyo3_binding::Pyo3BindingGenerator;
 pub use uniffi_binding::UniFfiBindingGenerator;
 
-///A trait to generate the binding files to be included in the built module
+/// A trait to generate the binding files to be included in the built module
 ///
 /// This trait is used to generate the support files necessary to build a python
 /// module for any [crate::BridgeModel]

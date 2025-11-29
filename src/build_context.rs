@@ -1065,6 +1065,10 @@ impl BuildContext {
                 )
             }
 
+            if !self.metadata24.entry_points.is_empty() {
+                bail!("You can't define entrypoints yourself for a binary project");
+            }
+
             if self.project_layout.python_module.is_some() {
                 // TODO: Can we have python code and the wasm launchers coexisting
                 // without clashes?
@@ -1109,7 +1113,7 @@ impl BuildContext {
         self.add_pth(&mut writer)?;
         add_data(
             &mut writer,
-            &self.metadata24,
+            &metadata24,
             self.project_layout.data.as_deref(),
         )?;
         let wheel_path = writer.finish(&metadata24, &self.project_layout.project_root, &tags)?;

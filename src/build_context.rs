@@ -8,14 +8,14 @@ use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
 use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
-use crate::module_writer::{WheelWriter, add_data};
+use crate::module_writer::{WheelWriter, add_data, write_pth};
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::target::{Arch, Os};
 use crate::{
     BridgeModel, BuildArtifact, Metadata24, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
-    compile, pyproject_toml::Format,
+    VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -340,7 +340,7 @@ impl BuildContext {
 
     fn add_external_libs<A>(
         &self,
-        writer: &mut WheelWriter,
+        writer: &mut VirtualWriter<WheelWriter>,
         artifacts: &[A],
         ext_libs: &[Vec<Library>],
     ) -> Result<()>
@@ -495,9 +495,9 @@ impl BuildContext {
         Ok(())
     }
 
-    fn add_pth(&self, writer: &mut WheelWriter) -> Result<()> {
+    fn add_pth(&self, writer: &mut VirtualWriter<WheelWriter>) -> Result<()> {
         if self.editable {
-            writer.add_pth(&self.project_layout, &self.metadata24)?;
+            write_pth(writer, &self.project_layout, &self.metadata24)?;
         }
         Ok(())
     }
@@ -714,13 +714,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let mut generator = Pyo3BindingGenerator::new(true, self.interpreter.first())
@@ -792,13 +787,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let mut generator = Pyo3BindingGenerator::new(false, Some(python_interpreter))
@@ -915,13 +905,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let interpreter = self.interpreter.first().ok_or_else(|| {
@@ -985,13 +970,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let mut generator = UniFfiBindingGenerator::default();
@@ -1072,13 +1052,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
 
         self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 

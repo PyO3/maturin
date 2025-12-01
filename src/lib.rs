@@ -34,7 +34,7 @@ pub use crate::develop::{DevelopOptions, develop};
 pub use crate::generate_json_schema::{GenerateJsonSchemaOptions, Mode, generate_json_schema};
 pub use crate::metadata::{Metadata24, WheelMetadata};
 pub use crate::module_writer::{
-    ModuleWriter, PathWriter, SDistWriter, WheelWriter, write_dist_info,
+    ModuleWriter, PathWriter, SDistWriter, VirtualWriter, WheelWriter, write_dist_info,
 };
 #[cfg(feature = "scaffolding")]
 pub use crate::new_project::{GenerateProjectOptions, init_project, new_project};

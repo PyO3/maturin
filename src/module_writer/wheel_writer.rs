@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::io;
 use std::io::Write as _;
@@ -7,63 +8,29 @@ use std::path::PathBuf;
 use anyhow::Context as _;
 use anyhow::Result;
 use fs_err::File;
-use ignore::overrides::Override;
-use normpath::PathExt as _;
 use tracing::debug;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
 use crate::Metadata24;
 use crate::archive_source::ArchiveSource;
-use crate::project_layout::ProjectLayout;
 
-use super::ModuleWriter as _;
 use super::ModuleWriterInternal;
 use super::default_permission;
-use super::util::FileTracker;
 use super::util::StreamSha256;
-use super::write_dist_info;
 
 /// A glorified zip builder, mostly useful for writing the record file of a wheel
 pub struct WheelWriter {
     zip: ZipWriter<File>,
     record: BTreeMap<PathBuf, (String, usize)>,
-    file_tracker: FileTracker,
-    excludes: Override,
     file_options: SimpleFileOptions,
-    target_exclusion_warning_emitted: bool,
 }
 
 impl super::private::Sealed for WheelWriter {}
 
 impl ModuleWriterInternal for WheelWriter {
     fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()> {
-        let source_path = source.path();
-        if let Some(source) = source_path {
-            if self.exclude(source) {
-                return Ok(());
-            }
-        }
-
         let target = target.as_ref();
-        if self.exclude(target) {
-            if !self.target_exclusion_warning_emitted {
-                self.target_exclusion_warning_emitted = true;
-                eprintln!(
-                    "⚠️ Warning: A file was excluded from the archive by the target path in the archive\n\
-                     ⚠️ instead of the source path on the filesystem. This behavior is deprecated and\n\
-                     ⚠️ will be removed in future versions of maturin.",
-                );
-            }
-            debug!("Excluded file {target:?} from archive by target path");
-            return Ok(());
-        }
-
-        if !self.file_tracker.add_file(target, source_path)? {
-            // Ignore duplicate files.
-            return Ok(());
-        }
-
         let options = self
             .file_options
             .unix_permissions(default_permission(source.executable()));
@@ -92,13 +59,10 @@ impl ModuleWriterInternal for WheelWriter {
 
 impl WheelWriter {
     /// Create a new wheel file which can be subsequently expanded
-    ///
-    /// Adds the .dist-info directory and the METADATA file in it
     pub fn new(
         tag: &str,
         wheel_dir: &Path,
         metadata24: &Metadata24,
-        excludes: Override,
         file_options: SimpleFileOptions,
     ) -> Result<WheelWriter> {
         let wheel_path = wheel_dir.join(format!(
@@ -113,64 +77,35 @@ impl WheelWriter {
         let builder = WheelWriter {
             zip: ZipWriter::new(file),
             record: BTreeMap::new(),
-            file_tracker: FileTracker::default(),
-            excludes,
             file_options,
-            target_exclusion_warning_emitted: false,
         };
 
         Ok(builder)
     }
 
-    /// Add a pth file to wheel root for editable installs
-    pub fn add_pth(
-        &mut self,
-        project_layout: &ProjectLayout,
-        metadata24: &Metadata24,
-    ) -> Result<()> {
-        if project_layout.python_module.is_some() || !project_layout.python_packages.is_empty() {
-            let absolute_path = project_layout
-                .python_dir
-                .normalize()
-                .with_context(|| {
-                    format!(
-                        "python dir path `{}` does not exist or is invalid",
-                        project_layout.python_dir.display()
-                    )
-                })?
-                .into_path_buf();
-            if let Some(python_path) = absolute_path.to_str() {
-                let name = metadata24.get_distribution_escaped();
-                let target = format!("{name}.pth");
-                debug!("Adding {} from {}", target, python_path);
-                self.add_bytes(target, None, python_path.as_bytes(), false)?;
-            } else {
-                eprintln!(
-                    "⚠️ source code path contains non-Unicode sequences, editable installs may not work."
-                );
+    /// PEP 427 recommends that the .dist-info directory be placed physically at the
+    /// end of the zip file, so this custom comparator does exactly that
+    pub(super) fn file_ordering<'p>(
+        &self,
+        dist_info_dir: &'p Path,
+    ) -> impl FnMut(&PathBuf, &PathBuf) -> Ordering + use<'p> {
+        move |p1, p2| {
+            let p1_is_dist_info = p1.starts_with(dist_info_dir);
+            let p2_is_dist_info = p2.starts_with(dist_info_dir);
+            match (p1_is_dist_info, p2_is_dist_info) {
+                (true, false) => Ordering::Greater,
+                (false, true) => Ordering::Less,
+                _ => p1.cmp(p2),
             }
         }
-        Ok(())
-    }
-
-    /// Returns `true` if the given path should be excluded
-    fn exclude(&self, path: impl AsRef<Path>) -> bool {
-        self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
     /// Creates the record file and finishes the zip
-    pub fn finish(
-        mut self,
-        metadata24: &Metadata24,
-        pyproject_dir: &Path,
-        tags: &[String],
-    ) -> Result<PathBuf> {
-        write_dist_info(&mut self, pyproject_dir, metadata24, tags)?;
-
+    pub fn finish(mut self, dist_info_dir: &Path) -> Result<PathBuf> {
         let options = self
             .file_options
             .unix_permissions(default_permission(false));
-        let record_filename = metadata24.get_dist_info_dir().join("RECORD");
+        let record_filename = dist_info_dir.join("RECORD");
         debug!("Adding {}", record_filename.display());
         self.zip.start_file_from_path(&record_filename, options)?;
 
@@ -188,7 +123,6 @@ impl WheelWriter {
 
 #[cfg(test)]
 mod tests {
-    use ignore::overrides::Override;
     use pep440_rs::Version;
     use tempfile::TempDir;
 
@@ -211,11 +145,10 @@ mod tests {
             "no compression",
             tmp_dir.path(),
             &metadata,
-            Override::empty(),
             compression_options.get_file_options(),
         )?;
 
-        writer.finish(&metadata, tmp_dir.path(), &[])?;
+        writer.finish(&metadata.get_dist_info_dir())?;
         tmp_dir.close()?;
 
         Ok(())

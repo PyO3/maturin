@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::io;
 use std::io::Read;
 use std::path::Path;
@@ -9,16 +10,13 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use fs_err as fs;
 use fs_err::File;
-use ignore::overrides::Override;
 use normpath::PathExt as _;
-use tracing::debug;
 
 use crate::Metadata24;
 use crate::archive_source::ArchiveSource;
 
 use super::ModuleWriterInternal;
 use super::default_permission;
-use super::util::FileTracker;
 
 /// A deterministic, arbitrary, non-zero timestamp that use used as `mtime`
 /// of headers when writing sdists.
@@ -34,41 +32,14 @@ const SDIST_DETERMINISTIC_TIMESTAMP: u64 = 1153704088;
 pub struct SDistWriter {
     tar: tar::Builder<GzEncoder<Vec<u8>>>,
     path: PathBuf,
-    file_tracker: FileTracker,
-    excludes: Override,
     mtime: u64,
-    target_exclusion_warning_emitted: bool,
 }
 
 impl super::private::Sealed for SDistWriter {}
 
 impl ModuleWriterInternal for SDistWriter {
     fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()> {
-        let source_path = source.path();
-        if let Some(source) = source_path {
-            if self.exclude(source) {
-                return Ok(());
-            }
-        }
-
         let target = target.as_ref();
-        if self.exclude(target) {
-            if !self.target_exclusion_warning_emitted {
-                self.target_exclusion_warning_emitted = true;
-                eprintln!(
-                    "⚠️ Warning: A file was excluded from the archive by the target path in the archive\n\
-                     ⚠️ instead of the source path on the filesystem. This behavior is deprecated and\n\
-                     ⚠️ will be removed in future versions of maturin.",
-                );
-            }
-            debug!("Excluded file {target:?} from archive by target path");
-            return Ok(());
-        }
-
-        if !self.file_tracker.add_file(target, source_path)? {
-            // Ignore duplicate files.
-            return Ok(());
-        }
 
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Regular);
@@ -112,7 +83,6 @@ impl SDistWriter {
     pub fn new(
         wheel_dir: impl AsRef<Path>,
         metadata24: &Metadata24,
-        excludes: Override,
         mtime_override: Option<u64>,
     ) -> Result<Self, io::Error> {
         let path = wheel_dir
@@ -132,16 +102,24 @@ impl SDistWriter {
         Ok(Self {
             tar,
             path,
-            file_tracker: FileTracker::default(),
-            excludes,
             mtime: mtime_override.unwrap_or(SDIST_DETERMINISTIC_TIMESTAMP),
-            target_exclusion_warning_emitted: false,
         })
     }
 
-    /// Returns `true` if the given path should be excluded
-    fn exclude(&self, path: impl AsRef<Path>) -> bool {
-        self.excludes.matched(path.as_ref(), false).is_whitelist()
+    /// Tar files do not have a central directory of entries, so the entire file needs to be walked
+    /// to find a specific entry. Most tools are interestd in the package metadata, so place that
+    /// at the beginning of the tar for convenience
+    pub(super) fn file_ordering(&self) -> impl FnMut(&PathBuf, &PathBuf) -> Ordering + use<> {
+        |p1, p2| {
+            let p1_is_info = p1 == "PKG-INFO";
+            let p2_is_info = p2 == "PKG-INFO";
+
+            match (p1_is_info, p2_is_info) {
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                _ => p1.cmp(p2),
+            }
+        }
     }
 
     /// Finished the .tar.gz archive
@@ -149,54 +127,5 @@ impl SDistWriter {
         let archive = self.tar.into_inner()?;
         fs::write(&self.path, archive.finish()?)?;
         Ok(self.path)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use ignore::overrides::Override;
-    use ignore::overrides::OverrideBuilder;
-    use pep440_rs::Version;
-    use tempfile::TempDir;
-
-    use crate::Metadata24;
-    use crate::ModuleWriter;
-    use crate::module_writer::EMPTY;
-
-    use super::SDistWriter;
-
-    #[test]
-    // The mechanism is the same for wheel_writer
-    fn sdist_writer_excludes() -> Result<(), Box<dyn std::error::Error>> {
-        let metadata = Metadata24::new("dummy".to_string(), Version::new([1, 0]));
-
-        // No excludes
-        let tmp_dir = TempDir::new()?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty(), None)?;
-        assert!(writer.file_tracker.files.is_empty());
-        writer.add_empty_file("test")?;
-        assert_eq!(writer.file_tracker.files.len(), 1);
-        writer.finish()?;
-        tmp_dir.close()?;
-
-        // A test filter
-        let tmp_dir = TempDir::new()?;
-        let mut excludes = OverrideBuilder::new(&tmp_dir);
-        excludes.add("test*")?;
-        excludes.add("!test2")?;
-        let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?, None)?;
-        writer.add_bytes("test1", Some(Path::new("test1")), EMPTY, true)?;
-        writer.add_bytes("test3", Some(Path::new("test3")), EMPTY, true)?;
-        assert!(writer.file_tracker.files.is_empty());
-        writer.add_bytes("test2", Some(Path::new("test2")), EMPTY, true)?;
-        assert!(!writer.file_tracker.files.is_empty());
-        writer.add_bytes("yes", Some(Path::new("yes")), EMPTY, true)?;
-        assert_eq!(writer.file_tracker.files.len(), 2);
-        writer.finish()?;
-        tmp_dir.close()?;
-
-        Ok(())
     }
 }

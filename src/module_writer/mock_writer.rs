@@ -6,6 +6,7 @@ use std::str;
 use anyhow::Result;
 use anyhow::bail;
 use fs_err::File;
+use ignore::overrides::Override;
 use indexmap::IndexMap;
 use indexmap::map::Entry;
 use insta::assert_snapshot;
@@ -17,9 +18,10 @@ use crate::archive_source::ArchiveSource;
 use crate::write_dist_info;
 
 use super::ModuleWriterInternal;
+use super::VirtualWriter;
 
 #[derive(Default)]
-struct MockWriter {
+pub(crate) struct MockWriter {
     files: IndexMap<PathBuf, Vec<u8>>,
 }
 
@@ -47,8 +49,14 @@ impl ModuleWriterInternal for MockWriter {
     }
 }
 
+impl MockWriter {
+    pub fn finish(self) -> IndexMap<PathBuf, Vec<u8>> {
+        self.files
+    }
+}
+
 #[test]
-fn metadata_hello_world_pep639() {
+fn metadata_hello_world_pep639() -> Result<()> {
     let build_options = BuildOptions {
         cargo: CargoOptions {
             manifest_path: Some(
@@ -62,7 +70,7 @@ fn metadata_hello_world_pep639() {
     };
     let context = build_options.into_build_context().build().unwrap();
 
-    let mut writer = MockWriter::default();
+    let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
     write_dist_info(
         &mut writer,
         &context.project_layout.project_root,
@@ -71,7 +79,8 @@ fn metadata_hello_world_pep639() {
     )
     .unwrap();
 
-    assert_snapshot!(writer.files.keys().map(|p| p.to_string_lossy()).collect_vec().join("\n").replace("\\", "/"), @r"
+    let files = writer.finish()?;
+    assert_snapshot!(files.keys().map(|p| p.to_string_lossy()).collect_vec().join("\n").replace("\\", "/"), @r"
     hello_world-0.1.0.dist-info/METADATA
     hello_world-0.1.0.dist-info/WHEEL
     hello_world-0.1.0.dist-info/licenses/LICENSE
@@ -79,7 +88,7 @@ fn metadata_hello_world_pep639() {
     ");
     let metadata_path = Path::new("hello_world-0.1.0.dist-info").join("METADATA");
     // Remove the README in the body of the email
-    let metadata = str::from_utf8(&writer.files[&metadata_path])
+    let metadata = str::from_utf8(&files[&metadata_path])
         .unwrap()
         .split_once("\n\n")
         .unwrap()
@@ -94,4 +103,6 @@ fn metadata_hello_world_pep639() {
     Author-email: konstin <konstin@mailbox.org>
     Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
     ");
+
+    Ok(())
 }

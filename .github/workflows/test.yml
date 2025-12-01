@@ -20,7 +20,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - run: |
           rustup component add rustfmt
           rustup component add clippy
@@ -86,7 +86,7 @@ jobs:
         run: |
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
       - name: Install python packages
         run: |
@@ -196,7 +196,7 @@ jobs:
     name: Build maturin
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - run: rustup show
       - run: rustup target add x86_64-unknown-linux-musl
       - run: sudo apt-get install musl-tools
@@ -216,7 +216,7 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
@@ -252,7 +252,7 @@ jobs:
       PYTHON_VERSION: "3.11.2"
       NODE_VERSION: 18
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         id: setup-python
         with:
@@ -295,7 +295,7 @@ jobs:
           set -ex
           apk add cargo python3-dev libffi-dev py3-pip curl \
             bash tar zstd git patchelf py3-virtualenv
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Fix git permissions
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - name: Cache cargo build
@@ -319,7 +319,7 @@ jobs:
         manylinux: ["manylinux_2_28"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/download-artifact@v6
         with:
@@ -339,7 +339,7 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -398,7 +398,7 @@ jobs:
             python: pypy3.11
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v6
         with:
           name: maturin-build
@@ -435,7 +435,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: changes
         with:
@@ -480,7 +480,7 @@ jobs:
     name: Test MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.85.0
       # Caching
       - name: Cache cargo build
@@ -521,7 +521,7 @@ jobs:
             apt-packages: gcc-arm-linux-gnueabi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Install packages
         run: |
           sudo apt-get update

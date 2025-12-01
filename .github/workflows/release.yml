@@ -17,7 +17,7 @@ jobs:
       name: crates.io
       url: ${{ steps.set_url.outputs.env_url }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
@@ -61,7 +61,7 @@ jobs:
       CARGO_PROFILE_RELEASE_LTO: "fat"
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -179,7 +179,7 @@ jobs:
         CARGO_HOME: /root/.cargo
         CARGO_PROFILE_RELEASE_LTO: "${{ matrix.platform.lto || 'fat' }}"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       # powerpc64le-unknown-linux-musl doesn't have official std library release
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
         if: ${{ !contains(fromJson('["powerpc64le-unknown-linux-musl", "s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target) }}

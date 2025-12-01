@@ -17,7 +17,7 @@ jobs:
     name: Update auditwheel policies
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Fetch latest policy files
       run: |
         curl https://raw.githubusercontent.com/pypa/auditwheel/main/src/auditwheel/policy/manylinux-policy.json > src/auditwheel/manylinux-policy.json

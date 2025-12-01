@@ -36,7 +36,7 @@ impl Pyo3BindingGenerator {
 
 impl BindingGenerator for Pyo3BindingGenerator {
     fn generate_bindings(
-        &self,
+        &mut self,
         context: &BuildContext,
         interpreter: Option<&PythonInterpreter>,
         artifact: &BuildArtifact,

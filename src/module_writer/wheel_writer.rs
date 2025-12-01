@@ -89,9 +89,7 @@ impl WheelWriter {
     pub fn new(
         tag: &str,
         wheel_dir: &Path,
-        pyproject_dir: &Path,
         metadata24: &Metadata24,
-        tags: &[String],
         excludes: Override,
         file_options: SimpleFileOptions,
     ) -> Result<WheelWriter> {
@@ -104,7 +102,7 @@ impl WheelWriter {
 
         let file = File::create(wheel_path)?;
 
-        let mut builder = WheelWriter {
+        let builder = WheelWriter {
             zip: ZipWriter::new(file),
             record: BTreeMap::new(),
             file_tracker: FileTracker::default(),
@@ -112,8 +110,6 @@ impl WheelWriter {
             file_options,
             target_exclusion_warning_emitted: false,
         };
-
-        write_dist_info(&mut builder, pyproject_dir, metadata24, tags)?;
 
         Ok(builder)
     }
@@ -155,7 +151,14 @@ impl WheelWriter {
     }
 
     /// Creates the record file and finishes the zip
-    pub fn finish(mut self, metadata24: &Metadata24) -> Result<PathBuf, io::Error> {
+    pub fn finish(
+        mut self,
+        metadata24: &Metadata24,
+        pyproject_dir: &Path,
+        tags: &[String],
+    ) -> Result<PathBuf> {
+        write_dist_info(&mut self, pyproject_dir, metadata24, tags)?;
+
         let options = self
             .file_options
             .unix_permissions(default_permission(false));
@@ -199,14 +202,12 @@ mod tests {
         let writer = WheelWriter::new(
             "no compression",
             tmp_dir.path(),
-            tmp_dir.path(),
             &metadata,
-            &[],
             Override::empty(),
             compression_options.get_file_options(),
         )?;
 
-        writer.finish(&metadata)?;
+        writer.finish(&metadata, tmp_dir.path(), &[])?;
         tmp_dir.close()?;
 
         Ok(())

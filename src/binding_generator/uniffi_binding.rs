@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -8,16 +7,84 @@ use anyhow::Context as _;
 use anyhow::Result;
 use anyhow::bail;
 use fs_err as fs;
-use fs_err::File;
 use normpath::PathExt as _;
+use tempfile::TempDir;
 use tracing::debug;
 
-use crate::ModuleWriter;
-use crate::PyProjectToml;
-use crate::module_writer::ModuleWriterExt;
-use crate::module_writer::write_python_part;
-use crate::project_layout::ProjectLayout;
+use crate::BuildArtifact;
+use crate::BuildContext;
+use crate::PythonInterpreter;
+use crate::archive_source::ArchiveSource;
+use crate::archive_source::FileSourceData;
+use crate::archive_source::GeneratedSourceData;
 use crate::target::Os;
+
+use super::BindingGenerator;
+use super::GeneratorOutput;
+
+/// A generator for producing UniFFI bindings.
+#[derive(Default)]
+pub struct UniFfiBindingGenerator {}
+
+impl BindingGenerator for UniFfiBindingGenerator {
+    fn generate_bindings(
+        &self,
+        context: &BuildContext,
+        _interpreter: Option<&PythonInterpreter>,
+        artifact: &BuildArtifact,
+        module: &Path,
+        _temp_dir: &TempDir,
+    ) -> Result<GeneratorOutput> {
+        let base_path = if context.project_layout.python_module.is_some() {
+            module.join(&context.project_layout.extension_name)
+        } else {
+            module.to_path_buf()
+        };
+
+        let UniFfiBindings {
+            names: binding_names,
+            cdylib,
+            path: binding_dir,
+        } = generate_uniffi_bindings(
+            context.manifest_path.parent().unwrap(),
+            &context.target_dir,
+            &context.module_name,
+            context.target.target_os(),
+            &artifact.path,
+        )?;
+        let artifact_target = base_path.join(cdylib);
+        let mut additional_files = HashMap::new();
+
+        let py_init = binding_names
+            .iter()
+            .map(|name| format!("from .{name} import *  # NOQA\n"))
+            .collect::<Vec<String>>()
+            .join("");
+        let source = GeneratedSourceData {
+            data: py_init.into(),
+            executable: false,
+        };
+        additional_files.insert(
+            base_path.join("__init__.py"),
+            ArchiveSource::Generated(source),
+        );
+
+        for binding in binding_names {
+            let filename = format!("{binding}.py");
+            let source = FileSourceData {
+                path: binding_dir.join(&filename),
+                executable: false,
+            };
+            additional_files.insert(base_path.join(filename), ArchiveSource::File(source));
+        }
+
+        Ok(GeneratorOutput {
+            artifact_target,
+            artifact_source_override: None,
+            additional_files: Some(additional_files),
+        })
+    }
+}
 
 /// uniffi.toml
 #[derive(Debug, serde::Deserialize)]
@@ -175,89 +242,4 @@ fn generate_uniffi_bindings(
         cdylib,
         path: binding_dir,
     })
-}
-
-/// Creates the uniffi module with the shared library
-#[allow(clippy::too_many_arguments)]
-pub fn write_uniffi_module(
-    writer: &mut impl ModuleWriter,
-    project_layout: &ProjectLayout,
-    crate_dir: &Path,
-    target_dir: &Path,
-    module_name: &str,
-    artifact: &Path,
-    target_os: Os,
-    editable: bool,
-    pyproject_toml: Option<&PyProjectToml>,
-) -> Result<()> {
-    let UniFfiBindings {
-        names: binding_names,
-        cdylib,
-        path: binding_dir,
-    } = generate_uniffi_bindings(crate_dir, target_dir, module_name, target_os, artifact)?;
-
-    let py_init = binding_names
-        .iter()
-        .map(|name| format!("from .{name} import *  # NOQA\n"))
-        .collect::<Vec<String>>()
-        .join("");
-
-    if !editable {
-        write_python_part(writer, project_layout, pyproject_toml)
-            .context("Failed to add the python module to the package")?;
-    }
-
-    let module;
-    if let Some(python_module) = &project_layout.python_module {
-        if editable {
-            let base_path = python_module.join(&project_layout.extension_name);
-            fs::create_dir_all(&base_path)?;
-            let target = base_path.join(&cdylib);
-            fs::copy(artifact, &target).context(format!(
-                "Failed to copy {} to {}",
-                artifact.display(),
-                target.display()
-            ))?;
-
-            File::create(base_path.join("__init__.py"))?.write_all(py_init.as_bytes())?;
-
-            for binding_name in binding_names.iter() {
-                let target: PathBuf = base_path.join(binding_name).with_extension("py");
-                fs::copy(binding_dir.join(binding_name).with_extension("py"), &target)
-                    .with_context(|| {
-                        format!("Failed to copy {:?} to {:?}", binding_dir.display(), target)
-                    })?;
-            }
-        }
-
-        let relative = project_layout
-            .rust_module
-            .strip_prefix(python_module.parent().unwrap())
-            .unwrap();
-        module = relative.join(&project_layout.extension_name);
-    } else {
-        module = PathBuf::from(module_name);
-        let type_stub = project_layout
-            .rust_module
-            .join(format!("{module_name}.pyi"));
-        if type_stub.exists() {
-            eprintln!("📖 Found type stub file at {module_name}.pyi");
-            writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
-            writer.add_empty_file(module.join("py.typed"))?;
-        }
-    };
-
-    if !editable || project_layout.python_module.is_none() {
-        writer.add_bytes(module.join("__init__.py"), None, py_init.as_bytes(), false)?;
-        for binding in binding_names.iter() {
-            writer.add_file(
-                module.join(binding).with_extension("py"),
-                binding_dir.join(binding).with_extension("py"),
-                false,
-            )?;
-        }
-        writer.add_file(module.join(cdylib), artifact, true)?;
-    }
-
-    Ok(())
 }

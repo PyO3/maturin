@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
@@ -7,6 +8,8 @@ use anyhow::Context as _;
 use anyhow::Result;
 use fs_err as fs;
 use fs_err::File;
+#[cfg(unix)]
+use fs_err::os::unix::fs::OpenOptionsExt as _;
 use tempfile::TempDir;
 use tempfile::tempdir;
 use tracing::debug;
@@ -16,7 +19,9 @@ use crate::BuildContext;
 use crate::Metadata24;
 use crate::ModuleWriter;
 use crate::PythonInterpreter;
+use crate::archive_source::ArchiveSource;
 use crate::module_writer::ModuleWriterExt;
+use crate::module_writer::default_permission;
 use crate::module_writer::write_python_part;
 
 mod cffi_binding;
@@ -26,7 +31,7 @@ mod wasm_binding;
 
 pub use cffi_binding::CffiBindingGenerator;
 pub use pyo3_binding::Pyo3BindingGenerator;
-pub use uniffi_binding::write_uniffi_module;
+pub use uniffi_binding::UniFfiBindingGenerator;
 pub use wasm_binding::write_wasm_launcher;
 
 ///A trait to generate the binding files to be included in the built module
@@ -56,7 +61,7 @@ pub(crate) struct GeneratorOutput {
 
     /// Additional files to be installed (e.g. __init__.py)
     /// The provided PathBuf should be relative to the archive root
-    additional_files: Option<HashMap<PathBuf, Vec<u8>>>,
+    additional_files: Option<HashMap<PathBuf, ArchiveSource>>,
 }
 
 /// Every binding generator ultimately has to install the following:
@@ -139,16 +144,25 @@ pub fn generate_binding(
 
             // 3. Install additional files
             if let Some(additional_files) = additional_files {
-                for (target, data) in additional_files {
+                for (target, source) in additional_files {
                     let target = base_path.join(target);
                     fs::create_dir_all(target.parent().unwrap())?;
                     debug!("Generating file {}", target.display());
-                    let mut file = File::options()
-                        .write(true)
-                        .create(true)
-                        .truncate(true)
-                        .open(&target)?;
-                    file.write_all(data.as_slice())?;
+                    let mut options = File::options();
+                    options.write(true).create(true).truncate(true);
+                    #[cfg(unix)]
+                    {
+                        options.mode(default_permission(source.executable()));
+                    }
+
+                    let mut file = options.open(&target)?;
+                    match source {
+                        ArchiveSource::Generated(source) => file.write_all(&source.data)?,
+                        ArchiveSource::File(source) => {
+                            let mut source = File::options().read(true).open(source.path)?;
+                            io::copy(&mut source, &mut file)?;
+                        }
+                    }
                 }
             }
         }
@@ -164,9 +178,21 @@ pub fn generate_binding(
 
             // 3. Install additional files
             if let Some(additional_files) = additional_files {
-                for (target, data) in additional_files {
+                for (target, source) in additional_files {
                     debug!("Generating archive entry {}", target.display());
-                    writer.add_bytes(target, None, data.as_slice(), false)?;
+                    match source {
+                        ArchiveSource::Generated(source) => {
+                            writer.add_bytes(
+                                target,
+                                None,
+                                source.data.as_slice(),
+                                source.executable,
+                            )?;
+                        }
+                        ArchiveSource::File(source) => {
+                            writer.add_file(target, source.path, source.executable)?;
+                        }
+                    }
                 }
             }
         }

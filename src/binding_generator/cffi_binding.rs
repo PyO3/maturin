@@ -20,6 +20,8 @@ use tracing::debug;
 use crate::BuildArtifact;
 use crate::BuildContext;
 use crate::PythonInterpreter;
+use crate::archive_source::ArchiveSource;
+use crate::archive_source::GeneratedSourceData;
 use crate::target::Os;
 
 use super::BindingGenerator;
@@ -55,21 +57,31 @@ impl BindingGenerator for CffiBindingGenerator {
         let artifact_target = base_path.join(&cffi_module_file_name);
 
         let mut additional_files = HashMap::new();
+        let source = GeneratedSourceData {
+            data: cffi_init_file(&cffi_module_file_name).into(),
+            executable: false,
+        };
         additional_files.insert(
             base_path.join("__init__.py"),
-            cffi_init_file(&cffi_module_file_name).into(),
+            ArchiveSource::Generated(source),
         );
-        additional_files.insert(
-            base_path.join("ffi.py"),
-            generate_cffi_declarations(
-                context.manifest_path.parent().unwrap(),
-                &context.target_dir,
-                &interpreter
-                    .ok_or_else(|| anyhow!("A python interpreter is required for cffi builds but one was not provided"))?
-                    .executable,
-            )?
-            .into(),
-        );
+
+        let declarations = generate_cffi_declarations(
+            context.manifest_path.parent().unwrap(),
+            &context.target_dir,
+            &interpreter
+                .ok_or_else(|| {
+                    anyhow!(
+                        "A python interpreter is required for cffi builds but one was not provided"
+                    )
+                })?
+                .executable,
+        )?;
+        let source = GeneratedSourceData {
+            data: declarations.into(),
+            executable: false,
+        };
+        additional_files.insert(base_path.join("ffi.py"), ArchiveSource::Generated(source));
 
         Ok(GeneratorOutput {
             artifact_target,

@@ -332,7 +332,7 @@ fn permission_is_executable(mode: u32) -> bool {
 }
 
 #[inline]
-fn default_permission(executable: bool) -> u32 {
+pub(crate) fn default_permission(executable: bool) -> u32 {
     match executable {
         true => 0o755,
         false => 0o644,

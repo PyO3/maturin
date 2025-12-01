@@ -46,6 +46,7 @@ pub use crate::upload::{PublishOpt, Registry, UploadError, upload, upload_ui};
 pub use auditwheel::PlatformTag;
 pub use target::Target;
 
+mod archive_source;
 mod auditwheel;
 mod binding_generator;
 mod bridge;

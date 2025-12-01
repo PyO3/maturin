@@ -1,8 +1,8 @@
 use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::binding_generator::{
-    CffiBindingGenerator, Pyo3BindingGenerator, generate_binding, write_bin, write_uniffi_module,
-    write_wasm_launcher,
+    CffiBindingGenerator, Pyo3BindingGenerator, UniFfiBindingGenerator, generate_binding,
+    write_bin, write_wasm_launcher,
 };
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
@@ -1049,16 +1049,13 @@ impl BuildContext {
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        write_uniffi_module(
+        let generator = UniFfiBindingGenerator::default();
+        generate_binding(
             &mut writer,
-            &self.project_layout,
-            self.manifest_path.parent().unwrap(),
-            &self.target_dir,
-            &self.module_name,
-            &artifact.path,
-            self.target.target_os(),
-            self.editable,
-            self.pyproject_toml.as_ref(),
+            &generator,
+            self,
+            self.interpreter.first(),
+            &artifact,
         )?;
 
         self.add_pth(&mut writer)?;

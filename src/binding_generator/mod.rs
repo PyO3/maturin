@@ -11,14 +11,11 @@ use fs_err as fs;
 use fs_err::File;
 #[cfg(unix)]
 use fs_err::os::unix::fs::OpenOptionsExt as _;
-use tempfile::TempDir;
-use tempfile::tempdir;
 use tracing::debug;
 
 use crate::BuildArtifact;
 use crate::BuildContext;
 use crate::ModuleWriter;
-use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
 use crate::module_writer::ModuleWriterExt;
 #[cfg(unix)]
@@ -43,10 +40,8 @@ pub(crate) trait BindingGenerator {
     fn generate_bindings(
         &mut self,
         context: &BuildContext,
-        interpreter: Option<&PythonInterpreter>,
         artifact: &BuildArtifact,
         module: &Path,
-        temp_dir: &TempDir,
     ) -> Result<GeneratorOutput>;
 }
 
@@ -88,7 +83,6 @@ pub fn generate_binding<A>(
     writer: &mut impl ModuleWriter,
     generator: &mut impl BindingGenerator,
     context: &BuildContext,
-    interpreter: Option<&PythonInterpreter>,
     artifacts: &[A],
 ) -> Result<()>
 where
@@ -122,12 +116,11 @@ where
 
     for artifact in artifacts {
         let artifact = artifact.borrow();
-        let temp_dir = tempdir()?;
         let GeneratorOutput {
             artifact_target,
             artifact_source_override,
             additional_files,
-        } = generator.generate_bindings(context, interpreter, artifact, &module, &temp_dir)?;
+        } = generator.generate_bindings(context, artifact, &module)?;
 
         match (context.editable, &base_path) {
             (true, Some(base_path)) => {

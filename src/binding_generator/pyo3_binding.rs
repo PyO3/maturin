@@ -4,9 +4,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use anyhow::Context;
 use anyhow::Result;
+use anyhow::anyhow;
 use anyhow::bail;
 use tempfile::TempDir;
+use tempfile::tempdir;
 use tracing::debug;
 
 use crate::BuildArtifact;
@@ -24,48 +27,63 @@ use super::GeneratorOutput;
 /// This struct is responsible for generating Python bindings for modules using PyO3.
 /// The `abi3` field determines whether the generated bindings use the stable PyO3 "abi3" interface,
 /// which allows compatibility with multiple Python versions.
-pub struct Pyo3BindingGenerator {
-    abi3: bool,
+pub struct Pyo3BindingGenerator<'a> {
+    binding_type: BindingType<'a>,
+    tempdir: TempDir,
 }
 
-impl Pyo3BindingGenerator {
-    pub fn new(abi3: bool) -> Self {
-        Self { abi3 }
+enum BindingType<'a> {
+    Abi3(Option<&'a PythonInterpreter>),
+    NonAbi3(&'a PythonInterpreter),
+}
+
+impl<'a> Pyo3BindingGenerator<'a> {
+    pub fn new(abi3: bool, interpreter: Option<&'a PythonInterpreter>) -> Result<Self> {
+        let binding_type = match abi3 {
+            true => BindingType::Abi3(interpreter),
+            false => {
+                let interpreter = interpreter.ok_or_else(|| anyhow!(
+                    "A python interpreter is required for non-abi3 builds but one was not provided"
+                ))?;
+                BindingType::NonAbi3(interpreter)
+            }
+        };
+        Ok(Self {
+            binding_type,
+            tempdir: tempdir()?,
+        })
     }
 }
 
-impl BindingGenerator for Pyo3BindingGenerator {
+impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
     fn generate_bindings(
         &mut self,
         context: &BuildContext,
-        interpreter: Option<&PythonInterpreter>,
         artifact: &BuildArtifact,
         module: &Path,
-        temp_dir: &TempDir,
     ) -> Result<GeneratorOutput> {
         let ext_name = &context.project_layout.extension_name;
         let target = &context.target;
 
-        let so_filename = if self.abi3 {
-            if target.is_unix() {
-                if target.is_cygwin() {
-                    format!("{ext_name}.abi3.dll")
-                } else {
-                    format!("{ext_name}.abi3.so")
-                }
-            } else {
-                match interpreter {
-                    Some(interpreter) if interpreter.is_windows_debug() => {
-                        format!("{ext_name}_d.pyd")
+        let so_filename = match self.binding_type {
+            BindingType::Abi3(interpreter) => {
+                if target.is_unix() {
+                    if target.is_cygwin() {
+                        format!("{ext_name}.abi3.dll")
+                    } else {
+                        format!("{ext_name}.abi3.so")
                     }
-                    // Apparently there is no tag for abi3 on windows
-                    _ => format!("{ext_name}.pyd"),
+                } else {
+                    match interpreter {
+                        Some(interpreter) if interpreter.is_windows_debug() => {
+                            format!("{ext_name}_d.pyd")
+                        }
+                        // Apparently there is no tag for abi3 on windows
+                        _ => format!("{ext_name}.pyd"),
+                    }
                 }
             }
-        } else {
-            let interpreter =
-                interpreter.expect("A python interpreter is required for non-abi3 build");
-            interpreter.get_library_name(ext_name)
+            BindingType::NonAbi3(interpreter) => interpreter.get_library_name(ext_name),
         };
         let artifact_target = module.join(so_filename);
 
@@ -73,7 +91,11 @@ impl BindingGenerator for Pyo3BindingGenerator {
             && artifact.path.extension().unwrap_or(OsStr::new(" ")) == OsStr::new("a");
 
         let artifact_source_override = if artifact_is_big_ar {
-            Some(unpack_big_archive(target, &artifact.path, temp_dir.path())?)
+            Some(unpack_big_archive(
+                target,
+                &artifact.path,
+                self.tempdir.path(),
+            )?)
         } else {
             None
         };
@@ -120,7 +142,7 @@ fn unpack_big_archive(target: &Target, artifact: &Path, temp_dir_path: &Path) ->
         .arg("-X64")
         .arg("x")
         .arg(artifact);
-    let status = ar_command.status().expect("Failed to run ar");
+    let status = ar_command.status().context("Failed to run ar")?;
     if !status.success() {
         bail!(r#"ar finished with "{}": `{:?}`"#, status, ar_command,)
     }

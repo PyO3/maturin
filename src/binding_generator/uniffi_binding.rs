@@ -8,12 +8,10 @@ use anyhow::Result;
 use anyhow::bail;
 use fs_err as fs;
 use normpath::PathExt as _;
-use tempfile::TempDir;
 use tracing::debug;
 
 use crate::BuildArtifact;
 use crate::BuildContext;
-use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::FileSourceData;
 use crate::archive_source::GeneratedSourceData;
@@ -30,10 +28,8 @@ impl BindingGenerator for UniFfiBindingGenerator {
     fn generate_bindings(
         &mut self,
         context: &BuildContext,
-        _interpreter: Option<&PythonInterpreter>,
         artifact: &BuildArtifact,
         module: &Path,
-        _temp_dir: &TempDir,
     ) -> Result<GeneratorOutput> {
         let base_path = if context.project_layout.python_module.is_some() {
             module.join(&context.project_layout.extension_name)

@@ -12,7 +12,7 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.9
         with:
@@ -23,7 +23,7 @@ jobs:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
         run: cargo build
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repository }}
           submodules: "recursive"

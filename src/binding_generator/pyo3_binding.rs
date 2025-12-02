@@ -25,8 +25,9 @@ use super::GeneratorOutput;
 /// A generator for producing PyO3 bindings.
 ///
 /// This struct is responsible for generating Python bindings for modules using PyO3.
-/// The `abi3` field determines whether the generated bindings use the stable PyO3 "abi3" interface,
-/// which allows compatibility with multiple Python versions.
+/// The `binding_type` field determines whether the generated bindings use the stable PyO3 "abi3" interface,
+/// which allows compatibility with multiple Python versions and allows targeting a specific python
+/// interpreter.
 pub struct Pyo3BindingGenerator<'a> {
     binding_type: BindingType<'a>,
     tempdir: TempDir,

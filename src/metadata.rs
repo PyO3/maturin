@@ -542,8 +542,8 @@ impl Metadata24 {
     }
 
     /// Formats the metadata into a list where keys with multiple values
-    /// become multiple single-valued key-value pairs. This format is needed for the pypi
-    /// uploader and for the METADATA file inside wheels
+    /// become multiple single-valued key-value pairs. This format is needed for
+    /// the METADATA file inside wheels
     pub fn to_vec(&self) -> Vec<(String, String)> {
         let mut fields = vec![
             ("Metadata-Version", self.metadata_version.clone()),

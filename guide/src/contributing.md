@@ -87,7 +87,7 @@ run `mdbook watch guide` from the repository root. The output can then be found 
 
 ## Code
 
-The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` takes care username and password for the pypi upload and otherwise calls into the library.
+The main part is the maturin library, which is completely documented and should be well integrable. The accompanying `main.rs` calls into the library.
 
 The `sysconfig` folder contains the output of `python -m sysconfig` for different python versions and platform, which is helpful during development.
 

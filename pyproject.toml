@@ -10,7 +10,7 @@ build-backend = "bootstrap"
 
 [project]
 name = "maturin"
-description = "Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
+description = "Build crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
 authors = [{ name = "konstin", email = "konstin@mailbox.org" }]
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.7"

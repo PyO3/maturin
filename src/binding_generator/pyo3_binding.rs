@@ -3,13 +3,13 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::rc::Rc;
 
 use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
 use anyhow::bail;
 use tempfile::TempDir;
-use tempfile::tempdir;
 use tracing::debug;
 
 use crate::BuildArtifact;
@@ -30,7 +30,7 @@ use super::GeneratorOutput;
 /// interpreter.
 pub struct Pyo3BindingGenerator<'a> {
     binding_type: BindingType<'a>,
-    tempdir: TempDir,
+    tempdir: Rc<TempDir>,
 }
 
 enum BindingType<'a> {
@@ -39,7 +39,11 @@ enum BindingType<'a> {
 }
 
 impl<'a> Pyo3BindingGenerator<'a> {
-    pub fn new(abi3: bool, interpreter: Option<&'a PythonInterpreter>) -> Result<Self> {
+    pub fn new(
+        abi3: bool,
+        interpreter: Option<&'a PythonInterpreter>,
+        tempdir: Rc<TempDir>,
+    ) -> Result<Self> {
         let binding_type = match abi3 {
             true => BindingType::Abi3(interpreter),
             false => {
@@ -51,7 +55,7 @@ impl<'a> Pyo3BindingGenerator<'a> {
         };
         Ok(Self {
             binding_type,
-            tempdir: tempdir()?,
+            tempdir,
         })
     }
 }

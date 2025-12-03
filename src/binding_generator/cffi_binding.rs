@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
+use std::rc::Rc;
 use std::str;
 
 use anyhow::Context as _;
@@ -13,7 +14,6 @@ use anyhow::Result;
 use anyhow::bail;
 use fs_err as fs;
 use tempfile::TempDir;
-use tempfile::tempdir;
 use tracing::debug;
 
 use crate::BuildArtifact;
@@ -29,14 +29,14 @@ use super::GeneratorOutput;
 /// A generator for producing Cffi bindings.
 pub struct CffiBindingGenerator<'a> {
     interpreter: &'a PythonInterpreter,
-    tempdir: TempDir,
+    tempdir: Rc<TempDir>,
 }
 
 impl<'a> CffiBindingGenerator<'a> {
-    pub fn new(interpreter: &'a PythonInterpreter) -> Result<Self> {
+    pub fn new(interpreter: &'a PythonInterpreter, tempdir: Rc<TempDir>) -> Result<Self> {
         Ok(Self {
             interpreter,
-            tempdir: tempdir()?,
+            tempdir,
         })
     }
 }

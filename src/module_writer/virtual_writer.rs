@@ -4,13 +4,17 @@ use std::collections::hash_map::Entry;
 use std::collections::hash_map::VacantEntry;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use anyhow::Result;
 use anyhow::bail;
 use ignore::overrides::Override;
 #[cfg(test)]
 use indexmap::IndexMap;
+use once_cell::unsync::OnceCell;
 use same_file::is_same_file;
+use tempfile::TempDir;
+use tempfile::tempdir;
 use tracing::debug;
 
 use crate::Metadata24;
@@ -39,6 +43,7 @@ pub struct VirtualWriter<W> {
     tracker: HashMap<PathBuf, ArchiveSource>,
     excludes: Override,
     target_exclusion_warning_emitted: bool,
+    temp_dir: OnceCell<Rc<TempDir>>,
 }
 
 impl<W: ModuleWriterInternal> VirtualWriter<W> {
@@ -50,7 +55,18 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
             tracker: HashMap::new(),
             excludes,
             target_exclusion_warning_emitted: false,
+            temp_dir: OnceCell::new(),
         }
+    }
+
+    /// Provides a temp dir that can contain files that will be added to the archive later
+    pub(crate) fn temp_dir(&self) -> Result<Rc<TempDir>> {
+        self.temp_dir
+            .get_or_try_init(|| {
+                let temp_dir = tempdir()?;
+                Ok(Rc::new(temp_dir))
+            })
+            .cloned()
     }
 
     /// Returns `true` if the given path should be excluded

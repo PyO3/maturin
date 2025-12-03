@@ -119,36 +119,42 @@ fn uniffi_bindgen_command(crate_dir: &Path) -> Result<Command> {
         None => cargo_metadata
             .packages
             .iter()
-            .find(|p| p.manifest_path == manifest_path),
+            .find(|&p| p.manifest_path == manifest_path),
     };
 
-    let has_uniffi_bindgen_target = root_pkg
-        .map(|pkg| {
-            pkg.targets
-                .iter()
-                .any(|target| target.name == "uniffi-bindgen" && target.is_bin())
-        })
-        .unwrap_or(false);
-    let has_uniffi_bindgen_workspace_package = cargo_metadata.packages.iter().any(|pkg| {
+    let uniffi_bindgen_target = root_pkg.and_then(|pkg| {
         pkg.targets
             .iter()
-            .any(|target| target.name == "uniffi-bindgen" && target.is_bin())
+            .find(|&target| target.name == "uniffi-bindgen" && target.is_bin())
     });
+    let uniffi_bindgen_workspace_target = cargo_metadata
+        .packages
+        .iter()
+        .flat_map(|pkg| pkg.targets.iter())
+        .find(|&target| target.name == "uniffi-bindgen" && target.is_bin());
 
-    let command = if has_uniffi_bindgen_target {
+    let command = if let Some(target) = uniffi_bindgen_target {
         let mut command = Command::new("cargo");
         command
             .args(["run", "--bin", "uniffi-bindgen", "--manifest-path"])
             .arg(manifest_path)
             .current_dir(crate_dir)
             .env_remove("CARGO_BUILD_TARGET");
+        if !target.required_features.is_empty() {
+            let features = target.required_features.join(",");
+            command.arg("--features").arg(features);
+        }
         command
-    } else if has_uniffi_bindgen_workspace_package {
+    } else if let Some(target) = uniffi_bindgen_workspace_target {
         let mut command = Command::new("cargo");
         command
             .args(["run", "--bin", "uniffi-bindgen"])
             .current_dir(cargo_metadata.workspace_root)
             .env_remove("CARGO_BUILD_TARGET");
+        if !target.required_features.is_empty() {
+            let features = target.required_features.join(",");
+            command.arg("--features").arg(features);
+        }
         command
     } else {
         let mut command = Command::new("uniffi-bindgen");

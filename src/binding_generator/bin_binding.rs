@@ -5,12 +5,10 @@ use std::str::FromStr as _;
 use anyhow::Context;
 use anyhow::Result;
 use pep508_rs::Requirement;
-use tempfile::TempDir;
 
 use crate::BuildArtifact;
 use crate::BuildContext;
 use crate::Metadata24;
-use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::GeneratedSourceData;
 
@@ -32,10 +30,8 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
     fn generate_bindings(
         &mut self,
         context: &BuildContext,
-        _interpreter: Option<&PythonInterpreter>,
         artifact: &BuildArtifact,
         _module: &Path,
-        _temp_dir: &TempDir,
     ) -> Result<GeneratorOutput> {
         // I wouldn't know of any case where this would be the wrong (and neither do
         // I know a better alternative)

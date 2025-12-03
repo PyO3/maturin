@@ -723,15 +723,10 @@ impl BuildContext {
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let mut generator = Pyo3BindingGenerator::new(true);
-        generate_binding(
-            &mut writer,
-            &mut generator,
-            self,
-            self.interpreter.first(),
-            &[&artifact],
-        )
-        .context("Failed to add the files to the wheel")?;
+        let mut generator = Pyo3BindingGenerator::new(true, self.interpreter.first())
+            .context("Failed to initialize PyO3 binding generator")?;
+        generate_binding(&mut writer, &mut generator, self, &[&artifact])
+            .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -806,15 +801,10 @@ impl BuildContext {
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let mut generator = Pyo3BindingGenerator::new(false);
-        generate_binding(
-            &mut writer,
-            &mut generator,
-            self,
-            Some(python_interpreter),
-            &[&artifact],
-        )
-        .context("Failed to add the files to the wheel")?;
+        let mut generator = Pyo3BindingGenerator::new(false, Some(python_interpreter))
+            .context("Failed to initialize PyO3 binding generator")?;
+        generate_binding(&mut writer, &mut generator, self, &[&artifact])
+            .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -934,14 +924,12 @@ impl BuildContext {
         )?;
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let mut generator = CffiBindingGenerator::default();
-        generate_binding(
-            &mut writer,
-            &mut generator,
-            self,
-            self.interpreter.first(),
-            &[&artifact],
-        )?;
+        let interpreter = self.interpreter.first().ok_or_else(|| {
+            anyhow!("A python interpreter is required for cffi builds but one was not provided")
+        })?;
+        let mut generator = CffiBindingGenerator::new(interpreter)
+            .context("Failed to initialize Cffi binding generator")?;
+        generate_binding(&mut writer, &mut generator, self, &[&artifact])?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -1007,13 +995,7 @@ impl BuildContext {
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let mut generator = UniFfiBindingGenerator::default();
-        generate_binding(
-            &mut writer,
-            &mut generator,
-            self,
-            self.interpreter.first(),
-            &[&artifact],
-        )?;
+        generate_binding(&mut writer, &mut generator, self, &[&artifact])?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -1101,14 +1083,8 @@ impl BuildContext {
         self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 
         let mut generator = BinBindingGenerator::new(&mut metadata24);
-        generate_binding(
-            &mut writer,
-            &mut generator,
-            self,
-            self.interpreter.first(),
-            artifacts,
-        )
-        .context("Failed to add the files to the wheel")?;
+        generate_binding(&mut writer, &mut generator, self, artifacts)
+            .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
         add_data(

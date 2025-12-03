@@ -10,7 +10,6 @@ use std::str;
 
 use anyhow::Context as _;
 use anyhow::Result;
-use anyhow::anyhow;
 use anyhow::bail;
 use fs_err as fs;
 use tempfile::TempDir;
@@ -28,17 +27,26 @@ use super::BindingGenerator;
 use super::GeneratorOutput;
 
 /// A generator for producing Cffi bindings.
-#[derive(Default)]
-pub struct CffiBindingGenerator {}
+pub struct CffiBindingGenerator<'a> {
+    interpreter: &'a PythonInterpreter,
+    tempdir: TempDir,
+}
 
-impl BindingGenerator for CffiBindingGenerator {
+impl<'a> CffiBindingGenerator<'a> {
+    pub fn new(interpreter: &'a PythonInterpreter) -> Result<Self> {
+        Ok(Self {
+            interpreter,
+            tempdir: tempdir()?,
+        })
+    }
+}
+
+impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
     fn generate_bindings(
         &mut self,
         context: &BuildContext,
-        interpreter: Option<&PythonInterpreter>,
         _artifact: &BuildArtifact,
         module: &Path,
-        _temp_dir: &TempDir,
     ) -> Result<GeneratorOutput> {
         let cffi_module_file_name = {
             let extension_name = &context.project_layout.extension_name;
@@ -69,13 +77,8 @@ impl BindingGenerator for CffiBindingGenerator {
         let declarations = generate_cffi_declarations(
             context.manifest_path.parent().unwrap(),
             &context.target_dir,
-            &interpreter
-                .ok_or_else(|| {
-                    anyhow!(
-                        "A python interpreter is required for cffi builds but one was not provided"
-                    )
-                })?
-                .executable,
+            &self.interpreter.executable,
+            &self.tempdir,
         )?;
         let source = GeneratedSourceData {
             data: declarations.into(),
@@ -175,9 +178,9 @@ fn generate_cffi_declarations(
     crate_dir: &Path,
     target_dir: &Path,
     python: &Path,
+    tempdir: &TempDir,
 ) -> Result<String> {
-    let tempdir = tempdir()?;
-    let header = cffi_header(crate_dir, target_dir, &tempdir)?;
+    let header = cffi_header(crate_dir, target_dir, tempdir)?;
 
     let ffi_py = tempdir.as_ref().join("ffi.py");
 
@@ -231,7 +234,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
 
     // If there was success or an error that was not missing cffi, return here
     if !install_cffi {
-        return handle_cffi_call_result(python, tempdir, &ffi_py, &output);
+        return handle_cffi_call_result(python, &ffi_py, &output);
     }
 
     eprintln!("⚠️ cffi not found. Trying to install it");
@@ -260,16 +263,11 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
 
     // Try again
     let output = call_python(python, ["-c", &cffi_invocation])?;
-    handle_cffi_call_result(python, tempdir, &ffi_py, &output)
+    handle_cffi_call_result(python, &ffi_py, &output)
 }
 
 /// Extracted into a function because this is needed twice
-fn handle_cffi_call_result(
-    python: &Path,
-    tempdir: TempDir,
-    ffi_py: &Path,
-    output: &Output,
-) -> Result<String> {
+fn handle_cffi_call_result(python: &Path, ffi_py: &Path, output: &Output) -> Result<String> {
     if !output.status.success() {
         bail!(
             "Failed to generate cffi declarations using {}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
@@ -283,7 +281,6 @@ fn handle_cffi_call_result(
         io::stderr().write_all(&output.stderr)?;
 
         let ffi_py_content = fs::read_to_string(ffi_py)?;
-        tempdir.close()?;
         Ok(ffi_py_content)
     }
 }

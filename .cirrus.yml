@@ -19,7 +19,7 @@ build_and_test:
 freebsd_task:
   name: Test (x86_64 FreeBSD)
   freebsd_instance:
-    image_family: freebsd-14-2
+    image_family: freebsd-14-3
   env:
     PATH: $HOME/.cargo/bin:$PATH
   target_cache:

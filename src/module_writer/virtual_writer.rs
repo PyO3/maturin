@@ -203,8 +203,8 @@ impl VirtualWriter<PathWriter> {
 
 impl VirtualWriter<SDistWriter> {
     /// Commit the tracked entries to the underlying [SDistWriter]
-    pub fn finish(self) -> Result<PathBuf> {
-        let mut comparator = self.inner.file_ordering();
+    pub fn finish(self, pkg_info_path: &Path) -> Result<PathBuf> {
+        let mut comparator = self.inner.file_ordering(pkg_info_path);
         let inner = self.finish_internal(&mut comparator)?;
         let path = inner.finish()?;
         Ok(path)

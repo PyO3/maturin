@@ -107,12 +107,15 @@ impl SDistWriter {
     }
 
     /// Tar files do not have a central directory of entries, so the entire file needs to be walked
-    /// to find a specific entry. Most tools are interestd in the package metadata, so place that
+    /// to find a specific entry. Most tools are interested in the package metadata, so place that
     /// at the beginning of the tar for convenience
-    pub(super) fn file_ordering(&self) -> impl FnMut(&PathBuf, &PathBuf) -> Ordering + use<> {
-        |p1, p2| {
-            let p1_is_info = p1 == "PKG-INFO";
-            let p2_is_info = p2 == "PKG-INFO";
+    pub(super) fn file_ordering<'a>(
+        &self,
+        pkg_info_path: &'a Path,
+    ) -> impl FnMut(&PathBuf, &PathBuf) -> Ordering + use<'a> {
+        move |p1, p2| {
+            let p1_is_info = p1 == pkg_info_path;
+            let p2_is_info = p2 == pkg_info_path;
 
             match (p1_is_info, p2_is_info) {
                 (true, false) => Ordering::Less,

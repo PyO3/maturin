@@ -857,14 +857,15 @@ pub fn source_distribution(
         }
     }
 
+    let pkg_info = root_dir.join("PKG-INFO");
     writer.add_bytes(
-        root_dir.join("PKG-INFO"),
+        &pkg_info,
         None,
         metadata24.to_file_contents()?.as_bytes(),
         false,
     )?;
 
-    let source_distribution_path = writer.finish()?;
+    let source_distribution_path = writer.finish(&pkg_info)?;
 
     eprintln!(
         "📦 Built source distribution to {}",

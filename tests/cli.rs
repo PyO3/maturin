@@ -16,7 +16,7 @@ fn cli_tests() {
         t.skip("tests/cmd/generate-ci.toml");
     }
 
-    #[cfg(not(all(feature = "zig", feature = "scaffolding")))]
+    #[cfg(not(all(feature = "zig", feature = "scaffolding", not(windows))))]
     {
         t.skip("tests/cmd/maturin.toml");
     }

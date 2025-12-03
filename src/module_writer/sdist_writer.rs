@@ -8,13 +8,15 @@ use anyhow::Result;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use fs_err as fs;
+use fs_err::File;
 use ignore::overrides::Override;
 use normpath::PathExt as _;
 use tracing::debug;
 
 use crate::Metadata24;
+use crate::archive_source::ArchiveSource;
 
-use super::ModuleWriter;
+use super::ModuleWriterInternal;
 use super::default_permission;
 use super::util::FileTracker;
 
@@ -38,15 +40,12 @@ pub struct SDistWriter {
     target_exclusion_warning_emitted: bool,
 }
 
-impl ModuleWriter for SDistWriter {
-    fn add_bytes(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: Option<&Path>,
-        mut data: impl Read,
-        executable: bool,
-    ) -> Result<()> {
-        if let Some(source) = source {
+impl super::private::Sealed for SDistWriter {}
+
+impl ModuleWriterInternal for SDistWriter {
+    fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()> {
+        let source_path = source.path();
+        if let Some(source) = source_path {
             if self.exclude(source) {
                 return Ok(());
             }
@@ -66,26 +65,41 @@ impl ModuleWriter for SDistWriter {
             return Ok(());
         }
 
-        if !self.file_tracker.add_file(target, source)? {
+        if !self.file_tracker.add_file(target, source_path)? {
             // Ignore duplicate files.
             return Ok(());
         }
 
-        let mut buffer = Vec::new();
-        data.read_to_end(&mut buffer)
-            .with_context(|| format!("Failed to read data into buffer for {}", target.display()))?;
-
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Regular);
-        header.set_size(buffer.len() as u64);
-        header.set_mode(default_permission(executable));
+        header.set_mode(default_permission(source.executable()));
         header.set_mtime(self.mtime);
+
+        let data = match source {
+            ArchiveSource::Generated(source) => source.data,
+            ArchiveSource::File(source) => {
+                let mut file =
+                    File::options()
+                        .read(true)
+                        .open(&source.path)
+                        .with_context(|| {
+                            format!("Failed to open file {:?} for reading", source.path)
+                        })?;
+                let mut buffer = Vec::new();
+                file.read_to_end(&mut buffer)
+                    .context("Failed to read file into buffer")?;
+                buffer
+            }
+        };
+
+        header.set_size(data.len() as u64);
+
         self.tar
-            .append_data(&mut header, target, buffer.as_slice())
+            .append_data(&mut header, target, data.as_slice())
             .with_context(|| {
                 format!(
                     "Failed to add {} bytes to sdist as {}",
-                    buffer.len(),
+                    data.len(),
                     target.display()
                 )
             })?;
@@ -140,7 +154,6 @@ impl SDistWriter {
 
 #[cfg(test)]
 mod tests {
-    use std::io::empty;
     use std::path::Path;
 
     use ignore::overrides::Override;
@@ -150,6 +163,7 @@ mod tests {
 
     use crate::Metadata24;
     use crate::ModuleWriter;
+    use crate::module_writer::EMPTY;
 
     use super::SDistWriter;
 
@@ -162,7 +176,7 @@ mod tests {
         let tmp_dir = TempDir::new()?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, Override::empty(), None)?;
         assert!(writer.file_tracker.files.is_empty());
-        writer.add_bytes("test", Some(Path::new("test")), empty(), true)?;
+        writer.add_empty_file("test")?;
         assert_eq!(writer.file_tracker.files.len(), 1);
         writer.finish()?;
         tmp_dir.close()?;
@@ -173,12 +187,12 @@ mod tests {
         excludes.add("test*")?;
         excludes.add("!test2")?;
         let mut writer = SDistWriter::new(&tmp_dir, &metadata, excludes.build()?, None)?;
-        writer.add_bytes("test1", Some(Path::new("test1")), empty(), true)?;
-        writer.add_bytes("test3", Some(Path::new("test3")), empty(), true)?;
+        writer.add_bytes("test1", Some(Path::new("test1")), EMPTY, true)?;
+        writer.add_bytes("test3", Some(Path::new("test3")), EMPTY, true)?;
         assert!(writer.file_tracker.files.is_empty());
-        writer.add_bytes("test2", Some(Path::new("test2")), empty(), true)?;
+        writer.add_bytes("test2", Some(Path::new("test2")), EMPTY, true)?;
         assert!(!writer.file_tracker.files.is_empty());
-        writer.add_bytes("yes", Some(Path::new("yes")), empty(), true)?;
+        writer.add_bytes("yes", Some(Path::new("yes")), EMPTY, true)?;
         assert_eq!(writer.file_tracker.files.len(), 2);
         writer.finish()?;
         tmp_dir.close()?;

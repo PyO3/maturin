@@ -114,6 +114,7 @@ if hasattr({ext_name}, "__all__"):
     __all__ = {ext_name}.__all__"#
                     )
                     .into(),
+                    path: None,
                     executable: false,
                 };
                 files.insert(module.join("__init__.py"), ArchiveSource::Generated(source));

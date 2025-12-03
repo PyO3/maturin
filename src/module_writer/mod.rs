@@ -1,6 +1,4 @@
 use std::fmt::Write as _;
-use std::io;
-use std::io::Read;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
@@ -9,7 +7,6 @@ use anyhow::Context as _;
 use anyhow::Result;
 use anyhow::bail;
 use fs_err as fs;
-use fs_err::File;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use itertools::Itertools as _;
@@ -17,9 +14,14 @@ use tracing::debug;
 
 use crate::Metadata24;
 use crate::PyProjectToml;
+use crate::archive_source::ArchiveSource;
+use crate::archive_source::FileSourceData;
+use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
 
+#[cfg(test)]
+mod mock_writer;
 mod path_writer;
 mod sdist_writer;
 mod util;
@@ -29,8 +31,20 @@ pub use path_writer::PathWriter;
 pub use sdist_writer::SDistWriter;
 pub use wheel_writer::WheelWriter;
 
+mod private {
+    pub trait Sealed {}
+}
+
+const EMPTY: Vec<u8> = vec![];
+
 /// Allows writing the module to a wheel or add it directly to the virtualenv
-pub trait ModuleWriter {
+pub(crate) trait ModuleWriterInternal: private::Sealed {
+    /// Adds an entry into the archive
+    fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()>;
+}
+
+/// Extension trait with convenience methods for interacting with a [ModuleWriterInternal]
+pub trait ModuleWriter: private::Sealed {
     /// Adds a file with data as content in target relative to the module base path while setting
     /// the appropriate unix permissions
     ///
@@ -39,15 +53,42 @@ pub trait ModuleWriter {
         &mut self,
         target: impl AsRef<Path>,
         source: Option<&Path>,
-        data: impl Read,
+        data: impl Into<Vec<u8>>,
         executable: bool,
     ) -> Result<()>;
-}
 
-/// Extension trait with convenience methods for interacting with a [ModuleWriter]
-pub trait ModuleWriterExt: ModuleWriter {
     /// Copies the source file the target path relative to the module base path while setting
     /// the given unix permissions
+    fn add_file(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: impl AsRef<Path>,
+        executable: bool,
+    ) -> Result<()>;
+
+    /// Add an empty file to the target path
+    fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()>;
+}
+
+/// This blanket impl makes it impossible to overwrite the methods in [ModuleWriter]
+impl<T: ModuleWriterInternal> ModuleWriter for T {
+    fn add_bytes(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: Option<&Path>,
+        data: impl Into<Vec<u8>>,
+        executable: bool,
+    ) -> Result<()> {
+        self.add_entry(
+            target,
+            ArchiveSource::Generated(GeneratedSourceData {
+                data: data.into(),
+                path: source.map(ToOwned::to_owned),
+                executable,
+            }),
+        )
+    }
+
     fn add_file(
         &mut self,
         target: impl AsRef<Path>,
@@ -58,21 +99,20 @@ pub trait ModuleWriterExt: ModuleWriter {
         let source = source.as_ref();
         debug!("Adding {} from {}", target.display(), source.display());
 
-        let file =
-            File::open(source).with_context(|| format!("Failed to open {}", source.display()))?;
-        self.add_bytes(target, Some(source), file, executable)
-            .with_context(|| format!("Failed to write to {}", target.display()))?;
-        Ok(())
+        self.add_entry(
+            target,
+            ArchiveSource::File(FileSourceData {
+                path: source.to_path_buf(),
+                executable,
+            }),
+        )
     }
 
-    /// Add an empty file to the target path
+    #[inline]
     fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
-        self.add_bytes(target, None, io::empty(), false)
+        self.add_bytes(target, None, EMPTY, false)
     }
 }
-
-/// This blanket impl makes it impossible to overwrite the methods in [ModuleWriterExt]
-impl<T: ModuleWriter> ModuleWriterExt for T {}
 
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(

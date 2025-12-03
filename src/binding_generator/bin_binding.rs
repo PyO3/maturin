@@ -56,6 +56,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
                     .with_extension("py"),
                 ArchiveSource::Generated(GeneratedSourceData {
                     data: generate_wasm_launcher(&bin_name).into(),
+                    path: None,
                     executable: false,
                 }),
             );

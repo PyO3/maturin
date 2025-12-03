@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::io;
-use std::io::Read;
 use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
@@ -15,9 +14,11 @@ use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
 use crate::Metadata24;
+use crate::archive_source::ArchiveSource;
 use crate::project_layout::ProjectLayout;
 
-use super::ModuleWriter;
+use super::ModuleWriter as _;
+use super::ModuleWriterInternal;
 use super::default_permission;
 use super::util::FileTracker;
 use super::util::StreamSha256;
@@ -33,15 +34,12 @@ pub struct WheelWriter {
     target_exclusion_warning_emitted: bool,
 }
 
-impl ModuleWriter for WheelWriter {
-    fn add_bytes(
-        &mut self,
-        target: impl AsRef<Path>,
-        source: Option<&Path>,
-        mut data: impl Read,
-        executable: bool,
-    ) -> Result<()> {
-        if let Some(source) = source {
+impl super::private::Sealed for WheelWriter {}
+
+impl ModuleWriterInternal for WheelWriter {
+    fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()> {
+        let source_path = source.path();
+        if let Some(source) = source_path {
             if self.exclude(source) {
                 return Ok(());
             }
@@ -61,19 +59,29 @@ impl ModuleWriter for WheelWriter {
             return Ok(());
         }
 
-        if !self.file_tracker.add_file(target, source)? {
+        if !self.file_tracker.add_file(target, source_path)? {
             // Ignore duplicate files.
             return Ok(());
         }
 
         let options = self
             .file_options
-            .unix_permissions(default_permission(executable));
+            .unix_permissions(default_permission(source.executable()));
         self.zip.start_file_from_path(target, options)?;
         let mut writer = StreamSha256::new(&mut self.zip);
 
-        io::copy(&mut data, &mut writer)
-            .with_context(|| format!("Failed to write to zip archive for {target:?}"))?;
+        match source {
+            ArchiveSource::Generated(source) => io::copy(&mut source.data.as_slice(), &mut writer),
+            ArchiveSource::File(source) => {
+                let mut file = File::options()
+                    .read(true)
+                    .open(&source.path)
+                    .with_context(|| format!("Failed to open file {:?}", source.path))?;
+
+                io::copy(&mut file, &mut writer)
+            }
+        }
+        .with_context(|| format!("Failed to write to zip archive for {target:?}"))?;
 
         let (hash, length) = writer.finalize()?;
         self.record.insert(target.to_path_buf(), (hash, length));

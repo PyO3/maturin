@@ -10,9 +10,10 @@ use cargo_zigbuild::Zig;
 #[cfg(feature = "cli-completion")]
 use clap::CommandFactory;
 use clap::{Parser, Subcommand};
+use ignore::overrides::Override;
 use maturin::{
     BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter, PythonInterpreter, Target,
-    TargetTriple, develop, find_path_deps, write_dist_info,
+    TargetTriple, VirtualWriter, develop, find_path_deps, write_dist_info,
 };
 #[cfg(feature = "schemars")]
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
@@ -284,14 +285,16 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 context.cargo_options.profile = Some("release".to_string());
             }
 
-            let mut writer = PathWriter::from_path(metadata_directory);
-            write_dist_info(
+            let mut writer =
+                VirtualWriter::new(PathWriter::from_path(metadata_directory), Override::empty());
+            let dist_info_dir = write_dist_info(
                 &mut writer,
                 &context.project_layout.project_root,
                 &context.metadata24,
                 &context.tags_from_bridge()?,
             )?;
-            println!("{}", context.metadata24.get_dist_info_dir().display());
+            writer.finish()?;
+            println!("{}", dist_info_dir.display());
         }
         Pep517Command::BuildWheel {
             build_options,

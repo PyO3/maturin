@@ -8,14 +8,14 @@ use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
 use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
-use crate::module_writer::{WheelWriter, add_data};
+use crate::module_writer::{WheelWriter, add_data, write_pth};
 use crate::project_layout::ProjectLayout;
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::target::{Arch, Os};
 use crate::{
     BridgeModel, BuildArtifact, Metadata24, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
-    compile, pyproject_toml::Format,
+    VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -340,7 +340,7 @@ impl BuildContext {
 
     fn add_external_libs<A>(
         &self,
-        writer: &mut WheelWriter,
+        writer: &mut VirtualWriter<WheelWriter>,
         artifacts: &[A],
         ext_libs: &[Vec<Library>],
     ) -> Result<()>
@@ -383,7 +383,7 @@ impl BuildContext {
         libs_dir.push(".libs");
         let libs_dir = PathBuf::from(libs_dir);
 
-        let temp_dir = tempfile::tempdir()?;
+        let temp_dir = writer.temp_dir()?;
         let mut soname_map = BTreeMap::new();
         let mut libs_copied = HashSet::new();
         for lib in ext_libs.iter().flatten() {
@@ -495,9 +495,9 @@ impl BuildContext {
         Ok(())
     }
 
-    fn add_pth(&self, writer: &mut WheelWriter) -> Result<()> {
+    fn add_pth(&self, writer: &mut VirtualWriter<WheelWriter>) -> Result<()> {
         if self.editable {
-            writer.add_pth(&self.project_layout, &self.metadata24)?;
+            write_pth(writer, &self.project_layout, &self.metadata24)?;
         }
         Ok(())
     }
@@ -714,17 +714,13 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let mut generator = Pyo3BindingGenerator::new(true, self.interpreter.first())
-            .context("Failed to initialize PyO3 binding generator")?;
+        let mut generator =
+            Pyo3BindingGenerator::new(true, self.interpreter.first(), writer.temp_dir()?)
+                .context("Failed to initialize PyO3 binding generator")?;
         generate_binding(&mut writer, &mut generator, self, &[&artifact])
             .context("Failed to add the files to the wheel")?;
 
@@ -792,17 +788,13 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
-        let mut generator = Pyo3BindingGenerator::new(false, Some(python_interpreter))
-            .context("Failed to initialize PyO3 binding generator")?;
+        let mut generator =
+            Pyo3BindingGenerator::new(false, Some(python_interpreter), writer.temp_dir()?)
+                .context("Failed to initialize PyO3 binding generator")?;
         generate_binding(&mut writer, &mut generator, self, &[&artifact])
             .context("Failed to add the files to the wheel")?;
 
@@ -915,19 +907,14 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let interpreter = self.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
-        let mut generator = CffiBindingGenerator::new(interpreter)
+        let mut generator = CffiBindingGenerator::new(interpreter, writer.temp_dir()?)
             .context("Failed to initialize Cffi binding generator")?;
         generate_binding(&mut writer, &mut generator, self, &[&artifact])?;
 
@@ -985,13 +972,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &self.metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let mut generator = UniFfiBindingGenerator::default();
@@ -1072,13 +1054,8 @@ impl BuildContext {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let mut writer = WheelWriter::new(
-            &tag,
-            &self.out,
-            &metadata24,
-            self.excludes(Format::Wheel)?,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(&tag, &self.out, &metadata24, file_options)?;
+        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
 
         self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 

@@ -16,12 +16,10 @@ use crate::archive_source::ArchiveSource;
 use super::ModuleWriterInternal;
 #[cfg(target_family = "unix")]
 use super::default_permission;
-use super::util::FileTracker;
 
 /// A [ModuleWriter] that adds the module somewhere in the filesystem, e.g. in a virtualenv
 pub struct PathWriter {
     base_path: PathBuf,
-    file_tracker: FileTracker,
 }
 
 impl super::private::Sealed for PathWriter {}
@@ -29,11 +27,6 @@ impl super::private::Sealed for PathWriter {}
 impl ModuleWriterInternal for PathWriter {
     fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()> {
         let target = self.base_path.join(target);
-        if !self.file_tracker.add_file(target.as_ref(), source.path())? {
-            // Ignore duplicate files.
-            return Ok(());
-        }
-
         if let Some(parent_dir) = target.parent() {
             fs::create_dir_all(parent_dir)
                 .with_context(|| format!("Failed to create directory {parent_dir:?}"))?;
@@ -82,7 +75,6 @@ impl PathWriter {
     pub fn from_path(path: impl AsRef<Path>) -> Self {
         Self {
             base_path: path.as_ref().to_path_buf(),
-            file_tracker: FileTracker::default(),
         }
     }
 }

@@ -2,6 +2,7 @@ use std::fmt::Write as _;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Context as _;
 use anyhow::Result;
@@ -10,6 +11,7 @@ use fs_err as fs;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use itertools::Itertools as _;
+use normpath::PathExt as _;
 use tracing::debug;
 
 use crate::Metadata24;
@@ -25,10 +27,12 @@ mod mock_writer;
 mod path_writer;
 mod sdist_writer;
 mod util;
+mod virtual_writer;
 mod wheel_writer;
 
 pub use path_writer::PathWriter;
 pub use sdist_writer::SDistWriter;
+pub use virtual_writer::VirtualWriter;
 pub use wheel_writer::WheelWriter;
 
 mod private {
@@ -38,7 +42,7 @@ mod private {
 const EMPTY: Vec<u8> = vec![];
 
 /// Allows writing the module to a wheel or add it directly to the virtualenv
-pub(crate) trait ModuleWriterInternal: private::Sealed {
+pub trait ModuleWriterInternal: private::Sealed {
     /// Adds an entry into the archive
     fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()>;
 }
@@ -67,7 +71,10 @@ pub trait ModuleWriter: private::Sealed {
     ) -> Result<()>;
 
     /// Add an empty file to the target path
-    fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()>;
+    #[inline]
+    fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
+        self.add_bytes(target, None, EMPTY, false)
+    }
 }
 
 /// This blanket impl makes it impossible to overwrite the methods in [ModuleWriter]
@@ -107,16 +114,11 @@ impl<T: ModuleWriterInternal> ModuleWriter for T {
             }),
         )
     }
-
-    #[inline]
-    fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
-        self.add_bytes(target, None, EMPTY, false)
-    }
 }
 
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(
-    writer: &mut impl ModuleWriter,
+    writer: &mut VirtualWriter<WheelWriter>,
     project_layout: &ProjectLayout,
     pyproject_toml: Option<&PyProjectToml>,
 ) -> Result<()> {
@@ -202,7 +204,7 @@ pub fn write_python_part(
 ///
 /// See https://peps.python.org/pep-0427/#file-contents
 pub fn add_data(
-    writer: &mut impl ModuleWriter,
+    writer: &mut VirtualWriter<WheelWriter>,
     metadata24: &Metadata24,
     data: Option<&Path>,
 ) -> Result<()> {
@@ -264,11 +266,11 @@ pub fn add_data(
 
 /// Creates the .dist-info directory and fills it with all metadata files except RECORD
 pub fn write_dist_info(
-    writer: &mut impl ModuleWriter,
+    writer: &mut VirtualWriter<impl ModuleWriterInternal>,
     pyproject_dir: &Path,
     metadata24: &Metadata24,
     tags: &[String],
-) -> Result<()> {
+) -> Result<PathBuf> {
     let dist_info_dir = metadata24.get_dist_info_dir();
 
     writer.add_bytes(
@@ -315,6 +317,37 @@ pub fn write_dist_info(
         }
     }
 
+    Ok(dist_info_dir)
+}
+
+/// Add a pth file to wheel root for editable installs
+pub fn write_pth(
+    writer: &mut VirtualWriter<WheelWriter>,
+    project_layout: &ProjectLayout,
+    metadata24: &Metadata24,
+) -> Result<()> {
+    if project_layout.python_module.is_some() || !project_layout.python_packages.is_empty() {
+        let absolute_path = project_layout
+            .python_dir
+            .normalize()
+            .with_context(|| {
+                format!(
+                    "python dir path `{}` does not exist or is invalid",
+                    project_layout.python_dir.display()
+                )
+            })?
+            .into_path_buf();
+        if let Some(python_path) = absolute_path.to_str() {
+            let name = metadata24.get_distribution_escaped();
+            let target = format!("{name}.pth");
+            debug!("Adding {} from {}", target, python_path);
+            writer.add_bytes(target, None, python_path, false)?;
+        } else {
+            eprintln!(
+                "⚠️ source code path contains non-Unicode sequences, editable installs may not work."
+            );
+        }
+    }
     Ok(())
 }
 

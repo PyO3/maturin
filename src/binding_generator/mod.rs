@@ -16,8 +16,9 @@ use tracing::debug;
 use crate::BuildArtifact;
 use crate::BuildContext;
 use crate::ModuleWriter;
+use crate::VirtualWriter;
+use crate::WheelWriter;
 use crate::archive_source::ArchiveSource;
-use crate::module_writer::ModuleWriterInternal;
 #[cfg(unix)]
 use crate::module_writer::default_permission;
 use crate::module_writer::write_python_part;
@@ -80,7 +81,7 @@ pub(crate) struct GeneratorOutput {
 ///
 /// Note: Writing the pth to the archive is handled by [BuildContext], not here
 pub fn generate_binding<A>(
-    writer: &mut impl ModuleWriterInternal,
+    writer: &mut VirtualWriter<WheelWriter>,
     generator: &mut impl BindingGenerator,
     context: &BuildContext,
     artifacts: &[A],

@@ -24,16 +24,6 @@
 //!   CentOS 6 docker container and which makes maturin itself manylinux compliant.
 //!
 //! - native-tls: Makes dependencies use the platform native tls stack
-//!
-//! Deprecate features:
-//!
-//! The following features no longer configure anything within maturin but remain in order
-//! to preserve backwards compatibility.
-//!
-//! - human-panic
-//! - log
-//! - password-storage
-//! - upload
 
 #![deny(missing_docs)]
 

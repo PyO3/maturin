@@ -160,12 +160,6 @@ static = ["xz2/static"]
 # Internal feature to speed up the tests significantly
 faster-tests = []
 
-# Deprecated features, keep them now for compatibility
-human-panic = []
-log = []
-password-storage = []
-upload = []
-
 [profile.profiling]
 inherits = "release"
 debug = true

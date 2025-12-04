@@ -142,7 +142,7 @@ jobs:
         if: startsWith(matrix.os, 'windows')
         run: echo "RUSTFLAGS="-C debuginfo=0"" >> $GITHUB_ENV
       - name: cargo test
-        run: cargo nextest run --features password-storage
+        run: cargo nextest run
       # TODO: https://github.com/PyO3/maturin/issues/2263
       #- name: test cross compiling with zig
       #  if: ${{ !contains(matrix.python-version, '-dev') }}
@@ -307,7 +307,7 @@ jobs:
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests
-          env -u GITHUB_ACTIONS cargo nextest run --features password-storage
+          env -u GITHUB_ACTIONS cargo nextest run
 
   test-auditwheel:
     name: Test Auditwheel

@@ -75,8 +75,6 @@ feature-depth = 1
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
-    # multipart unmaintained
-    "RUSTSEC-2023-0050",
     # paste unmaintained
     "RUSTSEC-2024-0436",
     # num_prefix unmaintained

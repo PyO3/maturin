@@ -9,12 +9,10 @@ See [environment variables Cargo reads](https://doc.rust-lang.org/cargo/referenc
 
 ## Python environment variables
 
-* `VIRTUAL_ENV`: Path to a Python virtual environment
-* `CONDA_PREFIX`: Path to a conda environment
-* `_PYTHON_SYSCONFIGDATA_NAME`: Name of a `sysconfigdata*.py` file
-* `MATURIN_PYPI_TOKEN`: PyPI token for uploading wheels
-* `MATURIN_PASSWORD`: PyPI password for uploading wheels
-* `MATURIN_PEP517_USE_BASE_PYTHON`: Use base Python executable instead of venv Python executable in PEP 517 build to avoid unnecessary rebuilds, should not be set when the sdist build requires packages installed in venv.
+- `VIRTUAL_ENV`: Path to a Python virtual environment
+- `CONDA_PREFIX`: Path to a conda environment
+- `_PYTHON_SYSCONFIGDATA_NAME`: Name of a `sysconfigdata*.py` file
+- `MATURIN_PEP517_USE_BASE_PYTHON`: Use base Python executable instead of venv Python executable in PEP 517 build to avoid unnecessary rebuilds, should not be set when the sdist build requires packages installed in venv.
 
 ## `pyo3` environment variables
 

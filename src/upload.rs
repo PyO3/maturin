@@ -11,6 +11,12 @@ use fs_err as fs;
 use fs_err::File;
 use multipart::client::lazy::Multipart;
 use regex::Regex;
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+use rustls_pki_types::CertificateDer;
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+use rustls_pki_types::pem::Error as PemError;
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+use rustls_pki_types::pem::PemObject as _;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -112,6 +118,10 @@ pub enum UploadError {
     #[cfg(feature = "native-tls")]
     #[error("TLS Error")]
     TlsError(#[source] native_tls::Error),
+    /// PEM parsing error
+    #[cfg(any(feature = "native-tls", feature = "rustls"))]
+    #[error("PEM parsing error")]
+    PemError(#[source] PemError),
 }
 
 impl From<io::Error> for UploadError {
@@ -130,6 +140,13 @@ impl From<ureq::Error> for UploadError {
 impl From<native_tls::Error> for UploadError {
     fn from(error: native_tls::Error) -> Self {
         UploadError::TlsError(error)
+    }
+}
+
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+impl From<PemError> for UploadError {
+    fn from(error: PemError) -> Self {
+        UploadError::PemError(error)
     }
 }
 
@@ -385,6 +402,16 @@ fn tls_ca_bundle() -> Option<OsString> {
         .or_else(|| env::var_os("CURL_CA_BUNDLE"))
 }
 
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+fn ca_certificates<'a>() -> Result<Option<Vec<CertificateDer<'a>>>, UploadError> {
+    let certs: Option<Vec<_>> = tls_ca_bundle()
+        .map(|ca_bundle_path| {
+            CertificateDer::pem_file_iter(ca_bundle_path).and_then(|iter| iter.collect())
+        })
+        .transpose()?;
+    Ok(certs)
+}
+
 // Prefer rustls if both native-tls and rustls features are enabled
 #[cfg(all(feature = "native-tls", not(feature = "rustls")))]
 #[allow(clippy::result_large_err)]
@@ -393,11 +420,9 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 
     let mut builder = ureq::builder().try_proxy_from_env(true);
     let mut tls_builder = native_tls::TlsConnector::builder();
-    if let Some(ca_bundle) = tls_ca_bundle() {
-        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
-        for cert in rustls_pemfile::certs(&mut reader) {
-            let cert = cert?;
-            tls_builder.add_root_certificate(native_tls::Certificate::from_pem(&cert)?);
+    if let Some(root_certs) = ca_certificates()? {
+        for cert in root_certs {
+            tls_builder.add_root_certificate(native_tls::Certificate::from_der(&cert)?);
         }
     }
     builder = builder.tls_connector(Arc::new(tls_builder.build()?));
@@ -410,13 +435,11 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
     let builder = ureq::builder().try_proxy_from_env(true);
-    if let Some(ca_bundle) = tls_ca_bundle() {
-        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
-        let certs = rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>()?;
-        let mut root_certs = rustls::RootCertStore::empty();
-        root_certs.add_parsable_certificates(certs);
+    if let Some(root_certs) = ca_certificates()? {
+        let mut cert_store = rustls::RootCertStore::empty();
+        cert_store.add_parsable_certificates(root_certs);
         let client_config = rustls::ClientConfig::builder()
-            .with_root_certificates(root_certs)
+            .with_root_certificates(cert_store)
             .with_no_client_auth();
         Ok(builder.tls_config(Arc::new(client_config)).build())
     } else {

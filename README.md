@@ -7,8 +7,8 @@ _formerly pyo3-pack_
 [![PyPI](https://img.shields.io/pypi/v/maturin.svg?logo=python&style=flat-square)](https://pypi.org/project/maturin)
 [![discord server](https://img.shields.io/discord/1209263839632424990?logo=discord&style=flat-square)](https://discord.gg/33kcChzH7f)
 
-Build and publish crates with [pyo3, cffi and uniffi bindings](https://maturin.rs/bindings) as well as rust binaries as python packages with minimal configuration.
-It supports building wheels for python 3.8+ on Windows, Linux, macOS and FreeBSD, can upload them to [pypi](https://pypi.org/) and has basic PyPy and GraalPy support.
+Build crates with [pyo3, cffi and uniffi bindings](https://maturin.rs/bindings) as well as rust binaries as python packages with minimal configuration.
+It supports building wheels for python 3.8+ on Windows, Linux, macOS and FreeBSD and has basic PyPy and GraalPy support.
 
 Check out the [User Guide](https://maturin.rs/)!
 
@@ -30,8 +30,7 @@ uv tool install maturin
 There are four main commands:
 
 - `maturin new` creates a new cargo project with maturin configured.
-- `maturin publish` builds the crate into python packages and publishes them to pypi.
-- `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's recommended to publish packages with [uv](https://github.com/astral-sh/uv) using `uv publish`.
+- `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default). It's recommended to publish packages with [uv](https://github.com/astral-sh/uv) using `uv publish`.
 - `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 
 maturin doesn't need extra configuration files and doesn't clash with an existing setuptools-rust configuration.

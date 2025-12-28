@@ -1,4 +1,4 @@
-//! Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries
+//! Build crates with pyo3, cffi and uniffi bindings as well as rust binaries
 //! as python packages. This file contains the CLI and keyring integration.
 //!
 //! Run with --help for usage information
@@ -19,8 +19,6 @@ use maturin::{
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
 #[cfg(feature = "scaffolding")]
 use maturin::{GenerateProjectOptions, ci::GenerateCI, init_project, new_project};
-#[cfg(feature = "upload")]
-use maturin::{PublishOpt, upload_ui};
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -36,7 +34,7 @@ use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::Subscribe
     after_help = "Visit https://maturin.rs to learn more about maturin.",
     styles = cargo_options::styles(),
 )]
-/// Build and publish crates with pyo3, cffi and uniffi bindings as well
+/// Build crates with pyo3, cffi and uniffi bindings as well
 /// as rust binaries as python packages
 struct Opt {
     /// Use verbose output.
@@ -56,7 +54,7 @@ struct Opt {
 
 #[derive(Debug, Parser)]
 #[allow(clippy::large_enum_variant)]
-/// Build and publish crates with pyo3, cffi and uniffi bindings as well
+/// Build crates with pyo3, cffi and uniffi bindings as well
 /// as rust binaries as python packages
 enum Command {
     #[command(name = "build", alias = "b")]
@@ -71,24 +69,6 @@ enum Command {
         /// Build a source distribution
         #[arg(long)]
         sdist: bool,
-        #[command(flatten)]
-        build: BuildOptions,
-    },
-    #[cfg(feature = "upload")]
-    #[command(name = "publish")]
-    /// Build and publish the crate as python packages to pypi
-    Publish {
-        /// Do not pass --release to cargo
-        #[arg(long, conflicts_with = "profile")]
-        debug: bool,
-        /// Do not strip the library for minimum file size
-        #[arg(long = "no-strip")]
-        no_strip: bool,
-        /// Don't build a source distribution
-        #[arg(long = "no-sdist")]
-        no_sdist: bool,
-        #[command(flatten)]
-        publish: PublishOpt,
         #[command(flatten)]
         build: BuildOptions,
     },
@@ -137,19 +117,6 @@ enum Command {
     #[cfg(feature = "scaffolding")]
     #[command(name = "generate-ci")]
     GenerateCI(GenerateCI),
-    /// Upload python packages to pypi
-    ///
-    /// It is mostly similar to `twine upload`, but can only upload python wheels
-    /// and source distributions.
-    #[cfg(feature = "upload")]
-    #[command(name = "upload")]
-    Upload {
-        #[command(flatten)]
-        publish: PublishOpt,
-        /// The python packages to upload
-        #[arg(value_name = "FILE")]
-        files: Vec<PathBuf>,
-    },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
     /// The commands are meant to be called from the python PEP 517
@@ -362,10 +329,7 @@ fn run() -> Result<()> {
         }
     }
 
-    #[cfg(not(feature = "wild"))]
     let opt = Opt::parse();
-    #[cfg(feature = "wild")]
-    let opt = Opt::parse_from(wild::args_os());
 
     setup_logging(opt.verbose)?;
 
@@ -392,51 +356,6 @@ fn run() -> Result<()> {
             }
             let wheels = build_context.build_wheels()?;
             assert!(!wheels.is_empty());
-        }
-        #[cfg(feature = "upload")]
-        Command::Publish {
-            mut build,
-            mut publish,
-            debug,
-            no_strip,
-            no_sdist,
-        } => {
-            // set profile to dev if specified; `--debug` and `--profile` are mutually exclusive
-            //
-            // do it here to take precedence over pyproject.toml profile setting
-            if debug {
-                build.profile = Some("dev".to_string());
-            }
-
-            let mut build_context = build
-                .into_build_context()
-                .strip(!no_strip)
-                .editable(false)
-                .build()?;
-
-            // ensure profile always set when publishing
-            // (respect pyproject.toml if set)
-            // don't need to check `debug` here, set above to take precedence if set
-            let profile = build_context
-                .cargo_options
-                .profile
-                .get_or_insert_with(|| "release".to_string());
-
-            if profile == "dev" {
-                eprintln!("⚠️  Warning: You're publishing debug wheels");
-            }
-
-            let mut wheels = build_context.build_wheels()?;
-            if !no_sdist {
-                if let Some(sd) = build_context.build_source_distribution()? {
-                    wheels.push(sd);
-                }
-            }
-
-            let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();
-            publish.non_interactive_on_ci();
-
-            upload_ui(&items, &publish)?
         }
         Command::ListPython { target } => {
             let found = if target.is_some() {
@@ -502,16 +421,6 @@ fn run() -> Result<()> {
         Command::NewProject { path, options } => new_project(path, options)?,
         #[cfg(feature = "scaffolding")]
         Command::GenerateCI(generate_ci) => generate_ci.execute()?,
-        #[cfg(feature = "upload")]
-        Command::Upload { mut publish, files } => {
-            if files.is_empty() {
-                eprintln!("⚠️  Warning: No files given, exiting.");
-                return Ok(());
-            }
-            publish.non_interactive_on_ci();
-
-            upload_ui(&files, &publish)?
-        }
         #[cfg(feature = "cli-completion")]
         Command::Completions { shell } => {
             shell.generate(&mut Opt::command(), &mut std::io::stdout());

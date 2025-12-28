@@ -288,9 +288,6 @@ wheels compatible with a wide range of Linux distros.
 📦 Built wheel for abi3 Python ≥ 3.8 to /Users/ferris/src/rust/guessing-game/target/wheels/guessing_game-0.1.0-cp37-abi3-macosx_10_7_x86_64.whl
 ```
 
-maturin can even publish wheels directly to [PyPI](https://pypi.org) with
-`maturin publish`!
-
 ## Summary
 
 Congratulations! You successfully created a Python module implemented entirely

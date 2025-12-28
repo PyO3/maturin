@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cargo/git \
     mkdir /maturin/src && \
     touch  /maturin/src/lib.rs && \
     echo 'fn main() { println!("Dummy") }' > /maturin/src/main.rs && \
-    cargo rustc --target $CARGO_BUILD_TARGET --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s
+    cargo rustc --target $CARGO_BUILD_TARGET --bin maturin --manifest-path /maturin/Cargo.toml --release -- -C link-arg=-s
 
 ADD . /maturin/
 
@@ -32,7 +32,7 @@ RUN touch /maturin/src/lib.rs /maturin/src/main.rs
 RUN --mount=type=cache,target=/root/.cargo/git \
     --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/maturin/target,sharing=locked \
-    cargo rustc --target $CARGO_BUILD_TARGET --bin maturin --manifest-path /maturin/Cargo.toml --release --features password-storage -- -C link-arg=-s \
+    cargo rustc --target $CARGO_BUILD_TARGET --bin maturin --manifest-path /maturin/Cargo.toml --release -- -C link-arg=-s \
     && mv /maturin/target/$CARGO_BUILD_TARGET/release/maturin /usr/bin/maturin
 
 FROM base-$TARGETARCH

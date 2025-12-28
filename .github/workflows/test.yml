@@ -114,10 +114,7 @@ jobs:
         if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           version: 0.12.1
-      - uses: dtolnay/rust-toolchain@stable
-        id: rustup
-        with:
-          targets: wasm32-wasip1 # Used by the test suite
+      - run: rustup target add wasm32-wasip1 # Used by the test suite
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Install additional Rust target
@@ -260,10 +257,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rust-src
-          targets: wasm32-unknown-emscripten
+      - run: |
+          rustup default nightly
+          rustup component add rust-src
+          rustup target add wasm32-unknown-emscripten
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: maturin-build
@@ -320,7 +317,6 @@ jobs:
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/download-artifact@v6
         with:
           name: maturin-build
@@ -404,9 +400,7 @@ jobs:
           name: maturin-build
           path: bin
       - run: chmod +x bin/maturin
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
+      - run: rustup target add ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
           set -ex
@@ -481,7 +475,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - run: rustup default 1.85.0
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2

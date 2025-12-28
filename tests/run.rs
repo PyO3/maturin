@@ -1,5 +1,6 @@
 //! To speed up the tests, they are tests all collected in a single module
 
+use common::pep517::{target_has_profile, test_pep517};
 use common::{
     TestInstallBackend, develop, errors, handle_result, integration, other,
     test_python_implementation,
@@ -13,8 +14,6 @@ use std::path::Path;
 use std::time::Duration;
 use time::macros::datetime;
 use which::which;
-
-use crate::common::{find_subslice, pep517};
 
 mod common;
 
@@ -1004,32 +1003,28 @@ fn sdist_source_date_epoch() {
 
 #[test]
 fn pep517_default_profile() {
-    let output = handle_result(pep517::test_pep517(
+    let unique_name = "pep517-pyo3-pure";
+    handle_result(test_pep517(
         "test-crates/pyo3-pure",
-        "pep517-pyo3-pure",
+        unique_name,
         false,
         false,
     ));
 
-    assert!(
-        find_subslice(&output.stderr, b"`release` profile [optimized]").is_some(),
-        "Output was: {}",
-        std::str::from_utf8(&output.stderr).unwrap()
-    );
+    assert!(target_has_profile(unique_name, "release"));
+    assert!(!target_has_profile(unique_name, "debug"));
 }
 
 #[test]
 fn pep517_editable_profile() {
-    let output = handle_result(pep517::test_pep517(
+    let unique_name = "pep517-pyo3-pure-editable";
+    handle_result(test_pep517(
         "test-crates/pyo3-pure",
-        "pep517-pyo3-pure-editable",
+        unique_name,
         false,
         true,
     ));
 
-    assert!(
-        find_subslice(&output.stderr, b"`dev` profile [unoptimized + debuginfo]").is_some(),
-        "Output was: {}",
-        std::str::from_utf8(&output.stderr).unwrap()
-    );
+    assert!(!target_has_profile(unique_name, "release"));
+    assert!(target_has_profile(unique_name, "debug"));
 }

@@ -248,8 +248,8 @@ jobs:
     name: Test Emscripten
     runs-on: ubuntu-latest
     env:
-      PYODIDE_VERSION: "0.23.4"
-      PYTHON_VERSION: "3.11.2"
+      PYODIDE_VERSION: "0.29.0"
+      PYTHON_VERSION: "3.13"
       NODE_VERSION: 18
     steps:
       - uses: actions/checkout@v6

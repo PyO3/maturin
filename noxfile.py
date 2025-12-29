@@ -56,7 +56,7 @@ def setup_pyodide(session: nox.Session):
                 "pyodide.asm.js",
                 external=True,
             )
-            with open("repodata.json") as f:
+            with open("pyodide-lock.json") as f:
                 emscripten_version = json.load(f)["info"]["platform"].split("_", 1)[1].replace("_", ".")
                 append_to_github_env("EMSCRIPTEN_VERSION", emscripten_version)
 

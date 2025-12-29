@@ -4,6 +4,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 
+pub fn target_dir(unique_name: &str) -> String {
+    format!(
+        "{}/test-crates/targets/{unique_name}",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// pip install to install it and checks it is working
 pub fn test_pep517(
@@ -47,13 +54,8 @@ pub fn test_pep517(
 
     cmd.arg(package.to_str().expect("package is utf8 path"));
 
-    cmd.env(
-        "CARGO_TARGET_DIR",
-        format!(
-            "{}/test-crates/targets/{unique_name}",
-            env!("CARGO_MANIFEST_DIR")
-        ),
-    );
+    let target_dir = target_dir(unique_name);
+    cmd.env("CARGO_TARGET_DIR", target_dir);
 
     // Building with `--no-build-isolation` means that `maturin` needs to be on PATH _and_
     // importable
@@ -90,4 +92,20 @@ fn insert_path(env_var: &str, new_path: &Path) -> String {
         .expect("Expected to be able to re-join PATH")
         .into_string()
         .expect("PATH is not valid utf8")
+}
+
+/// Whether cargo built the shared library for the specified cargo profile in the test target
+/// directory.
+pub fn target_has_profile(unique_name: &str, profile: &str) -> bool {
+    let shared_library = if cfg!(windows) {
+        "pyo3_pure.dll"
+    } else if cfg!(target_os = "macos") {
+        "libpyo3_pure.dylib"
+    } else {
+        "libpyo3_pure.so"
+    };
+    PathBuf::from(target_dir(unique_name))
+        .join(profile)
+        .join(shared_library)
+        .is_file()
 }

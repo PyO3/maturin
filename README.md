@@ -27,10 +27,9 @@ uv tool install maturin
 >
 > `pip install maturin` should also work if you don't want to use pipx.
 
-There are four main commands:
+There are three main commands:
 
 - `maturin new` creates a new cargo project with maturin configured.
-- `maturin publish` builds the crate into python packages and publishes them to pypi.
 - `maturin build` builds the wheels and stores them in a folder (`target/wheels` by default), but doesn't upload them. It's recommended to publish packages with [uv](https://github.com/astral-sh/uv) using `uv publish`.
 - `maturin develop` builds the crate and installs it as a python module directly in the current virtualenv. Note that while `maturin develop` is faster, it doesn't support all the feature that running `pip install` after `maturin build` supports.
 

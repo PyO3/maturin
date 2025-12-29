@@ -6,7 +6,7 @@ from pathlib import Path
 import nox
 
 
-PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.23.4")
+PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.29.0")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
 MSRV = "1.83.0"
@@ -56,7 +56,7 @@ def setup_pyodide(session: nox.Session):
                 "pyodide.asm.js",
                 external=True,
             )
-            with open("repodata.json") as f:
+            with open("pyodide-lock.json") as f:
                 emscripten_version = json.load(f)["info"]["platform"].split("_", 1)[1].replace("_", ".")
                 append_to_github_env("EMSCRIPTEN_VERSION", emscripten_version)
 

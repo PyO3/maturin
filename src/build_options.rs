@@ -749,9 +749,10 @@ impl BuildContextBuilder {
                         // Zig bundles musl 1.2
                         Some(PlatformTag::Musllinux { major: 1, minor: 2 })
                     } else {
-                        // With zig we can compile to any glibc version that we want, so we pick the lowest
-                        // one supported by the rust compiler
-                        Some(target.get_minimum_manylinux_tag())
+                        // With zig we can compile to any glibc version that we want, but
+                        // there are some black-listed libc symbols in auditwheel for manylinux <= 2.17/2024.
+                        // Thus we let auditwheel decide the compatibility tag.
+                        None
                     }
                 } else {
                     // Defaults to musllinux_1_2 for musl target if it's not bin bindings

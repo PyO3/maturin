@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+## [1.11.0]
+
 * Refactor `ModuleWriter` to be easier to implement and use
+* Add Android cross compilation support, fix wheel tags for Android
+* Update generate-ci to macos-15-intel and add windows arm support
+* Deprecate 'upload' and 'publish' CLI commands
 
 ## [1.10.2]
 
@@ -1135,7 +1140,8 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.10.2...HEAD
+[Unreleased]: https://github.com/pyo3/maturin/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/pyo3/maturin/compare/v1.10.2...v1.11.0
 [1.10.2]: https://github.com/pyo3/maturin/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/pyo3/maturin/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/pyo3/maturin/compare/v1.9.6...v1.10.0

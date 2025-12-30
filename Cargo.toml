@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>", "messense <messense@icloud.com>"]
 name = "maturin"
-version = "1.10.2"
+version = "1.11.0"
 description = "Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
 exclude = [
     "test-crates/**/*",
@@ -78,7 +78,7 @@ python-pkginfo = "0.6.6"
 textwrap = "0.16.1"
 ignore = "0.4.20"
 itertools = "0.14.0"
-lddtree = "0.3.8"
+lddtree = "0.4.0"
 cc = "1.0.88"
 dunce = "1.0.2"
 normpath = "1.1.1"

@@ -175,13 +175,15 @@ where
                     artifact_target.display(),
                     source.display()
                 );
-                writer.add_file(artifact_target, source, true)?;
+                // Use add_file_force to bypass exclusion checks for the compiled artifact
+                writer.add_file_force(artifact_target, source, true)?;
 
                 // 3b. Install additional files
                 if let Some(additional_files) = additional_files {
                     for (target, source) in additional_files {
                         debug!("Generating archive entry {}", target.display());
-                        writer.add_entry(target, source)?;
+                        // Use add_entry_force to bypass exclusion checks for generated binding files
+                        writer.add_entry_force(target, source)?;
                     }
                 }
             }

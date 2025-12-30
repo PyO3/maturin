@@ -14,7 +14,7 @@ use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::target::{Arch, Os};
 use crate::{
-    BridgeModel, BuildArtifact, Metadata24, ModuleWriter, PyProjectToml, PythonInterpreter, Target,
+    BridgeModel, BuildArtifact, Metadata24, PyProjectToml, PythonInterpreter, Target,
     VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
@@ -458,7 +458,8 @@ impl BuildContext {
             if !replacements.is_empty() {
                 patchelf::replace_needed(path, &replacements[..])?;
             }
-            writer.add_file(libs_dir.join(new_soname), path, true)?;
+            // Use add_file_force to bypass exclusion checks for external shared libraries
+            writer.add_file_force(libs_dir.join(new_soname), path, true)?;
         }
 
         eprintln!(

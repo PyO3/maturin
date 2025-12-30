@@ -159,6 +159,45 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         Ok(())
     }
 
+    /// Adds a file to the archive, bypassing exclusion checks.
+    /// This is used for build artifacts (compiled shared libraries) which should
+    /// always be included regardless of exclude patterns.
+    pub(crate) fn add_file_force(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: impl AsRef<Path>,
+        executable: bool,
+    ) -> Result<()> {
+        let target = target.as_ref();
+        let source = source.as_ref();
+        debug!("Adding {} from {}", target.display(), source.display());
+        let source = ArchiveSource::File(FileSourceData {
+            path: source.to_path_buf(),
+            executable,
+        });
+        self.add_entry_force(target, source)
+    }
+
+    /// Adds an entry to the archive, bypassing exclusion checks.
+    /// This is used for build artifacts and generated files that should
+    /// always be included regardless of exclude patterns.
+    pub(crate) fn add_entry_force(
+        &mut self,
+        target: impl AsRef<Path>,
+        source: ArchiveSource,
+    ) -> Result<()> {
+        let target = target.as_ref();
+        debug!("Adding {} (forced)", target.display());
+        // Directly insert into tracker, bypassing exclusion checks but still detecting duplicates
+        if self.tracker.insert(target.to_path_buf(), source).is_some() {
+            bail!(
+                "File {} overwrote an existing tracked file",
+                target.display()
+            );
+        }
+        Ok(())
+    }
+
     /// Actually write the entries to the underlying archive using the provided comparator
     /// to order the entries
     fn finish_internal(
@@ -305,6 +344,71 @@ mod tests {
         test2
         yes
         ");
+        Ok(())
+    }
+
+    #[test]
+    fn virtual_writer_force_bypasses_excludes() -> Result<()> {
+        use std::io::Write as _;
+
+        // Create a temp file to use as a source
+        let tmp_dir = TempDir::new()?;
+        let source_file = tmp_dir.path().join("artifact.so");
+        {
+            let mut file = fs_err::File::create(&source_file)?;
+            file.write_all(b"test artifact")?;
+        }
+
+        // Set up excludes that would match the source file
+        let mut excludes = OverrideBuilder::new(tmp_dir.path());
+        excludes.add("*.so")?;
+        let mut writer = VirtualWriter::new(MockWriter::default(), excludes.build()?);
+
+        // Regular add_file should be excluded by the source path
+        writer.add_file("excluded.so", &source_file, true)?;
+        assert!(
+            writer.tracker.is_empty(),
+            "Regular add_file should be excluded"
+        );
+
+        // add_file_force should bypass exclusion
+        writer.add_file_force("forced.so", &source_file, true)?;
+        assert_eq!(
+            writer.tracker.len(),
+            1,
+            "add_file_force should bypass exclusion"
+        );
+
+        let files = writer.finish()?;
+        assert!(files.contains_key(Path::new("forced.so")));
+        assert!(!files.contains_key(Path::new("excluded.so")));
+
+        tmp_dir.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn virtual_writer_force_detects_duplicates() -> Result<()> {
+        use std::io::Write as _;
+
+        let tmp_dir = TempDir::new()?;
+        let source_file = tmp_dir.path().join("artifact.so");
+        {
+            let mut file = fs_err::File::create(&source_file)?;
+            file.write_all(b"test artifact")?;
+        }
+
+        let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
+
+        // First add should succeed
+        writer.add_file_force("target.so", &source_file, true)?;
+        assert_eq!(writer.tracker.len(), 1);
+
+        // Second add to same target should fail
+        let result = writer.add_file_force("target.so", &source_file, true);
+        assert!(result.is_err(), "Duplicate add_file_force should fail");
+
+        tmp_dir.close()?;
         Ok(())
     }
 }

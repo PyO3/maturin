@@ -25,6 +25,7 @@ use ignore::overrides::{Override, OverrideBuilder};
 use lddtree::Library;
 use normpath::PathExt;
 use platform_info::*;
+use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashSet};
@@ -550,16 +551,28 @@ impl BuildContext {
             // Linux
             (Os::Linux, _) => {
                 let arch = target.get_platform_arch()?;
-                let mut platform_tags = platform_tags.to_vec();
-                platform_tags.sort();
-                let mut tags = vec![];
-                for platform_tag in platform_tags {
-                    tags.push(format!("{platform_tag}_{arch}"));
-                    for alias in platform_tag.aliases() {
-                        tags.push(format!("{alias}_{arch}"));
+                if target.target_triple().contains("android") {
+                    let android_arch = match arch.as_str() {
+                        "armv7l" => "armeabi_v7a",
+                        "aarch64" => "arm64_v8a",
+                        "i686" => "x86",
+                        "x86_64" => "x86_64",
+                        _ => bail!("Unsupported Android architecture: {}", arch),
+                    };
+                    let api_level = find_android_api_level(target.target_triple(), &self.manifest_path)?;
+                    format!("android_{}_{}", api_level, android_arch)
+                } else {
+                    let mut platform_tags = platform_tags.to_vec();
+                    platform_tags.sort();
+                    let mut tags = vec![];
+                    for platform_tag in platform_tags {
+                        tags.push(format!("{platform_tag}_{arch}"));
+                        for alias in platform_tag.aliases() {
+                            tags.push(format!("{alias}_{arch}"));
+                        }
                     }
+                    tags.join(".")
                 }
-                tags.join(".")
             }
             // macOS
             (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
@@ -1295,6 +1308,43 @@ fn emcc_version() -> Result<String> {
     let mut trimmed = ver.trim();
     trimmed = trimmed.strip_suffix("-git").unwrap_or(trimmed);
     Ok(trimmed.into())
+}
+
+fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<String> {
+    if let Ok(val) = env::var("ANDROID_API_LEVEL") {
+        return Ok(val);
+    }
+
+    let mut clues = Vec::new();
+
+    // 1. Linker from cargo-config2
+    if let Some(manifest_dir) = manifest_path.parent() {
+        if let Ok(config) = cargo_config2::Config::load_with_cwd(manifest_dir) {
+            if let Ok(Some(linker)) = config.linker(target_triple) {
+                clues.push(linker.to_string_lossy().into_owned());
+            }
+        }
+    }
+
+    // 2. CC env vars
+    if let Ok(cc) = env::var(format!("CC_{}", target_triple.replace('-', "_"))) {
+        clues.push(cc);
+    }
+    if let Ok(cc) = env::var("CC") {
+        clues.push(cc);
+    }
+
+    // Search for android(\d+) in clues
+    let re = Regex::new(r"android(\d+)")?;
+    for clue in clues {
+        if let Some(caps) = re.captures(&clue) {
+            return Ok(caps[1].to_string());
+        }
+    }
+
+    bail!(
+        "Failed to determine Android API level. Please set the ANDROID_API_LEVEL environment variable."
+    );
 }
 
 /// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable

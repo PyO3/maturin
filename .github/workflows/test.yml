@@ -224,7 +224,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.12
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: maturin-build
           path: bin
@@ -321,7 +321,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: maturin-build
           path: bin
@@ -399,7 +399,7 @@ jobs:
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: maturin-build
           path: bin

@@ -23,7 +23,7 @@ jobs:
         curl https://raw.githubusercontent.com/pypa/auditwheel/main/src/auditwheel/policy/manylinux-policy.json > src/auditwheel/manylinux-policy.json
         curl https://raw.githubusercontent.com/pypa/auditwheel/main/src/auditwheel/policy/musllinux-policy.json > src/auditwheel/musllinux-policy.json
     - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v7
+      uses: peter-evans/create-pull-request@v8
       with:
         delete-branch: true
         add-paths: |

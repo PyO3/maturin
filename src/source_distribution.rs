@@ -237,7 +237,6 @@ fn add_crate_to_source_distribution(
             (relative_to_manifests, relative_to_cwd)
         })
         .filter(|(target, source)| {
-            #[allow(clippy::if_same_then_else)]
             if *target == "Cargo.toml.orig" {
                 // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
                 // and https://github.com/PyO3/maturin/issues/449

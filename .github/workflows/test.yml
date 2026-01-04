@@ -199,7 +199,7 @@ jobs:
       - run: sudo apt-get install musl-tools
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --target x86_64-unknown-linux-musl --release
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: maturin-build
           path: target/x86_64-unknown-linux-musl/release/maturin
@@ -469,7 +469,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - name: Upload wheel artifacts
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ runner.os }}
           path: dist

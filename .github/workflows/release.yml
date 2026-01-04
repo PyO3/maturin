@@ -12,16 +12,20 @@ jobs:
   release-crates-io:
     name: Release crates.io
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
     environment:
       name: crates.io
       url: ${{ steps.set_url.outputs.env_url }}
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+      - name: cargo publish (dry run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: cargo publish --dry-run
       - name: cargo login
+        if: startsWith(github.ref, 'refs/tags/')
         run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
       - name: cargo publish
+        if: startsWith(github.ref, 'refs/tags/')
         run: cargo publish
       - name: Set environment url
         id: set_url
@@ -239,7 +243,9 @@ jobs:
             ./*.tar.gz
             ./*.whl
       - uses: astral-sh/setup-uv@v7
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish (dry run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: uv publish --dry-run '*'
       - name: Publish
         if: startsWith(github.ref, 'refs/tags/')
         run: uv publish '*'

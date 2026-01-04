@@ -428,6 +428,11 @@ pub fn abi3_without_version() -> Result<()> {
 pub fn test_unreadable_dir() -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
+    // Root bypasses permission checks, so we can't test this as root.
+    if nix::unistd::getuid().is_root() {
+        return Ok(());
+    }
+
     let temp_dir = tempfile::tempdir()?;
     let project_dir = temp_dir.path().join("pyo3-mixed");
     copy_dir_recursive(Path::new("test-crates/pyo3-mixed"), &project_dir)?;

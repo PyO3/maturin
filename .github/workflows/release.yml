@@ -183,12 +183,10 @@ jobs:
       - uses: actions/checkout@v6
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
         if: ${{ !contains(fromJson('["s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target) }}
-      - name: Install Rust stable toolchain
+      - uses: dtolnay/rust-toolchain@stable
         if: contains(fromJson('["s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target)
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          rustup target add ${{ matrix.platform.target }}
+        with:
+          targets: ${{ matrix.platform.target }}
       - name: Build wheel
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79

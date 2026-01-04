@@ -387,7 +387,6 @@ fn tls_ca_bundle() -> Option<OsString> {
 
 // Prefer rustls if both native-tls and rustls features are enabled
 #[cfg(all(feature = "native-tls", not(feature = "rustls")))]
-#[allow(clippy::result_large_err)]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
@@ -405,7 +404,6 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 }
 
 #[cfg(feature = "rustls")]
-#[allow(clippy::result_large_err)]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
     use std::sync::Arc;
 
@@ -425,14 +423,12 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 }
 
 #[cfg(not(any(feature = "native-tls", feature = "rustls")))]
-#[allow(clippy::result_large_err)]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
     let builder = ureq::builder().try_proxy_from_env(true);
     Ok(builder.build())
 }
 
 /// Uploads a single wheel to the registry
-#[allow(clippy::result_large_err)]
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
     let hash_hex = hash_file(wheel_path)?;
 

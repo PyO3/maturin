@@ -55,7 +55,6 @@ struct Opt {
 }
 
 #[derive(Debug, Parser)]
-#[allow(clippy::large_enum_variant)]
 /// Build and publish crates with pyo3, cffi and uniffi bindings as well
 /// as rust binaries as python packages
 enum Command {

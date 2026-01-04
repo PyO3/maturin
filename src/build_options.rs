@@ -884,8 +884,6 @@ fn resolve_interpreters(
                 vec![python]
             }
         } else {
-            // XXX: False positive clippy warning
-            #[allow(clippy::redundant_clone)]
             build_options.interpreter.clone()
         };
         build_options.find_interpreters(bridge, &interpreter, target, None, generate_import_lib)?
@@ -909,7 +907,6 @@ fn validate_bridge_type(
                 );
             }
 
-            #[allow(clippy::comparison_chain)]
             if platform_tags.len() > 2 {
                 bail!(
                     "Expected only one or two platform tags but found {}",

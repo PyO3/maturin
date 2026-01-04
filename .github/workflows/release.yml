@@ -228,7 +228,7 @@ jobs:
       url: ${{ steps.set_url.outputs.env_url }}
     needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: wheels-*
           merge-multiple: true
@@ -263,7 +263,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: binaries-*
           merge-multiple: true

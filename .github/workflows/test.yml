@@ -401,7 +401,10 @@ jobs:
           name: maturin-build
           path: bin
       - run: chmod +x bin/maturin
-      - run: rustup target add ${{ matrix.platform.target }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets:
+            ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
           set -ex

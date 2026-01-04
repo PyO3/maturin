@@ -604,6 +604,12 @@ fn musl() {
 }
 
 #[test]
+#[cfg(unix)]
+fn unreadable_dir() {
+    handle_result(other::test_unreadable_dir())
+}
+
+#[test]
 fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
 }

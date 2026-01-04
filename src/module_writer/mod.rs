@@ -12,7 +12,7 @@ use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use itertools::Itertools as _;
 use normpath::PathExt as _;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::Metadata24;
 use crate::PyProjectToml;
@@ -142,7 +142,25 @@ pub fn write_python_part(
         .git_exclude(false)
         .build()
     {
-        let absolute = absolute?.into_path();
+        let absolute = match absolute {
+            Ok(entry) => entry.into_path(),
+            Err(err) => {
+                // Skip errors for paths that don't need to be included, e.g. for directories
+                // that we don't have permissions for.
+                if let ignore::Error::WithPath { path, .. } = &err {
+                    if !python_packages.iter().any(|pkg| path.starts_with(pkg)) {
+                        // Log priority logging, we're only looking at the directory at all due to
+                        // a particularity in how we're doing path traversal.
+                        trace!(
+                            "Skipping inaccessible path {} due to read error: {err}",
+                            path.display()
+                        );
+                        continue;
+                    }
+                }
+                return Err(err.into());
+            }
+        };
         if !python_packages
             .iter()
             .any(|path| absolute.starts_with(path))

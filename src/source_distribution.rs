@@ -262,7 +262,9 @@ fn add_crate_to_source_distribution(
                 debug!("Ignoring {}", target);
                 false
             } else {
-                source.exists()
+                // Use `is_file` instead of `exists` to work around cargo bug:
+                // https://github.com/rust-lang/cargo/issues/16465
+                source.is_file()
             }
         })
         .collect();

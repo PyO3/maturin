@@ -13,6 +13,26 @@ use tar::Archive;
 use time::OffsetDateTime;
 use zip::ZipArchive;
 
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs_err::create_dir_all(dst)?;
+    for entry in fs_err::read_dir(src)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        // Skip build artifacts and caches
+        if name.to_str() == Some("target") {
+            continue;
+        }
+        let src_path = entry.path();
+        let dst_path = dst.join(name);
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs_err::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
 /// Tries to compile a sample crate (pyo3-pure) for musl,
 /// given that rustup and the the musl target are installed
 ///
@@ -398,5 +418,72 @@ pub fn abi3_without_version() -> Result<()> {
         .build();
     assert!(result.is_ok());
 
+    Ok(())
+}
+
+/// Test that builds succeed even when there are unreadable directories in the project root.
+///
+/// See https://github.com/PyO3/maturin/issues/2777
+#[cfg(unix)]
+pub fn test_unreadable_dir() -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp_dir = tempfile::tempdir()?;
+    let project_dir = temp_dir.path().join("pyo3-mixed");
+    copy_dir_recursive(Path::new("test-crates/pyo3-mixed"), &project_dir)?;
+
+    // Create an unreadable dir that is not the python package.
+    let unreadable_dir = project_dir.join("unreadable_cache");
+    fs_err::create_dir(&unreadable_dir)?;
+    fs_err::write(unreadable_dir.join("cache_file"), "cached data")?;
+    fs_err::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o000))?;
+    assert!(
+        fs_err::read_dir(&unreadable_dir).is_err(),
+        "Directory must be unreadable"
+    );
+
+    // Test source dist build. See also https://github.com/rust-lang/cargo/issues/16465
+    let sdist_options = BuildOptions::try_parse_from([
+        "build",
+        "--manifest-path",
+        project_dir.join("Cargo.toml").to_str().unwrap(),
+        "--quiet",
+        "--target-dir",
+        temp_dir.path().join("target").to_str().unwrap(),
+        "--out",
+        temp_dir.path().join("dist").to_str().unwrap(),
+    ])?;
+
+    let sdist_context = sdist_options
+        .into_build_context()
+        .strip(false)
+        .editable(false)
+        .sdist_only(true)
+        .build()?;
+    sdist_context.build_source_distribution()?;
+
+    // Test wheel build
+    let wheel_options = BuildOptions::try_parse_from([
+        "build",
+        "--manifest-path",
+        project_dir.join("Cargo.toml").to_str().unwrap(),
+        "--quiet",
+        "--target-dir",
+        temp_dir.path().join("target").to_str().unwrap(),
+        "--out",
+        temp_dir.path().join("dist").to_str().unwrap(),
+    ])?;
+
+    let wheel_context = wheel_options
+        .into_build_context()
+        .strip(cfg!(feature = "faster-tests"))
+        .editable(false)
+        .build()?;
+    let wheel_result = wheel_context.build_wheels();
+
+    // Restore permissions before temp_dir cleanup
+    fs_err::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o755))?;
+
+    wheel_result?;
     Ok(())
 }

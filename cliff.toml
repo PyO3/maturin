@@ -5,12 +5,12 @@ header = """
 """
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}]
+    ## {{ version | trim_start_matches(pat="v") }}
 {% else %}\
-    ## [unreleased]
+    ## Unreleased
 {% endif %}\
 {% for commit in commits %}
-    - {% if commit.remote.pr_title %}\
+    * {% if commit.remote.pr_title %}\
           {{ commit.remote.pr_title | upper_first }}\
       {% else %}\
           {{ commit.message | split(pat="\n") | first | upper_first }}\

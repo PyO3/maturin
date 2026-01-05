@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Skip unreadable directories not included in the wheel instead of failing
+* Filter out directories from `cargo package --list` output when building sdists
+
 ## [1.11.0]
 
 * Refactor `ModuleWriter` to be easier to implement and use

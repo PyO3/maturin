@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.2
+
+* Fix failed release
+
 ## 1.11.1
 
 * Fix compiled artifacts being excluded by source path matching ([#2910](https://github.com/pyo3/maturin/pull/2910))

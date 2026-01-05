@@ -1,11 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.11.1
 
-* Skip unreadable directories not included in the wheel instead of failing
-* Filter out directories from `cargo package --list` output when building sdists
+* Fix compiled artifacts being excluded by source path matching ([#2910](https://github.com/pyo3/maturin/pull/2910))
+* Better error reporting for missing interpreters ([#2918](https://github.com/pyo3/maturin/pull/2918))
+* Ignore unreadable excluded directories ([#2916](https://github.com/pyo3/maturin/pull/2916))
 
-## [1.11.0]
+## [1.11.0] - Yanked
+
+Note: This release was yanked to a regression: https://github.com/PyO3/maturin/issues/2909
 
 * Refactor `ModuleWriter` to be easier to implement and use
 * Add Android cross compilation support, fix wheel tags for Android
@@ -1143,7 +1146,6 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.11.0...HEAD
 [1.11.0]: https://github.com/pyo3/maturin/compare/v1.10.2...v1.11.0
 [1.10.2]: https://github.com/pyo3/maturin/compare/v1.10.1...v1.10.2
 [1.10.1]: https://github.com/pyo3/maturin/compare/v1.10.0...v1.10.1

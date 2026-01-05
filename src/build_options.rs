@@ -1298,7 +1298,12 @@ fn find_single_python_interpreter(
     target: &Target,
     bridge_name: &str,
 ) -> Result<PythonInterpreter> {
-    let err_message = "Failed to find a python interpreter";
+    let interpreter_str = interpreter
+        .iter()
+        .map(|interpreter| format!("`{}`", interpreter.display()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let err_message = format!("Failed to find a python interpreter from {interpreter_str}");
 
     let executable = if interpreter.is_empty() {
         target.get_python()
@@ -1312,7 +1317,7 @@ fn find_single_python_interpreter(
     };
 
     let interpreter = PythonInterpreter::check_executable(executable, target, bridge)
-        .context(format_err!(err_message))?
+        .context(format_err!(err_message.clone()))?
         .ok_or_else(|| format_err!(err_message))?;
     Ok(interpreter)
 }
@@ -1687,11 +1692,11 @@ impl CargoOptions {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use cargo_metadata::MetadataCommand;
+    use insta::assert_snapshot;
     use pretty_assertions::assert_eq;
     use std::path::Path;
-
-    use super::*;
 
     #[test]
     fn test_find_bridge_pyo3() {
@@ -1857,5 +1862,16 @@ mod tests {
         ];
 
         assert_eq!(extract_cargo_metadata_args(&args).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_find_single_python_interpreter_not_found() {
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+        let bridge = BridgeModel::Cffi;
+        let interpreter = vec![PathBuf::from("nonexistent-python-xyz")];
+
+        let result = find_single_python_interpreter(&bridge, &interpreter, &target, "cffi");
+        let err_msg = result.unwrap_err().to_string();
+        assert_snapshot!(err_msg, @"Failed to find a python interpreter from `nonexistent-python-xyz`");
     }
 }

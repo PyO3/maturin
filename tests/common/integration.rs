@@ -7,7 +7,7 @@ use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
 use fs4::fs_err3::FileExt;
-use maturin::{BuildOptions, PythonInterpreter, Target};
+use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;
@@ -66,11 +66,13 @@ pub fn test_integration(
     #[cfg(not(feature = "zig"))]
     let zig_found = false;
 
-    if zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
+    let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
         cli.push("--zig".into());
+        true
     } else {
         cli.push("--compatibility".into());
         cli.push("linux".into());
+        false
     };
 
     // One scope up to extend the lifetime
@@ -159,6 +161,20 @@ pub fn test_integration(
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
         check_for_duplicates(filename)?;
+        if test_zig
+            && build_context.target.is_linux()
+            && !build_context.target.is_musl_libc()
+            && build_context.target.get_minimum_manylinux_tag() != PlatformTag::Linux
+        {
+            let rustc_ver = rustc_version::version()?;
+            let python_arch = build_context.target.get_python_arch();
+            let file_suffix = if rustc_ver >= semver::Version::new(1, 64, 0) {
+                format!("manylinux_2_17_{python_arch}.manylinux2014_{python_arch}.whl")
+            } else {
+                format!("manylinux_2_12_{python_arch}.manylinux2010_{python_arch}.whl")
+            };
+            assert!(filename.to_string_lossy().ends_with(&file_suffix))
+        }
         let mut venv_name = if supported_version == "py3" {
             format!("{unique_name}-py3")
         } else {

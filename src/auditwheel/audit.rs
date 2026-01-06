@@ -5,7 +5,7 @@ use crate::compile::BuildArtifact;
 use crate::target::Target;
 use anyhow::{Context, Result, bail};
 use fs_err::File;
-use goblin::elf::{Elf, sym::STT_FUNC};
+use goblin::elf::{Elf, sym::STB_WEAK, sym::STT_FUNC};
 use lddtree::Library;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -162,7 +162,10 @@ fn policy_is_satisfied(
         .dynsyms
         .iter()
         .filter_map(|sym| {
-            if sym.st_shndx == goblin::elf::section_header::SHN_UNDEF as usize {
+            // Do not consider weak symbols as undefined, they are optional at runtime.
+            if sym.st_shndx == goblin::elf::section_header::SHN_UNDEF as usize
+                && sym.st_bind() != STB_WEAK
+            {
                 elf.dynstrtab.get_at(sym.st_name).map(ToString::to_string)
             } else {
                 None

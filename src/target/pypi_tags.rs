@@ -62,17 +62,25 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
             };
             ANDROID_ARCHES.contains(&android_arch)
         }
-        Os::Linux => match dbg!(target.target_env()) {
-            Environment::Gnu
-            | Environment::Gnuabi64
-            | Environment::Gnueabi
-            | Environment::Gnueabihf => MANYLINUX_ARCHES.contains(&arch.as_str()),
-            Environment::Musl
-            | Environment::Musleabi
-            | Environment::Musleabihf
-            | Environment::Muslabi64 => MUSLLINUX_ARCHES.contains(&arch.as_str()),
-            _ => false,
-        },
+        Os::Linux => {
+            // Old arm versions
+            // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
+            if arch == Arch::Armv6L || arch == Arch::Armv7L {
+                return true;
+            }
+
+            match target.target_env() {
+                Environment::Gnu
+                | Environment::Gnuabi64
+                | Environment::Gnueabi
+                | Environment::Gnueabihf => MANYLINUX_ARCHES.contains(&arch.as_str()),
+                Environment::Musl
+                | Environment::Musleabi
+                | Environment::Musleabihf
+                | Environment::Muslabi64 => MUSLLINUX_ARCHES.contains(&arch.as_str()),
+                _ => false,
+            }
+        }
         _ => false,
     }
 }
@@ -105,6 +113,12 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
             "many" => MANYLINUX_ARCHES.contains(&arch),
             _ => false,
         };
+    }
+
+    // Old arm versions
+    // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
+    if platform_tag == "linux_armv6l" || platform_tag == "linux_armv7l" {
+        return true;
     }
 
     // iOS
@@ -178,6 +192,10 @@ mod tests {
             // musllinux platforms
             ("musllinux_1_1_x86_64", true),
             ("musllinux_1_1_riscv64", false),
+            // Old arm versions
+            // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
+            ("linux_armv6l", true),
+            ("linux_armv7l", true),
             // macOS platforms
             ("macosx_9_0_x86_64", false), // Invalid major version
             ("macosx_10_9_x86_64", true),

@@ -178,9 +178,7 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
     if let Err(err) = result {
         let err_string = err.to_string();
         assert!(
-            err_string.contains(
-                "Target riscv32gc-unknown-linux-gnu architecture is not supported by PyPI"
-            ),
+            err_string.contains("Rust target riscv32gc-unknown-linux-gnu is not supported by PyPI"),
             "{err_string}",
         );
     } else {

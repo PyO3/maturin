@@ -769,7 +769,7 @@ impl BuildContextBuilder {
         } else if let [PlatformTag::Pypi] = &build_options.platform_tag[..] {
             // Avoid building for architectures we already know aren't allowed on PyPI
             if !is_arch_supported_by_pypi(&target) {
-                bail!("Target {} is not supported by PyPI", target);
+                bail!("Rust target {} is not supported by PyPI", target);
             }
             // The defaults are already targeting PyPI: manylinux on linux,
             // and the native tag on windows and mac

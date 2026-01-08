@@ -188,21 +188,22 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
     Ok(())
 }
 
-/// Test that --compatibility pypi cannot be combined with other platform tags
-pub fn pypi_compatibility_mixed_tags() -> Result<()> {
+/// Test that `--compatibility pypi` cannot be used with the linux tag.
+#[cfg(target_os = "linux")]
+pub fn pypi_compatibility_linux_tag() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![
         "build",
         "-m",
-        "test-crates/pyo3-mixed/Cargo.toml",
+        "test-crates/hello-world/Cargo.toml",
         "--compatibility",
         "pypi",
         "--compatibility",
-        "manylinux2014", // Should fail when combined with pypi
+        "linux", // Should fail when combined with pypi
         "--target-dir",
-        "test-crates/targets/pypi_compatibility_mixed_tags",
+        "test-crates/targets/pypi_compatibility_linux_tag",
         "--out",
-        "test-crates/targets/pypi_compatibility_mixed_tags",
+        "test-crates/targets/pypi_compatibility_linux_tag",
         "-i",
         "python3.12", // Add interpreter to bypass interpreter detection
     ];
@@ -211,14 +212,13 @@ pub fn pypi_compatibility_mixed_tags() -> Result<()> {
         .into_build_context()
         .strip(cfg!(feature = "faster-tests"))
         .editable(false)
-        .build();
+        .build()?
+        .build_wheels();
 
     if let Err(err) = result {
         let err_string = err.to_string();
         assert!(
-            err_string.contains(
-                "The 'pypi' compatibility option cannot be combined with other platform tags"
-            ),
+            err_string.contains("PyPI validation failed"),
             "{err_string}",
         );
     } else {

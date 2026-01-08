@@ -590,8 +590,9 @@ fn pypi_compatibility_unsupported_target() {
 }
 
 #[test]
-fn pypi_compatibility_mixed_tags() {
-    handle_result(errors::pypi_compatibility_mixed_tags())
+#[cfg(target_os = "linux")]
+fn pypi_compatibility_linux_tag() {
+    handle_result(errors::pypi_compatibility_linux_tag())
 }
 
 #[test]

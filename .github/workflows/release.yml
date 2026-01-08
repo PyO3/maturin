@@ -194,13 +194,17 @@ jobs:
         if: contains(fromJson('["s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target)
         with:
           targets: ${{ matrix.platform.target }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          # No need to take cache size for maturin in the release pipeline
+          enable-cache: "false"
       - name: Build wheel
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
           CFLAGS_s390x_unknown_linux_gnu: "-march=z10"
         run: |
-          sudo python3 -m pip install -U --pre maturin
-          maturin build --release -b bin -o dist \
+          uvx maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage

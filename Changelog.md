@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.3
+
+* Fix manylinux2014 compliance check ([#2922](https://github.com/pyo3/maturin/pull/2922))
+
 ## 1.11.2
 
 * Fix failed release

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.5
+
+* Allow combining `--compatibility pypi` with other `--compatibility` values ([#2928](https://github.com/pyo3/maturin/pull/2928))
+
 ## 1.11.4
 
 * Support armv6l and armv7l in pypi compatibility ([#2926](https://github.com/pyo3/maturin/pull/2926))

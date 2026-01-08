@@ -590,6 +590,7 @@ fn pypi_compatibility_unsupported_target() {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
 fn pypi_compatibility_linux_tag() {
     handle_result(errors::pypi_compatibility_linux_tag())
 }

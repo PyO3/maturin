@@ -778,10 +778,10 @@ impl BuildContextBuilder {
             // and the native tag on windows and mac
             Vec::new()
         } else {
-            if build_options.platform_tag.iter().any(|tag| tag.is_pypi()) {
-                if !is_arch_supported_by_pypi(&target) {
-                    bail!("Rust target {target} is not supported by PyPI");
-                }
+            if build_options.platform_tag.iter().any(|tag| tag.is_pypi())
+                && !is_arch_supported_by_pypi(&target)
+            {
+                bail!("Rust target {target} is not supported by PyPI");
             }
 
             // All non-PyPI tags - use as-is

@@ -4,6 +4,13 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+  pull_request:
+    paths:
+      # Dry run the release pipeline when changing the version of maturin or of its dependencies
+      - pyproject.toml
+      - Cargo.toml
+      # Dry run the release pipeline when it's changed
+      - .github/workflows/release.yml
 
 permissions:
   contents: read

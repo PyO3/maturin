@@ -204,7 +204,9 @@ jobs:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
           CFLAGS_s390x_unknown_linux_gnu: "-march=z10"
         run: |
-          uvx maturin build --release -b bin -o dist \
+          # TODO: Avoid pinning an explicit version here. This specific version avoid a regression in a later version
+          # See https://github.com/pyo3/maturin/pull/2922
+          uvx maturin==1.10.1 build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage

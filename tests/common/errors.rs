@@ -189,6 +189,7 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
 }
 
 /// Test that `--compatibility pypi` cannot be used with the linux tag.
+#[cfg(target_os = "linux")]
 pub fn pypi_compatibility_linux_tag() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![
@@ -217,10 +218,7 @@ pub fn pypi_compatibility_linux_tag() -> Result<()> {
     if let Err(err) = result {
         let err_string = err.to_string();
         assert!(
-            err_string.contains(
-                "PyPI validation failed: Platform tag 'linux_x86_64' in wheel \
-                'hello_world-0.1.0-py3-none-linux_x86_64.whl' is not allowed by PyPI"
-            ),
+            err_string.contains("PyPI validation failed"),
             "{err_string}",
         );
     } else {

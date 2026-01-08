@@ -730,7 +730,10 @@ impl BuildContextBuilder {
             });
 
         // Check if PyPI validation is needed before we move platform_tag
-        let pypi_validation = matches!(&build_options.platform_tag[..], [PlatformTag::Pypi]);
+        let pypi_validation = build_options
+            .platform_tag
+            .iter()
+            .any(|platform_tag| platform_tag == &PlatformTag::Pypi);
 
         let platform_tags = if build_options.platform_tag.is_empty() {
             #[cfg(feature = "zig")]
@@ -769,16 +772,24 @@ impl BuildContextBuilder {
         } else if let [PlatformTag::Pypi] = &build_options.platform_tag[..] {
             // Avoid building for architectures we already know aren't allowed on PyPI
             if !is_arch_supported_by_pypi(&target) {
-                bail!("Rust target {} is not supported by PyPI", target);
+                bail!("Rust target {target} is not supported by PyPI");
             }
             // The defaults are already targeting PyPI: manylinux on linux,
             // and the native tag on windows and mac
             Vec::new()
-        } else if build_options.platform_tag.iter().all(|tag| !tag.is_pypi()) {
-            // All non-PyPI tags - use as-is
-            build_options.platform_tag
         } else {
-            bail!("The 'pypi' compatibility option cannot be combined with other platform tags");
+            if build_options.platform_tag.iter().any(|tag| tag.is_pypi()) {
+                if !is_arch_supported_by_pypi(&target) {
+                    bail!("Rust target {target} is not supported by PyPI");
+                }
+            }
+
+            // All non-PyPI tags - use as-is
+            build_options
+                .platform_tag
+                .into_iter()
+                .filter(|platform_tag| platform_tag != &PlatformTag::Pypi)
+                .collect()
         };
 
         for platform_tag in &platform_tags {

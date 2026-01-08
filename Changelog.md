@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.4
+
+* Support armv6l and armv7l in pypi compatibility ([#2926](https://github.com/pyo3/maturin/pull/2926))
+* Improve the reliability of maturin's own CI
+
 ## 1.11.3
 
 * Fix manylinux2014 compliance check ([#2922](https://github.com/pyo3/maturin/pull/2922))

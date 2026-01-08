@@ -23,23 +23,31 @@ use crate::target::legacy_py::{
     LINUX_PLATFORM_RE, MACOS_ARCHES, MACOS_MAJOR_VERSIONS, MACOS_PLATFORM_RE, MANYLINUX_ARCHES,
     MUSLLINUX_ARCHES, WINDOWS_ARCHES,
 };
-use crate::target::{Os, Target};
+use crate::target::{Arch, Os, Target};
 use anyhow::{Result, anyhow, bail};
 use target_lexicon::Environment;
 
 /// Check for target architectures that we know aren't supported by PyPI to error early.
 pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
-    let arch = target.target_arch().to_string();
+    let arch = target.target_arch();
     match target.target_os() {
         Os::Windows => WINDOWS_ARCHES.contains(&arch.as_str()),
         Os::Macos => {
             // macOS uses arm64 in platform tags, but target triple uses aarch64
-            let normalized_arch = if arch == "aarch64" { "arm64" } else { &arch };
+            let normalized_arch = if arch == Arch::Aarch64 {
+                "arm64"
+            } else {
+                arch.as_str()
+            };
             MACOS_ARCHES.contains(&normalized_arch)
         }
         Os::Ios => {
             // iOS uses arm64 in platform tags, but target triple uses aarch64
-            let normalized_arch = if arch == "aarch64" { "arm64" } else { &arch };
+            let normalized_arch = if arch == Arch::Aarch64 {
+                "arm64"
+            } else {
+                arch.as_str()
+            };
             // PyPI allows iOS with arm64 and x86_64 (simulator)
             matches!(normalized_arch, "arm64" | "x86_64")
         }
@@ -54,21 +62,15 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
             };
             ANDROID_ARCHES.contains(&android_arch)
         }
-        Os::Linux => match target.target_env() {
+        Os::Linux => match dbg!(target.target_env()) {
             Environment::Gnu
             | Environment::Gnuabi64
             | Environment::Gnueabi
-            | Environment::Gnueabihf => {
-                let arch1 = arch.as_str();
-                MANYLINUX_ARCHES.contains(&arch1)
-            }
+            | Environment::Gnueabihf => MANYLINUX_ARCHES.contains(&arch.as_str()),
             Environment::Musl
             | Environment::Musleabi
             | Environment::Musleabihf
-            | Environment::Muslabi64 => {
-                let arch1 = arch.as_str();
-                MUSLLINUX_ARCHES.contains(&arch1)
-            }
+            | Environment::Muslabi64 => MUSLLINUX_ARCHES.contains(&arch.as_str()),
             _ => false,
         },
         _ => false,

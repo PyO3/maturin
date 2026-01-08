@@ -99,30 +99,36 @@ pub enum Arch {
     LoongArch64,
 }
 
+impl Arch {
+    pub fn as_str(&self) -> &str {
+        match *self {
+            Arch::Aarch64 => "aarch64",
+            Arch::Armv5teL => "armv5tel",
+            Arch::Armv6L => "armv6l",
+            Arch::Armv7L => "armv7l",
+            Arch::Powerpc => "ppc",
+            Arch::Powerpc64Le => "ppc64le",
+            Arch::Powerpc64 => "ppc64",
+            Arch::X86 => "i686",
+            Arch::X86_64 => "x86_64",
+            Arch::S390X => "s390x",
+            Arch::Wasm32 => "wasm32",
+            Arch::Riscv32 => "riscv32",
+            Arch::Riscv64 => "riscv64",
+            Arch::Mips64el => "mips64el",
+            Arch::Mips64 => "mips64",
+            Arch::Mipsel => "mipsel",
+            Arch::Mips => "mips",
+            Arch::Sparc64 => "sparc64",
+            Arch::Sparcv9 => "sparcv9",
+            Arch::LoongArch64 => "loongarch64",
+        }
+    }
+}
+
 impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Arch::Aarch64 => write!(f, "aarch64"),
-            Arch::Armv5teL => write!(f, "armv5tel"),
-            Arch::Armv6L => write!(f, "armv6l"),
-            Arch::Armv7L => write!(f, "armv7l"),
-            Arch::Powerpc => write!(f, "ppc"),
-            Arch::Powerpc64Le => write!(f, "ppc64le"),
-            Arch::Powerpc64 => write!(f, "ppc64"),
-            Arch::X86 => write!(f, "i686"),
-            Arch::X86_64 => write!(f, "x86_64"),
-            Arch::S390X => write!(f, "s390x"),
-            Arch::Wasm32 => write!(f, "wasm32"),
-            Arch::Riscv32 => write!(f, "riscv32"),
-            Arch::Riscv64 => write!(f, "riscv64"),
-            Arch::Mips64el => write!(f, "mips64el"),
-            Arch::Mips64 => write!(f, "mips64"),
-            Arch::Mipsel => write!(f, "mipsel"),
-            Arch::Mips => write!(f, "mips"),
-            Arch::Sparc64 => write!(f, "sparc64"),
-            Arch::Sparcv9 => write!(f, "sparcv9"),
-            Arch::LoongArch64 => write!(f, "loongarch64"),
-        }
+        f.write_str(self.as_str())
     }
 }
 

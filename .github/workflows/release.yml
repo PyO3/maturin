@@ -210,7 +210,7 @@ jobs:
             --target ${{ matrix.platform.target }} \
             # Run the pypi pre-upload checks
             --compatibility pypi
-            # Determine the manylinux/musllinux tags 
+            # Determine the manylinux/musllinux tags
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary

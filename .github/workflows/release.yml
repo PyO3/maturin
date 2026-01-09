@@ -208,7 +208,7 @@ jobs:
           # See https://github.com/pyo3/maturin/pull/2922
           uvx maturin==1.11.5 build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
-            --compatibility pypi \
+            ${{ matrix.platform.target != 'loongarch64-unknown-linux-gnu' && '--compatibility pypi' || '' }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary

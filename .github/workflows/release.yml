@@ -90,16 +90,16 @@ jobs:
       - name: Build wheel (with sdist)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1
+          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1 --compatibility pypi
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features full,native-tls
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features full,native-tls --compatibility pypi
 
       - name: Build wheel (without sdist)
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage,static
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage,static --compatibility pypi
 
       - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
@@ -111,7 +111,7 @@ jobs:
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage,static
+          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage,static --compatibility pypi
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
@@ -206,8 +206,9 @@ jobs:
         run: |
           # TODO: Avoid pinning an explicit version here. This specific version avoid a regression in a later version
           # See https://github.com/pyo3/maturin/pull/2922
-          uvx maturin==1.10.1 build --release -b bin -o dist \
+          uvx maturin==1.11.5 build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
+            ${{ matrix.platform.target != 'loongarch64-unknown-linux-gnu' && '--compatibility pypi' || '' }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary

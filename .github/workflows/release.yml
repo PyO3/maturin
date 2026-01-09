@@ -206,11 +206,9 @@ jobs:
         run: |
           # TODO: Avoid pinning an explicit version here. This specific version avoid a regression in a later version
           # See https://github.com/pyo3/maturin/pull/2922
-          uvx maturin==1.11.4 build --release -b bin -o dist \
+          uvx maturin==1.11.5 build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
-            # Run the pypi pre-upload checks
             --compatibility pypi \
-            # Determine the manylinux/musllinux tags
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary

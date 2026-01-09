@@ -1,0 +1,11 @@
+[package]
+name = "b"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+bench = false
+
+[dependencies]
+uniffi = { version = "=0.25.2" }

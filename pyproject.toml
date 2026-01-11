@@ -31,7 +31,8 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 zig = ["ziglang>=0.10.0,<0.13.0"]
-patchelf = ["patchelf"]
+# Deprecated: The patchelf extra is not required anymore
+patchelf = []
 
 [project.urls]
 "Source Code" = "https://github.com/PyO3/maturin"

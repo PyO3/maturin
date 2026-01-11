@@ -1,96 +1,67 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
+use arwen::elf::ElfContainer;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
-use std::process::Command;
-
-static MISSING_PATCHELF_ERROR: &str = "Failed to execute 'patchelf', did you install it? Hint: Try `pip install maturin[patchelf]` (or just `pip install patchelf`)";
-
-/// Verify patchelf version
-pub fn verify_patchelf() -> Result<()> {
-    let output = Command::new("patchelf")
-        .arg("--version")
-        .output()
-        .context(MISSING_PATCHELF_ERROR)?;
-    let version = String::from_utf8(output.stdout)
-        .context("Failed to parse patchelf version")?
-        .trim()
-        .to_string();
-    let version = version.strip_prefix("patchelf").unwrap_or(&version).trim();
-    let semver = version.parse::<semver::Version>().context(
-        "Failed to parse patchelf version, auditwheel repair requires patchelf >= 0.14.0.",
-    )?;
-    if semver < semver::Version::new(0, 14, 0) {
-        bail!(
-            "patchelf {} found. auditwheel repair requires patchelf >= 0.14.0.",
-            version
-        );
-    }
-    Ok(())
-}
 
 /// Replace a declared dependency on a dynamic library with another one (`DT_NEEDED`)
 pub fn replace_needed<O: AsRef<OsStr>, N: AsRef<OsStr>>(
     file: impl AsRef<Path>,
     old_new_pairs: &[(O, N)],
 ) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    for (old, new) in old_new_pairs {
-        cmd.arg("--replace-needed").arg(old).arg(new);
-    }
-    cmd.arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --replace-needed failed: {}",
-            String::from_utf8_lossy(&output.stderr)
+    let bytes_of_file = fs_err::read(file.as_ref())?;
+    let mut elf = ElfContainer::parse(&bytes_of_file)?;
+
+    let mut dt_needed = HashMap::new();
+    for (key, value) in old_new_pairs {
+        dt_needed.insert(
+            key.as_ref().as_encoded_bytes(),
+            value.as_ref().as_encoded_bytes(),
         );
     }
+
+    elf.replace_needed(&dt_needed)?;
+
+    elf.write_to_path(file.as_ref())?;
+
     Ok(())
 }
 
 /// Change `SONAME` of a dynamic library
 pub fn set_soname<S: AsRef<OsStr>>(file: impl AsRef<Path>, soname: &S) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--set-soname").arg(soname).arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --set-soname failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let bytes_of_file = fs_err::read(file.as_ref())?;
+    let mut elf = ElfContainer::parse(&bytes_of_file)?;
+
+    elf.set_soname(soname.as_ref().as_encoded_bytes())?;
+
+    elf.write_to_path(file.as_ref())?;
+
     Ok(())
 }
 
 /// Remove a `RPATH` from executables and libraries
 pub fn remove_rpath(file: impl AsRef<Path>) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--remove-rpath").arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --remove-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let bytes_of_file = fs_err::read(file.as_ref())?;
+    let mut elf = ElfContainer::parse(&bytes_of_file)?;
+
+    elf.remove_runpath()?;
+
+    elf.write_to_path(file.as_ref())?;
+
     Ok(())
 }
 
 /// Change the `RPATH` of executables and libraries
 pub fn set_rpath<S: AsRef<OsStr>>(file: impl AsRef<Path>, rpath: &S) -> Result<()> {
     remove_rpath(&file)?;
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--force-rpath")
-        .arg("--set-rpath")
-        .arg(rpath)
-        .arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --set-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let bytes_of_file = fs_err::read(file.as_ref())?;
+    let mut elf = ElfContainer::parse(&bytes_of_file)?;
+
+    elf.add_runpath(rpath.as_ref().as_encoded_bytes())?;
+    elf.force_rpath()?;
+
+    elf.write_to_path(file.as_ref())?;
+
     Ok(())
 }
 

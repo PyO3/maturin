@@ -371,8 +371,6 @@ impl BuildContext {
             );
         }
 
-        patchelf::verify_patchelf()?;
-
         // Put external libs to ${module_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
         let mut libs_dir = self

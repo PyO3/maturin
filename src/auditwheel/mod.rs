@@ -1,6 +1,5 @@
 mod audit;
 mod musllinux;
-pub mod patchelf;
 mod platform_tag;
 mod policy;
 mod repair;

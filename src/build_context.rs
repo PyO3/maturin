@@ -1,4 +1,4 @@
-use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
+use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::binding_generator::{
     BinBindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator, UniFfiBindingGenerator,
@@ -18,6 +18,7 @@ use crate::{
     VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
+use arwen::elf::ElfContainer;
 use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
 use fs_err as fs;
@@ -28,7 +29,7 @@ use platform_info::*;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -313,27 +314,38 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable && self.target.is_linux() && !artifacts.is_empty() {
-            for artifact in artifacts {
-                let artifact = artifact.borrow();
-                if artifact.linked_paths.is_empty() {
-                    continue;
+        for artifact in artifacts {
+            let artifact = artifact.borrow();
+            if artifact.linked_paths.is_empty() {
+                continue;
+            }
+            let old_rpaths = get_rpath(&artifact.path)?;
+            let mut new_rpaths = old_rpaths.clone();
+            for path in &artifact.linked_paths {
+                if !old_rpaths.contains(path) {
+                    new_rpaths.push(path.to_string());
                 }
-                let old_rpaths = patchelf::get_rpath(&artifact.path)?;
-                let mut new_rpaths = old_rpaths.clone();
-                for path in &artifact.linked_paths {
-                    if !old_rpaths.contains(path) {
-                        new_rpaths.push(path.to_string());
-                    }
-                }
-                let new_rpath = new_rpaths.join(":");
-                if let Err(err) = patchelf::set_rpath(&artifact.path, &new_rpath) {
-                    eprintln!(
-                        "⚠️ Warning: Failed to set rpath for {}: {}",
-                        artifact.path.display(),
-                        err
-                    );
-                }
+            }
+            let new_rpath = new_rpaths.join(":");
+
+            let contents = fs_err::read(&artifact.path)?;
+            let mut elf = ElfContainer::parse(&contents)?;
+
+            // Pseudo-try-block
+            let result: arwen::elf::Result<()> = (|| {
+                elf.remove_runpath()?;
+                elf.add_runpath(new_rpath)?;
+                elf.force_rpath()?;
+
+                elf.write_to_path(&artifact.path)?;
+                Ok(())
+            })();
+            if let Err(err) = result {
+                eprintln!(
+                    "⚠️ Warning: Failed to set rpath for {}: {}",
+                    artifact.path.display(),
+                    err
+                );
             }
         }
         Ok(())
@@ -348,7 +360,7 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable {
+        if self.editable && self.target.is_linux() {
             return self.add_rpath(artifacts);
         }
         if ext_libs.iter().all(|libs| libs.is_empty()) {
@@ -414,10 +426,16 @@ impl BuildContext {
             perms.set_readonly(false);
             fs::set_permissions(&dest_path, perms)?;
 
-            patchelf::set_soname(&dest_path, &new_soname)?;
+            let contents = fs_err::read(&dest_path)?;
+            let mut elf = ElfContainer::parse(&contents)?;
+            elf.set_soname(&new_soname)?;
             if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
-                patchelf::set_rpath(&dest_path, &libs_dir)?;
+                elf.remove_runpath()?;
+                elf.add_runpath(libs_dir.as_os_str().as_encoded_bytes())?;
+                elf.force_rpath()?;
             }
+            elf.write_to_path(&dest_path)?;
+
             soname_map.insert(
                 lib.name.clone(),
                 (new_soname.clone(), dest_path.clone(), lib.needed.clone()),
@@ -431,14 +449,17 @@ impl BuildContext {
                 .iter()
                 .filter_map(|(k, v)| {
                     if artifact_deps.contains(k) {
-                        Some((k, v.0.clone()))
+                        Some((k.clone(), v.0.clone()))
                     } else {
                         None
                     }
                 })
-                .collect::<Vec<_>>();
+                .collect::<HashMap<_, _>>();
             if !replacements.is_empty() {
-                patchelf::replace_needed(&artifact.path, &replacements[..])?;
+                let bytes_of_file = fs_err::read(&artifact.path)?;
+                let mut elf = ElfContainer::parse(&bytes_of_file)?;
+                elf.replace_needed(&replacements)?;
+                elf.write_to_path(&artifact.path)?;
             }
         }
 
@@ -447,14 +468,17 @@ impl BuildContext {
         // we need to update those records so each now knows about the new
         // name of the other.
         for (new_soname, path, needed) in soname_map.values() {
-            let mut replacements = Vec::new();
+            let mut replacements = HashMap::new();
             for n in needed {
                 if soname_map.contains_key(n) {
-                    replacements.push((n, soname_map[n].0.clone()));
+                    replacements.insert(n.clone(), soname_map[n].0.clone());
                 }
             }
             if !replacements.is_empty() {
-                patchelf::replace_needed(path, &replacements[..])?;
+                let bytes_of_file = fs_err::read(path)?;
+                let mut elf = ElfContainer::parse(&bytes_of_file)?;
+                elf.replace_needed(&replacements)?;
+                elf.write_to_path(path)?;
             }
             // Use add_file_force to bypass exclusion checks for external shared libraries
             writer.add_file_force(libs_dir.join(new_soname), path, true)?;
@@ -484,13 +508,20 @@ impl BuildContext {
         };
         for artifact in artifacts {
             let artifact = artifact.borrow();
-            let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
+            let mut new_rpaths = get_rpath(&artifact.path)?;
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
             let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&artifact.path, &new_rpath)?;
+            let bytes_of_file = fs_err::read(&artifact.path)?;
+            let mut elf = ElfContainer::parse(&bytes_of_file)?;
+
+            elf.remove_runpath()?;
+            elf.add_runpath(new_rpath)?;
+            elf.force_rpath()?;
+
+            elf.write_to_path(&artifact.path)?;
         }
         Ok(())
     }
@@ -1359,6 +1390,26 @@ fn zip_mtime() -> DateTime {
         });
 
     res.unwrap_or_default()
+}
+
+/// Get the `RPATH` of executables and libraries.
+///
+/// TODO: Unify goblin and object usage.
+pub fn get_rpath(file: impl AsRef<Path>) -> Result<Vec<String>> {
+    let file = file.as_ref();
+    let contents = fs_err::read(file)?;
+    match goblin::Object::parse(&contents) {
+        Ok(goblin::Object::Elf(elf)) => {
+            let rpaths = if !elf.runpaths.is_empty() {
+                elf.runpaths
+            } else {
+                elf.rpaths
+            };
+            Ok(rpaths.iter().map(|r| r.to_string()).collect())
+        }
+        Ok(_) => bail!("'{}' is not an ELF file", file.display()),
+        Err(e) => bail!("Failed to parse ELF file at '{}': {}", file.display(), e),
+    }
 }
 
 #[cfg(test)]

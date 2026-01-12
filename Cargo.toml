@@ -56,8 +56,8 @@ serde_json = "1.0.114"
 sha2 = "0.10.3"
 tar = "0.4.38"
 tempfile = "3.2.0"
-toml = "0.9.8"
-toml_edit = "0.23.7"
+toml = "0.9.11"
+toml_edit = "0.24.0"
 zip = { version = "6.0.0", default-features = false, features = [
     "bzip2",
     "deflate",

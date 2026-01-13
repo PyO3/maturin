@@ -1,15 +1,21 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "nox",
+# ]
+# ///
 import os
 import json
 import sys
 from pathlib import Path
+import tomllib
 
 import nox
-
 
 PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.29.0")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")
 GITHUB_ENV = os.getenv("GITHUB_ENV")
-MSRV = "1.83.0"
+MSRV = tomllib.loads(Path("Cargo.toml").read_text())["package"]["rust-version"]
 
 
 def append_to_github_env(name: str, value: str):

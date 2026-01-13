@@ -47,10 +47,26 @@ pub(crate) trait BindingGenerator {
 }
 
 #[derive(Debug)]
+pub(crate) enum ArtifactTarget {
+    /// A binary executable that should be installed in scripts
+    Binary(PathBuf),
+    /// An extension module
+    ExtensionModule(PathBuf),
+}
+
+impl ArtifactTarget {
+    pub(crate) fn path(&self) -> &Path {
+        match self {
+            ArtifactTarget::Binary(path) | ArtifactTarget::ExtensionModule(path) => path,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct GeneratorOutput {
     /// The path, relative to the archive root, where the built artifact/module
     /// should be installed
-    artifact_target: PathBuf,
+    artifact_target: ArtifactTarget,
 
     /// In some cases, the source path of the artifact is altered
     /// (e.g. when the build output is an archive which needs to be unpacked)
@@ -125,23 +141,31 @@ where
 
         match (context.editable, &base_path) {
             (true, Some(base_path)) => {
-                let target = base_path.join(&artifact_target);
-                debug!("Removing previously built module {}", target.display());
-                fs::create_dir_all(target.parent().unwrap())?;
-                // Remove existing so file to avoid triggering SIGSEV in running process
-                // See https://github.com/PyO3/maturin/issues/758
-                let _ = fs::remove_file(&target);
                 let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
+                match artifact_target {
+                    ArtifactTarget::Binary(path) => {
+                        // Use add_file_force to bypass exclusion checks for the compiled artifact
+                        writer.add_file_force(path, source, true)?;
+                    }
+                    ArtifactTarget::ExtensionModule(path) => {
+                        let target = base_path.join(path);
+                        debug!("Removing previously built module {}", target.display());
+                        fs::create_dir_all(target.parent().unwrap())?;
+                        // Remove existing so file to avoid triggering SIGSEV in running process
+                        // See https://github.com/PyO3/maturin/issues/758
+                        let _ = fs::remove_file(&target);
 
-                // 2a. Install the artifact
-                debug!("Installing {} from {}", target.display(), source.display());
-                fs::copy(&source, &target).with_context(|| {
-                    format!(
-                        "Failed to copy {} to {}",
-                        source.display(),
-                        target.display(),
-                    )
-                })?;
+                        // 2a. Install the artifact
+                        debug!("Installing {} from {}", target.display(), source.display());
+                        fs::copy(&source, &target).with_context(|| {
+                            format!(
+                                "Failed to copy {} to {}",
+                                source.display(),
+                                target.display(),
+                            )
+                        })?;
+                    }
+                }
 
                 // 3a. Install additional files
                 if let Some(additional_files) = additional_files {
@@ -172,11 +196,11 @@ where
                 let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
                 debug!(
                     "Adding to archive {} from {}",
-                    artifact_target.display(),
+                    artifact_target.path().display(),
                     source.display()
                 );
                 // Use add_file_force to bypass exclusion checks for the compiled artifact
-                writer.add_file_force(artifact_target, source, true)?;
+                writer.add_file_force(artifact_target.path(), source, true)?;
 
                 // 3b. Install additional files
                 if let Some(additional_files) = additional_files {

@@ -15,6 +15,7 @@ use crate::BuildContext;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::FileSourceData;
 use crate::archive_source::GeneratedSourceData;
+use crate::binding_generator::ArtifactTarget;
 use crate::target::Os;
 
 use super::BindingGenerator;
@@ -48,7 +49,7 @@ impl BindingGenerator for UniFfiBindingGenerator {
             context.target.target_os(),
             &artifact.path,
         )?;
-        let artifact_target = base_path.join(cdylib);
+        let artifact_target = ArtifactTarget::ExtensionModule(base_path.join(cdylib));
         let mut additional_files = HashMap::new();
 
         let py_init = binding_names

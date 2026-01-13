@@ -11,6 +11,7 @@ use crate::BuildContext;
 use crate::Metadata24;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::GeneratedSourceData;
+use crate::binding_generator::ArtifactTarget;
 
 use super::BindingGenerator;
 use super::GeneratorOutput;
@@ -43,7 +44,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
             .context("binary produced by cargo has non-utf8 filename")?
             .to_string();
         let scripts_dir = self.metadata.get_data_dir().join("scripts");
-        let artifact_target = scripts_dir.join(&bin_name);
+        let artifact_target = ArtifactTarget::Binary(scripts_dir.join(&bin_name));
 
         let mut additional_files = None;
         if context.target.is_wasi() {

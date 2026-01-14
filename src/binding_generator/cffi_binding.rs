@@ -21,6 +21,7 @@ use crate::BuildContext;
 use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::GeneratedSourceData;
+use crate::binding_generator::ArtifactTarget;
 use crate::target::Os;
 
 use super::BindingGenerator;
@@ -62,7 +63,8 @@ impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
         } else {
             module.to_path_buf()
         };
-        let artifact_target = base_path.join(&cffi_module_file_name);
+        let artifact_target =
+            ArtifactTarget::ExtensionModule(base_path.join(&cffi_module_file_name));
 
         let mut additional_files = HashMap::new();
         additional_files.insert(

@@ -227,6 +227,19 @@ fn develop_hello_world(#[case] backend: TestInstallBackend, #[case] name: &str) 
     ));
 }
 
+/// Test editable install of a project with both a binary and a Python module.
+/// This is a regression test for https://github.com/PyO3/maturin/issues/2933
+#[test]
+fn develop_bin_with_python_module() {
+    handle_result(develop::test_develop(
+        "test-crates/bin-with-python-module",
+        None,
+        "develop-bin-with-python-module",
+        false,
+        TestInstallBackend::Pip,
+    ));
+}
+
 #[rstest]
 #[timeout(Duration::from_secs(120))]
 #[case(TestInstallBackend::Pip, "pip")]

@@ -1,0 +1,5 @@
+[package]
+name = "bin-with-python-module"
+version = "0.1.0"
+edition = "2021"
+description = "Test crate with a binary and a plain Python module"

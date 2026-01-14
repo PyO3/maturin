@@ -18,6 +18,7 @@ use crate::PythonInterpreter;
 use crate::Target;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::GeneratedSourceData;
+use crate::binding_generator::ArtifactTarget;
 
 use super::BindingGenerator;
 use super::GeneratorOutput;
@@ -90,7 +91,7 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
             }
             BindingType::NonAbi3(interpreter) => interpreter.get_library_name(ext_name),
         };
-        let artifact_target = module.join(so_filename);
+        let artifact_target = ArtifactTarget::ExtensionModule(module.join(so_filename));
 
         let artifact_is_big_ar = target.is_aix()
             && artifact.path.extension().unwrap_or(OsStr::new(" ")) == OsStr::new("a");

@@ -15,7 +15,10 @@ def main():
         raise Exception(f"Expected version '0.1.0', got '{version}'")
 
     # Test 2: Check that the binary is installed and works
-    # The binary should be in PATH after editable install
+    # The binary should be in PATH in the venv bin dir after editable install
+    bin = which("bin-with-python-module")
+    if not os.path.realpath(bin).startswith(os.path.realpath(sys.prefix)):
+        raise Exception(f"Binary '{os.path.realpath(bin)}' not in venv at '{os.path.realpath(sys.prefix)}'")
     result = subprocess.run(
         ["bin-with-python-module"],
         capture_output=True,

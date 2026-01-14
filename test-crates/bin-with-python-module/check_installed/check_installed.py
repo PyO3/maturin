@@ -3,6 +3,7 @@ Test that both the binary and Python module work correctly after editable instal
 This tests the fix for https://github.com/PyO3/maturin/issues/2933
 """
 
+import os
 import shutil
 import subprocess
 

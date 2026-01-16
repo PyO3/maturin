@@ -94,21 +94,30 @@ pub fn compile(
                 )
             })?
             .join(module_name);
-        generate_stubs_for_module(&stub_dir, module_name, module_path);
-        artifact.stub_dir = Some(stub_dir.to_path_buf());
+        if generate_stubs_for_module(&stub_dir, module_name, module_path).is_ok() {
+            artifact.stub_dir = Some(stub_dir.to_path_buf());
+            eprintln!(
+                "✅ Successfully generated type stubs for module '{}'",
+                module_name
+            );
+        } else {
+            eprintln!(
+                "⚠️  Warning: Failed to generate type stubs for module '{}'",
+                module_name
+            );
+        }
     }
     Ok(result)
 }
 
-fn generate_stubs_for_module(stub_dir: &Path, lib_name: &str, lib_path: &Path) {
+fn generate_stubs_for_module(stub_dir: &Path, lib_name: &str, lib_path: &Path) -> Result<()> {
     println!(
         "Generating type stubs for module '{}' at path '{}'",
         lib_name,
         stub_dir.display()
     );
 
-    let module = introspect_cdylib(lib_path, lib_name)
-        .expect("Failed to introspect cdylib for stub generation");
+    let module = introspect_cdylib(lib_path, lib_name)?;
     let stub_files = module_stub_files(&module);
     for (file_name, content) in stub_files {
         let stub_path = stub_dir.join(file_name);
@@ -117,6 +126,7 @@ fn generate_stubs_for_module(stub_dir: &Path, lib_name: &str, lib_path: &Path) {
         fs::write(&stub_path, content).expect("Failed to write stub file");
         println!("Wrote stub file to '{}'", stub_path.display());
     }
+    Ok(())
 }
 /// Build an universal2 wheel for macos which contains both an x86 and an aarch64 binary
 fn compile_universal2(

@@ -97,9 +97,10 @@ pub fn compile(
 
         if let Err(e) = generate_stubs_for_module(&stub_dir, module_name, module_path) {
             eprintln!(
-                "⚠️  Warning: Failed to generate type stubs for module '{}' due to error: {}",
+                "⚠️  Error! Failed to generate type stubs for module '{}' due to error: {}",
                 module_name, e
             );
+            return Err(e);
         } else {
             artifact.stub_dir = Some(stub_dir.to_path_buf());
             eprintln!(

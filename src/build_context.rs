@@ -316,10 +316,13 @@ impl BuildContext {
     {
         for artifact in artifacts {
             let artifact = artifact.borrow();
+            let contents = fs_err::read(&artifact.path)?;
+            let mut elf = ElfContainer::parse(&contents)?;
+
             if artifact.linked_paths.is_empty() {
                 continue;
             }
-            let old_rpaths = get_rpath(&artifact.path)?;
+            let old_rpaths = elf.get_rpath();
             let mut new_rpaths = old_rpaths.clone();
             for path in &artifact.linked_paths {
                 if !old_rpaths.contains(path) {
@@ -327,9 +330,6 @@ impl BuildContext {
                 }
             }
             let new_rpath = new_rpaths.join(":");
-
-            let contents = fs_err::read(&artifact.path)?;
-            let mut elf = ElfContainer::parse(&contents)?;
 
             // Pseudo-try-block
             let result: arwen::elf::Result<()> = (|| {
@@ -508,15 +508,15 @@ impl BuildContext {
         };
         for artifact in artifacts {
             let artifact = artifact.borrow();
-            let mut new_rpaths = get_rpath(&artifact.path)?;
+            let bytes_of_file = fs_err::read(&artifact.path)?;
+            let mut elf = ElfContainer::parse(&bytes_of_file)?;
+
+            let mut new_rpaths = elf.get_rpath();
             // TODO: clean existing rpath entries if it's not pointed to a location within the wheel
             // See https://github.com/pypa/auditwheel/blob/353c24250d66951d5ac7e60b97471a6da76c123f/src/auditwheel/repair.py#L160
             let new_rpath = Path::new("$ORIGIN").join(relpath(&libs_dir, &artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
             let new_rpath = new_rpaths.join(":");
-            let bytes_of_file = fs_err::read(&artifact.path)?;
-            let mut elf = ElfContainer::parse(&bytes_of_file)?;
-
             elf.remove_runpath()?;
             elf.add_runpath(new_rpath)?;
             elf.force_rpath()?;
@@ -1390,26 +1390,6 @@ fn zip_mtime() -> DateTime {
         });
 
     res.unwrap_or_default()
-}
-
-/// Get the `RPATH` of executables and libraries.
-///
-/// TODO: Unify goblin and object usage.
-pub fn get_rpath(file: impl AsRef<Path>) -> Result<Vec<String>> {
-    let file = file.as_ref();
-    let contents = fs_err::read(file)?;
-    match goblin::Object::parse(&contents) {
-        Ok(goblin::Object::Elf(elf)) => {
-            let rpaths = if !elf.runpaths.is_empty() {
-                elf.runpaths
-            } else {
-                elf.rpaths
-            };
-            Ok(rpaths.iter().map(|r| r.to_string()).collect())
-        }
-        Ok(_) => bail!("'{}' is not an ELF file", file.display()),
-        Err(e) => bail!("Failed to parse ELF file at '{}': {}", file.display(), e),
-    }
 }
 
 #[cfg(test)]

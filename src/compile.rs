@@ -94,15 +94,16 @@ pub fn compile(
                 )
             })?
             .join(module_name);
-        if generate_stubs_for_module(&stub_dir, module_name, module_path).is_ok() {
+
+        if let Err(e) = generate_stubs_for_module(&stub_dir, module_name, module_path) {
+            eprintln!(
+                "⚠️  Warning: Failed to generate type stubs for module '{}' due to error: {}",
+                module_name, e
+            );
+        } else {
             artifact.stub_dir = Some(stub_dir.to_path_buf());
             eprintln!(
                 "✅ Successfully generated type stubs for module '{}'",
-                module_name
-            );
-        } else {
-            eprintln!(
-                "⚠️  Warning: Failed to generate type stubs for module '{}'",
                 module_name
             );
         }

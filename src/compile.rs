@@ -7,6 +7,7 @@ use cargo_metadata::CrateType;
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use normpath::PathExt;
+use pyo3_introspection::{introspect_cdylib, module_stub_files};
 use std::collections::HashMap;
 use std::env;
 use std::io::{BufReader, Read};
@@ -14,7 +15,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
 use tracing::{debug, instrument, trace};
-
 /// The first version of pyo3 that supports building Windows abi3 wheel
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
@@ -44,23 +44,80 @@ pub struct BuildArtifact {
     /// Array of paths to include in the library search path, as indicated by
     /// the `cargo:rustc-link-search` instruction.
     pub linked_paths: Vec<String>,
+    /// Path to the generated stub file
+    pub stub_dir: Option<PathBuf>,
 }
 
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
-/// to artifact location.
+/// to artifact location. Also generates type stubs for the built module.
 pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
-    if context.universal2 {
-        compile_universal2(context, python_interpreter, targets)
+    let mut result = if context.universal2 {
+        compile_universal2(context, python_interpreter, targets)?
     } else {
-        compile_targets(context, python_interpreter, targets)
+        compile_targets(context, python_interpreter, targets)?
+    };
+
+    // Generate type stubs for each target
+    for (target, artifacts) in targets.iter().zip(&mut result) {
+        // Skip binary targets
+        if target.bridge_model.is_bin() {
+            println!("Skipping stub generation for binary target");
+            continue;
+        }
+        // Skip if no cdylib was built
+        let Some(artifact) = artifacts.get_mut(&CrateType::CDyLib) else {
+            println!(
+                "Cargo didn't build a cdylib Did you miss crate-type = [\"cdylib\"] \
+                in the lib section of your Cargo.toml?",
+            );
+            continue;
+        };
+        println!(
+            "Generating type stubs for module '{}'...",
+            context.module_name
+        );
+
+        // Get the path to the generated .so or .dll file
+        let module_path = &artifact.path;
+        let module_name = &context.module_name;
+        let stub_dir = module_path
+            .parent()
+            .ok_or_else(|| {
+                anyhow!(
+                    "Module path {} didn't have a valid parent!",
+                    module_path.display()
+                )
+            })?
+            .join(module_name);
+        generate_stubs_for_module(&stub_dir, module_name, module_path);
+        artifact.stub_dir = Some(stub_dir.to_path_buf());
     }
+    Ok(result)
 }
 
+fn generate_stubs_for_module(stub_dir: &Path, lib_name: &str, lib_path: &Path) {
+    println!(
+        "Generating type stubs for module '{}' at path '{}'",
+        lib_name,
+        stub_dir.display()
+    );
+
+    let module = introspect_cdylib(lib_path, lib_name)
+        .expect("Failed to introspect cdylib for stub generation");
+    let stub_files = module_stub_files(&module);
+    for (file_name, content) in stub_files {
+        let stub_path = stub_dir.join(file_name);
+        let stub_path_dir = stub_path.parent().unwrap();
+        fs::create_dir_all(stub_path_dir).expect("Failed to create directories for stub file");
+        fs::write(&stub_path, content).expect("Failed to write stub file");
+        println!("Wrote stub file to '{}'", stub_path.display());
+    }
+}
 /// Build an universal2 wheel for macos which contains both an x86 and an aarch64 binary
 fn compile_universal2(
     context: &BuildContext,
@@ -552,6 +609,7 @@ fn compile_target(
                         let artifact = BuildArtifact {
                             path,
                             linked_paths: Vec::new(),
+                            stub_dir: None,
                         };
                         artifacts.insert(crate_type, artifact);
                     }

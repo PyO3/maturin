@@ -102,9 +102,9 @@ dependencies = [
 
 [[package]]
 name = "arwen"
-version = "0.0.4"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5753efbc28c589ae44341a7909f6021292cbf09a12412c1c43e27a0919c63d56"
+checksum = "d44cbd9bd79165abe331ebabb9dd4d59a5dc93791be33ff15ebd71baaadc85ba"
 dependencies = [
  "clap",
  "goblin",

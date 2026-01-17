@@ -779,7 +779,7 @@ impl BuildContext {
             self.write_pyo3_wheel_abi3(artifact, &platform_tags, external_libs, major, min_minor)?;
 
         eprintln!(
-            "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
+            "📦 Built pyo3 wheel for abi3 Python ≥ {}.{} to {}",
             major,
             min_minor,
             wheel_path.display()
@@ -856,7 +856,7 @@ impl BuildContext {
             let (wheel_path, tag) =
                 self.write_pyo3_wheel(python_interpreter, artifact, &platform_tags, external_libs)?;
             eprintln!(
-                "📦 Built wheel for {} {}.{}{} to {}",
+                "📦 Built pyo3 wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
                 python_interpreter.minor,
@@ -906,6 +906,16 @@ impl BuildContext {
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
         fs::copy(artifact_path, &new_artifact_path)?;
         artifact.path = new_artifact_path.normalize()?.into_path_buf();
+        if let Some(stub_dir) = artifact.stub_dir {
+            let new_stub_dir = maturin_build.join(stub_dir.file_name().unwrap());
+            fs::create_dir_all(&new_stub_dir)?;
+            for entry in fs::read_dir(&stub_dir)? {
+                let entry = entry?;
+                let file_name = entry.file_name();
+                fs::copy(entry.path(), new_stub_dir.join(file_name))?;
+            }
+            artifact.stub_dir = Some(new_stub_dir);
+        }
         Ok(artifact)
     }
 
@@ -968,7 +978,7 @@ impl BuildContext {
             );
         }
 
-        eprintln!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built cffi wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
@@ -1016,7 +1026,7 @@ impl BuildContext {
         };
         let (wheel_path, tag) = self.write_uniffi_wheel(artifact, &platform_tags, external_libs)?;
 
-        eprintln!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built uniffiwheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)
@@ -1128,7 +1138,7 @@ impl BuildContext {
             &platform_tags,
             &ext_libs,
         )?;
-        eprintln!("📦 Built wheel to {}", wheel_path.display());
+        eprintln!("📦 Built bin wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
 
         Ok(wheels)

@@ -9,6 +9,7 @@ use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
 use anyhow::bail;
+use fs_err::{self as fs};
 use tempfile::TempDir;
 use tracing::debug;
 
@@ -106,25 +107,48 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
             None
         };
 
-        let additional_files = match context.project_layout.python_module {
-            Some(_) => None,
-            None => {
-                let mut files = HashMap::new();
-                let source = GeneratedSourceData {
-                    data: format!(
-                        r#"from .{ext_name} import *
+        let mut additional_files: HashMap<PathBuf, ArchiveSource> = HashMap::new();
+        // Generate __init__.py if needed
+        if context.project_layout.python_module.is_none() {
+            let source = GeneratedSourceData {
+                data: format!(
+                    r#"from .{ext_name} import *
 
 __doc__ = {ext_name}.__doc__
 if hasattr({ext_name}, "__all__"):
     __all__ = {ext_name}.__all__"#
-                    )
-                    .into(),
-                    path: None,
+                )
+                .into(),
+                path: None,
+                executable: false,
+            };
+            additional_files.insert(module.join("__init__.py"), ArchiveSource::Generated(source));
+        }
+        // Copy over type stubs if they exist
+        if let Some(stub_dir) = &artifact.stub_dir {
+            for entry in fs::read_dir(stub_dir)? {
+                let entry = entry?;
+                let file_name = &entry.file_name();
+                let source = GeneratedSourceData {
+                    data: fs::read(entry.path())?,
+                    path: Some(module.join(file_name)),
                     executable: false,
                 };
-                files.insert(module.join("__init__.py"), ArchiveSource::Generated(source));
-                Some(files)
+                additional_files.insert(module.join(file_name), ArchiveSource::Generated(source));
             }
+            // Add a py.typed marker file
+            let source = GeneratedSourceData {
+                data: Vec::new(),
+                path: Some(module.join("py.typed")),
+                executable: false,
+            };
+            additional_files.insert(module.join("py.typed"), ArchiveSource::Generated(source));
+        }
+
+        let additional_files = if additional_files.is_empty() {
+            None
+        } else {
+            Some(additional_files)
         };
 
         Ok(GeneratorOutput {

@@ -336,7 +336,7 @@ jobs:\n",
           pip uninstall -y pyodide-build\n",
                 );
                 conf.push_str(
-                    "      - uses: mymindstorm/setup-emsdk@v12
+                    "      - uses: mymindstorm/setup-emsdk@v14
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache\n",

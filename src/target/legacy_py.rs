@@ -60,5 +60,6 @@ pub(super) static MANYLINUX_ARCHES: &[&str] = &[
     "x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x", "ppc64", "riscv64",
 ];
 
-pub(super) static MUSLLINUX_ARCHES: &[&str] =
-    &["x86_64", "i686", "aarch64", "armv6l", "armv7l", "ppc64le", "s390x"];
+pub(super) static MUSLLINUX_ARCHES: &[&str] = &[
+    "x86_64", "i686", "aarch64", "armv6l", "armv7l", "ppc64le", "s390x",
+];

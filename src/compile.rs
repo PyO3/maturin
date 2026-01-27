@@ -559,12 +559,33 @@ fn compile_target(
             }
             // See https://doc.rust-lang.org/cargo/reference/external-tools.html#build-script-output
             cargo_metadata::Message::BuildScriptExecuted(msg) => {
-                for path in msg.linked_paths.iter().map(|p| p.as_str()) {
-                    // `linked_paths` may include a "KIND=" prefix in the string where KIND is the library kind
-                    if let Some(index) = path.find('=') {
-                        linked_paths.push(path[index + 1..].to_string());
+                // Check if there are any dylib libraries in linked_libs
+                // Syntax: [KIND[:MODIFIERS]=]NAME[:RENAME]
+                // See https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-link-lib
+                let has_dylib = msg.linked_libs.iter().map(|l| l.as_str()).any(|lib| {
+                    if let Some(index) = lib.find('=') {
+                        let kind = &lib[..index];
+                        // KIND could have modifiers like "dylib:+verbatim"
+                        kind.starts_with("dylib")
                     } else {
-                        linked_paths.push(path.to_string());
+                        // No KIND prefix means it defaults to dylib (on most platforms)
+                        true
+                    }
+                });
+                // Only add linked_paths if there are dylib libraries
+                if has_dylib {
+                    for path in msg.linked_paths.iter().map(|p| p.as_str()) {
+                        // `linked_paths` may include a "KIND=" prefix in the string where KIND is the library kind
+                        // We only add paths with KIND of "native" or "all" (default when no KIND specified)
+                        if let Some(index) = path.find('=') {
+                            let kind = &path[..index];
+                            if kind == "native" || kind == "all" {
+                                linked_paths.push(path[index + 1..].to_string());
+                            }
+                        } else {
+                            // No KIND prefix means default "all"
+                            linked_paths.push(path.to_string());
+                        }
                     }
                 }
             }

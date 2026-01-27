@@ -581,7 +581,7 @@ impl BuildContextBuilder {
         self.editable = editable;
         self
     }
-    
+
     pub fn skip_rpath_replacement(mut self, skip_rpath_replacement: bool) -> Self {
         self.skip_rpath_replacement = skip_rpath_replacement;
         self

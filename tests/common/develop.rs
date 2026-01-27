@@ -63,6 +63,7 @@ pub fn test_develop(
         strip: false,
         extras: Vec::new(),
         skip_install: false,
+        skip_rpath_replacement: false,
         pip_path: None,
         cargo_options: CargoOptions {
             manifest_path: Some(manifest_file),

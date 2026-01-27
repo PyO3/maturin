@@ -221,7 +221,7 @@ pub struct DevelopOptions {
     pub skip_install: bool,
     #[arg(long)]
     /// Skip rpath replacement.
-    /// 
+    ///
     /// This is faster but breaks the installed wheel if it has dynamically
     /// linked dependencies.
     pub skip_rpath_replacement: bool,

@@ -558,6 +558,7 @@ pub struct BuildContextBuilder {
     strip: bool,
     editable: bool,
     sdist_only: bool,
+    skip_rpath_replacement: bool,
 }
 
 impl BuildContextBuilder {
@@ -567,6 +568,7 @@ impl BuildContextBuilder {
             strip: false,
             editable: false,
             sdist_only: false,
+            skip_rpath_replacement: false,
         }
     }
 
@@ -577,6 +579,11 @@ impl BuildContextBuilder {
 
     pub fn editable(mut self, editable: bool) -> Self {
         self.editable = editable;
+        self
+    }
+    
+    pub fn skip_rpath_replacement(mut self, skip_rpath_replacement: bool) -> Self {
+        self.skip_rpath_replacement = skip_rpath_replacement;
         self
     }
 
@@ -591,6 +598,7 @@ impl BuildContextBuilder {
             strip,
             editable,
             sdist_only,
+            skip_rpath_replacement,
         } = self;
         build_options.compression.validate();
         let ProjectResolver {
@@ -851,6 +859,7 @@ impl BuildContextBuilder {
             cargo_metadata,
             universal2,
             editable,
+            skip_rpath_replacement,
             cargo_options,
             compression: build_options.compression,
             pypi_validation,

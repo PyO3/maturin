@@ -219,6 +219,12 @@ pub struct DevelopOptions {
     /// Only works with mixed Rust/Python project layout
     #[arg(long)]
     pub skip_install: bool,
+    #[arg(long)]
+    /// Skip rpath replacement.
+    /// 
+    /// This is faster but breaks the installed wheel if it has dynamically
+    /// linked dependencies.
+    pub skip_rpath_replacement: bool,
     /// Use a specific pip installation instead of the default one.
     ///
     /// This can be used to supply the path to a pip executable when the
@@ -390,6 +396,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         strip,
         extras,
         skip_install,
+        skip_rpath_replacement,
         pip_path,
         mut cargo_options,
         uv,
@@ -437,6 +444,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         .into_build_context()
         .strip(strip)
         .editable(true)
+        .skip_rpath_replacement(skip_rpath_replacement)
         .build()?;
 
     // Ensure that version information is present, https://github.com/PyO3/maturin/issues/2416

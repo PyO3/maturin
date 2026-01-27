@@ -80,6 +80,8 @@ pub struct BuildContext {
     pub universal2: bool,
     /// Build editable wheels
     pub editable: bool,
+    /// Whether to skip replacing the rpath.
+    pub skip_rpath_replacement: bool,
     /// Cargo build options
     pub cargo_options: CargoOptions,
     /// Compression options
@@ -348,7 +350,7 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable {
+        if self.editable && !self.skip_rpath_replacement {
             return self.add_rpath(artifacts);
         }
         if ext_libs.iter().all(|libs| libs.is_empty()) {

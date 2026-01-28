@@ -9,7 +9,7 @@ use fs_err::{self as fs, File};
 use normpath::PathExt;
 use std::collections::HashMap;
 use std::env;
-use std::io::{BufReader, Read};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
@@ -626,11 +626,10 @@ fn compile_target(
 #[instrument(skip_all)]
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
-    let mut fd = File::open(artifact)?;
-    let mut buffer = Vec::new();
-    fd.read_to_end(&mut buffer)?;
+    let fd = File::open(artifact)?;
+    let mmap = unsafe { memmap2::Mmap::map(&fd).context("mmap failed")? };
     let mut found = false;
-    match goblin::Object::parse(&buffer)? {
+    match goblin::Object::parse(&mmap)? {
         goblin::Object::Elf(elf) => {
             for dyn_sym in elf.dynsyms.iter() {
                 if py_init == elf.dynstrtab[dyn_sym.st_name] {

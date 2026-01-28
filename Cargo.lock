@@ -1449,6 +1449,7 @@ dependencies = [
  "itertools 0.14.0",
  "keyring",
  "lddtree",
+ "memmap2",
  "minijinja",
  "multipart",
  "native-tls",

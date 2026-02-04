@@ -652,11 +652,17 @@ impl Metadata24 {
         Ok(out)
     }
 
-    /// Returns the distribution name according to PEP 427, Section "Escaping
-    /// and Unicode"
+    /// Returns the distribution name normalized according to the PyPA Binary
+    /// Distribution Format specification.
+    ///
+    /// This is the name that will be used in the wheel filename and for the
+    /// `.dist-info` directory name. It is also the name that will be used in
+    /// the source distribution (sdist) filename.
+    ///
+    /// See https://packaging.python.org/en/latest/specifications/binary-distribution-format/#escaping-and-unicode
     pub fn get_distribution_escaped(&self) -> String {
-        let re = Regex::new(r"[^\w\d.]+").unwrap();
-        re.replace_all(&self.name, "_").to_string()
+        let re = Regex::new(r"[-_.]+").unwrap();
+        re.replace_all(&self.name, "_").to_lowercase()
     }
 
     /// Returns the version encoded according to PEP 427, Section "Escaping

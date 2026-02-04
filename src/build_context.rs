@@ -1035,14 +1035,6 @@ impl BuildContext {
 
         if self.target.is_wasi() {
             eprintln!("⚠️  Warning: wasi support is experimental");
-            // escaped can contain [\w\d.], but i don't know how we'd handle dots correctly here
-            if self.metadata24.get_distribution_escaped().contains('.') {
-                bail!(
-                    "Can't build wasm wheel if there is a dot in the name ('{}')",
-                    self.metadata24.get_distribution_escaped()
-                )
-            }
-
             if !self.metadata24.entry_points.is_empty() {
                 bail!("You can't define entrypoints yourself for a binary project");
             }

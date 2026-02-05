@@ -151,12 +151,12 @@ jobs:
           - target: "s390x-unknown-linux-gnu"
             image: "manylinux2014-cross:s390x"
             compatibility: "manylinux2014"
-          - target: "loongarch64-unknown-linux-gnu"
-            image: "manylinux_2_36-cross:loongarch64"
-            compatibility: "manylinux_2_36"
-          - target: "riscv64gc-unknown-linux-gnu"
-            image: "manylinux_2_31-cross:riscv64"
-            compatibility: "manylinux_2_31"
+          - target: "loongarch64-unknown-linux-musl"
+            image: "rust-musl-cross:loongarch64-musl"
+            compatibility: "manylinux_2_36 musllinux_1_2"
+          - target: "riscv64gc-unknown-linux-musl"
+            image: "rust-musl-cross:riscv64gc-musl"
+            compatibility: "manylinux_2_31 musllinux_1_1"
     container:
       image: docker://ghcr.io/rust-cross/${{ matrix.platform.image }}
       env:
@@ -166,9 +166,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
-        if: ${{ !contains(fromJson('["s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target) }}
+        if: ${{ !contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target) }}
       - uses: dtolnay/rust-toolchain@stable
-        if: contains(fromJson('["s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target)
+        if: contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target)
         with:
           targets: ${{ matrix.platform.target }}
       - name: Install uv
@@ -176,6 +176,10 @@ jobs:
         with:
           # No need to take cache size for maturin in the release pipeline
           enable-cache: "false"
+      - name: Install patchelf
+        if: contains(fromJson('["loongarch64-unknown-linux-musl", "riscv64gc-unknown-linux-musl"]'), matrix.platform.target)
+        run: |
+          pip install patchelf
       - name: Build wheel
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
@@ -185,14 +189,14 @@ jobs:
           # See https://github.com/pyo3/maturin/pull/2922
           uvx maturin==1.11.5 build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
-            ${{ matrix.platform.target != 'loongarch64-unknown-linux-gnu' && '--compatibility pypi' || '' }} \
+            ${{ !contains(fromJson('["loongarch64-unknown-linux-musl", "riscv64gc-unknown-linux-musl"]'), matrix.platform.target) && '--compatibility pypi' || '' }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary
         run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
       - name: Upload wheel artifacts
         # loongarch64 is not allowed to publish to pypi currently, see https://github.com/pypi/warehouse/blob/348117529910181cb8c14e9b5fb00fcf4dbaf07c/warehouse/forklift/legacy.py#L114-L185
-        if: matrix.platform.target != 'loongarch64-unknown-linux-gnu'
+        if: ${{ !contains(fromJson('["loongarch64-unknown-linux-musl"]'), matrix.platform.target) }}
         uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}

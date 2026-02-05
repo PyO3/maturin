@@ -109,6 +109,135 @@ fn rewrite_cargo_toml(
     Ok(())
 }
 
+// Strip targets whose source files are excluded from the sdist, matching Cargo's
+// behavior when `package.include`/`package.exclude` or tool.maturin excludes remove them.
+fn rewrite_cargo_toml_targets(
+    document: &mut DocumentMut,
+    manifest_path: &Path,
+    packaged_files: &HashSet<PathBuf>,
+) -> Result<()> {
+    debug!(
+        "Rewriting Cargo.toml build targets at {}",
+        manifest_path.display()
+    );
+
+    let manifest_dir = manifest_path.parent().unwrap();
+    let package_name = document
+        .get("package")
+        .and_then(|item| item.as_table())
+        .and_then(|table| table.get("name"))
+        .and_then(|item| item.as_str())
+        .map(str::to_string);
+
+    let normalize_path = |path: &Path| -> PathBuf {
+        let path = if path.is_absolute() {
+            path.strip_prefix(manifest_dir).unwrap_or(path)
+        } else {
+            path
+        };
+        let normalized = path.normalize();
+        match normalized {
+            Ok(normalized) => normalized.into(),
+            Err(_) => path.to_path_buf(),
+        }
+    };
+
+    let has_packaged_path =
+        |paths: &[PathBuf]| -> bool { paths.iter().any(|path| packaged_files.contains(path)) };
+
+    // Cargo's implicit target path rules when `path` is not set:
+    // - lib: src/lib.rs
+    // - bin: src/bin/<name>.rs or src/bin/<name>/main.rs (src/main.rs only for implicit default bin)
+    // - example/test/bench: <dir>/<name>.rs or <dir>/<name>/main.rs
+    let candidate_paths_for_target =
+        |kind: &str, name: Option<&str>, path: Option<&str>, package_name: Option<&str>| {
+            if let Some(path) = path {
+                return vec![normalize_path(Path::new(path))];
+            }
+
+            let name = name.or(package_name);
+            match (kind, name) {
+                ("lib", _) => vec![normalize_path(Path::new("src/lib.rs"))],
+                ("bin", Some(name)) => {
+                    vec![
+                        normalize_path(Path::new(&format!("src/bin/{name}.rs"))),
+                        normalize_path(Path::new(&format!("src/bin/{name}/main.rs"))),
+                    ]
+                }
+                ("bin", None) => vec![normalize_path(Path::new("src/main.rs"))],
+                ("example", Some(name)) => vec![
+                    normalize_path(Path::new(&format!("examples/{name}.rs"))),
+                    normalize_path(Path::new(&format!("examples/{name}/main.rs"))),
+                ],
+                ("test", Some(name)) => vec![
+                    normalize_path(Path::new(&format!("tests/{name}.rs"))),
+                    normalize_path(Path::new(&format!("tests/{name}/main.rs"))),
+                ],
+                ("bench", Some(name)) => vec![
+                    normalize_path(Path::new(&format!("benches/{name}.rs"))),
+                    normalize_path(Path::new(&format!("benches/{name}/main.rs"))),
+                ],
+                _ => Vec::new(),
+            }
+        };
+
+    let package_name = package_name.as_deref();
+
+    let mut drop_lib = false;
+    if let Some(lib) = document.get("lib").and_then(|item| item.as_table()) {
+        let name = lib.get("name").and_then(|item| item.as_str());
+        let path = lib.get("path").and_then(|item| item.as_str());
+        let candidates = candidate_paths_for_target("lib", name, path, package_name);
+        if !candidates.is_empty() && !has_packaged_path(&candidates) {
+            debug!(
+                "Stripping [lib] target {:?} from {}",
+                name.or(path),
+                manifest_path.display()
+            );
+            drop_lib = true;
+        }
+    }
+
+    if drop_lib {
+        document.remove("lib");
+    }
+
+    for (key, kind) in [
+        ("bin", "bin"),
+        ("example", "example"),
+        ("test", "test"),
+        ("bench", "bench"),
+    ] {
+        if let Some(targets) = document
+            .get_mut(key)
+            .and_then(|item| item.as_array_of_tables_mut())
+        {
+            let mut idx = 0;
+            while idx < targets.len() {
+                let target = targets.get(idx).unwrap();
+                let name = target.get("name").and_then(|item| item.as_str());
+                let path = target.get("path").and_then(|item| item.as_str());
+                let candidates = candidate_paths_for_target(kind, name, path, package_name);
+                if !candidates.is_empty() && !has_packaged_path(&candidates) {
+                    debug!(
+                        "Stripping {key} target {:?} from {}",
+                        name.or(path),
+                        manifest_path.display()
+                    );
+                    targets.remove(idx);
+                } else {
+                    idx += 1;
+                }
+            }
+            if targets.is_empty() {
+                document.remove(key);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Rewrite `Cargo.toml` to find the readme in the same directory.
 ///
 /// `package.readme` may point to any point above the package, so when we move the directory, but
@@ -230,6 +359,13 @@ fn add_crate_to_source_distribution(
 
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
+    let normalize_packaged_path = |path: &Path| -> PathBuf {
+        let normalized = path.normalize();
+        match normalized {
+            Ok(normalized) => normalized.into(),
+            Err(_) => path.to_path_buf(),
+        }
+    };
     let target_source: Vec<_> = file_list
         .into_iter()
         .map(|relative_to_manifests| {
@@ -264,8 +400,15 @@ fn add_crate_to_source_distribution(
                 // Use `is_file` instead of `exists` to work around cargo bug:
                 // https://github.com/rust-lang/cargo/issues/16465
                 source.is_file()
+                    && !writer.exclude(source)
+                    && !writer.exclude(prefix.join(target))
             }
         })
+        .collect();
+
+    let packaged_files: HashSet<PathBuf> = target_source
+        .iter()
+        .map(|(target, _)| normalize_packaged_path(Path::new(target)))
         .collect();
 
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
@@ -284,6 +427,7 @@ fn add_crate_to_source_distribution(
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
         rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
+        rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),
@@ -293,6 +437,7 @@ fn add_crate_to_source_distribution(
     } else if !skip_cargo_toml {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
+        rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),

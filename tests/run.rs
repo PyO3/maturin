@@ -961,6 +961,24 @@ fn workspace_inheritance_sdist() {
 
 #[test]
 fn workspace_license_files() {
+    let cargo_toml = expect![[r#"
+        [package]
+        name = "hello-world"
+        version = "0.1.0"
+        authors = ["konstin <konstin@mailbox.org>"]
+        edition = "2021"
+        # Test references to out-of-project files
+        readme = "README.md"
+        default-run = "hello-world"
+
+        [dependencies]
+
+        [[bench]]
+        name = "included_bench"
+
+        [[example]]
+        name = "included_example"
+    "#]];
     handle_result(other::test_source_distribution(
         "test-crates/hello-world",
         SdistGenerator::Cargo,
@@ -971,14 +989,16 @@ fn workspace_license_files() {
                 "hello_world-0.1.0/LICENSE",
                 "hello_world-0.1.0/PKG-INFO",
                 "hello_world-0.1.0/README.md",
+                "hello_world-0.1.0/benches/included_bench.rs",
                 "hello_world-0.1.0/check_installed/check_installed.py",
+                "hello_world-0.1.0/examples/included_example.rs",
                 "hello_world-0.1.0/licenses/AUTHORS.txt",
                 "hello_world-0.1.0/pyproject.toml",
                 "hello_world-0.1.0/src/bin/foo.rs",
                 "hello_world-0.1.0/src/main.rs",
             }
         "#]],
-        None,
+        Some((Path::new("hello_world-0.1.0/Cargo.toml"), cargo_toml)),
         "sdist-hello-world",
     ))
 }

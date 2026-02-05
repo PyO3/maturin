@@ -109,6 +109,32 @@ fn rewrite_cargo_toml(
     Ok(())
 }
 
+fn normalize_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut components = Vec::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                // Only pop if there's a normal component to cancel out
+                match components.last() {
+                    Some(Component::Normal(_)) => {
+                        components.pop();
+                    }
+                    _ => {
+                        // Keep the ParentDir if path is empty or last is also ParentDir
+                        components.push(component);
+                    }
+                }
+            }
+            _ => components.push(component),
+        }
+    }
+
+    components.iter().collect()
+}
+
 // Strip targets whose source files are excluded from the sdist, matching Cargo's
 // behavior when `package.include`/`package.exclude` or tool.maturin excludes remove them.
 fn rewrite_cargo_toml_targets(
@@ -132,23 +158,13 @@ fn rewrite_cargo_toml_targets(
     // We need to normalize paths without accessing the filesystem (which might not match
     // the manifest context) and without resolving symlinks. This matches `cargo package --list`
     // behavior which outputs normalized paths.
-    let normalize_path = |path: &Path| -> PathBuf {
+    let normalize = |path: &Path| -> PathBuf {
         let path = if path.is_absolute() {
             path.strip_prefix(manifest_dir).unwrap_or(path)
         } else {
             path
         };
-        let mut normalized = PathBuf::new();
-        for component in path.components() {
-            match component {
-                std::path::Component::CurDir => {}
-                std::path::Component::ParentDir => {
-                    normalized.pop();
-                }
-                _ => normalized.push(component),
-            }
-        }
-        normalized
+        normalize_path(path)
     };
 
     let has_packaged_path =
@@ -161,30 +177,30 @@ fn rewrite_cargo_toml_targets(
     let candidate_paths_for_target =
         |kind: &str, name: Option<&str>, path: Option<&str>, package_name: Option<&str>| {
             if let Some(path) = path {
-                return vec![normalize_path(Path::new(path))];
+                return vec![normalize(Path::new(path))];
             }
 
             let name = name.or(package_name);
             match (kind, name) {
-                ("lib", _) => vec![normalize_path(Path::new("src/lib.rs"))],
+                ("lib", _) => vec![normalize(Path::new("src/lib.rs"))],
                 ("bin", Some(name)) => {
                     vec![
-                        normalize_path(Path::new(&format!("src/bin/{name}.rs"))),
-                        normalize_path(Path::new(&format!("src/bin/{name}/main.rs"))),
+                        normalize(Path::new(&format!("src/bin/{name}.rs"))),
+                        normalize(Path::new(&format!("src/bin/{name}/main.rs"))),
                     ]
                 }
-                ("bin", None) => vec![normalize_path(Path::new("src/main.rs"))],
+                ("bin", None) => vec![normalize(Path::new("src/main.rs"))],
                 ("example", Some(name)) => vec![
-                    normalize_path(Path::new(&format!("examples/{name}.rs"))),
-                    normalize_path(Path::new(&format!("examples/{name}/main.rs"))),
+                    normalize(Path::new(&format!("examples/{name}.rs"))),
+                    normalize(Path::new(&format!("examples/{name}/main.rs"))),
                 ],
                 ("test", Some(name)) => vec![
-                    normalize_path(Path::new(&format!("tests/{name}.rs"))),
-                    normalize_path(Path::new(&format!("tests/{name}/main.rs"))),
+                    normalize(Path::new(&format!("tests/{name}.rs"))),
+                    normalize(Path::new(&format!("tests/{name}/main.rs"))),
                 ],
                 ("bench", Some(name)) => vec![
-                    normalize_path(Path::new(&format!("benches/{name}.rs"))),
-                    normalize_path(Path::new(&format!("benches/{name}/main.rs"))),
+                    normalize(Path::new(&format!("benches/{name}.rs"))),
+                    normalize(Path::new(&format!("benches/{name}/main.rs"))),
                 ],
                 _ => Vec::new(),
             }
@@ -394,19 +410,6 @@ fn add_crate_to_source_distribution(
 
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
-    let normalize_packaged_path = |path: &Path| -> PathBuf {
-        let mut normalized = PathBuf::new();
-        for component in path.components() {
-            match component {
-                std::path::Component::CurDir => {}
-                std::path::Component::ParentDir => {
-                    normalized.pop();
-                }
-                _ => normalized.push(component),
-            }
-        }
-        normalized
-    };
     let target_source: Vec<_> = file_list
         .into_iter()
         .map(|relative_to_manifests| {
@@ -449,7 +452,7 @@ fn add_crate_to_source_distribution(
 
     let packaged_files: HashSet<PathBuf> = target_source
         .iter()
-        .map(|(target, _)| normalize_packaged_path(Path::new(target)))
+        .map(|(target, _)| normalize_path(Path::new(target)))
         .collect();
 
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
@@ -1087,4 +1090,52 @@ where
         }
     }
     if found { Some(final_path) } else { None }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_path() {
+        let test_cases = vec![
+            // Basic paths without normalization needed
+            ("foo/bar", "foo/bar"),
+            ("src/lib.rs", "src/lib.rs"),
+            // Remove current directory components
+            ("./foo/bar", "foo/bar"),
+            ("foo/./bar", "foo/bar"),
+            (".", ""),
+            // Parent directory that cancels with a normal component
+            ("foo/../bar", "bar"),
+            ("foo/bar/..", "foo"),
+            ("foo/bar/../baz", "foo/baz"),
+            // Leading parent directories should be preserved
+            ("../foo", "../foo"),
+            ("../../foo", "../../foo"),
+            ("../../../foo/bar", "../../../foo/bar"),
+            // More parent dirs than normal components
+            ("a/../../b", "../b"),
+            ("a/b/../../../c", "../c"),
+            ("foo/bar/baz/../../..", ""),
+            // Mix of current and parent directory components
+            ("./foo/../bar", "bar"),
+            ("foo/./bar/../baz", "foo/baz"),
+            ("./../foo/./bar", "../foo/bar"),
+            // Edge cases
+            ("", ""),
+            ("foo", "foo"),
+            ("..", ".."),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                normalize_path(Path::new(input)),
+                PathBuf::from(expected),
+                "normalize_path({:?}) should equal {:?}",
+                input,
+                expected
+            );
+        }
+    }
 }

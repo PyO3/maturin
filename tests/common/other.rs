@@ -13,7 +13,7 @@ use tar::Archive;
 use time::OffsetDateTime;
 use zip::ZipArchive;
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     fs_err::create_dir_all(dst)?;
     for entry in fs_err::read_dir(src)? {
         let entry = entry?;

@@ -129,17 +129,26 @@ fn rewrite_cargo_toml_targets(
         .and_then(|item| item.as_str())
         .map(str::to_string);
 
+    // We need to normalize paths without accessing the filesystem (which might not match
+    // the manifest context) and without resolving symlinks. This matches `cargo package --list`
+    // behavior which outputs normalized paths.
     let normalize_path = |path: &Path| -> PathBuf {
         let path = if path.is_absolute() {
             path.strip_prefix(manifest_dir).unwrap_or(path)
         } else {
             path
         };
-        let normalized = path.normalize();
-        match normalized {
-            Ok(normalized) => normalized.into(),
-            Err(_) => path.to_path_buf(),
+        let mut normalized = PathBuf::new();
+        for component in path.components() {
+            match component {
+                std::path::Component::CurDir => {}
+                std::path::Component::ParentDir => {
+                    normalized.pop();
+                }
+                _ => normalized.push(component),
+            }
         }
+        normalized
     };
 
     let has_packaged_path =
@@ -202,6 +211,7 @@ fn rewrite_cargo_toml_targets(
         document.remove("lib");
     }
 
+    let mut removed_bins = Vec::new();
     for (key, kind) in [
         ("bin", "bin"),
         ("example", "example"),
@@ -224,6 +234,11 @@ fn rewrite_cargo_toml_targets(
                         name.or(path),
                         manifest_path.display()
                     );
+                    if kind == "bin" {
+                        if let Some(name) = name {
+                            removed_bins.push(name.to_string());
+                        }
+                    }
                     targets.remove(idx);
                 } else {
                     idx += 1;
@@ -231,6 +246,26 @@ fn rewrite_cargo_toml_targets(
             }
             if targets.is_empty() {
                 document.remove(key);
+            }
+        }
+    }
+
+    // If we removed any binaries, we must check if they were the `default-run` target.
+    // If so, we remove `default-run` to prevent `cargo run` from failing with a missing target.
+    if !removed_bins.is_empty() {
+        if let Some(package) = document
+            .get_mut("package")
+            .and_then(|item| item.as_table_mut())
+        {
+            if let Some(default_run) = package.get("default-run").and_then(|item| item.as_str()) {
+                if removed_bins.iter().any(|name| name == default_run) {
+                    debug!(
+                        "Stripping [package.default-run] target {:?} from {}",
+                        default_run,
+                        manifest_path.display()
+                    );
+                    package.remove("default-run");
+                }
             }
         }
     }
@@ -360,11 +395,17 @@ fn add_crate_to_source_distribution(
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
     let normalize_packaged_path = |path: &Path| -> PathBuf {
-        let normalized = path.normalize();
-        match normalized {
-            Ok(normalized) => normalized.into(),
-            Err(_) => path.to_path_buf(),
+        let mut normalized = PathBuf::new();
+        for component in path.components() {
+            match component {
+                std::path::Component::CurDir => {}
+                std::path::Component::ParentDir => {
+                    normalized.pop();
+                }
+                _ => normalized.push(component),
+            }
         }
+        normalized
     };
     let target_source: Vec<_> = file_list
         .into_iter()

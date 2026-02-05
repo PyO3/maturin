@@ -15,6 +15,86 @@ use std::time::Duration;
 use time::macros::datetime;
 use which::which;
 
+#[test]
+fn sdist_excludes_default_run() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("hello-world");
+    common::other::copy_dir_recursive(Path::new("test-crates/hello-world"), &project_dir).unwrap();
+
+    // Add excluded bin and set as default-run
+    let cargo_toml_path = project_dir.join("Cargo.toml");
+    let mut cargo_toml = fs_err::read_to_string(&cargo_toml_path).unwrap();
+
+    // Fix README path
+    fs_err::write(project_dir.join("README.md"), "Test readme").unwrap();
+    cargo_toml = cargo_toml.replace("../../README.md", "README.md");
+
+    cargo_toml.push_str("\n[[bin]]\nname = \"excluded_bin\"\npath = \"src/bin/excluded_bin.rs\"\n");
+    // Replace default-run
+    let cargo_toml = cargo_toml.replace(
+        "default-run = \"hello-world\"",
+        "default-run = \"excluded_bin\"",
+    );
+    fs_err::write(&cargo_toml_path, cargo_toml).unwrap();
+
+    // Add source file
+    let bin_path = project_dir.join("src/bin/excluded_bin.rs");
+    // Ensure parent dir exists (src/bin might be missing if I just copied structure and it was empty? No, hello-world has src/bin/foo.rs)
+    fs_err::write(&bin_path, "fn main() {}").unwrap();
+
+    // Add exclusion
+    let pyproject_toml_path = project_dir.join("pyproject.toml");
+    let mut pyproject_toml = fs_err::read_to_string(&pyproject_toml_path).unwrap();
+    pyproject_toml =
+        pyproject_toml.replace("exclude = [", "exclude = [\n  \"src/bin/excluded_bin.rs\",");
+    fs_err::write(&pyproject_toml_path, pyproject_toml).unwrap();
+
+    // Expect Cargo.toml NOT to have default-run="excluded_bin"
+    let expected_cargo_toml = expect![[r#"
+        [package]
+        name = "hello-world"
+        version = "0.1.0"
+        authors = ["konstin <konstin@mailbox.org>"]
+        edition = "2021"
+        # Test references to out-of-project files
+        readme = "README.md"
+
+        [dependencies]
+
+        [[bench]]
+        name = "included_bench"
+
+        [[example]]
+        name = "included_example"
+    "#]];
+
+    handle_result(other::test_source_distribution(
+        &project_dir,
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "hello_world-0.1.0/Cargo.lock",
+                "hello_world-0.1.0/Cargo.toml",
+                "hello_world-0.1.0/LICENSE",
+                "hello_world-0.1.0/PKG-INFO",
+                "hello_world-0.1.0/README.md",
+                "hello_world-0.1.0/benches/included_bench.rs",
+                "hello_world-0.1.0/check_installed/check_installed.py",
+                "hello_world-0.1.0/examples/included_example.rs",
+                "hello_world-0.1.0/licenses/AUTHORS.txt",
+                "hello_world-0.1.0/pyproject.toml",
+                "hello_world-0.1.0/src/bin/foo.rs",
+                "hello_world-0.1.0/src/main.rs",
+            }
+        "#]],
+        Some((
+            Path::new("hello_world-0.1.0/Cargo.toml"),
+            expected_cargo_toml,
+        )),
+        "sdist-hello-world-default-run",
+    ))
+}
+
 mod common;
 
 #[test]

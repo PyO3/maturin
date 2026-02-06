@@ -109,6 +109,186 @@ fn rewrite_cargo_toml(
     Ok(())
 }
 
+fn normalize_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut components = Vec::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                // Only pop if there's a normal component to cancel out
+                match components.last() {
+                    Some(Component::Normal(_)) => {
+                        components.pop();
+                    }
+                    _ => {
+                        // Keep the ParentDir if path is empty or last is also ParentDir
+                        components.push(component);
+                    }
+                }
+            }
+            _ => components.push(component),
+        }
+    }
+
+    components.iter().collect()
+}
+
+// Strip targets whose source files are excluded from the sdist, matching Cargo's
+// behavior when `package.include`/`package.exclude` or tool.maturin excludes remove them.
+fn rewrite_cargo_toml_targets(
+    document: &mut DocumentMut,
+    manifest_path: &Path,
+    packaged_files: &HashSet<PathBuf>,
+) -> Result<()> {
+    debug!(
+        "Rewriting Cargo.toml build targets at {}",
+        manifest_path.display()
+    );
+
+    let manifest_dir = manifest_path.parent().unwrap();
+    let package_name = document
+        .get("package")
+        .and_then(|item| item.as_table())
+        .and_then(|table| table.get("name"))
+        .and_then(|item| item.as_str())
+        .map(str::to_string);
+
+    // We need to normalize paths without accessing the filesystem (which might not match
+    // the manifest context) and without resolving symlinks. This matches `cargo package --list`
+    // behavior which outputs normalized paths.
+    let normalize = |path: &Path| -> PathBuf {
+        let path = if path.is_absolute() {
+            path.strip_prefix(manifest_dir).unwrap_or(path)
+        } else {
+            path
+        };
+        normalize_path(path)
+    };
+
+    let has_packaged_path =
+        |paths: &[PathBuf]| -> bool { paths.iter().any(|path| packaged_files.contains(path)) };
+
+    // Cargo's implicit target path rules when `path` is not set:
+    // - lib: src/lib.rs
+    // - bin: src/bin/<name>.rs or src/bin/<name>/main.rs (src/main.rs only for implicit default bin)
+    // - example/test/bench: <dir>/<name>.rs or <dir>/<name>/main.rs
+    let candidate_paths_for_target =
+        |kind: &str, name: Option<&str>, path: Option<&str>, package_name: Option<&str>| {
+            if let Some(path) = path {
+                return vec![normalize(Path::new(path))];
+            }
+
+            let name = name.or(package_name);
+            match (kind, name) {
+                ("lib", _) => vec![normalize(Path::new("src/lib.rs"))],
+                ("bin", Some(name)) => {
+                    vec![
+                        normalize(Path::new(&format!("src/bin/{name}.rs"))),
+                        normalize(Path::new(&format!("src/bin/{name}/main.rs"))),
+                    ]
+                }
+                ("bin", None) => vec![normalize(Path::new("src/main.rs"))],
+                ("example", Some(name)) => vec![
+                    normalize(Path::new(&format!("examples/{name}.rs"))),
+                    normalize(Path::new(&format!("examples/{name}/main.rs"))),
+                ],
+                ("test", Some(name)) => vec![
+                    normalize(Path::new(&format!("tests/{name}.rs"))),
+                    normalize(Path::new(&format!("tests/{name}/main.rs"))),
+                ],
+                ("bench", Some(name)) => vec![
+                    normalize(Path::new(&format!("benches/{name}.rs"))),
+                    normalize(Path::new(&format!("benches/{name}/main.rs"))),
+                ],
+                _ => Vec::new(),
+            }
+        };
+
+    let package_name = package_name.as_deref();
+
+    let mut drop_lib = false;
+    if let Some(lib) = document.get("lib").and_then(|item| item.as_table()) {
+        let name = lib.get("name").and_then(|item| item.as_str());
+        let path = lib.get("path").and_then(|item| item.as_str());
+        let candidates = candidate_paths_for_target("lib", name, path, package_name);
+        if !candidates.is_empty() && !has_packaged_path(&candidates) {
+            debug!(
+                "Stripping [lib] target {:?} from {}",
+                name.or(path),
+                manifest_path.display()
+            );
+            drop_lib = true;
+        }
+    }
+
+    if drop_lib {
+        document.remove("lib");
+    }
+
+    let mut removed_bins = Vec::new();
+    for (key, kind) in [
+        ("bin", "bin"),
+        ("example", "example"),
+        ("test", "test"),
+        ("bench", "bench"),
+    ] {
+        if let Some(targets) = document
+            .get_mut(key)
+            .and_then(|item| item.as_array_of_tables_mut())
+        {
+            let mut idx = 0;
+            while idx < targets.len() {
+                let target = targets.get(idx).unwrap();
+                let name = target.get("name").and_then(|item| item.as_str());
+                let path = target.get("path").and_then(|item| item.as_str());
+                let candidates = candidate_paths_for_target(kind, name, path, package_name);
+                if !candidates.is_empty() && !has_packaged_path(&candidates) {
+                    debug!(
+                        "Stripping {key} target {:?} from {}",
+                        name.or(path),
+                        manifest_path.display()
+                    );
+                    if kind == "bin" {
+                        if let Some(name) = name {
+                            removed_bins.push(name.to_string());
+                        }
+                    }
+                    targets.remove(idx);
+                } else {
+                    idx += 1;
+                }
+            }
+            if targets.is_empty() {
+                document.remove(key);
+            }
+        }
+    }
+
+    // If we removed any binaries, we must check if they were the `default-run` target.
+    // If so, we remove `default-run` to prevent `cargo run` from failing with a missing target.
+    if !removed_bins.is_empty() {
+        if let Some(package) = document
+            .get_mut("package")
+            .and_then(|item| item.as_table_mut())
+        {
+            if let Some(default_run) = package.get("default-run").and_then(|item| item.as_str()) {
+                if removed_bins.iter().any(|name| name == default_run) {
+                    debug!(
+                        "Stripping [package.default-run] target {:?} from {}",
+                        default_run,
+                        manifest_path.display()
+                    );
+                    package.remove("default-run");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Rewrite `Cargo.toml` to find the readme in the same directory.
 ///
 /// `package.readme` may point to any point above the package, so when we move the directory, but
@@ -264,8 +444,15 @@ fn add_crate_to_source_distribution(
                 // Use `is_file` instead of `exists` to work around cargo bug:
                 // https://github.com/rust-lang/cargo/issues/16465
                 source.is_file()
+                    && !writer.exclude(source)
+                    && !writer.exclude(prefix.join(target))
             }
         })
+        .collect();
+
+    let packaged_files: HashSet<PathBuf> = target_source
+        .iter()
+        .map(|(target, _)| normalize_path(Path::new(target)))
         .collect();
 
     let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
@@ -284,6 +471,7 @@ fn add_crate_to_source_distribution(
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
         rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
+        rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),
@@ -293,6 +481,7 @@ fn add_crate_to_source_distribution(
     } else if !skip_cargo_toml {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
+        rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         writer.add_bytes(
             cargo_toml_path,
             Some(manifest_path),
@@ -901,4 +1090,52 @@ where
         }
     }
     if found { Some(final_path) } else { None }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_path() {
+        let test_cases = vec![
+            // Basic paths without normalization needed
+            ("foo/bar", "foo/bar"),
+            ("src/lib.rs", "src/lib.rs"),
+            // Remove current directory components
+            ("./foo/bar", "foo/bar"),
+            ("foo/./bar", "foo/bar"),
+            (".", ""),
+            // Parent directory that cancels with a normal component
+            ("foo/../bar", "bar"),
+            ("foo/bar/..", "foo"),
+            ("foo/bar/../baz", "foo/baz"),
+            // Leading parent directories should be preserved
+            ("../foo", "../foo"),
+            ("../../foo", "../../foo"),
+            ("../../../foo/bar", "../../../foo/bar"),
+            // More parent dirs than normal components
+            ("a/../../b", "../b"),
+            ("a/b/../../../c", "../c"),
+            ("foo/bar/baz/../../..", ""),
+            // Mix of current and parent directory components
+            ("./foo/../bar", "bar"),
+            ("foo/./bar/../baz", "foo/baz"),
+            ("./../foo/./bar", "../foo/bar"),
+            // Edge cases
+            ("", ""),
+            ("foo", "foo"),
+            ("..", ".."),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                normalize_path(Path::new(input)),
+                PathBuf::from(expected),
+                "normalize_path({:?}) should equal {:?}",
+                input,
+                expected
+            );
+        }
+    }
 }

@@ -70,7 +70,7 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
     }
 
     /// Returns `true` if the given path should be excluded
-    fn exclude(&self, path: impl AsRef<Path>) -> bool {
+    pub(crate) fn exclude(&self, path: impl AsRef<Path>) -> bool {
         self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 

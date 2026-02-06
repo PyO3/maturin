@@ -110,11 +110,15 @@ impl WheelWriter {
         self.zip.start_file_from_path(&record_filename, options)?;
 
         for (filename, (hash, len)) in self.record {
-            let filename = filename.to_string_lossy();
+            let filename = filename.to_string_lossy().replace("\\", "/");
             writeln!(self.zip, "{filename},sha256={hash},{len}")?;
         }
         // Write the record for the RECORD file itself
-        writeln!(self.zip, "{},,", record_filename.display())?;
+        writeln!(
+            self.zip,
+            "{},,",
+            record_filename.to_string_lossy().replace("\\", "/")
+        )?;
 
         let file = self.zip.finish()?;
         Ok(file.into_path())

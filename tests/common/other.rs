@@ -307,6 +307,19 @@ pub fn check_wheel_mtimes(
     Ok(())
 }
 
+pub fn check_wheel_paths(
+    package: impl AsRef<Path>,
+    record_file: &str,
+    unique_name: &str,
+) -> Result<()> {
+    let mut wheel = build_wheel_files(package, unique_name)?;
+    let mut f = wheel.by_path(record_file)?;
+    let mut s = String::new();
+    f.read_to_string(&mut s)?;
+    assert!(!s.contains("\\"));
+    Ok(())
+}
+
 pub fn check_wheel_files(
     package: impl AsRef<Path>,
     expected_files: Vec<&str>,

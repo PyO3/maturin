@@ -58,7 +58,7 @@ tar = "0.4.38"
 tempfile = "3.2.0"
 toml = "0.9.11"
 toml_edit = "0.24.0"
-zip = { version = "6.0.0", default-features = false, features = [
+zip = { version = "7.4.0", default-features = false, features = [
     "bzip2",
     "deflate",
     "time",

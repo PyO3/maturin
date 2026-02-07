@@ -393,10 +393,12 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
     let mut builder = ureq::builder().try_proxy_from_env(true);
     let mut tls_builder = native_tls::TlsConnector::builder();
     if let Some(ca_bundle) = tls_ca_bundle() {
-        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
-        for cert in rustls_pemfile::certs(&mut reader) {
-            let cert = cert?;
-            tls_builder.add_root_certificate(native_tls::Certificate::from_pem(&cert)?);
+        use rustls_pki_types::pem::PemObject;
+        for cert in rustls_pki_types::CertificateDer::pem_file_iter(&ca_bundle)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+        {
+            let cert = cert.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+            tls_builder.add_root_certificate(native_tls::Certificate::from_der(cert.as_ref())?);
         }
     }
     builder = builder.tls_connector(Arc::new(tls_builder.build()?));
@@ -409,8 +411,11 @@ fn http_agent() -> Result<ureq::Agent, UploadError> {
 
     let builder = ureq::builder().try_proxy_from_env(true);
     if let Some(ca_bundle) = tls_ca_bundle() {
-        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
-        let certs = rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>()?;
+        use rustls_pki_types::pem::PemObject;
+        let certs = rustls_pki_types::CertificateDer::pem_file_iter(&ca_bundle)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut root_certs = rustls::RootCertStore::empty();
         root_certs.add_parsable_certificates(certs);
         let client_config = rustls::ClientConfig::builder()

@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::Context as _;
 use anyhow::Result;
 use fs_err::File;
+use path_slash::PathBufExt as _;
 use tracing::debug;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
@@ -110,11 +111,11 @@ impl WheelWriter {
         self.zip.start_file_from_path(&record_filename, options)?;
 
         for (filename, (hash, len)) in self.record {
-            let filename = filename.to_string_lossy();
+            let filename = filename.to_slash_lossy();
             writeln!(self.zip, "{filename},sha256={hash},{len}")?;
         }
         // Write the record for the RECORD file itself
-        writeln!(self.zip, "{},,", record_filename.display())?;
+        writeln!(self.zip, "{},,", record_filename.to_slash_lossy())?;
 
         let file = self.zip.finish()?;
         Ok(file.into_path())

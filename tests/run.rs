@@ -951,6 +951,17 @@ fn pyo3_mixed_include_exclude_wheel_files() {
     ))
 }
 
+// Tests that paths in the wheel `RECORD` use `/` instead of `\\`. Even
+// (especially, exclusively) on Windows.
+#[test]
+fn pyo3_wheel_record_has_normalized_paths() {
+    handle_result(other::check_wheel_paths(
+        "test-crates/pyo3-mixed-include-exclude",
+        "pyo3_mixed_include_exclude-2.1.3.dist-info/RECORD",
+        "wheel-files-pyo3-mixed-include-exclude",
+    ))
+}
+
 #[test]
 fn workspace_sdist() {
     handle_result(other::test_source_distribution(

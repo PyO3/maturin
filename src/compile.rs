@@ -668,11 +668,11 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
         }
         goblin::Object::PE(pe) => {
             for sym in &pe.exports {
-                if let Some(sym_name) = sym.name {
-                    if py_init == sym_name {
-                        found = true;
-                        break;
-                    }
+                if let Some(sym_name) = sym.name
+                    && py_init == sym_name
+                {
+                    found = true;
+                    break;
                 }
             }
         }

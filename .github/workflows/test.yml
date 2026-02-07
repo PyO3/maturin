@@ -479,7 +479,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - run: rustup default 1.85.0
+      - run: rustup default 1.88.0
       # Caching
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2

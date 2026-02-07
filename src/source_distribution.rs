@@ -59,50 +59,50 @@ fn rewrite_cargo_toml(
         manifest_path.display()
     );
     // Update workspace members
-    if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut()) {
-        if let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array()) {
-            if known_path_deps.is_empty() {
-                // Remove workspace members when there isn't any path dep
-                workspace.remove("members");
-                if workspace.is_empty() {
-                    // Remove workspace all together if it's empty
-                    document.remove("workspace");
-                }
-            } else {
-                let mut new_members = toml_edit::Array::new();
-                for member in members {
-                    if let toml_edit::Value::String(s) = member {
-                        let member_path = s.value();
-                        // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
-                        let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);
-                        if is_glob_pattern {
-                            let pattern = glob::Pattern::new(member_path).with_context(|| {
-                                format!(
-                                    "Invalid `workspace.members` glob pattern: {} in {}",
-                                    member_path,
-                                    manifest_path.display()
-                                )
-                            })?;
-                            if known_path_deps.values().any(|path_dep| {
-                                let relative_path = path_dep
-                                    .manifest_path
-                                    .strip_prefix(&path_dep.workspace_root)
-                                    .unwrap();
-                                let relative_path_str = relative_path.to_str().unwrap();
-                                pattern.matches(relative_path_str)
-                            }) {
-                                new_members.push(member_path);
-                            }
-                        } else if known_path_deps.contains_key(member_path) {
+    if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut())
+        && let Some(members) = workspace.get_mut("members").and_then(|x| x.as_array())
+    {
+        if known_path_deps.is_empty() {
+            // Remove workspace members when there isn't any path dep
+            workspace.remove("members");
+            if workspace.is_empty() {
+                // Remove workspace all together if it's empty
+                document.remove("workspace");
+            }
+        } else {
+            let mut new_members = toml_edit::Array::new();
+            for member in members {
+                if let toml_edit::Value::String(s) = member {
+                    let member_path = s.value();
+                    // See https://github.com/rust-lang/cargo/blob/0de91c89e6479016d0ed8719fdc2947044335b36/src/cargo/util/restricted_names.rs#L119-L122
+                    let is_glob_pattern = member_path.contains(['*', '?', '[', ']']);
+                    if is_glob_pattern {
+                        let pattern = glob::Pattern::new(member_path).with_context(|| {
+                            format!(
+                                "Invalid `workspace.members` glob pattern: {} in {}",
+                                member_path,
+                                manifest_path.display()
+                            )
+                        })?;
+                        if known_path_deps.values().any(|path_dep| {
+                            let relative_path = path_dep
+                                .manifest_path
+                                .strip_prefix(&path_dep.workspace_root)
+                                .unwrap();
+                            let relative_path_str = relative_path.to_str().unwrap();
+                            pattern.matches(relative_path_str)
+                        }) {
                             new_members.push(member_path);
                         }
+                    } else if known_path_deps.contains_key(member_path) {
+                        new_members.push(member_path);
                     }
                 }
-                if !new_members.is_empty() {
-                    workspace["members"] = toml_edit::value(new_members);
-                } else {
-                    workspace.remove("members");
-                }
+            }
+            if !new_members.is_empty() {
+                workspace["members"] = toml_edit::value(new_members);
+            } else {
+                workspace.remove("members");
             }
         }
     }
@@ -250,10 +250,10 @@ fn rewrite_cargo_toml_targets(
                         name.or(path),
                         manifest_path.display()
                     );
-                    if kind == "bin" {
-                        if let Some(name) = name {
-                            removed_bins.push(name.to_string());
-                        }
+                    if kind == "bin"
+                        && let Some(name) = name
+                    {
+                        removed_bins.push(name.to_string());
                     }
                     targets.remove(idx);
                 } else {
@@ -268,22 +268,19 @@ fn rewrite_cargo_toml_targets(
 
     // If we removed any binaries, we must check if they were the `default-run` target.
     // If so, we remove `default-run` to prevent `cargo run` from failing with a missing target.
-    if !removed_bins.is_empty() {
-        if let Some(package) = document
+    if !removed_bins.is_empty()
+        && let Some(package) = document
             .get_mut("package")
             .and_then(|item| item.as_table_mut())
-        {
-            if let Some(default_run) = package.get("default-run").and_then(|item| item.as_str()) {
-                if removed_bins.iter().any(|name| name == default_run) {
-                    debug!(
-                        "Stripping [package.default-run] target {:?} from {}",
-                        default_run,
-                        manifest_path.display()
-                    );
-                    package.remove("default-run");
-                }
-            }
-        }
+        && let Some(default_run) = package.get("default-run").and_then(|item| item.as_str())
+        && removed_bins.iter().any(|name| name == default_run)
+    {
+        debug!(
+            "Stripping [package.default-run] target {:?} from {}",
+            default_run,
+            manifest_path.display()
+        );
+        package.remove("default-run");
     }
 
     Ok(())

@@ -365,15 +365,13 @@ fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
     if let Some(Some(location)) = Regex::new(r"Location: ([^\r\n]*)")?
         .captures(pip_show_output)
         .map(|c| c.get(1))
-    {
-        if let Some(Some(direct_url_path)) = Regex::new(r"  (.*direct_url.json)")?
+        && let Some(Some(direct_url_path)) = Regex::new(r"  (.*direct_url.json)")?
             .captures(pip_show_output)
             .map(|c| c.get(1))
-        {
-            return Ok(Some(
-                PathBuf::from(location.as_str()).join(direct_url_path.as_str()),
-            ));
-        }
+    {
+        return Ok(Some(
+            PathBuf::from(location.as_str()).join(direct_url_path.as_str()),
+        ));
     }
     Ok(None)
 }
@@ -407,10 +405,10 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let python = target.get_venv_python(venv_dir);
 
     // check python platform and architecture
-    if !target.user_specified {
-        if let Some(detected_target) = detect_arch_from_python(&python, &target) {
-            target_triple = Some(detected_target);
-        }
+    if !target.user_specified
+        && let Some(detected_target) = detect_arch_from_python(&python, &target)
+    {
+        target_triple = Some(detected_target);
     }
 
     // Store wheel in a unique location so we don't get name clashes with parallel runs

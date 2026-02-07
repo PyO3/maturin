@@ -636,29 +636,27 @@ impl BuildContextBuilder {
 
         let mut universal2 = target_triple == Some(TargetTriple::Universal2);
         // Also try to determine universal2 from ARCHFLAGS environment variable
-        if target_triple.is_none() {
-            if let Ok(arch_flags) = env::var("ARCHFLAGS") {
-                let arches: HashSet<&str> = arch_flags
-                    .split("-arch")
-                    .filter_map(|x| {
-                        let x = x.trim();
-                        if x.is_empty() { None } else { Some(x) }
-                    })
-                    .collect();
-                match (arches.contains("x86_64"), arches.contains("arm64")) {
-                    (true, true) => universal2 = true,
-                    (true, false) => {
-                        target_triple =
-                            Some(TargetTriple::Regular("x86_64-apple-darwin".to_string()))
-                    }
-                    (false, true) => {
-                        target_triple =
-                            Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()))
-                    }
-                    (false, false) => {}
+        if target_triple.is_none()
+            && let Ok(arch_flags) = env::var("ARCHFLAGS")
+        {
+            let arches: HashSet<&str> = arch_flags
+                .split("-arch")
+                .filter_map(|x| {
+                    let x = x.trim();
+                    if x.is_empty() { None } else { Some(x) }
+                })
+                .collect();
+            match (arches.contains("x86_64"), arches.contains("arm64")) {
+                (true, true) => universal2 = true,
+                (true, false) => {
+                    target_triple = Some(TargetTriple::Regular("x86_64-apple-darwin".to_string()))
                 }
-            };
-        }
+                (false, true) => {
+                    target_triple = Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()))
+                }
+                (false, false) => {}
+            }
+        };
         if universal2 {
             // Ensure that target_triple is valid. This is necessary to properly
             // infer the platform tags when cross-compiling from Linux.
@@ -1647,53 +1645,53 @@ impl CargoOptions {
             }
         }
 
-        if let Some(features) = tool_maturin.features {
-            if self.features.is_empty() {
-                self.features = features;
-                args_from_pyproject.push("features");
-            }
+        if let Some(features) = tool_maturin.features
+            && self.features.is_empty()
+        {
+            self.features = features;
+            args_from_pyproject.push("features");
         }
 
-        if let Some(all_features) = tool_maturin.all_features {
-            if !self.all_features {
-                self.all_features = all_features;
-                args_from_pyproject.push("all-features");
-            }
+        if let Some(all_features) = tool_maturin.all_features
+            && !self.all_features
+        {
+            self.all_features = all_features;
+            args_from_pyproject.push("all-features");
         }
 
-        if let Some(no_default_features) = tool_maturin.no_default_features {
-            if !self.no_default_features {
-                self.no_default_features = no_default_features;
-                args_from_pyproject.push("no-default-features");
-            }
+        if let Some(no_default_features) = tool_maturin.no_default_features
+            && !self.no_default_features
+        {
+            self.no_default_features = no_default_features;
+            args_from_pyproject.push("no-default-features");
         }
 
-        if let Some(frozen) = tool_maturin.frozen {
-            if !self.frozen {
-                self.frozen = frozen;
-                args_from_pyproject.push("frozen");
-            }
+        if let Some(frozen) = tool_maturin.frozen
+            && !self.frozen
+        {
+            self.frozen = frozen;
+            args_from_pyproject.push("frozen");
         }
 
-        if let Some(locked) = tool_maturin.locked {
-            if !self.locked {
-                self.locked = locked;
-                args_from_pyproject.push("locked");
-            }
+        if let Some(locked) = tool_maturin.locked
+            && !self.locked
+        {
+            self.locked = locked;
+            args_from_pyproject.push("locked");
         }
 
-        if let Some(config) = tool_maturin.config {
-            if self.config.is_empty() {
-                self.config = config;
-                args_from_pyproject.push("config");
-            }
+        if let Some(config) = tool_maturin.config
+            && self.config.is_empty()
+        {
+            self.config = config;
+            args_from_pyproject.push("config");
         }
 
-        if let Some(unstable_flags) = tool_maturin.unstable_flags {
-            if self.unstable_flags.is_empty() {
-                self.unstable_flags = unstable_flags;
-                args_from_pyproject.push("unstable-flags");
-            }
+        if let Some(unstable_flags) = tool_maturin.unstable_flags
+            && self.unstable_flags.is_empty()
+        {
+            self.unstable_flags = unstable_flags;
+            args_from_pyproject.push("unstable-flags");
         }
 
         args_from_pyproject

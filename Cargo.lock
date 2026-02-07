@@ -1579,6 +1579,7 @@ dependencies = [
  "pep508_rs",
  "platform-info",
  "pretty_assertions",
+ "pyo3-introspection",
  "pyproject-toml",
  "python-pkginfo",
  "regex",
@@ -2065,6 +2066,19 @@ checksum = "3852766467df634d74f0b2d7819bf8dc483a0eb2e3b0f50f756f9cfe8b0d18d8"
 dependencies = [
  "ar_archive_writer",
  "cc",
+]
+
+[[package]]
+name = "pyo3-introspection"
+version = "0.27.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6cd5679197d3cfdd7d9d241edf688ec13efd4fc302b35e8596f2831a0be5109"
+dependencies = [
+ "anyhow",
+ "goblin",
+ "serde",
+ "serde_json",
+ "unicode-ident",
 ]
 
 [[package]]

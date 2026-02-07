@@ -261,16 +261,15 @@ impl BuildContext {
             return Ok((Policy::default(), Vec::new()));
         }
 
-        if let Some(python_interpreter) = python_interpreter {
-            if platform_tag.is_empty()
-                && self.target.is_linux()
-                && !python_interpreter.support_portable_wheels()
-            {
-                eprintln!(
-                    "🐍 Skipping auditwheel because {python_interpreter} does not support manylinux/musllinux wheels"
-                );
-                return Ok((Policy::default(), Vec::new()));
-            }
+        if let Some(python_interpreter) = python_interpreter
+            && platform_tag.is_empty()
+            && self.target.is_linux()
+            && !python_interpreter.support_portable_wheels()
+        {
+            eprintln!(
+                "🐍 Skipping auditwheel because {python_interpreter} does not support manylinux/musllinux wheels"
+            );
+            return Ok((Policy::default(), Vec::new()));
         }
 
         let mut musllinux: Vec<_> = platform_tag
@@ -510,14 +509,14 @@ impl BuildContext {
             Err(_) => self.manifest_path.normalize()?.into_path_buf(),
         };
         let mut excludes = OverrideBuilder::new(project_dir.parent().unwrap());
-        if let Some(pyproject) = self.pyproject_toml.as_ref() {
-            if let Some(glob_patterns) = &pyproject.exclude() {
-                for glob in glob_patterns
-                    .iter()
-                    .filter_map(|glob_pattern| glob_pattern.targets(format))
-                {
-                    excludes.add(glob)?;
-                }
+        if let Some(pyproject) = self.pyproject_toml.as_ref()
+            && let Some(glob_patterns) = &pyproject.exclude()
+        {
+            for glob in glob_patterns
+                .iter()
+                .filter_map(|glob_pattern| glob_pattern.targets(format))
+            {
+                excludes.add(glob)?;
             }
         }
         // Ignore sdist output files so that we don't include them in the sdist
@@ -1224,18 +1223,17 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
         .args(["--target", target])
         .args(["--print", "deployment-target"])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let target_version = std::str::from_utf8(&output.stdout)
-                .unwrap()
-                .split('=')
-                .next_back()
-                .and_then(|v| v.trim().split_once('.'));
-            if let Some((major, minor)) = target_version {
-                let major: u16 = major.parse().unwrap();
-                let minor: u16 = minor.parse().unwrap();
-                return (major, minor);
-            }
+        let target_version = std::str::from_utf8(&output.stdout)
+            .unwrap()
+            .split('=')
+            .next_back()
+            .and_then(|v| v.trim().split_once('.'));
+        if let Some((major, minor)) = target_version {
+            let major: u16 = major.parse().unwrap();
+            let minor: u16 = minor.parse().unwrap();
+            return (major, minor);
         }
     }
 
@@ -1311,12 +1309,11 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
     let mut clues = Vec::new();
 
     // 1. Linker from cargo-config2
-    if let Some(manifest_dir) = manifest_path.parent() {
-        if let Ok(config) = cargo_config2::Config::load_with_cwd(manifest_dir) {
-            if let Ok(Some(linker)) = config.linker(target_triple) {
-                clues.push(linker.to_string_lossy().into_owned());
-            }
-        }
+    if let Some(manifest_dir) = manifest_path.parent()
+        && let Ok(config) = cargo_config2::Config::load_with_cwd(manifest_dir)
+        && let Ok(Some(linker)) = config.linker(target_triple)
+    {
+        clues.push(linker.to_string_lossy().into_owned());
     }
 
     // 2. CC env vars

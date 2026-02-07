@@ -614,13 +614,11 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
             }
             Err(err) => {
                 let filename = i.file_name().unwrap_or(i.as_os_str());
-                if let UploadError::FileExistsError(_) = err {
-                    if publish.skip_existing {
-                        eprintln!(
-                            "⚠️ Note: Skipping {filename:?} because it appears to already exist"
-                        );
-                        continue;
-                    }
+                if let UploadError::FileExistsError(_) = err
+                    && publish.skip_existing
+                {
+                    eprintln!("⚠️ Note: Skipping {filename:?} because it appears to already exist");
+                    continue;
                 }
                 let filesize = fs::metadata(i)
                     .map(|x| ByteSize(x.len()).to_string())

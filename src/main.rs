@@ -426,10 +426,8 @@ fn run() -> Result<()> {
             }
 
             let mut wheels = build_context.build_wheels()?;
-            if !no_sdist {
-                if let Some(sd) = build_context.build_source_distribution()? {
-                    wheels.push(sd);
-                }
+            if !no_sdist && let Some(sd) = build_context.build_source_distribution()? {
+                wheels.push(sd);
             }
 
             let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();

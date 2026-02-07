@@ -83,10 +83,10 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         target: PathBuf,
         source: Option<&Path>,
     ) -> Result<Option<VacantEntry<'_, PathBuf, ArchiveSource>>> {
-        if let Some(source) = source {
-            if self.exclude(source) {
-                return Ok(None);
-            }
+        if let Some(source) = source
+            && self.exclude(source)
+        {
+            return Ok(None);
         }
 
         if self.exclude(&target) {

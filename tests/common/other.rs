@@ -209,12 +209,12 @@ pub fn test_source_distribution(
         let mut entry = entry?;
         files.insert(format!("{}", entry.path()?.display()));
         file_count += 1;
-        if let Some(cargo_toml_path) = expected_cargo_toml.as_ref().map(|(p, _)| *p) {
-            if entry.path()? == cargo_toml_path {
-                let mut contents = String::new();
-                entry.read_to_string(&mut contents)?;
-                cargo_toml = Some(contents);
-            }
+        if let Some(cargo_toml_path) = expected_cargo_toml.as_ref().map(|(p, _)| *p)
+            && entry.path()? == cargo_toml_path
+        {
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents)?;
+            cargo_toml = Some(contents);
         }
     }
     expected_files.assert_debug_eq(&files);

@@ -1096,7 +1096,7 @@ impl BuildContext {
         let mut ext_libs = Vec::new();
         let mut artifact_paths = Vec::with_capacity(artifacts.len());
         for artifact in artifacts {
-            let artifact = artifact
+            let mut artifact = artifact
                 .get(&CrateType::Bin)
                 .cloned()
                 .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
@@ -1104,6 +1104,16 @@ impl BuildContext {
             let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
             policies.push(policy);
             ext_libs.push(external_libs);
+
+            // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns
+            if !self.editable && !matches!(self.auditwheel, AuditWheelMode::Skip) {
+                let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
+                fs::create_dir_all(&maturin_build)?;
+                let artifact_path = &artifact.path;
+                let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
+                fs::copy(artifact_path, &new_artifact_path)?;
+                artifact.path = new_artifact_path.normalize()?.into_path_buf();
+            }
             artifact_paths.push(artifact);
         }
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();

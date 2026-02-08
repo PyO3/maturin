@@ -895,9 +895,6 @@ impl BuildContext {
             let _ = warn_missing_py_init(&artifact.path, extension_name);
         }
 
-        if self.editable || matches!(self.auditwheel, AuditWheelMode::Skip) {
-            return Ok(artifact);
-        }
         self.copy_artifact_for_repair(&mut artifact)?;
         Ok(artifact)
     }
@@ -906,7 +903,13 @@ impl BuildContext {
     /// modify it in-place without altering the original cargo build output.
     /// This prevents errors on subsequent rebuilds where cargo skips
     /// recompilation.
+    ///
+    /// Only performs the copy when auditwheel mode is `Repair`, since that is
+    /// the only mode that modifies artifacts in-place.
     fn copy_artifact_for_repair(&self, artifact: &mut BuildArtifact) -> Result<()> {
+        if self.editable || !matches!(self.auditwheel, AuditWheelMode::Repair) {
+            return Ok(());
+        }
         let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
         fs::create_dir_all(&maturin_build)?;
         let artifact_path = &artifact.path;
@@ -1113,9 +1116,7 @@ impl BuildContext {
             policies.push(policy);
             ext_libs.push(external_libs);
 
-            if !self.editable && !matches!(self.auditwheel, AuditWheelMode::Skip) {
-                self.copy_artifact_for_repair(&mut artifact)?;
-            }
+            self.copy_artifact_for_repair(&mut artifact)?;
             artifact_paths.push(artifact);
         }
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();

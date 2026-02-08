@@ -431,7 +431,20 @@ impl Metadata24 {
             self.license_files.retain(|p| !p.is_absolute());
             for license_file in license_files {
                 let license_path = if let Ok(relative) = license_file.strip_prefix(pyproject_dir) {
-                    relative.to_path_buf()
+                    // Guard against paths that contain `..` components after stripping
+                    // (e.g. symlink-resolved paths like `.../host/../LICENSE`).
+                    // Such paths would escape the licenses/ directory in the wheel.
+                    if relative
+                        .components()
+                        .any(|c| matches!(c, std::path::Component::ParentDir))
+                    {
+                        let name = license_file
+                            .file_name()
+                            .context("license file path has no filename")?;
+                        PathBuf::from(name)
+                    } else {
+                        relative.to_path_buf()
+                    }
                 } else {
                     // License file is outside pyproject_dir (e.g. workspace-level license).
                     // Use just the filename and record the absolute source path.

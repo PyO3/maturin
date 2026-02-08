@@ -329,6 +329,16 @@ pub fn write_dist_info(
     if !metadata24.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("licenses");
         for path in &metadata24.license_files {
+            if path.is_absolute()
+                || path
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
+                bail!(
+                    "Refusing to write license file with unsafe path `{}` into wheel",
+                    path.display()
+                );
+            }
             let source = metadata24
                 .license_file_sources
                 .get(path)

@@ -133,6 +133,34 @@ fn path_to_content_type(path: &Path) -> String {
         })
 }
 
+fn normalize_license_file_path(
+    base_dir: &Path,
+    absolute_license_path: &Path,
+) -> Result<(PathBuf, Option<PathBuf>)> {
+    let file_name = absolute_license_path
+        .file_name()
+        .context("license file path has no filename")?;
+    let fallback = || {
+        (
+            PathBuf::from(file_name),
+            Some(absolute_license_path.to_path_buf()),
+        )
+    };
+
+    let Ok(relative) = absolute_license_path.strip_prefix(base_dir) else {
+        return Ok(fallback());
+    };
+
+    if relative
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Ok(fallback());
+    }
+
+    Ok((relative.to_path_buf(), None))
+}
+
 impl Metadata24 {
     /// Merge metadata with pyproject.toml, where pyproject.toml takes precedence
     ///
@@ -255,7 +283,13 @@ impl Metadata24 {
                     }
                     // Deprecated by PEP 639
                     License::File { file } => {
-                        self.license_files.push(file.to_path_buf());
+                        let file = file.to_path_buf();
+                        // pyproject.toml takes precedence over Cargo metadata for the same
+                        // `License-File` path.
+                        self.license_file_sources.remove(&file);
+                        if !self.license_files.contains(&file) {
+                            self.license_files.push(file);
+                        }
                     }
                     License::Text { text } => self.license = Some(text.clone()),
                 }
@@ -418,45 +452,26 @@ impl Metadata24 {
             }
         }
 
-        // Make sure existing license files from `Cargo.toml` are relative to the project root.
-        // This runs unconditionally (not just when [project] is present) so that
-        // license files from Cargo.toml are always normalized.
-        let license_files = self
+        // Make sure existing license files from Cargo metadata are relative to
+        // the project root. This runs unconditionally (not just when [project]
+        // is present) so `license-file.workspace = true` works without [project].
+        let absolute_license_files = self
             .license_files
             .iter()
             .filter(|p| p.is_absolute())
             .cloned()
             .collect::<Vec<_>>();
-        if !license_files.is_empty() {
+        if !absolute_license_files.is_empty() {
             self.license_files.retain(|p| !p.is_absolute());
-            for license_file in license_files {
-                let license_path = if let Ok(relative) = license_file.strip_prefix(pyproject_dir) {
-                    // Guard against paths that contain `..` components after stripping
-                    // (e.g. symlink-resolved paths like `.../host/../LICENSE`).
-                    // Such paths would escape the licenses/ directory in the wheel.
-                    if relative
-                        .components()
-                        .any(|c| matches!(c, std::path::Component::ParentDir))
-                    {
-                        let name = license_file
-                            .file_name()
-                            .context("license file path has no filename")?;
-                        PathBuf::from(name)
-                    } else {
-                        relative.to_path_buf()
+            for absolute_license_file in absolute_license_files {
+                let (wheel_path, source_override) =
+                    normalize_license_file_path(pyproject_dir, &absolute_license_file)?;
+                if !self.license_files.contains(&wheel_path) {
+                    if let Some(source_override) = source_override {
+                        self.license_file_sources
+                            .insert(wheel_path.clone(), source_override);
                     }
-                } else {
-                    // License file is outside pyproject_dir (e.g. workspace-level license).
-                    // Use just the filename and record the absolute source path.
-                    let name = license_file
-                        .file_name()
-                        .context("license file path has no filename")?;
-                    PathBuf::from(name)
-                };
-                if !self.license_files.contains(&license_path) {
-                    self.license_file_sources
-                        .insert(license_path.clone(), license_file);
-                    self.license_files.push(license_path);
+                    self.license_files.push(wheel_path);
                 }
             }
         }
@@ -526,38 +541,21 @@ impl Metadata24 {
         }
         let mut license_file_sources = HashMap::new();
         let license_files = if let Some(license_file) = package.license_file.as_ref() {
-            let abs_license_path = manifest_path.as_ref().join(license_file).normalize()?;
-            if !abs_license_path.is_file() {
+            let absolute_license_path = manifest_path.as_ref().join(license_file).normalize()?;
+            if !absolute_license_path.is_file() {
                 bail!(
                     "license file `{license_file}` specified in `{}` is not a file",
                     manifest_path.as_ref().display()
                 );
             }
-            let abs_license_path = abs_license_path.into_path_buf();
-            let abs_manifest_dir = manifest_path.as_ref().normalize()?.into_path_buf();
-            let rel_path = if let Ok(relative) = abs_license_path.strip_prefix(&abs_manifest_dir) {
-                if relative
-                    .components()
-                    .any(|c| matches!(c, std::path::Component::ParentDir))
-                {
-                    let name = abs_license_path
-                        .file_name()
-                        .context("license file path has no filename")?;
-                    let rel = PathBuf::from(name);
-                    license_file_sources.insert(rel.clone(), abs_license_path);
-                    rel
-                } else {
-                    relative.to_path_buf()
-                }
-            } else {
-                let name = abs_license_path
-                    .file_name()
-                    .context("license file path has no filename")?;
-                let rel = PathBuf::from(name);
-                license_file_sources.insert(rel.clone(), abs_license_path);
-                rel
-            };
-            vec![rel_path]
+            let absolute_license_path = absolute_license_path.into_path_buf();
+            let manifest_dir = manifest_path.as_ref().normalize()?.into_path_buf();
+            let (wheel_path, source_override) =
+                normalize_license_file_path(&manifest_dir, &absolute_license_path)?;
+            if let Some(source_override) = source_override {
+                license_file_sources.insert(wheel_path.clone(), source_override);
+            }
+            vec![wheel_path]
         } else {
             Vec::new()
         };
@@ -1218,6 +1216,73 @@ A test project
             metadata.license_files.iter().all(|p| p.is_relative()),
             "all license_files should be relative: {:?}",
             metadata.license_files
+        );
+    }
+
+    #[test]
+    fn test_pyproject_license_file_overrides_cargo_source_mapping() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let crate_dir = workspace_root.join("crate");
+        fs::create_dir_all(crate_dir.join("src")).unwrap();
+        fs::write(crate_dir.join("src/lib.rs"), "").unwrap();
+
+        // Different contents so we can tell which source path wins.
+        fs::write(workspace_root.join("LICENSE"), "workspace license").unwrap();
+        fs::write(crate_dir.join("LICENSE"), "crate license").unwrap();
+
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "my-crate"
+            version = "0.1.0"
+            license = { file = "LICENSE" }
+            "#
+        );
+        fs::write(crate_dir.join("pyproject.toml"), pyproject_toml_content).unwrap();
+
+        let mut metadata =
+            Metadata24::new("my-crate".to_string(), Version::from_str("0.1.0").unwrap());
+        metadata.license_files.push(PathBuf::from("LICENSE"));
+        metadata
+            .license_file_sources
+            .insert(PathBuf::from("LICENSE"), workspace_root.join("LICENSE"));
+
+        let pyproject_toml = PyProjectToml::new(crate_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&crate_dir, &pyproject_toml)
+            .unwrap();
+
+        assert_eq!(
+            metadata
+                .license_files
+                .iter()
+                .filter(|path| path.as_path() == Path::new("LICENSE"))
+                .count(),
+            1,
+            "expected exactly one LICENSE entry, got {:?}",
+            metadata.license_files
+        );
+        assert!(
+            metadata
+                .license_file_sources
+                .get(Path::new("LICENSE"))
+                .is_none(),
+            "expected pyproject license file to override Cargo source mapping"
+        );
+
+        let metadata_text = metadata.to_file_contents().unwrap();
+        assert_eq!(
+            metadata_text
+                .lines()
+                .filter(|line| *line == "License-File: LICENSE")
+                .count(),
+            1,
+            "expected a single License-File header, got:\n{metadata_text}"
         );
     }
 

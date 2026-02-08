@@ -809,10 +809,16 @@ fn add_cargo_package_files_to_sdist(
             .into_path_buf();
         // Add license file next to Cargo.toml so we don't get collisions between crates
         // using license files higher up the file tree. See also [`rewrite_cargo_toml_license_file`].
+        let license_file_name = license_file.file_name().with_context(|| {
+            format!(
+                "license-file path `{}` has no filename component",
+                license_file.display()
+            )
+        })?;
         writer.add_file(
             root_dir
                 .join(relative_main_crate_manifest_dir)
-                .join(license_file.file_name().unwrap()),
+                .join(license_file_name),
             &abs_license_file,
             false,
         )?;

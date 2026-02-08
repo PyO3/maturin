@@ -7,8 +7,12 @@ Arguments:
           Rustc flags
 
 Options:
-      --strip
-          Strip the library for minimum file size
+      --strip [<STRIP>]
+          Strip the library for minimum file size. Can be set to `true` or `false`, or used as a
+          flag (`--strip` implies `true`)
+          
+          [env: MATURIN_STRIP=]
+          [possible values: true, false]
 
       --sdist
           Build a source distribution

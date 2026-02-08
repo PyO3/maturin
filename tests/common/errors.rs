@@ -24,7 +24,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?
         .build_wheels();
@@ -61,7 +61,7 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
     if let Err(err) = result {
@@ -98,7 +98,7 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?
         .build_wheels();
@@ -171,7 +171,7 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
 
@@ -210,7 +210,7 @@ pub fn pypi_compatibility_linux_tag() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?
         .build_wheels();

@@ -57,6 +57,10 @@ pub struct Metadata24 {
     pub license: Option<String>,
     pub license_expression: Option<String>,
     pub license_files: Vec<PathBuf>,
+    /// Mapping from relative license path to absolute source path on disk.
+    /// Used for license files that live outside the pyproject directory (e.g. workspace-level).
+    #[serde(skip)]
+    pub license_file_sources: HashMap<PathBuf, PathBuf>,
     pub classifiers: Vec<String>,
     pub requires_dist: Vec<Requirement>,
     pub provides_dist: Vec<String>,
@@ -92,6 +96,7 @@ impl Metadata24 {
             license: None,
             license_expression: None,
             license_files: vec![],
+            license_file_sources: HashMap::new(),
             classifiers: vec![],
             requires_dist: vec![],
             provides_dist: vec![],
@@ -236,22 +241,6 @@ impl Metadata24 {
                     self.description_content_type.clone_from(content_type);
                 }
                 None => {}
-            }
-
-            // Make sure existing license files from `Cargo.toml` are relative to the project root
-            let license_files = std::mem::take(&mut self.license_files);
-            for license_file in license_files {
-                let license_path = license_file
-                    .strip_prefix(pyproject_dir)
-                    .with_context(|| {
-                        format!(
-                            "license file `{}` exists outside of the project root `{}`",
-                            license_file.display(),
-                            pyproject_dir.display()
-                        )
-                    })?
-                    .to_path_buf();
-                self.license_files.push(license_path);
             }
 
             if let Some(requires_python) = &project.requires_python {
@@ -428,6 +417,37 @@ impl Metadata24 {
                 self.entry_points.clone_from(entry_points);
             }
         }
+
+        // Make sure existing license files from `Cargo.toml` are relative to the project root.
+        // This runs unconditionally (not just when [project] is present) so that
+        // license files from Cargo.toml are always normalized.
+        let license_files = self
+            .license_files
+            .iter()
+            .filter(|p| p.is_absolute())
+            .cloned()
+            .collect::<Vec<_>>();
+        if !license_files.is_empty() {
+            self.license_files.retain(|p| !p.is_absolute());
+            for license_file in license_files {
+                let license_path = if let Ok(relative) = license_file.strip_prefix(pyproject_dir) {
+                    relative.to_path_buf()
+                } else {
+                    // License file is outside pyproject_dir (e.g. workspace-level license).
+                    // Use just the filename and record the absolute source path.
+                    let name = license_file
+                        .file_name()
+                        .context("license file path has no filename")?;
+                    PathBuf::from(name)
+                };
+                if !self.license_files.contains(&license_path) {
+                    self.license_file_sources
+                        .insert(license_path.clone(), license_file);
+                    self.license_files.push(license_path);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -535,6 +555,7 @@ impl Metadata24 {
             author_email,
             license: package.license.clone(),
             license_files,
+            license_file_sources: HashMap::new(),
             project_url,
             ..Metadata24::new(name.to_string(), version)
         };
@@ -1022,6 +1043,144 @@ A test project
             let expected = format!("{expected_name} <{email}>");
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn test_license_file_normalization_outside_pyproject_dir() {
+        // Simulate a workspace-level license file that lives outside pyproject_dir.
+        // merge_pyproject_toml should normalize it to just the filename and record
+        // the absolute source in license_file_sources.
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let crate_dir = workspace_root.join("crates/my-crate");
+        fs::create_dir_all(crate_dir.join("src")).unwrap();
+        fs::write(crate_dir.join("src/lib.rs"), "").unwrap();
+
+        // Workspace-level LICENSE
+        fs::write(workspace_root.join("LICENSE"), "MIT License").unwrap();
+
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            name = "my-crate"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+            "#
+        );
+        fs::write(crate_dir.join("Cargo.toml"), cargo_toml).unwrap();
+
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "my-crate"
+            version = "0.1.0"
+            "#
+        );
+        fs::write(crate_dir.join("pyproject.toml"), pyproject_toml_content).unwrap();
+
+        let mut metadata =
+            Metadata24::new("my-crate".to_string(), Version::from_str("0.1.0").unwrap());
+        // Simulate an absolute license file from Cargo.toml (workspace-level)
+        let abs_license = workspace_root
+            .join("LICENSE")
+            .normalize()
+            .unwrap()
+            .into_path_buf();
+        metadata.license_files.push(abs_license.clone());
+
+        let pyproject_toml = PyProjectToml::new(crate_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&crate_dir, &pyproject_toml)
+            .unwrap();
+
+        // Should be normalized to just the filename
+        assert!(
+            metadata
+                .license_files
+                .iter()
+                .any(|p| p == Path::new("LICENSE")),
+            "expected relative LICENSE in license_files, got: {:?}",
+            metadata.license_files
+        );
+        // Should have the absolute source recorded
+        assert_eq!(
+            metadata.license_file_sources.get(Path::new("LICENSE")),
+            Some(&abs_license),
+        );
+    }
+
+    #[test]
+    fn test_license_normalization_without_project_table() {
+        // When pyproject.toml has no [project] table, license file normalization
+        // should still run (the fix moved it outside the if-let guard).
+        let temp_dir = TempDir::new().unwrap();
+        let crate_dir = temp_dir.path();
+        fs::create_dir(crate_dir.join("src")).unwrap();
+        fs::write(crate_dir.join("src/lib.rs"), "").unwrap();
+
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            name = "no-project"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+            "#
+        );
+        fs::write(crate_dir.join("Cargo.toml"), cargo_toml).unwrap();
+
+        // pyproject.toml with NO [project] table
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+            "#
+        );
+        fs::write(crate_dir.join("pyproject.toml"), pyproject_toml_content).unwrap();
+
+        // Create a license file inside the crate
+        fs::write(crate_dir.join("LICENSE"), "MIT").unwrap();
+
+        let mut metadata = Metadata24::new(
+            "no-project".to_string(),
+            Version::from_str("0.1.0").unwrap(),
+        );
+        // Add absolute path (as from_cargo_toml would)
+        let abs_license = crate_dir
+            .join("LICENSE")
+            .normalize()
+            .unwrap()
+            .into_path_buf();
+        metadata.license_files.push(abs_license);
+
+        let normalized_crate_dir = crate_dir.normalize().unwrap().into_path_buf();
+        let pyproject_toml = PyProjectToml::new(crate_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&normalized_crate_dir, &pyproject_toml)
+            .unwrap();
+
+        // Should still be normalized to relative even without [project]
+        assert!(
+            metadata.license_files.contains(&PathBuf::from("LICENSE")),
+            "expected relative LICENSE, got: {:?}",
+            metadata.license_files
+        );
+        // No absolute paths should remain
+        assert!(
+            metadata.license_files.iter().all(|p| p.is_relative()),
+            "all license_files should be relative: {:?}",
+            metadata.license_files
+        );
     }
 
     #[test]

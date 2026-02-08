@@ -347,6 +347,33 @@ fn rewrite_cargo_toml_readme(
     Ok(())
 }
 
+/// Rewrite `Cargo.toml` to find the license file in the same directory.
+///
+/// `package.license-file` may point above the package (e.g. workspace-level license),
+/// so when we flatten the directory structure in the sdist, the path needs updating.
+/// This mirrors what [`rewrite_cargo_toml_readme`] does for readmes.
+fn rewrite_cargo_toml_license_file(
+    document: &mut DocumentMut,
+    manifest_path: &Path,
+    license_file_name: Option<&str>,
+) -> Result<()> {
+    debug!(
+        "Rewriting Cargo.toml `package.license-file` at {}",
+        manifest_path.display()
+    );
+
+    if let Some(license_file_name) = license_file_name {
+        let project = document.get_mut("package").with_context(|| {
+            format!(
+                "Missing `[package]` table in Cargo.toml with license-file at {}",
+                manifest_path.display()
+            )
+        })?;
+        project["license-file"] = toml_edit::value(license_file_name);
+    }
+    Ok(())
+}
+
 /// When `pyproject.toml` is inside the Cargo workspace root,
 /// we need to update `tool.maturin.manifest-path` and `tool.maturin.python-source`
 /// in `pyproject.toml`.
@@ -404,11 +431,13 @@ fn rewrite_pyproject_toml(
 /// and rewriting path entries in Cargo.toml
 ///
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
+#[allow(clippy::too_many_arguments)]
 fn add_crate_to_source_distribution(
     writer: &mut VirtualWriter<SDistWriter>,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     readme: Option<&Path>,
+    license_file: Option<&Path>,
     known_path_deps: &HashMap<String, PathDependency>,
     root_crate: bool,
     skip_cargo_toml: bool,
@@ -515,9 +544,22 @@ fn add_crate_to_source_distribution(
         })
         .transpose()?;
 
+    let license_file_name = license_file
+        .as_ref()
+        .map(|lf| {
+            lf.file_name().and_then(OsStr::to_str).with_context(|| {
+                format!(
+                    "Missing license-file filename for {}",
+                    manifest_path.display()
+                )
+            })
+        })
+        .transpose()?;
+
     if root_crate || !skip_cargo_toml {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
+        rewrite_cargo_toml_license_file(&mut document, manifest_path, license_file_name)?;
         if root_crate {
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         }
@@ -753,11 +795,37 @@ fn add_cargo_package_files_to_sdist(
     } else {
         None
     };
+    // Handle possible relative license-file field in Cargo.toml
+    let license_file_path = if let Some(license_file) = main_crate.license_file.as_ref() {
+        let license_file = abs_manifest_dir.join(license_file);
+        let abs_license_file = license_file
+            .normalize()
+            .with_context(|| {
+                format!(
+                    "license-file path `{}` does not exist or is invalid",
+                    license_file.display()
+                )
+            })?
+            .into_path_buf();
+        // Add license file next to Cargo.toml so we don't get collisions between crates
+        // using license files higher up the file tree. See also [`rewrite_cargo_toml_license_file`].
+        writer.add_file(
+            root_dir
+                .join(relative_main_crate_manifest_dir)
+                .join(license_file.file_name().unwrap()),
+            &abs_license_file,
+            false,
+        )?;
+        Some(abs_license_file)
+    } else {
+        None
+    };
     add_crate_to_source_distribution(
         writer,
         manifest_path,
         root_dir.join(relative_main_crate_manifest_dir),
         readme_path.as_deref(),
+        license_file_path.as_deref(),
         &ctx.known_path_deps,
         true,
         false,
@@ -944,6 +1012,7 @@ fn add_path_dep(
         &path_dep.manifest_path,
         ctx.root_dir.join(relative_path_dep_manifest_dir),
         path_dep.readme.as_deref(),
+        None,
         &ctx.known_path_deps,
         false,
         skip_cargo_toml,
@@ -1185,5 +1254,34 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_rewrite_cargo_toml_license_file() {
+        let manifest_path = Path::new("Cargo.toml");
+
+        // When license_file_name is Some, it should rewrite the field
+        let toml_str = r#"
+[package]
+name = "test"
+version = "0.1.0"
+license-file = "../../LICENSE"
+"#;
+        let mut document = toml_str.parse::<DocumentMut>().unwrap();
+        rewrite_cargo_toml_license_file(&mut document, manifest_path, Some("LICENSE")).unwrap();
+        let result = document.to_string();
+        assert!(
+            result.contains(r#"license-file = "LICENSE""#),
+            "expected rewritten license-file, got: {result}"
+        );
+
+        // When license_file_name is None, it should be a no-op
+        let mut document2 = toml_str.parse::<DocumentMut>().unwrap();
+        rewrite_cargo_toml_license_file(&mut document2, manifest_path, None).unwrap();
+        let result2 = document2.to_string();
+        assert!(
+            result2.contains(r#"license-file = "../../LICENSE""#),
+            "expected unchanged license-file, got: {result2}"
+        );
     }
 }

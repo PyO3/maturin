@@ -33,6 +33,8 @@ pub struct PathDependency {
     workspace_root: PathBuf,
     /// readme path of the path dependency
     readme: Option<PathBuf>,
+    /// license-file path of the path dependency
+    license_file: Option<PathBuf>,
 }
 
 /// Returns `true` if the file extension indicates a compiled artifact
@@ -41,32 +43,45 @@ fn is_compiled_artifact(path: &Path) -> bool {
     matches!(path.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
 }
 
-/// Resolve a readme path relative to a manifest directory and add it to the sdist
-/// next to its `Cargo.toml` to avoid collisions between crates using readmes
+/// Resolve a file path relative to a manifest directory and add it to the sdist
+/// next to its `Cargo.toml` to avoid collisions between crates using files
 /// higher up the file tree.
 ///
-/// Returns the absolute path of the readme if it exists.
+/// `kind` is used in error messages (e.g. "readme", "license-file").
+/// Returns the absolute path of the file.
+fn resolve_and_add_file(
+    writer: &mut VirtualWriter<SDistWriter>,
+    file: &Path,
+    manifest_dir: &Path,
+    target_dir: &Path,
+    kind: &str,
+) -> Result<PathBuf> {
+    let file = manifest_dir.join(file);
+    let abs_file = file
+        .normalize()
+        .with_context(|| {
+            format!(
+                "{kind} path `{}` does not exist or is invalid",
+                file.display()
+            )
+        })?
+        .into_path_buf();
+    let filename = file
+        .file_name()
+        .with_context(|| format!("{kind} path `{}` has no filename", file.display()))?;
+    writer.add_file(target_dir.join(filename), &abs_file, false)?;
+    Ok(abs_file)
+}
+
+/// Resolve a readme path relative to a manifest directory and add it to the sdist.
+/// See [`resolve_and_add_file`] for details.
 fn resolve_and_add_readme(
     writer: &mut VirtualWriter<SDistWriter>,
     readme: &Path,
     manifest_dir: &Path,
     target_dir: &Path,
 ) -> Result<PathBuf> {
-    let readme = manifest_dir.join(readme);
-    let abs_readme = readme
-        .normalize()
-        .with_context(|| {
-            format!(
-                "readme path `{}` does not exist or is invalid",
-                readme.display()
-            )
-        })?
-        .into_path_buf();
-    let readme_filename = readme
-        .file_name()
-        .with_context(|| format!("readme path `{}` has no filename", readme.display()))?;
-    writer.add_file(target_dir.join(readme_filename), &abs_readme, false)?;
-    Ok(abs_readme)
+    resolve_and_add_file(writer, readme, manifest_dir, target_dir, "readme")
 }
 
 fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
@@ -598,6 +613,16 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                 .map(|readme| (&package.id, readme.clone().into_std_path_buf()))
         })
         .collect();
+    let pkg_license_files: HashMap<&PackageId, PathBuf> = cargo_metadata
+        .packages
+        .iter()
+        .filter_map(|package| {
+            package
+                .license_file
+                .as_ref()
+                .map(|license_file| (&package.id, PathBuf::from(license_file)))
+        })
+        .collect();
     let resolve_nodes: HashMap<&PackageId, &[cargo_metadata::NodeDep]> = cargo_metadata
         .resolve
         .as_ref()
@@ -660,6 +685,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                             .clone()
                             .into_std_path_buf(),
                         readme: pkg_readmes.get(&node_dep.pkg).cloned(),
+                        license_file: pkg_license_files.get(&node_dep.pkg).cloned(),
                     },
                 );
                 // Continue scanning the path dependency's own dependencies
@@ -797,32 +823,14 @@ fn add_cargo_package_files_to_sdist(
     };
     // Handle possible relative license-file field in Cargo.toml
     let license_file_path = if let Some(license_file) = main_crate.license_file.as_ref() {
-        let license_file = abs_manifest_dir.join(license_file);
-        let abs_license_file = license_file
-            .normalize()
-            .with_context(|| {
-                format!(
-                    "license-file path `{}` does not exist or is invalid",
-                    license_file.display()
-                )
-            })?
-            .into_path_buf();
-        // Add license file next to Cargo.toml so we don't get collisions between crates
-        // using license files higher up the file tree. See also [`rewrite_cargo_toml_license_file`].
-        let license_file_name = license_file.file_name().with_context(|| {
-            format!(
-                "license-file path `{}` has no filename component",
-                license_file.display()
-            )
-        })?;
-        writer.add_file(
-            root_dir
-                .join(relative_main_crate_manifest_dir)
-                .join(license_file_name),
-            &abs_license_file,
-            false,
-        )?;
-        Some(abs_license_file)
+        let target_dir = root_dir.join(relative_main_crate_manifest_dir);
+        Some(resolve_and_add_file(
+            writer,
+            license_file.as_std_path(),
+            abs_manifest_dir,
+            &target_dir,
+            "license-file",
+        )?)
     } else {
         None
     };
@@ -910,6 +918,7 @@ fn add_cargo_package_files_to_sdist(
                 manifest_path: manifest_path.clone(),
                 workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
                 readme: None,
+                license_file: None,
             },
         );
         // Rewrite workspace Cargo.toml to only include relevant members,
@@ -1013,12 +1022,40 @@ fn add_path_dep(
     // we may need to rewrite workspace Cargo.toml later so don't add it to sdist yet
     let skip_cargo_toml =
         ctx.workspace_manifest_path.as_std_path() == path_dep.manifest_path.as_path();
+
+    // Handle possible relative readme field in Cargo.toml
+    let readme_path = if let Some(readme) = path_dep.readme.as_ref() {
+        let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
+        Some(resolve_and_add_readme(
+            writer,
+            readme,
+            path_dep_manifest_dir,
+            &target_dir,
+        )?)
+    } else {
+        None
+    };
+
+    // Handle possible relative license-file field in Cargo.toml
+    let license_file_path = if let Some(license_file) = path_dep.license_file.as_ref() {
+        let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
+        Some(resolve_and_add_file(
+            writer,
+            license_file,
+            path_dep_manifest_dir,
+            &target_dir,
+            "license-file",
+        )?)
+    } else {
+        None
+    };
+
     add_crate_to_source_distribution(
         writer,
         &path_dep.manifest_path,
         ctx.root_dir.join(relative_path_dep_manifest_dir),
-        path_dep.readme.as_deref(),
-        None,
+        readme_path.as_deref(),
+        license_file_path.as_deref(),
         &ctx.known_path_deps,
         false,
         skip_cargo_toml,
@@ -1030,11 +1067,6 @@ fn add_path_dep(
             path_dep.manifest_path.display()
         )
     })?;
-    // Include readme
-    if let Some(readme) = path_dep.readme.as_ref() {
-        let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
-        resolve_and_add_readme(writer, readme, path_dep_manifest_dir, &target_dir)?;
-    }
     // Handle different workspace manifest
     if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
         let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
@@ -1218,6 +1250,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cargo_metadata::MetadataCommand;
+    use fs_err as fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_normalize_path() {
@@ -1260,6 +1295,74 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_find_path_deps_captures_workspace_license_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let py_dir = workspace_root.join("py");
+        let dep_dir = workspace_root.join("dep");
+
+        fs::create_dir_all(py_dir.join("src")).unwrap();
+        fs::create_dir_all(dep_dir.join("src")).unwrap();
+        fs::write(py_dir.join("src/lib.rs"), "").unwrap();
+        fs::write(dep_dir.join("src/lib.rs"), "").unwrap();
+        fs::write(workspace_root.join("LICENSE"), "MIT").unwrap();
+
+        fs::write(
+            workspace_root.join("Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [workspace]
+                resolver = "2"
+                members = ["py", "dep"]
+
+                [workspace.package]
+                license-file = "LICENSE"
+                "#
+            ),
+        )
+        .unwrap();
+
+        fs::write(
+            dep_dir.join("Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "dep"
+                version = "0.1.0"
+                edition = "2021"
+                license-file.workspace = true
+                "#
+            ),
+        )
+        .unwrap();
+
+        fs::write(
+            py_dir.join("Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "py"
+                version = "0.1.0"
+                edition = "2021"
+
+                [dependencies]
+                dep = { path = "../dep" }
+                "#
+            ),
+        )
+        .unwrap();
+
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(py_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        let path_deps = find_path_deps(&cargo_metadata).unwrap();
+        let dep = path_deps.get("dep").expect("missing path dependency");
+        assert_eq!(dep.license_file.as_deref(), Some(Path::new("../LICENSE")));
     }
 
     #[test]

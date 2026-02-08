@@ -147,3 +147,29 @@ fn write_dist_info_uses_license_file_sources() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn write_dist_info_rejects_absolute_license_paths() {
+    use pep440_rs::Version;
+    use std::str::FromStr;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let pyproject_dir = temp_dir.path();
+
+    let mut metadata = Metadata24::new("test-pkg".to_string(), Version::from_str("1.0.0").unwrap());
+    metadata.license_files.push(temp_dir.path().join("LICENSE"));
+
+    let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
+    let err = write_dist_info(
+        &mut writer,
+        pyproject_dir,
+        &metadata,
+        &["py3-none-any".to_string()],
+    )
+    .unwrap_err();
+
+    assert!(
+        err.to_string().contains("unsafe path"),
+        "unexpected error: {err:#}"
+    );
+}

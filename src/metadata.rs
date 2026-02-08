@@ -1274,10 +1274,9 @@ A test project
             metadata.license_files
         );
         assert!(
-            metadata
+            !metadata
                 .license_file_sources
-                .get(Path::new("LICENSE"))
-                .is_none(),
+                .contains_key(Path::new("LICENSE")),
             "expected pyproject license file to override Cargo source mapping"
         );
 

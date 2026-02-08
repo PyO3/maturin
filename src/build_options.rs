@@ -555,7 +555,7 @@ impl BuildOptions {
 #[derive(Debug)]
 pub struct BuildContextBuilder {
     build_options: BuildOptions,
-    strip: bool,
+    strip: Option<bool>,
     editable: bool,
     sdist_only: bool,
 }
@@ -564,13 +564,13 @@ impl BuildContextBuilder {
     fn new(build_options: BuildOptions) -> Self {
         Self {
             build_options,
-            strip: false,
+            strip: None,
             editable: false,
             sdist_only: false,
         }
     }
 
-    pub fn strip(mut self, strip: bool) -> Self {
+    pub fn strip(mut self, strip: Option<bool>) -> Self {
         self.strip = strip;
         self
     }
@@ -715,7 +715,7 @@ impl BuildContextBuilder {
             }
         }
 
-        let strip = pyproject.map(|x| x.strip()).unwrap_or_default() || strip;
+        let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
         let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
             || build_options.skip_auditwheel;
         let auditwheel = build_options

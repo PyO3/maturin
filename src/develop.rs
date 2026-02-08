@@ -433,7 +433,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     let build_context = build_options
         .into_build_context()
-        .strip(strip)
+        .strip(if strip { Some(true) } else { None })
         .editable(true)
         .build()?;
 

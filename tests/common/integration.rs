@@ -138,7 +138,7 @@ pub fn test_integration(
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
     let wheels = build_context.build_wheels()?;
@@ -265,7 +265,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
 
     let build_context = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
     let wheels = build_context.build_wheels()?;

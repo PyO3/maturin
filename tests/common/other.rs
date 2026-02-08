@@ -90,7 +90,7 @@ pub fn test_musl() -> Result<bool> {
 
     let build_context = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
     let built_lib =
@@ -133,7 +133,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
 
     let build_context = options
         .into_build_context()
-        .strip(false)
+        .strip(Some(false))
         .editable(false)
         .build()?;
     let source_distribution = build_context.build_source_distribution()?;
@@ -165,7 +165,7 @@ pub fn build_source_distribution(
 
     let mut build_context = build_options
         .into_build_context()
-        .strip(false)
+        .strip(Some(false))
         .editable(false)
         .sdist_only(true)
         .build()?;
@@ -276,7 +276,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
 
     let build_context = build_options
         .into_build_context()
-        .strip(false)
+        .strip(Some(false))
         .editable(false)
         .build()?;
     let wheels = build_context
@@ -349,7 +349,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -365,7 +365,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -385,7 +385,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .strip(cfg!(feature = "faster-tests"))
+            .strip(Some(cfg!(feature = "faster-tests")))
             .editable(false)
             .build();
         assert!(result.is_err());
@@ -401,7 +401,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .strip(cfg!(feature = "faster-tests"))
+            .strip(Some(cfg!(feature = "faster-tests")))
             .editable(false)
             .build();
         assert!(result.is_err());
@@ -426,7 +426,7 @@ pub fn abi3_without_version() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -474,7 +474,7 @@ pub fn test_unreadable_dir() -> Result<()> {
 
     let sdist_context = sdist_options
         .into_build_context()
-        .strip(false)
+        .strip(Some(false))
         .editable(false)
         .sdist_only(true)
         .build()?;
@@ -494,7 +494,7 @@ pub fn test_unreadable_dir() -> Result<()> {
 
     let wheel_context = wheel_options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
     let wheel_result = wheel_context.build_wheels();

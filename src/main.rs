@@ -64,9 +64,17 @@ enum Command {
         /// Build artifacts in release mode, with optimizations
         #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
         release: bool,
-        /// Strip the library for minimum file size
-        #[arg(long)]
-        strip: bool,
+        /// Strip the library for minimum file size.
+        /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
+        #[arg(
+            long,
+            env = "MATURIN_STRIP",
+            // `--strip` without a value is treated as `--strip true`
+            default_missing_value = "true",
+            num_args = 0..=1,
+            require_equals = false
+        )]
+        strip: Option<bool>,
         /// Build a source distribution
         #[arg(long)]
         sdist: bool,
@@ -185,20 +193,34 @@ enum Pep517Command {
         /// The metadata_directory argument to prepare_metadata_for_build_wheel
         #[arg(long = "metadata-directory")]
         metadata_directory: PathBuf,
-        /// Strip the library for minimum file size
-        #[arg(long)]
-        strip: bool,
+        /// Strip the library for minimum file size.
+        /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
+        #[arg(
+            long,
+            env = "MATURIN_STRIP",
+            // `--strip` without a value is treated as `--strip true`
+            default_missing_value = "true",
+            num_args = 0..=1,
+            require_equals = false
+        )]
+        strip: Option<bool>,
     },
     #[command(name = "build-wheel")]
     /// Implementation of build_wheel
-    ///
-    /// --release and --strip are currently unused by the PEP 517 implementation
     BuildWheel {
         #[command(flatten)]
         build_options: BuildOptions,
-        /// Strip the library for minimum file size
-        #[arg(long)]
-        strip: bool,
+        /// Strip the library for minimum file size.
+        /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
+        #[arg(
+            long,
+            env = "MATURIN_STRIP",
+            // `--strip` without a value is treated as `--strip true`
+            default_missing_value = "true",
+            num_args = 0..=1,
+            require_equals = false
+        )]
+        strip: Option<bool>,
         /// Build editable wheels
         #[arg(long)]
         editable: bool,
@@ -329,7 +351,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             };
             let build_context = build_options
                 .into_build_context()
-                .strip(false)
+                .strip(Some(false))
                 .editable(false)
                 .sdist_only(true)
                 .build()?;
@@ -409,7 +431,7 @@ fn run() -> Result<()> {
 
             let mut build_context = build
                 .into_build_context()
-                .strip(!no_strip)
+                .strip(Some(!no_strip))
                 .editable(false)
                 .build()?;
 
@@ -484,7 +506,7 @@ fn run() -> Result<()> {
             };
             let build_context = build_options
                 .into_build_context()
-                .strip(false)
+                .strip(Some(false))
                 .editable(false)
                 .sdist_only(true)
                 .build()?;

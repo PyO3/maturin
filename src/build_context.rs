@@ -898,14 +898,22 @@ impl BuildContext {
         if self.editable || matches!(self.auditwheel, AuditWheelMode::Skip) {
             return Ok(artifact);
         }
-        // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns
+        self.copy_artifact_for_repair(&mut artifact)?;
+        Ok(artifact)
+    }
+
+    /// Copy an artifact to a staging directory so that auditwheel repair can
+    /// modify it in-place without altering the original cargo build output.
+    /// This prevents errors on subsequent rebuilds where cargo skips
+    /// recompilation.
+    fn copy_artifact_for_repair(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
         fs::create_dir_all(&maturin_build)?;
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
         fs::copy(artifact_path, &new_artifact_path)?;
         artifact.path = new_artifact_path.normalize()?.into_path_buf();
-        Ok(artifact)
+        Ok(())
     }
 
     fn write_cffi_wheel(
@@ -1105,14 +1113,8 @@ impl BuildContext {
             policies.push(policy);
             ext_libs.push(external_libs);
 
-            // auditwheel repair will edit the file, so we need to copy it to avoid errors in reruns
             if !self.editable && !matches!(self.auditwheel, AuditWheelMode::Skip) {
-                let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
-                fs::create_dir_all(&maturin_build)?;
-                let artifact_path = &artifact.path;
-                let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
-                fs::copy(artifact_path, &new_artifact_path)?;
-                artifact.path = new_artifact_path.normalize()?.into_path_buf();
+                self.copy_artifact_for_repair(&mut artifact)?;
             }
             artifact_paths.push(artifact);
         }

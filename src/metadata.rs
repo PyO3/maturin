@@ -524,15 +524,40 @@ impl Metadata24 {
         if let Some(repository) = package.repository.as_ref() {
             project_url.insert("Source Code".to_string(), repository.clone());
         }
+        let mut license_file_sources = HashMap::new();
         let license_files = if let Some(license_file) = package.license_file.as_ref() {
-            let license_path = manifest_path.as_ref().join(license_file).normalize()?;
-            if !license_path.is_file() {
+            let abs_license_path = manifest_path.as_ref().join(license_file).normalize()?;
+            if !abs_license_path.is_file() {
                 bail!(
                     "license file `{license_file}` specified in `{}` is not a file",
                     manifest_path.as_ref().display()
                 );
             }
-            vec![license_path.into_path_buf()]
+            let abs_license_path = abs_license_path.into_path_buf();
+            let abs_manifest_dir = manifest_path.as_ref().normalize()?.into_path_buf();
+            let rel_path = if let Ok(relative) = abs_license_path.strip_prefix(&abs_manifest_dir) {
+                if relative
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+                {
+                    let name = abs_license_path
+                        .file_name()
+                        .context("license file path has no filename")?;
+                    let rel = PathBuf::from(name);
+                    license_file_sources.insert(rel.clone(), abs_license_path);
+                    rel
+                } else {
+                    relative.to_path_buf()
+                }
+            } else {
+                let name = abs_license_path
+                    .file_name()
+                    .context("license file path has no filename")?;
+                let rel = PathBuf::from(name);
+                license_file_sources.insert(rel.clone(), abs_license_path);
+                rel
+            };
+            vec![rel_path]
         } else {
             Vec::new()
         };
@@ -568,7 +593,7 @@ impl Metadata24 {
             author_email,
             license: package.license.clone(),
             license_files,
-            license_file_sources: HashMap::new(),
+            license_file_sources,
             project_url,
             ..Metadata24::new(name.to_string(), version)
         };

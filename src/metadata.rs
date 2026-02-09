@@ -322,6 +322,9 @@ impl Metadata24 {
                             .strip_prefix(pyproject_dir)
                             .expect("matched path starts with glob root")
                             .to_path_buf();
+                        // pyproject.toml-originating license paths take precedence over
+                        // Cargo-derived source overrides for the same relative wheel path.
+                        self.license_file_sources.remove(&license_path);
                         if !self.license_files.contains(&license_path) {
                             debug!("Including license file `{}`", license_path.display());
                             self.license_files.push(license_path);
@@ -1303,6 +1306,61 @@ A test project
                 .count(),
             1,
             "expected a single License-File header, got:\n{metadata_text}"
+        );
+    }
+
+    #[test]
+    fn test_pyproject_license_files_override_cargo_source_mapping() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let crate_dir = workspace_root.join("crate");
+        fs::create_dir_all(crate_dir.join("src")).unwrap();
+        fs::write(crate_dir.join("src/lib.rs"), "").unwrap();
+
+        fs::write(workspace_root.join("LICENSE"), "workspace license").unwrap();
+        fs::write(crate_dir.join("LICENSE"), "crate license").unwrap();
+
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "my-crate"
+            version = "0.1.0"
+            license-files = ["LICENSE"]
+            "#
+        );
+        fs::write(crate_dir.join("pyproject.toml"), pyproject_toml_content).unwrap();
+
+        let mut metadata =
+            Metadata24::new("my-crate".to_string(), Version::from_str("0.1.0").unwrap());
+        metadata.license_files.push(PathBuf::from("LICENSE"));
+        metadata
+            .license_file_sources
+            .insert(PathBuf::from("LICENSE"), workspace_root.join("LICENSE"));
+
+        let pyproject_toml = PyProjectToml::new(crate_dir.join("pyproject.toml")).unwrap();
+        metadata
+            .merge_pyproject_toml(&crate_dir, &pyproject_toml)
+            .unwrap();
+
+        assert!(
+            !metadata
+                .license_file_sources
+                .contains_key(Path::new("LICENSE")),
+            "expected pyproject license-files to override Cargo source mapping"
+        );
+        assert_eq!(
+            metadata
+                .license_files
+                .iter()
+                .filter(|path| path.as_path() == Path::new("LICENSE"))
+                .count(),
+            1,
+            "expected exactly one LICENSE entry, got {:?}",
+            metadata.license_files
         );
     }
 

@@ -48,6 +48,7 @@ fn is_compiled_artifact(path: &Path) -> bool {
 /// higher up the file tree.
 ///
 /// `kind` is used in error messages (e.g. "readme", "license-file").
+/// If `allowed_root` is set, the resolved path must be under it.
 /// Returns the absolute path of the file.
 fn resolve_and_add_file(
     writer: &mut VirtualWriter<SDistWriter>,
@@ -55,6 +56,7 @@ fn resolve_and_add_file(
     manifest_dir: &Path,
     target_dir: &Path,
     kind: &str,
+    allowed_root: Option<&Path>,
 ) -> Result<PathBuf> {
     let file = manifest_dir.join(file);
     let abs_file = file
@@ -66,6 +68,24 @@ fn resolve_and_add_file(
             )
         })?
         .into_path_buf();
+    if let Some(allowed_root) = allowed_root {
+        let allowed_root = allowed_root
+            .normalize()
+            .with_context(|| {
+                format!(
+                    "allowed root `{}` does not exist or is invalid",
+                    allowed_root.display()
+                )
+            })?
+            .into_path_buf();
+        if !abs_file.starts_with(&allowed_root) {
+            bail!(
+                "{kind} path `{}` resolves outside allowed root `{}`",
+                file.display(),
+                allowed_root.display()
+            );
+        }
+    }
     let filename = file
         .file_name()
         .with_context(|| format!("{kind} path `{}` has no filename", file.display()))?;
@@ -81,7 +101,7 @@ fn resolve_and_add_readme(
     manifest_dir: &Path,
     target_dir: &Path,
 ) -> Result<PathBuf> {
-    resolve_and_add_file(writer, readme, manifest_dir, target_dir, "readme")
+    resolve_and_add_file(writer, readme, manifest_dir, target_dir, "readme", None)
 }
 
 fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
@@ -830,6 +850,7 @@ fn add_cargo_package_files_to_sdist(
             abs_manifest_dir,
             &target_dir,
             "license-file",
+            Some(workspace_root.as_std_path()),
         )?)
     } else {
         None
@@ -1045,6 +1066,7 @@ fn add_path_dep(
             path_dep_manifest_dir,
             &target_dir,
             "license-file",
+            Some(&path_dep.workspace_root),
         )?)
     } else {
         None
@@ -1252,7 +1274,12 @@ mod tests {
     use super::*;
     use cargo_metadata::MetadataCommand;
     use fs_err as fs;
+    use ignore::overrides::Override;
+    use pep440_rs::Version;
+    use std::str::FromStr;
     use tempfile::TempDir;
+
+    use crate::Metadata24;
 
     #[test]
     fn test_normalize_path() {
@@ -1295,6 +1322,37 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_copy_manifest_sidecar_file_rejects_license_outside_allowed_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path().join("workspace");
+        let manifest_dir = workspace_root.join("crate");
+        let out_dir = temp_dir.path().join("out");
+        fs::create_dir_all(manifest_dir.join("src")).unwrap();
+        fs::create_dir_all(&out_dir).unwrap();
+        fs::write(manifest_dir.join("src/lib.rs"), "").unwrap();
+        fs::write(temp_dir.path().join("SECRET_LICENSE"), "secret").unwrap();
+
+        let metadata = Metadata24::new("test-pkg".to_string(), Version::from_str("1.0.0").unwrap());
+        let sdist_writer = SDistWriter::new(&out_dir, &metadata, None).unwrap();
+        let mut writer = VirtualWriter::new(sdist_writer, Override::empty());
+
+        let err = resolve_and_add_file(
+            &mut writer,
+            Path::new("../../SECRET_LICENSE"),
+            &manifest_dir,
+            &Path::new("pkg-1.0.0").join("crate"),
+            "license-file",
+            Some(&workspace_root),
+        )
+        .unwrap_err();
+
+        assert!(
+            err.to_string().contains("outside allowed root"),
+            "unexpected error: {err:#}"
+        );
     }
 
     #[test]

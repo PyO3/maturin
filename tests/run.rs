@@ -951,6 +951,27 @@ fn pyo3_mixed_include_exclude_wheel_files() {
     ))
 }
 
+// Regression test for https://github.com/PyO3/maturin/issues/2691
+// Verifies that `include` patterns work correctly with `python-source` (src-layout),
+// where include paths should be resolved relative to the project root, not the python dir.
+#[test]
+fn pyo3_mixed_py_subdir_include_wheel_files() {
+    handle_result(other::check_wheel_files(
+        "test-crates/pyo3-mixed-py-subdir",
+        vec![
+            "pyo3_mixed_py_subdir-2.1.3.dist-info/METADATA",
+            "pyo3_mixed_py_subdir-2.1.3.dist-info/RECORD",
+            "pyo3_mixed_py_subdir-2.1.3.dist-info/WHEEL",
+            "pyo3_mixed_py_subdir-2.1.3.dist-info/entry_points.txt",
+            "pyo3_mixed_py_subdir/__init__.py",
+            "pyo3_mixed_py_subdir/python_module/__init__.py",
+            "pyo3_mixed_py_subdir/python_module/double.py",
+            "assets/extra_data.txt",
+        ],
+        "wheel-files-pyo3-mixed-py-subdir-include",
+    ))
+}
+
 // Tests that paths in the wheel `RECORD` use `/` instead of `\\`. Even
 // (especially, exclusively) on Windows.
 #[test]

@@ -188,19 +188,21 @@ pub fn write_python_part(
 
     // Include additional files
     if let Some(pyproject) = pyproject_toml {
-        // FIXME: in src-layout pyproject.toml isn't located directly in python dir
-        let pyproject_dir = python_dir;
+        let project_root = &project_layout.project_root;
         if let Some(glob_patterns) = pyproject.include() {
+            let escaped_project_root = PathBuf::from(glob::Pattern::escape(
+                project_root.to_string_lossy().as_ref(),
+            ));
             for pattern in glob_patterns
                 .iter()
                 .filter_map(|glob_pattern| glob_pattern.targets(Format::Wheel))
             {
                 eprintln!("📦 Including files matching \"{pattern}\"");
-                for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
+                for source in glob::glob(&escaped_project_root.join(pattern).to_string_lossy())
                     .with_context(|| format!("Invalid glob pattern: {pattern}"))?
                     .filter_map(Result::ok)
                 {
-                    let target = source.strip_prefix(pyproject_dir)?.to_path_buf();
+                    let target = source.strip_prefix(project_root)?.to_path_buf();
                     if !source.is_dir() {
                         #[cfg(unix)]
                         let mode = source.metadata()?.permissions().mode();

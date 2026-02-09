@@ -738,61 +738,31 @@ fn add_cargo_package_files_to_sdist(
         false,
     )?;
 
-    // Add Cargo.lock file and workspace Cargo.toml
+    // Add Cargo.lock file
     let manifest_cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
     let workspace_cargo_lock = workspace_root.join("Cargo.lock").into_std_path_buf();
-    let (cargo_lock_path, use_workspace_cargo_lock) = if manifest_cargo_lock_path.exists() {
-        (Some(manifest_cargo_lock_path.clone()), false)
+    let cargo_lock_path = if manifest_cargo_lock_path.exists() {
+        Some(manifest_cargo_lock_path.clone())
     } else if workspace_cargo_lock.exists() {
-        (Some(workspace_cargo_lock), true)
+        Some(workspace_cargo_lock)
     } else {
-        (None, false)
+        None
     };
     let cargo_lock_required =
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
+    // Determine the project root for computing relative paths inside the sdist.
+    // This is the outermost directory that contains both pyproject.toml and the
+    // sdist root (which accounts for workspace root and all path dependencies).
+    let pyproject_root = pyproject_toml_path.parent().unwrap();
+    let project_root = if pyproject_root == sdist_root || pyproject_root.starts_with(&sdist_root) {
+        &sdist_root
+    } else {
+        assert!(sdist_root.starts_with(pyproject_root));
+        pyproject_root
+    };
     if let Some(cargo_lock_path) = cargo_lock_path {
-        let pyproject_root = pyproject_toml_path.parent().unwrap();
-        let project_root =
-            if pyproject_root == sdist_root || pyproject_root.starts_with(&sdist_root) {
-                &sdist_root
-            } else {
-                assert!(sdist_root.starts_with(pyproject_root));
-                pyproject_root
-            };
         let relative_cargo_lock = cargo_lock_path.strip_prefix(project_root).unwrap();
         writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path, false)?;
-        if use_workspace_cargo_lock {
-            let relative_workspace_cargo_toml = relative_cargo_lock.with_file_name("Cargo.toml");
-            let mut deps_to_keep = known_path_deps.clone();
-            // Also need to the main Python binding crate
-            let main_member_name = abs_manifest_dir
-                .strip_prefix(workspace_root)
-                .unwrap()
-                .to_slash()
-                .unwrap()
-                .to_string();
-            deps_to_keep.insert(
-                main_member_name,
-                PathDependency {
-                    manifest_path: manifest_path.clone(),
-                    workspace_root: workspace_root.clone().into_std_path_buf(),
-                    readme: None,
-                },
-            );
-            let mut document =
-                parse_toml_file(workspace_manifest_path.as_std_path(), "Cargo.toml")?;
-            rewrite_cargo_toml(
-                &mut document,
-                workspace_manifest_path.as_std_path(),
-                &deps_to_keep,
-            )?;
-            writer.add_bytes(
-                root_dir.join(relative_workspace_cargo_toml),
-                Some(workspace_manifest_path.as_std_path()),
-                document.to_string().as_bytes(),
-                false,
-            )?;
-        }
     } else if cargo_lock_required {
         bail!("Cargo.lock is required by `--locked`/`--frozen` but it's not found.");
     } else {
@@ -800,6 +770,60 @@ fn add_cargo_package_files_to_sdist(
             "⚠️  Warning: Cargo.lock is not found, it is recommended \
             to include it in the source distribution"
         );
+    }
+
+    // Add workspace Cargo.toml when the crate is a workspace member.
+    // Without it, cargo can't resolve workspace-level dependencies from the sdist.
+    // Note: when a crate is `exclude`d from a workspace, `cargo metadata` reports
+    // the crate's own directory as `workspace_root`, so this check correctly
+    // skips adding the parent workspace Cargo.toml for excluded crates.
+    //
+    // We normalize workspace_root to match abs_manifest_dir (also normalized) so
+    // that symlinks or .. components don't cause a false positive. A false positive
+    // here would try to add a rewritten workspace Cargo.toml on top of the main
+    // crate's Cargo.toml, causing a duplicate-file error in VirtualWriter.
+    let normalized_workspace_root = workspace_root
+        .as_std_path()
+        .normalize()
+        .map(|p| p.into_path_buf())
+        .unwrap_or_else(|_| workspace_root.as_std_path().to_path_buf());
+    let is_in_workspace = normalized_workspace_root != abs_manifest_dir;
+    if is_in_workspace {
+        let relative_workspace_cargo_toml = workspace_manifest_path
+            .as_std_path()
+            .strip_prefix(project_root)
+            .unwrap();
+        // Collect all crates that must remain in `workspace.members`:
+        // the known path dependencies plus the main Python binding crate itself.
+        let mut deps_to_keep = known_path_deps.clone();
+        let main_member_name = abs_manifest_dir
+            .strip_prefix(workspace_root)
+            .unwrap()
+            .to_slash()
+            .unwrap()
+            .to_string();
+        deps_to_keep.insert(
+            main_member_name,
+            PathDependency {
+                manifest_path: manifest_path.clone(),
+                workspace_root: workspace_root.clone().into_std_path_buf(),
+                readme: None,
+            },
+        );
+        // Rewrite workspace Cargo.toml to only include relevant members,
+        // removing unrelated workspace members to keep the sdist minimal.
+        let mut document = parse_toml_file(workspace_manifest_path.as_std_path(), "Cargo.toml")?;
+        rewrite_cargo_toml(
+            &mut document,
+            workspace_manifest_path.as_std_path(),
+            &deps_to_keep,
+        )?;
+        writer.add_bytes(
+            root_dir.join(relative_workspace_cargo_toml),
+            Some(workspace_manifest_path.as_std_path()),
+            document.to_string().as_bytes(),
+            false,
+        )?;
     }
 
     // Add pyproject.toml

@@ -548,14 +548,29 @@ impl Metadata24 {
         }
         let mut license_file_sources = HashMap::new();
         let license_files = if let Some(license_file) = package.license_file.as_ref() {
-            let absolute_license_path = manifest_path.as_ref().join(license_file).normalize()?;
+            let absolute_license_path = manifest_path
+                .as_ref()
+                .join(license_file)
+                .normalize()?
+                .into_path_buf();
+            let workspace_root = cargo_metadata
+                .workspace_root
+                .as_std_path()
+                .normalize()?
+                .into_path_buf();
+            if !absolute_license_path.starts_with(&workspace_root) {
+                bail!(
+                    "license file `{license_file}` specified in `{}` resolves outside Cargo workspace root `{}`",
+                    manifest_path.as_ref().display(),
+                    workspace_root.display()
+                );
+            }
             if !absolute_license_path.is_file() {
                 bail!(
                     "license file `{license_file}` specified in `{}` is not a file",
                     manifest_path.as_ref().display()
                 );
             }
-            let absolute_license_path = absolute_license_path.into_path_buf();
             let manifest_dir = manifest_path.as_ref().normalize()?.into_path_buf();
             let wheel_path = normalize_license_file_path(&manifest_dir, &absolute_license_path)?;
             // Always keep the absolute source path so write_dist_info can copy
@@ -1356,6 +1371,56 @@ A test project
         assert_eq!(
             metadata.license_file_sources.get(Path::new("LICENSE")),
             Some(&expected_source)
+        );
+    }
+
+    #[test]
+    fn test_from_cargo_toml_rejects_license_file_outside_workspace_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path().join("workspace");
+        let crate_dir = workspace_root.join("crate");
+        let outside_license = temp_dir.path().join("SECRET_LICENSE");
+
+        fs::create_dir_all(crate_dir.join("src")).unwrap();
+        fs::write(crate_dir.join("src/lib.rs"), "").unwrap();
+        fs::write(&outside_license, "secret").unwrap();
+
+        fs::write(
+            workspace_root.join("Cargo.toml"),
+            indoc!(
+                r#"
+                [workspace]
+                resolver = "2"
+                members = ["crate"]
+                "#
+            ),
+        )
+        .unwrap();
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            indoc!(
+                r#"
+                [package]
+                name = "crate"
+                version = "0.1.0"
+                edition = "2021"
+                license-file = "../../SECRET_LICENSE"
+
+                [lib]
+                crate-type = ["rlib"]
+                "#
+            ),
+        )
+        .unwrap();
+
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(crate_dir.join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let err = Metadata24::from_cargo_toml(&crate_dir, &cargo_metadata).unwrap_err();
+        assert!(
+            err.to_string().contains("outside Cargo workspace root"),
+            "unexpected error: {err:#}"
         );
     }
 

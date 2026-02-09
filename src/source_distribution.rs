@@ -620,7 +620,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
             package
                 .license_file
                 .as_ref()
-                .map(|license_file| (&package.id, PathBuf::from(license_file)))
+                .map(|license_file| (&package.id, license_file.clone().into_std_path_buf()))
         })
         .collect();
     let resolve_nodes: HashMap<&PackageId, &[cargo_metadata::NodeDep]> = cargo_metadata

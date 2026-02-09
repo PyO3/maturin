@@ -314,10 +314,12 @@ fn rewrite_cargo_toml_readme(
 }
 
 /// When `pyproject.toml` is inside the Cargo workspace root,
-/// we need to update `tool.maturin.manifest-path` in `pyproject.toml`.
+/// we need to update `tool.maturin.manifest-path` and `tool.maturin.python-source`
+/// in `pyproject.toml`.
 fn rewrite_pyproject_toml(
     pyproject_toml_path: &Path,
     relative_manifest_path: &Path,
+    relative_python_source: Option<&Path>,
 ) -> Result<String> {
     let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
     let tool = data
@@ -346,6 +348,20 @@ fn rewrite_pyproject_toml(
         "manifest-path",
         toml_edit::value(relative_manifest_path.to_str().unwrap()),
     );
+
+    if let Some(python_source) = relative_python_source {
+        maturin.remove("python-source");
+        let python_source_str = python_source.to_slash().with_context(|| {
+            format!(
+                "python-source path `{}` is not valid UTF-8",
+                python_source.display()
+            )
+        })?;
+        maturin.insert(
+            "python-source",
+            toml_edit::value(python_source_str.as_ref()),
+        );
+    }
 
     Ok(data.to_string())
 }
@@ -789,10 +805,23 @@ fn add_cargo_package_files_to_sdist(
     // Add pyproject.toml
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     if pyproject_dir != sdist_root {
-        // rewrite `tool.maturin.manifest-path` in pyproject.toml
+        // rewrite `tool.maturin.manifest-path` and `tool.maturin.python-source` in pyproject.toml
+        let python_dir = &build_context.project_layout.python_dir;
+        // If python_dir is not under pyproject_dir (e.g. due to an absolute python-source
+        // or path normalization differences), we skip rewriting python-source and let
+        // the auto-detection logic handle it when building from the sdist.
+        let relative_python_source = if python_dir != pyproject_dir {
+            python_dir
+                .strip_prefix(pyproject_dir)
+                .ok()
+                .map(|p| p.to_path_buf())
+        } else {
+            None
+        };
         let rewritten_pyproject_toml = rewrite_pyproject_toml(
             pyproject_toml_path,
             &relative_main_crate_manifest_dir.join("Cargo.toml"),
+            relative_python_source.as_deref(),
         )?;
         writer.add_bytes(
             root_dir.join("pyproject.toml"),

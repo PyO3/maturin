@@ -1050,9 +1050,12 @@ pub fn source_distribution(
         }
     }
 
+    let escaped_pyproject_dir = PathBuf::from(glob::Pattern::escape(
+        pyproject_dir.to_string_lossy().as_ref(),
+    ));
     let mut include = |pattern| -> Result<()> {
         eprintln!("📦 Including files matching \"{pattern}\"");
-        for source in glob::glob(&pyproject_dir.join(pattern).to_string_lossy())
+        for source in glob::glob(&escaped_pyproject_dir.join(pattern).to_string_lossy())
             .with_context(|| format!("Invalid glob pattern: {pattern}"))?
             .filter_map(Result::ok)
         {

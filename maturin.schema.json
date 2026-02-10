@@ -163,6 +163,17 @@
         "type": "string"
       }
     },
+    "sbom": {
+      "description": "SBOM configuration",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SbomConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "sdist-generator": {
       "description": "Source distribution generator",
       "$ref": "#/$defs/SdistGenerator",
@@ -430,6 +441,29 @@
           "const": "Pypi"
         }
       ]
+    },
+    "SbomConfig": {
+      "description": "SBOM configuration",
+      "type": "object",
+      "properties": {
+        "include": {
+          "description": "Additional SBOM files to include in the `.dist-info/sboms` directory.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "rust": {
+          "description": "Generate an SBOM for Rust crates. Defaults to `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
     },
     "SdistGenerator": {
       "description": "Source distribution generator",

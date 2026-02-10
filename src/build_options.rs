@@ -774,6 +774,10 @@ impl BuildContextBuilder {
             .iter()
             .any(|platform_tag| platform_tag == &PlatformTag::Pypi);
 
+        let sbom = pyproject
+            .and_then(|x| x.maturin())
+            .and_then(|x| x.sbom.clone());
+
         let platform_tags = if build_options.platform_tag.is_empty() {
             #[cfg(feature = "zig")]
             let use_zig = build_options.zig;
@@ -893,6 +897,7 @@ impl BuildContextBuilder {
             cargo_options,
             compression: build_options.compression,
             pypi_validation,
+            sbom,
         })
     }
 }

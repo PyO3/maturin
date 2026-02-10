@@ -163,6 +163,17 @@ pub enum SdistGenerator {
     Git,
 }
 
+/// SBOM configuration
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct SbomConfig {
+    /// Generate an SBOM for Rust crates. Defaults to `true`.
+    pub rust: Option<bool>,
+    /// Additional SBOM files to include in the `.dist-info/sboms` directory.
+    pub include: Option<Vec<PathBuf>>,
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -232,6 +243,8 @@ pub struct ToolMaturin {
     // in venv.
     #[serde(default)]
     pub use_base_python: bool,
+    /// SBOM configuration
+    pub sbom: Option<SbomConfig>,
 }
 
 /// A pyproject.toml as specified in PEP 517

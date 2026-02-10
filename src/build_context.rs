@@ -10,12 +10,13 @@ use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
 use crate::module_writer::{WheelWriter, add_data, write_pth};
 use crate::project_layout::ProjectLayout;
+use crate::sbom::{SbomData, generate_sbom_data, write_sboms};
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::target::{Arch, Os};
 use crate::{
     BridgeModel, BuildArtifact, Metadata24, PyProjectToml, PythonInterpreter, Target,
-    VirtualWriter, compile, pyproject_toml::Format,
+    VirtualWriter, compile, pyproject_toml::Format, pyproject_toml::SbomConfig,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -86,6 +87,8 @@ pub struct BuildContext {
     pub compression: CompressionOptions,
     /// Whether to validate wheels against PyPI platform tag rules
     pub pypi_validation: bool,
+    /// SBOM configuration
+    pub sbom: Option<SbomConfig>,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -104,9 +107,13 @@ impl BuildContext {
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
+        // Generate SBOM data once for all wheels (the Rust dependency graph
+        // is the same regardless of the target Python interpreter).
+        let sbom_data = generate_sbom_data(self)?;
+
         let wheels = match self.bridge() {
-            BridgeModel::Bin(None) => self.build_bin_wheel(None)?,
-            BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter)?,
+            BridgeModel::Bin(None) => self.build_bin_wheel(None, &sbom_data)?,
+            BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter, &sbom_data)?,
             BridgeModel::PyO3(crate::PyO3 { abi3, .. }) => match abi3 {
                 Some(Abi3Version::Version(major, minor)) => {
                     let abi3_interps: Vec<_> = self
@@ -127,6 +134,7 @@ impl BuildContext {
                             &abi3_interps,
                             *major,
                             *minor,
+                            &sbom_data,
                         )?);
                     }
                     if !non_abi3_interps.is_empty() {
@@ -138,7 +146,7 @@ impl BuildContext {
                             "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
                             interp_names.iter().join(", ")
                         );
-                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps)?);
+                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps, &sbom_data)?);
                     }
                     built_wheels
                 }
@@ -162,6 +170,7 @@ impl BuildContext {
                             &abi3_interps,
                             interp.major as u8,
                             interp.minor as u8,
+                            &sbom_data,
                         )?);
                     }
                     if !non_abi3_interps.is_empty() {
@@ -173,14 +182,14 @@ impl BuildContext {
                             "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
                             interp_names.iter().join(", ")
                         );
-                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps)?);
+                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps, &sbom_data)?);
                     }
                     built_wheels
                 }
-                None => self.build_pyo3_wheels(&self.interpreter)?,
+                None => self.build_pyo3_wheels(&self.interpreter, &sbom_data)?,
             },
-            BridgeModel::Cffi => self.build_cffi_wheel()?,
-            BridgeModel::UniFfi => self.build_uniffi_wheel()?,
+            BridgeModel::Cffi => self.build_cffi_wheel(&sbom_data)?,
+            BridgeModel::UniFfi => self.build_uniffi_wheel(&sbom_data)?,
         };
 
         // Validate wheel filenames against PyPI platform tag rules if requested
@@ -717,6 +726,7 @@ impl BuildContext {
         ext_libs: Vec<Library>,
         major: u8,
         min_minor: u8,
+        sbom_data: &Option<SbomData>,
     ) -> Result<BuiltWheelMetadata> {
         let platform = self.get_platform_tag(platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
@@ -741,6 +751,14 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
+
+        write_sboms(
+            self,
+            sbom_data.as_ref(),
+            &mut writer,
+            &self.metadata24.get_dist_info_dir(),
+        )?;
+
         let wheel_path = writer.finish(
             &self.metadata24,
             &self.project_layout.project_root,
@@ -756,6 +774,7 @@ impl BuildContext {
         interpreters: &[PythonInterpreter],
         major: u8,
         min_minor: u8,
+        sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         // On windows, we have picked an interpreter to set the location of python.lib,
@@ -772,8 +791,14 @@ impl BuildContext {
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) =
-            self.write_pyo3_wheel_abi3(artifact, &platform_tags, external_libs, major, min_minor)?;
+        let (wheel_path, tag) = self.write_pyo3_wheel_abi3(
+            artifact,
+            &platform_tags,
+            external_libs,
+            major,
+            min_minor,
+            sbom_data,
+        )?;
 
         eprintln!(
             "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
@@ -792,6 +817,7 @@ impl BuildContext {
         artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
+        sbom_data: &Option<SbomData>,
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(self, platform_tags)?;
 
@@ -815,6 +841,14 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
+
+        write_sboms(
+            self,
+            sbom_data.as_ref(),
+            &mut writer,
+            &self.metadata24.get_dist_info_dir(),
+        )?;
+
         let wheel_path = writer.finish(
             &self.metadata24,
             &self.project_layout.project_root,
@@ -836,6 +870,7 @@ impl BuildContext {
     pub fn build_pyo3_wheels(
         &self,
         interpreters: &[PythonInterpreter],
+        sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         for python_interpreter in interpreters {
@@ -850,8 +885,13 @@ impl BuildContext {
             } else {
                 self.platform_tag.clone()
             };
-            let (wheel_path, tag) =
-                self.write_pyo3_wheel(python_interpreter, artifact, &platform_tags, external_libs)?;
+            let (wheel_path, tag) = self.write_pyo3_wheel(
+                python_interpreter,
+                artifact,
+                &platform_tags,
+                external_libs,
+                sbom_data,
+            )?;
             eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -922,6 +962,7 @@ impl BuildContext {
         artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
+        sbom_data: &Option<SbomData>,
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
@@ -946,13 +987,24 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
+
+        write_sboms(
+            self,
+            sbom_data.as_ref(),
+            &mut writer,
+            &self.metadata24.get_dist_info_dir(),
+        )?;
+
         let wheel_path =
             writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
     /// Builds a wheel with cffi bindings
-    pub fn build_cffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub fn build_cffi_wheel(
+        &self,
+        sbom_data: &Option<SbomData>,
+    ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
@@ -961,7 +1013,8 @@ impl BuildContext {
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) = self.write_cffi_wheel(artifact, &platform_tags, external_libs)?;
+        let (wheel_path, tag) =
+            self.write_cffi_wheel(artifact, &platform_tags, external_libs, sbom_data)?;
 
         // Warn if cffi isn't specified in the requirements
         if !self
@@ -987,6 +1040,7 @@ impl BuildContext {
         artifact: BuildArtifact,
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
+        sbom_data: &Option<SbomData>,
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
@@ -1007,13 +1061,24 @@ impl BuildContext {
             &self.metadata24,
             self.project_layout.data.as_deref(),
         )?;
+
+        write_sboms(
+            self,
+            sbom_data.as_ref(),
+            &mut writer,
+            &self.metadata24.get_dist_info_dir(),
+        )?;
+
         let wheel_path =
             writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
     /// Builds a wheel with uniffi bindings
-    pub fn build_uniffi_wheel(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub fn build_uniffi_wheel(
+        &self,
+        sbom_data: &Option<SbomData>,
+    ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifact = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
@@ -1022,7 +1087,8 @@ impl BuildContext {
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) = self.write_uniffi_wheel(artifact, &platform_tags, external_libs)?;
+        let (wheel_path, tag) =
+            self.write_uniffi_wheel(artifact, &platform_tags, external_libs, sbom_data)?;
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
@@ -1036,6 +1102,7 @@ impl BuildContext {
         artifacts: &[BuildArtifact],
         platform_tags: &[PlatformTag],
         ext_libs: &[Vec<Library>],
+        sbom_data: &Option<SbomData>,
     ) -> Result<BuiltWheelMetadata> {
         if !self.metadata24.scripts.is_empty() {
             bail!("Defining scripts and working with a binary doesn't mix well");
@@ -1083,6 +1150,12 @@ impl BuildContext {
             &metadata24,
             self.project_layout.data.as_deref(),
         )?;
+        write_sboms(
+            self,
+            sbom_data.as_ref(),
+            &mut writer,
+            &metadata24.get_dist_info_dir(),
+        )?;
         let wheel_path = writer.finish(&metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
@@ -1093,6 +1166,7 @@ impl BuildContext {
     pub fn build_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
+        sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let artifacts = compile(self, python_interpreter, &self.compile_targets)
@@ -1129,6 +1203,7 @@ impl BuildContext {
             &artifact_paths,
             &platform_tags,
             &ext_libs,
+            sbom_data,
         )?;
         eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
@@ -1142,10 +1217,11 @@ impl BuildContext {
     pub fn build_bin_wheels(
         &self,
         interpreters: &[PythonInterpreter],
+        sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         for python_interpreter in interpreters {
-            wheels.extend(self.build_bin_wheel(Some(python_interpreter))?);
+            wheels.extend(self.build_bin_wheel(Some(python_interpreter), sbom_data)?);
         }
         Ok(wheels)
     }

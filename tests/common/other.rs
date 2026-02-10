@@ -339,6 +339,30 @@ pub fn check_wheel_files(
     Ok(())
 }
 
+#[cfg(feature = "sbom")]
+pub fn check_wheel_files_with_sbom(package: impl AsRef<Path>, unique_name: &str) -> Result<()> {
+    let wheel = build_wheel_files(&package, unique_name)?;
+
+    let sbom_files: Vec<String> = wheel
+        .file_names()
+        .filter(|f| f.contains("sboms/"))
+        .map(|f| f.to_string())
+        .collect();
+    assert!(
+        !sbom_files.is_empty(),
+        "Expected SBOM files in the wheel, but found none. Wheel contents: {:?}",
+        wheel.file_names().collect::<Vec<_>>()
+    );
+    for sbom_file in &sbom_files {
+        assert!(
+            sbom_file.ends_with(".cyclonedx.json"),
+            "Expected SBOM file to have .cyclonedx.json extension, got: {sbom_file}"
+        );
+    }
+
+    Ok(())
+}
+
 pub fn abi3_python_interpreter_args() -> Result<()> {
     // Case 1: maturin build without `-i`, should work
     let options = BuildOptions::try_parse_from(vec![

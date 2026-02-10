@@ -139,6 +139,28 @@ fn rewrite_cargo_toml(
                 document.remove("workspace");
             }
         } else {
+            // Build a set of relative directory paths (from workspace root) for
+            // all known path dependencies. Workspace `members` entries are
+            // directory paths, not crate names, so we must compare against the
+            // actual directory of each dependency rather than its name.
+            let relative_dep_dirs: HashSet<String> = known_path_deps
+                .values()
+                .filter_map(|path_dep| {
+                    let manifest_rel = path_dep
+                        .manifest_path
+                        .strip_prefix(&path_dep.workspace_root)
+                        .ok()?;
+                    // Strip the trailing `Cargo.toml` to get the directory
+                    manifest_rel.parent().and_then(|p| p.to_slash()).map(|s| {
+                        if s.is_empty() {
+                            ".".into()
+                        } else {
+                            s.into_owned()
+                        }
+                    })
+                })
+                .collect();
+
             let mut new_members = toml_edit::Array::new();
             for member in members {
                 if let toml_edit::Value::String(s) = member {
@@ -153,17 +175,10 @@ fn rewrite_cargo_toml(
                                 manifest_path.display()
                             )
                         })?;
-                        if known_path_deps.values().any(|path_dep| {
-                            let relative_path = path_dep
-                                .manifest_path
-                                .strip_prefix(&path_dep.workspace_root)
-                                .unwrap();
-                            let relative_path_str = relative_path.to_str().unwrap();
-                            pattern.matches(relative_path_str)
-                        }) {
+                        if relative_dep_dirs.iter().any(|dir| pattern.matches(dir)) {
                             new_members.push(member_path);
                         }
-                    } else if known_path_deps.contains_key(member_path) {
+                    } else if relative_dep_dirs.contains(member_path) {
                         new_members.push(member_path);
                     }
                 }
@@ -912,17 +927,17 @@ fn add_cargo_package_files_to_sdist(
     // in the sdist. See https://github.com/PyO3/maturin/issues/2383
     let skip_prefixes: Vec<PathBuf> = if !relative_main_crate_manifest_dir.as_os_str().is_empty() {
         let mut prefixes = Vec::new();
-        if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
-            if let Ok(rel) = python_module.strip_prefix(abs_manifest_dir) {
-                prefixes.push(rel.to_path_buf());
-            }
+        if let Some(python_module) = build_context.project_layout.python_module.as_ref()
+            && let Ok(rel) = python_module.strip_prefix(abs_manifest_dir)
+        {
+            prefixes.push(rel.to_path_buf());
         }
         for package in &build_context.project_layout.python_packages {
             let package_path = build_context.project_layout.python_dir.join(package);
-            if let Ok(rel) = package_path.strip_prefix(abs_manifest_dir) {
-                if !prefixes.contains(&rel.to_path_buf()) {
-                    prefixes.push(rel.to_path_buf());
-                }
+            if let Ok(rel) = package_path.strip_prefix(abs_manifest_dir)
+                && !prefixes.contains(&rel.to_path_buf())
+            {
+                prefixes.push(rel.to_path_buf());
             }
         }
         prefixes
@@ -1026,6 +1041,32 @@ fn add_cargo_package_files_to_sdist(
             ctx.workspace_manifest_path.as_std_path(),
             &deps_to_keep,
         )?;
+        // When the workspace root Cargo.toml is also a [package] (virtual
+        // workspaces don't have one), the package's source files are typically
+        // not included in the sdist. Cargo will fail to parse the manifest if
+        // it can't find the library/binary source. Strip the [package] section
+        // and all package-level tables so cargo treats it as a virtual workspace.
+        let workspace_root_is_path_dep = ctx
+            .known_path_deps
+            .values()
+            .any(|dep| dep.manifest_path.as_path() == ctx.workspace_manifest_path.as_std_path());
+        if !workspace_root_is_path_dep && document.contains_key("package") {
+            debug!(
+                "Stripping [package] from workspace Cargo.toml at {} (source files not in sdist)",
+                ctx.workspace_manifest_path
+            );
+            // Remove all sections that belong to the [package] crate, keeping
+            // only workspace-level tables ([workspace], [workspace.*], [profile]).
+            let package_level_keys: Vec<String> = document
+                .as_table()
+                .iter()
+                .filter(|(key, _)| !matches!(&**key, "workspace" | "profile" | "patch" | "replace"))
+                .map(|(key, _)| key.to_string())
+                .collect();
+            for key in &package_level_keys {
+                document.remove(key);
+            }
+        }
         writer.add_bytes(
             root_dir.join(relative_workspace_cargo_toml),
             Some(ctx.workspace_manifest_path.as_std_path()),

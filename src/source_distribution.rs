@@ -483,9 +483,6 @@ enum CrateRole<'a> {
 /// and rewriting path entries in Cargo.toml
 ///
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
-///
-/// `skip_prefixes` is a list of path prefixes (relative to the manifest directory) whose files
-/// should be skipped because they are added separately (e.g. python source directories).
 fn add_crate_to_source_distribution(
     writer: &mut VirtualWriter<SDistWriter>,
     manifest_path: impl AsRef<Path>,

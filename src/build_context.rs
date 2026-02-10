@@ -372,16 +372,14 @@ impl BuildContext {
 
         patchelf::verify_patchelf()?;
 
-        // Put external libs to ${module_name}.libs directory
+        // Put external libs to ${distribution_name}.libs directory
         // See https://github.com/pypa/auditwheel/issues/89
-        let mut libs_dir = self
-            .project_layout
-            .python_module
-            .as_ref()
-            .and_then(|py| py.file_name().map(|s| s.to_os_string()))
-            .unwrap_or_else(|| self.module_name.clone().into());
-        libs_dir.push(".libs");
-        let libs_dir = PathBuf::from(libs_dir);
+        // Use the distribution name (matching auditwheel's behavior) to avoid
+        // conflicts with other packages in the same namespace.
+        let libs_dir = PathBuf::from(format!(
+            "{}.libs",
+            self.metadata24.get_distribution_escaped()
+        ));
 
         let temp_dir = writer.temp_dir()?;
         let mut soname_map = BTreeMap::new();

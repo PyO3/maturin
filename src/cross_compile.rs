@@ -1,11 +1,14 @@
+use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
 use crate::target::Os;
 use crate::{PythonInterpreter, Target};
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use fs_err::{self as fs, DirEntry};
 use normpath::PathExt as _;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 pub fn is_cross_compiling(target: &Target) -> Result<bool> {
     let target_triple = target.target_triple();
@@ -212,4 +215,280 @@ fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Result<Vec<PathBuf
         }
     }
     Ok(sysconfig_paths)
+}
+
+/// PEP 739 `build-details.json` schema types
+#[derive(Deserialize)]
+struct BuildDetails {
+    language: BuildDetailsLanguage,
+    implementation: BuildDetailsImplementation,
+    abi: Option<BuildDetailsAbi>,
+}
+
+#[derive(Deserialize)]
+struct BuildDetailsLanguage {
+    version: String,
+}
+
+#[derive(Deserialize)]
+struct BuildDetailsImplementation {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct BuildDetailsAbi {
+    flags: Option<Vec<String>>,
+    extension_suffix: String,
+}
+
+/// Search for `build-details.json` in the given lib directory.
+///
+/// Starting from Python 3.14, the file is installed in the platform-independent
+/// standard library directory, e.g. `<prefix>/lib/python3.14/build-details.json`.
+pub fn find_build_details(path: &Path) -> Option<PathBuf> {
+    let candidate = path.join("build-details.json");
+    if candidate.is_file() {
+        return Some(candidate);
+    }
+    let cross_python_version =
+        env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap());
+    let version_pat = cross_python_version
+        .as_deref()
+        .map(|v| format!("python{v}"))
+        .unwrap_or_else(|| "python3.".into());
+    let entries = fs::read_dir(path).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        let dominated = name_str.starts_with(&version_pat)
+            || name_str.starts_with("lib")
+            || name_str.ends_with(".framework")
+            || name_str == "Frameworks"
+            || name_str == "Versions"
+            || name_str.starts_with("3.");
+        if dominated
+            && entry.path().is_dir()
+            && let Some(found) = find_build_details(&entry.path())
+        {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Read and parse a PEP 739 `build-details.json` file into an `InterpreterConfig`.
+pub fn parse_build_details_json_file(path: &Path) -> Result<InterpreterConfig> {
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    parse_build_details(&content).with_context(|| format!("Failed to parse {}", path.display()))
+}
+
+/// Parse PEP 739 `build-details.json` content into an `InterpreterConfig`.
+///
+/// This allows cross-compilation without needing a host Python interpreter,
+/// since the file is static JSON that can be read directly.
+pub fn parse_build_details(content: &str) -> Result<InterpreterConfig> {
+    let details: BuildDetails =
+        serde_json::from_str(content).context("Invalid build-details.json")?;
+
+    let (major, minor) = details
+        .language
+        .version
+        .split_once('.')
+        .context("Invalid language.version in build-details.json")?;
+    let major = major
+        .parse::<usize>()
+        .context("Invalid major version in build-details.json")?;
+    let minor = minor
+        .parse::<usize>()
+        .context("Invalid minor version in build-details.json")?;
+
+    let impl_name = details.implementation.name.to_ascii_lowercase();
+    let interpreter_kind = match impl_name.as_str() {
+        "cpython" => InterpreterKind::CPython,
+        "pypy" => InterpreterKind::PyPy,
+        "graalpy" => InterpreterKind::GraalPy,
+        other => bail!("Unsupported Python implementation in build-details.json: {other}"),
+    };
+
+    let abi = details.abi.context(
+        "build-details.json is missing the 'abi' section, cannot determine extension suffix",
+    )?;
+
+    let abiflags = abi.flags.as_deref().unwrap_or_default().join("");
+    let gil_disabled = abi
+        .flags
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .any(|f| f == "t");
+    let ext_suffix = abi.extension_suffix.clone();
+
+    debug!(
+        "Parsed build-details.json: {interpreter_kind} {major}.{minor}, ext_suffix={ext_suffix}, abiflags={abiflags}"
+    );
+
+    Ok(InterpreterConfig {
+        major,
+        minor,
+        interpreter_kind,
+        abiflags,
+        ext_suffix,
+        pointer_width: None,
+        gil_disabled,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_parse_build_details_cpython() {
+        let config = parse_build_details(
+            r#"{
+                "schema_version": "1.0",
+                "base_prefix": "/usr",
+                "platform": "linux-x86_64",
+                "language": { "version": "3.14" },
+                "implementation": {
+                    "name": "cpython",
+                    "version": { "major": 3, "minor": 14, "micro": 0, "releaselevel": "final", "serial": 0 },
+                    "hexversion": 51249312,
+                    "cache_tag": "cpython-314"
+                },
+                "abi": {
+                    "flags": [],
+                    "extension_suffix": ".cpython-314-x86_64-linux-gnu.so",
+                    "stable_abi_suffix": ".abi3.so"
+                }
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(config.major, 3);
+        assert_eq!(config.minor, 14);
+        assert_eq!(config.interpreter_kind, InterpreterKind::CPython);
+        assert_eq!(config.abiflags, "");
+        assert_eq!(config.ext_suffix, ".cpython-314-x86_64-linux-gnu.so");
+        assert!(!config.gil_disabled);
+    }
+
+    #[test]
+    fn test_parse_build_details_free_threaded() {
+        let config = parse_build_details(
+            r#"{
+                "schema_version": "1.0",
+                "base_prefix": "/usr",
+                "platform": "linux-x86_64",
+                "language": { "version": "3.14" },
+                "implementation": {
+                    "name": "cpython",
+                    "version": { "major": 3, "minor": 14, "micro": 0, "releaselevel": "final", "serial": 0 },
+                    "hexversion": 51249312,
+                    "cache_tag": "cpython-314"
+                },
+                "abi": {
+                    "flags": ["t"],
+                    "extension_suffix": ".cpython-314t-x86_64-linux-gnu.so"
+                }
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(config.abiflags, "t");
+        assert_eq!(config.ext_suffix, ".cpython-314t-x86_64-linux-gnu.so");
+        assert!(config.gil_disabled);
+    }
+
+    #[test]
+    fn test_parse_build_details_debug_free_threaded() {
+        let config = parse_build_details(
+            r#"{
+                "schema_version": "1.0",
+                "base_prefix": "/usr",
+                "platform": "linux-x86_64",
+                "language": { "version": "3.14" },
+                "implementation": {
+                    "name": "cpython",
+                    "version": { "major": 3, "minor": 14, "micro": 0, "releaselevel": "alpha", "serial": 0 },
+                    "hexversion": 51249312,
+                    "cache_tag": "cpython-314"
+                },
+                "abi": {
+                    "flags": ["t", "d"],
+                    "extension_suffix": ".cpython-314td-x86_64-linux-gnu.so"
+                }
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(config.abiflags, "td");
+        assert!(config.gil_disabled);
+    }
+
+    #[test]
+    fn test_parse_build_details_missing_abi() {
+        let result = parse_build_details(
+            r#"{
+                "schema_version": "1.0",
+                "base_prefix": "/usr",
+                "platform": "linux-x86_64",
+                "language": { "version": "3.14" },
+                "implementation": {
+                    "name": "cpython",
+                    "version": { "major": 3, "minor": 14, "micro": 0, "releaselevel": "final", "serial": 0 },
+                    "hexversion": 51249312,
+                    "cache_tag": "cpython-314"
+                }
+            }"#,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_build_details_direct() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("build-details.json");
+        fs::write(&path, r#"{"schema_version":"1.0"}"#).unwrap();
+
+        let found = find_build_details(dir.path());
+        assert_eq!(found, Some(path));
+    }
+
+    #[test]
+    fn test_find_build_details_in_python_subdir() {
+        let dir = TempDir::new().unwrap();
+        let pydir = dir.path().join("lib").join("python3.14");
+        fs::create_dir_all(&pydir).unwrap();
+        let path = pydir.join("build-details.json");
+        fs::write(&path, r#"{"schema_version":"1.0"}"#).unwrap();
+
+        let found = find_build_details(dir.path());
+        assert_eq!(found, Some(path));
+    }
+
+    #[test]
+    fn test_find_build_details_in_framework_layout() {
+        let dir = TempDir::new().unwrap();
+        let pydir = dir
+            .path()
+            .join("Frameworks")
+            .join("Python.framework")
+            .join("Versions")
+            .join("3.14")
+            .join("lib")
+            .join("python3.14");
+        fs::create_dir_all(&pydir).unwrap();
+        let path = pydir.join("build-details.json");
+        fs::write(&path, r#"{"schema_version":"1.0"}"#).unwrap();
+
+        let found = find_build_details(dir.path());
+        assert_eq!(found, Some(path));
+    }
+
+    #[test]
+    fn test_find_build_details_not_present() {
+        let dir = TempDir::new().unwrap();
+        let found = find_build_details(dir.path());
+        assert!(found.is_none());
+    }
 }

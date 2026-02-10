@@ -462,20 +462,29 @@ fn rewrite_pyproject_toml(
     Ok(data.to_string())
 }
 
+/// Describes the role of a crate being added to the source distribution.
+enum CrateRole<'a> {
+    /// The main Python binding crate: rewrite workspace deps in Cargo.toml,
+    /// skip pyproject.toml from `cargo package --list` (handled separately).
+    Root {
+        known_path_deps: &'a HashMap<String, PathDependency>,
+    },
+    /// A path dependency. When `skip_cargo_toml` is true, the crate's Cargo.toml
+    /// is the workspace manifest and will be added separately with workspace-level rewrites.
+    PathDependency { skip_cargo_toml: bool },
+}
+
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies
 /// and rewriting path entries in Cargo.toml
 ///
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
-#[allow(clippy::too_many_arguments)]
 fn add_crate_to_source_distribution(
     writer: &mut VirtualWriter<SDistWriter>,
     manifest_path: impl AsRef<Path>,
     prefix: impl AsRef<Path>,
     readme: Option<&Path>,
     license_file: Option<&Path>,
-    known_path_deps: &HashMap<String, PathDependency>,
-    root_crate: bool,
-    skip_cargo_toml: bool,
+    role: CrateRole<'_>,
 ) -> Result<()> {
     debug!(
         "Getting cargo package file list for {}",
@@ -535,7 +544,7 @@ fn add_crate_to_source_distribution(
             } else if *target == "Cargo.toml" {
                 // We rewrite Cargo.toml and add it separately
                 false
-            } else if root_crate && *target == "pyproject.toml" {
+            } else if matches!(role, CrateRole::Root { .. }) && *target == "pyproject.toml" {
                 // pyproject.toml is handled separately because it has to be put in the root dir
                 // of source distribution
                 false
@@ -591,11 +600,16 @@ fn add_crate_to_source_distribution(
         })
         .transpose()?;
 
-    if root_crate || !skip_cargo_toml {
+    if !matches!(
+        role,
+        CrateRole::PathDependency {
+            skip_cargo_toml: true
+        }
+    ) {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
         rewrite_cargo_toml_license_file(&mut document, manifest_path, license_file_name)?;
-        if root_crate {
+        if let CrateRole::Root { known_path_deps } = &role {
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         }
         rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
@@ -861,9 +875,9 @@ fn add_cargo_package_files_to_sdist(
         root_dir.join(relative_main_crate_manifest_dir),
         readme_path.as_deref(),
         license_file_path.as_deref(),
-        &ctx.known_path_deps,
-        true,
-        false,
+        CrateRole::Root {
+            known_path_deps: &ctx.known_path_deps,
+        },
     )?;
 
     // Add Cargo.lock file
@@ -1078,9 +1092,7 @@ fn add_path_dep(
         ctx.root_dir.join(relative_path_dep_manifest_dir),
         readme_path.as_deref(),
         license_file_path.as_deref(),
-        &ctx.known_path_deps,
-        false,
-        skip_cargo_toml,
+        CrateRole::PathDependency { skip_cargo_toml },
     )
     .with_context(|| {
         format!(

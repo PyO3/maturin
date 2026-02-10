@@ -62,6 +62,7 @@ pub fn test_develop(
         release: false,
         strip: false,
         extras: Vec::new(),
+        group: Vec::new(),
         skip_install: false,
         pip_path: None,
         cargo_options: CargoOptions {

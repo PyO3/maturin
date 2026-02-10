@@ -20,6 +20,11 @@ Options:
           
           Use as `--extras=extra1,extra2`
 
+  -G, --group <GROUP>
+          Install dependency groups defined in pyproject.toml (PEP 735)
+          
+          Use as `--group=test,docs`
+
       --skip-install
           Skip installation, only build the extension module inplace
           

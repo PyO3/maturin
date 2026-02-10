@@ -175,6 +175,15 @@ fn rewrite_cargo_toml(
             }
         }
     }
+
+    // Remove `default-members` to avoid build failures when some entries
+    // are not included in the sdist. Without `default-members`, Cargo
+    // treats all `members` as defaults, which is the correct behavior
+    // for source distributions. See https://github.com/PyO3/maturin/issues/2046
+    if let Some(workspace) = document.get_mut("workspace").and_then(|x| x.as_table_mut()) {
+        workspace.remove("default-members");
+    }
+
     Ok(())
 }
 
@@ -1461,6 +1470,37 @@ license-file = "../../LICENSE"
         assert!(
             result2.contains(r#"license-file = "../../LICENSE""#),
             "expected unchanged license-file, got: {result2}"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_cargo_toml_removes_default_members() {
+        let manifest_path = Path::new("Cargo.toml");
+        let toml_str = r#"
+[workspace]
+members = ["crate-a", "crate-b"]
+default-members = ["crate-a", "crate-c"]
+"#;
+        let mut document = toml_str.parse::<DocumentMut>().unwrap();
+        let mut known_path_deps = HashMap::new();
+        known_path_deps.insert(
+            "crate-a".to_string(),
+            PathDependency {
+                manifest_path: PathBuf::from("crate-a/Cargo.toml"),
+                workspace_root: PathBuf::from(""),
+                readme: None,
+                license_file: None,
+            },
+        );
+        rewrite_cargo_toml(&mut document, manifest_path, &known_path_deps).unwrap();
+        let result = document.to_string();
+        assert!(
+            result.contains(r#"members = ["crate-a"]"#),
+            "expected filtered members, got: {result}"
+        );
+        assert!(
+            !result.contains("default-members"),
+            "expected default-members to be removed, got: {result}"
         );
     }
 }

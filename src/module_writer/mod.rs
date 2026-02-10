@@ -329,11 +329,28 @@ pub fn write_dist_info(
     if !metadata24.license_files.is_empty() {
         let license_files_dir = dist_info_dir.join("licenses");
         for path in &metadata24.license_files {
-            writer.add_file(
-                license_files_dir.join(path),
-                pyproject_dir.join(path),
-                false,
-            )?;
+            if path.is_absolute()
+                || path.components().any(|c| {
+                    matches!(
+                        c,
+                        std::path::Component::ParentDir
+                            | std::path::Component::Prefix(_)
+                            | std::path::Component::RootDir
+                    )
+                })
+            {
+                bail!(
+                    "Refusing to write license file with unsafe path `{}` into wheel",
+                    path.display()
+                );
+            }
+
+            let source = metadata24
+                .license_file_sources
+                .get(path)
+                .cloned()
+                .unwrap_or_else(|| pyproject_dir.join(path));
+            writer.add_file(license_files_dir.join(path), source, false)?;
         }
     }
 

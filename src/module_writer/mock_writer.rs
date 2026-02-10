@@ -14,6 +14,7 @@ use itertools::Itertools as _;
 
 use crate::BuildOptions;
 use crate::CargoOptions;
+use crate::Metadata24;
 use crate::archive_source::ArchiveSource;
 use crate::write_dist_info;
 
@@ -105,4 +106,70 @@ fn metadata_hello_world_pep639() -> Result<()> {
     ");
 
     Ok(())
+}
+
+#[test]
+fn write_dist_info_uses_license_file_sources() -> Result<()> {
+    use pep440_rs::Version;
+    use std::str::FromStr;
+
+    let temp_dir = tempfile::tempdir()?;
+    let pyproject_dir = temp_dir.path().join("crate");
+    let workspace_root = temp_dir.path();
+    fs_err::create_dir_all(&pyproject_dir)?;
+
+    // Create a workspace-level license file (outside pyproject_dir)
+    let license_content = b"MIT License - workspace level";
+    fs_err::write(workspace_root.join("LICENSE"), license_content)?;
+
+    let mut metadata = Metadata24::new("test-pkg".to_string(), Version::from_str("1.0.0").unwrap());
+    metadata.license_files.push(PathBuf::from("LICENSE"));
+    metadata
+        .license_file_sources
+        .insert(PathBuf::from("LICENSE"), workspace_root.join("LICENSE"));
+
+    let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
+    write_dist_info(
+        &mut writer,
+        &pyproject_dir,
+        &metadata,
+        &["py3-none-any".to_string()],
+    )?;
+
+    let files = writer.finish()?;
+    let license_key = Path::new("test_pkg-1.0.0.dist-info/licenses/LICENSE");
+    assert!(
+        files.contains_key(license_key),
+        "expected license file in dist-info, got keys: {:?}",
+        files.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(files[license_key], license_content);
+
+    Ok(())
+}
+
+#[test]
+fn write_dist_info_rejects_absolute_license_paths() {
+    use pep440_rs::Version;
+    use std::str::FromStr;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let pyproject_dir = temp_dir.path();
+
+    let mut metadata = Metadata24::new("test-pkg".to_string(), Version::from_str("1.0.0").unwrap());
+    metadata.license_files.push(temp_dir.path().join("LICENSE"));
+
+    let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
+    let err = write_dist_info(
+        &mut writer,
+        pyproject_dir,
+        &metadata,
+        &["py3-none-any".to_string()],
+    )
+    .unwrap_err();
+
+    assert!(
+        err.to_string().contains("unsafe path"),
+        "unexpected error: {err:#}"
+    );
 }

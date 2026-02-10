@@ -468,6 +468,11 @@ enum CrateRole<'a> {
     /// skip pyproject.toml from `cargo package --list` (handled separately).
     Root {
         known_path_deps: &'a HashMap<String, PathDependency>,
+        /// Path prefixes (relative to the manifest directory) whose files should be
+        /// skipped from `cargo package --list` because they are added separately
+        /// (e.g. python source directories that the explicit python source loop handles).
+        /// See <https://github.com/PyO3/maturin/issues/2383>.
+        skip_prefixes: Vec<PathBuf>,
     },
     /// A path dependency. When `skip_cargo_toml` is true, the crate's Cargo.toml
     /// is the workspace manifest and will be added separately with workspace-level rewrites.
@@ -478,6 +483,9 @@ enum CrateRole<'a> {
 /// and rewriting path entries in Cargo.toml
 ///
 /// Runs `cargo package --list --allow-dirty` to obtain a list of files to package.
+///
+/// `skip_prefixes` is a list of path prefixes (relative to the manifest directory) whose files
+/// should be skipped because they are added separately (e.g. python source directories).
 fn add_crate_to_source_distribution(
     writer: &mut VirtualWriter<SDistWriter>,
     manifest_path: impl AsRef<Path>,
@@ -530,6 +538,10 @@ fn add_crate_to_source_distribution(
 
     // manifest_dir should be a relative path
     let manifest_dir = manifest_path.parent().unwrap();
+    let skip_prefixes = match &role {
+        CrateRole::Root { skip_prefixes, .. } => skip_prefixes.as_slice(),
+        CrateRole::PathDependency { .. } => &[],
+    };
     let target_source: Vec<_> = file_list
         .into_iter()
         .map(|relative_to_manifests| {
@@ -553,6 +565,21 @@ fn add_crate_to_source_distribution(
                 // member and the root have a pyproject.toml.
                 debug!(
                     "Skipping potentially non-main {}",
+                    prefix.join(target).display()
+                );
+                false
+            } else if !skip_prefixes.is_empty()
+                && skip_prefixes
+                    .iter()
+                    .any(|p| Path::new(target).starts_with(p))
+            {
+                // Skip files that will be added separately (e.g. python source files
+                // that are added by the explicit python source loop).
+                // This avoids duplicating them under the crate subdirectory when the
+                // crate is a workspace member.
+                // See https://github.com/PyO3/maturin/issues/2383
+                debug!(
+                    "Skipping {} (will be added separately)",
                     prefix.join(target).display()
                 );
                 false
@@ -609,7 +636,10 @@ fn add_crate_to_source_distribution(
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
         rewrite_cargo_toml_license_file(&mut document, manifest_path, license_file_name)?;
-        if let CrateRole::Root { known_path_deps } = &role {
+        if let CrateRole::Root {
+            known_path_deps, ..
+        } = &role
+        {
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         }
         rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
@@ -869,6 +899,30 @@ fn add_cargo_package_files_to_sdist(
     } else {
         None
     };
+    // Compute python source directories relative to the manifest directory.
+    // When the crate is a workspace member in a subdirectory, `cargo package --list`
+    // includes python source files that will also be added by the explicit python
+    // source loop (relative to pyproject_dir). We skip them here to avoid duplicates
+    // in the sdist. See https://github.com/PyO3/maturin/issues/2383
+    let skip_prefixes: Vec<PathBuf> = if !relative_main_crate_manifest_dir.as_os_str().is_empty() {
+        let mut prefixes = Vec::new();
+        if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
+            if let Ok(rel) = python_module.strip_prefix(abs_manifest_dir) {
+                prefixes.push(rel.to_path_buf());
+            }
+        }
+        for package in &build_context.project_layout.python_packages {
+            let package_path = build_context.project_layout.python_dir.join(package);
+            if let Ok(rel) = package_path.strip_prefix(abs_manifest_dir) {
+                if !prefixes.contains(&rel.to_path_buf()) {
+                    prefixes.push(rel.to_path_buf());
+                }
+            }
+        }
+        prefixes
+    } else {
+        Vec::new()
+    };
     add_crate_to_source_distribution(
         writer,
         manifest_path,
@@ -877,6 +931,7 @@ fn add_cargo_package_files_to_sdist(
         license_file_path.as_deref(),
         CrateRole::Root {
             known_path_deps: &ctx.known_path_deps,
+            skip_prefixes,
         },
     )?;
 

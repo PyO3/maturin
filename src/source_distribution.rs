@@ -1,7 +1,7 @@
 use crate::pyproject_toml::{Format, SdistGenerator};
 use crate::{BuildContext, ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
-use cargo_metadata::camino::Utf8Path;
+use cargo_metadata::camino::{self, Utf8Path};
 use cargo_metadata::{Metadata, MetadataCommand, PackageId};
 use fs_err as fs;
 use ignore::overrides::Override;
@@ -33,6 +33,40 @@ pub struct PathDependency {
     workspace_root: PathBuf,
     /// readme path of the path dependency
     readme: Option<PathBuf>,
+}
+
+/// Returns `true` if the file extension indicates a compiled artifact
+/// that should be excluded from the source distribution.
+fn is_compiled_artifact(path: &Path) -> bool {
+    matches!(path.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
+}
+
+/// Resolve a readme path relative to a manifest directory and add it to the sdist
+/// next to its `Cargo.toml` to avoid collisions between crates using readmes
+/// higher up the file tree.
+///
+/// Returns the absolute path of the readme if it exists.
+fn resolve_and_add_readme(
+    writer: &mut VirtualWriter<SDistWriter>,
+    readme: &Path,
+    manifest_dir: &Path,
+    target_dir: &Path,
+) -> Result<PathBuf> {
+    let readme = manifest_dir.join(readme);
+    let abs_readme = readme
+        .normalize()
+        .with_context(|| {
+            format!(
+                "readme path `{}` does not exist or is invalid",
+                readme.display()
+            )
+        })?
+        .into_path_buf();
+    let readme_filename = readme
+        .file_name()
+        .with_context(|| format!("readme path `{}` has no filename", readme.display()))?;
+    writer.add_file(target_dir.join(readme_filename), &abs_readme, false)?;
+    Ok(abs_readme)
 }
 
 fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
@@ -444,9 +478,12 @@ fn add_crate_to_source_distribution(
             } else if prefix.components().count() == 1 && *target == "pyproject.toml" {
                 // Skip pyproject.toml for cases when the root is in a workspace member and both the
                 // member and the root have a pyproject.toml.
-                debug!("Skipping potentially non-main {}", prefix.join(target).display());
+                debug!(
+                    "Skipping potentially non-main {}",
+                    prefix.join(target).display()
+                );
                 false
-            } else if matches!(Path::new(target).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so") {
+            } else if is_compiled_artifact(Path::new(target)) {
                 // Technically, `cargo package --list` should handle this,
                 // but somehow it doesn't on Alpine Linux running in GitHub Actions,
                 // so we do it manually here.
@@ -456,9 +493,7 @@ fn add_crate_to_source_distribution(
             } else {
                 // Use `is_file` instead of `exists` to work around cargo bug:
                 // https://github.com/rust-lang/cargo/issues/16465
-                source.is_file()
-                    && !writer.exclude(source)
-                    && !writer.exclude(prefix.join(target))
+                source.is_file() && !writer.exclude(source) && !writer.exclude(prefix.join(target))
             }
         })
         .collect();
@@ -480,20 +515,12 @@ fn add_crate_to_source_distribution(
         })
         .transpose()?;
 
-    if root_crate {
+    if root_crate || !skip_cargo_toml {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
         rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
-        rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
-        rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
-        writer.add_bytes(
-            cargo_toml_path,
-            Some(manifest_path),
-            document.to_string().as_bytes(),
-            false,
-        )?;
-    } else if !skip_cargo_toml {
-        let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
-        rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
+        if root_crate {
+            rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
+        }
         rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         writer.add_bytes(
             cargo_toml_path,
@@ -515,54 +542,57 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
     let root = cargo_metadata
         .root_package()
         .context("Expected the dependency graph to have a root package")?;
-    let pkg_readmes = cargo_metadata
+
+    // Pre-build lookup indices to avoid repeated linear scans
+    let packages_by_id: HashMap<&PackageId, &cargo_metadata::Package> =
+        cargo_metadata.packages.iter().map(|p| (&p.id, p)).collect();
+    let pkg_readmes: HashMap<&PackageId, PathBuf> = cargo_metadata
         .packages
         .iter()
         .filter_map(|package| {
             package
                 .readme
                 .as_ref()
-                .map(|readme| (package.id.clone(), readme.clone().into_std_path_buf()))
+                .map(|readme| (&package.id, readme.clone().into_std_path_buf()))
         })
-        .collect::<HashMap<PackageId, PathBuf>>();
-    // scan the dependency graph for path dependencies
+        .collect();
+    let resolve_nodes: HashMap<&PackageId, &[cargo_metadata::NodeDep]> = cargo_metadata
+        .resolve
+        .as_ref()
+        .context("cargo metadata is missing dependency resolve information")?
+        .nodes
+        .iter()
+        .map(|node| (&node.id, node.deps.as_slice()))
+        .collect();
+
+    // Scan the dependency graph for path dependencies
     let mut path_deps = HashMap::new();
     let mut stack: Vec<&cargo_metadata::Package> = vec![root];
     while let Some(top) = stack.pop() {
-        // There seems to be no API to get the package id of a dependency, so collect the package ids from resolve
-        // and match them up with the `Dependency`s from `Package.dependencies`.
-        let dep_ids = &cargo_metadata
-            .resolve
-            .as_ref()
-            .unwrap()
-            .nodes
-            .iter()
-            .find(|node| node.id == top.id)
-            .unwrap()
-            .dependencies;
-        for dep_id in dep_ids {
-            // Assumption: Each package name can only occur once in a `[dependencies]` table.
+        let node_deps = resolve_nodes
+            .get(&top.id)
+            .with_context(|| format!("missing resolve node for package {}", top.id))?;
+        for node_dep in *node_deps {
+            let dep_pkg = packages_by_id
+                .get(&node_dep.pkg)
+                .with_context(|| format!("missing package metadata for {}", node_dep.pkg))?;
+            // Match the resolved dependency back to the declared dependency
+            // to check if it's a path dependency.
             let dependency = top
                 .dependencies
                 .iter()
-                .find(|&package| {
-                    // Package ids are opaque and there seems to be no way to query their name.
-                    let dep_name = &cargo_metadata
-                        .packages
-                        .iter()
-                        .find(|package| &package.id == dep_id)
-                        .unwrap()
-                        .name;
-                    package.name == dep_name.as_ref()
-                })
-                .unwrap();
+                .find(|d| d.name == dep_pkg.name.as_ref())
+                .with_context(|| {
+                    format!(
+                        "could not find dependency {} in package {}",
+                        dep_pkg.name, top.id
+                    )
+                })?;
             if let Some(path) = &dependency.path {
                 let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
                 if path_deps.contains_key(dep_name) {
                     continue;
                 }
-                // we search for the respective package by `manifest_path`, there seems
-                // to be no way to query the dependency graph given `dependency`
                 let dep_manifest_path = path.join("Cargo.toml");
                 // Path dependencies may not be in the same workspace as the root crate,
                 // thus we need to find out its workspace root from `cargo metadata`
@@ -574,7 +604,8 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                     .exec()
                     .with_context(|| {
                         format!(
-                            "Failed to resolve workspace root for {dep_id} at '{dep_manifest_path}'"
+                            "Failed to resolve workspace root for {} at '{dep_manifest_path}'",
+                            node_dep.pkg
                         )
                     })?;
 
@@ -586,15 +617,11 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                             .workspace_root
                             .clone()
                             .into_std_path_buf(),
-                        readme: pkg_readmes.get(dep_id).cloned(),
+                        readme: pkg_readmes.get(&node_dep.pkg).cloned(),
                     },
                 );
-                if let Some(dep_package) = cargo_metadata
-                    .packages
-                    .iter()
-                    .find(|package| package.manifest_path == dep_manifest_path)
-                {
-                    // scan the dependencies of the path dependency
+                // Continue scanning the path dependency's own dependencies
+                if let Some(&dep_package) = packages_by_id.get(&node_dep.pkg) {
                     stack.push(dep_package)
                 }
             }
@@ -639,6 +666,18 @@ fn add_git_tracked_files_to_sdist(
     Ok(())
 }
 
+/// Shared context for building a source distribution from cargo packages.
+///
+/// Groups the common parameters needed when adding crates and path dependencies
+/// to the sdist, avoiding excessive argument counts.
+struct SdistContext<'a> {
+    root_dir: &'a Path,
+    workspace_root: &'a Utf8Path,
+    workspace_manifest_path: camino::Utf8PathBuf,
+    known_path_deps: HashMap<String, PathDependency>,
+    sdist_root: PathBuf,
+}
+
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies
 /// and rewriting path entries in Cargo.toml
 fn add_cargo_package_files_to_sdist(
@@ -670,19 +709,18 @@ fn add_cargo_package_files_to_sdist(
 
     debug!("Found sdist root: {}", sdist_root.display());
 
+    let ctx = SdistContext {
+        root_dir,
+        workspace_root,
+        workspace_manifest_path,
+        known_path_deps,
+        sdist_root,
+    };
+
     // Add local path dependencies
-    for (name, path_dep) in known_path_deps.iter() {
-        add_path_dep(
-            writer,
-            root_dir,
-            workspace_root,
-            &workspace_manifest_path,
-            &known_path_deps,
-            &sdist_root,
-            name,
-            path_dep,
-        )
-        .with_context(|| format!("Failed to add path dependency {name}"))?;
+    for (name, path_dep) in ctx.known_path_deps.iter() {
+        add_path_dep(writer, &ctx, name, path_dep)
+            .with_context(|| format!("Failed to add path dependency {name}"))?;
     }
 
     debug!("Adding the main crate {}", manifest_path.display());
@@ -701,30 +739,17 @@ fn add_cargo_package_files_to_sdist(
     let relative_main_crate_manifest_dir = manifest_path
         .parent()
         .unwrap()
-        .strip_prefix(&sdist_root)
+        .strip_prefix(&ctx.sdist_root)
         .unwrap();
     // Handle possible relative readme field in Cargo.toml
     let readme_path = if let Some(readme) = main_crate.readme.as_ref() {
-        let readme = abs_manifest_dir.join(readme);
-        let abs_readme = readme
-            .normalize()
-            .with_context(|| {
-                format!(
-                    "readme path `{}` does not exist or is invalid",
-                    readme.display()
-                )
-            })?
-            .into_path_buf();
-        // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
-        // higher up the file tree.
-        writer.add_file(
-            root_dir
-                .join(relative_main_crate_manifest_dir)
-                .join(readme.file_name().unwrap()),
-            &abs_readme,
-            false,
-        )?;
-        Some(abs_readme)
+        let target_dir = root_dir.join(relative_main_crate_manifest_dir);
+        Some(resolve_and_add_readme(
+            writer,
+            readme.as_std_path(),
+            abs_manifest_dir,
+            &target_dir,
+        )?)
     } else {
         None
     };
@@ -733,14 +758,14 @@ fn add_cargo_package_files_to_sdist(
         manifest_path,
         root_dir.join(relative_main_crate_manifest_dir),
         readme_path.as_deref(),
-        &known_path_deps,
+        &ctx.known_path_deps,
         true,
         false,
     )?;
 
     // Add Cargo.lock file
     let manifest_cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
-    let workspace_cargo_lock = workspace_root.join("Cargo.lock").into_std_path_buf();
+    let workspace_cargo_lock = ctx.workspace_root.join("Cargo.lock").into_std_path_buf();
     let cargo_lock_path = if manifest_cargo_lock_path.exists() {
         Some(manifest_cargo_lock_path.clone())
     } else if workspace_cargo_lock.exists() {
@@ -754,12 +779,13 @@ fn add_cargo_package_files_to_sdist(
     // This is the outermost directory that contains both pyproject.toml and the
     // sdist root (which accounts for workspace root and all path dependencies).
     let pyproject_root = pyproject_toml_path.parent().unwrap();
-    let project_root = if pyproject_root == sdist_root || pyproject_root.starts_with(&sdist_root) {
-        &sdist_root
-    } else {
-        assert!(sdist_root.starts_with(pyproject_root));
-        pyproject_root
-    };
+    let project_root =
+        if pyproject_root == ctx.sdist_root || pyproject_root.starts_with(&ctx.sdist_root) {
+            &ctx.sdist_root
+        } else {
+            assert!(ctx.sdist_root.starts_with(pyproject_root));
+            pyproject_root
+        };
     if let Some(cargo_lock_path) = cargo_lock_path {
         let relative_cargo_lock = cargo_lock_path.strip_prefix(project_root).unwrap();
         writer.add_file(root_dir.join(relative_cargo_lock), &cargo_lock_path, false)?;
@@ -782,22 +808,24 @@ fn add_cargo_package_files_to_sdist(
     // that symlinks or .. components don't cause a false positive. A false positive
     // here would try to add a rewritten workspace Cargo.toml on top of the main
     // crate's Cargo.toml, causing a duplicate-file error in VirtualWriter.
-    let normalized_workspace_root = workspace_root
+    let normalized_workspace_root = ctx
+        .workspace_root
         .as_std_path()
         .normalize()
         .map(|p| p.into_path_buf())
-        .unwrap_or_else(|_| workspace_root.as_std_path().to_path_buf());
+        .unwrap_or_else(|_| ctx.workspace_root.as_std_path().to_path_buf());
     let is_in_workspace = normalized_workspace_root != abs_manifest_dir;
     if is_in_workspace {
-        let relative_workspace_cargo_toml = workspace_manifest_path
+        let relative_workspace_cargo_toml = ctx
+            .workspace_manifest_path
             .as_std_path()
             .strip_prefix(project_root)
             .unwrap();
         // Collect all crates that must remain in `workspace.members`:
         // the known path dependencies plus the main Python binding crate itself.
-        let mut deps_to_keep = known_path_deps.clone();
+        let mut deps_to_keep = ctx.known_path_deps.clone();
         let main_member_name = abs_manifest_dir
-            .strip_prefix(workspace_root)
+            .strip_prefix(ctx.workspace_root)
             .unwrap()
             .to_slash()
             .unwrap()
@@ -806,21 +834,22 @@ fn add_cargo_package_files_to_sdist(
             main_member_name,
             PathDependency {
                 manifest_path: manifest_path.clone(),
-                workspace_root: workspace_root.clone().into_std_path_buf(),
+                workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
                 readme: None,
             },
         );
         // Rewrite workspace Cargo.toml to only include relevant members,
         // removing unrelated workspace members to keep the sdist minimal.
-        let mut document = parse_toml_file(workspace_manifest_path.as_std_path(), "Cargo.toml")?;
+        let mut document =
+            parse_toml_file(ctx.workspace_manifest_path.as_std_path(), "Cargo.toml")?;
         rewrite_cargo_toml(
             &mut document,
-            workspace_manifest_path.as_std_path(),
+            ctx.workspace_manifest_path.as_std_path(),
             &deps_to_keep,
         )?;
         writer.add_bytes(
             root_dir.join(relative_workspace_cargo_toml),
-            Some(workspace_manifest_path.as_std_path()),
+            Some(ctx.workspace_manifest_path.as_std_path()),
             document.to_string().as_bytes(),
             false,
         )?;
@@ -828,7 +857,7 @@ fn add_cargo_package_files_to_sdist(
 
     // Add pyproject.toml
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
-    if pyproject_dir != sdist_root {
+    if pyproject_dir != ctx.sdist_root {
         // rewrite `tool.maturin.manifest-path` and `tool.maturin.python-source` in pyproject.toml
         let python_dir = &build_context.project_layout.python_dir;
         // If python_dir is not under pyproject_dir (e.g. due to an absolute python-source
@@ -879,11 +908,7 @@ fn add_cargo_package_files_to_sdist(
             // but somehow it doesn't on Alpine Linux running in GitHub Actions,
             // so we do it manually here.
             // See https://github.com/PyO3/maturin/pull/1187#issuecomment-1273987013
-            if source
-                .extension()
-                .map(|ext| ext == "pyc" || ext == "pyd" || ext == "so")
-                .unwrap_or_default()
-            {
+            if is_compiled_artifact(&source) {
                 debug!("Ignoring {}", source.display());
                 continue;
             }
@@ -897,14 +922,9 @@ fn add_cargo_package_files_to_sdist(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)] // TODO(konsti)
 fn add_path_dep(
     writer: &mut VirtualWriter<SDistWriter>,
-    root_dir: &Path,
-    workspace_root: &Utf8Path,
-    workspace_manifest_path: &Utf8Path,
-    known_path_deps: &HashMap<String, PathDependency>,
-    sdist_root: &Path,
+    ctx: &SdistContext<'_>,
     name: &str,
     path_dep: &PathDependency,
 ) -> Result<()> {
@@ -914,15 +934,17 @@ fn add_path_dep(
         path_dep.manifest_path.display()
     );
     let path_dep_manifest_dir = path_dep.manifest_path.parent().unwrap();
-    let relative_path_dep_manifest_dir = path_dep_manifest_dir.strip_prefix(sdist_root).unwrap();
+    let relative_path_dep_manifest_dir =
+        path_dep_manifest_dir.strip_prefix(&ctx.sdist_root).unwrap();
     // we may need to rewrite workspace Cargo.toml later so don't add it to sdist yet
-    let skip_cargo_toml = workspace_manifest_path == path_dep.manifest_path;
+    let skip_cargo_toml =
+        ctx.workspace_manifest_path.as_std_path() == path_dep.manifest_path.as_path();
     add_crate_to_source_distribution(
         writer,
         &path_dep.manifest_path,
-        root_dir.join(relative_path_dep_manifest_dir),
+        ctx.root_dir.join(relative_path_dep_manifest_dir),
         path_dep.readme.as_deref(),
-        known_path_deps,
+        &ctx.known_path_deps,
         false,
         skip_cargo_toml,
     )
@@ -935,34 +957,17 @@ fn add_path_dep(
     })?;
     // Include readme
     if let Some(readme) = path_dep.readme.as_ref() {
-        let readme = path_dep_manifest_dir.join(readme);
-        let abs_readme = readme
-            .normalize()
-            .with_context(|| {
-                format!(
-                    "readme path `{}` does not exist or is invalid",
-                    readme.display()
-                )
-            })?
-            .into_path_buf();
-        // Add readme next to Cargo.toml so we don't get collisions between crates using readmes
-        // higher up the file tree. See also [`rewrite_cargo_toml_readme`].
-        writer.add_file(
-            root_dir
-                .join(relative_path_dep_manifest_dir)
-                .join(readme.file_name().unwrap()),
-            &abs_readme,
-            false,
-        )?;
+        let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
+        resolve_and_add_readme(writer, readme, path_dep_manifest_dir, &target_dir)?;
     }
     // Handle different workspace manifest
-    if path_dep.workspace_root != workspace_root {
+    if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
         let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
         let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
-            .strip_prefix(sdist_root)
+            .strip_prefix(&ctx.sdist_root)
             .unwrap();
         writer.add_file(
-            root_dir.join(relative_path_dep_workspace_manifest),
+            ctx.root_dir.join(relative_path_dep_workspace_manifest),
             &path_dep_workspace_manifest,
             false,
         )?;
@@ -1024,16 +1029,6 @@ pub fn source_distribution(
         }
     }
 
-    let pyproject_toml_path = build_context
-        .pyproject_toml_path
-        .normalize()
-        .with_context(|| {
-            format!(
-                "pyproject.toml path `{}` does not exist or is invalid",
-                build_context.pyproject_toml_path.display()
-            )
-        })?
-        .into_path_buf();
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     // Add readme, license
     if let Some(project) = pyproject.project.as_ref() {

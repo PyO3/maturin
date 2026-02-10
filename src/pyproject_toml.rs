@@ -248,6 +248,8 @@ pub struct PyProjectToml {
     ///
     /// We use it for `[tool.maturin]`
     pub tool: Option<Tool>,
+    /// PEP 735: Dependency groups
+    pub dependency_groups: Option<pyproject_toml::DependencyGroups>,
 }
 
 impl PyProjectToml {

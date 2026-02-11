@@ -345,7 +345,7 @@ pub fn check_wheel_files_with_sbom(package: impl AsRef<Path>, unique_name: &str)
 
     let sbom_files: Vec<String> = wheel
         .file_names()
-        .filter(|f| f.contains("sboms/"))
+        .filter(|f| f.contains(".dist-info/sboms/"))
         .map(|f| f.to_string())
         .collect();
     assert!(

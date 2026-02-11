@@ -170,6 +170,13 @@ pub enum SdistGenerator {
 pub struct SbomConfig {
     /// Generate an SBOM for Rust crates. Defaults to `true`.
     pub rust: Option<bool>,
+    /// Generate a CycloneDX SBOM for external shared libraries grafted during
+    /// auditwheel repair. Defaults to `true` when repair copies libraries.
+    ///
+    /// The SBOM is written to `<dist-info>/sboms/auditwheel.cdx.json` and
+    /// records which OS packages (deb, rpm, apk) provided the grafted
+    /// libraries, following the same convention as Python's auditwheel.
+    pub auditwheel: Option<bool>,
     /// Additional SBOM files to include in the `.dist-info/sboms` directory.
     pub include: Option<Vec<PathBuf>>,
 }

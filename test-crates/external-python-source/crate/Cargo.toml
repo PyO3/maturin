@@ -1,0 +1,8 @@
+[package]
+name = "external-python-source"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "external-python-source"
+path = "src/main.rs"

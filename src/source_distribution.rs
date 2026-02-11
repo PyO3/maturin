@@ -464,9 +464,15 @@ fn rewrite_pyproject_toml(
         })?;
 
     maturin.remove("manifest-path");
+    let manifest_path_str = relative_manifest_path.to_slash().with_context(|| {
+        format!(
+            "manifest-path `{}` is not valid UTF-8",
+            relative_manifest_path.display()
+        )
+    })?;
     maturin.insert(
         "manifest-path",
-        toml_edit::value(relative_manifest_path.to_str().unwrap()),
+        toml_edit::value(manifest_path_str.as_ref()),
     );
 
     if let Some(python_source) = relative_python_source {
@@ -869,6 +875,14 @@ fn add_cargo_package_files_to_sdist(
             bail!("Failed to determine common path prefix of path dependencies");
         }
     }
+    // Expand sdist_root to also cover python_dir when python-source points
+    // outside the workspace/pyproject directory tree (issue #2202).
+    let python_dir = &build_context.project_layout.python_dir;
+    if !python_dir.starts_with(&sdist_root)
+        && let Some(prefix) = common_path_prefix(&sdist_root, python_dir)
+    {
+        sdist_root = prefix;
+    }
 
     debug!("Found sdist root: {}", sdist_root.display());
 
@@ -1090,12 +1104,14 @@ fn add_cargo_package_files_to_sdist(
     if pyproject_dir != ctx.sdist_root {
         // rewrite `tool.maturin.manifest-path` and `tool.maturin.python-source` in pyproject.toml
         let python_dir = &build_context.project_layout.python_dir;
-        // If python_dir is not under pyproject_dir (e.g. due to an absolute python-source
-        // or path normalization differences), we skip rewriting python-source and let
-        // the auto-detection logic handle it when building from the sdist.
+        // Compute python-source relative to pyproject_dir.  When python_dir is
+        // outside pyproject_dir (e.g. `python-source = "../../python"`), compute
+        // the path relative to project_root instead (the sdist root) so that the
+        // rewritten pyproject.toml can still find the files.
         let relative_python_source = if python_dir != pyproject_dir {
             python_dir
                 .strip_prefix(pyproject_dir)
+                .or_else(|_| python_dir.strip_prefix(project_root))
                 .ok()
                 .map(|p| p.to_path_buf())
         } else {
@@ -1142,7 +1158,20 @@ fn add_cargo_package_files_to_sdist(
                 debug!("Ignoring {}", source.display());
                 continue;
             }
-            let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
+            // When python-source points outside pyproject_dir, strip from
+            // project_root instead (issue #2202).
+            let relative = source
+                .strip_prefix(pyproject_dir)
+                .or_else(|_| source.strip_prefix(project_root))
+                .with_context(|| {
+                    format!(
+                        "Python source file `{}` is outside both pyproject dir `{}` and project root `{}`",
+                        source.display(),
+                        pyproject_dir.display(),
+                        project_root.display(),
+                    )
+                })?;
+            let target = root_dir.join(relative);
             if !source.is_dir() {
                 writer.add_file(target, &source, false)?;
             }

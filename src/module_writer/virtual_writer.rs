@@ -74,6 +74,11 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         self.excludes.matched(path.as_ref(), false).is_whitelist()
     }
 
+    /// Returns `true` if the given target path has already been added to the archive
+    pub(crate) fn contains_target(&self, target: impl AsRef<Path>) -> bool {
+        self.tracker.contains_key(target.as_ref())
+    }
+
     /// Checks exclusions and previously tracked sources to determine if the
     /// current source should be allowed.
     /// Returns Ok(Some(..)) if the new source should be included, Ok(None) if

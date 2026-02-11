@@ -25,9 +25,13 @@ fn sdist_excludes_default_run() {
     let cargo_toml_path = project_dir.join("Cargo.toml");
     let mut cargo_toml = fs_err::read_to_string(&cargo_toml_path).unwrap();
 
-    // Fix README path
-    fs_err::write(project_dir.join("README.md"), "Test readme").unwrap();
-    cargo_toml = cargo_toml.replace("../../README.md", "README.md");
+    // Create two different README files: one at the project root (for pyproject.toml)
+    // and one at a parent directory (for Cargo.toml). Both resolve to "README.md" in the
+    // sdist, reproducing https://github.com/PyO3/maturin/issues/2358.
+    fs_err::write(project_dir.join("README.md"), "Pyproject readme").unwrap();
+    let parent_readme = temp_dir.path().join("README.md");
+    fs_err::write(&parent_readme, "Cargo readme").unwrap();
+    cargo_toml = cargo_toml.replace("../../README.md", "../README.md");
 
     cargo_toml.push_str("\n[[bin]]\nname = \"excluded_bin\"\npath = \"src/bin/excluded_bin.rs\"\n");
     // Replace default-run
@@ -42,11 +46,21 @@ fn sdist_excludes_default_run() {
     // Ensure parent dir exists (src/bin might be missing if I just copied structure and it was empty? No, hello-world has src/bin/foo.rs)
     fs_err::write(&bin_path, "fn main() {}").unwrap();
 
-    // Add exclusion
+    // Add exclusion and set a pyproject.toml readme that differs from Cargo.toml's readme.
+    // This reproduces https://github.com/PyO3/maturin/issues/2358 where having readme in
+    // both Cargo.toml and pyproject.toml (pointing to different files) caused a
+    // "was already added" error.
     let pyproject_toml_path = project_dir.join("pyproject.toml");
     let mut pyproject_toml = fs_err::read_to_string(&pyproject_toml_path).unwrap();
     pyproject_toml =
         pyproject_toml.replace("exclude = [", "exclude = [\n  \"src/bin/excluded_bin.rs\",");
+    // Set pyproject.toml readme = "README.md" so both Cargo.toml and pyproject.toml
+    // add a file at the same target path (README.md) from different sources.
+    // The Cargo.toml README.md was already written above with different content.
+    pyproject_toml = pyproject_toml.replace(
+        "dynamic = [\"authors\", \"readme\"]",
+        "readme = \"README.md\"\ndynamic = [\"authors\"]",
+    );
     fs_err::write(&pyproject_toml_path, pyproject_toml).unwrap();
 
     // Expect Cargo.toml NOT to have default-run="excluded_bin"

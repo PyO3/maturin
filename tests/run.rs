@@ -852,6 +852,48 @@ fn lib_with_target_path_dep_sdist() {
     ))
 }
 
+/// Regression test for https://github.com/PyO3/maturin/issues/2202
+/// When `python-source` points outside the Rust source directory,
+/// `maturin sdist` used to panic with a `StripPrefixError`.
+#[test]
+fn external_python_source_sdist() {
+    let pyproject_toml = expect![[r#"
+        [project]
+        name = "external-python-source"
+        version = "0.1.0"
+
+        [build-system]
+        requires = ["maturin>=1.0,<2.0"]
+        build-backend = "maturin"
+
+        [tool.maturin]
+        bindings = "bin"
+        module-name = "external_python_source"
+        manifest-path = "crate/Cargo.toml"
+        python-source = "python"
+    "#]];
+    handle_result(other::test_source_distribution(
+        "test-crates/external-python-source/crate",
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "external_python_source-0.1.0/PKG-INFO",
+                "external_python_source-0.1.0/crate/.gitignore",
+                "external_python_source-0.1.0/crate/Cargo.lock",
+                "external_python_source-0.1.0/crate/Cargo.toml",
+                "external_python_source-0.1.0/crate/src/main.rs",
+                "external_python_source-0.1.0/pyproject.toml",
+                "external_python_source-0.1.0/python/external_python_source/__init__.py",
+            }
+        "#]],
+        Some((
+            Path::new("external_python_source-0.1.0/pyproject.toml"),
+            pyproject_toml,
+        )),
+        "sdist-external-python-source",
+    ))
+}
+
 #[test]
 fn pyo3_mixed_src_layout_sdist() {
     handle_result(other::test_source_distribution(

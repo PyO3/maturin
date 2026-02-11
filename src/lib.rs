@@ -68,6 +68,7 @@ mod new_project;
 mod project_layout;
 pub mod pyproject_toml;
 mod python_interpreter;
+mod sbom;
 mod source_distribution;
 mod target;
 #[cfg(feature = "upload")]

@@ -735,6 +735,7 @@ fn workspace_members_beneath_pyproject_sdist() {
         expect![[r#"
             {
                 "pyo3_mixed_workspace-2.1.3/PKG-INFO",
+                "pyo3_mixed_workspace-2.1.3/README.md",
                 "pyo3_mixed_workspace-2.1.3/pyproject.toml",
                 "pyo3_mixed_workspace-2.1.3/rust/Cargo.lock",
                 "pyo3_mixed_workspace-2.1.3/rust/Cargo.toml",
@@ -916,6 +917,7 @@ fn pyo3_mixed_src_layout_sdist() {
         expect![[r#"
             {
                 "pyo3_mixed_src-2.1.3/PKG-INFO",
+                "pyo3_mixed_src-2.1.3/README.md",
                 "pyo3_mixed_src-2.1.3/pyproject.toml",
                 "pyo3_mixed_src-2.1.3/rust/Cargo.lock",
                 "pyo3_mixed_src-2.1.3/rust/Cargo.toml",

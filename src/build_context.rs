@@ -1,4 +1,4 @@
-use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
+use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, get_sysroot_path, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::binding_generator::{
     BinBindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator, UniFfiBindingGenerator,
@@ -8,7 +8,7 @@ use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
 use crate::compile::{CompileTarget, warn_missing_py_init};
 use crate::compression::CompressionOptions;
-use crate::module_writer::{WheelWriter, add_data, write_pth};
+use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
 use crate::project_layout::ProjectLayout;
 use crate::sbom::{SbomData, generate_sbom_data, write_sboms};
 use crate::source_distribution::source_distribution;
@@ -472,8 +472,36 @@ impl BuildContext {
             "🖨  Copied external shared libraries to package {} directory:",
             libs_dir.display()
         );
-        for lib_path in libs_copied {
+        for lib_path in &libs_copied {
             eprintln!("    {}", lib_path.display());
+        }
+
+        // Generate auditwheel SBOM for the grafted libraries.
+        // This mirrors Python auditwheel's behaviour of writing a CycloneDX
+        // SBOM to <dist-info>/sboms/auditwheel.cdx.json that records which OS
+        // packages provided the grafted shared libraries.
+        let auditwheel_sbom_enabled = self
+            .sbom
+            .as_ref()
+            .and_then(|c| c.auditwheel)
+            .unwrap_or(true);
+        if auditwheel_sbom_enabled {
+            let grafted_paths: Vec<PathBuf> = libs_copied.into_iter().collect();
+            // Obtain the sysroot so whichprovides can strip cross-compilation
+            // prefixes when querying the host package manager.
+            let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
+            if let Some(sbom_json) = crate::auditwheel::sbom::create_auditwheel_sbom(
+                &self.metadata24.name,
+                &self.metadata24.version.to_string(),
+                &grafted_paths,
+                &sysroot,
+            ) {
+                let sbom_path = self
+                    .metadata24
+                    .get_dist_info_dir()
+                    .join("sboms/auditwheel.cdx.json");
+                writer.add_bytes(&sbom_path, None, sbom_json, false)?;
+            }
         }
 
         let artifact_dir = match self.bridge() {

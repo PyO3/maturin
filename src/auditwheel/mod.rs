@@ -4,6 +4,8 @@ pub mod patchelf;
 mod platform_tag;
 mod policy;
 mod repair;
+pub mod sbom;
+mod whichprovides;
 
 pub use audit::*;
 pub use platform_tag::PlatformTag;

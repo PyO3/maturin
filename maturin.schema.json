@@ -446,6 +446,13 @@
       "description": "SBOM configuration",
       "type": "object",
       "properties": {
+        "auditwheel": {
+          "description": "Generate a CycloneDX SBOM for external shared libraries grafted during\nauditwheel repair. Defaults to `true` when repair copies libraries.\n\nThe SBOM is written to `<dist-info>/sboms/auditwheel.cdx.json` and\nrecords which OS packages (deb, rpm, apk) provided the grafted\nlibraries, following the same convention as Python's auditwheel.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "include": {
           "description": "Additional SBOM files to include in the `.dist-info/sboms` directory.",
           "type": [

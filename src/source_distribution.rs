@@ -648,6 +648,16 @@ fn add_crate_to_source_distribution(
         })
         .transpose()?;
 
+    // Filter out files that were already added by resolve_and_add_readme /
+    // resolve_and_add_file (e.g. readme or license-file from Cargo.toml pointing
+    // outside the crate). `cargo package --list` may include a local copy at the
+    // same target path, causing a duplicate.
+    // See https://github.com/PyO3/maturin/issues/2358
+    let target_source: Vec<_> = target_source
+        .into_iter()
+        .filter(|(target, _)| !writer.contains_target(prefix.join(target)))
+        .collect();
+
     if !matches!(
         role,
         CrateRole::PathDependency {
@@ -1274,12 +1284,22 @@ pub fn source_distribution(
 
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
     // Add readme, license
+    // Skip if the target path was already added (e.g. from Cargo.toml metadata)
+    // to avoid "was already added" errors when both Cargo.toml and pyproject.toml
+    // specify a readme/license pointing to different files.
+    // See https://github.com/PyO3/maturin/issues/2358
     if let Some(project) = pyproject.project.as_ref() {
         if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
-            writer.add_file(root_dir.join(readme), pyproject_dir.join(readme), false)?;
+            let target = root_dir.join(readme);
+            if !writer.contains_target(&target) {
+                writer.add_file(target, pyproject_dir.join(readme), false)?;
+            }
         }
         if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
-            writer.add_file(root_dir.join(file), pyproject_dir.join(file), false)?;
+            let target = root_dir.join(file);
+            if !writer.contains_target(&target) {
+                writer.add_file(target, pyproject_dir.join(file), false)?;
+            }
         }
         if let Some(license_files) = &project.license_files {
             // Safe on Windows and Unix as neither forward nor backwards slashes are escaped.

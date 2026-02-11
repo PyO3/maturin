@@ -673,8 +673,8 @@ fn invalid_manylinux_does_not_panic() {
 }
 
 #[test]
-fn warn_on_missing_python_source() {
-    handle_result(errors::warn_on_missing_python_source())
+fn error_on_missing_python_source() {
+    handle_result(errors::error_on_missing_python_source())
 }
 
 #[test]

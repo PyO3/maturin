@@ -150,7 +150,9 @@ impl ProjectResolver {
                 .normalize()
                 .with_context(|| {
                     format!(
-                        "python source path `{}` does not exist or is invalid",
+                        "python-source is set to `{}` but the directory does not exist. \
+                        Either create the directory or remove the `python-source` setting \
+                        from pyproject.toml.",
                         py_src.display()
                     )
                 })?
@@ -438,9 +440,10 @@ impl ProjectLayout {
                 })
             } else {
                 if custom_python_source {
-                    eprintln!(
-                        "⚠️ Warning: You specified the python source as {}, but the python module at \
-                        {} is missing. No python module will be included.",
+                    bail!(
+                        "python-source is set to `{}`, but the python module at `{}` \
+                        does not exist. Either create the Python module or remove the \
+                        `python-source` setting from pyproject.toml.",
                         python_root.display(),
                         python_module.display()
                     );

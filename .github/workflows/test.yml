@@ -111,7 +111,6 @@ jobs:
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
       - uses: mlugg/setup-zig@v2
-        if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           version: 0.15.2
       - run: rustup target add wasm32-wasip1 # Used by the test suite

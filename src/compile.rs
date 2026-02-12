@@ -1,6 +1,6 @@
 #[cfg(feature = "zig")]
 use crate::PlatformTag;
-use crate::target::RUST_1_64_0;
+use crate::target::{RUST_1_64_0, RUST_1_93_0};
 use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -245,6 +245,21 @@ fn cargo_build_command(
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
+        // The -Z link-native-libraries=no flag is needed for older Rust versions
+        // where Emscripten builds fail without it due to the behavior that it links
+        // libc automatically.
+        // From Rust 1.93.0, it is possible to build Emscripten with stable toolchain
+        // and this flag can be and should be removed.
+        if target.rustc_version.semver < RUST_1_93_0
+            && !rustflags
+                .flags
+                .iter()
+                .any(|f| f.contains("link-native-libraries"))
+        {
+            debug!("Setting `-Z link-native-libraries=no` for Emscripten (rust < 1.93.0)");
+            rustflags.push("-Z");
+            rustflags.push("link-native-libraries=no");
+        }
         let mut emscripten_args = Vec::new();
         // Allow user to override these default settings
         if !cargo_rustc

@@ -245,16 +245,6 @@ fn cargo_build_command(
             cargo_rustc.args.extend(mac_args);
         }
     } else if target.is_emscripten() {
-        // Allow user to override these default flags
-        if !rustflags
-            .flags
-            .iter()
-            .any(|f| f.contains("link-native-libraries"))
-        {
-            debug!("Setting `-Z link-native-libraries=no` for Emscripten");
-            rustflags.push("-Z");
-            rustflags.push("link-native-libraries=no");
-        }
         let mut emscripten_args = Vec::new();
         // Allow user to override these default settings
         if !cargo_rustc

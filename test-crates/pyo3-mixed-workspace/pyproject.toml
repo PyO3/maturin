@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pyo3-mixed-workspace"
+readme = "README.md"
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Rust"

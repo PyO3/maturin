@@ -11,6 +11,7 @@ classifiers = [
 requires-python = ">=3.7"
 dependencies = ["boltons"]
 license = "MIT"
+readme = "README.md"
 dynamic = ["version"]
 
 [project.scripts]

@@ -111,9 +111,8 @@ jobs:
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
       - uses: mlugg/setup-zig@v2
-        if: ${{ matrix.os != 'windows-11-arm' }}
         with:
-          version: 0.12.1
+          version: 0.15.2
       - run: rustup target add wasm32-wasip1 # Used by the test suite
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -140,38 +139,37 @@ jobs:
         run: echo "RUSTFLAGS="-C debuginfo=0"" >> $GITHUB_ENV
       - name: cargo test
         run: cargo nextest run --features password-storage
-      # TODO: https://github.com/PyO3/maturin/issues/2263
-      #- name: test cross compiling with zig
-      #  if: ${{ !contains(matrix.python-version, '-dev') }}
-      #  shell: bash
-      #  run: |
-      #    set -ex
-      #    rustup target add aarch64-unknown-linux-gnu
-      #    rustup target add aarch64-unknown-linux-musl
-      #    rustup target add aarch64-apple-darwin
-      #
-      #    # abi3
-      #    cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
-      #    cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
-      #    if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
-      #      cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
-      #    fi
-      #
-      #    if [[ "$PYTHON_VERSION" == "3.1"* ]]; then
-      #      # Check abi3 wheels with abi3audit on CPython only
-      #      pip install abi3audit
-      #      abi3audit test-crates/pyo3-pure/target/wheels/*.whl
-      #    fi
-      #    # Check wheels with twine
-      #    twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
-      #
-      #    # non-abi3
-      #    cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
-      #    if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
-      #      cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
-      #    fi
-      #    # Check wheels with twine
-      #    twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
+      - name: test cross compiling with zig
+        if: ${{ !contains(matrix.python-version, '-dev') }}
+        shell: bash
+        run: |
+          set -ex
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add aarch64-unknown-linux-musl
+          rustup target add aarch64-apple-darwin
+
+          # abi3
+          cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
+          if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
+            cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
+          fi
+
+          if [[ "$PYTHON_VERSION" == "3.1"* ]]; then
+            # Check abi3 wheels with abi3audit on CPython only
+            pip install abi3audit
+            abi3audit test-crates/pyo3-pure/target/wheels/*.whl
+          fi
+          # Check wheels with twine
+          twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
+
+          # non-abi3
+          cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
+            cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
+          fi
+          # Check wheels with twine
+          twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl
       - name: test compiling with PYO3_CONFIG_FILE
         if: ${{ matrix.os != 'windows-11-arm' }}
         shell: bash

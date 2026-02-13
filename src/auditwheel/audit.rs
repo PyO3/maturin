@@ -19,6 +19,10 @@ use thiserror::Error;
 static IS_LIBPYTHON: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^libpython3\.\d+m?u?t?\.so\.\d+\.\d+$").unwrap());
 
+fn is_dynamic_linker(name: &str) -> bool {
+    name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1"
+}
+
 /// Error raised during auditing an elf file for manylinux/musllinux compatibility
 #[derive(Error, Debug)]
 #[error("Ensuring manylinux/musllinux compliance failed")]
@@ -96,6 +100,24 @@ pub struct VersionedLibrary {
     versions: HashSet<String>,
 }
 
+impl VersionedLibrary {
+    /// Parse version strings (e.g. "GLIBC_2.17") into a map of name -> set of versions.
+    /// e.g. {"GLIBC" -> {"2.17", "2.5"}, "GCC" -> {"3.0"}}
+    ///
+    fn parsed_versions(&self) -> HashMap<String, HashSet<String>> {
+        let mut result: HashMap<String, HashSet<String>> = HashMap::new();
+        for v in &self.versions {
+            if let Some((name, version)) = v.split_once('_') {
+                result
+                    .entry(name.to_string())
+                    .or_default()
+                    .insert(version.to_string());
+            }
+        }
+        result
+    }
+}
+
 /// Find required dynamic linked libraries with version information
 pub fn find_versioned_libraries(elf: &Elf) -> Vec<VersionedLibrary> {
     let mut symbols = Vec::new();
@@ -103,7 +125,7 @@ pub fn find_versioned_libraries(elf: &Elf) -> Vec<VersionedLibrary> {
         for need_file in verneed.iter() {
             if let Some(name) = elf.dynstrtab.get_at(need_file.vn_file) {
                 // Skip dynamic linker/loader
-                if name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1" {
+                if is_dynamic_linker(name) {
                     continue;
                 }
                 let mut versions = HashSet::new();
@@ -174,8 +196,7 @@ fn policy_is_satisfied(
         .collect();
 
     for dep in deps {
-        // Skip dynamic linker/loader
-        if dep.starts_with("ld-linux") || dep == "ld64.so.2" || dep == "ld64.so.1" {
+        if is_dynamic_linker(dep) {
             continue;
         }
         if !policy.lib_whitelist.contains(dep) {
@@ -197,16 +218,14 @@ fn policy_is_satisfied(
             offending_libs.insert(library.name.clone());
             continue;
         }
-        let mut versions: HashMap<String, HashSet<String>> = HashMap::new();
-        for v in &library.versions {
-            let (name, version) = v.split_once('_').unwrap();
-            versions
-                .entry(name.to_string())
-                .or_default()
-                .insert(version.to_string());
-        }
-        for (name, versions_needed) in versions.iter() {
-            let versions_allowed = &arch_versions[name];
+        for (name, versions_needed) in library.parsed_versions() {
+            let Some(versions_allowed) = arch_versions.get(&name) else {
+                offending_versioned_syms.insert(format!(
+                    "{} offending versions: unknown symbol namespace {name}",
+                    library.name,
+                ));
+                continue;
+            };
             if !versions_needed.is_subset(versions_allowed) {
                 let offending_versions: Vec<&str> = versions_needed
                     .difference(versions_allowed)
@@ -523,7 +542,104 @@ pub fn get_policy_and_libs(
     } else {
         Vec::new()
     };
+
+    // Check external libraries for versioned symbol requirements that may
+    // require a stricter (less compatible, e.g. newer manylinux) policy than what
+    // the main artifact alone would need. See https://github.com/PyO3/maturin/issues/1490
+    let policy = if !external_libs.is_empty() {
+        let (adjusted, offenders) = check_external_libs_policy(&policy, &external_libs, target)?;
+        if platform_tag.is_some() && !offenders.is_empty() {
+            bail!(
+                "External libraries {offenders:?} require newer symbol versions than {policy} allows. \
+                 Consider using --compatibility {adjusted} or a newer manylinux tag"
+            );
+        }
+        adjusted
+    } else {
+        policy
+    };
+
     Ok((policy, external_libs))
+}
+
+/// Check whether the versioned symbol requirements are satisfied by a policy's allowed versions.
+fn versioned_symbols_satisfied(
+    policy: &Policy,
+    arch: &str,
+    versioned_libraries: &[VersionedLibrary],
+) -> bool {
+    let arch_versions = match policy.symbol_versions.get(arch) {
+        Some(v) => v,
+        None => return false,
+    };
+    for library in versioned_libraries {
+        if !policy.lib_whitelist.contains(&library.name) {
+            continue;
+        }
+        for (name, versions_needed) in library.parsed_versions() {
+            match arch_versions.get(&name) {
+                Some(versions_allowed) if versions_needed.is_subset(versions_allowed) => {}
+                _ => return false,
+            }
+        }
+    }
+    true
+}
+
+/// Check if external libraries require a newer glibc than the current policy allows.
+/// Returns the adjusted policy and a list of library names that caused the downgrade.
+fn check_external_libs_policy(
+    policy: &Policy,
+    external_libs: &[Library],
+    target: &Target,
+) -> Result<(Policy, Vec<String>)> {
+    let arch = target.target_arch().to_string();
+    let platform_policies = get_default_platform_policies();
+    // Policies must be sorted from highest to lowest priority so we find the
+    // best (most compatible) match first when iterating.
+    debug_assert!(
+        platform_policies
+            .windows(2)
+            .all(|w| w[0].priority >= w[1].priority)
+    );
+
+    let mut result = policy.clone();
+    let mut offenders = Vec::new();
+    for lib in external_libs {
+        let lib_path = match lib.realpath.as_ref() {
+            Some(path) => path,
+            None => continue,
+        };
+        let buffer = fs_err::read(lib_path)
+            .with_context(|| format!("Failed to read external library {}", lib_path.display()))?;
+        let elf = match Elf::parse(&buffer) {
+            Ok(elf) => elf,
+            Err(_) => continue,
+        };
+        let versioned_libraries = find_versioned_libraries(&elf);
+        if versioned_libraries.is_empty() {
+            continue;
+        }
+
+        // Find the highest policy that this external library satisfies
+        for candidate in platform_policies.iter() {
+            if candidate.priority > result.priority {
+                continue;
+            }
+            if versioned_symbols_satisfied(candidate, &arch, &versioned_libraries) {
+                if candidate.priority < result.priority {
+                    eprintln!(
+                        "📦 Downgrading tag to {candidate} because external library {} requires it",
+                        lib.name,
+                    );
+                    offenders.push(lib.name.clone());
+                    result = candidate.clone();
+                }
+                break;
+            }
+        }
+    }
+    Ok((result, offenders))
 }
 
 /// Extract library search paths from RUSTFLAGS configuration

@@ -295,8 +295,8 @@ fn fun_with_abiflags(
         && !(target.get_python_os() == "cygwin"
             && message.system.to_lowercase().starts_with("cygwin"))
     {
-        // Python versions <= 3.12 used to report sys.platform as "linux". Only on Python versions
-        // >= 3.13, sys.platform reports as "android". So maintain backwards compatibility with
+        // Python versions <= 3.12 used to report platform.system() as "linux". Only on Python versions
+        // >= 3.13, platform.system() reports as "android". So maintain backwards compatibility with
         // Python 3.12 when compiling on Android environment (for e.g. Termux)
         let is_android_compat = target.get_python_os() == "android"
             && message.system == "linux"

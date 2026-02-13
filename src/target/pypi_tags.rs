@@ -51,7 +51,7 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
             // PyPI allows iOS with arm64 and x86_64 (simulator)
             matches!(normalized_arch, "arm64" | "x86_64")
         }
-        Os::Linux if target.target_triple().contains("android") => {
+        Os::Android => {
             // Android target triples map to specific platform tag architectures
             let android_arch = match arch.as_str() {
                 "armv7l" => "armeabi_v7a", // armv7 little-endian

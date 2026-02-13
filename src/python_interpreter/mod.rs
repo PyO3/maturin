@@ -13,7 +13,6 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::{self, FromStr};
-use target_lexicon::Environment;
 use tracing::{debug, instrument};
 
 mod config;

@@ -44,6 +44,7 @@ pub enum Os {
     Aix,
     Hurd,
     Cygwin,
+    Android,
 }
 
 impl fmt::Display for Os {
@@ -65,6 +66,7 @@ impl fmt::Display for Os {
             Os::Aix => write!(f, "AIX"),
             Os::Hurd => write!(f, "Hurd"),
             Os::Cygwin => write!(f, "Cygwin"),
+            Os::Android => write!(f, "Android"),
         }
     }
 }
@@ -160,6 +162,14 @@ impl Arch {
 // Returns the set of supported architectures for each operating system
 fn get_supported_architectures(os: &Os) -> Vec<Arch> {
     match os {
+        Os::Android => vec![
+            Arch::Aarch64,
+            Arch::Armv5teL,
+            Arch::Armv6L,
+            Arch::Armv7L,
+            Arch::X86,
+            Arch::X86_64,
+        ],
         Os::Linux => vec![
             Arch::Aarch64,
             Arch::Armv5teL,
@@ -277,7 +287,10 @@ impl Target {
             .map_err(|_| format_err!("Unknown target triple {}", target_triple))?;
 
         let os = match platform.operating_system {
-            OperatingSystem::Linux => Os::Linux,
+            OperatingSystem::Linux => match platform.environment {
+                Environment::Android | Environment::Androideabi => Os::Android,
+                _ => Os::Linux,
+            },
             OperatingSystem::Windows => Os::Windows,
             OperatingSystem::MacOSX(_) | OperatingSystem::Darwin(_) => Os::Macos,
             OperatingSystem::IOS(_) => Os::Ios,
@@ -457,6 +470,7 @@ impl Target {
     /// Returns the name python uses in `sys.platform` for this os
     pub fn get_python_os(&self) -> &str {
         match self.os {
+            Os::Android => "android",
             Os::Windows => "windows",
             Os::Linux => "linux",
             Os::Macos => "darwin",
@@ -570,7 +584,8 @@ impl Target {
             | Os::Wasi
             | Os::Aix
             | Os::Hurd
-            | Os::Cygwin => true,
+            | Os::Cygwin
+            | Os::Android => true,
         }
     }
 
@@ -668,6 +683,11 @@ impl Target {
     #[inline]
     pub fn is_aix(&self) -> bool {
         self.os == Os::Aix
+    }
+
+    /// Returns true if we're building a binary for Android
+    pub fn is_android(&self) -> bool {
+        self.os == Os::Android
     }
 
     /// Returns true if the current platform's target env is Musl

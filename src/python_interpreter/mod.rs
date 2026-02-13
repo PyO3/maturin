@@ -13,6 +13,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::{self, FromStr};
+use target_lexicon::Environment;
 use tracing::{debug, instrument};
 
 mod config;
@@ -295,11 +296,19 @@ fn fun_with_abiflags(
         && !(target.get_python_os() == "cygwin"
             && message.system.to_lowercase().starts_with("cygwin"))
     {
-        bail!(
-            "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
-            message.system,
-            target,
-        )
+        // Python versions <= 3.12 used to report sys.platform as "linux". Only on Python versions
+        // >= 3.13, sys.platform reports as "android". So maintain backwards compatibility with
+        // Python 3.12 when compiling on Android environment (for e.g. Termux)
+        let is_android_compat = target.get_python_os() == "android"
+            && message.system == "linux"
+            && message.major == 3 && message.minor <= 12;
+        if !is_android_compat {
+            bail!(
+                "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",
+                message.system,
+                target,
+            )
+        }
     }
 
     if message.major != 3 || message.minor < 7 {

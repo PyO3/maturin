@@ -23,6 +23,7 @@ mod pypi_tags;
 pub use pypi_tags::{is_arch_supported_by_pypi, validate_wheel_filename_for_pypi};
 
 pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
+pub(crate) const RUST_1_93_0: semver::Version = semver::Version::new(1, 93, 0);
 
 /// All supported operating system
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Deserialize)]

@@ -372,57 +372,59 @@ impl InterpreterConfig {
             }),
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
-        let ext_suffix = if target.is_linux() || target.is_android() || target.is_macos() || target.is_hurd() {
-            let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
-            match interpreter_kind {
-                InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
-                    // Eg: .cpython-38-x86_64-linux-gnu.so
+        let ext_suffix =
+            if target.is_linux() || target.is_android() || target.is_macos() || target.is_hurd() {
+                let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
+                match interpreter_kind {
+                    InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
+                        // Eg: .cpython-38-x86_64-linux-gnu.so
+                        format!(
+                            ".cpython-{}-{}-{}-{}.{}",
+                            abi_tag,
+                            target.get_python_ext_arch(interpreter_kind),
+                            target.get_python_os(),
+                            target_env,
+                            file_ext,
+                        )
+                    }),
+                    InterpreterKind::PyPy => ext_suffix.unwrap_or_else(|| {
+                        // Eg: .pypy38-pp73-x86_64-linux-gnu.so
+                        format!(
+                            ".pypy{}{}-{}-{}-{}-{}.{}",
+                            major,
+                            minor,
+                            abi_tag,
+                            target.get_python_ext_arch(interpreter_kind),
+                            target.get_python_os(),
+                            target_env,
+                            file_ext,
+                        )
+                    }),
+                    InterpreterKind::GraalPy => ext_suffix.unwrap_or_else(|| {
+                        // e.g. .graalpy230-310-native-x86_64-linux.so
+                        format!(
+                            ".{}-{}-{}.{}",
+                            abi_tag.replace('_', "-"),
+                            target.get_python_ext_arch(interpreter_kind),
+                            target.get_python_os(),
+                            file_ext,
+                        )
+                    }),
+                }
+            } else if target.is_emscripten() && matches!(interpreter_kind, InterpreterKind::CPython)
+            {
+                ext_suffix.unwrap_or_else(|| {
                     format!(
-                        ".cpython-{}-{}-{}-{}.{}",
+                        ".cpython-{}-{}-{}.{}",
                         abi_tag,
                         target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
-                        target_env,
-                        file_ext,
+                        file_ext
                     )
-                }),
-                InterpreterKind::PyPy => ext_suffix.unwrap_or_else(|| {
-                    // Eg: .pypy38-pp73-x86_64-linux-gnu.so
-                    format!(
-                        ".pypy{}{}-{}-{}-{}-{}.{}",
-                        major,
-                        minor,
-                        abi_tag,
-                        target.get_python_ext_arch(interpreter_kind),
-                        target.get_python_os(),
-                        target_env,
-                        file_ext,
-                    )
-                }),
-                InterpreterKind::GraalPy => ext_suffix.unwrap_or_else(|| {
-                    // e.g. .graalpy230-310-native-x86_64-linux.so
-                    format!(
-                        ".{}-{}-{}.{}",
-                        abi_tag.replace('_', "-"),
-                        target.get_python_ext_arch(interpreter_kind),
-                        target.get_python_os(),
-                        file_ext,
-                    )
-                }),
-            }
-        } else if target.is_emscripten() && matches!(interpreter_kind, InterpreterKind::CPython) {
-            ext_suffix.unwrap_or_else(|| {
-                format!(
-                    ".cpython-{}-{}-{}.{}",
-                    abi_tag,
-                    target.get_python_ext_arch(interpreter_kind),
-                    target.get_python_os(),
-                    file_ext
-                )
-            })
-        } else {
-            ext_suffix.context("missing value for ext_suffix")?
-        };
+                })
+            } else {
+                ext_suffix.context("missing value for ext_suffix")?
+            };
         let gil_disabled = build_flags
             .map(|flags| flags.contains("Py_GIL_DISABLED"))
             .unwrap_or(false);

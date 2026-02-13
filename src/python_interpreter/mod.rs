@@ -301,7 +301,8 @@ fn fun_with_abiflags(
         // Python 3.12 when compiling on Android environment (for e.g. Termux)
         let is_android_compat = target.get_python_os() == "android"
             && message.system == "linux"
-            && message.major == 3 && message.minor <= 12;
+            && message.major == 3
+            && message.minor <= 12;
         if !is_android_compat {
             bail!(
                 "platform.system() in python, {}, and the rust target, {:?}, don't match ಠ_ಠ",

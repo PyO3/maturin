@@ -14,6 +14,7 @@
 - [Local Development](./local_development.md)
   - [Import Hook](./import_hook.md)
 - [Distribution](./distribution.md)
+- [SBOM](./sbom.md)
 - [Sphinx Integration](./sphinx.md)
 
 ---

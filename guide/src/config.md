@@ -95,6 +95,23 @@ include = [
 The default behavior is apply these configurations to both `sdist` and `wheel`
 targets.
 
+#### SBOM options
+
+```toml
+[tool.maturin.sbom]
+# Generate a CycloneDX SBOM for the Rust dependency tree.
+# Defaults to true when the sbom feature is enabled.
+rust = true
+# Generate a CycloneDX SBOM for external shared libraries grafted during
+# auditwheel repair. Defaults to true when repair copies libraries.
+auditwheel = true
+# Additional SBOM files to include in the wheel.
+# Paths are relative to the project root.
+include = ["sboms/vendor.cdx.json"]
+```
+
+See the [SBOM](./sbom.md) page for more details.
+
 #### target specific maturin options
 
 Currently only macOS deployment target SDK version can be configured

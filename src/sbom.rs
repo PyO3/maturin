@@ -55,9 +55,15 @@ pub fn generate_sbom_data(context: &BuildContext) -> Result<Option<SbomData>> {
 
         let mut rust_sboms = Vec::new();
         for sbom in sboms {
+            // Only keep the SBOM for the crate being built into a wheel.
+            // Each member's SBOM already contains the full transitive
+            // dependency graph, so filtering is safe.
+            if sbom.package_name != context.crate_name {
+                continue;
+            }
             let mut buf = Vec::new();
             sbom.bom
-                .output_as_json_v1_3(&mut buf)
+                .output_as_json_v1_5(&mut buf)
                 .map_err(|e| anyhow::anyhow!("Failed to serialize SBOM: {}", e))?;
             rust_sboms.push((sbom.package_name, buf));
         }

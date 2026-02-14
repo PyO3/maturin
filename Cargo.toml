@@ -100,7 +100,7 @@ clap = { version = "4.0.0", features = [
 clap_complete_command = { version = "0.6.1", optional = true }
 
 # cross compile
-cargo-zigbuild = { version = "0.21.8", default-features = false, optional = true }
+cargo-zigbuild = { version = "0.22.0", default-features = false, optional = true }
 cargo-xwin = { version = "0.19.2", default-features = false, optional = true }
 xz2 = { version = "0.1", optional = true }
 

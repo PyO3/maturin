@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.12.0
+
+* Use pypi compatibility validation for own CI (#2929)
+* Update toml crates for toml 1.1 support (#2934)
+* Use a single location for MSRV (#2936)
+* Fix editable install for binary projects with Python modules (#2938)
+* Release to crates.io only after the builds passed (#2939)
+* Use `mymindstorm/setup-emsdk@v14` in generated GitHub Actions workflow (#2941)
+* Use trusted publishing for crates.io (#2943)
+* Filter linked_paths by KIND and linked_libs (#2949)
+* Update bytes to 1.11.1 (#2960)
+* Normalize wheel distribution names to match the PyPA spec (#2954)
+* Allow build loongarch64 and riscv64 for musllinux (#2963)
+* Strip excluded cargo targets in sdist (#2964)
+* Normalize wheel `RECORD` paths (on Windows) (#2965)
+* Bump MSRV to 1.88.0 (#2966)
+* Support MATURIN_STRIP env var and --strip true/false to override pyproject.toml (#2968)
+* Fix: copy bin artifacts before auditwheel repair to avoid rerun failures (#2969)
+* Fix: rewrite python-source in pyproject.toml when building sdist (#2972)
+* Fix: resolve wheel include patterns relative to project root (#2973)
+* Fix: always include workspace Cargo.toml in sdist (#2974)
+* Refactor: simplify source_distribution.rs (#2976)
+* Feat: support PEP 735 dependency groups in develop command (#2978)
+* Fix license file handling for workspace-level license files (#2970)
+* Support PEP 739 build-details.json when cross compiling (#2979)
+* Fix .libs directory name for namespace packages (#2981)
+* Fix: exclude duplicate python source files from sdist for workspace members (#2982)
+* Fix: remove default-members from workspace Cargo.toml in sdist (#2983)
+* Fix: correctly filter workspace members in sdist by directory path (#2984)
+* Feat: Add PEP 770 SBOM support (#2980)
+* Error when python-source is set but Python module is missing (#2986)
+* Feat: add auditwheel SBOM for grafted shared libraries (#2985)
+* Fix sdist duplicate README error when readme is in both Cargo.toml and pyproject.toml (#2987)
+* Fix: support python-source pointing outside Rust source directory (#2988)
+* Relax ziglang dependency version requirement (#2990)
+* Stop adding link-native-libraries flag by default in Emscripten platform in latest Rust (#2991)
+* Fix docker build github workflow
+* Fix: platform.system() on Android for Python 3.13+ (#2992)
+* Document more environment variables in user guide
+* Fix: check external libs for glibc version when determining platform tag (#2993)
+* Update cargo-zigbuild to 0.22.0 (#2994)
+* Sbom: filter to bindings crate only and upgrade to CycloneDX v1.5 (#2995)
+* Upgrade ureq to 3.2.0 and migrate to built-in multipart (#2997)
+
 ## 1.11.5
 
 * Allow combining `--compatibility pypi` with other `--compatibility` values ([#2928](https://github.com/pyo3/maturin/pull/2928))

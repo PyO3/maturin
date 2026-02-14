@@ -392,74 +392,69 @@ fn tls_ca_bundle() -> Option<OsString> {
 }
 
 // Prefer rustls if both native-tls and rustls features are enabled
+/// Load certificates from a CA bundle file
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+fn load_ca_certs(
+    ca_bundle: impl AsRef<std::path::Path>,
+) -> Result<Vec<ureq::tls::Certificate<'static>>, UploadError> {
+    use rustls_pki_types::pem::PemObject;
+
+    let certs = rustls_pki_types::CertificateDer::pem_file_iter(ca_bundle)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+    Ok(certs
+        .into_iter()
+        .map(|cert| {
+            let owned = cert.into_owned();
+            ureq::tls::Certificate::from_der(owned.as_ref()).to_owned()
+        })
+        .collect())
+}
+
 #[cfg(all(feature = "native-tls", not(feature = "rustls")))]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
-    let builder = ureq::Agent::config_builder()
-        .proxy(ureq::Proxy::try_from_env())
-        .http_status_as_error(false);
+    let mut tls_config =
+        ureq::tls::TlsConfig::builder().provider(ureq::tls::TlsProvider::NativeTls);
+
     if let Some(ca_bundle) = tls_ca_bundle() {
-        use rustls_pki_types::pem::PemObject;
-        let certs = rustls_pki_types::CertificateDer::pem_file_iter(&ca_bundle)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        let ureq_certs: Vec<ureq::tls::Certificate<'static>> = certs
-            .into_iter()
-            .map(|cert| {
-                let owned = cert.into_owned();
-                ureq::tls::Certificate::from_der(owned.as_ref()).to_owned()
-            })
-            .collect();
-
-        let tls_config = ureq::tls::TlsConfig::builder()
-            .provider(ureq::tls::TlsProvider::NativeTls)
-            .root_certs(ureq::tls::RootCerts::new_with_certs(&ureq_certs))
-            .build();
-        Ok(builder.tls_config(tls_config).build().into())
-    } else {
-        let tls_config = ureq::tls::TlsConfig::builder()
-            .provider(ureq::tls::TlsProvider::NativeTls)
-            .build();
-        Ok(builder.tls_config(tls_config).build().into())
+        let certs = load_ca_certs(ca_bundle)?;
+        tls_config = tls_config.root_certs(ureq::tls::RootCerts::new_with_certs(&certs));
     }
+
+    Ok(ureq::Agent::config_builder()
+        .proxy(ureq::Proxy::try_from_env())
+        .http_status_as_error(false)
+        .tls_config(tls_config.build())
+        .build()
+        .into())
 }
 
 #[cfg(feature = "rustls")]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
-    let builder = ureq::Agent::config_builder()
+    let mut builder = ureq::Agent::config_builder()
         .proxy(ureq::Proxy::try_from_env())
         .http_status_as_error(false);
+
     if let Some(ca_bundle) = tls_ca_bundle() {
-        use rustls_pki_types::pem::PemObject;
-        let certs = rustls_pki_types::CertificateDer::pem_file_iter(&ca_bundle)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-        let ureq_certs: Vec<ureq::tls::Certificate<'static>> = certs
-            .into_iter()
-            .map(|cert| {
-                let owned = cert.into_owned();
-                ureq::tls::Certificate::from_der(owned.as_ref()).to_owned()
-            })
-            .collect();
-
+        let certs = load_ca_certs(ca_bundle)?;
         let tls_config = ureq::tls::TlsConfig::builder()
-            .root_certs(ureq::tls::RootCerts::new_with_certs(&ureq_certs))
+            .root_certs(ureq::tls::RootCerts::new_with_certs(&certs))
             .build();
-        Ok(builder.tls_config(tls_config).build().into())
-    } else {
-        Ok(builder.build().into())
+        builder = builder.tls_config(tls_config);
     }
+
+    Ok(builder.build().into())
 }
 
 #[cfg(not(any(feature = "native-tls", feature = "rustls")))]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
-    let builder = ureq::Agent::config_builder()
+    Ok(ureq::Agent::config_builder()
         .proxy(ureq::Proxy::try_from_env())
-        .http_status_as_error(false);
-    Ok(builder.build().into())
+        .http_status_as_error(false)
+        .build()
+        .into())
 }
 
 /// Uploads a single wheel to the registry
@@ -554,41 +549,50 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
 
     let status = response.status();
     if status.is_success() {
-        Ok(())
-    } else {
-        let err_text = response.body_mut().read_to_string().unwrap_or_else(|e| {
-            format!(
-                "The registry should return some text, \
-                even in case of an error, but didn't ({e})"
-            )
-        });
-        debug!("Upload error response: {}", err_text);
-        // Detect FileExistsError the way twine does
-        // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
-        let status_code = status.as_u16();
-        if status_code == 403 {
+        return Ok(());
+    }
+
+    let err_text = response.body_mut().read_to_string().unwrap_or_else(|e| {
+        format!(
+            "The registry should return some text, \
+            even in case of an error, but didn't ({e})"
+        )
+    });
+    debug!("Upload error response: {}", err_text);
+
+    handle_upload_error(status.as_u16(), err_text)
+}
+
+/// Classify upload error based on status code and response text
+fn handle_upload_error(status_code: u16, err_text: String) -> Result<(), UploadError> {
+    // Detect FileExistsError the way twine does
+    // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
+    match status_code {
+        403 => {
             if err_text.contains("overwrite artifact") {
                 // Artifactory (https://jfrog.com/artifactory/)
                 Err(UploadError::FileExistsError(err_text))
             } else {
                 Err(UploadError::AuthenticationError(err_text))
             }
-        } else {
-            let status_string = status_code.to_string();
-            if status_code == 409 // conflict, pypiserver (https://pypi.org/project/pypiserver)
-            // PyPI / TestPyPI
-            || (status_code == 400 && err_text.contains("already exists"))
-            // Nexus Repository OSS (https://www.sonatype.com/nexus-repository-oss)
-            || (status_code == 400 && err_text.contains("updating asset"))
-            // # Gitlab Enterprise Edition (https://about.gitlab.com)
-            || (status_code == 400 && err_text.contains("already been taken"))
-            {
-                Err(UploadError::FileExistsError(err_text))
-            } else {
-                Err(UploadError::StatusCodeError(status_string, err_text))
-            }
         }
+        409 => {
+            // conflict, pypiserver (https://pypi.org/project/pypiserver)
+            Err(UploadError::FileExistsError(err_text))
+        }
+        400 if is_file_exists_error(&err_text) => Err(UploadError::FileExistsError(err_text)),
+        _ => Err(UploadError::StatusCodeError(
+            status_code.to_string(),
+            err_text,
+        )),
     }
+}
+
+/// Check if error text indicates file already exists
+fn is_file_exists_error(err_text: &str) -> bool {
+    err_text.contains("already exists")        // PyPI / TestPyPI
+        || err_text.contains("updating asset") // Nexus Repository OSS
+        || err_text.contains("already been taken") // GitLab Enterprise Edition
 }
 
 /// Handles authentication/keyring integration and retrying of the publish subcommand

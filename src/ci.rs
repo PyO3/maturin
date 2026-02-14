@@ -495,18 +495,16 @@ jobs:\n",
                         conf.push_str(&format!(
                             "      - name: pytest
         if: ${{{{ startsWith(matrix.platform.target, 'x86_64') }}}}
-        uses: addnab/docker-run-action@v3
-        with:
-          image: alpine:latest
-          options: -v ${{{{ github.workspace }}}}:/io -w /io
-          run: |
-            set -e
+        run: |
+          set -e
+          docker run --rm -v ${{{{ github.workspace }}}}:/io -w /io alpine:latest sh -c '
             apk add py3-pip py3-virtualenv
             python3 -m virtualenv .venv
             source .venv/bin/activate
             pip install {project_name} --no-index --find-links dist --force-reinstall
             pip install pytest
             {chdir}pytest
+          '
 "
                         ));
                         conf.push_str(&format!(
@@ -1471,18 +1469,16 @@ mod tests {
                       path: dist
                   - name: pytest
                     if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
-                    uses: addnab/docker-run-action@v3
-                    with:
-                      image: alpine:latest
-                      options: -v ${{ github.workspace }}:/io -w /io
-                      run: |
-                        set -e
+                    run: |
+                      set -e
+                      docker run --rm -v ${{ github.workspace }}:/io -w /io alpine:latest sh -c '
                         apk add py3-pip py3-virtualenv
                         python3 -m virtualenv .venv
                         source .venv/bin/activate
                         pip install example --no-index --find-links dist --force-reinstall
                         pip install pytest
                         pytest
+                      '
                   - name: pytest
                     if: ${{ !startsWith(matrix.platform.target, 'x86') }}
                     uses: uraimo/run-on-arch-action@v2

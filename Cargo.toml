@@ -117,13 +117,11 @@ minijinja = { version = "2.5.0", optional = true }
 bytesize = { version = "2.2.0", optional = true }
 configparser = { version = "3.0.3", optional = true }
 dirs = { version = "6.0.0", optional = true }
-multipart = { version = "0.18.0", features = [
-    "client",
-], default-features = false, optional = true }
-ureq = { version = "2.9.4", features = [
+ureq = { version = "3.2.0", features = [
     "gzip",
     "json",
     "socks-proxy",
+    "multipart",
 ], default-features = false, optional = true }
 native-tls = { version = "0.2.8", optional = true }
 rustls = { version = "0.23", default-features = false, features = [
@@ -168,7 +166,6 @@ cli-completion = ["dep:clap_complete_command"]
 
 upload = [
     "ureq",
-    "multipart",
     "configparser",
     "bytesize",
     "dialoguer/password",
@@ -185,7 +182,7 @@ password-storage = ["upload", "keyring"]
 
 rustls = [
     "dep:rustls",
-    "ureq?/tls",
+    "ureq?/rustls",
     "cargo-xwin?/rustls-tls",
     "dep:rustls-pki-types",
 ]

@@ -103,6 +103,25 @@ include = [
 ]
 ```
 
+### CLI argument
+
+Additional SBOM files can also be included via the `--sbom-include` CLI
+argument, which is useful when you only want to include SBOMs in certain
+environments (e.g. CI) without modifying `pyproject.toml`:
+
+```bash
+maturin build --sbom-include sboms/ci-report.cdx.json
+
+# Multiple files at once
+maturin build --sbom-include sboms/a.cdx.json sboms/b.cdx.json
+
+# Or repeated flags
+maturin build --sbom-include sboms/a.cdx.json --sbom-include sboms/b.cdx.json
+```
+
+Paths from `--sbom-include` are merged with any `include` paths in
+`pyproject.toml` and deduplicated.
+
 ## Inspecting SBOMs in a wheel
 
 After building a wheel, you can inspect the included SBOMs by unzipping it:

@@ -474,6 +474,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             target: target_triple,
             ..cargo_options
         },
+        sbom_include: Vec::new(),
         compression,
     };
 

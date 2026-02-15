@@ -224,6 +224,11 @@ pub struct BuildOptions {
     #[command(flatten)]
     pub cargo: CargoOptions,
 
+    /// Additional SBOM files to include in the `.dist-info/sboms` directory.
+    /// Can be specified multiple times.
+    #[arg(long = "sbom-include", num_args = 1.., action = clap::ArgAction::Append)]
+    pub sbom_include: Vec<PathBuf>,
+
     /// Wheel compression options
     #[command(flatten)]
     pub compression: CompressionOptions,
@@ -774,9 +779,18 @@ impl BuildContextBuilder {
             .iter()
             .any(|platform_tag| platform_tag == &PlatformTag::Pypi);
 
-        let sbom = pyproject
-            .and_then(|x| x.maturin())
-            .and_then(|x| x.sbom.clone());
+        let sbom = {
+            let mut config = pyproject
+                .and_then(|x| x.maturin())
+                .and_then(|x| x.sbom.clone())
+                .unwrap_or_default();
+            if !build_options.sbom_include.is_empty() {
+                let includes = config.include.get_or_insert_with(Vec::new);
+                includes.extend(build_options.sbom_include.iter().cloned());
+                includes.dedup();
+            }
+            Some(config)
+        };
 
         let platform_tags = if build_options.platform_tag.is_empty() {
             #[cfg(feature = "zig")]

@@ -86,6 +86,10 @@ Options:
       --future-incompat-report
           Outputs a future incompatibility report at the end of the build (unstable)
 
+      --sbom-include <SBOM_INCLUDE>...
+          Additional SBOM files to include in the `.dist-info/sboms` directory. Can be specified
+          multiple times
+
       --compression-method <COMPRESSION_METHOD>
           Zip compression method. Only Stored and Deflated are currently compatible with all package
           managers

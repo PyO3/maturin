@@ -66,6 +66,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
     steps:
       - name: Enable long paths
         if: startsWith(matrix.os, 'windows')
@@ -77,15 +79,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: sccache setup
-        if: ${{ matrix.os != 'windows-11-arm' }}
         uses: mozilla-actions/sccache-action@v0.0.9
-        with:
-          version: "v0.10.0"
-      - name: Enable sccache
-        if: ${{ matrix.os != 'windows-11-arm' }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
       - name: Install python packages
@@ -401,8 +395,7 @@ jobs:
       - run: chmod +x bin/maturin
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets:
-            ${{ matrix.platform.target }}
+          targets: ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
           set -ex

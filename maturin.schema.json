@@ -65,7 +65,7 @@
       ]
     },
     "exclude": {
-      "description": "Exclude files matching the given glob pattern(s)",
+      "description": "Exclude files matching the given glob pattern(s).\nPatterns are resolved relative to the directory containing `pyproject.toml`.",
       "type": [
         "array",
         "null"
@@ -92,7 +92,7 @@
       ]
     },
     "include": {
-      "description": "Include files matching the given glob pattern(s)",
+      "description": "Include files matching the given glob pattern(s).\nPatterns are resolved relative to the directory containing `pyproject.toml`.\nWhen `python-source` is configured, patterns are also tried relative to\nthat directory if no matches are found.",
       "type": [
         "array",
         "null"

@@ -1,3 +1,3 @@
 [build]
 publish = "guide/book/"
-command = "curl -L https://github.com/rust-lang/mdBook/releases/download/v0.4.43/mdbook-v0.4.43-x86_64-unknown-linux-musl.tar.gz | tar xvz && ./mdbook build guide"
+command = "curl -L https://github.com/rust-lang/mdBook/releases/download/v0.5.2/mdbook-v0.5.2-x86_64-unknown-linux-musl.tar.gz | tar xvz && ./mdbook build guide"

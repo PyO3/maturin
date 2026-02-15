@@ -189,9 +189,13 @@ pub struct ToolMaturin {
     // maturin specific options
     /// Module name, accepts setuptools style import name like `foo.bar`
     pub module_name: Option<String>,
-    /// Include files matching the given glob pattern(s)
+    /// Include files matching the given glob pattern(s).
+    /// Patterns are resolved relative to the directory containing `pyproject.toml`.
+    /// When `python-source` is configured, patterns are also tried relative to
+    /// that directory if no matches are found.
     pub include: Option<Vec<GlobPattern>>,
-    /// Exclude files matching the given glob pattern(s)
+    /// Exclude files matching the given glob pattern(s).
+    /// Patterns are resolved relative to the directory containing `pyproject.toml`.
     pub exclude: Option<Vec<GlobPattern>>,
     /// Bindings type
     pub bindings: Option<String>,

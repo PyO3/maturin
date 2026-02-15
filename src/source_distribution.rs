@@ -1361,29 +1361,23 @@ pub fn source_distribution(
         }
     }
 
-    let escaped_pyproject_dir = PathBuf::from(glob::Pattern::escape(
-        pyproject_dir.to_string_lossy().as_ref(),
-    ));
-    let mut include = |pattern| -> Result<()> {
-        eprintln!("📦 Including files matching \"{pattern}\"");
-        for source in glob::glob(&escaped_pyproject_dir.join(pattern).to_string_lossy())
-            .with_context(|| format!("Invalid glob pattern: {pattern}"))?
-            .filter_map(Result::ok)
-        {
-            let target = root_dir.join(source.strip_prefix(pyproject_dir).unwrap());
-            if !source.is_dir() {
-                writer.add_file(target, source, false)?;
-            }
-        }
-        Ok(())
-    };
+    let python_dir = &build_context.project_layout.python_dir;
 
     if let Some(glob_patterns) = pyproject.include() {
         for pattern in glob_patterns
             .iter()
             .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
         {
-            include(pattern)?;
+            eprintln!("📦 Including files matching \"{pattern}\"");
+            let matches = crate::module_writer::glob::resolve_include_matches(
+                pattern,
+                Format::Sdist,
+                pyproject_dir,
+                python_dir,
+            )?;
+            for m in matches {
+                writer.add_file(root_dir.join(&m.target), m.source, false)?;
+            }
         }
     }
 

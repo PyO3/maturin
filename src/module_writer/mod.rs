@@ -22,6 +22,7 @@ use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
 
+pub(crate) mod glob;
 #[cfg(test)]
 mod mock_writer;
 mod path_writer;
@@ -190,26 +191,23 @@ pub fn write_python_part(
     if let Some(pyproject) = pyproject_toml {
         let project_root = &project_layout.project_root;
         if let Some(glob_patterns) = pyproject.include() {
-            let escaped_project_root = PathBuf::from(glob::Pattern::escape(
-                project_root.to_string_lossy().as_ref(),
-            ));
             for pattern in glob_patterns
                 .iter()
                 .filter_map(|glob_pattern| glob_pattern.targets(Format::Wheel))
             {
                 eprintln!("📦 Including files matching \"{pattern}\"");
-                for source in glob::glob(&escaped_project_root.join(pattern).to_string_lossy())
-                    .with_context(|| format!("Invalid glob pattern: {pattern}"))?
-                    .filter_map(Result::ok)
-                {
-                    let target = source.strip_prefix(project_root)?.to_path_buf();
-                    if !source.is_dir() {
-                        #[cfg(unix)]
-                        let mode = source.metadata()?.permissions().mode();
-                        #[cfg(not(unix))]
-                        let mode = 0o644;
-                        writer.add_file(target, source, permission_is_executable(mode))?;
-                    }
+                let matches = glob::resolve_include_matches(
+                    pattern,
+                    Format::Wheel,
+                    project_root,
+                    python_dir,
+                )?;
+                for m in matches {
+                    #[cfg(unix)]
+                    let mode = m.source.metadata()?.permissions().mode();
+                    #[cfg(not(unix))]
+                    let mode = 0o644;
+                    writer.add_file(m.target, m.source, permission_is_executable(mode))?;
                 }
             }
         }

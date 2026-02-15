@@ -76,6 +76,15 @@ The `[tool.maturin.include]` and `[tool.maturin.exclude]` configuration are
 inspired by
 [Poetry](https://python-poetry.org/docs/pyproject/#include-and-exclude).
 
+Glob patterns are resolved relative to the directory containing `pyproject.toml`.
+When using `python-source` (e.g. `python-source = "src/python"`), patterns are
+also tried relative to the `python-source` directory if they don't match relative
+to `pyproject.toml`. This means you can use a single pattern like
+`include = ["mypackage/data.txt"]` and it will work for both sdist and wheel
+targets: the sdist will include the file at its original location
+(`src/python/mypackage/data.txt`), and the wheel will include it at the
+package-relative path (`mypackage/data.txt`).
+
 To specify files or globs directly:
 
 ```toml

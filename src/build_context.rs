@@ -367,19 +367,28 @@ impl BuildContext {
             return Ok(());
         }
 
-        if matches!(self.auditwheel, AuditWheelMode::Check) {
-            eprintln!(
-                "🖨️ Your library is not manylinux/musllinux compliant because it requires copying the following libraries:"
-            );
-            for lib in ext_libs.iter().flatten() {
-                if let Some(path) = lib.realpath.as_ref() {
-                    eprintln!("    {} => {}", lib.name, path.display())
-                } else {
-                    eprintln!("    {} => not found", lib.name)
-                };
+        // Log which libraries need to be copied and which artifacts require them
+        // before calling patchelf, so users can see this even if patchelf is missing.
+        eprintln!("🔗 External shared libraries to be copied into the wheel:");
+        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+            let artifact = artifact.borrow();
+            if artifact_ext_libs.is_empty() {
+                continue;
             }
+            eprintln!("  {} requires:", artifact.path.display());
+            for lib in artifact_ext_libs {
+                if let Some(path) = lib.realpath.as_ref() {
+                    eprintln!("    {} => {}", lib.name, path.display());
+                } else {
+                    eprintln!("    {} => not found", lib.name);
+                }
+            }
+        }
+
+        if matches!(self.auditwheel, AuditWheelMode::Check) {
             bail!(
-                "Can not repair the wheel because `--auditwheel=check` is specified, re-run with `--auditwheel=repair` to copy the libraries."
+                "Your library is not manylinux/musllinux compliant because it requires copying the above libraries. \
+                 Re-run with `--auditwheel=repair` to copy them."
             );
         }
 

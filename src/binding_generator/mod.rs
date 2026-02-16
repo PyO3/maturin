@@ -11,6 +11,8 @@ use fs_err as fs;
 use fs_err::File;
 #[cfg(unix)]
 use fs_err::os::unix::fs::OpenOptionsExt as _;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt as _;
 use tracing::debug;
 
 use crate::BuildArtifact;
@@ -101,6 +103,7 @@ pub fn generate_binding<A>(
     generator: &mut impl BindingGenerator,
     context: &BuildContext,
     artifacts: &[A],
+    out_dirs: &HashMap<String, PathBuf>,
 ) -> Result<()>
 where
     A: Borrow<BuildArtifact>,
@@ -225,6 +228,63 @@ where
             eprintln!("📖 Found type stub file at {ext_name}.pyi");
             writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
             writer.add_empty_file(module.join("py.typed"))?;
+        }
+    }
+
+    // 5. Include files from OUT_DIR
+    if let Some(pyproject) = context.pyproject_toml.as_ref()
+        && let Some(glob_patterns) = pyproject.include()
+    {
+        for inc in glob_patterns.iter().filter_map(|p| p.as_out_dir_include()) {
+            let pkg_name = inc.crate_name.unwrap_or(&context.crate_name);
+            let out_dir = out_dirs.get(pkg_name).with_context(|| {
+                format!(
+                    "No OUT_DIR found for crate \"{pkg_name}\". \
+                     Make sure the crate has a build script (build.rs)."
+                )
+            })?;
+            eprintln!(
+                "📦 Including files matching \"{}\" from OUT_DIR of \"{pkg_name}\"",
+                inc.path
+            );
+            let matches =
+                crate::module_writer::glob::resolve_out_dir_includes(inc.path, out_dir, inc.to)?;
+            if matches.is_empty() {
+                eprintln!(
+                    "⚠️  Warning: No files matched \"{}\" in OUT_DIR ({})",
+                    inc.path,
+                    out_dir.display()
+                );
+            }
+            match (context.editable, &base_path) {
+                (true, Some(base_path)) => {
+                    for m in matches {
+                        let target = base_path.join(&m.target);
+                        if let Some(parent) = target.parent() {
+                            fs::create_dir_all(parent)?;
+                        }
+                        debug!(
+                            "Installing OUT_DIR file {} from {}",
+                            target.display(),
+                            m.source.display()
+                        );
+                        fs::copy(&m.source, &target)?;
+                    }
+                }
+                _ => {
+                    for m in matches {
+                        #[cfg(unix)]
+                        let mode = m.source.metadata()?.permissions().mode();
+                        #[cfg(not(unix))]
+                        let mode = 0o644;
+                        writer.add_file(
+                            m.target,
+                            m.source,
+                            crate::module_writer::permission_is_executable(mode),
+                        )?;
+                    }
+                }
+            }
         }
     }
 

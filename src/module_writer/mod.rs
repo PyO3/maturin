@@ -435,7 +435,7 @@ fn entry_points_txt(
 }
 
 #[inline]
-fn permission_is_executable(mode: u32) -> bool {
+pub(crate) fn permission_is_executable(mode: u32) -> bool {
     (0o100 & mode) == 0o100
 }
 

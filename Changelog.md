@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.2
+
+* Fix: allow absolute paths for `--sbom-include` (#3004)
+
 ## 1.12.1
 
 * Replace addnab/docker-run-action with direct docker run command

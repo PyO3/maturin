@@ -1,0 +1,5 @@
+[target.loongarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.riscv64gc-unknown-linux-musl]
+rustflags = ["-C", "target-feature=+crt-static"]

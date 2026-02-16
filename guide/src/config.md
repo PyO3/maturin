@@ -74,7 +74,7 @@ use-base-python = false
 
 The `[tool.maturin.include]` and `[tool.maturin.exclude]` configuration are
 inspired by
-[Poetry](https://python-poetry.org/docs/pyproject/#include-and-exclude).
+[Poetry](https://python-poetry.org/docs/pyproject/#exclude-and-include).
 
 Glob patterns are resolved relative to the directory containing `pyproject.toml`.
 When using `python-source` (e.g. `python-source = "src/python"`), patterns are

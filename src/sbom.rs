@@ -78,11 +78,15 @@ pub fn generate_sbom_data(context: &BuildContext) -> Result<Option<SbomData>> {
     }
 }
 
-/// Validate and resolve an SBOM include path, ensuring it stays within the project root.
+/// Validate and resolve an SBOM include path.
+///
+/// Absolute paths are used as-is (after canonicalization).
+/// Relative paths are resolved against the project root and must stay within it.
 ///
 /// Returns the canonicalized path on success.
 fn resolve_sbom_include(path: &Path, project_root: &Path) -> Result<PathBuf> {
-    let resolved_path = if path.is_absolute() {
+    let is_absolute = path.is_absolute();
+    let resolved_path = if is_absolute {
         path.to_path_buf()
     } else {
         project_root.join(path)
@@ -95,7 +99,11 @@ fn resolve_sbom_include(path: &Path, project_root: &Path) -> Result<PathBuf> {
         )
     })?;
 
-    if !resolved_path.starts_with(project_root) {
+    // Only enforce the project-root constraint for relative paths
+    // to prevent directory traversal (e.g. "../../etc/passwd").
+    // Absolute paths are intentionally allowed to reference files
+    // outside the project root.
+    if !is_absolute && !resolved_path.starts_with(project_root) {
         anyhow::bail!(
             "SBOM include path '{}' escapes the project root '{}'",
             resolved_path.display(),
@@ -197,20 +205,14 @@ mod tests {
     }
 
     #[test]
-    fn test_reject_absolute_path_outside_root() {
+    fn test_accept_absolute_path_outside_root() {
         let dir = tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
         let outside = tempdir().unwrap();
-        let outside_file = outside.path().join("evil.json");
+        let outside_file = outside.path().join("external.json");
         fs::write(&outside_file, "{}").unwrap();
-        let result = resolve_sbom_include(&outside_file, &root);
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("escapes the project root")
-        );
+        let result = resolve_sbom_include(&outside_file, &root).unwrap();
+        assert_eq!(result, outside_file.canonicalize().unwrap());
     }
     #[test]
     fn test_reject_nonexistent_path() {

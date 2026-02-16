@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.1
+
+* Replace addnab/docker-run-action with direct docker run command
+* Add `--sbom-include` CLI argument for additional SBOM files (#2999)
+* Fix: resolve include patterns relative to python-source for sdist and wheel (#3000)
+* Feat: log external shared libraries and their dependents before patchelf
+* Feat: support including `OUT_DIR` assets in wheel builds (#3001)
+* Add test case for uniffi with multiple crates (#2839)
+
 ## 1.12.0
 
 * Use pypi compatibility validation for own CI (#2929)

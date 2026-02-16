@@ -52,7 +52,7 @@ bindings = "pyo3"
 compatibility = "pypi"
 # auditwheel mode, possible values are repair, check and skip
 auditwheel = "repair"
-# Don't check for manylinux compliance, deprecated in favor of auditwheel = "audit"
+# Don't check for manylinux compliance, deprecated in favor of auditwheel = "skip"
 skip-auditwheel = false
 # Python source directory
 python-source = "src"

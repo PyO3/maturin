@@ -282,6 +282,17 @@ fn develop_uniffi_mixed() {
 }
 
 #[test]
+fn develop_uniffi_multiple_crates() {
+    handle_result(develop::test_develop(
+        "test-crates/uniffi-multiple-crates",
+        None,
+        "develop-uniffi-multiple-crates",
+        false,
+        TestInstallBackend::Pip,
+    ));
+}
+
+#[test]
 fn develop_uniffi_multiple_binding_files() {
     if env::var("GITHUB_ACTIONS").is_ok() || which("uniffi-bindgen").is_ok() {
         handle_result(develop::test_develop(

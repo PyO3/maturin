@@ -2,7 +2,7 @@
 
 ## Configuration format
 
-You can configure maturin in `tool.maturin` section of [`pyproject.toml`](https://peps.python.org/pep-0518/#tool-table).
+You can configure maturin in `tool.maturin` section of [`pyproject.toml`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#arbitrary-tool-configuration-the-tool-table).
 
 ## Configuration keys
 

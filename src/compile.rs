@@ -46,6 +46,15 @@ pub struct BuildArtifact {
     pub linked_paths: Vec<String>,
 }
 
+/// Result of compiling one or more cargo targets.
+#[derive(Debug, Clone)]
+pub struct CompileResult {
+    /// Per-target mapping from crate type to build artifact.
+    pub artifacts: Vec<HashMap<CrateType, BuildArtifact>>,
+    /// Map of package name to OUT_DIR path from build script execution.
+    pub out_dirs: HashMap<String, PathBuf>,
+}
+
 /// Builds the rust crate into a native module (i.e. an .so or .dll) for a
 /// specific python version. Returns a mapping from crate type (e.g. cdylib)
 /// to artifact location.
@@ -53,7 +62,7 @@ pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
-) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
+) -> Result<CompileResult> {
     if context.universal2 {
         compile_universal2(context, python_interpreter, targets)
     } else {
@@ -66,23 +75,26 @@ fn compile_universal2(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
-) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
+) -> Result<CompileResult> {
     let mut aarch64_context = context.clone();
     aarch64_context.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
 
-    let aarch64_artifacts = compile_targets(&aarch64_context, python_interpreter, targets)
+    let aarch64_result = compile_targets(&aarch64_context, python_interpreter, targets)
         .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
     x86_64_context.target = Target::from_resolved_target_triple("x86_64-apple-darwin")?;
 
-    let x86_64_artifacts = compile_targets(&x86_64_context, python_interpreter, targets)
+    let x86_64_result = compile_targets(&x86_64_context, python_interpreter, targets)
         .context("Failed to build a x86_64 library through cargo")?;
 
     let mut universal_artifacts = Vec::with_capacity(targets.len());
-    for (bridge_model, (aarch64_artifact, x86_64_artifact)) in targets
-        .iter()
-        .map(|target| &target.bridge_model)
-        .zip(aarch64_artifacts.iter().zip(&x86_64_artifacts))
+    for (bridge_model, (aarch64_artifact, x86_64_artifact)) in
+        targets.iter().map(|target| &target.bridge_model).zip(
+            aarch64_result
+                .artifacts
+                .iter()
+                .zip(&x86_64_result.artifacts),
+        )
     {
         let build_type = if bridge_model.is_bin() {
             CrateType::Bin
@@ -131,25 +143,38 @@ fn compile_universal2(
         let mut result = HashMap::new();
         let universal_artifact = BuildArtifact {
             path: PathBuf::from(output_path),
-            ..x86_64_artifact
+            linked_paths: x86_64_artifact.linked_paths.clone(),
         };
         result.insert(build_type, universal_artifact);
         universal_artifacts.push(result);
     }
-    Ok(universal_artifacts)
+    // Note: we use x86_64 OUT_DIR paths for universal2 builds.
+    // OUT_DIR files are expected to be architecture-independent (e.g. generated
+    // Python code or data); architecture-specific generated files are not
+    // supported in universal2 mode.
+    Ok(CompileResult {
+        artifacts: universal_artifacts,
+        out_dirs: x86_64_result.out_dirs,
+    })
 }
 
 fn compile_targets(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
-) -> Result<Vec<HashMap<CrateType, BuildArtifact>>> {
+) -> Result<CompileResult> {
     let mut artifacts = Vec::with_capacity(targets.len());
+    let mut out_dirs = HashMap::new();
     for target in targets {
         let build_command = cargo_build_command(context, python_interpreter, target)?;
-        artifacts.push(compile_target(context, build_command)?);
+        let (target_artifacts, target_out_dirs) = compile_target(context, build_command)?;
+        artifacts.push(target_artifacts);
+        out_dirs.extend(target_out_dirs);
     }
-    Ok(artifacts)
+    Ok(CompileResult {
+        artifacts,
+        out_dirs,
+    })
 }
 
 fn cargo_build_command(
@@ -490,7 +515,7 @@ fn cargo_build_command(
 fn compile_target(
     context: &BuildContext,
     mut build_command: Command,
-) -> Result<HashMap<CrateType, BuildArtifact>> {
+) -> Result<(HashMap<CrateType, BuildArtifact>, HashMap<String, PathBuf>)> {
     debug!("Running {:?}", build_command);
 
     let using_cross = build_command
@@ -503,6 +528,7 @@ fn compile_target(
 
     let mut artifacts = HashMap::new();
     let mut linked_paths = Vec::new();
+    let mut out_dirs: HashMap<String, PathBuf> = HashMap::new();
 
     let stream = cargo_build
         .stdout
@@ -593,6 +619,18 @@ fn compile_target(
                         }
                     }
                 }
+                // Capture OUT_DIR for each package
+                if !msg.out_dir.as_os_str().is_empty() {
+                    let pkg_name = context
+                        .cargo_metadata
+                        .packages
+                        .iter()
+                        .find(|p| p.id == msg.package_id)
+                        .map(|p| p.name.clone());
+                    if let Some(name) = pkg_name {
+                        out_dirs.insert(name.to_string(), msg.out_dir.into_std_path_buf());
+                    }
+                }
             }
             cargo_metadata::Message::CompilerMessage(msg) => {
                 println!("{}", msg.message);
@@ -601,7 +639,6 @@ fn compile_target(
         }
     }
 
-    // Add linked_paths to build artifacts
     for artifact in artifacts.values_mut() {
         artifact.linked_paths.clone_from(&linked_paths);
     }
@@ -618,7 +655,7 @@ fn compile_target(
         )
     }
 
-    Ok(artifacts)
+    Ok((artifacts, out_dirs))
 }
 
 /// Checks that the native library contains a function called `PyInit_<module name>` and warns

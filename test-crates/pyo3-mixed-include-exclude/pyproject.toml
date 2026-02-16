@@ -17,6 +17,7 @@ include = [
   "pyo3_mixed_include_exclude/include_this_file",
   "missing",
   "README.md",
+  { path = "generated_info.txt", from = "out-dir", to = "pyo3_mixed_include_exclude/" },
 ]
 exclude = [
   "pyo3_mixed_include_exclude/exclude_this_file",

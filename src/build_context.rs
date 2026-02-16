@@ -33,7 +33,7 @@ use platform_info::*;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -766,6 +766,7 @@ impl BuildContext {
         Ok((tag, tags))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_pyo3_wheel_abi3(
         &self,
         artifact: BuildArtifact,
@@ -774,6 +775,7 @@ impl BuildContext {
         major: u8,
         min_minor: u8,
         sbom_data: &Option<SbomData>,
+        out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         let platform = self.get_platform_tag(platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
@@ -789,7 +791,7 @@ impl BuildContext {
         let mut generator =
             Pyo3BindingGenerator::new(true, self.interpreter.first(), writer.temp_dir()?)
                 .context("Failed to initialize PyO3 binding generator")?;
-        generate_binding(&mut writer, &mut generator, self, &[&artifact])
+        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)
             .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
@@ -827,7 +829,7 @@ impl BuildContext {
         // On windows, we have picked an interpreter to set the location of python.lib,
         // otherwise it's none
         let python_interpreter = interpreters.first();
-        let artifact = self.compile_cdylib(
+        let (artifact, out_dirs) = self.compile_cdylib(
             python_interpreter,
             Some(&self.project_layout.extension_name),
         )?;
@@ -845,6 +847,7 @@ impl BuildContext {
             major,
             min_minor,
             sbom_data,
+            &out_dirs,
         )?;
 
         eprintln!(
@@ -865,6 +868,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
+        out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(self, platform_tags)?;
 
@@ -879,7 +883,7 @@ impl BuildContext {
         let mut generator =
             Pyo3BindingGenerator::new(false, Some(python_interpreter), writer.temp_dir()?)
                 .context("Failed to initialize PyO3 binding generator")?;
-        generate_binding(&mut writer, &mut generator, self, &[&artifact])
+        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)
             .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
@@ -921,7 +925,7 @@ impl BuildContext {
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         for python_interpreter in interpreters {
-            let artifact = self.compile_cdylib(
+            let (artifact, out_dirs) = self.compile_cdylib(
                 Some(python_interpreter),
                 Some(&self.project_layout.extension_name),
             )?;
@@ -938,6 +942,7 @@ impl BuildContext {
                 &platform_tags,
                 external_libs,
                 sbom_data,
+                &out_dirs,
             )?;
             eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
@@ -962,12 +967,12 @@ impl BuildContext {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
-    ) -> Result<BuildArtifact> {
-        let artifacts = compile(self, python_interpreter, &self.compile_targets)
+    ) -> Result<(BuildArtifact, HashMap<String, PathBuf>)> {
+        let result = compile(self, python_interpreter, &self.compile_targets)
             .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
-        let artifacts = artifacts.first().context(error_msg)?;
+        let artifacts = result.artifacts.first().context(error_msg)?;
 
         let mut artifact = artifacts
             .get(&CrateType::CDyLib)
@@ -981,7 +986,7 @@ impl BuildContext {
         }
 
         self.copy_artifact_for_repair(&mut artifact)?;
-        Ok(artifact)
+        Ok((artifact, result.out_dirs))
     }
 
     /// Copy an artifact to a staging directory so that auditwheel repair can
@@ -1010,6 +1015,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
+        out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
@@ -1026,7 +1032,7 @@ impl BuildContext {
         })?;
         let mut generator = CffiBindingGenerator::new(interpreter, writer.temp_dir()?)
             .context("Failed to initialize Cffi binding generator")?;
-        generate_binding(&mut writer, &mut generator, self, &[&artifact])?;
+        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -1053,15 +1059,20 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifact = self.compile_cdylib(None, None)?;
+        let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
         let platform_tags = if self.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) =
-            self.write_cffi_wheel(artifact, &platform_tags, external_libs, sbom_data)?;
+        let (wheel_path, tag) = self.write_cffi_wheel(
+            artifact,
+            &platform_tags,
+            external_libs,
+            sbom_data,
+            &out_dirs,
+        )?;
 
         // Warn if cffi isn't specified in the requirements
         if !self
@@ -1088,6 +1099,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
+        out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
@@ -1100,7 +1112,7 @@ impl BuildContext {
         self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
 
         let mut generator = UniFfiBindingGenerator::default();
-        generate_binding(&mut writer, &mut generator, self, &[&artifact])?;
+        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -1127,15 +1139,20 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifact = self.compile_cdylib(None, None)?;
+        let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
         let platform_tags = if self.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) =
-            self.write_uniffi_wheel(artifact, &platform_tags, external_libs, sbom_data)?;
+        let (wheel_path, tag) = self.write_uniffi_wheel(
+            artifact,
+            &platform_tags,
+            external_libs,
+            sbom_data,
+            &out_dirs,
+        )?;
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));
@@ -1150,6 +1167,7 @@ impl BuildContext {
         platform_tags: &[PlatformTag],
         ext_libs: &[Vec<Library>],
         sbom_data: &Option<SbomData>,
+        out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         if !self.metadata24.scripts.is_empty() {
             bail!("Defining scripts and working with a binary doesn't mix well");
@@ -1188,7 +1206,7 @@ impl BuildContext {
         self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 
         let mut generator = BinBindingGenerator::new(&mut metadata24);
-        generate_binding(&mut writer, &mut generator, self, artifacts)
+        generate_binding(&mut writer, &mut generator, self, artifacts, out_dirs)
             .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
@@ -1216,16 +1234,16 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let artifacts = compile(self, python_interpreter, &self.compile_targets)
+        let result = compile(self, python_interpreter, &self.compile_targets)
             .context("Failed to build a native library through cargo")?;
-        if artifacts.is_empty() {
+        if result.artifacts.is_empty() {
             bail!("Cargo didn't build a binary")
         }
 
-        let mut policies = Vec::with_capacity(artifacts.len());
+        let mut policies = Vec::with_capacity(result.artifacts.len());
         let mut ext_libs = Vec::new();
-        let mut artifact_paths = Vec::with_capacity(artifacts.len());
-        for artifact in artifacts {
+        let mut artifact_paths = Vec::with_capacity(result.artifacts.len());
+        for artifact in result.artifacts {
             let mut artifact = artifact
                 .get(&CrateType::Bin)
                 .cloned()
@@ -1251,6 +1269,7 @@ impl BuildContext {
             &platform_tags,
             &ext_libs,
             sbom_data,
+            &result.out_dirs,
         )?;
         eprintln!("📦 Built wheel to {}", wheel_path.display());
         wheels.push((wheel_path, tag));

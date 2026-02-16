@@ -358,6 +358,47 @@
             "path",
             "format"
           ]
+        },
+        {
+          "description": "A glob `path` relative to a crate's OUT_DIR",
+          "type": "object",
+          "properties": {
+            "crate_name": {
+              "description": "Optional crate name (defaults to the root crate)",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "from": {
+              "description": "Source: must be \"out-dir\"",
+              "$ref": "#/$defs/IncludeFrom"
+            },
+            "path": {
+              "description": "A glob pattern relative to OUT_DIR",
+              "type": "string"
+            },
+            "to": {
+              "description": "Target path in wheel (e.g. \"my_package/\")",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "from",
+            "to"
+          ]
+        }
+      ]
+    },
+    "IncludeFrom": {
+      "description": "Supported values for the `from` field in include patterns.",
+      "oneOf": [
+        {
+          "description": "Include files from the crate's OUT_DIR",
+          "type": "string",
+          "const": "out-dir"
         }
       ]
     },

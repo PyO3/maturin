@@ -117,6 +117,27 @@ fn glob_files<'a>(root: &'a Path, pattern: &str) -> Result<Vec<(PathBuf, &'a Pat
     Ok(matches)
 }
 
+/// Resolve out-dir include patterns: globs files matching `pattern` under
+/// `out_dir` and maps each match to `{to}/{relative_path}` inside the wheel.
+pub(crate) fn resolve_out_dir_includes(
+    pattern: &str,
+    out_dir: &Path,
+    to: &str,
+) -> Result<Vec<IncludeMatch>> {
+    validate_pattern(pattern)?;
+    validate_pattern(to)?;
+
+    let matches = glob_files(out_dir, pattern)?;
+    matches
+        .into_iter()
+        .map(|(source, matched_root)| {
+            let relative = source.strip_prefix(matched_root)?;
+            let target = PathBuf::from(to).join(relative);
+            Ok(IncludeMatch { source, target })
+        })
+        .collect()
+}
+
 /// Reject patterns that are not purely relative (absolute, contain `..`, or
 /// have a Windows drive/UNC prefix).
 fn validate_pattern(pattern: &str) -> Result<()> {
@@ -253,6 +274,14 @@ mod tests {
                 .unwrap();
         assert_eq!(wheel.len(), 1);
         assert_eq!(wheel[0].target, Path::new("pkg/data.txt"));
+    }
+
+    #[test]
+    fn test_out_dir_validates_to_parameter() {
+        let dir = setup_tree(&["gen.txt"]);
+        assert!(resolve_out_dir_includes("gen.txt", dir.path(), "../escape").is_err());
+        assert!(resolve_out_dir_includes("gen.txt", dir.path(), "/absolute").is_err());
+        assert!(resolve_out_dir_includes("gen.txt", dir.path(), "pkg/").is_ok());
     }
 
     #[test]

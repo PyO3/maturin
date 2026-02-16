@@ -2,6 +2,7 @@ use crate::common::{
     TestInstallBackend, check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo,
 };
 use anyhow::Result;
+use maturin::pyproject_toml::PyProjectToml;
 use maturin::{CargoOptions, DevelopOptions, develop};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -56,7 +57,22 @@ pub fn test_develop(
         }
     }
 
-    let manifest_file = package.join("Cargo.toml");
+    let manifest_file = {
+        let pyproject_file = package.join("pyproject.toml");
+        if pyproject_file.is_file() {
+            if let Ok(pyproject) = PyProjectToml::new(&pyproject_file) {
+                if let Some(manifest_path) = pyproject.manifest_path() {
+                    package.join(manifest_path)
+                } else {
+                    package.join("Cargo.toml")
+                }
+            } else {
+                package.join("Cargo.toml")
+            }
+        } else {
+            package.join("Cargo.toml")
+        }
+    };
     let develop_options = DevelopOptions {
         bindings,
         release: false,

@@ -4,7 +4,7 @@ use expect_test::Expect;
 use flate2::read::GzDecoder;
 use fs_err::File;
 use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
-use maturin::{BuildOptions, CargoOptions, PlatformTag};
+use maturin::{BuildOptions, CargoOptions, PlatformTag, unpack_sdist};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::io::Read;
@@ -527,5 +527,63 @@ pub fn test_unreadable_dir() -> Result<()> {
     fs_err::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o755))?;
 
     wheel_result?;
+    Ok(())
+}
+
+/// Test that building wheels from an sdist works correctly.
+/// This simulates the `maturin build --sdist` workflow: build sdist first,
+/// unpack it, then build wheels from the unpacked sdist.
+pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str) -> Result<()> {
+    let package = package.as_ref();
+    let temp_dir = tempfile::tempdir()?;
+    let sdist_dir = temp_dir.path().join("sdist");
+    let wheel_dir = temp_dir.path().join("wheels");
+
+    // Step 1: Build the sdist
+    let sdist_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(package.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let sdist_context = sdist_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()?;
+    let (sdist_path, _) = sdist_context
+        .build_source_distribution()?
+        .context("Failed to build source distribution")?;
+
+    // Step 2: Unpack sdist and build wheels from it
+    let (_tmp, cargo_toml) = unpack_sdist(&sdist_path)?;
+    let wheel_options = BuildOptions {
+        out: Some(wheel_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(cargo_toml),
+            quiet: true,
+            target_dir: Some(PathBuf::from(format!(
+                "test-crates/targets/{unique_name}_from_sdist"
+            ))),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let wheel_context = wheel_options
+        .into_build_context()
+        .strip(Some(cfg!(feature = "faster-tests")))
+        .editable(false)
+        .build()?;
+    let wheels = wheel_context.build_wheels()?;
+    assert!(
+        !wheels.is_empty(),
+        "Expected at least one wheel to be built"
+    );
+
     Ok(())
 }

@@ -154,9 +154,11 @@ jobs:
           - target: "loongarch64-unknown-linux-musl"
             image: "rust-musl-cross:loongarch64-musl"
             compatibility: "manylinux_2_36 musllinux_1_2"
+            rustflags: "-C target-feature=+crt-static"
           - target: "riscv64gc-unknown-linux-musl"
             image: "rust-musl-cross:riscv64gc-musl"
             compatibility: "manylinux_2_31 musllinux_1_1"
+            rustflags: "-C target-feature=+crt-static"
     container:
       image: docker://ghcr.io/rust-cross/${{ matrix.platform.image }}
       env:
@@ -184,10 +186,9 @@ jobs:
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
           CFLAGS_s390x_unknown_linux_gnu: "-march=z10"
+          RUSTFLAGS: ${{ matrix.platform.rustflags || '' }}
         run: |
-          # TODO: Avoid pinning an explicit version here. This specific version avoid a regression in a later version
-          # See https://github.com/pyo3/maturin/pull/2922
-          uvx maturin==1.11.5 build --release -b bin -o dist \
+          uvx maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
             ${{ !contains(fromJson('["loongarch64-unknown-linux-musl", "riscv64gc-unknown-linux-musl"]'), matrix.platform.target) && '--compatibility pypi' || '' }} \
             --compatibility ${{ matrix.platform.compatibility }} \

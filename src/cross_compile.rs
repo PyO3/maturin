@@ -31,6 +31,11 @@ pub fn is_cross_compiling(target: &Target) -> Result<bool> {
         // Not cross-compiling to compile for 32-bit Python from windows 64-bit
         return Ok(false);
     }
+    if target_triple.starts_with("x86_64-pc-windows") && host.starts_with("aarch64-pc-windows") {
+        // Not cross-compiling to compile for x86-64 Python from Windows arm64,
+        // Windows arm64 can run x86-64 binaries natively
+        return Ok(false);
+    }
     if target_triple.ends_with("windows-gnu") && host.ends_with("windows-msvc") {
         // Not cross-compiling to compile for Windows GNU from Windows MSVC host
         return Ok(false);

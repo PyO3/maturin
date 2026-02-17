@@ -785,6 +785,13 @@ pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Opti
                 } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
                     return Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
                 }
+            } else if platform.contains("win") {
+                // On Windows ARM with x86_64 Python (win-amd64), detect the arch mismatch
+                if platform.contains("amd64") && target.target_arch() != Arch::X86_64 {
+                    return Some(TargetTriple::Regular("x86_64-pc-windows-msvc".to_string()));
+                } else if platform.contains("arm64") && target.target_arch() != Arch::Aarch64 {
+                    return Some(TargetTriple::Regular("aarch64-pc-windows-msvc".to_string()));
+                }
             }
         }
         _ => eprintln!("⚠️  Warning: Failed to determine python platform"),

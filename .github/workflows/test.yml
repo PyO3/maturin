@@ -73,6 +73,18 @@ jobs:
         if: startsWith(matrix.os, 'windows')
         run: |
           reg add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f
+      - name: Setup dev drive
+        if: startsWith(matrix.os, 'windows')
+        uses: samypr100/setup-dev-drive@v3
+        with:
+          drive-size: 10GB
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
+            CARGO_TARGET_DIR,{{ DEV_DRIVE }}/target
+      - name: Setup Rust toolchain on dev drive
+        if: startsWith(matrix.os, 'windows')
+        run: rustup default stable
       - name: Cleanup Disk
         if: ${{ !startsWith(matrix.os, 'windows') }}
         run: |
@@ -171,15 +183,15 @@ jobs:
           set -ex
           rustup target add x86_64-unknown-linux-gnu
           export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
-          target/debug/maturin build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
+          "${CARGO_TARGET_DIR:-target}/debug/maturin" build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
       - name: test maturin new
         shell: bash
         run: |
           set -ex
-          target/debug/maturin new -b pyo3 test-crates/pyo3-new
-          target/debug/maturin build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
-          target/debug/maturin new --mixed -b pyo3 test-crates/pyo3-new-mixed
-          target/debug/maturin build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
+          "${CARGO_TARGET_DIR:-target}/debug/maturin" new -b pyo3 test-crates/pyo3-new
+          "${CARGO_TARGET_DIR:-target}/debug/maturin" build -m test-crates/pyo3-new/Cargo.toml --target-dir test-crates/targets/
+          "${CARGO_TARGET_DIR:-target}/debug/maturin" new --mixed -b pyo3 test-crates/pyo3-new-mixed
+          "${CARGO_TARGET_DIR:-target}/debug/maturin" build -m test-crates/pyo3-new-mixed/Cargo.toml --target-dir test-crates/targets/
 
   build-maturin:
     name: Build maturin
@@ -424,6 +436,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
+      - name: Setup dev drive
+        if: startsWith(matrix.os, 'windows')
+        uses: samypr100/setup-dev-drive@v3
+        with:
+          drive-size: 10GB
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
+            CARGO_TARGET_DIR,{{ DEV_DRIVE }}/target
+      - name: Setup Rust toolchain on dev drive
+        if: startsWith(matrix.os, 'windows')
+        run: rustup default stable
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: changes

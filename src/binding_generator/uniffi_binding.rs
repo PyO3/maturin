@@ -94,6 +94,11 @@ struct UniFfiToml {
 #[derive(Debug, serde::Deserialize)]
 struct UniFfiBindingsConfig {
     cdylib_name: Option<String>,
+    /// Maps external crate names to their Python package names.
+    /// Bindings for these crates are provided by external packages
+    /// and should not be included in the wheel.
+    #[serde(default)]
+    external_packages: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -190,12 +195,13 @@ fn generate_uniffi_bindings(
 
     let config_file = crate_dir.join("uniffi.toml");
     let mut cdylib_name = None;
+    let mut external_package_names = Vec::new();
     if config_file.is_file() {
         let uniffi_toml: UniFfiToml = toml::from_str(&fs::read_to_string(&config_file)?)?;
-        cdylib_name = uniffi_toml
-            .bindings
-            .get("python")
-            .and_then(|py| py.cdylib_name.clone());
+        if let Some(py_config) = uniffi_toml.bindings.get("python") {
+            cdylib_name = py_config.cdylib_name.clone();
+            external_package_names = py_config.external_packages.keys().cloned().collect();
+        }
 
         // TODO: is this needed? `uniffi-bindgen` uses `uniffi.toml` by default,
         // `uniffi_bindgen_command` sets cwd to the crate (workspace) root, so maybe
@@ -238,7 +244,15 @@ fn generate_uniffi_bindings(
                 .to_string_lossy()
                 .to_string()
         })
+        .filter(|name| !external_package_names.contains(name))
         .collect();
+
+    if !external_package_names.is_empty() {
+        debug!(
+            "Excluding external UniFFI bindings: {:?}",
+            external_package_names
+        );
+    }
 
     Ok(UniFfiBindings {
         names: py_bindings,

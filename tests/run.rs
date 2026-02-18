@@ -734,6 +734,14 @@ fn workspace_cargo_lock() {
 }
 
 #[test]
+fn build_wheels_from_sdist_hello_world() {
+    handle_result(other::test_build_wheels_from_sdist(
+        "test-crates/hello-world",
+        "build_wheels_from_sdist_hello_world",
+    ))
+}
+
+#[test]
 fn workspace_members_beneath_pyproject_sdist() {
     let cargo_toml = expect![[r#"
         [workspace]

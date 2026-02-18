@@ -13,7 +13,7 @@ use clap::{Parser, Subcommand};
 use ignore::overrides::Override;
 use maturin::{
     BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter, PythonInterpreter, Target,
-    TargetTriple, VirtualWriter, develop, find_path_deps, write_dist_info,
+    TargetTriple, VirtualWriter, develop, find_path_deps, unpack_sdist, write_dist_info,
 };
 #[cfg(feature = "schemars")]
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
@@ -75,7 +75,10 @@ enum Command {
             require_equals = false
         )]
         strip: Option<bool>,
-        /// Build a source distribution
+        /// Build a source distribution and build wheels from it.
+        ///
+        /// This verifies that the source distribution is complete and can be
+        /// used to build the project from source.
         #[arg(long)]
         sdist: bool,
         #[command(flatten)]
@@ -416,16 +419,27 @@ fn run() -> Result<()> {
             if release {
                 build.profile = Some("release".to_string());
             }
+            // Keep tempdir alive for the duration of the build
+            let _sdist_tmp;
+            if sdist {
+                // Build sdist first, then build wheels from the unpacked sdist
+                // to verify that the source distribution is complete.
+                let sdist_path = build_sdist(&build, strip)?;
+                let (tmp, cargo_toml) = unpack_sdist(&sdist_path)?;
+                _sdist_tmp = Some(tmp);
+                eprintln!(
+                    "📦 Building wheels from source distribution at {}",
+                    cargo_toml.parent().unwrap().display()
+                );
+                build.cargo.manifest_path = Some(cargo_toml);
+            } else {
+                _sdist_tmp = None;
+            }
             let build_context = build
                 .into_build_context()
                 .strip(strip)
                 .editable(false)
                 .build()?;
-            if sdist {
-                build_context
-                    .build_source_distribution()?
-                    .context("Failed to build source distribution, pyproject.toml not found")?;
-            }
             let wheels = build_context.build_wheels()?;
             assert!(!wheels.is_empty());
         }
@@ -444,6 +458,24 @@ fn run() -> Result<()> {
                 build.profile = Some("dev".to_string());
             }
 
+            // Keep tempdir alive for the duration of the build
+            let _sdist_tmp;
+            let mut sdist_path = None;
+            if !no_sdist {
+                // Build sdist first, then build wheels from the unpacked sdist
+                let path = build_sdist(&build, Some(!no_strip))?;
+                let (tmp, cargo_toml) = unpack_sdist(&path)?;
+                _sdist_tmp = Some(tmp);
+                eprintln!(
+                    "📦 Building wheels from source distribution at {}",
+                    cargo_toml.parent().unwrap().display()
+                );
+                build.cargo.manifest_path = Some(cargo_toml);
+                sdist_path = Some(path);
+            } else {
+                _sdist_tmp = None;
+            }
+
             let mut build_context = build
                 .into_build_context()
                 .strip(Some(!no_strip))
@@ -457,19 +489,17 @@ fn run() -> Result<()> {
                 .cargo_options
                 .profile
                 .get_or_insert_with(|| "release".to_string());
-
             if profile == "dev" {
                 eprintln!("⚠️  Warning: You're publishing debug wheels");
             }
 
             let mut wheels = build_context.build_wheels()?;
-            if !no_sdist && let Some(sd) = build_context.build_source_distribution()? {
-                wheels.push(sd);
+            if let Some(sdist_path) = sdist_path {
+                wheels.push((sdist_path, "source".to_string()));
             }
 
             let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();
             publish.non_interactive_on_ci();
-
             upload_ui(&items, &publish)?
         }
         Command::ListPython { target } => {
@@ -561,6 +591,21 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Build a source distribution from the given build options, returning the sdist path.
+fn build_sdist(build: &BuildOptions, strip: Option<bool>) -> Result<PathBuf> {
+    let sdist_context = build
+        .clone()
+        .into_build_context()
+        .strip(strip)
+        .editable(false)
+        .sdist_only(true)
+        .build()?;
+    let (sdist_path, _) = sdist_context
+        .build_source_distribution()?
+        .context("Failed to build source distribution, pyproject.toml not found")?;
+    Ok(sdist_path)
 }
 
 #[cfg(not(debug_assertions))]

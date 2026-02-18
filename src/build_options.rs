@@ -887,6 +887,9 @@ impl BuildContextBuilder {
         }
 
         let crate_name = cargo_toml.package.name;
+        let include_import_lib = pyproject
+            .map(|p| p.include_import_lib())
+            .unwrap_or_default();
         Ok(BuildContext {
             target,
             compile_targets,
@@ -912,6 +915,7 @@ impl BuildContextBuilder {
             compression: build_options.compression,
             pypi_validation,
             sbom,
+            include_import_lib,
         })
     }
 }

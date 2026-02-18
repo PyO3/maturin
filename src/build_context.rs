@@ -147,6 +147,8 @@ pub struct BuildContext {
     pub pypi_validation: bool,
     /// SBOM configuration
     pub sbom: Option<SbomConfig>,
+    /// Include the import library (.dll.lib) in the wheel on Windows
+    pub include_import_lib: bool,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).

@@ -306,6 +306,9 @@ pub struct ToolMaturin {
     pub use_base_python: bool,
     /// SBOM configuration
     pub sbom: Option<SbomConfig>,
+    /// Include the import library (.dll.lib) in the wheel on Windows
+    #[serde(default)]
+    pub include_import_lib: bool,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -438,6 +441,13 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
         self.maturin()?.manifest_path.as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.include-import-lib]` in pyproject.toml
+    pub fn include_import_lib(&self) -> bool {
+        self.maturin()
+            .map(|maturin| maturin.include_import_lib)
+            .unwrap_or_default()
     }
 
     /// Warn about `build-system.requires` mismatching expectations.

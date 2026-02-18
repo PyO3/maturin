@@ -193,6 +193,16 @@ where
                         }
                     }
                 }
+
+                // 4a. Install import library on Windows
+                if let Some(import_lib) = &artifact.import_lib_path
+                    && context.include_import_lib
+                {
+                    let target = base_path.join(import_lib.file_name().unwrap());
+                    fs::create_dir_all(target.parent().unwrap())?;
+                    debug!("Installing import library {}", target.display());
+                    fs::copy(import_lib, &target)?;
+                }
             }
             _ => {
                 // 2b. Install the artifact
@@ -212,6 +222,15 @@ where
                         // Use add_entry_force to bypass exclusion checks for generated binding files
                         writer.add_entry_force(target, source)?;
                     }
+                }
+
+                // 4b. Install import library on Windows
+                if let Some(import_lib) = &artifact.import_lib_path
+                    && context.include_import_lib
+                {
+                    let dest = module.join(import_lib.file_name().unwrap());
+                    debug!("Adding import library to archive {}", dest.display());
+                    writer.add_file_force(dest, import_lib, false)?;
                 }
             }
         }

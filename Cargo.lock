@@ -326,9 +326,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.22.0"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41e8a44660dbbfed47703c23423cbb93814b6d16e357d1c6b2d8a8b158ef0e52"
+checksum = "6a72970dc4f54505e68b934ae90af6040a3edea6af820f535421e00d510b7984"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -338,9 +338,11 @@ dependencies = [
  "crc",
  "dirs",
  "fs-err",
+ "goblin",
  "path-slash",
  "rustc_version",
  "rustflags",
+ "scroll",
  "semver",
  "serde",
  "serde_json",
@@ -1158,9 +1160,9 @@ dependencies = [
 
 [[package]]
 name = "goblin"
-version = "0.10.4"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4db6758c546e6f81f265638c980e5e84dfbda80cfd8e89e02f83454c8e8124bd"
+checksum = "983a6aafb3b12d4c41ea78d39e189af4298ce747353945ff5105b54a056e5cd9"
 dependencies = [
  "log",
  "plain",

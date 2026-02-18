@@ -369,7 +369,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
 fn run() -> Result<()> {
     #[cfg(feature = "zig")]
     {
-        // Allow symlink `maturin` to `ar` to invoke `zig ar`
+        // Allow symlink `maturin` to various tool names to invoke zig wrappers
         // See https://github.com/messense/cargo-zigbuild/issues/52
         let mut args = env::args();
         let program_path = PathBuf::from(args.next().expect("no program path"));
@@ -379,6 +379,21 @@ fn run() -> Result<()> {
                 args: args.collect(),
             };
             zig.execute()?;
+            return Ok(());
+        } else if program_name.eq_ignore_ascii_case("lib") {
+            let zig = Zig::Lib {
+                args: args.collect(),
+            };
+            zig.execute()?;
+            return Ok(());
+        } else if program_name.to_string_lossy().ends_with("dlltool") {
+            let zig = Zig::Dlltool {
+                args: args.collect(),
+            };
+            zig.execute()?;
+            return Ok(());
+        } else if program_name.eq_ignore_ascii_case("install_name_tool") {
+            cargo_zigbuild::macos::install_name_tool::execute(args)?;
             return Ok(());
         }
     }

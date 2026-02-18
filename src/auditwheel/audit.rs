@@ -15,6 +15,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::{fmt, io};
 use thiserror::Error;
+use tracing::debug;
 
 static IS_LIBPYTHON: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^libpython3\.\d+m?u?t?\.so\.\d+\.\d+$").unwrap());
@@ -549,9 +550,14 @@ pub fn get_policy_and_libs(
     let policy = if !external_libs.is_empty() {
         let (adjusted, offenders) = check_external_libs_policy(&policy, &external_libs, target)?;
         if platform_tag.is_some() && !offenders.is_empty() {
+            let tag_kind = if policy.name.starts_with("musllinux") {
+                "musllinux"
+            } else {
+                "manylinux"
+            };
             bail!(
                 "External libraries {offenders:?} require newer symbol versions than {policy} allows. \
-                 Consider using --compatibility {adjusted} or a newer manylinux tag"
+                 Consider using --compatibility {adjusted} or a newer {tag_kind} tag"
             );
         }
         adjusted
@@ -562,39 +568,60 @@ pub fn get_policy_and_libs(
     Ok((policy, external_libs))
 }
 
-/// Check whether the versioned symbol requirements are satisfied by a policy's allowed versions.
-fn versioned_symbols_satisfied(
+/// Return the symbol versions required by external libraries that are not
+/// allowed by the given policy, e.g. `["GLIBC_2.29", "GLIBC_2.33"]`.
+fn unsatisfied_symbol_versions(
     policy: &Policy,
     arch: &str,
     versioned_libraries: &[VersionedLibrary],
-) -> bool {
+) -> Vec<String> {
     let arch_versions = match policy.symbol_versions.get(arch) {
         Some(v) => v,
-        None => return false,
+        None => return vec!["(unsupported arch)".to_string()],
     };
+    let mut unsatisfied = Vec::new();
     for library in versioned_libraries {
         if !policy.lib_whitelist.contains(&library.name) {
             continue;
         }
         for (name, versions_needed) in library.parsed_versions() {
             match arch_versions.get(&name) {
-                Some(versions_allowed) if versions_needed.is_subset(versions_allowed) => {}
-                _ => return false,
+                Some(versions_allowed) => {
+                    for v in versions_needed.difference(versions_allowed) {
+                        unsatisfied.push(format!("{name}_{v}"));
+                    }
+                }
+                None => {
+                    for v in &versions_needed {
+                        unsatisfied.push(format!("{name}_{v}"));
+                    }
+                }
             }
         }
     }
-    true
+    unsatisfied.sort();
+    unsatisfied
 }
 
 /// Check if external libraries require a newer glibc than the current policy allows.
-/// Returns the adjusted policy and a list of library names that caused the downgrade.
+/// Returns the adjusted policy and a list of `"libfoo.so (GLIBC_2.29, GLIBC_2.33)"`
+/// descriptions for libraries that caused a downgrade.
 fn check_external_libs_policy(
     policy: &Policy,
     external_libs: &[Library],
     target: &Target,
 ) -> Result<(Policy, Vec<String>)> {
     let arch = target.target_arch().to_string();
-    let platform_policies = get_default_platform_policies();
+    let mut platform_policies = if policy.name.starts_with("musllinux") {
+        MUSLLINUX_POLICIES.clone()
+    } else if policy.name.starts_with("manylinjux") {
+        MANYLINUX_POLICIES.clone()
+    } else {
+        get_default_platform_policies()
+    };
+    for p in &mut platform_policies {
+        p.fixup_musl_libc_so_name(target.target_arch());
+    }
     // Policies must be sorted from highest to lowest priority so we find the
     // best (most compatible) match first when iterating.
     debug_assert!(
@@ -622,17 +649,22 @@ fn check_external_libs_policy(
         }
 
         // Find the highest policy that this external library satisfies
+        let unsatisfied = unsatisfied_symbol_versions(&result, &arch, &versioned_libraries);
+        if unsatisfied.is_empty() {
+            continue;
+        }
         for candidate in platform_policies.iter() {
             if candidate.priority > result.priority {
                 continue;
             }
-            if versioned_symbols_satisfied(candidate, &arch, &versioned_libraries) {
+            if unsatisfied_symbol_versions(candidate, &arch, &versioned_libraries).is_empty() {
                 if candidate.priority < result.priority {
-                    eprintln!(
-                        "📦 Downgrading tag to {candidate} because external library {} requires it",
+                    debug!(
+                        "Downgrading tag to {candidate} because external library {} requires {}",
                         lib.name,
+                        unsatisfied.join(", "),
                     );
-                    offenders.push(lib.name.clone());
+                    offenders.push(format!("{} ({})", lib.name, unsatisfied.join(", ")));
                     result = candidate.clone();
                 }
                 break;

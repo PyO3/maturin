@@ -41,6 +41,8 @@ pub struct CompileTarget {
 pub struct BuildArtifact {
     /// Path to the build artifact
     pub path: PathBuf,
+    /// Path to the Windows import library (.dll.lib or .dll.a), if any
+    pub import_lib_path: Option<PathBuf>,
     /// Array of paths to include in the library search path, as indicated by
     /// the `cargo:rustc-link-search` instruction.
     pub linked_paths: Vec<String>,
@@ -143,6 +145,7 @@ fn compile_universal2(
         let mut result = HashMap::new();
         let universal_artifact = BuildArtifact {
             path: PathBuf::from(output_path),
+            import_lib_path: None,
             linked_paths: x86_64_artifact.linked_paths.clone(),
         };
         result.insert(build_type, universal_artifact);
@@ -564,27 +567,42 @@ fn compile_target(
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
                 if crate_name.as_ref() == context.crate_name {
-                    let tuples = artifact
-                        .target
-                        .crate_types
-                        .into_iter()
-                        .zip(artifact.filenames);
-                    for (crate_type, filename) in tuples {
-                        let path = if using_cross && filename.starts_with("/target") {
-                            // Convert cross target path in docker back to path on host
-                            context
-                                .cargo_metadata
-                                .target_directory
-                                .join(filename.strip_prefix("/target").unwrap())
-                                .into_std_path_buf()
-                        } else {
-                            filename.into()
-                        };
-                        let artifact = BuildArtifact {
-                            path,
-                            linked_paths: Vec::new(),
-                        };
-                        artifacts.insert(crate_type, artifact);
+                    let num_crate_types = artifact.target.crate_types.len();
+                    let mut filenames_iter = artifact.filenames.into_iter();
+                    for crate_type in artifact.target.crate_types {
+                        if let Some(filename) = filenames_iter.next() {
+                            let path = if using_cross && filename.starts_with("/target") {
+                                // Convert cross target path in docker back to path on host
+                                context
+                                    .cargo_metadata
+                                    .target_directory
+                                    .join(filename.strip_prefix("/target").unwrap())
+                                    .into_std_path_buf()
+                            } else {
+                                filename.into()
+                            };
+                            let artifact = BuildArtifact {
+                                path,
+                                import_lib_path: None,
+                                linked_paths: Vec::new(),
+                            };
+                            artifacts.insert(crate_type, artifact);
+                        }
+                    }
+                    // Remaining filenames may include import libraries (.dll.lib, .dll.a)
+                    if num_crate_types == 1
+                        && let Some((_, artifact)) = artifacts.iter_mut().next()
+                    {
+                        for extra in filenames_iter {
+                            let extra_path: PathBuf = extra.into();
+                            if extra_path
+                                .extension()
+                                .is_some_and(|ext| ext == "lib" || ext == "a")
+                            {
+                                artifact.import_lib_path = Some(extra_path);
+                                break;
+                            }
+                        }
                     }
                 }
             }

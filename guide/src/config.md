@@ -63,6 +63,10 @@ strip = true
 # Source distribution generator,
 # supports cargo (default) and git.
 sdist-generator = "cargo"
+# Include the Windows import library (.dll.lib or .dll.a) in the wheel.
+# This is useful when distributing shared libraries that other programs
+# need to link against at compile time.
+include-import-lib = false
 # Use base Python executable instead of venv Python executable in PEP 517 build.
 #
 # This can help avoid unnecessary rebuilds, as the Python executable does not change

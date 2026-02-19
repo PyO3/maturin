@@ -101,6 +101,11 @@
         "$ref": "#/$defs/GlobPattern"
       }
     },
+    "include-import-lib": {
+      "description": "Include the import library (.dll.lib) in the wheel on Windows",
+      "type": "boolean",
+      "default": false
+    },
     "locked": {
       "description": "Require Cargo.lock is up to date",
       "type": [

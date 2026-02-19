@@ -16,6 +16,24 @@ permissions:
   contents: read
 
 jobs:
+  sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          # No need to take cache size for maturin in the release pipeline
+          enable-cache: "false"
+      - name: Build sdist
+        run: uvx maturin sdist -o dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-sdist
+          path: dist/*.tar.gz
+
   build:
     name: Build ${{ matrix.target }}
     strategy:
@@ -64,17 +82,17 @@ jobs:
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
 
       # Those two will also create target/${{ matrix.target }}/maturin
-      - name: Build wheel (with sdist)
+      - name: Build wheel (linux x86_64)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1 --compatibility pypi
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1 --compatibility pypi
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
         run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features full,native-tls --compatibility pypi
 
-      - name: Build wheel (without sdist)
+      - name: Build wheel
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
         run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage,static --compatibility pypi
 
@@ -222,7 +240,7 @@ jobs:
     environment:
       name: PyPI
       url: ${{ steps.set_url.outputs.env_url }}
-    needs: [build, build-musl]
+    needs: [sdist, build, build-musl]
     steps:
       - uses: actions/download-artifact@v7
         with:

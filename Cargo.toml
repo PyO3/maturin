@@ -107,6 +107,7 @@ xz2 = { version = "0.1", optional = true }
 # log
 tracing = "0.1.36"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+walkdir = "2.5.0"
 
 # project scaffolding, maturin new/init/generate-ci
 dialoguer = { version = "0.12.0", default-features = false, optional = true }

@@ -1,6 +1,9 @@
 *.egg
 *.egg-info/
+*.dwp
+*.dSYM
 *.o
+*.pdb
 *.py[cdo]
 *.so
 .pytest_cache/

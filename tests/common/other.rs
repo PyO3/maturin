@@ -327,7 +327,8 @@ pub fn check_wheel_files(
 ) -> Result<()> {
     let wheel = build_wheel_files(package, unique_name)?;
     let drop_platform_specific_files = |file: &&str| -> bool {
-        !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
+        !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so" || ext == "pdb" || ext == "dwp")
+            && !file.contains(".dSYM/")
     };
     assert_eq!(
         wheel

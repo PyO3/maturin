@@ -4,6 +4,8 @@
 
 For local development, the `maturin develop` command can be used to quickly
 build a package in debug mode by default and install it to virtualenv.
+Debug info files (.pdb, .dSYM, .dwp) are automatically included alongside the
+built artifact unless `--strip` is used.
 
 ```
 Usage: maturin develop [OPTIONS] [ARGS]...

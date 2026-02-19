@@ -13,7 +13,7 @@ use fs_err::File;
 use fs_err::os::unix::fs::OpenOptionsExt as _;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt as _;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::BuildArtifact;
 use crate::BuildContext;
@@ -24,6 +24,7 @@ use crate::archive_source::ArchiveSource;
 #[cfg(unix)]
 use crate::module_writer::default_permission;
 use crate::module_writer::write_python_part;
+use walkdir::WalkDir;
 
 mod bin_binding;
 mod cffi_binding;
@@ -145,6 +146,19 @@ where
         match (context.editable, &base_path) {
             (true, Some(base_path)) => {
                 let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
+                // Compute the directory where debug info files should be placed.
+                // For extension modules (e.g. CFFI mixed projects) the artifact
+                // may live in a subdirectory of base_path, so we derive the
+                // debug info directory from the artifact's installed location to
+                // keep the .dSYM / .pdb / .dwp next to the library it belongs to.
+                let debuginfo_base = match &artifact_target {
+                    ArtifactTarget::Binary(_) => base_path.clone(),
+                    ArtifactTarget::ExtensionModule(path) => base_path
+                        .join(path)
+                        .parent()
+                        .map(|p| p.to_path_buf())
+                        .unwrap_or_else(|| base_path.clone()),
+                };
                 match artifact_target {
                     ArtifactTarget::Binary(path) => {
                         // Use add_file_force to bypass exclusion checks for the compiled artifact
@@ -203,6 +217,13 @@ where
                     debug!("Installing import library {}", target.display());
                     fs::copy(import_lib, &target)?;
                 }
+
+                // 5a. Install debug info files
+                if let Some(debuginfo) = &artifact.debuginfo_path
+                    && context.include_debuginfo
+                {
+                    install_debuginfo_editable(debuginfo, &debuginfo_base)?;
+                }
             }
             _ => {
                 // 2b. Install the artifact
@@ -231,6 +252,35 @@ where
                     let dest = module.join(import_lib.file_name().unwrap());
                     debug!("Adding import library to archive {}", dest.display());
                     writer.add_file_force(dest, import_lib, false)?;
+                }
+
+                // 5b. Install debug info files
+                if let Some(debuginfo) = &artifact.debuginfo_path
+                    && context.include_debuginfo
+                {
+                    // Binary artifacts go into the `.data/scripts/` directory.
+                    // The wheel spec only permits regular files in `scripts/`, so
+                    // a `.dSYM` directory bundle (macOS debug info) cannot be
+                    // placed there.  Skip debug-info installation for binaries to
+                    // avoid producing an invalid wheel that tools like uv reject.
+                    if matches!(artifact_target, ArtifactTarget::Binary(_)) {
+                        warn!(
+                            "Skipping debug info for binary artifact in wheel: {} \
+                             (directory bundles such as .dSYM are not permitted in \
+                             the wheel `scripts` directory)",
+                            debuginfo.display()
+                        );
+                    } else {
+                        // Place debug info next to the artifact inside the wheel,
+                        // not at the top-level module (the artifact may be nested
+                        // in a subdirectory for CFFI/UniFFI mixed projects).
+                        let debuginfo_dir = artifact_target
+                            .path()
+                            .parent()
+                            .map(|p| p.to_path_buf())
+                            .unwrap_or_else(|| module.clone());
+                        install_debuginfo_wheel(writer, debuginfo, &debuginfo_dir)?;
+                    }
                 }
             }
         }
@@ -307,5 +357,111 @@ where
         }
     }
 
+    Ok(())
+}
+
+/// Install debug info files for editable installs by copying to the target directory.
+/// Handles both single files (.pdb, .dwp) and directory bundles (.dSYM).
+fn install_debuginfo_editable(debuginfo: &Path, base_path: &Path) -> Result<()> {
+    let debuginfo_name = debuginfo
+        .file_name()
+        .context("Failed to get debug info file name")?;
+    let target = base_path.join(debuginfo_name);
+
+    // Remove stale debuginfo to avoid mixed contents (mirrors the
+    // "remove existing .so" logic for the extension module itself)
+    if target.is_dir() {
+        let _ = fs::remove_dir_all(&target);
+    } else if target.exists() {
+        let _ = fs::remove_file(&target);
+    }
+
+    if debuginfo.is_dir() {
+        // .dSYM is a directory bundle on macOS
+        debug!(
+            "Copying debug info directory {} to {}",
+            debuginfo.display(),
+            target.display()
+        );
+        copy_dir_all(debuginfo, &target)?;
+    } else if debuginfo.is_file() {
+        debug!(
+            "Installing debug info {} to {}",
+            debuginfo.display(),
+            target.display()
+        );
+        fs::create_dir_all(target.parent().unwrap())?;
+        fs::copy(debuginfo, &target)?;
+    } else {
+        warn!(
+            "Debug info path {} is neither a file nor a directory, skipping",
+            debuginfo.display()
+        );
+    }
+    Ok(())
+}
+
+/// Install debug info files into a wheel archive.
+/// Handles both single files (.pdb, .dwp) and directory bundles (.dSYM).
+fn install_debuginfo_wheel(
+    writer: &mut VirtualWriter<WheelWriter>,
+    debuginfo: &Path,
+    module: &Path,
+) -> Result<()> {
+    let debuginfo_name = debuginfo
+        .file_name()
+        .context("Failed to get debug info file name")?;
+
+    if debuginfo.is_dir() {
+        // .dSYM is a directory bundle on macOS — add all files recursively
+        for entry in WalkDir::new(debuginfo).follow_links(true) {
+            let entry = entry?;
+            if entry.file_type().is_file() {
+                let relative = entry
+                    .path()
+                    .strip_prefix(debuginfo)
+                    .context("Failed to compute relative path in debug info bundle")?;
+                let dest = module.join(debuginfo_name).join(relative);
+                debug!(
+                    "Adding debug info {} to archive at {}",
+                    entry.path().display(),
+                    dest.display()
+                );
+                writer.add_file_force(dest, entry.path(), false)?;
+            }
+        }
+    } else if debuginfo.is_file() {
+        let dest = module.join(debuginfo_name);
+        debug!(
+            "Adding debug info {} to archive at {}",
+            debuginfo.display(),
+            dest.display()
+        );
+        writer.add_file_force(dest, debuginfo, false)?;
+    } else {
+        warn!(
+            "Debug info path {} is neither a file nor a directory, skipping",
+            debuginfo.display()
+        );
+    }
+    Ok(())
+}
+
+/// Recursively copy a directory and its contents.
+pub(crate) fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in WalkDir::new(src).follow_links(true) {
+        let entry = entry?;
+        let relative = entry
+            .path()
+            .strip_prefix(src)
+            .context("Failed to compute relative path")?;
+        let target = dst.join(relative);
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&target)?;
+        } else {
+            fs::copy(entry.path(), &target)?;
+        }
+    }
     Ok(())
 }

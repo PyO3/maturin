@@ -68,6 +68,11 @@ Options:
           
           Make sure you installed zig with `pip install maturin[zig]`
 
+      --include-debuginfo
+          Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux) in the wheel.
+          When enabled, maturin automatically configures split-debuginfo=packed so that separate
+          debug info files are produced
+
   -q, --quiet
           Do not print cargo log messages
 

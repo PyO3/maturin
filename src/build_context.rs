@@ -150,6 +150,8 @@ pub struct BuildContext {
     pub sbom: Option<SbomConfig>,
     /// Include the import library (.dll.lib) in the wheel on Windows
     pub include_import_lib: bool,
+    /// Include debug info files (.pdb, .dSYM, .dwp) in the wheel
+    pub include_debuginfo: bool,
     /// Cargo features conditionally enabled based on the target Python version
     pub conditional_features: Vec<(String, VersionSpecifiers)>,
 }

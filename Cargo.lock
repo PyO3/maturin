@@ -1720,6 +1720,7 @@ dependencies = [
  "unicode-xid",
  "ureq",
  "url",
+ "walkdir",
  "which",
  "wild",
  "xz2",

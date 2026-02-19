@@ -42,6 +42,11 @@ Options:
       --strip
           Strip the library for minimum file size
 
+      --include-debuginfo
+          Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux) in the wheel.
+          When enabled, maturin automatically configures split-debuginfo=packed so that separate
+          debug info files are produced. Cannot be used with --strip.
+
       --sdist
           Build a source distribution
 

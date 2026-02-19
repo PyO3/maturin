@@ -542,12 +542,9 @@ impl BuildContext {
         grafted_paths.sort();
 
         eprintln!(
-            "🖨  Copied external shared libraries to package {} directory:",
+            "🖨  Copied external shared libraries to package {} directory.",
             libs_dir.display()
         );
-        for lib_path in &grafted_paths {
-            eprintln!("    {}", lib_path.display());
-        }
 
         // Generate auditwheel SBOM for the grafted libraries.
         // This mirrors Python auditwheel's behaviour of writing a CycloneDX

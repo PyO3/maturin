@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.3
+
+* CI: set crt-static for riscv64 and loongarch64 musl targets (#3009)
+* Fix: support `maturin develop` on Windows ARM with x86 Python (#3011)
+* Fix: exclude `external_packages` bindings from uniffi wheels (#3013)
+* Update cargo-zigbuild to 0.22.1 (#3015)
+* Feat: build wheels from sdist with `--sdist` flag (#3014)
+* Feat: add `include-import-lib` option to bundle Windows import libraries in wheels (#3017)
+* Fix: auditwheel external lib check respects musllinux and reports symbol versions (#3019)
+
 ## 1.12.2
 
 * Fix: allow absolute paths for `--sbom-include` (#3004)

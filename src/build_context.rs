@@ -655,31 +655,32 @@ impl BuildContext {
             (Os::Windows, Arch::X86) => "win32".to_string(),
             (Os::Windows, Arch::X86_64) => "win_amd64".to_string(),
             (Os::Windows, Arch::Aarch64) => "win_arm64".to_string(),
+            // Android
+            (Os::Android, _) => {
+                let arch = target.get_platform_arch()?;
+                let android_arch = match arch.as_str() {
+                    "armv7l" => "armeabi_v7a",
+                    "aarch64" => "arm64_v8a",
+                    "i686" => "x86",
+                    "x86_64" => "x86_64",
+                    _ => bail!("Unsupported Android architecture: {}", arch),
+                };
+                let api_level = find_android_api_level(target.target_triple(), &self.manifest_path)?;
+                format!("android_{}_{}", api_level, android_arch)
+            }
             // Linux
             (Os::Linux, _) => {
                 let arch = target.get_platform_arch()?;
-                if target.target_triple().contains("android") {
-                    let android_arch = match arch.as_str() {
-                        "armv7l" => "armeabi_v7a",
-                        "aarch64" => "arm64_v8a",
-                        "i686" => "x86",
-                        "x86_64" => "x86_64",
-                        _ => bail!("Unsupported Android architecture: {}", arch),
-                    };
-                    let api_level = find_android_api_level(target.target_triple(), &self.manifest_path)?;
-                    format!("android_{}_{}", api_level, android_arch)
-                } else {
-                    let mut platform_tags = platform_tags.to_vec();
-                    platform_tags.sort();
-                    let mut tags = vec![];
-                    for platform_tag in platform_tags {
-                        tags.push(format!("{platform_tag}_{arch}"));
-                        for alias in platform_tag.aliases() {
-                            tags.push(format!("{alias}_{arch}"));
-                        }
+                let mut platform_tags = platform_tags.to_vec();
+                platform_tags.sort();
+                let mut tags = vec![];
+                for platform_tag in platform_tags {
+                    tags.push(format!("{platform_tag}_{arch}"));
+                    for alias in platform_tag.aliases() {
+                        tags.push(format!("{alias}_{arch}"));
                     }
-                    tags.join(".")
                 }
+                tags.join(".")
             }
             // macOS
             (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {

@@ -185,6 +185,8 @@ fn cargo_build_command(
     python_interpreter: Option<&PythonInterpreter>,
     compile_target: &CompileTarget,
 ) -> Result<Command> {
+    use crate::pyproject_toml::FeatureSpec;
+
     let target = &context.target;
 
     let user_specified_target = if target.user_specified {
@@ -192,10 +194,31 @@ fn cargo_build_command(
     } else {
         None
     };
-    let mut cargo_rustc = context
-        .cargo_options
-        .clone()
-        .into_rustc_options(user_specified_target);
+    let mut cargo_options = context.cargo_options.clone();
+
+    // Resolve conditional features based on the target Python version
+    if let Some(interpreter) = python_interpreter {
+        let extra = FeatureSpec::resolve_conditional(
+            &context.conditional_features,
+            interpreter.major,
+            interpreter.minor,
+        );
+        if !extra.is_empty() {
+            debug!(
+                "Enabling conditional features for Python {}.{}: {}",
+                interpreter.major,
+                interpreter.minor,
+                extra.join(", ")
+            );
+            for feature in extra {
+                if !cargo_options.features.contains(&feature) {
+                    cargo_options.features.push(feature);
+                }
+            }
+        }
+    }
+
+    let mut cargo_rustc = cargo_options.into_rustc_options(user_specified_target);
     cargo_rustc.message_format = vec!["json-render-diagnostics".to_string()];
 
     // Add `--crate-type cdylib` if available

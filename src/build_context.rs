@@ -29,6 +29,7 @@ use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
 use lddtree::Library;
 use normpath::PathExt;
+use pep440_rs::VersionSpecifiers;
 use platform_info::*;
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -149,6 +150,8 @@ pub struct BuildContext {
     pub sbom: Option<SbomConfig>,
     /// Include the import library (.dll.lib) in the wheel on Windows
     pub include_import_lib: bool,
+    /// Cargo features conditionally enabled based on the target Python version
+    pub conditional_features: Vec<(String, VersionSpecifiers)>,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).

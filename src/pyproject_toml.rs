@@ -4,7 +4,7 @@ use crate::PlatformTag;
 use crate::auditwheel::AuditWheelMode;
 use anyhow::{Context, Result};
 use fs_err as fs;
-use pep440_rs::Version;
+use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::VersionOrUrl;
 use pyproject_toml::{BuildSystem, Project};
 use serde::{Deserialize, Serialize};
@@ -231,6 +231,55 @@ pub struct SbomConfig {
     pub include: Option<Vec<PathBuf>>,
 }
 
+/// A cargo feature specification that can be either a plain feature name
+/// or a conditional feature that is only enabled for certain Python versions.
+///
+/// # Examples
+///
+/// ```toml
+/// [tool.maturin]
+/// features = [
+///   "some-feature",
+///   { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
+///   { feature = "pyo3/abi3-py38", python-version = "<3.11" },
+/// ]
+/// ```
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FeatureSpec {
+    /// A plain feature name, always enabled
+    Plain(String),
+    /// A feature enabled only when the target Python version matches
+    Conditional {
+        /// The cargo feature to enable
+        feature: String,
+        /// PEP 440 version specifier for the target Python version, e.g. ">=3.11"
+        #[serde(rename = "python-version")]
+        #[cfg_attr(feature = "schemars", schemars(with = "String"))]
+        python_version: VersionSpecifiers,
+    },
+}
+
+impl FeatureSpec {
+    /// Resolve which conditional features should be enabled for a given Python version.
+    ///
+    /// Returns the feature names whose `python-version` specifier matches the
+    /// given `(major, minor)` version.
+    pub fn resolve_conditional(
+        conditional_features: &[(String, VersionSpecifiers)],
+        major: usize,
+        minor: usize,
+    ) -> Vec<String> {
+        let python_version = Version::new([major as u64, minor as u64]);
+        conditional_features
+            .iter()
+            .filter(|(_, specifiers)| specifiers.contains(&python_version))
+            .map(|(feature, _)| feature.clone())
+            .collect()
+    }
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -279,8 +328,10 @@ pub struct ToolMaturin {
     pub profile: Option<String>,
     /// Same as `profile` but for "editable" builds
     pub editable_profile: Option<String>,
-    /// Space or comma separated list of features to activate
-    pub features: Option<Vec<String>>,
+    /// List of features to activate.
+    /// Each entry can be a plain feature name string, or a conditional object
+    /// with `feature` and `python-version` keys.
+    pub features: Option<Vec<FeatureSpec>>,
     /// Activate all available features
     pub all_features: Option<bool>,
     /// Do not activate the `default` feature
@@ -552,7 +603,7 @@ impl PyProjectToml {
 mod tests {
     use crate::{
         PyProjectToml,
-        pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
+        pyproject_toml::{FeatureSpec, Format, Formats, GlobPattern, ToolMaturin},
     };
     use expect_test::expect;
     use fs_err as fs;
@@ -599,7 +650,10 @@ mod tests {
         assert_eq!(maturin.profile.as_deref(), Some("dev"));
         assert_eq!(
             maturin.features,
-            Some(vec!["foo".to_string(), "bar".to_string()])
+            Some(vec![
+                FeatureSpec::Plain("foo".to_string()),
+                FeatureSpec::Plain("bar".to_string()),
+            ])
         );
         assert!(maturin.all_features.is_none());
         assert_eq!(maturin.no_default_features, Some(true));
@@ -812,5 +866,81 @@ mod tests {
             ^^^
         "#]];
         expected.assert_eq(&inner_error.to_string());
+    }
+
+    #[test]
+    fn test_resolve_conditional_features() {
+        let specs = vec![
+            FeatureSpec::Conditional {
+                feature: "pyo3/abi3-py311".to_string(),
+                python_version: ">=3.11".parse().unwrap(),
+            },
+            FeatureSpec::Conditional {
+                feature: "pyo3/abi3-py38".to_string(),
+                python_version: "<3.11".parse().unwrap(),
+            },
+            FeatureSpec::Conditional {
+                feature: "fast-buffer".to_string(),
+                python_version: ">=3.11".parse().unwrap(),
+            },
+        ];
+        let conditional: Vec<_> = specs
+            .into_iter()
+            .filter_map(|spec| match spec {
+                FeatureSpec::Conditional {
+                    feature,
+                    python_version,
+                } => Some((feature, python_version)),
+                _ => None,
+            })
+            .collect();
+
+        // Python 3.12 should match >=3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 12);
+        assert_eq!(resolved, vec!["pyo3/abi3-py311", "fast-buffer"]);
+
+        // Python 3.11 should match >=3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 11);
+        assert_eq!(resolved, vec!["pyo3/abi3-py311", "fast-buffer"]);
+
+        // Python 3.9 should match <3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 9);
+        assert_eq!(resolved, vec!["pyo3/abi3-py38"]);
+
+        // Python 3.8 should match <3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 8);
+        assert_eq!(resolved, vec!["pyo3/abi3-py38"]);
+    }
+
+    #[test]
+    fn test_feature_spec_deserialize_mixed() {
+        let toml_str = r#"
+            features = [
+                "plain-feature",
+                { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
+            ]
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            maturin.features,
+            Some(vec![
+                FeatureSpec::Plain("plain-feature".to_string()),
+                FeatureSpec::Conditional {
+                    feature: "pyo3/abi3-py311".to_string(),
+                    python_version: ">=3.11".parse().unwrap(),
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn test_feature_spec_deserialize_invalid_specifier() {
+        let toml_str = r#"
+            features = [
+                { feature = "foo", python-version = "not-a-version" },
+            ]
+        "#;
+        let result: Result<ToolMaturin, _> = toml::from_str(toml_str);
+        assert!(result.is_err());
     }
 }

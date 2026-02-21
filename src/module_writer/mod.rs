@@ -170,18 +170,9 @@ pub fn write_python_part(
         }
         let relative = absolute.strip_prefix(python_dir).unwrap();
         if !absolute.is_dir() {
-            // Ignore native libraries from develop, if any
-            if let Some(file_name) = relative.file_name() {
-                let file_name = file_name.to_string_lossy();
-                if file_name.starts_with(&project_layout.extension_name)
-                    && (file_name.ends_with(".so")
-                        || file_name.ends_with(".pyd")
-                        || file_name.ends_with(".dll")
-                        || file_name.ends_with(".dylib"))
-                {
-                    debug!("Ignoring native library {}", relative.display());
-                    continue;
-                }
+            if is_develop_native_library(relative, &project_layout.extension_name) {
+                debug!("Ignoring native library {}", relative.display());
+                continue;
             }
             #[cfg(unix)]
             let mode = absolute.metadata()?.permissions().mode();
@@ -390,6 +381,31 @@ pub fn write_pth(
         }
     }
     Ok(())
+}
+
+/// Check if a file is a native library artifact left behind by `maturin develop`.
+///
+/// `maturin develop` copies compiled extension modules (`.so`, `.pyd`, `.dll`, `.dylib`)
+/// directly into the Python source tree for editable installs. When `maturin build` later
+/// walks the same source tree to collect files for the wheel, these artifacts must be
+/// skipped to avoid conflicts with the freshly compiled library being added to the wheel.
+///
+/// The artifacts follow different naming conventions depending on the binding type:
+/// - **PyO3/pyo3-ffi**: `{ext_name}.cpython-3XX-*.so`, `{ext_name}.abi3.so`, `{ext_name}.pyd`
+/// - **CFFI**: `lib{ext_name}.so`, `lib{ext_name}.dylib` (Unix), `{ext_name}.dll` (Windows)
+/// - **UniFFI**: `lib{ext_name}.so`, `lib{ext_name}.dylib` (Unix), `{ext_name}.dll` (Windows)
+fn is_develop_native_library(relative_path: &Path, extension_name: &str) -> bool {
+    let Some(file_name) = relative_path.file_name() else {
+        return false;
+    };
+    let file_name = file_name.to_string_lossy();
+    let is_native_ext = file_name.ends_with(".so")
+        || file_name.ends_with(".pyd")
+        || file_name.ends_with(".dll")
+        || file_name.ends_with(".dylib");
+    is_native_ext
+        && (file_name.starts_with(extension_name)
+            || file_name.starts_with(&format!("lib{extension_name}")))
 }
 
 fn expand_compressed_tag(tag: &str) -> impl Iterator<Item = String> + '_ {

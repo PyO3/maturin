@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.4
+
+* Upgrade memmap2 version ([#3021](https://github.com/pyo3/maturin/pull/3021))
+* Fix: platform tag detection for Android targets ([#3023](https://github.com/pyo3/maturin/pull/3023))
+* Fix: only ignore maturin-generated native libraries on all platforms ([#3025](https://github.com/pyo3/maturin/pull/3025))
+* Fix: ignore develop artifacts for all binding types during build ([#3026](https://github.com/pyo3/maturin/pull/3026))
+* Feat: support conditional cargo features based on Python version ([#3027](https://github.com/pyo3/maturin/pull/3027))
+
 ## 1.12.3
 
 * Ci: set crt-static for riscv64 and loongarch64 musl targets ([#3009](https://github.com/pyo3/maturin/pull/3009))

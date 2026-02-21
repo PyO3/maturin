@@ -171,11 +171,17 @@ pub fn write_python_part(
         let relative = absolute.strip_prefix(python_dir).unwrap();
         if !absolute.is_dir() {
             // Ignore native libraries from develop, if any
-            if let Some(extension) = relative.extension()
-                && extension.to_string_lossy() == "so"
-            {
-                debug!("Ignoring native library {}", relative.display());
-                continue;
+            if let Some(file_name) = relative.file_name() {
+                let file_name = file_name.to_string_lossy();
+                if file_name.starts_with(&project_layout.extension_name)
+                    && (file_name.ends_with(".so")
+                        || file_name.ends_with(".pyd")
+                        || file_name.ends_with(".dll")
+                        || file_name.ends_with(".dylib"))
+                {
+                    debug!("Ignoring native library {}", relative.display());
+                    continue;
+                }
             }
             #[cfg(unix)]
             let mode = absolute.metadata()?.permissions().mode();

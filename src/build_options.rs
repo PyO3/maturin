@@ -6,7 +6,7 @@ use crate::cross_compile::{
     find_build_details, find_sysconfigdata, parse_build_details_json_file, parse_sysconfigdata,
 };
 use crate::project_layout::ProjectResolver;
-use crate::pyproject_toml::ToolMaturin;
+use crate::pyproject_toml::{FeatureSpec, ToolMaturin};
 use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
@@ -890,6 +890,30 @@ impl BuildContextBuilder {
         let include_import_lib = pyproject
             .map(|p| p.include_import_lib())
             .unwrap_or_default();
+        // Extract conditional features from pyproject.toml if CLI features
+        // didn't override (i.e. pyproject features were actually used)
+        let conditional_features = if pyproject_toml_maturin_options.contains(&"features") {
+            pyproject_toml
+                .as_ref()
+                .and_then(|p| p.maturin())
+                .and_then(|m| m.features.as_ref())
+                .map(|specs| {
+                    specs
+                        .iter()
+                        .filter_map(|spec| match spec {
+                            FeatureSpec::Conditional {
+                                feature,
+                                python_version,
+                            } => Some((feature.clone(), python_version.clone())),
+                            FeatureSpec::Plain(_) => None,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
         Ok(BuildContext {
             target,
             compile_targets,
@@ -916,6 +940,7 @@ impl BuildContextBuilder {
             pypi_validation,
             sbom,
             include_import_lib,
+            conditional_features,
         })
     }
 }
@@ -1726,10 +1751,16 @@ impl CargoOptions {
             }
         }
 
-        if let Some(features) = tool_maturin.features
+        if let Some(feature_specs) = tool_maturin.features
             && self.features.is_empty()
         {
-            self.features = features;
+            self.features = feature_specs
+                .into_iter()
+                .filter_map(|spec| match spec {
+                    FeatureSpec::Plain(f) => Some(f),
+                    FeatureSpec::Conditional { .. } => None,
+                })
+                .collect();
             args_from_pyproject.push("features");
         }
 

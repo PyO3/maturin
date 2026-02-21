@@ -18,6 +18,13 @@ profile = "release"
 editable-profile = "release"
 # List of features to activate
 features = ["foo", "bar"]
+# Features can also be conditional on the target Python version
+# using PEP 440 version specifiers:
+# features = [
+#   "always-on-feature",
+#   { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
+#   { feature = "pyo3/abi3-py38", python-version = "<3.11" },
+# ]
 # Activate all available features
 all-features = false
 # Do not activate the `default` feature

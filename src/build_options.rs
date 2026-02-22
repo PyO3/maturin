@@ -618,30 +618,16 @@ fn resolve_interpreters(
     requires_python: Option<&VersionSpecifiers>,
     generate_import_lib: bool,
 ) -> Result<Vec<PythonInterpreter>> {
-    let interpreter = if build_options.find_interpreter {
-        // Auto-detect interpreters
-        vec![]
-    } else if build_options.interpreter.is_empty() && !target.cross_compiling() {
-        // Default: use PYO3_PYTHON or system python
-        if cfg!(test) {
-            match env::var_os("MATURIN_TEST_PYTHON") {
-                Some(python) => vec![python.into()],
-                None => vec![target.get_python()],
-            }
-        } else {
-            let python = if bridge.is_pyo3() {
-                std::env::var("PYO3_PYTHON")
-                    .ok()
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| target.get_python())
-            } else {
-                target.get_python()
-            };
-            vec![python]
-        }
-    } else {
-        build_options.interpreter.clone()
-    };
+    let mut interpreter = build_options.interpreter.clone();
+
+    // In test mode, allow MATURIN_TEST_PYTHON to override the default
+    if cfg!(test)
+        && interpreter.is_empty()
+        && !build_options.find_interpreter
+        && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
+    {
+        interpreter = vec![python.into()];
+    }
 
     let resolver = InterpreterResolver {
         target,

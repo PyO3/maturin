@@ -594,16 +594,31 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Find a host Python interpreter for cross-compilation.
     fn find_host_python(&self) -> Result<PythonInterpreter> {
-        let host_interps = find_interpreter_in_host(
-            self.bridge,
-            self.user_interpreters,
-            self.target,
-            self.requires_python,
-        )?;
-        Ok(host_interps
+        let interpreters = if !self.user_interpreters.is_empty() {
+            PythonInterpreter::check_executables(self.user_interpreters, self.target, self.bridge)?
+        } else {
+            PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
+                .context("Finding python interpreters failed")?
+        };
+
+        if interpreters.is_empty() {
+            if let Some(requires_python) = self.requires_python {
+                bail!(
+                    "Couldn't find any python interpreters with {}. \
+                     Please specify at least one with -i",
+                    requires_python
+                );
+            } else {
+                bail!(
+                    "Couldn't find any python interpreters. \
+                     Please specify at least one with -i"
+                );
+            }
+        }
+        Ok(interpreters
             .into_iter()
             .next()
-            .expect("find_interpreter_in_host returned empty"))
+            .expect("checked non-empty above"))
     }
 
     /// Build a PythonInterpreter from sysconfigdata.
@@ -837,37 +852,6 @@ fn find_interpreter(
         }
     }
     Ok(found_interpreters)
-}
-
-/// Find python interpreters in the host machine.
-fn find_interpreter_in_host(
-    bridge: &BridgeModel,
-    interpreter: &[PathBuf],
-    target: &Target,
-    requires_python: Option<&VersionSpecifiers>,
-) -> Result<Vec<PythonInterpreter>> {
-    let interpreters = if !interpreter.is_empty() {
-        PythonInterpreter::check_executables(interpreter, target, bridge)?
-    } else {
-        PythonInterpreter::find_all(target, bridge, requires_python)
-            .context("Finding python interpreters failed")?
-    };
-
-    if interpreters.is_empty() {
-        if let Some(requires_python) = requires_python {
-            bail!(
-                "Couldn't find any python interpreters with {}. \
-                 Please specify at least one with -i",
-                requires_python
-            );
-        } else {
-            bail!(
-                "Couldn't find any python interpreters. \
-                 Please specify at least one with -i"
-            );
-        }
-    }
-    Ok(interpreters)
 }
 
 /// Find python interpreters in the bundled sysconfig.

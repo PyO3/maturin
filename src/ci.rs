@@ -6,7 +6,7 @@ use anyhow::Result;
 use clap::{ArgAction, Parser, ValueEnum};
 use fs_err as fs;
 
-use crate::build_options::find_bridge;
+use crate::bridge::find_bridge;
 use crate::project_layout::ProjectResolver;
 use crate::{BridgeModel, CargoOptions};
 

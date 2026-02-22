@@ -1,5 +1,5 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::bridge::{Abi3Version, PyO3Crate};
+use crate::bridge::{find_bridge, is_generating_import_lib};
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::compression::CompressionOptions;
 use crate::project_layout::ProjectResolver;
@@ -8,10 +8,10 @@ use crate::python_interpreter::{InterpreterResolver, ResolveResult};
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
-use crate::{BridgeModel, BuildContext, PyO3, PythonInterpreter, Target};
-use anyhow::{Context, Result, bail};
-use cargo_metadata::{CrateType, PackageId, TargetKind};
-use cargo_metadata::{Metadata, Node};
+use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
+use anyhow::{Result, bail};
+use cargo_metadata::CrateType;
+use cargo_metadata::Metadata;
 use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
@@ -21,12 +21,6 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
 use tracing::{debug, instrument};
-
-// This is used for `BridgeModel::PyO3`.
-// These should be treated almost identically but must be correctly identified
-// as one or the other in logs. pyo3-ffi is ordered first because it is newer
-// and more restrictive.
-const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3];
 
 /// A Rust target triple or a virtual target triple.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -350,60 +344,10 @@ impl BuildContextBuilder {
             );
         }
 
-        let mut target_triple = build_options.target.clone();
-
-        let mut universal2 = target_triple == Some(TargetTriple::Universal2);
-        // Also try to determine universal2 from ARCHFLAGS environment variable
-        if target_triple.is_none()
-            && let Ok(arch_flags) = env::var("ARCHFLAGS")
-        {
-            let arches: HashSet<&str> = arch_flags
-                .split("-arch")
-                .filter_map(|x| {
-                    let x = x.trim();
-                    if x.is_empty() { None } else { Some(x) }
-                })
-                .collect();
-            match (arches.contains("x86_64"), arches.contains("arm64")) {
-                (true, true) => universal2 = true,
-                (true, false) => {
-                    target_triple = Some(TargetTriple::Regular("x86_64-apple-darwin".to_string()))
-                }
-                (false, true) => {
-                    target_triple = Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()))
-                }
-                (false, false) => {}
-            }
-        };
-        if universal2 {
-            // Ensure that target_triple is valid. This is necessary to properly
-            // infer the platform tags when cross-compiling from Linux.
-            target_triple = Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
-        }
-
-        let mut target = Target::from_target_triple(target_triple.as_ref())?;
-        if !target.user_specified && !universal2 {
-            if let Some(interpreter) = build_options.interpreter.first() {
-                // If there's an explicitly provided interpreter, check to see
-                // if it's a cross-compiling interpreter; otherwise, check to
-                // see if an target change is required.
-                if let Some(detected_target) = detect_target_from_cross_python(interpreter) {
-                    target = Target::from_target_triple(Some(&detected_target))?;
-                } else if let Some(detected_target) = detect_arch_from_python(interpreter, &target)
-                {
-                    target = Target::from_target_triple(Some(&detected_target))?;
-                }
-            } else {
-                // If there's no explicit user-provided target or interpreter,
-                // check the interpreter; if the interpreter identifies as a
-                // cross compiler, set the target based on the platform reported
-                // by the interpreter.
-                if let Some(detected_target) = detect_target_from_cross_python(&target.get_python())
-                {
-                    target = Target::from_target_triple(Some(&detected_target))?;
-                }
-            }
-        }
+        let (target, universal2) = resolve_target(
+            build_options.target.clone(),
+            build_options.interpreter.first(),
+        )?;
 
         let wheel_dir = match build_options.out {
             Some(ref dir) => dir.clone(),
@@ -468,70 +412,15 @@ impl BuildContextBuilder {
             Some(config)
         };
 
-        let platform_tags = if build_options.platform_tag.is_empty() {
+        let platform_tags = resolve_platform_tags(
+            build_options.platform_tag,
+            &target,
+            &bridge,
+            pyproject,
+            &mut pyproject_toml_maturin_options,
             #[cfg(feature = "zig")]
-            let use_zig = build_options.zig;
-            #[cfg(not(feature = "zig"))]
-            let use_zig = false;
-            let compatibility = pyproject
-                .and_then(|x| {
-                    if x.compatibility().is_some() {
-                        pyproject_toml_maturin_options.push("compatibility");
-                    }
-                    x.compatibility()
-                })
-                .or(if use_zig {
-                    if target.is_musl_libc() {
-                        // Zig bundles musl 1.2
-                        Some(PlatformTag::Musllinux { major: 1, minor: 2 })
-                    } else {
-                        // With zig we can compile to any glibc version that we want, so we pick the lowest
-                        // one supported by the rust compiler
-                        Some(target.get_minimum_manylinux_tag())
-                    }
-                } else {
-                    // Defaults to musllinux_1_2 for musl target if it's not bin bindings
-                    if target.is_musl_libc() && !bridge.is_bin() {
-                        Some(PlatformTag::Musllinux { major: 1, minor: 2 })
-                    } else {
-                        None
-                    }
-                });
-            if let Some(platform_tag) = compatibility {
-                vec![platform_tag]
-            } else {
-                Vec::new()
-            }
-        } else if let [PlatformTag::Pypi] = &build_options.platform_tag[..] {
-            // Avoid building for architectures we already know aren't allowed on PyPI
-            if !is_arch_supported_by_pypi(&target) {
-                bail!("Rust target {target} is not supported by PyPI");
-            }
-            // The defaults are already targeting PyPI: manylinux on linux,
-            // and the native tag on windows and mac
-            Vec::new()
-        } else {
-            if build_options.platform_tag.iter().any(|tag| tag.is_pypi())
-                && !is_arch_supported_by_pypi(&target)
-            {
-                bail!("Rust target {target} is not supported by PyPI");
-            }
-
-            // All non-PyPI tags - use as-is
-            build_options
-                .platform_tag
-                .into_iter()
-                .filter(|platform_tag| platform_tag != &PlatformTag::Pypi)
-                .collect()
-        };
-
-        for platform_tag in &platform_tags {
-            if !platform_tag.is_supported() {
-                eprintln!("⚠️  Warning: {platform_tag} is unsupported by the Rust compiler.");
-            } else if platform_tag.is_musllinux() && !target.is_musl_libc() {
-                eprintln!("⚠️  Warning: {target} is not compatible with {platform_tag}.");
-            }
-        }
+            build_options.zig,
+        )?;
 
         validate_bridge_type(&bridge, &target, &platform_tags)?;
 
@@ -609,6 +498,121 @@ impl BuildContextBuilder {
             conditional_features,
         })
     }
+}
+
+/// Resolve the build target and universal2 flag from the user-specified
+/// target triple (or `ARCHFLAGS`) and the first interpreter (if any).
+fn resolve_target(
+    target_triple: Option<TargetTriple>,
+    first_interpreter: Option<&PathBuf>,
+) -> Result<(Target, bool)> {
+    let mut target_triple = target_triple;
+    let mut universal2 = target_triple == Some(TargetTriple::Universal2);
+
+    // Also try to determine universal2 from ARCHFLAGS environment variable
+    if target_triple.is_none()
+        && let Ok(arch_flags) = env::var("ARCHFLAGS")
+    {
+        let arches: HashSet<&str> = arch_flags
+            .split("-arch")
+            .filter_map(|x| {
+                let x = x.trim();
+                if x.is_empty() { None } else { Some(x) }
+            })
+            .collect();
+        match (arches.contains("x86_64"), arches.contains("arm64")) {
+            (true, true) => universal2 = true,
+            (true, false) => {
+                target_triple = Some(TargetTriple::Regular("x86_64-apple-darwin".to_string()))
+            }
+            (false, true) => {
+                target_triple = Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()))
+            }
+            (false, false) => {}
+        }
+    };
+    if universal2 {
+        target_triple = Some(TargetTriple::Regular("aarch64-apple-darwin".to_string()));
+    }
+
+    let mut target = Target::from_target_triple(target_triple.as_ref())?;
+    if !target.user_specified && !universal2 {
+        if let Some(interpreter) = first_interpreter {
+            if let Some(detected_target) = detect_target_from_cross_python(interpreter) {
+                target = Target::from_target_triple(Some(&detected_target))?;
+            } else if let Some(detected_target) = detect_arch_from_python(interpreter, &target) {
+                target = Target::from_target_triple(Some(&detected_target))?;
+            }
+        } else if let Some(detected_target) = detect_target_from_cross_python(&target.get_python())
+        {
+            target = Target::from_target_triple(Some(&detected_target))?;
+        }
+    }
+
+    Ok((target, universal2))
+}
+
+/// Resolve platform tags from CLI flags, pyproject.toml, and target properties.
+fn resolve_platform_tags(
+    user_tags: Vec<PlatformTag>,
+    target: &Target,
+    bridge: &BridgeModel,
+    pyproject: Option<&crate::pyproject_toml::PyProjectToml>,
+    pyproject_options: &mut Vec<&str>,
+    #[cfg(feature = "zig")] use_zig: bool,
+) -> Result<Vec<PlatformTag>> {
+    let platform_tags = if user_tags.is_empty() {
+        #[cfg(feature = "zig")]
+        let zig = use_zig;
+        #[cfg(not(feature = "zig"))]
+        let zig = false;
+        let compatibility = pyproject
+            .and_then(|x| {
+                if x.compatibility().is_some() {
+                    pyproject_options.push("compatibility");
+                }
+                x.compatibility()
+            })
+            .or(if zig {
+                if target.is_musl_libc() {
+                    Some(PlatformTag::Musllinux { major: 1, minor: 2 })
+                } else {
+                    Some(target.get_minimum_manylinux_tag())
+                }
+            } else if target.is_musl_libc() && !bridge.is_bin() {
+                Some(PlatformTag::Musllinux { major: 1, minor: 2 })
+            } else {
+                None
+            });
+        if let Some(platform_tag) = compatibility {
+            vec![platform_tag]
+        } else {
+            Vec::new()
+        }
+    } else if let [PlatformTag::Pypi] = &user_tags[..] {
+        if !is_arch_supported_by_pypi(target) {
+            bail!("Rust target {target} is not supported by PyPI");
+        }
+        Vec::new()
+    } else {
+        if user_tags.iter().any(|tag| tag.is_pypi()) && !is_arch_supported_by_pypi(target) {
+            bail!("Rust target {target} is not supported by PyPI");
+        }
+        user_tags
+            .into_iter()
+            .filter(|platform_tag| platform_tag != &PlatformTag::Pypi)
+            .collect()
+    };
+
+    for platform_tag in &platform_tags {
+        if !platform_tag.is_supported() {
+            eprintln!("⚠️  Warning: {platform_tag} is unsupported by the Rust compiler.");
+        } else if platform_tag.is_musllinux() && !target.is_musl_libc() {
+            eprintln!("⚠️  Warning: {target} is not compatible with {platform_tag}.");
+        }
+    }
+
+    Ok(platform_tags)
 }
 
 fn resolve_interpreters(
@@ -819,285 +823,6 @@ pub fn pyo3_features_from_conditional(
     extra
 }
 
-/// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
-fn has_abi3(
-    deps: &HashMap<&str, &Node>,
-    extra_features: &HashMap<&str, Vec<String>>,
-) -> Result<Option<Abi3Version>> {
-    for &lib in PYO3_BINDING_CRATES.iter() {
-        let lib = lib.as_str();
-        if let Some(&pyo3_crate) = deps.get(lib) {
-            let extra = extra_features.get(lib);
-            // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
-            // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-            let all_features: Vec<&str> = pyo3_crate
-                .features
-                .iter()
-                .map(AsRef::as_ref)
-                .chain(extra.into_iter().flatten().map(String::as_str))
-                .collect();
-
-            let abi3_selected = all_features.contains(&"abi3");
-
-            let min_abi3_version = all_features
-                .iter()
-                .filter(|&&x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
-                .map(|x| {
-                    Ok((
-                        (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
-                        x[8..].parse::<u8>()?,
-                    ))
-                })
-                .collect::<Result<Vec<(u8, u8)>>>()
-                .context(format!("Bogus {lib} cargo features"))?
-                .into_iter()
-                .min();
-            match min_abi3_version {
-                Some((major, minor)) => return Ok(Some(Abi3Version::Version(major, minor))),
-                None if abi3_selected => return Ok(Some(Abi3Version::CurrentPython)),
-                None => {}
-            }
-        }
-    }
-    Ok(None)
-}
-
-/// pyo3 0.16.4+ supports building abi3 wheels without a working Python interpreter for Windows
-/// when `generate-import-lib` feature is enabled
-fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected cargo to return metadata with resolve")?;
-    for &lib in PYO3_BINDING_CRATES.iter().rev() {
-        let lib = lib.as_str();
-        let pyo3_packages = resolve
-            .nodes
-            .iter()
-            .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
-            .collect::<Vec<_>>();
-        match pyo3_packages.as_slice() {
-            &[pyo3_crate] => {
-                let generate_import_lib = pyo3_crate
-                    .features
-                    .iter()
-                    .map(AsRef::as_ref)
-                    .any(|x| x == "generate-import-lib" || x == "generate-abi3-import-lib");
-                return Ok(generate_import_lib);
-            }
-            _ => continue,
-        }
-    }
-    Ok(false)
-}
-
-/// Tries to determine the bindings type from dependency
-fn find_pyo3_bindings(
-    deps: &HashMap<&str, &Node>,
-    packages: &HashMap<&str, &cargo_metadata::Package>,
-) -> anyhow::Result<Option<PyO3>> {
-    use crate::bridge::PyO3MetadataRaw;
-
-    if deps.get("pyo3").is_some() {
-        let pyo3_metadata = match packages.get("pyo3-ffi") {
-            Some(pyo3_ffi) => pyo3_ffi.metadata.clone(),
-            None => {
-                // Old versions of pyo3 does not depend on pyo3-ffi,
-                // thus does not have the metadata
-                serde_json::Value::Null
-            }
-        };
-        let metadata = match serde_json::from_value::<Option<PyO3MetadataRaw>>(pyo3_metadata) {
-            Ok(Some(metadata)) => Some(metadata.try_into()?),
-            Ok(None) | Err(_) => None,
-        };
-        let version = packages["pyo3"].version.clone();
-        Ok(Some(PyO3 {
-            crate_name: PyO3Crate::PyO3,
-            version,
-            abi3: None,
-            metadata,
-        }))
-    } else if deps.get("pyo3-ffi").is_some() {
-        let package = &packages["pyo3-ffi"];
-        let version = package.version.clone();
-        let metadata =
-            match serde_json::from_value::<Option<PyO3MetadataRaw>>(package.metadata.clone()) {
-                Ok(Some(metadata)) => Some(metadata.try_into()?),
-                Ok(None) | Err(_) => None,
-            };
-        Ok(Some(PyO3 {
-            crate_name: PyO3Crate::PyO3Ffi,
-            version,
-            abi3: None,
-            metadata,
-        }))
-    } else {
-        Ok(None)
-    }
-}
-
-/// Return a map with all (transitive) dependencies of the *current* crate.
-/// This is different from `metadata.resolve`, which also includes packages
-/// that are used in the same workspace, but on which the current crate does not depend.
-fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str, &Node>> {
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected to get a dependency graph from cargo")?;
-    let root = resolve
-        .root
-        .as_ref()
-        .context("expected to get a root package")?;
-    let nodes: HashMap<&PackageId, &Node> =
-        resolve.nodes.iter().map(|node| (&node.id, node)).collect();
-
-    // Walk the dependency tree to get all (in)direct children.
-    let mut dep_ids = HashSet::with_capacity(nodes.len());
-    let mut todo = Vec::from([root]);
-    while let Some(id) = todo.pop() {
-        for dep in nodes[id].deps.iter() {
-            if dep_ids.contains(&dep.pkg) {
-                continue;
-            }
-            dep_ids.insert(&dep.pkg);
-            todo.push(&dep.pkg);
-        }
-    }
-
-    Ok(nodes
-        .into_iter()
-        .filter_map(|(id, node)| {
-            dep_ids
-                .contains(&id)
-                .then_some((cargo_metadata[id].name.as_ref(), node))
-        })
-        .collect())
-}
-
-/// Tries to determine the [BridgeModel] for the target crate
-pub fn find_bridge(
-    cargo_metadata: &Metadata,
-    bridge: Option<&str>,
-    extra_pyo3_features: &HashMap<&str, Vec<String>>,
-) -> Result<BridgeModel> {
-    let deps = current_crate_dependencies(cargo_metadata)?;
-    let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
-        .packages
-        .iter()
-        .filter_map(|pkg| {
-            let name = pkg.name.as_ref();
-            if name == "pyo3" || name == "pyo3-ffi" || name == "cpython" || name == "uniffi" {
-                Some((name, pkg))
-            } else {
-                None
-            }
-        })
-        .collect();
-    let root_package = cargo_metadata
-        .root_package()
-        .context("Expected cargo to return metadata with root_package")?;
-    let targets: Vec<_> = root_package
-        .targets
-        .iter()
-        .filter(|target| {
-            target.kind.iter().any(|kind| {
-                !matches!(
-                    kind,
-                    TargetKind::Bench
-                        | TargetKind::CustomBuild
-                        | TargetKind::Example
-                        | TargetKind::ProcMacro
-                        | TargetKind::Test
-                )
-            })
-        })
-        .flat_map(|target| target.crate_types.iter().cloned())
-        .collect();
-
-    let bridge = if let Some(bindings) = bridge {
-        if bindings == "cffi" {
-            BridgeModel::Cffi
-        } else if bindings == "uniffi" {
-            BridgeModel::UniFfi
-        } else if bindings == "bin" {
-            let bindings = find_pyo3_bindings(&deps, &packages)?;
-            BridgeModel::Bin(bindings)
-        } else {
-            let bindings = find_pyo3_bindings(&deps, &packages)?.context("unknown binding type")?;
-            BridgeModel::PyO3(bindings)
-        }
-    } else {
-        match find_pyo3_bindings(&deps, &packages)? {
-            Some(bindings) => {
-                if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
-                    BridgeModel::Bin(Some(bindings))
-                } else {
-                    BridgeModel::PyO3(bindings)
-                }
-            }
-            _ => {
-                if deps.contains_key("uniffi") {
-                    BridgeModel::UniFfi
-                } else if targets.contains(&CrateType::CDyLib) {
-                    BridgeModel::Cffi
-                } else if targets.contains(&CrateType::Bin) {
-                    BridgeModel::Bin(find_pyo3_bindings(&deps, &packages)?)
-                } else {
-                    bail!(
-                        "Couldn't detect the binding type; Please specify them with --bindings/-b"
-                    )
-                }
-            }
-        }
-    };
-
-    if !bridge.is_pyo3() {
-        eprintln!("🔗 Found {bridge} bindings");
-        return Ok(bridge);
-    }
-
-    for &lib in PYO3_BINDING_CRATES.iter() {
-        if !bridge.is_bin() && bridge.is_pyo3_crate(lib) {
-            let lib_name = lib.as_str();
-            let pyo3_node = deps[lib_name];
-            if !pyo3_node
-                .features
-                .iter()
-                .map(AsRef::as_ref)
-                .any(|f| f == "extension-module")
-            {
-                let version = &cargo_metadata[&pyo3_node.id].version;
-                if (version.major, version.minor) < (0, 26) {
-                    // pyo3 0.26+ will use the `PYO3_BUILD_EXTENSION_MODULE` env var instead
-                    eprintln!(
-                        "⚠️  Warning: You're building a library without activating {lib}'s \
-                        `extension-module` feature. \
-                        See https://pyo3.rs/v{version}/building-and-distribution.html#the-extension-module-feature"
-                    );
-                }
-            }
-
-            return if let Some(abi3_version) = has_abi3(&deps, extra_pyo3_features)? {
-                eprintln!("🔗 Found {lib} bindings with abi3 support");
-                let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
-                let bindings = PyO3 {
-                    crate_name: lib,
-                    version: pyo3.version.clone(),
-                    abi3: Some(abi3_version),
-                    metadata: pyo3.metadata.clone(),
-                };
-                Ok(BridgeModel::PyO3(bindings))
-            } else {
-                eprintln!("🔗 Found {lib} bindings");
-                Ok(bridge)
-            };
-        }
-    }
-
-    Ok(bridge)
-}
-
 /// We need to pass the global flags to cargo metadata
 /// (https://github.com/PyO3/maturin/issues/211 and https://github.com/PyO3/maturin/issues/472),
 /// but we can't pass all the extra args, as e.g. `--target` isn't supported, so this tries to
@@ -1284,6 +1009,7 @@ impl CargoOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bridge::{Abi3Version, PyO3, PyO3Crate};
     use cargo_metadata::MetadataCommand;
     use insta::assert_snapshot;
     use pretty_assertions::assert_eq;

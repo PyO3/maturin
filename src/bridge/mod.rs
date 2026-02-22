@@ -1,3 +1,7 @@
+mod detection;
+
+pub use detection::{find_bridge, is_generating_import_lib};
+
 use std::{fmt, str::FromStr};
 
 use anyhow::Context;

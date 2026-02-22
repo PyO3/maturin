@@ -354,25 +354,43 @@ fn fun_with_abiflags(
     if message.interpreter == "pypy" || message.interpreter == "graalvm" {
         // pypy and graalpy do not specify abi flags
         Ok("".to_string())
-    } else if message.system == "windows" && message.minor < 14 {
-        if matches!(message.abiflags.as_deref(), Some("") | None) {
-            // windows has a few annoying cases, but its abiflags in sysconfig always empty
-            // python <= 3.7 has "m"
-            if message.minor <= 7 {
-                Ok("m".to_string())
-            } else if message.gil_disabled {
-                ensure!(
-                    message.minor >= 13,
-                    "gil_disabled is only available in python 3.13+ ಠ_ಠ"
-                );
-                Ok("t".to_string())
-            } else {
-                Ok("".to_string())
+    } else if message.system == "windows" {
+        // On Windows:
+        // - Python < 3.8: abiflags is empty/None but we need "m"
+        // - Python 3.8 - 3.13: abiflags is empty/None
+        // - Python 3.13t: abiflags is empty/None but we need "t" (gil_disabled)
+        // - Python >= 3.14: abiflags is now defined in sysconfig (upstream change)
+        match message.abiflags.as_deref() {
+            Some("") | None => {
+                if message.minor <= 7 {
+                    Ok("m".to_string())
+                } else if message.gil_disabled {
+                    ensure!(
+                        message.minor >= 13,
+                        "gil_disabled is only available in python 3.13+ ಠ_ಠ"
+                    );
+                    Ok("t".to_string())
+                } else {
+                    Ok("".to_string())
+                }
             }
-        } else {
-            bail!(
-                "A python 3 interpreter on Windows does not define abiflags in its sysconfig before Python 3.14 ಠ_ಠ"
-            )
+            Some(abiflags) => {
+                // Python 3.14+ on Windows now defines ABIFLAGS in sysconfig.
+                // Accept it (fixes #2740).
+                if message.minor >= 14 {
+                    Ok(abiflags.to_string())
+                } else if message.gil_disabled && abiflags == "t" {
+                    // Python 3.13t may also report "t"
+                    Ok(abiflags.to_string())
+                } else {
+                    bail!(
+                        "Unexpected abiflags '{}' for Python {}.{} on Windows ಠ_ಠ",
+                        abiflags,
+                        message.major,
+                        message.minor
+                    )
+                }
+            }
         }
     } else if let Some(ref abiflags) = message.abiflags {
         if message.minor >= 8 {
@@ -1343,6 +1361,72 @@ mod tests {
                 soabi: None,
             }
         );
+    }
+
+    #[test]
+    fn test_interpreter_from_metadata_windows_314() {
+        // Test that Python 3.14+ on Windows with ABIFLAGS defined works (fixes #2740)
+        let target_x64 = Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap();
+
+        let bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 26, 0),
+            abi3: None,
+            metadata: None,
+        });
+
+        // Python 3.14 with ABIFLAGS="" (standard build)
+        let message_314 = InterpreterMetadataMessage {
+            major: 3,
+            minor: 14,
+            interpreter: "cpython".to_string(),
+            implementation_name: "CPython".to_string(),
+            abiflags: Some("".to_string()),
+            ext_suffix: Some(".cp314-win_amd64.pyd".to_string()),
+            platform: "win-amd64".to_string(),
+            executable: None,
+            soabi: None,
+            gil_disabled: false,
+            system: "windows".to_string(),
+        };
+        let interp = PythonInterpreter::from_metadata_message(
+            "python3.14",
+            &target_x64,
+            &bridge,
+            message_314,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(interp.major, 3);
+        assert_eq!(interp.minor, 14);
+        assert_eq!(interp.abiflags, "");
+
+        // Python 3.14t free-threaded with ABIFLAGS="t"
+        let message_314t = InterpreterMetadataMessage {
+            major: 3,
+            minor: 14,
+            interpreter: "cpython".to_string(),
+            implementation_name: "CPython".to_string(),
+            abiflags: Some("t".to_string()),
+            ext_suffix: Some(".cp314t-win_amd64.pyd".to_string()),
+            platform: "win-amd64".to_string(),
+            executable: None,
+            soabi: None,
+            gil_disabled: true,
+            system: "windows".to_string(),
+        };
+        let interp = PythonInterpreter::from_metadata_message(
+            "python3.14t",
+            &target_x64,
+            &bridge,
+            message_314t,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(interp.major, 3);
+        assert_eq!(interp.minor, 14);
+        assert_eq!(interp.abiflags, "t");
+        assert!(interp.gil_disabled);
     }
 
     #[test]

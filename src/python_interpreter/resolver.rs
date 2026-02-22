@@ -3,6 +3,16 @@
 //! This module consolidates the various interpreter discovery, validation,
 //! deduplication, and filtering paths that were previously scattered across
 //! `build_options.rs` and `python_interpreter/mod.rs`.
+//!
+//! The resolution follows a unified pipeline:
+//!
+//! ```text
+//! PYO3_CONFIG_FILE check
+//!   → Discover candidates (native, cross+lib_dir, cross+sysconfig)
+//!     → Filter (abi3 policy)
+//!       → Finalize (fallback to placeholder, platform-specific)
+//!         → Convert Candidate → PythonInterpreter
+//! ```
 
 use super::{InterpreterConfig, InterpreterKind, PythonInterpreter};
 use crate::cross_compile::{
@@ -16,6 +26,102 @@ use std::path::{Path, PathBuf};
 use tracing::debug;
 
 use crate::bridge::{Abi3Version, PyO3};
+
+// ---------------------------------------------------------------------------
+// Candidate types
+// ---------------------------------------------------------------------------
+
+/// How a candidate Python interpreter was discovered.
+///
+/// Tracks provenance so the pipeline can make informed decisions
+/// (e.g. whether to set `PYO3_PYTHON`, whether the interpreter is runnable).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)] // Variants are part of the design for clarity; some used only in tests/future
+enum CandidateSource {
+    /// A real executable on the host machine.
+    Executable,
+    /// From `PYO3_CONFIG_FILE`.
+    ConfigFile,
+    /// From `PYO3_CROSS_LIB_DIR` (build-details.json or sysconfigdata).
+    CrossCompileLib,
+    /// From maturin's bundled sysconfig data (no real interpreter available).
+    Sysconfig,
+    /// A non-runnable placeholder for abi3 when no real interpreter was found.
+    Placeholder,
+}
+
+/// A Python interpreter candidate found during discovery.
+///
+/// Wraps a [`PythonInterpreter`] with metadata about how it was found,
+/// enabling the resolution pipeline to make informed decisions about
+/// filtering, environment setup, and fallback strategies.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // `source` is part of the design; used for debugging and future decisions
+struct Candidate {
+    interpreter: PythonInterpreter,
+    source: CandidateSource,
+}
+
+impl Candidate {
+    fn executable(interp: PythonInterpreter) -> Self {
+        Self {
+            interpreter: interp,
+            source: CandidateSource::Executable,
+        }
+    }
+
+    fn cross_compile_lib(interp: PythonInterpreter) -> Self {
+        Self {
+            interpreter: interp,
+            source: CandidateSource::CrossCompileLib,
+        }
+    }
+
+    fn sysconfig(interp: PythonInterpreter) -> Self {
+        Self {
+            interpreter: interp,
+            source: CandidateSource::Sysconfig,
+        }
+    }
+
+    fn placeholder(interp: PythonInterpreter) -> Self {
+        Self {
+            interpreter: interp,
+            source: CandidateSource::Placeholder,
+        }
+    }
+
+    /// Convert this candidate into a `PythonInterpreter`, discarding source info.
+    fn into_interpreter(self) -> PythonInterpreter {
+        self.interpreter
+    }
+}
+
+/// Classify existing `PythonInterpreter`s as candidates based on `runnable`.
+fn to_candidates(interps: Vec<PythonInterpreter>) -> Vec<Candidate> {
+    interps
+        .into_iter()
+        .map(|i| {
+            if i.runnable {
+                Candidate::executable(i)
+            } else {
+                Candidate::sysconfig(i)
+            }
+        })
+        .collect()
+}
+
+/// Result of interpreter discovery, before filtering/finalization.
+struct DiscoveryResult {
+    candidates: Vec<Candidate>,
+    /// Host Python interpreter found during cross-compile discovery.
+    /// Used to set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` for the build.
+    host_python: Option<PythonInterpreter>,
+}
+
+// ---------------------------------------------------------------------------
+// Resolver
+// ---------------------------------------------------------------------------
 
 /// Encapsulates all inputs and logic for resolving Python interpreters.
 ///
@@ -44,256 +150,139 @@ impl<'a> InterpreterResolver<'a> {
         }
     }
 
-    /// Resolve interpreters for pyo3/pyo3-ffi bindings (including Bin(Some(pyo3))).
-    fn resolve_pyo3(&self, pyo3: &PyO3) -> Result<Vec<PythonInterpreter>> {
-        match &pyo3.abi3 {
-            None | Some(Abi3Version::CurrentPython) => self.resolve_pyo3_no_fixed_abi3(),
-            Some(Abi3Version::Version(major, minor)) => self.resolve_pyo3_abi3(*major, *minor),
-        }
-    }
+    // -----------------------------------------------------------------------
+    // Unified PyO3 pipeline
+    // -----------------------------------------------------------------------
 
-    /// Resolve for pyo3 without a fixed abi3 version (non-abi3 or CurrentPython abi3).
-    fn resolve_pyo3_no_fixed_abi3(&self) -> Result<Vec<PythonInterpreter>> {
-        // Check for PYO3_CONFIG_FILE override
+    /// Resolve interpreters for pyo3/pyo3-ffi bindings (including Bin(Some(pyo3))).
+    ///
+    /// Follows a unified pipeline regardless of native/cross, abi3/non-abi3:
+    /// 1. Check `PYO3_CONFIG_FILE` (explicit override)
+    /// 2. Discover candidates
+    /// 3. Set `PYO3_PYTHON` if cross-compiling with a host interpreter
+    /// 4. Filter for abi3 (if applicable)
+    /// 5. Finalize: apply fallback policies, validate result
+    fn resolve_pyo3(&self, pyo3: &PyO3) -> Result<Vec<PythonInterpreter>> {
+        // Step 1: PYO3_CONFIG_FILE is an explicit override that trumps everything
         if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
             let config = InterpreterConfig::from_pyo3_config(config_file.as_ref(), self.target)
                 .context("Invalid PYO3_CONFIG_FILE")?;
             return Ok(vec![PythonInterpreter::from_config(config)]);
         }
 
-        // Cross-compilation with PYO3_CROSS_LIB_DIR
-        if self.target.cross_compiling() {
-            if let Some(cross_lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR") {
-                return self.resolve_cross_compile(cross_lib_dir.as_ref());
-            }
-
-            // Cross-compiling without PYO3_CROSS_LIB_DIR: use sysconfig
-            return self.resolve_cross_no_lib_dir();
-        }
-
-        // Native build: discover interpreters
-        let interpreters = self.discover_interpreters()?;
-        self.print_found(&interpreters);
-        Ok(interpreters)
-    }
-
-    /// Resolve for pyo3 with a fixed abi3 version (e.g. abi3-py38).
-    fn resolve_pyo3_abi3(&self, major: u8, minor: u8) -> Result<Vec<PythonInterpreter>> {
-        // Try to find real interpreters on the host first
-        let found = self.try_find_host_interpreters();
-
-        // Apply fallback/sysconfig strategies
-        let found = match found {
-            Ok(interps) => interps,
-            Err(err) => {
-                // Fallback: try sysconfig-derived interpreters
-                if self.target.is_windows() && !self.generate_import_lib {
-                    return Err(err.context(
-                        "Need a Python interpreter to compile for Windows without \
-                         PyO3's `generate-import-lib` feature",
-                    ));
-                }
-                let sysconfig_interps = find_interpreter_in_sysconfig(
-                    self.bridge,
-                    self.user_interpreters,
-                    self.target,
-                    self.requires_python,
-                )
-                .unwrap_or_default();
-                if sysconfig_interps.is_empty() && !self.user_interpreters.is_empty() {
-                    return Err(err);
-                }
-                sysconfig_interps
-            }
+        let fixed_abi3 = match &pyo3.abi3 {
+            Some(Abi3Version::Version(major, minor)) => Some((*major, *minor)),
+            _ => None,
         };
 
-        // For abi3 builds, apply smart interpreter selection:
-        // - Prefer non-free-threaded CPython (which supports abi3) over free-threaded
-        // - Only include non-abi3-capable interpreters (PyPy, free-threaded CPython)
-        //   if explicitly requested by the user via -i
-        let found = self.filter_for_abi3(found);
+        // Step 2: Discover candidates (unified for native/cross)
+        let discovery = self.discover_candidates(fixed_abi3)?;
 
-        // Platform-specific abi3 handling
-        if self.target.is_windows() {
-            return self.resolve_abi3_windows(found, major, minor);
+        // Step 3: Set PYO3_PYTHON for cross-compilation
+        if let Some(host) = &discovery.host_python {
+            self.set_pyo3_env(host);
         }
 
-        if self.target.cross_compiling() {
-            return self.resolve_abi3_cross_compile(found);
-        }
-
-        if !found.is_empty() {
-            self.print_found(&found);
-            Ok(found)
-        } else if self.user_interpreters.is_empty() {
-            eprintln!("🐍 Not using a specific python interpreter");
-            Ok(vec![
-                self.make_fake_interpreter(major as usize, minor as usize),
-            ])
+        // Step 4-5: Filter and finalize (differs for abi3 vs non-abi3)
+        if let Some((major, minor)) = fixed_abi3 {
+            let filtered = self.filter_for_abi3(discovery.candidates);
+            self.finalize_abi3(filtered, major, minor)
         } else {
-            bail!("Failed to find any python interpreter");
+            let interpreters = Self::candidates_to_interpreters(discovery.candidates);
+            self.print_found(&interpreters);
+            Ok(interpreters)
         }
     }
 
-    /// Check if any user-specified interpreter looks like PyPy.
-    fn user_requested_pypy(&self) -> bool {
-        !self.user_interpreters.is_empty()
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.contains("pypy")
-            })
-    }
+    // -----------------------------------------------------------------------
+    // Discovery: unified entry point
+    // -----------------------------------------------------------------------
 
-    /// Check if any user-specified interpreter looks like free-threaded Python.
-    fn user_requested_free_threaded(&self) -> bool {
-        !self.user_interpreters.is_empty()
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.ends_with('t') && s.chars().rev().nth(1).is_some_and(|c| c.is_ascii_digit())
-            })
-    }
-
-    /// Filter interpreters for abi3 builds.
+    /// Discover interpreter candidates based on the build context.
     ///
-    /// When building abi3 wheels, we prefer interpreters that support the stable API.
-    /// Non-abi3-capable interpreters (PyPy, free-threaded CPython) are only included
-    /// if explicitly requested by the user via `-i`.
-    ///
-    /// This fixes:
-    /// - #2772: free-threaded interpreter chosen over non-free-threaded for abi3
-    /// - #2852: unexpected PyPy wheel generated for abi3 cross-compile
-    /// - #2607: PyPy from `-i` is now honored (not silently dropped)
-    fn filter_for_abi3(&self, interpreters: Vec<PythonInterpreter>) -> Vec<PythonInterpreter> {
-        if interpreters.is_empty() {
-            return interpreters;
-        }
-
-        let user_requested_pypy = self.user_requested_pypy();
-        let user_requested_free_threaded = self.user_requested_free_threaded();
-
-        let (abi3_capable, non_abi3): (Vec<_>, Vec<_>) = interpreters
-            .into_iter()
-            .partition(|interp| interp.has_stable_api());
-
-        let mut result = abi3_capable;
-
-        // Only include non-abi3-capable interpreters if explicitly requested
-        for interp in non_abi3 {
-            let excluded = match interp.interpreter_kind {
-                InterpreterKind::PyPy => !user_requested_pypy,
-                InterpreterKind::CPython if interp.gil_disabled => !user_requested_free_threaded,
-                _ => false,
-            };
-            if !excluded {
-                result.push(interp);
+    /// Source priority:
+    /// 1. `PYO3_CROSS_LIB_DIR` (build-details.json or sysconfigdata)
+    /// 2. Cross-compile without lib dir: bundled sysconfig (non-abi3)
+    /// 3. Native build / abi3 cross without lib dir: real host interpreters
+    fn discover_candidates(&self, fixed_abi3: Option<(u8, u8)>) -> Result<DiscoveryResult> {
+        // Cross-compilation with PYO3_CROSS_LIB_DIR
+        if self.target.cross_compiling()
+            && let Some(cross_lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR")
+        {
+            // Abi3 Windows cross: just return a placeholder (poorly supported)
+            if let Some((major, minor)) = fixed_abi3
+                && self.target.is_windows()
+            {
+                eprintln!("⚠️  Cross-compiling is poorly supported");
+                return Ok(DiscoveryResult {
+                    candidates: vec![Candidate::placeholder(
+                        self.make_fake_interpreter(major as usize, minor as usize),
+                    )],
+                    host_python: None,
+                });
             }
+            return self.discover_from_cross_lib_dir(cross_lib_dir.as_ref());
         }
 
-        result
+        // Cross-compile without lib dir, non-abi3: use bundled sysconfig
+        if self.target.cross_compiling() && fixed_abi3.is_none() {
+            return self.discover_cross_sysconfig();
+        }
+
+        // Native build, or abi3 cross without PYO3_CROSS_LIB_DIR
+        // (abi3 cross can use host interpreters since the wheel is version-independent)
+        self.discover_native(fixed_abi3)
     }
 
-    /// Handle abi3 on Windows.
-    fn resolve_abi3_windows(
-        &self,
-        found: Vec<PythonInterpreter>,
-        major: u8,
-        minor: u8,
-    ) -> Result<Vec<PythonInterpreter>> {
-        if env::var_os("PYO3_CROSS_LIB_DIR").is_some() {
-            eprintln!("⚠️  Cross-compiling is poorly supported");
-            return Ok(vec![
-                self.make_fake_interpreter(major as usize, minor as usize),
-            ]);
-        }
+    // -----------------------------------------------------------------------
+    // Discovery: cross-compile with PYO3_CROSS_LIB_DIR
+    // -----------------------------------------------------------------------
 
-        if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
-            let config = InterpreterConfig::from_pyo3_config(config_file.as_ref(), self.target)
-                .context("Invalid PYO3_CONFIG_FILE")?;
-            return Ok(vec![PythonInterpreter::from_config(config)]);
-        }
-
-        if self.generate_import_lib {
-            eprintln!(
-                "🐍 Not using a specific python interpreter \
-                 (automatically generating windows import library)"
-            );
-            let mut result = found;
-            if result.is_empty() {
-                result.push(self.make_fake_interpreter(major as usize, minor as usize));
-            }
-            return Ok(result);
-        }
-
-        if found.is_empty() {
-            bail!("Failed to find any python interpreter");
-        }
-        Ok(found)
-    }
-
-    /// Handle abi3 cross-compilation.
-    fn resolve_abi3_cross_compile(
-        &self,
-        found: Vec<PythonInterpreter>,
-    ) -> Result<Vec<PythonInterpreter>> {
-        let mut interps = Vec::with_capacity(found.len());
-        let mut pypys = Vec::new();
-        for interp in found {
-            if interp.interpreter_kind.is_pypy() {
-                // Only include PyPy in cross-compile abi3 if explicitly requested (#2852)
-                if self.user_requested_pypy() {
-                    pypys.push(PathBuf::from(format!(
-                        "pypy{}.{}",
-                        interp.major, interp.minor
-                    )));
-                }
-            } else {
-                interps.push(interp);
-            }
-        }
-        // Cross-compiling to PyPy with abi3: can't use host pypy, use sysconfig
-        if !pypys.is_empty() {
-            interps.extend(find_interpreter_in_sysconfig(
-                self.bridge,
-                &pypys,
-                self.target,
-                self.requires_python,
-            )?);
-        }
-        if interps.is_empty() {
-            bail!("Failed to find any python interpreter");
-        }
-        Ok(interps)
-    }
-
-    /// Cross-compile with PYO3_CROSS_LIB_DIR set.
-    fn resolve_cross_compile(&self, cross_lib_path: &Path) -> Result<Vec<PythonInterpreter>> {
+    /// Discover from `PYO3_CROSS_LIB_DIR` (build-details.json or sysconfigdata).
+    fn discover_from_cross_lib_dir(&self, cross_lib_path: &Path) -> Result<DiscoveryResult> {
         if let Some(build_details_path) = find_build_details(cross_lib_path) {
             eprintln!("🐍 Using build-details.json for cross-compiling preparation");
             let config = parse_build_details_json_file(&build_details_path)?;
             let host_python = self.find_host_python()?;
-            self.set_pyo3_env(&host_python);
             let soabi = soabi_from_ext_suffix(&config.ext_suffix);
             let implementation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
-            Ok(vec![PythonInterpreter {
+            let interp = PythonInterpreter {
                 config,
                 executable: PathBuf::new(),
                 platform: None,
                 runnable: false,
                 implementation_name,
                 soabi,
-            }])
+            };
+            Ok(DiscoveryResult {
+                candidates: vec![Candidate::cross_compile_lib(interp)],
+                host_python: Some(host_python),
+            })
         } else {
             let host_python = self.find_host_python()?;
             eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
-            self.set_pyo3_env(&host_python);
             let sysconfig_path = find_sysconfigdata(cross_lib_path, self.target)?;
             let sysconfig_data = parse_sysconfigdata(&host_python, sysconfig_path)?;
-            self.interpreter_from_sysconfigdata(&sysconfig_data)
+            let interps = self.interpreter_from_sysconfigdata(&sysconfig_data)?;
+            Ok(DiscoveryResult {
+                candidates: interps
+                    .into_iter()
+                    .map(Candidate::cross_compile_lib)
+                    .collect(),
+                host_python: Some(host_python),
+            })
         }
     }
 
-    /// Cross-compile without PYO3_CROSS_LIB_DIR.
-    fn resolve_cross_no_lib_dir(&self) -> Result<Vec<PythonInterpreter>> {
+    // -----------------------------------------------------------------------
+    // Discovery: cross-compile without PYO3_CROSS_LIB_DIR (non-abi3)
+    // -----------------------------------------------------------------------
+
+    /// Discover interpreters for cross-compilation without `PYO3_CROSS_LIB_DIR`.
+    ///
+    /// Uses maturin's bundled sysconfig data to construct non-runnable interpreters
+    /// matching the target platform.
+    fn discover_cross_sysconfig(&self) -> Result<DiscoveryResult> {
         if self.user_interpreters.is_empty() && !self.find_interpreter {
             bail!(
                 "Couldn't find any python interpreters. \
@@ -328,8 +317,249 @@ impl<'a> InterpreterResolver<'a> {
                     .join(", ")
             );
         }
+        Ok(DiscoveryResult {
+            candidates: interpreters.into_iter().map(Candidate::sysconfig).collect(),
+            host_python: None,
+        })
+    }
+
+    // -----------------------------------------------------------------------
+    // Discovery: native (also used for abi3 cross without lib dir)
+    // -----------------------------------------------------------------------
+
+    /// Discover interpreters on the host machine.
+    ///
+    /// For abi3 builds, falls back to sysconfig if real interpreters aren't found.
+    fn discover_native(&self, fixed_abi3: Option<(u8, u8)>) -> Result<DiscoveryResult> {
+        match self.find_native_interpreters() {
+            Ok(interps) => Ok(DiscoveryResult {
+                candidates: to_candidates(interps),
+                host_python: None,
+            }),
+            Err(err) if fixed_abi3.is_some() => {
+                // Abi3: try sysconfig fallback before giving up
+                if self.target.is_windows() && !self.generate_import_lib {
+                    return Err(err.context(
+                        "Need a Python interpreter to compile for Windows without \
+                         PyO3's `generate-import-lib` feature",
+                    ));
+                }
+                let sysconfig_interps = find_interpreter_in_sysconfig(
+                    self.bridge,
+                    self.user_interpreters,
+                    self.target,
+                    self.requires_python,
+                )
+                .unwrap_or_default();
+                if sysconfig_interps.is_empty() && !self.user_interpreters.is_empty() {
+                    return Err(err);
+                }
+                Ok(DiscoveryResult {
+                    candidates: sysconfig_interps
+                        .into_iter()
+                        .map(Candidate::sysconfig)
+                        .collect(),
+                    host_python: None,
+                })
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Find native interpreters: auto-discover, user-specified, or default.
+    fn find_native_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
+        if self.find_interpreter {
+            PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
+                .context("Finding python interpreters failed")
+        } else if !self.user_interpreters.is_empty() {
+            find_interpreter(
+                self.bridge,
+                self.user_interpreters,
+                self.target,
+                self.requires_python,
+                self.generate_import_lib,
+            )
+        } else {
+            let python = self.get_default_python();
+            find_interpreter(
+                self.bridge,
+                &[python],
+                self.target,
+                self.requires_python,
+                self.generate_import_lib,
+            )
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Filtering: abi3 policy
+    // -----------------------------------------------------------------------
+
+    /// Filter candidates for abi3 builds.
+    ///
+    /// When building abi3 wheels, we prefer interpreters that support the stable API.
+    /// Non-abi3-capable interpreters (PyPy, free-threaded CPython) are only included
+    /// if explicitly requested by the user via `-i`.
+    ///
+    /// This fixes:
+    /// - #2772: free-threaded interpreter chosen over non-free-threaded for abi3
+    /// - #2852: unexpected PyPy wheel generated for abi3 cross-compile
+    /// - #2607: PyPy from `-i` is now honored (not silently dropped)
+    fn filter_for_abi3(&self, candidates: Vec<Candidate>) -> Vec<Candidate> {
+        if candidates.is_empty() {
+            return candidates;
+        }
+
+        let user_requested_pypy = self.user_requested_pypy();
+        let user_requested_free_threaded = self.user_requested_free_threaded();
+
+        let (abi3_capable, non_abi3): (Vec<_>, Vec<_>) = candidates
+            .into_iter()
+            .partition(|c| c.interpreter.has_stable_api());
+
+        let mut result = abi3_capable;
+
+        // Only include non-abi3-capable interpreters if explicitly requested
+        for candidate in non_abi3 {
+            let excluded = match candidate.interpreter.interpreter_kind {
+                InterpreterKind::PyPy => !user_requested_pypy,
+                InterpreterKind::CPython if candidate.interpreter.gil_disabled => {
+                    !user_requested_free_threaded
+                }
+                _ => false,
+            };
+            if !excluded {
+                result.push(candidate);
+            }
+        }
+
+        result
+    }
+
+    /// Check if any user-specified interpreter looks like PyPy.
+    fn user_requested_pypy(&self) -> bool {
+        !self.user_interpreters.is_empty()
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.contains("pypy")
+            })
+    }
+
+    /// Check if any user-specified interpreter looks like free-threaded Python.
+    fn user_requested_free_threaded(&self) -> bool {
+        !self.user_interpreters.is_empty()
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.ends_with('t') && s.chars().rev().nth(1).is_some_and(|c| c.is_ascii_digit())
+            })
+    }
+
+    // -----------------------------------------------------------------------
+    // Finalization
+    // -----------------------------------------------------------------------
+
+    /// Finalize abi3 resolution: apply platform-specific fallbacks.
+    fn finalize_abi3(
+        &self,
+        candidates: Vec<Candidate>,
+        major: u8,
+        minor: u8,
+    ) -> Result<Vec<PythonInterpreter>> {
+        // Handle abi3 cross-compilation (PyPy → sysconfig)
+        let candidates = if self.target.cross_compiling() {
+            self.handle_abi3_cross(candidates)?
+        } else {
+            candidates
+        };
+
+        // Windows-specific abi3 handling
+        if self.target.is_windows() {
+            return self.finalize_abi3_windows(candidates, major, minor);
+        }
+
+        let interpreters = Self::candidates_to_interpreters(candidates);
+
+        if !interpreters.is_empty() {
+            if !self.target.cross_compiling() {
+                self.print_found(&interpreters);
+            }
+            Ok(interpreters)
+        } else if self.user_interpreters.is_empty() {
+            eprintln!("🐍 Not using a specific python interpreter");
+            Ok(vec![
+                self.make_fake_interpreter(major as usize, minor as usize),
+            ])
+        } else {
+            bail!("Failed to find any python interpreter");
+        }
+    }
+
+    /// Handle abi3 cross-compilation: resolve PyPy through sysconfig.
+    fn handle_abi3_cross(&self, candidates: Vec<Candidate>) -> Result<Vec<Candidate>> {
+        let mut interps = Vec::with_capacity(candidates.len());
+        let mut pypys = Vec::new();
+        for candidate in candidates {
+            if candidate.interpreter.interpreter_kind.is_pypy() {
+                // Only include PyPy in cross-compile abi3 if explicitly requested (#2852)
+                if self.user_requested_pypy() {
+                    pypys.push(PathBuf::from(format!(
+                        "pypy{}.{}",
+                        candidate.interpreter.major, candidate.interpreter.minor
+                    )));
+                }
+            } else {
+                interps.push(candidate);
+            }
+        }
+        // Cross-compiling to PyPy with abi3: can't use host pypy, use sysconfig
+        if !pypys.is_empty() {
+            let sysconfig_interps = find_interpreter_in_sysconfig(
+                self.bridge,
+                &pypys,
+                self.target,
+                self.requires_python,
+            )?;
+            interps.extend(sysconfig_interps.into_iter().map(Candidate::sysconfig));
+        }
+        if interps.is_empty() {
+            bail!("Failed to find any python interpreter");
+        }
+        Ok(interps)
+    }
+
+    /// Finalize abi3 on Windows.
+    ///
+    /// Note: `PYO3_CROSS_LIB_DIR` and `PYO3_CONFIG_FILE` are already handled
+    /// earlier in the unified pipeline.
+    fn finalize_abi3_windows(
+        &self,
+        candidates: Vec<Candidate>,
+        major: u8,
+        minor: u8,
+    ) -> Result<Vec<PythonInterpreter>> {
+        let interpreters = Self::candidates_to_interpreters(candidates);
+
+        if self.generate_import_lib {
+            eprintln!(
+                "🐍 Not using a specific python interpreter \
+                 (automatically generating windows import library)"
+            );
+            let mut result = interpreters;
+            if result.is_empty() {
+                result.push(self.make_fake_interpreter(major as usize, minor as usize));
+            }
+            return Ok(result);
+        }
+
+        if interpreters.is_empty() {
+            bail!("Failed to find any python interpreter");
+        }
         Ok(interpreters)
     }
+
+    // -----------------------------------------------------------------------
+    // Shared helpers
+    // -----------------------------------------------------------------------
 
     /// Find a host Python interpreter for cross-compilation.
     fn find_host_python(&self) -> Result<PythonInterpreter> {
@@ -345,7 +575,8 @@ impl<'a> InterpreterResolver<'a> {
             .expect("find_interpreter_in_host returned empty"))
     }
 
-    /// Set PYO3_PYTHON and PYTHON_SYS_EXECUTABLE environment variables.
+    /// Set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` environment variables
+    /// for the build.
     fn set_pyo3_env(&self, host_python: &PythonInterpreter) {
         unsafe {
             env::set_var("PYO3_PYTHON", &host_python.executable);
@@ -411,44 +642,6 @@ impl<'a> InterpreterResolver<'a> {
         }])
     }
 
-    /// Discover interpreters: either user-specified + fallback, or auto-discovery.
-    fn discover_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
-        if self.find_interpreter {
-            // --find-interpreter: auto-discover all
-            PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
-                .context("Finding python interpreters failed")
-        } else if !self.user_interpreters.is_empty() {
-            // User specified -i: try host first, sysconfig fallback
-            find_interpreter(
-                self.bridge,
-                self.user_interpreters,
-                self.target,
-                self.requires_python,
-                self.generate_import_lib,
-            )
-        } else {
-            // Default: use PYO3_PYTHON or system python
-            let python = self.get_default_python();
-            find_interpreter(
-                self.bridge,
-                &[python],
-                self.target,
-                self.requires_python,
-                self.generate_import_lib,
-            )
-        }
-    }
-
-    /// Try to find host interpreters, returning Err if none found.
-    fn try_find_host_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
-        find_interpreter_in_host(
-            self.bridge,
-            self.user_interpreters,
-            self.target,
-            self.requires_python,
-        )
-    }
-
     /// Resolve a single interpreter for cffi or similar.
     fn resolve_single(&self, bridge_name: &str) -> Result<PythonInterpreter> {
         let interp = find_single_python_interpreter(
@@ -508,9 +701,19 @@ impl<'a> InterpreterResolver<'a> {
             eprintln!("🐍 Found {s}");
         }
     }
+
+    /// Convert candidates to interpreters, discarding source info.
+    fn candidates_to_interpreters(candidates: Vec<Candidate>) -> Vec<PythonInterpreter> {
+        candidates
+            .into_iter()
+            .map(Candidate::into_interpreter)
+            .collect()
+    }
 }
 
-// --- Helper functions (kept as module-level for reuse) ---
+// ---------------------------------------------------------------------------
+// Helper functions (kept as module-level for reuse)
+// ---------------------------------------------------------------------------
 
 /// Shared between cffi and pyo3-abi3: find exactly one interpreter.
 fn find_single_python_interpreter(

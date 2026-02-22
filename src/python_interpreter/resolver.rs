@@ -36,12 +36,9 @@ use crate::bridge::{Abi3Version, PyO3};
 /// Tracks provenance so the pipeline can make informed decisions
 /// (e.g. whether to set `PYO3_PYTHON`, whether the interpreter is runnable).
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)] // Variants are part of the design for clarity; some used only in tests/future
 enum CandidateSource {
     /// A real executable on the host machine.
     Executable,
-    /// From `PYO3_CONFIG_FILE`.
-    ConfigFile,
     /// From `PYO3_CROSS_LIB_DIR` (build-details.json or sysconfigdata).
     CrossCompileLib,
     /// From maturin's bundled sysconfig data (no real interpreter available).
@@ -56,7 +53,6 @@ enum CandidateSource {
 /// enabling the resolution pipeline to make informed decisions about
 /// filtering, environment setup, and fallback strategies.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // `source` is part of the design; used for debugging and future decisions
 struct Candidate {
     interpreter: PythonInterpreter,
     source: CandidateSource,
@@ -214,9 +210,8 @@ impl<'a> InterpreterResolver<'a> {
             let filtered = self.filter_for_abi3(discovery.candidates);
             self.finalize_abi3(filtered, major, minor)?
         } else {
-            let interpreters = Self::candidates_to_interpreters(discovery.candidates);
-            self.print_found(&interpreters);
-            interpreters
+            Self::print_found_candidates(&discovery.candidates);
+            Self::candidates_to_interpreters(discovery.candidates)
         };
 
         Ok(ResolveResult {
@@ -508,13 +503,9 @@ impl<'a> InterpreterResolver<'a> {
             return self.finalize_abi3_windows(candidates, major, minor);
         }
 
-        let interpreters = Self::candidates_to_interpreters(candidates);
-
-        if !interpreters.is_empty() {
-            if !self.target.cross_compiling() {
-                self.print_found(&interpreters);
-            }
-            Ok(interpreters)
+        if !candidates.is_empty() {
+            Self::print_found_candidates(&candidates);
+            Ok(Self::candidates_to_interpreters(candidates))
         } else if self.user_interpreters.is_empty() {
             eprintln!("🐍 Not using a specific python interpreter");
             Ok(vec![
@@ -727,15 +718,23 @@ impl<'a> InterpreterResolver<'a> {
         }
     }
 
-    /// Print the found interpreters.
-    fn print_found(&self, interpreters: &[PythonInterpreter]) {
-        if !interpreters.is_empty() {
-            let s = interpreters
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            eprintln!("🐍 Found {s}");
+    /// Print "Found ..." for candidates discovered from executables or sysconfig.
+    ///
+    /// Candidates from `CrossCompileLib` and `Placeholder` sources are skipped
+    /// since they have their own messages printed during discovery/finalization.
+    fn print_found_candidates(candidates: &[Candidate]) {
+        let displayable: Vec<_> = candidates
+            .iter()
+            .filter(|c| {
+                matches!(
+                    c.source,
+                    CandidateSource::Executable | CandidateSource::Sysconfig
+                )
+            })
+            .map(|c| c.interpreter.to_string())
+            .collect();
+        if !displayable.is_empty() {
+            eprintln!("🐍 Found {}", displayable.join(", "));
         }
     }
 

@@ -220,6 +220,12 @@ pub struct BuildOptions {
     #[arg(long)]
     pub zig: bool,
 
+    /// Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux)
+    /// in the wheel. When enabled, maturin automatically configures
+    /// split-debuginfo=packed so that separate debug info files are produced.
+    #[arg(long)]
+    pub include_debuginfo: bool,
+
     /// Cargo build options
     #[command(flatten)]
     pub cargo: CargoOptions,
@@ -762,6 +768,10 @@ impl BuildContextBuilder {
         }
 
         let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
+        if strip && build_options.include_debuginfo {
+            bail!("--include-debuginfo cannot be used with --strip");
+        }
+        let include_debuginfo = build_options.include_debuginfo;
         let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
             || build_options.skip_auditwheel;
         let auditwheel = build_options
@@ -940,6 +950,7 @@ impl BuildContextBuilder {
             pypi_validation,
             sbom,
             include_import_lib,
+            include_debuginfo,
             conditional_features,
         })
     }

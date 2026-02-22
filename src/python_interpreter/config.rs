@@ -56,6 +56,23 @@ pub struct InterpreterConfig {
 }
 
 impl InterpreterConfig {
+    /// Derive SOABI from an extension suffix.
+    ///
+    /// For example, `.cpython-314-x86_64-linux-gnu.so` becomes
+    /// `cpython-314-x86_64-linux-gnu`.
+    pub fn soabi_from_ext_suffix(ext_suffix: &str) -> Option<String> {
+        let s = ext_suffix.strip_prefix('.')?;
+        let s = s
+            .strip_suffix(".so")
+            .or_else(|| s.strip_suffix(".pyd"))
+            .unwrap_or(s);
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    }
+
     /// Lookup a wellknown sysconfig for a given Python interpreter
     pub fn lookup_one(
         target: &Target,

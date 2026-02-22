@@ -59,28 +59,28 @@ struct Candidate {
 }
 
 impl Candidate {
+    /// Classify existing `PythonInterpreter`s as candidates based on `runnable`.
+    fn from_interpreters(interps: Vec<PythonInterpreter>) -> Vec<Self> {
+        interps
+            .into_iter()
+            .map(|interpreter| {
+                let source = if interpreter.runnable {
+                    CandidateSource::Executable
+                } else {
+                    CandidateSource::Sysconfig
+                };
+                Candidate {
+                    interpreter,
+                    source,
+                }
+            })
+            .collect()
+    }
+
     /// Convert this candidate into a `PythonInterpreter`, discarding source info.
     fn into_interpreter(self) -> PythonInterpreter {
         self.interpreter
     }
-}
-
-/// Classify existing `PythonInterpreter`s as candidates based on `runnable`.
-fn to_candidates(interps: Vec<PythonInterpreter>) -> Vec<Candidate> {
-    interps
-        .into_iter()
-        .map(|interpreter| {
-            let source = if interpreter.runnable {
-                CandidateSource::Executable
-            } else {
-                CandidateSource::Sysconfig
-            };
-            Candidate {
-                interpreter,
-                source,
-            }
-        })
-        .collect()
 }
 
 /// Result of interpreter discovery, before filtering/finalization.
@@ -104,6 +104,105 @@ pub struct ResolveResult {
     /// The caller should set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` to
     /// this path before building.
     pub host_python: Option<PathBuf>,
+}
+
+// ---------------------------------------------------------------------------
+// Interpreter spec (parsed from user-provided strings)
+// ---------------------------------------------------------------------------
+
+/// A parsed interpreter specification from a user-provided string.
+///
+/// Handles formats like `"python3.14t"`, `"pypy3.11"`, `"graalpy-3.10"`, `"3.9"`.
+#[derive(Debug, Clone)]
+struct InterpreterSpec {
+    kind: InterpreterKind,
+    major: usize,
+    minor: usize,
+    abiflags: String,
+}
+
+impl InterpreterSpec {
+    /// Parse a user-provided interpreter string.
+    ///
+    /// Accepts:
+    /// - `pypy3.11` or `pypy-3.11`
+    /// - `graalpy3.10` or `graalpy-3.10`
+    /// - `python3.14t` or `python-3.14t`
+    /// - `3.9` or `3.14t` (bare version, assumes CPython)
+    ///
+    /// Returns `None` for version-less names like `"pypy"` or `"python"`.
+    /// Returns `Err` for file paths or unrecognized formats.
+    fn parse(s: &str) -> Result<Option<Self>> {
+        let (kind, ver_str) = if let Some(ver) = s.strip_prefix("pypy") {
+            (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
+        } else if let Some(ver) = s.strip_prefix("graalpy") {
+            (
+                InterpreterKind::GraalPy,
+                ver.strip_prefix('-').unwrap_or(ver),
+            )
+        } else if let Some(ver) = s.strip_prefix("python") {
+            (
+                InterpreterKind::CPython,
+                ver.strip_prefix('-').unwrap_or(ver),
+            )
+        } else if s.starts_with(|c: char| c.is_ascii_digit()) {
+            (InterpreterKind::CPython, s)
+        } else if Path::new(s).is_file() {
+            bail!(
+                "Python interpreter should be a kind of interpreter \
+                 (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, \
+                 got path to interpreter: {s}"
+            );
+        } else {
+            bail!(
+                "Unsupported Python interpreter for cross-compilation: {s}; \
+                 supported interpreters are pypy, graalpy, and python (cpython)"
+            );
+        };
+
+        if ver_str.is_empty() {
+            return Ok(None);
+        }
+
+        let (ver_str, abiflags) = if let Some(v) = ver_str.strip_suffix('t') {
+            (v, "t")
+        } else {
+            (ver_str, "")
+        };
+
+        // PyPy / GraalPy don't support free-threaded builds
+        if !matches!(kind, InterpreterKind::CPython) && abiflags == "t" {
+            bail!("Free-threaded builds are only supported for CPython, not {kind}");
+        }
+
+        let (major_str, minor_str) = ver_str
+            .split_once('.')
+            .context("Invalid python interpreter version")?;
+        let major = major_str.parse::<usize>().with_context(|| {
+            format!("Invalid python interpreter major version '{major_str}', expect a digit")
+        })?;
+        let minor = minor_str.parse::<usize>().with_context(|| {
+            format!("Invalid python interpreter minor version '{minor_str}', expect a digit")
+        })?;
+
+        if (major, minor) < (3, 13) && abiflags == "t" {
+            bail!("Free-threaded Python interpreter is only supported on 3.13 and later.");
+        }
+
+        Ok(Some(InterpreterSpec {
+            kind,
+            major,
+            minor,
+            abiflags: abiflags.to_string(),
+        }))
+    }
+
+    /// Try to parse a filename (not a full path) for kind/abiflags detection.
+    /// Returns `None` for unparsable names rather than erroring.
+    fn try_parse_filename(s: &str) -> Option<Self> {
+        // Ignore errors (file paths, unsupported formats) — just return None
+        Self::parse(s).ok().flatten()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +346,7 @@ impl<'a> InterpreterResolver<'a> {
             eprintln!("🐍 Using build-details.json for cross-compiling preparation");
             let config = parse_build_details_json_file(&build_details_path)?;
             let host_python = self.find_host_python()?;
-            let soabi = soabi_from_ext_suffix(&config.ext_suffix);
+            let soabi = InterpreterConfig::soabi_from_ext_suffix(&config.ext_suffix);
             let implementation_name = config.interpreter_kind.to_string().to_ascii_lowercase();
             let interp = PythonInterpreter {
                 config,
@@ -305,12 +404,7 @@ impl<'a> InterpreterResolver<'a> {
             }
         }
 
-        let interpreters = find_interpreter_in_sysconfig(
-            self.bridge,
-            self.user_interpreters,
-            self.target,
-            self.requires_python,
-        )?;
+        let interpreters = self.find_in_sysconfig(self.user_interpreters)?;
         if interpreters.is_empty() {
             bail!(
                 "Couldn't find any python interpreters from '{}'. \
@@ -345,7 +439,7 @@ impl<'a> InterpreterResolver<'a> {
     fn discover_native(&self, fixed_abi3: Option<(u8, u8)>) -> Result<DiscoveryResult> {
         match self.find_native_interpreters() {
             Ok(interps) => Ok(DiscoveryResult {
-                candidates: to_candidates(interps),
+                candidates: Candidate::from_interpreters(interps),
                 host_python: None,
             }),
             Err(err) if fixed_abi3.is_some() => {
@@ -356,13 +450,9 @@ impl<'a> InterpreterResolver<'a> {
                          PyO3's `generate-import-lib` feature",
                     ));
                 }
-                let sysconfig_interps = find_interpreter_in_sysconfig(
-                    self.bridge,
-                    self.user_interpreters,
-                    self.target,
-                    self.requires_python,
-                )
-                .unwrap_or_default();
+                let sysconfig_interps = self
+                    .find_in_sysconfig(self.user_interpreters)
+                    .unwrap_or_default();
                 if sysconfig_interps.is_empty() && !self.user_interpreters.is_empty() {
                     return Err(err);
                 }
@@ -419,12 +509,7 @@ impl<'a> InterpreterResolver<'a> {
 
         // Fallback to bundled sysconfig for missing interpreters
         if !missing.is_empty() {
-            let sysconfig_interps = find_interpreter_in_sysconfig(
-                self.bridge,
-                &missing,
-                self.target,
-                self.requires_python,
-            )?;
+            let sysconfig_interps = self.find_in_sysconfig(&missing)?;
 
             // Can only use sysconfig-derived interpreter on windows if generating the import lib
             if !sysconfig_interps.is_empty()
@@ -504,11 +589,14 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Check if any user-specified interpreter looks like PyPy.
     fn user_requested_pypy(&self) -> bool {
-        !self.user_interpreters.is_empty()
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.contains("pypy")
-            })
+        self.user_interpreters.iter().any(|p| {
+            let name = p
+                .file_name()
+                .map(|f| f.to_string_lossy())
+                .unwrap_or_default();
+            InterpreterSpec::try_parse_filename(&name)
+                .is_some_and(|s| s.kind == InterpreterKind::PyPy)
+        })
     }
 
     /// Check if any user-specified interpreter looks like free-threaded Python.
@@ -518,8 +606,7 @@ impl<'a> InterpreterResolver<'a> {
                 .file_name()
                 .map(|f| f.to_string_lossy())
                 .unwrap_or_default();
-            let (_, abiflags) = maybe_free_threaded(&name);
-            abiflags == "t"
+            InterpreterSpec::try_parse_filename(&name).is_some_and(|s| s.abiflags == "t")
         })
     }
 
@@ -578,12 +665,7 @@ impl<'a> InterpreterResolver<'a> {
         }
         // Cross-compiling to PyPy with abi3: can't use host pypy, use sysconfig
         if !pypys.is_empty() {
-            let sysconfig_interps = find_interpreter_in_sysconfig(
-                self.bridge,
-                &pypys,
-                self.target,
-                self.requires_python,
-            )?;
+            let sysconfig_interps = self.find_in_sysconfig(&pypys)?;
             interps.extend(sysconfig_interps.into_iter().map(|interpreter| Candidate {
                 interpreter,
                 source: CandidateSource::Sysconfig,
@@ -655,6 +737,47 @@ impl<'a> InterpreterResolver<'a> {
             .expect("checked non-empty above"))
     }
 
+    /// Find python interpreters in the bundled sysconfig.
+    ///
+    /// When `interpreters` is empty, returns all interpreters matching the target.
+    /// Otherwise, parses each entry as an [`InterpreterSpec`] and looks up the
+    /// corresponding sysconfig.
+    fn find_in_sysconfig(&self, interpreters: &[PathBuf]) -> Result<Vec<PythonInterpreter>> {
+        if interpreters.is_empty() {
+            return Ok(PythonInterpreter::find_by_target(
+                self.target,
+                self.requires_python,
+                Some(self.bridge),
+            ));
+        }
+        let mut result = Vec::new();
+        for interp in interpreters {
+            let python = interp.display().to_string();
+            let spec = match InterpreterSpec::parse(&python)? {
+                Some(spec) => spec,
+                None => continue, // version-less name like bare "pypy"
+            };
+            let sysconfig = InterpreterConfig::lookup_one(
+                self.target,
+                spec.kind,
+                (spec.major, spec.minor),
+                &spec.abiflags,
+            )
+            .with_context(|| {
+                format!(
+                    "Failed to find a {} {}.{} interpreter in known sysconfig",
+                    spec.kind, spec.major, spec.minor
+                )
+            })?;
+            debug!(
+                "Found {} {}.{}{} in bundled sysconfig",
+                sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor, sysconfig.abiflags
+            );
+            result.push(PythonInterpreter::from_config(sysconfig.clone()));
+        }
+        Ok(result)
+    }
+
     /// Build a PythonInterpreter from sysconfigdata.
     fn interpreter_from_sysconfigdata(
         &self,
@@ -715,12 +838,23 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Resolve a single interpreter for cffi or similar.
     fn resolve_single(&self, bridge_name: &str) -> Result<PythonInterpreter> {
-        let interp = find_single_python_interpreter(
-            self.bridge,
-            self.user_interpreters,
-            self.target,
-            bridge_name,
-        )?;
+        let executable = if self.user_interpreters.is_empty() {
+            self.target.get_python()
+        } else if self.user_interpreters.len() == 1 {
+            self.user_interpreters[0].clone()
+        } else {
+            bail!(
+                "You can only specify one python interpreter for {}",
+                bridge_name
+            );
+        };
+        let err_message = format!(
+            "Failed to find a python interpreter from `{}`",
+            executable.display()
+        );
+        let interp = PythonInterpreter::check_executable(executable, self.target, self.bridge)
+            .context(format_err!(err_message.clone()))?
+            .ok_or_else(|| format_err!(err_message))?;
         eprintln!("🐍 Using {interp} to generate the {bridge_name} bindings");
         Ok(interp)
     }
@@ -787,153 +921,5 @@ impl<'a> InterpreterResolver<'a> {
             .into_iter()
             .map(Candidate::into_interpreter)
             .collect()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helper functions (kept as module-level for reuse)
-// ---------------------------------------------------------------------------
-
-/// Shared between cffi and pyo3-abi3: find exactly one interpreter.
-fn find_single_python_interpreter(
-    bridge: &BridgeModel,
-    interpreter: &[PathBuf],
-    target: &Target,
-    bridge_name: &str,
-) -> Result<PythonInterpreter> {
-    let interpreter_str = interpreter
-        .iter()
-        .map(|interpreter| format!("`{}`", interpreter.display()))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let err_message = format!("Failed to find a python interpreter from {interpreter_str}");
-
-    let executable = if interpreter.is_empty() {
-        target.get_python()
-    } else if interpreter.len() == 1 {
-        interpreter[0].clone()
-    } else {
-        bail!(
-            "You can only specify one python interpreter for {}",
-            bridge_name
-        );
-    };
-
-    let interpreter = PythonInterpreter::check_executable(executable, target, bridge)
-        .context(format_err!(err_message.clone()))?
-        .ok_or_else(|| format_err!(err_message))?;
-    Ok(interpreter)
-}
-
-/// Find python interpreters in the bundled sysconfig.
-fn find_interpreter_in_sysconfig(
-    bridge: &BridgeModel,
-    interpreter: &[PathBuf],
-    target: &Target,
-    requires_python: Option<&VersionSpecifiers>,
-) -> Result<Vec<PythonInterpreter>> {
-    if interpreter.is_empty() {
-        return Ok(PythonInterpreter::find_by_target(
-            target,
-            requires_python,
-            Some(bridge),
-        ));
-    }
-    let mut interpreters = Vec::new();
-    for interp in interpreter {
-        let python = interp.display().to_string();
-        let (python_impl, python_ver, abiflags) = if let Some(ver) = python.strip_prefix("pypy") {
-            (
-                InterpreterKind::PyPy,
-                ver.strip_prefix('-').unwrap_or(ver),
-                "",
-            )
-        } else if let Some(ver) = python.strip_prefix("graalpy") {
-            (
-                InterpreterKind::GraalPy,
-                ver.strip_prefix('-').unwrap_or(ver),
-                "",
-            )
-        } else if let Some(ver) = python.strip_prefix("python") {
-            let (ver, abiflags) = maybe_free_threaded(ver.strip_prefix('-').unwrap_or(ver));
-            (InterpreterKind::CPython, ver, abiflags)
-        } else if python
-            .chars()
-            .next()
-            .map(|c| c.is_ascii_digit())
-            .unwrap_or(false)
-        {
-            let (ver, abiflags) = maybe_free_threaded(&python);
-            (InterpreterKind::CPython, ver, abiflags)
-        } else if std::path::Path::new(&python).is_file() {
-            bail!(
-                "Python interpreter should be a kind of interpreter \
-                 (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, \
-                 got path to interpreter: {}",
-                python
-            );
-        } else {
-            bail!(
-                "Unsupported Python interpreter for cross-compilation: {}; \
-                 supported interpreters are pypy, graalpy, and python (cpython)",
-                python
-            );
-        };
-        if python_ver.is_empty() {
-            continue;
-        }
-        let (ver_major, ver_minor) = python_ver
-            .split_once('.')
-            .context("Invalid python interpreter version")?;
-        let ver_major = ver_major.parse::<usize>().with_context(|| {
-            format!("Invalid python interpreter major version '{ver_major}', expect a digit")
-        })?;
-        let ver_minor = ver_minor.parse::<usize>().with_context(|| {
-            format!("Invalid python interpreter minor version '{ver_minor}', expect a digit")
-        })?;
-
-        if (ver_major, ver_minor) < (3, 13) && abiflags == "t" {
-            bail!("Free-threaded Python interpreter is only supported on 3.13 and later.");
-        }
-
-        let sysconfig =
-            InterpreterConfig::lookup_one(target, python_impl, (ver_major, ver_minor), abiflags)
-                .with_context(|| {
-                    format!(
-                        "Failed to find a {python_impl} {ver_major}.{ver_minor} \
-                     interpreter in known sysconfig"
-                    )
-                })?;
-        debug!(
-            "Found {} {}.{}{} in bundled sysconfig",
-            sysconfig.interpreter_kind, sysconfig.major, sysconfig.minor, sysconfig.abiflags
-        );
-        interpreters.push(PythonInterpreter::from_config(sysconfig.clone()));
-    }
-    Ok(interpreters)
-}
-
-/// Derive SOABI from an extension suffix.
-///
-/// For example, `.cpython-314-x86_64-linux-gnu.so` becomes
-/// `cpython-314-x86_64-linux-gnu`.
-fn soabi_from_ext_suffix(ext_suffix: &str) -> Option<String> {
-    let s = ext_suffix.strip_prefix('.')?;
-    let s = s
-        .strip_suffix(".so")
-        .or_else(|| s.strip_suffix(".pyd"))
-        .unwrap_or(s);
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.to_string())
-    }
-}
-
-fn maybe_free_threaded(python_ver: &str) -> (&str, &str) {
-    if let Some(ver) = python_ver.strip_suffix('t') {
-        (ver, "t")
-    } else {
-        (python_ver, "")
     }
 }

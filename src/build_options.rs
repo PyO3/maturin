@@ -663,6 +663,7 @@ impl BuildContextBuilder {
         )?;
         let pyproject = pyproject_toml.as_ref();
 
+        let extra_pyo3_features = pyo3_features_from_conditional(pyproject);
         let bridge = find_bridge(
             &cargo_metadata,
             build_options.bindings.as_deref().or_else(|| {
@@ -673,6 +674,7 @@ impl BuildContextBuilder {
                     x.bindings()
                 })
             }),
+            &extra_pyo3_features,
         )?;
         debug!("Resolved bridge model: {:?}", bridge);
 
@@ -906,19 +908,8 @@ impl BuildContextBuilder {
             pyproject_toml
                 .as_ref()
                 .and_then(|p| p.maturin())
-                .and_then(|m| m.features.as_ref())
-                .map(|specs| {
-                    specs
-                        .iter()
-                        .filter_map(|spec| match spec {
-                            FeatureSpec::Conditional {
-                                feature,
-                                python_version,
-                            } => Some((feature.clone(), python_version.clone())),
-                            FeatureSpec::Plain(_) => None,
-                        })
-                        .collect()
-                })
+                .and_then(|m| m.features.clone())
+                .map(|specs| FeatureSpec::split(specs).1)
                 .unwrap_or_default()
         } else {
             Vec::new()
@@ -1130,23 +1121,61 @@ fn filter_cargo_targets(
     Ok(targets)
 }
 
+/// Extract pyo3/pyo3-ffi feature names from conditional features in pyproject.toml.
+///
+/// For a conditional feature like `pyo3/abi3-py311`, this extracts `abi3-py311`
+/// for the corresponding binding crate.
+pub fn pyo3_features_from_conditional(
+    pyproject: Option<&crate::PyProjectToml>,
+) -> HashMap<&'static str, Vec<String>> {
+    let mut extra: HashMap<&'static str, Vec<String>> = HashMap::new();
+    let features = match pyproject
+        .and_then(|p| p.maturin())
+        .and_then(|m| m.features.as_ref())
+    {
+        Some(f) => f,
+        None => return extra,
+    };
+    let crate_names: &[&'static str] = &["pyo3", "pyo3-ffi"];
+    for spec in features {
+        if let FeatureSpec::Conditional { feature, .. } = spec {
+            for &crate_name in crate_names {
+                let prefix = format!("{crate_name}/");
+                if let Some(feat_name) = feature.strip_prefix(&prefix) {
+                    extra
+                        .entry(crate_name)
+                        .or_default()
+                        .push(feat_name.to_string());
+                }
+            }
+        }
+    }
+    extra
+}
+
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
-fn has_abi3(deps: &HashMap<&str, &Node>) -> Result<Option<Abi3Version>> {
+fn has_abi3(
+    deps: &HashMap<&str, &Node>,
+    extra_features: &HashMap<&str, Vec<String>>,
+) -> Result<Option<Abi3Version>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
         let lib = lib.as_str();
         if let Some(&pyo3_crate) = deps.get(lib) {
+            let extra = extra_features.get(lib);
             // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
             // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-            let abi3_selected = pyo3_crate
+            let all_features: Vec<&str> = pyo3_crate
                 .features
                 .iter()
                 .map(AsRef::as_ref)
-                .any(|x| x == "abi3");
+                .chain(extra.into_iter().flatten().map(String::as_str))
+                .collect();
 
-            let min_abi3_version = pyo3_crate
-                .features
+            let abi3_selected = all_features.contains(&"abi3");
+
+            let min_abi3_version = all_features
                 .iter()
-                .filter(|&x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
+                .filter(|&&x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
                 .map(|x| {
                     Ok((
                         (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
@@ -1281,7 +1310,11 @@ fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str,
 }
 
 /// Tries to determine the [BridgeModel] for the target crate
-pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
+pub fn find_bridge(
+    cargo_metadata: &Metadata,
+    bridge: Option<&str>,
+    extra_pyo3_features: &HashMap<&str, Vec<String>>,
+) -> Result<BridgeModel> {
     let deps = current_crate_dependencies(cargo_metadata)?;
     let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
         .packages
@@ -1379,7 +1412,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 }
             }
 
-            return if let Some(abi3_version) = has_abi3(&deps)? {
+            return if let Some(abi3_version) = has_abi3(&deps, extra_pyo3_features)? {
                 eprintln!("🔗 Found {lib} bindings with abi3 support");
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
@@ -1765,13 +1798,8 @@ impl CargoOptions {
         if let Some(feature_specs) = tool_maturin.features
             && self.features.is_empty()
         {
-            self.features = feature_specs
-                .into_iter()
-                .filter_map(|spec| match spec {
-                    FeatureSpec::Plain(f) => Some(f),
-                    FeatureSpec::Conditional { .. } => None,
-                })
-                .collect();
+            let (plain, _conditional) = FeatureSpec::split(feature_specs);
+            self.features = plain;
             args_from_pyproject.push("features");
         }
 
@@ -1836,12 +1864,13 @@ mod tests {
             .exec()
             .unwrap();
 
+        let no_extra = HashMap::new();
         assert!(matches!(
-            find_bridge(&pyo3_mixed, None),
+            find_bridge(&pyo3_mixed, None, &no_extra),
             Ok(BridgeModel::PyO3 { .. })
         ));
         assert!(matches!(
-            find_bridge(&pyo3_mixed, Some("pyo3")),
+            find_bridge(&pyo3_mixed, Some("pyo3"), &no_extra),
             Ok(BridgeModel::PyO3 { .. })
         ));
     }
@@ -1870,8 +1899,12 @@ mod tests {
                 },
             }),
         });
-        assert_eq!(find_bridge(&pyo3_pure, None).unwrap(), bridge);
-        assert_eq!(find_bridge(&pyo3_pure, Some("pyo3")).unwrap(), bridge);
+        let no_extra = HashMap::new();
+        assert_eq!(find_bridge(&pyo3_pure, None, &no_extra).unwrap(), bridge);
+        assert_eq!(
+            find_bridge(&pyo3_pure, Some("pyo3"), &no_extra).unwrap(),
+            bridge
+        );
     }
 
     #[test]
@@ -1881,7 +1914,8 @@ mod tests {
             .exec()
             .unwrap();
 
-        assert!(find_bridge(&pyo3_pure, None).is_err());
+        let no_extra = HashMap::new();
+        assert!(find_bridge(&pyo3_pure, None, &no_extra).is_err());
 
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
@@ -1890,7 +1924,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            find_bridge(&pyo3_pure, None).unwrap(),
+            find_bridge(&pyo3_pure, None, &no_extra).unwrap(),
             BridgeModel::PyO3 { .. }
         ));
     }
@@ -1902,13 +1936,17 @@ mod tests {
             .exec()
             .unwrap();
 
+        let no_extra = HashMap::new();
         assert_eq!(
-            find_bridge(&cffi_pure, Some("cffi")).unwrap(),
+            find_bridge(&cffi_pure, Some("cffi"), &no_extra).unwrap(),
             BridgeModel::Cffi
         );
-        assert_eq!(find_bridge(&cffi_pure, None).unwrap(), BridgeModel::Cffi);
+        assert_eq!(
+            find_bridge(&cffi_pure, None, &no_extra).unwrap(),
+            BridgeModel::Cffi
+        );
 
-        assert!(find_bridge(&cffi_pure, Some("pyo3")).is_err());
+        assert!(find_bridge(&cffi_pure, Some("pyo3"), &no_extra).is_err());
     }
 
     #[test]
@@ -1918,27 +1956,28 @@ mod tests {
             .exec()
             .unwrap();
 
+        let no_extra = HashMap::new();
         assert_eq!(
-            find_bridge(&hello_world, Some("bin")).unwrap(),
+            find_bridge(&hello_world, Some("bin"), &no_extra).unwrap(),
             BridgeModel::Bin(None)
         );
         assert_eq!(
-            find_bridge(&hello_world, None).unwrap(),
+            find_bridge(&hello_world, None, &no_extra).unwrap(),
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
+        assert!(find_bridge(&hello_world, Some("pyo3"), &no_extra).is_err());
 
         let pyo3_bin = MetadataCommand::new()
             .manifest_path(Path::new("test-crates/pyo3-bin").join("Cargo.toml"))
             .exec()
             .unwrap();
         assert!(matches!(
-            find_bridge(&pyo3_bin, Some("bin")).unwrap(),
+            find_bridge(&pyo3_bin, Some("bin"), &no_extra).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
         assert!(matches!(
-            find_bridge(&pyo3_bin, None).unwrap(),
+            find_bridge(&pyo3_bin, None, &no_extra).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
     }

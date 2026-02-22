@@ -262,6 +262,22 @@ pub enum FeatureSpec {
 }
 
 impl FeatureSpec {
+    /// Split a list of feature specs into plain features and conditional features.
+    pub fn split(specs: Vec<FeatureSpec>) -> (Vec<String>, Vec<(String, VersionSpecifiers)>) {
+        let mut plain = Vec::new();
+        let mut conditional = Vec::new();
+        for spec in specs {
+            match spec {
+                FeatureSpec::Plain(f) => plain.push(f),
+                FeatureSpec::Conditional {
+                    feature,
+                    python_version,
+                } => conditional.push((feature, python_version)),
+            }
+        }
+        (plain, conditional)
+    }
+
     /// Resolve which conditional features should be enabled for a given Python version.
     ///
     /// Returns the feature names whose `python-version` specifier matches the
@@ -884,16 +900,7 @@ mod tests {
                 python_version: ">=3.11".parse().unwrap(),
             },
         ];
-        let conditional: Vec<_> = specs
-            .into_iter()
-            .filter_map(|spec| match spec {
-                FeatureSpec::Conditional {
-                    feature,
-                    python_version,
-                } => Some((feature, python_version)),
-                _ => None,
-            })
-            .collect();
+        let (_plain, conditional) = FeatureSpec::split(specs);
 
         // Python 3.12 should match >=3.11
         let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 12);

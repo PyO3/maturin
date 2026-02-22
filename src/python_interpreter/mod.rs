@@ -106,8 +106,8 @@ fn find_all_windows(
         };
     }
 
-    /// Check if an executable has already been seen (accepted or rejected).
-    /// Returns true if already processed, and marks it as seen if not.
+    // Check if an executable has already been seen (accepted or rejected).
+    // Returns true if already processed, and marks it as seen if not.
     fn mark_seen(seen: &mut HashSet<PathBuf>, executable: &Path) -> bool {
         if let Ok(canonical) = executable.canonicalize() {
             !seen.insert(canonical)

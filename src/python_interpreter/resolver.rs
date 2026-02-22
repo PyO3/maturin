@@ -59,34 +59,6 @@ struct Candidate {
 }
 
 impl Candidate {
-    fn executable(interp: PythonInterpreter) -> Self {
-        Self {
-            interpreter: interp,
-            source: CandidateSource::Executable,
-        }
-    }
-
-    fn cross_compile_lib(interp: PythonInterpreter) -> Self {
-        Self {
-            interpreter: interp,
-            source: CandidateSource::CrossCompileLib,
-        }
-    }
-
-    fn sysconfig(interp: PythonInterpreter) -> Self {
-        Self {
-            interpreter: interp,
-            source: CandidateSource::Sysconfig,
-        }
-    }
-
-    fn placeholder(interp: PythonInterpreter) -> Self {
-        Self {
-            interpreter: interp,
-            source: CandidateSource::Placeholder,
-        }
-    }
-
     /// Convert this candidate into a `PythonInterpreter`, discarding source info.
     fn into_interpreter(self) -> PythonInterpreter {
         self.interpreter
@@ -97,11 +69,15 @@ impl Candidate {
 fn to_candidates(interps: Vec<PythonInterpreter>) -> Vec<Candidate> {
     interps
         .into_iter()
-        .map(|i| {
-            if i.runnable {
-                Candidate::executable(i)
+        .map(|interpreter| {
+            let source = if interpreter.runnable {
+                CandidateSource::Executable
             } else {
-                Candidate::sysconfig(i)
+                CandidateSource::Sysconfig
+            };
+            Candidate {
+                interpreter,
+                source,
             }
         })
         .collect()
@@ -241,9 +217,10 @@ impl<'a> InterpreterResolver<'a> {
             {
                 eprintln!("⚠️  Cross-compiling is poorly supported");
                 return Ok(DiscoveryResult {
-                    candidates: vec![Candidate::placeholder(
-                        self.make_fake_interpreter(major as usize, minor as usize),
-                    )],
+                    candidates: vec![Candidate {
+                        interpreter: self.make_fake_interpreter(major as usize, minor as usize),
+                        source: CandidateSource::Placeholder,
+                    }],
                     host_python: None,
                 });
             }
@@ -281,7 +258,10 @@ impl<'a> InterpreterResolver<'a> {
                 soabi,
             };
             Ok(DiscoveryResult {
-                candidates: vec![Candidate::cross_compile_lib(interp)],
+                candidates: vec![Candidate {
+                    interpreter: interp,
+                    source: CandidateSource::CrossCompileLib,
+                }],
                 host_python: Some(host_python),
             })
         } else {
@@ -289,12 +269,12 @@ impl<'a> InterpreterResolver<'a> {
             eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
             let sysconfig_path = find_sysconfigdata(cross_lib_path, self.target)?;
             let sysconfig_data = parse_sysconfigdata(&host_python, sysconfig_path)?;
-            let interps = self.interpreter_from_sysconfigdata(&sysconfig_data)?;
+            let interpreter = self.interpreter_from_sysconfigdata(&sysconfig_data)?;
             Ok(DiscoveryResult {
-                candidates: interps
-                    .into_iter()
-                    .map(Candidate::cross_compile_lib)
-                    .collect(),
+                candidates: vec![Candidate {
+                    interpreter,
+                    source: CandidateSource::CrossCompileLib,
+                }],
                 host_python: Some(host_python),
             })
         }
@@ -344,7 +324,13 @@ impl<'a> InterpreterResolver<'a> {
             );
         }
         Ok(DiscoveryResult {
-            candidates: interpreters.into_iter().map(Candidate::sysconfig).collect(),
+            candidates: interpreters
+                .into_iter()
+                .map(|interpreter| Candidate {
+                    interpreter,
+                    source: CandidateSource::Sysconfig,
+                })
+                .collect(),
             host_python: None,
         })
     }
@@ -383,7 +369,10 @@ impl<'a> InterpreterResolver<'a> {
                 Ok(DiscoveryResult {
                     candidates: sysconfig_interps
                         .into_iter()
-                        .map(Candidate::sysconfig)
+                        .map(|interpreter| Candidate {
+                            interpreter,
+                            source: CandidateSource::Sysconfig,
+                        })
                         .collect(),
                     host_python: None,
                 })
@@ -393,28 +382,79 @@ impl<'a> InterpreterResolver<'a> {
     }
 
     /// Find native interpreters: auto-discover, user-specified, or default.
+    ///
+    /// Checks executables on the host first, falling back to bundled sysconfig
+    /// for any that aren't found.
     fn find_native_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
         if self.find_interpreter {
-            PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
-                .context("Finding python interpreters failed")
-        } else if !self.user_interpreters.is_empty() {
-            find_interpreter(
-                self.bridge,
-                self.user_interpreters,
-                self.target,
-                self.requires_python,
-                self.generate_import_lib,
-            )
-        } else {
-            let python = self.get_default_python();
-            find_interpreter(
-                self.bridge,
-                &[python],
-                self.target,
-                self.requires_python,
-                self.generate_import_lib,
-            )
+            return PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
+                .context("Finding python interpreters failed");
         }
+
+        let interpreters = if !self.user_interpreters.is_empty() {
+            self.user_interpreters
+        } else {
+            // Handled via the slice below
+            &[]
+        };
+
+        // Determine what to check: user-specified or default python
+        let default_python;
+        let to_check: &[PathBuf] = if !interpreters.is_empty() {
+            interpreters
+        } else {
+            default_python = self.get_default_python();
+            std::slice::from_ref(&default_python)
+        };
+
+        // Try to find each interpreter, tracking which ones are missing
+        let mut found = Vec::new();
+        let mut missing = Vec::new();
+        for interp in to_check {
+            match PythonInterpreter::check_executable(interp.clone(), self.target, self.bridge)? {
+                Some(interp) => found.push(interp),
+                None => missing.push(interp.clone()),
+            }
+        }
+
+        // Fallback to bundled sysconfig for missing interpreters
+        if !missing.is_empty() {
+            let sysconfig_interps = find_interpreter_in_sysconfig(
+                self.bridge,
+                &missing,
+                self.target,
+                self.requires_python,
+            )?;
+
+            // Can only use sysconfig-derived interpreter on windows if generating the import lib
+            if !sysconfig_interps.is_empty()
+                && self.target.is_windows()
+                && !self.generate_import_lib
+            {
+                let names = sysconfig_interps
+                    .iter()
+                    .map(|i| format!("{} {}.{}", i.interpreter_kind, i.major, i.minor))
+                    .collect::<Vec<_>>();
+                bail!(
+                    "Interpreters {names:?} were found in maturin's bundled sysconfig, \
+                     but compiling for Windows without an interpreter requires \
+                     PyO3's `generate-import-lib` feature"
+                );
+            }
+
+            found.extend(sysconfig_interps);
+        }
+
+        if found.is_empty() {
+            let interps_str = to_check
+                .iter()
+                .map(|path| format!("'{}'", path.display()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!("Couldn't find any python interpreters from {interps_str}.");
+        }
+
+        Ok(found)
     }
 
     // -----------------------------------------------------------------------
@@ -473,11 +513,14 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Check if any user-specified interpreter looks like free-threaded Python.
     fn user_requested_free_threaded(&self) -> bool {
-        !self.user_interpreters.is_empty()
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.ends_with('t') && s.chars().rev().nth(1).is_some_and(|c| c.is_ascii_digit())
-            })
+        self.user_interpreters.iter().any(|p| {
+            let name = p
+                .file_name()
+                .map(|f| f.to_string_lossy())
+                .unwrap_or_default();
+            let (_, abiflags) = maybe_free_threaded(&name);
+            abiflags == "t"
+        })
     }
 
     // -----------------------------------------------------------------------
@@ -541,10 +584,10 @@ impl<'a> InterpreterResolver<'a> {
                 self.target,
                 self.requires_python,
             )?;
-            interps.extend(sysconfig_interps.into_iter().map(Candidate::sysconfig));
-        }
-        if interps.is_empty() {
-            bail!("Failed to find any python interpreter");
+            interps.extend(sysconfig_interps.into_iter().map(|interpreter| Candidate {
+                interpreter,
+                source: CandidateSource::Sysconfig,
+            }));
         }
         Ok(interps)
     }
@@ -616,7 +659,7 @@ impl<'a> InterpreterResolver<'a> {
     fn interpreter_from_sysconfigdata(
         &self,
         data: &std::collections::HashMap<String, String>,
-    ) -> Result<Vec<PythonInterpreter>> {
+    ) -> Result<PythonInterpreter> {
         let major = data
             .get("version_major")
             .context("version_major is not defined")?
@@ -652,7 +695,7 @@ impl<'a> InterpreterResolver<'a> {
                 }
             })
             .context("unsupported Python interpreter")?;
-        Ok(vec![PythonInterpreter {
+        Ok(PythonInterpreter {
             config: InterpreterConfig {
                 major,
                 minor,
@@ -667,7 +710,7 @@ impl<'a> InterpreterResolver<'a> {
             runnable: false,
             implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),
             soabi: soabi.cloned(),
-        }])
+        })
     }
 
     /// Resolve a single interpreter for cffi or similar.
@@ -780,77 +823,6 @@ fn find_single_python_interpreter(
         .context(format_err!(err_message.clone()))?
         .ok_or_else(|| format_err!(err_message))?;
     Ok(interpreter)
-}
-
-/// Find python interpreters in the host machine first,
-/// fallback to bundled sysconfig if not found.
-fn find_interpreter(
-    bridge: &BridgeModel,
-    interpreter: &[PathBuf],
-    target: &Target,
-    requires_python: Option<&VersionSpecifiers>,
-    generate_import_lib: bool,
-) -> Result<Vec<PythonInterpreter>> {
-    let mut found_interpreters = Vec::new();
-    if !interpreter.is_empty() {
-        let mut missing = Vec::new();
-        for interp in interpreter {
-            match PythonInterpreter::check_executable(interp.clone(), target, bridge)? {
-                Some(interp) => found_interpreters.push(interp),
-                None => missing.push(interp.clone()),
-            }
-        }
-        if !missing.is_empty() {
-            let sysconfig_interps =
-                find_interpreter_in_sysconfig(bridge, &missing, target, requires_python)?;
-
-            // Can only use sysconfig-derived interpreter on windows if generating the import lib
-            if !sysconfig_interps.is_empty() && target.is_windows() && !generate_import_lib {
-                let found = sysconfig_interps
-                    .iter()
-                    .map(|i| format!("{} {}.{}", i.interpreter_kind, i.major, i.minor))
-                    .collect::<Vec<_>>();
-                bail!(
-                    "Interpreters {found:?} were found in maturin's bundled sysconfig, \
-                     but compiling for Windows without an interpreter requires \
-                     PyO3's `generate-import-lib` feature"
-                );
-            }
-
-            found_interpreters.extend(sysconfig_interps);
-        }
-    } else {
-        found_interpreters = PythonInterpreter::find_all(target, bridge, requires_python)
-            .context("Finding python interpreters failed")?;
-    }
-
-    if found_interpreters.is_empty() {
-        if interpreter.is_empty() {
-            if let Some(requires_python) = requires_python {
-                bail!(
-                    "Couldn't find any python interpreters with version {}. \
-                     Please specify at least one with -i",
-                    requires_python
-                );
-            } else {
-                bail!(
-                    "Couldn't find any python interpreters. \
-                     Please specify at least one with -i"
-                );
-            }
-        } else {
-            let interps_str = interpreter
-                .iter()
-                .map(|path| format!("'{}'", path.display()))
-                .collect::<Vec<_>>()
-                .join(", ");
-            bail!(
-                "Couldn't find any python interpreters from {}.",
-                interps_str
-            );
-        }
-    }
-    Ok(found_interpreters)
 }
 
 /// Find python interpreters in the bundled sysconfig.

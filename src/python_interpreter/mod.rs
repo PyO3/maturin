@@ -1,4 +1,5 @@
 pub use self::config::InterpreterConfig;
+pub use self::discovery::{check_executable, check_executables, find_all, find_by_target};
 use crate::auditwheel::PlatformTag;
 use crate::{BuildContext, Target};
 use anyhow::Result;
@@ -14,22 +15,29 @@ mod resolver;
 
 pub(crate) use self::resolver::{InterpreterResolver, ResolveResult};
 
+/// Minimum supported CPython minor version.
 pub const MINIMUM_PYTHON_MINOR: usize = 7;
+/// Minimum supported PyPy minor version.
 pub const MINIMUM_PYPY_MINOR: usize = 8;
 /// Be liberal here to include preview versions
 pub const MAXIMUM_PYTHON_MINOR: usize = 14;
+/// Maximum supported PyPy minor version.
 pub const MAXIMUM_PYPY_MINOR: usize = 11;
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+/// The kind of Python interpreter (CPython, PyPy, or GraalPy).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, serde::Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 #[clap(rename_all = "lower")]
 pub enum InterpreterKind {
+    /// CPython — the reference Python implementation.
     CPython,
+    /// PyPy — a fast, alternative Python implementation.
     PyPy,
+    /// GraalPy — Python on GraalVM.
     GraalPy,
 }
 

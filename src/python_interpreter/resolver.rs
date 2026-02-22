@@ -398,7 +398,7 @@ impl<'a> InterpreterResolver<'a> {
         // Check if user-specified interpreters are valid file paths
         for interp in self.user_interpreters {
             if interp.components().count() > 1
-                && PythonInterpreter::check_executable(interp, self.target, self.bridge)?.is_none()
+                && super::check_executable(interp, self.target, self.bridge)?.is_none()
             {
                 bail!("{} is not a valid python interpreter", interp.display());
             }
@@ -477,7 +477,7 @@ impl<'a> InterpreterResolver<'a> {
     /// for any that aren't found.
     fn find_native_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
         if self.find_interpreter {
-            return PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
+            return super::find_all(self.target, self.bridge, self.requires_python)
                 .context("Finding python interpreters failed");
         }
 
@@ -501,7 +501,7 @@ impl<'a> InterpreterResolver<'a> {
         let mut found = Vec::new();
         let mut missing = Vec::new();
         for interp in to_check {
-            match PythonInterpreter::check_executable(interp.clone(), self.target, self.bridge)? {
+            match super::check_executable(interp.clone(), self.target, self.bridge)? {
                 Some(interp) => found.push(interp),
                 None => missing.push(interp.clone()),
             }
@@ -711,9 +711,9 @@ impl<'a> InterpreterResolver<'a> {
     /// Find a host Python interpreter for cross-compilation.
     fn find_host_python(&self) -> Result<PythonInterpreter> {
         let interpreters = if !self.user_interpreters.is_empty() {
-            PythonInterpreter::check_executables(self.user_interpreters, self.target, self.bridge)?
+            super::check_executables(self.user_interpreters, self.target, self.bridge)?
         } else {
-            PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
+            super::find_all(self.target, self.bridge, self.requires_python)
                 .context("Finding python interpreters failed")?
         };
 
@@ -744,7 +744,7 @@ impl<'a> InterpreterResolver<'a> {
     /// corresponding sysconfig.
     fn find_in_sysconfig(&self, interpreters: &[PathBuf]) -> Result<Vec<PythonInterpreter>> {
         if interpreters.is_empty() {
-            return Ok(PythonInterpreter::find_by_target(
+            return Ok(super::find_by_target(
                 self.target,
                 self.requires_python,
                 Some(self.bridge),
@@ -852,7 +852,7 @@ impl<'a> InterpreterResolver<'a> {
             "Failed to find a python interpreter from `{}`",
             executable.display()
         );
-        let interp = PythonInterpreter::check_executable(executable, self.target, self.bridge)
+        let interp = super::check_executable(executable, self.target, self.bridge)
             .context(format_err!(err_message.clone()))?
             .ok_or_else(|| format_err!(err_message))?;
         eprintln!("🐍 Using {interp} to generate the {bridge_name} bindings");

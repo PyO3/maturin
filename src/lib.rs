@@ -67,7 +67,8 @@ mod module_writer;
 mod new_project;
 mod project_layout;
 pub mod pyproject_toml;
-mod python_interpreter;
+/// Python interpreter discovery, configuration, and resolution.
+pub mod python_interpreter;
 mod sbom;
 mod source_distribution;
 mod target;

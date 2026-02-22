@@ -12,8 +12,8 @@ use clap::CommandFactory;
 use clap::{Parser, Subcommand};
 use ignore::overrides::Override;
 use maturin::{
-    BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter, PythonInterpreter, Target,
-    TargetTriple, VirtualWriter, develop, find_path_deps, unpack_sdist, write_dist_info,
+    BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter, Target, TargetTriple,
+    VirtualWriter, develop, find_path_deps, unpack_sdist, write_dist_info,
 };
 #[cfg(feature = "schemars")]
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
@@ -527,11 +527,11 @@ fn run() -> Result<()> {
         Command::ListPython { target } => {
             let found = if target.is_some() {
                 let target = Target::from_target_triple(target.as_ref())?;
-                PythonInterpreter::find_by_target(&target, None, None)
+                maturin::python_interpreter::find_by_target(&target, None, None)
             } else {
                 let target = Target::from_target_triple(None)?;
                 // We don't know the targeted bindings yet, so we use the most lenient
-                PythonInterpreter::find_all(&target, &BridgeModel::Cffi, None)?
+                maturin::python_interpreter::find_all(&target, &BridgeModel::Cffi, None)?
             };
             eprintln!("🐍 {} python interpreter found:", found.len());
             for interpreter in found {

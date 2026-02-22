@@ -1,11 +1,11 @@
 use crate::BuildContext;
 use crate::BuildOptions;
 use crate::PlatformTag;
-use crate::PythonInterpreter;
 use crate::Target;
 use crate::auditwheel::AuditWheelMode;
 use crate::build_options::CargoOptions;
 use crate::compression::CompressionOptions;
+use crate::python_interpreter;
 use crate::target::detect_arch_from_python;
 use anyhow::ensure;
 use anyhow::{Context, Result, anyhow, bail};
@@ -498,9 +498,10 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     }
 
     let interpreter =
-        PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
-            || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
-        )?;
+        python_interpreter::check_executable(&python, &target, build_context.bridge())?
+            .ok_or_else(|| {
+                anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+            })?;
 
     let uv_venv = is_uv_venv(venv_dir);
     let uv_info = if uv || uv_venv {

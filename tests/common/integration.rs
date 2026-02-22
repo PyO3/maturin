@@ -146,7 +146,7 @@ pub fn test_integration(
     // For abi3 on unix, we didn't use a python interpreter, but we need one here
     let interpreter = if build_context.interpreter.is_empty() {
         let error_message = "python3 should be a python interpreter";
-        let venv_interpreter = PythonInterpreter::check_executable(
+        let venv_interpreter = maturin::python_interpreter::check_executable(
             python_interp.as_deref().unwrap_or("python3"),
             &build_context.target,
             build_context.bridge(),

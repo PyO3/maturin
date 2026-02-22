@@ -84,7 +84,7 @@ impl<'a> WindowsInterpreterFinder<'a> {
     /// Checks version constraints, deduplicates by version, and tracks
     /// seen executables to avoid processing the same interpreter twice.
     fn try_add(&mut self, executable: &Path) -> Result<()> {
-        let interp = PythonInterpreter::check_executable(executable, self.target, self.bridge)?;
+        let interp = check_executable(executable, self.target, self.bridge)?;
         if let Some(interp) = interp {
             let key = (interp.major, interp.minor, interp.gil_disabled);
             if interp.major == 3
@@ -262,367 +262,271 @@ pub(super) fn find_all_windows(
 // Cross-platform discovery
 // ---------------------------------------------------------------------------
 
-impl PythonInterpreter {
-    /// Checks whether the given command is a python interpreter and returns a
-    /// [PythonInterpreter] if that is the case
-    #[instrument(skip_all, fields(executable = %executable.as_ref().display()))]
-    pub fn check_executable(
-        executable: impl AsRef<Path>,
-        target: &Target,
-        bridge: &BridgeModel,
-    ) -> Result<Option<PythonInterpreter>> {
-        let output = Command::new(executable.as_ref())
-            .env("PYTHONNOUSERSITE", "1")
-            .args(["-c", GET_INTERPRETER_METADATA])
-            .output();
+// ---------------------------------------------------------------------------
+// Cross-platform discovery (free functions)
+// ---------------------------------------------------------------------------
 
-        let err_msg = format!(
-            "Trying to get metadata from the python interpreter '{}' failed",
-            executable.as_ref().display()
-        );
-        let output = match output {
-            Ok(output) => {
-                if output.status.success() {
-                    output
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    if stderr.starts_with(&format!(
-                        "pyenv: {}: command not found",
+/// Checks whether the given command is a python interpreter and returns a
+/// [`PythonInterpreter`] if that is the case.
+#[instrument(skip_all, fields(executable = %executable.as_ref().display()))]
+pub fn check_executable(
+    executable: impl AsRef<Path>,
+    target: &Target,
+    bridge: &BridgeModel,
+) -> Result<Option<PythonInterpreter>> {
+    let output = Command::new(executable.as_ref())
+        .env("PYTHONNOUSERSITE", "1")
+        .args(["-c", GET_INTERPRETER_METADATA])
+        .output();
+
+    let err_msg = format!(
+        "Trying to get metadata from the python interpreter '{}' failed",
+        executable.as_ref().display()
+    );
+    let output = match output {
+        Ok(output) => {
+            if output.status.success() {
+                output
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if stderr.starts_with(&format!(
+                    "pyenv: {}: command not found",
+                    executable.as_ref().display()
+                )) {
+                    eprintln!(
+                        "⚠️  Warning: skipped unavailable python interpreter '{}' from pyenv",
                         executable.as_ref().display()
-                    )) {
-                        eprintln!(
-                            "⚠️  Warning: skipped unavailable python interpreter '{}' from pyenv",
-                            executable.as_ref().display()
-                        );
-                        return Ok(None);
-                    } else {
-                        eprintln!("{stderr}");
-                        bail!(err_msg);
-                    }
+                    );
+                    return Ok(None);
+                } else {
+                    eprintln!("{stderr}");
+                    bail!(err_msg);
                 }
             }
-            Err(err) => {
-                if err.kind() == io::ErrorKind::NotFound {
-                    if cfg!(windows) {
-                        if let Some(python) = executable.as_ref().to_str() {
-                            let ver = if python.starts_with("python") {
-                                python.strip_prefix("python").unwrap_or(python)
-                            } else {
-                                python
-                            };
-                            // Try py -x.y on Windows
-                            let mut metadata_py = tempfile::NamedTempFile::new()?;
-                            write!(metadata_py, "{GET_INTERPRETER_METADATA}")?;
-                            let mut cmd = Command::new("cmd");
-                            let suffix = match target.target_arch() {
-                                Arch::X86 => "-32",
-                                Arch::X86_64 => "-64",
-                                Arch::Aarch64 => "-arm64",
-                                _ => "",
-                            };
-                            cmd.arg("/c")
-                                .arg("py")
-                                .arg(format!("-{ver}{suffix}"))
-                                .arg(metadata_py.path())
-                                .env("PYTHONNOUSERSITE", "1");
-                            let output = cmd.output();
-                            match output {
-                                Ok(output) if output.status.success() => output,
-                                _ => return Ok(None),
-                            }
+        }
+        Err(err) => {
+            if err.kind() == io::ErrorKind::NotFound {
+                if cfg!(windows) {
+                    if let Some(python) = executable.as_ref().to_str() {
+                        let ver = if python.starts_with("python") {
+                            python.strip_prefix("python").unwrap_or(python)
                         } else {
-                            return Ok(None);
+                            python
+                        };
+                        // Try py -x.y on Windows
+                        let mut metadata_py = tempfile::NamedTempFile::new()?;
+                        write!(metadata_py, "{GET_INTERPRETER_METADATA}")?;
+                        let mut cmd = Command::new("cmd");
+                        let suffix = match target.target_arch() {
+                            Arch::X86 => "-32",
+                            Arch::X86_64 => "-64",
+                            Arch::Aarch64 => "-arm64",
+                            _ => "",
+                        };
+                        cmd.arg("/c")
+                            .arg("py")
+                            .arg(format!("-{ver}{suffix}"))
+                            .arg(metadata_py.path())
+                            .env("PYTHONNOUSERSITE", "1");
+                        let output = cmd.output();
+                        match output {
+                            Ok(output) if output.status.success() => output,
+                            _ => return Ok(None),
                         }
                     } else {
                         return Ok(None);
                     }
                 } else {
-                    return Err(err).context(err_msg);
-                }
-            }
-        };
-        let message: InterpreterMetadataMessage = serde_json::from_slice(&output.stdout)
-            .context(err_msg)
-            .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
-
-        Self::from_metadata_message(executable, target, bridge, message)
-    }
-
-    /// Configure a `PythonInterpreter` from the metadata message.
-    ///
-    /// Returns `None` if the interpreter is not suitable to use (e.g. too old or wrong architecture)
-    fn from_metadata_message(
-        executable: impl AsRef<Path>,
-        target: &Target,
-        bridge: &BridgeModel,
-        message: InterpreterMetadataMessage,
-    ) -> Result<Option<PythonInterpreter>> {
-        if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
-            debug!(
-                "Skipping outdated python interpreter '{}'",
-                executable.as_ref().display()
-            );
-            return Ok(None);
-        }
-
-        let interpreter = match message.interpreter.as_str() {
-            "cpython" => InterpreterKind::CPython,
-            "pypy" => InterpreterKind::PyPy,
-            "graalvm" | "graalpy" => InterpreterKind::GraalPy,
-            other => {
-                bail!("Unsupported interpreter {}", other);
-            }
-        };
-
-        let abiflags = fun_with_abiflags(&message, target, bridge).context(format_err!(
-            "Failed to get information from the python interpreter at {}",
-            executable.as_ref().display()
-        ))?;
-
-        let executable = message
-            .executable
-            .map(PathBuf::from)
-            .unwrap_or_else(|| executable.as_ref().to_path_buf());
-
-        if target.is_windows() {
-            'windows_arch_check: {
-                // on windows we must check the architecture, because three different architectures
-                // can all run on the same hardware
-                let python_arch = match message.platform.as_str().trim() {
-                    "win32" => Arch::X86,
-                    "win-amd64" => Arch::X86_64,
-                    "win-arm64" => Arch::Aarch64,
-                    _ => {
-                        eprintln!(
-                            "⚠️  Warning: '{}' reports unknown platform. This may fail to build.",
-                            executable.display()
-                        );
-                        break 'windows_arch_check;
-                    }
-                };
-
-                if python_arch != target.target_arch() {
-                    eprintln!(
-                        "👽 '{}' reports a platform '{platform}' (architecture '{python_arch}'), while the Rust target is '{target_arch}'. Skipping.",
-                        executable.display(),
-                        platform = message.platform,
-                        python_arch = python_arch,
-                        target_arch = target.target_arch(),
-                    );
                     return Ok(None);
                 }
-            }
-        }
-
-        let platform = if message.platform.starts_with("macosx") {
-            // We don't use platform from sysconfig on macOS
-            None
-        } else {
-            Some(message.platform.to_lowercase().replace(['-', '.'], "_"))
-        };
-
-        debug!(
-            "Found {} interpreter at {}",
-            interpreter,
-            executable.display()
-        );
-        Ok(Some(PythonInterpreter {
-            config: InterpreterConfig {
-                major: message.major,
-                minor: message.minor,
-                interpreter_kind: interpreter,
-                abiflags,
-                ext_suffix: message
-                    .ext_suffix
-                    .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
-                pointer_width: None,
-                gil_disabled: message.gil_disabled,
-            },
-            executable,
-            platform,
-            runnable: true,
-            implementation_name: message.implementation_name,
-            soabi: message.soabi,
-        }))
-    }
-
-    /// Find all available python interpreters for a given target
-    pub fn find_by_target(
-        target: &Target,
-        requires_python: Option<&VersionSpecifiers>,
-        bridge: Option<&BridgeModel>,
-    ) -> Vec<PythonInterpreter> {
-        let min_python_minor = bridge
-            .map(|bridge| bridge.minimal_python_minor_version())
-            .unwrap_or(MINIMUM_PYTHON_MINOR);
-        let min_pypy_minor = bridge
-            .map(|bridge| bridge.minimal_pypy_minor_version())
-            .unwrap_or(MINIMUM_PYPY_MINOR);
-        let supports_free_threaded = bridge
-            .map(|bridge| bridge.supports_free_threaded())
-            .unwrap_or(false);
-        InterpreterConfig::lookup_target(target)
-            .into_iter()
-            .filter_map(|config| match requires_python {
-                Some(requires_python) => {
-                    if requires_python
-                        .contains(&Version::new([config.major as u64, config.minor as u64]))
-                    {
-                        Some(Self::from_config(config))
-                    } else {
-                        None
-                    }
-                }
-                None => Some(Self::from_config(config)),
-            })
-            .filter_map(|config| match config.interpreter_kind {
-                InterpreterKind::CPython => {
-                    if config.minor >= min_python_minor {
-                        Some(config)
-                    } else {
-                        None
-                    }
-                }
-                InterpreterKind::PyPy => {
-                    if config.minor >= min_pypy_minor {
-                        Some(config)
-                    } else {
-                        None
-                    }
-                }
-                InterpreterKind::GraalPy => Some(config),
-            })
-            .filter_map(|config| {
-                if config.gil_disabled && !supports_free_threaded {
-                    None
-                } else {
-                    Some(config)
-                }
-            })
-            .collect()
-    }
-
-    /// Tries to find all installed python versions using the heuristic for the
-    /// given platform.
-    ///
-    /// We have two filters: The optional requires-python from the pyproject.toml and minimum python
-    /// minor either from the bindings (i.e. Cargo.toml `abi3-py{major}{minor}`) or the global
-    /// default minimum minor version
-    pub fn find_all(
-        target: &Target,
-        bridge: &BridgeModel,
-        requires_python: Option<&VersionSpecifiers>,
-    ) -> Result<Vec<PythonInterpreter>> {
-        if target.is_windows() {
-            // TOFIX: add PyPy support to Windows
-            return find_all_windows(target, bridge, requires_python);
-        };
-
-        let mut executables: Vec<String> = (bridge.minimal_python_minor_version()
-            ..=bridge.maximum_python_minor_version())
-            .filter(|minor| {
-                requires_python
-                    .map(|requires_python| {
-                        requires_python.contains(&Version::new([3, *minor as u64]))
-                    })
-                    .unwrap_or(true)
-            })
-            .map(|minor| format!("python3.{minor}"))
-            .collect();
-
-        // Also try to find PyPy for cffi and pyo3 bindings
-        if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
-            executables.extend(
-                (bridge.minimal_pypy_minor_version()..=bridge.maximum_pypy_minor_version())
-                    .filter(|minor| {
-                        requires_python
-                            .map(|requires_python| {
-                                requires_python.contains(&Version::new([3, *minor as u64]))
-                            })
-                            .unwrap_or(true)
-                    })
-                    .map(|minor| format!("pypy3.{minor}")),
-            );
-        }
-
-        // Deduplicate by (kind, major, minor, gil_disabled) to avoid
-        // picking up the same interpreter via multiple names.
-        let mut seen = HashSet::new();
-        let mut available_versions = Vec::new();
-        for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)?
-            {
-                let key = (
-                    version.interpreter_kind,
-                    version.major,
-                    version.minor,
-                    version.gil_disabled,
-                );
-                if seen.insert(key) {
-                    available_versions.push(version);
-                }
-            }
-        }
-
-        // Fallback: try `python3` and `python` for environments like pyenv
-        // where only the generic name is available (fixes #2312)
-        if available_versions.is_empty() {
-            for name in &["python3", "python"] {
-                if let Some(version) = PythonInterpreter::check_executable(name, target, bridge)?
-                    .filter(|v| {
-                        v.major == 3
-                            && v.minor >= bridge.minimal_python_minor_version()
-                            && requires_python.is_none_or(|req| {
-                                req.contains(&Version::new([v.major as u64, v.minor as u64]))
-                            })
-                    })
-                {
-                    available_versions.push(version);
-                    break;
-                }
-            }
-        }
-
-        Ok(available_versions)
-    }
-
-    /// Checks that given list of executables are all valid python interpreters,
-    /// determines the abiflags and versions of those interpreters and
-    /// returns them as [PythonInterpreter]
-    pub fn check_executables(
-        executables: &[PathBuf],
-        target: &Target,
-        bridge: &BridgeModel,
-    ) -> Result<Vec<PythonInterpreter>> {
-        let mut available_versions = Vec::new();
-        let mut missing = Vec::new();
-        for executable in executables {
-            if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)
-                .context(format!(
-                "{} is not a valid python interpreter",
-                executable.display()
-            ))? {
-                available_versions.push(version);
             } else {
-                missing.push(executable);
+                return Err(err).context(err_msg);
             }
         }
+    };
+    let message: InterpreterMetadataMessage = serde_json::from_slice(&output.stdout)
+        .context(err_msg)
+        .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 
-        if !missing.is_empty() {
-            let missing_str = missing
-                .iter()
-                .map(|p| format!("`{}`", p.display()))
-                .collect::<Vec<_>>()
-                .join(", ");
-            bail!(
-                "The following Python interpreters could not be found: {}",
-                missing_str
-            );
-        }
+    from_metadata_message(executable, target, bridge, message)
+}
 
-        Ok(available_versions)
+/// Find all available python interpreters for a given target from bundled sysconfig.
+pub fn find_by_target(
+    target: &Target,
+    requires_python: Option<&VersionSpecifiers>,
+    bridge: Option<&BridgeModel>,
+) -> Vec<PythonInterpreter> {
+    let min_python_minor = bridge
+        .map(|bridge| bridge.minimal_python_minor_version())
+        .unwrap_or(MINIMUM_PYTHON_MINOR);
+    let min_pypy_minor = bridge
+        .map(|bridge| bridge.minimal_pypy_minor_version())
+        .unwrap_or(MINIMUM_PYPY_MINOR);
+    let supports_free_threaded = bridge
+        .map(|bridge| bridge.supports_free_threaded())
+        .unwrap_or(false);
+    InterpreterConfig::lookup_target(target)
+        .into_iter()
+        .filter_map(|config| match requires_python {
+            Some(requires_python) => {
+                if requires_python
+                    .contains(&Version::new([config.major as u64, config.minor as u64]))
+                {
+                    Some(PythonInterpreter::from_config(config))
+                } else {
+                    None
+                }
+            }
+            None => Some(PythonInterpreter::from_config(config)),
+        })
+        .filter_map(|config| match config.interpreter_kind {
+            InterpreterKind::CPython => {
+                if config.minor >= min_python_minor {
+                    Some(config)
+                } else {
+                    None
+                }
+            }
+            InterpreterKind::PyPy => {
+                if config.minor >= min_pypy_minor {
+                    Some(config)
+                } else {
+                    None
+                }
+            }
+            InterpreterKind::GraalPy => Some(config),
+        })
+        .filter_map(|config| {
+            if config.gil_disabled && !supports_free_threaded {
+                None
+            } else {
+                Some(config)
+            }
+        })
+        .collect()
+}
+
+/// Tries to find all installed python versions using the heuristic for the
+/// given platform.
+///
+/// We have two filters: The optional requires-python from the pyproject.toml and minimum python
+/// minor either from the bindings (i.e. Cargo.toml `abi3-py{major}{minor}`) or the global
+/// default minimum minor version
+pub fn find_all(
+    target: &Target,
+    bridge: &BridgeModel,
+    requires_python: Option<&VersionSpecifiers>,
+) -> Result<Vec<PythonInterpreter>> {
+    if target.is_windows() {
+        // TOFIX: add PyPy support to Windows
+        return find_all_windows(target, bridge, requires_python);
+    };
+
+    let mut executables: Vec<String> = (bridge.minimal_python_minor_version()
+        ..=bridge.maximum_python_minor_version())
+        .filter(|minor| {
+            requires_python
+                .map(|requires_python| requires_python.contains(&Version::new([3, *minor as u64])))
+                .unwrap_or(true)
+        })
+        .map(|minor| format!("python3.{minor}"))
+        .collect();
+
+    // Also try to find PyPy for cffi and pyo3 bindings
+    if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
+        executables.extend(
+            (bridge.minimal_pypy_minor_version()..=bridge.maximum_pypy_minor_version())
+                .filter(|minor| {
+                    requires_python
+                        .map(|requires_python| {
+                            requires_python.contains(&Version::new([3, *minor as u64]))
+                        })
+                        .unwrap_or(true)
+                })
+                .map(|minor| format!("pypy3.{minor}")),
+        );
     }
 
+    // Deduplicate by (kind, major, minor, gil_disabled) to avoid
+    // picking up the same interpreter via multiple names.
+    let mut seen = HashSet::new();
+    let mut available_versions = Vec::new();
+    for executable in executables {
+        if let Some(version) = check_executable(executable, target, bridge)? {
+            let key = (
+                version.interpreter_kind,
+                version.major,
+                version.minor,
+                version.gil_disabled,
+            );
+            if seen.insert(key) {
+                available_versions.push(version);
+            }
+        }
+    }
+
+    // Fallback: try `python3` and `python` for environments like pyenv
+    // where only the generic name is available (fixes #2312)
+    if available_versions.is_empty() {
+        for name in &["python3", "python"] {
+            if let Some(version) = check_executable(name, target, bridge)?.filter(|v| {
+                v.major == 3
+                    && v.minor >= bridge.minimal_python_minor_version()
+                    && requires_python.is_none_or(|req| {
+                        req.contains(&Version::new([v.major as u64, v.minor as u64]))
+                    })
+            }) {
+                available_versions.push(version);
+                break;
+            }
+        }
+    }
+
+    Ok(available_versions)
+}
+
+/// Checks that given list of executables are all valid python interpreters,
+/// determines the abiflags and versions of those interpreters and
+/// returns them as [PythonInterpreter]
+pub fn check_executables(
+    executables: &[PathBuf],
+    target: &Target,
+    bridge: &BridgeModel,
+) -> Result<Vec<PythonInterpreter>> {
+    let mut available_versions = Vec::new();
+    let mut missing = Vec::new();
+    for executable in executables {
+        if let Some(version) = check_executable(executable, target, bridge).context(format!(
+            "{} is not a valid python interpreter",
+            executable.display()
+        ))? {
+            available_versions.push(version);
+        } else {
+            missing.push(executable);
+        }
+    }
+
+    if !missing.is_empty() {
+        let missing_str = missing
+            .iter()
+            .map(|p| format!("`{}`", p.display()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        bail!(
+            "The following Python interpreters could not be found: {}",
+            missing_str
+        );
+    }
+
+    Ok(available_versions)
+}
+
+// ---------------------------------------------------------------------------
+// Instance methods on PythonInterpreter
+// ---------------------------------------------------------------------------
+
+impl PythonInterpreter {
     /// Run a python script using this Python interpreter.
     pub fn run_script(&self, script: &str) -> Result<String> {
         if !self.runnable {
@@ -665,6 +569,105 @@ impl PythonInterpreter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/// Configure a `PythonInterpreter` from the metadata message.
+///
+/// Returns `None` if the interpreter is not suitable to use (e.g. too old or wrong architecture)
+fn from_metadata_message(
+    executable: impl AsRef<Path>,
+    target: &Target,
+    bridge: &BridgeModel,
+    message: InterpreterMetadataMessage,
+) -> Result<Option<PythonInterpreter>> {
+    if (message.major == 2 && message.minor != 7) || (message.major == 3 && message.minor < 5) {
+        debug!(
+            "Skipping outdated python interpreter '{}'",
+            executable.as_ref().display()
+        );
+        return Ok(None);
+    }
+
+    let interpreter = match message.interpreter.as_str() {
+        "cpython" => InterpreterKind::CPython,
+        "pypy" => InterpreterKind::PyPy,
+        "graalvm" | "graalpy" => InterpreterKind::GraalPy,
+        other => {
+            bail!("Unsupported interpreter {}", other);
+        }
+    };
+
+    let abiflags = fun_with_abiflags(&message, target, bridge).context(format_err!(
+        "Failed to get information from the python interpreter at {}",
+        executable.as_ref().display()
+    ))?;
+
+    let executable = message
+        .executable
+        .map(PathBuf::from)
+        .unwrap_or_else(|| executable.as_ref().to_path_buf());
+
+    if target.is_windows() {
+        'windows_arch_check: {
+            let python_arch = match message.platform.as_str().trim() {
+                "win32" => Arch::X86,
+                "win-amd64" => Arch::X86_64,
+                "win-arm64" => Arch::Aarch64,
+                _ => {
+                    eprintln!(
+                        "⚠️  Warning: '{}' reports unknown platform. This may fail to build.",
+                        executable.display()
+                    );
+                    break 'windows_arch_check;
+                }
+            };
+
+            if python_arch != target.target_arch() {
+                eprintln!(
+                    "👽 '{}' reports a platform '{platform}' (architecture '{python_arch}'), while the Rust target is '{target_arch}'. Skipping.",
+                    executable.display(),
+                    platform = message.platform,
+                    python_arch = python_arch,
+                    target_arch = target.target_arch(),
+                );
+                return Ok(None);
+            }
+        }
+    }
+
+    let platform = if message.platform.starts_with("macosx") {
+        None
+    } else {
+        Some(message.platform.to_lowercase().replace(['-', '.'], "_"))
+    };
+
+    debug!(
+        "Found {} interpreter at {}",
+        interpreter,
+        executable.display()
+    );
+    Ok(Some(PythonInterpreter {
+        config: InterpreterConfig {
+            major: message.major,
+            minor: message.minor,
+            interpreter_kind: interpreter,
+            abiflags,
+            ext_suffix: message
+                .ext_suffix
+                .context("syconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?,
+            pointer_width: None,
+            gil_disabled: message.gil_disabled,
+        },
+        executable,
+        platform,
+        runnable: true,
+        implementation_name: message.implementation_name,
+        soabi: message.soabi,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -676,7 +679,7 @@ mod tests {
     #[test]
     fn test_find_interpreter_by_target() {
         let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
-        let pythons = PythonInterpreter::find_by_target(&target, None, None)
+        let pythons = find_by_target(&target, None, None)
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
@@ -699,7 +702,7 @@ mod tests {
         expected.assert_debug_eq(&pythons);
 
         // pyo3 0.23+ should find CPython 3.13t
-        let pythons = PythonInterpreter::find_by_target(
+        let pythons = find_by_target(
             &target,
             None,
             Some(&BridgeModel::PyO3(PyO3 {
@@ -731,7 +734,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        let pythons = PythonInterpreter::find_by_target(
+        let pythons = find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
             None,
@@ -756,7 +759,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        let pythons = PythonInterpreter::find_by_target(
+        let pythons = find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
             None,
@@ -777,7 +780,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        let pythons = PythonInterpreter::find_by_target(
+        let pythons = find_by_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
             Some(&BridgeModel::PyO3(PyO3 {
@@ -840,7 +843,7 @@ mod tests {
 
         // Test Python 2.x should be rejected
         assert_eq!(
-            PythonInterpreter::from_metadata_message(
+            from_metadata_message(
                 "python2.7",
                 &target_x64,
                 &bridge,
@@ -853,7 +856,7 @@ mod tests {
 
         // Test Python 3.x but below minimum version
         assert_eq!(
-            PythonInterpreter::from_metadata_message(
+            from_metadata_message(
                 "python3.6",
                 &target_x64,
                 &bridge,
@@ -871,14 +874,9 @@ mod tests {
             (&target_arm64, "win-arm64"),
         ] {
             assert_eq!(
-                PythonInterpreter::from_metadata_message(
-                    "python3.10",
-                    target,
-                    &bridge,
-                    message(3, 10, platform),
-                )
-                .unwrap()
-                .unwrap(),
+                from_metadata_message("python3.10", target, &bridge, message(3, 10, platform),)
+                    .unwrap()
+                    .unwrap(),
                 PythonInterpreter {
                     config: InterpreterConfig {
                         major: 3,
@@ -908,20 +906,15 @@ mod tests {
             (&target_arm64, "win-amd64"),
         ] {
             assert_eq!(
-                PythonInterpreter::from_metadata_message(
-                    "python3.10",
-                    target,
-                    &bridge,
-                    message(3, 10, platform),
-                )
-                .unwrap(),
+                from_metadata_message("python3.10", target, &bridge, message(3, 10, platform),)
+                    .unwrap(),
                 None
             );
         }
 
         // Test edge case with unknown platform (should not match any specific architecture, build anyway)
         assert_eq!(
-            PythonInterpreter::from_metadata_message(
+            from_metadata_message(
                 "python3.10",
                 &target_x64,
                 &bridge,
@@ -974,14 +967,9 @@ mod tests {
             gil_disabled: false,
             system: "windows".to_string(),
         };
-        let interp = PythonInterpreter::from_metadata_message(
-            "python3.14",
-            &target_x64,
-            &bridge,
-            message_314,
-        )
-        .unwrap()
-        .unwrap();
+        let interp = from_metadata_message("python3.14", &target_x64, &bridge, message_314)
+            .unwrap()
+            .unwrap();
         assert_eq!(interp.major, 3);
         assert_eq!(interp.minor, 14);
         assert_eq!(interp.abiflags, "");
@@ -1000,14 +988,9 @@ mod tests {
             gil_disabled: true,
             system: "windows".to_string(),
         };
-        let interp = PythonInterpreter::from_metadata_message(
-            "python3.14t",
-            &target_x64,
-            &bridge,
-            message_314t,
-        )
-        .unwrap()
-        .unwrap();
+        let interp = from_metadata_message("python3.14t", &target_x64, &bridge, message_314t)
+            .unwrap()
+            .unwrap();
         assert_eq!(interp.major, 3);
         assert_eq!(interp.minor, 14);
         assert_eq!(interp.abiflags, "t");
@@ -1020,7 +1003,7 @@ mod tests {
         let bridge = BridgeModel::Bin(None);
         let executables = vec![PathBuf::from("nonexistent-python-1")];
 
-        let result = PythonInterpreter::check_executables(&executables, &target, &bridge);
+        let result = check_executables(&executables, &target, &bridge);
         let err_msg = result.unwrap_err().to_string();
         assert_snapshot!(err_msg, @"The following Python interpreters could not be found: `nonexistent-python-1`");
     }
@@ -1034,7 +1017,7 @@ mod tests {
             PathBuf::from("nonexistent-python-2"),
         ];
 
-        let result = PythonInterpreter::check_executables(&executables, &target, &bridge);
+        let result = check_executables(&executables, &target, &bridge);
         let err_msg = result.unwrap_err().to_string();
         assert_snapshot!(err_msg, @"The following Python interpreters could not be found: `nonexistent-python-1`, `nonexistent-python-2`");
     }

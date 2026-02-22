@@ -119,6 +119,21 @@ struct DiscoveryResult {
     host_python: Option<PythonInterpreter>,
 }
 
+/// Result of interpreter resolution.
+///
+/// In addition to the resolved interpreters, this carries the host Python
+/// path discovered during cross-compilation. The caller is responsible for
+/// setting `PYO3_PYTHON` / `PYTHON_SYS_EXECUTABLE` using this value
+/// before invoking cargo.
+#[derive(Debug)]
+pub struct ResolveResult {
+    pub interpreters: Vec<PythonInterpreter>,
+    /// Host Python interpreter found during cross-compile discovery.
+    /// The caller should set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` to
+    /// this path before building.
+    pub host_python: Option<PathBuf>,
+}
+
 // ---------------------------------------------------------------------------
 // Resolver
 // ---------------------------------------------------------------------------
@@ -142,10 +157,20 @@ pub struct InterpreterResolver<'a> {
 
 impl<'a> InterpreterResolver<'a> {
     /// Main entry point: resolve the list of Python interpreters to build for.
-    pub fn resolve(&self) -> Result<Vec<PythonInterpreter>> {
+    ///
+    /// Returns a [`ResolveResult`] containing the interpreters and, for
+    /// cross-compilation, the host Python path that should be used to set
+    /// `PYO3_PYTHON`.
+    pub fn resolve(&self) -> Result<ResolveResult> {
         match self.bridge {
-            BridgeModel::Cffi => self.resolve_single("cffi").map(|i| vec![i]),
-            BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(vec![]),
+            BridgeModel::Cffi => self.resolve_single("cffi").map(|i| ResolveResult {
+                interpreters: vec![i],
+                host_python: None,
+            }),
+            BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(ResolveResult {
+                interpreters: vec![],
+                host_python: None,
+            }),
             BridgeModel::PyO3(pyo3) | BridgeModel::Bin(Some(pyo3)) => self.resolve_pyo3(pyo3),
         }
     }
@@ -162,12 +187,15 @@ impl<'a> InterpreterResolver<'a> {
     /// 3. Set `PYO3_PYTHON` if cross-compiling with a host interpreter
     /// 4. Filter for abi3 (if applicable)
     /// 5. Finalize: apply fallback policies, validate result
-    fn resolve_pyo3(&self, pyo3: &PyO3) -> Result<Vec<PythonInterpreter>> {
+    fn resolve_pyo3(&self, pyo3: &PyO3) -> Result<ResolveResult> {
         // Step 1: PYO3_CONFIG_FILE is an explicit override that trumps everything
         if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
             let config = InterpreterConfig::from_pyo3_config(config_file.as_ref(), self.target)
                 .context("Invalid PYO3_CONFIG_FILE")?;
-            return Ok(vec![PythonInterpreter::from_config(config)]);
+            return Ok(ResolveResult {
+                interpreters: vec![PythonInterpreter::from_config(config)],
+                host_python: None,
+            });
         }
 
         let fixed_abi3 = match &pyo3.abi3 {
@@ -178,20 +206,23 @@ impl<'a> InterpreterResolver<'a> {
         // Step 2: Discover candidates (unified for native/cross)
         let discovery = self.discover_candidates(fixed_abi3)?;
 
-        // Step 3: Set PYO3_PYTHON for cross-compilation
-        if let Some(host) = &discovery.host_python {
-            self.set_pyo3_env(host);
-        }
+        // Capture host_python for the caller to set PYO3_PYTHON
+        let host_python = discovery.host_python.as_ref().map(|h| h.executable.clone());
 
-        // Step 4-5: Filter and finalize (differs for abi3 vs non-abi3)
-        if let Some((major, minor)) = fixed_abi3 {
+        // Step 3-4: Filter and finalize (differs for abi3 vs non-abi3)
+        let interpreters = if let Some((major, minor)) = fixed_abi3 {
             let filtered = self.filter_for_abi3(discovery.candidates);
-            self.finalize_abi3(filtered, major, minor)
+            self.finalize_abi3(filtered, major, minor)?
         } else {
             let interpreters = Self::candidates_to_interpreters(discovery.candidates);
             self.print_found(&interpreters);
-            Ok(interpreters)
-        }
+            interpreters
+        };
+
+        Ok(ResolveResult {
+            interpreters,
+            host_python,
+        })
     }
 
     // -----------------------------------------------------------------------
@@ -573,15 +604,6 @@ impl<'a> InterpreterResolver<'a> {
             .into_iter()
             .next()
             .expect("find_interpreter_in_host returned empty"))
-    }
-
-    /// Set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` environment variables
-    /// for the build.
-    fn set_pyo3_env(&self, host_python: &PythonInterpreter) {
-        unsafe {
-            env::set_var("PYO3_PYTHON", &host_python.executable);
-            env::set_var("PYTHON_SYS_EXECUTABLE", &host_python.executable);
-        }
     }
 
     /// Build a PythonInterpreter from sysconfigdata.

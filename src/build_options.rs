@@ -4,7 +4,7 @@ use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::compression::CompressionOptions;
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::{FeatureSpec, ToolMaturin};
-use crate::python_interpreter::InterpreterResolver;
+use crate::python_interpreter::{InterpreterResolver, ResolveResult};
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
@@ -651,7 +651,21 @@ fn resolve_interpreters(
         find_interpreter: build_options.find_interpreter,
         generate_import_lib,
     };
-    resolver.resolve()
+    let ResolveResult {
+        interpreters,
+        host_python,
+    } = resolver.resolve()?;
+
+    // Set PYO3_PYTHON for cross-compilation so pyo3's build script
+    // can find the host interpreter.
+    if let Some(host_python) = host_python {
+        unsafe {
+            env::set_var("PYO3_PYTHON", &host_python);
+            env::set_var("PYTHON_SYS_EXECUTABLE", &host_python);
+        }
+    }
+
+    Ok(interpreters)
 }
 
 /// Checks for bridge/platform type edge cases

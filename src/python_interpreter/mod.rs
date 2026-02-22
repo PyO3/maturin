@@ -18,7 +18,7 @@ use tracing::{debug, instrument};
 mod config;
 mod resolver;
 
-pub(crate) use self::resolver::InterpreterResolver;
+pub(crate) use self::resolver::{InterpreterResolver, ResolveResult};
 
 /// This snippets will give us information about the python interpreter's
 /// version and abi as json through stdout

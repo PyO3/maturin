@@ -184,13 +184,19 @@ impl BuildContext {
                     let abi3_interps: Vec<_> = self
                         .interpreter
                         .iter()
-                        .filter(|interp| interp.has_stable_api())
+                        .filter(|interp| {
+                            interp.has_stable_api()
+                                && (interp.major as u8, interp.minor as u8) >= (*major, *minor)
+                        })
                         .cloned()
                         .collect();
                     let non_abi3_interps: Vec<_> = self
                         .interpreter
                         .iter()
-                        .filter(|interp| !interp.has_stable_api())
+                        .filter(|interp| {
+                            !interp.has_stable_api()
+                                || (interp.major as u8, interp.minor as u8) < (*major, *minor)
+                        })
                         .cloned()
                         .collect();
                     let mut built_wheels = Vec::new();

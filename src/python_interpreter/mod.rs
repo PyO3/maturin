@@ -74,6 +74,10 @@ fn find_all_windows(
     let min_python_minor = bridge.minimal_python_minor_version();
     let mut interpreter = vec![];
     let mut versions_found = HashSet::new();
+    // Track all executable paths we've already processed (accepted or rejected)
+    // to avoid duplicated warnings for the same interpreter found via different
+    // discovery mechanisms (e.g. py launcher + pythonX.Y alias). Fixes #2751.
+    let mut seen_executables = HashSet::new();
 
     macro_rules! maybe_add_interp {
         ($executable:expr) => {
@@ -81,19 +85,36 @@ fn find_all_windows(
                 if let Some(interp) = interp {
                     let major = interp.major;
                     let minor = interp.minor;
+                    let gil_disabled = interp.gil_disabled;
+                    let key = (major, minor, gil_disabled);
                     if major == 3
                         && minor >= min_python_minor
-                        && !versions_found.contains(&(major, minor))
+                        && !versions_found.contains(&key)
                         && requires_python.map_or(true, |requires_python| {
                             requires_python.contains(&Version::new([major as u64, minor as u64]))
                         })
                     {
+                        // Track the canonical path of accepted interpreters
+                        if let Ok(canonical) = interp.executable.canonicalize() {
+                            seen_executables.insert(canonical);
+                        }
                         interpreter.push(interp);
-                        versions_found.insert((major, minor));
+                        versions_found.insert(key);
                     }
                 }
             })
         };
+    }
+
+    /// Check if an executable has already been seen (accepted or rejected).
+    /// Returns true if already processed, and marks it as seen if not.
+    fn mark_seen(seen: &mut HashSet<PathBuf>, executable: &Path) -> bool {
+        if let Ok(canonical) = executable.canonicalize() {
+            !seen.insert(canonical)
+        } else {
+            // If we can't canonicalize, try the path as-is
+            !seen.insert(executable.to_path_buf())
+        }
     }
 
     // If Python is installed from Python.org it should include the "python launcher"
@@ -123,11 +144,16 @@ fn find_all_windows(
                     .as_str()
                     .parse::<usize>()
                     .context("Expected a digit for minor version")?;
-                if !versions_found.contains(&(major, minor)) {
+                if !versions_found.contains(&(major, minor, false))
+                    && !versions_found.contains(&(major, minor, true))
+                {
                     let executable = capture.get(6).unwrap().as_str();
                     let executable_path = Path::new(&executable);
                     // Skip non-existing paths
                     if !executable_path.exists() {
+                        continue;
+                    }
+                    if mark_seen(&mut seen_executables, executable_path) {
                         continue;
                     }
                     maybe_add_interp!(executable_path)?;
@@ -161,13 +187,16 @@ fn find_all_windows(
             } else {
                 Path::new(&path).join("python")
             };
-            maybe_add_interp!(executable.as_path())?;
+            if !mark_seen(&mut seen_executables, &executable) {
+                maybe_add_interp!(executable.as_path())?;
+            }
         }
     }
 
     // Fallback to pythonX.Y for Microsoft Store versions
     for minor in min_python_minor..=bridge.maximum_python_minor_version() {
-        if !versions_found.contains(&(3, minor)) {
+        let key = (3, minor, false);
+        if !versions_found.contains(&key) {
             let executable = format!("python3.{minor}.exe");
             maybe_add_interp!(Path::new(&executable))?;
         }
@@ -181,7 +210,7 @@ fn find_all_windows(
     Ok(interpreter)
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 #[clap(rename_all = "lower")]
 pub enum InterpreterKind {
@@ -775,11 +804,41 @@ impl PythonInterpreter {
             );
         }
 
+        // Deduplicate by (kind, major, minor, gil_disabled) to avoid
+        // picking up the same interpreter via multiple names.
+        let mut seen = HashSet::new();
         let mut available_versions = Vec::new();
         for executable in executables {
             if let Some(version) = PythonInterpreter::check_executable(executable, target, bridge)?
             {
-                available_versions.push(version);
+                let key = (
+                    version.interpreter_kind,
+                    version.major,
+                    version.minor,
+                    version.gil_disabled,
+                );
+                if seen.insert(key) {
+                    available_versions.push(version);
+                }
+            }
+        }
+
+        // Fallback: try `python3` and `python` for environments like pyenv
+        // where only the generic name is available (fixes #2312)
+        if available_versions.is_empty() {
+            for name in &["python3", "python"] {
+                if let Some(version) = PythonInterpreter::check_executable(name, target, bridge)?
+                    .filter(|v| {
+                        v.major == 3
+                            && v.minor >= bridge.minimal_python_minor_version()
+                            && requires_python.is_none_or(|req| {
+                                req.contains(&Version::new([v.major as u64, v.minor as u64]))
+                            })
+                    })
+                {
+                    available_versions.push(version);
+                    break;
+                }
             }
         }
 

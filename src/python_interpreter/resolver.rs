@@ -26,12 +26,12 @@ use crate::bridge::{Abi3Version, PyO3};
 /// - Windows vs Unix
 /// - user-specified interpreters vs auto-discovery
 pub struct InterpreterResolver<'a> {
-    pub target: &'a Target,
-    pub bridge: &'a BridgeModel,
-    pub requires_python: Option<&'a VersionSpecifiers>,
-    pub user_interpreters: &'a [PathBuf],
-    pub find_interpreter: bool,
-    pub generate_import_lib: bool,
+    pub(crate) target: &'a Target,
+    pub(crate) bridge: &'a BridgeModel,
+    pub(crate) requires_python: Option<&'a VersionSpecifiers>,
+    pub(crate) user_interpreters: &'a [PathBuf],
+    pub(crate) find_interpreter: bool,
+    pub(crate) generate_import_lib: bool,
 }
 
 impl<'a> InterpreterResolver<'a> {
@@ -135,6 +135,24 @@ impl<'a> InterpreterResolver<'a> {
         }
     }
 
+    /// Check if any user-specified interpreter looks like PyPy.
+    fn user_requested_pypy(&self) -> bool {
+        !self.user_interpreters.is_empty()
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.contains("pypy")
+            })
+    }
+
+    /// Check if any user-specified interpreter looks like free-threaded Python.
+    fn user_requested_free_threaded(&self) -> bool {
+        !self.user_interpreters.is_empty()
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.ends_with('t') && s.chars().rev().nth(1).is_some_and(|c| c.is_ascii_digit())
+            })
+    }
+
     /// Filter interpreters for abi3 builds.
     ///
     /// When building abi3 wheels, we prefer interpreters that support the stable API.
@@ -150,56 +168,25 @@ impl<'a> InterpreterResolver<'a> {
             return interpreters;
         }
 
-        let has_user_interpreters = !self.user_interpreters.is_empty();
-        let user_requested_pypy = has_user_interpreters
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.contains("pypy")
-            });
-        let user_requested_free_threaded = has_user_interpreters
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.ends_with('t') && s.chars().rev().nth(1).is_some_and(|c| c.is_ascii_digit())
-            });
+        let user_requested_pypy = self.user_requested_pypy();
+        let user_requested_free_threaded = self.user_requested_free_threaded();
 
         let (abi3_capable, non_abi3): (Vec<_>, Vec<_>) = interpreters
             .into_iter()
             .partition(|interp| interp.has_stable_api());
 
-        let mut result = Vec::new();
-
-        // Always include abi3-capable interpreters
-        if !abi3_capable.is_empty() {
-            // When auto-discovering (no -i flag), prefer non-free-threaded CPython.
-            // If the user didn't explicitly ask for free-threaded, exclude free-threaded
-            // interpreters that happen to be abi3-capable (currently none are, but future-proof).
-            result.extend(abi3_capable);
-        }
+        let mut result = abi3_capable;
 
         // Only include non-abi3-capable interpreters if explicitly requested
         for interp in non_abi3 {
-            let dominated = match interp.interpreter_kind {
-                InterpreterKind::PyPy => {
-                    // Include PyPy only if user explicitly passed `-i pypy...`
-                    !user_requested_pypy
-                }
-                InterpreterKind::CPython if interp.gil_disabled => {
-                    // Include free-threaded CPython only if user explicitly requested it
-                    !user_requested_free_threaded
-                }
+            let excluded = match interp.interpreter_kind {
+                InterpreterKind::PyPy => !user_requested_pypy,
+                InterpreterKind::CPython if interp.gil_disabled => !user_requested_free_threaded,
                 _ => false,
             };
-            if !dominated {
+            if !excluded {
                 result.push(interp);
             }
-        }
-
-        // If filtering removed everything (shouldn't happen with abi3_capable),
-        // fall back to the original behavior
-        if result.is_empty() {
-            debug!("abi3 filtering removed all interpreters, using unfiltered list");
-            // Re-collect from scratch - but we consumed the iterators.
-            // This case should be unreachable in practice.
         }
 
         result
@@ -248,18 +235,12 @@ impl<'a> InterpreterResolver<'a> {
         &self,
         found: Vec<PythonInterpreter>,
     ) -> Result<Vec<PythonInterpreter>> {
-        let user_requested_pypy = !self.user_interpreters.is_empty()
-            && self.user_interpreters.iter().any(|p| {
-                let s = p.display().to_string();
-                s.contains("pypy")
-            });
-
         let mut interps = Vec::with_capacity(found.len());
         let mut pypys = Vec::new();
         for interp in found {
             if interp.interpreter_kind.is_pypy() {
                 // Only include PyPy in cross-compile abi3 if explicitly requested (#2852)
-                if user_requested_pypy {
+                if self.user_requested_pypy() {
                     pypys.push(PathBuf::from(format!(
                         "pypy{}.{}",
                         interp.major, interp.minor
@@ -432,49 +413,30 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Discover interpreters: either user-specified + fallback, or auto-discovery.
     fn discover_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
-        let interpreters = if self.find_interpreter {
+        if self.find_interpreter {
             // --find-interpreter: auto-discover all
-            self.auto_discover()?
+            PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
+                .context("Finding python interpreters failed")
         } else if !self.user_interpreters.is_empty() {
             // User specified -i: try host first, sysconfig fallback
-            self.find_specified_interpreters()?
+            find_interpreter(
+                self.bridge,
+                self.user_interpreters,
+                self.target,
+                self.requires_python,
+                self.generate_import_lib,
+            )
         } else {
             // Default: use PYO3_PYTHON or system python
             let python = self.get_default_python();
-            self.find_specified_interpreters_from(&[python])?
-        };
-        Ok(interpreters)
-    }
-
-    /// Auto-discover all interpreters on the system.
-    fn auto_discover(&self) -> Result<Vec<PythonInterpreter>> {
-        PythonInterpreter::find_all(self.target, self.bridge, self.requires_python)
-            .context("Finding python interpreters failed")
-    }
-
-    /// Find interpreters from user-specified list, with sysconfig fallback.
-    fn find_specified_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
-        find_interpreter(
-            self.bridge,
-            self.user_interpreters,
-            self.target,
-            self.requires_python,
-            self.generate_import_lib,
-        )
-    }
-
-    /// Find interpreters from a given list, with sysconfig fallback.
-    fn find_specified_interpreters_from(
-        &self,
-        interpreters: &[PathBuf],
-    ) -> Result<Vec<PythonInterpreter>> {
-        find_interpreter(
-            self.bridge,
-            interpreters,
-            self.target,
-            self.requires_python,
-            self.generate_import_lib,
-        )
+            find_interpreter(
+                self.bridge,
+                &[python],
+                self.target,
+                self.requires_python,
+                self.generate_import_lib,
+            )
+        }
     }
 
     /// Try to find host interpreters, returning Err if none found.
@@ -684,7 +646,7 @@ fn find_interpreter_in_host(
 }
 
 /// Find python interpreters in the bundled sysconfig.
-pub(crate) fn find_interpreter_in_sysconfig(
+fn find_interpreter_in_sysconfig(
     bridge: &BridgeModel,
     interpreter: &[PathBuf],
     target: &Target,
@@ -775,7 +737,7 @@ pub(crate) fn find_interpreter_in_sysconfig(
 ///
 /// For example, `.cpython-314-x86_64-linux-gnu.so` becomes
 /// `cpython-314-x86_64-linux-gnu`.
-pub(crate) fn soabi_from_ext_suffix(ext_suffix: &str) -> Option<String> {
+fn soabi_from_ext_suffix(ext_suffix: &str) -> Option<String> {
     let s = ext_suffix.strip_prefix('.')?;
     let s = s
         .strip_suffix(".so")

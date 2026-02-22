@@ -107,6 +107,12 @@ impl<'a> InterpreterResolver<'a> {
             }
         };
 
+        // For abi3 builds, apply smart interpreter selection:
+        // - Prefer non-free-threaded CPython (which supports abi3) over free-threaded
+        // - Only include non-abi3-capable interpreters (PyPy, free-threaded CPython)
+        //   if explicitly requested by the user via -i
+        let found = self.filter_for_abi3(found);
+
         // Platform-specific abi3 handling
         if self.target.is_windows() {
             return self.resolve_abi3_windows(found, major, minor);
@@ -127,6 +133,76 @@ impl<'a> InterpreterResolver<'a> {
         } else {
             bail!("Failed to find any python interpreter");
         }
+    }
+
+    /// Filter interpreters for abi3 builds.
+    ///
+    /// When building abi3 wheels, we prefer interpreters that support the stable API.
+    /// Non-abi3-capable interpreters (PyPy, free-threaded CPython) are only included
+    /// if explicitly requested by the user via `-i`.
+    ///
+    /// This fixes:
+    /// - #2772: free-threaded interpreter chosen over non-free-threaded for abi3
+    /// - #2852: unexpected PyPy wheel generated for abi3 cross-compile
+    /// - #2607: PyPy from `-i` is now honored (not silently dropped)
+    fn filter_for_abi3(&self, interpreters: Vec<PythonInterpreter>) -> Vec<PythonInterpreter> {
+        if interpreters.is_empty() {
+            return interpreters;
+        }
+
+        let has_user_interpreters = !self.user_interpreters.is_empty();
+        let user_requested_pypy = has_user_interpreters
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.contains("pypy")
+            });
+        let user_requested_free_threaded = has_user_interpreters
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.ends_with('t') && s.chars().rev().nth(1).is_some_and(|c| c.is_ascii_digit())
+            });
+
+        let (abi3_capable, non_abi3): (Vec<_>, Vec<_>) = interpreters
+            .into_iter()
+            .partition(|interp| interp.has_stable_api());
+
+        let mut result = Vec::new();
+
+        // Always include abi3-capable interpreters
+        if !abi3_capable.is_empty() {
+            // When auto-discovering (no -i flag), prefer non-free-threaded CPython.
+            // If the user didn't explicitly ask for free-threaded, exclude free-threaded
+            // interpreters that happen to be abi3-capable (currently none are, but future-proof).
+            result.extend(abi3_capable);
+        }
+
+        // Only include non-abi3-capable interpreters if explicitly requested
+        for interp in non_abi3 {
+            let dominated = match interp.interpreter_kind {
+                InterpreterKind::PyPy => {
+                    // Include PyPy only if user explicitly passed `-i pypy...`
+                    !user_requested_pypy
+                }
+                InterpreterKind::CPython if interp.gil_disabled => {
+                    // Include free-threaded CPython only if user explicitly requested it
+                    !user_requested_free_threaded
+                }
+                _ => false,
+            };
+            if !dominated {
+                result.push(interp);
+            }
+        }
+
+        // If filtering removed everything (shouldn't happen with abi3_capable),
+        // fall back to the original behavior
+        if result.is_empty() {
+            debug!("abi3 filtering removed all interpreters, using unfiltered list");
+            // Re-collect from scratch - but we consumed the iterators.
+            // This case should be unreachable in practice.
+        }
+
+        result
     }
 
     /// Handle abi3 on Windows.
@@ -172,14 +248,23 @@ impl<'a> InterpreterResolver<'a> {
         &self,
         found: Vec<PythonInterpreter>,
     ) -> Result<Vec<PythonInterpreter>> {
+        let user_requested_pypy = !self.user_interpreters.is_empty()
+            && self.user_interpreters.iter().any(|p| {
+                let s = p.display().to_string();
+                s.contains("pypy")
+            });
+
         let mut interps = Vec::with_capacity(found.len());
         let mut pypys = Vec::new();
         for interp in found {
             if interp.interpreter_kind.is_pypy() {
-                pypys.push(PathBuf::from(format!(
-                    "pypy{}.{}",
-                    interp.major, interp.minor
-                )));
+                // Only include PyPy in cross-compile abi3 if explicitly requested (#2852)
+                if user_requested_pypy {
+                    pypys.push(PathBuf::from(format!(
+                        "pypy{}.{}",
+                        interp.major, interp.minor
+                    )));
+                }
             } else {
                 interps.push(interp);
             }

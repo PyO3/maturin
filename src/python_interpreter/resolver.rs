@@ -124,13 +124,12 @@ impl InterpreterSpec {
             (InterpreterKind::CPython, s)
         } else if Path::new(s).is_file() {
             bail!(
-                "Python interpreter should be a kind of interpreter \
-                 (e.g. 'python3.14' or 'pypy3.11') when cross-compiling, \
-                 got path to interpreter: {s}"
+                "Expected a python interpreter name \
+                 (e.g. 'python3.14' or 'pypy3.11'), got path: {s}"
             );
         } else {
             bail!(
-                "Unsupported Python interpreter for cross-compilation: {s}; \
+                "Unsupported Python interpreter: {s}; \
                  supported interpreters are pypy, graalpy, and python (cpython)"
             );
         };

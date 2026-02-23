@@ -264,6 +264,10 @@ fn find_all_windows(
 
 /// Checks whether the given command is a python interpreter and returns a
 /// [`PythonInterpreter`] if that is the case.
+///
+/// The `bridge` parameter is threaded through to [`fun_with_abiflags`] which
+/// skips the platform-system mismatch check for cffi bindings (cffi doesn't
+/// require the interpreter's platform to match the build target).
 #[instrument(skip_all, fields(executable = %executable.as_ref().display()))]
 pub fn check_executable(
     executable: impl AsRef<Path>,

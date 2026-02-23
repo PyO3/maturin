@@ -527,7 +527,7 @@ fn run() -> Result<()> {
         Command::ListPython { target } => {
             let found = if target.is_some() {
                 let target = Target::from_target_triple(target.as_ref())?;
-                maturin::python_interpreter::find_by_target(&target, None, None)
+                maturin::python_interpreter::lookup_target(&target, None, None)
             } else {
                 let target = Target::from_target_triple(None)?;
                 // We don't know the targeted bindings yet, so we use the most lenient

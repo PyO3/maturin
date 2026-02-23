@@ -1,5 +1,5 @@
 pub use self::config::InterpreterConfig;
-pub use self::discovery::{check_executable, check_executables, find_all, find_by_target};
+pub use self::discovery::{check_executable, check_executables, find_all, lookup_target};
 use crate::auditwheel::PlatformTag;
 use crate::{BuildContext, Target};
 use anyhow::Result;

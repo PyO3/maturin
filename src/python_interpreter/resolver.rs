@@ -735,7 +735,7 @@ impl<'a> InterpreterResolver<'a> {
     /// corresponding sysconfig.
     fn find_in_sysconfig(&self, interpreters: &[PathBuf]) -> Result<Vec<PythonInterpreter>> {
         if interpreters.is_empty() {
-            return Ok(super::find_by_target(
+            return Ok(super::lookup_target(
                 self.target,
                 self.requires_python,
                 Some(self.bridge),

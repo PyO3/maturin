@@ -347,8 +347,11 @@ pub fn check_executable(
     from_metadata_message(executable, target, bridge, message)
 }
 
-/// Find all available python interpreters for a given target from bundled sysconfig.
-pub fn find_by_target(
+/// Look up Python interpreters for a given target from maturin's bundled sysconfig data.
+///
+/// This does **not** discover interpreters on disk — it returns non-runnable
+/// `PythonInterpreter` values constructed from bundled sysconfig metadata.
+pub fn lookup_target(
     target: &Target,
     requires_python: Option<&VersionSpecifiers>,
     bridge: Option<&BridgeModel>,
@@ -673,9 +676,9 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn test_find_interpreter_by_target() {
+    fn test_lookup_target() {
         let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
-        let pythons = find_by_target(&target, None, None)
+        let pythons = lookup_target(&target, None, None)
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
@@ -698,7 +701,7 @@ mod tests {
         expected.assert_debug_eq(&pythons);
 
         // pyo3 0.23+ should find CPython 3.13t
-        let pythons = find_by_target(
+        let pythons = lookup_target(
             &target,
             None,
             Some(&BridgeModel::PyO3(PyO3 {
@@ -730,7 +733,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        let pythons = find_by_target(
+        let pythons = lookup_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
             None,
@@ -755,7 +758,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        let pythons = find_by_target(
+        let pythons = lookup_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.10").unwrap()),
             None,
@@ -776,7 +779,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        let pythons = find_by_target(
+        let pythons = lookup_target(
             &target,
             Some(&VersionSpecifiers::from_str(">=3.8").unwrap()),
             Some(&BridgeModel::PyO3(PyO3 {

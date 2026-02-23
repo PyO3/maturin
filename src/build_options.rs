@@ -15,7 +15,7 @@ use cargo_metadata::Metadata;
 use cargo_options::heading;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::env;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -321,7 +321,6 @@ impl BuildContextBuilder {
         )?;
         let pyproject = pyproject_toml.as_ref();
 
-        let extra_pyo3_features = pyo3_features_from_conditional(pyproject);
         let bridge = find_bridge(
             &cargo_metadata,
             build_options.bindings.as_deref().or_else(|| {
@@ -332,7 +331,7 @@ impl BuildContextBuilder {
                     x.bindings()
                 })
             }),
-            &extra_pyo3_features,
+            pyproject,
         )?;
         debug!("Resolved bridge model: {:?}", bridge);
 
@@ -789,40 +788,6 @@ fn filter_cargo_targets(
     Ok(targets)
 }
 
-/// Extract pyo3/pyo3-ffi feature names from conditional features in pyproject.toml.
-///
-/// For a conditional feature like `pyo3/abi3-py311`, this extracts `abi3-py311`
-/// for the corresponding binding crate.
-pub fn pyo3_features_from_conditional(
-    pyproject: Option<&crate::PyProjectToml>,
-) -> HashMap<&'static str, Vec<String>> {
-    let mut extra: HashMap<&'static str, Vec<String>> = HashMap::new();
-    let features = match pyproject
-        .and_then(|p| p.maturin())
-        .and_then(|m| m.features.as_ref())
-    {
-        Some(f) => f,
-        None => return extra,
-    };
-    let crate_names: &[&'static str] = &["pyo3", "pyo3-ffi"];
-    for spec in features {
-        let feature = match spec {
-            FeatureSpec::Plain(_) => continue,
-            FeatureSpec::Conditional { feature, .. } => feature,
-        };
-        for &crate_name in crate_names {
-            let prefix = format!("{crate_name}/");
-            if let Some(feat_name) = feature.strip_prefix(&prefix) {
-                extra
-                    .entry(crate_name)
-                    .or_default()
-                    .push(feat_name.to_string());
-            }
-        }
-    }
-    extra
-}
-
 /// We need to pass the global flags to cargo metadata
 /// (https://github.com/PyO3/maturin/issues/211 and https://github.com/PyO3/maturin/issues/472),
 /// but we can't pass all the extra args, as e.g. `--target` isn't supported, so this tries to
@@ -1022,13 +987,12 @@ mod tests {
             .exec()
             .unwrap();
 
-        let no_extra = HashMap::new();
         assert!(matches!(
-            find_bridge(&pyo3_mixed, None, &no_extra),
+            find_bridge(&pyo3_mixed, None, None),
             Ok(BridgeModel::PyO3 { .. })
         ));
         assert!(matches!(
-            find_bridge(&pyo3_mixed, Some("pyo3"), &no_extra),
+            find_bridge(&pyo3_mixed, Some("pyo3"), None),
             Ok(BridgeModel::PyO3 { .. })
         ));
     }
@@ -1057,12 +1021,8 @@ mod tests {
                 },
             }),
         });
-        let no_extra = HashMap::new();
-        assert_eq!(find_bridge(&pyo3_pure, None, &no_extra).unwrap(), bridge);
-        assert_eq!(
-            find_bridge(&pyo3_pure, Some("pyo3"), &no_extra).unwrap(),
-            bridge
-        );
+        assert_eq!(find_bridge(&pyo3_pure, None, None).unwrap(), bridge);
+        assert_eq!(find_bridge(&pyo3_pure, Some("pyo3"), None).unwrap(), bridge);
     }
 
     #[test]
@@ -1072,8 +1032,7 @@ mod tests {
             .exec()
             .unwrap();
 
-        let no_extra = HashMap::new();
-        assert!(find_bridge(&pyo3_pure, None, &no_extra).is_err());
+        assert!(find_bridge(&pyo3_pure, None, None).is_err());
 
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
@@ -1082,7 +1041,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            find_bridge(&pyo3_pure, None, &no_extra).unwrap(),
+            find_bridge(&pyo3_pure, None, None).unwrap(),
             BridgeModel::PyO3 { .. }
         ));
     }
@@ -1094,17 +1053,16 @@ mod tests {
             .exec()
             .unwrap();
 
-        let no_extra = HashMap::new();
         assert_eq!(
-            find_bridge(&cffi_pure, Some("cffi"), &no_extra).unwrap(),
+            find_bridge(&cffi_pure, Some("cffi"), None).unwrap(),
             BridgeModel::Cffi
         );
         assert_eq!(
-            find_bridge(&cffi_pure, None, &no_extra).unwrap(),
+            find_bridge(&cffi_pure, None, None).unwrap(),
             BridgeModel::Cffi
         );
 
-        assert!(find_bridge(&cffi_pure, Some("pyo3"), &no_extra).is_err());
+        assert!(find_bridge(&cffi_pure, Some("pyo3"), None).is_err());
     }
 
     #[test]
@@ -1114,28 +1072,27 @@ mod tests {
             .exec()
             .unwrap();
 
-        let no_extra = HashMap::new();
         assert_eq!(
-            find_bridge(&hello_world, Some("bin"), &no_extra).unwrap(),
+            find_bridge(&hello_world, Some("bin"), None).unwrap(),
             BridgeModel::Bin(None)
         );
         assert_eq!(
-            find_bridge(&hello_world, None, &no_extra).unwrap(),
+            find_bridge(&hello_world, None, None).unwrap(),
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("pyo3"), &no_extra).is_err());
+        assert!(find_bridge(&hello_world, Some("pyo3"), None).is_err());
 
         let pyo3_bin = MetadataCommand::new()
             .manifest_path(Path::new("test-crates/pyo3-bin").join("Cargo.toml"))
             .exec()
             .unwrap();
         assert!(matches!(
-            find_bridge(&pyo3_bin, Some("bin"), &no_extra).unwrap(),
+            find_bridge(&pyo3_bin, Some("bin"), None).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
         assert!(matches!(
-            find_bridge(&pyo3_bin, None, &no_extra).unwrap(),
+            find_bridge(&pyo3_bin, None, None).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
     }

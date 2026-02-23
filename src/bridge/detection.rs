@@ -5,6 +5,8 @@
 //! whether abi3 is enabled, and whether `generate-import-lib` is active.
 
 use super::{Abi3Version, BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw};
+use crate::PyProjectToml;
+use crate::pyproject_toml::FeatureSpec;
 use anyhow::{Context, Result, bail};
 use cargo_metadata::{CrateType, Metadata, Node, PackageId, TargetKind};
 use std::collections::{HashMap, HashSet};
@@ -20,8 +22,9 @@ const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3
 pub fn find_bridge(
     cargo_metadata: &Metadata,
     bridge: Option<&str>,
-    extra_pyo3_features: &HashMap<&str, Vec<String>>,
+    pyproject: Option<&PyProjectToml>,
 ) -> Result<BridgeModel> {
+    let extra_pyo3_features = pyo3_features_from_conditional(pyproject);
     let deps = current_crate_dependencies(cargo_metadata)?;
     let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
         .packages
@@ -119,7 +122,7 @@ pub fn find_bridge(
                 }
             }
 
-            return if let Some(abi3_version) = has_abi3(&deps, extra_pyo3_features)? {
+            return if let Some(abi3_version) = has_abi3(&deps, &extra_pyo3_features)? {
                 eprintln!("🔗 Found {lib} bindings with abi3 support");
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
@@ -298,4 +301,35 @@ fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str,
                 .then_some((cargo_metadata[id].name.as_ref(), node))
         })
         .collect())
+}
+
+/// Extract pyo3/pyo3-ffi feature names from conditional features in pyproject.toml.
+///
+/// For a conditional feature like `pyo3/abi3-py311`, this extracts `abi3-py311`
+/// for the corresponding binding crate.
+fn pyo3_features_from_conditional(
+    pyproject: Option<&PyProjectToml>,
+) -> HashMap<&'static str, Vec<String>> {
+    let mut extra: HashMap<&'static str, Vec<String>> = HashMap::new();
+    let features = match pyproject
+        .and_then(|p| p.maturin())
+        .and_then(|m| m.features.clone())
+    {
+        Some(f) => f,
+        None => return extra,
+    };
+    let (_plain, conditional) = FeatureSpec::split(features);
+    let crate_names: &[&'static str] = &["pyo3", "pyo3-ffi"];
+    for cond in &conditional {
+        for &crate_name in crate_names {
+            let prefix = format!("{crate_name}/");
+            if let Some(feat_name) = cond.feature.strip_prefix(&prefix) {
+                extra
+                    .entry(crate_name)
+                    .or_default()
+                    .push(feat_name.to_string());
+            }
+        }
+    }
+    extra
 }

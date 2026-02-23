@@ -404,25 +404,38 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Discover interpreters on the host machine.
     ///
-    /// For abi3 builds, falls back to sysconfig if real interpreters aren't found.
+    /// 1. Try to find real interpreters (auto-discover or check user-specified)
+    /// 2. Fall back to bundled sysconfig for any that aren't found
+    /// 3. For abi3 builds, also try a broader sysconfig fallback if nothing works
     fn discover_native(&self, fixed_abi3: Option<(u8, u8)>) -> Result<DiscoveryResult> {
-        match self.find_native_interpreters() {
-            Ok(interps) => Ok((Candidate::from_interpreters(interps), None)),
-            Err(err) if fixed_abi3.is_some() => {
-                // Abi3: try sysconfig fallback before giving up
-                if self.target.is_windows() && !self.generate_import_lib {
-                    return Err(err.context(
-                        "Need a Python interpreter to compile for Windows without \
-                         PyO3's `generate-import-lib` feature",
-                    ));
-                }
-                let sysconfig_interps = self
-                    .find_in_sysconfig(self.user_interpreters)
-                    .unwrap_or_default();
-                if sysconfig_interps.is_empty() && !self.user_interpreters.is_empty() {
-                    return Err(err);
-                }
-                Ok((
+        // --- Step 1+2: Find real interpreters with per-interpreter sysconfig fallback ---
+        let found = if self.find_interpreter {
+            super::discovery::find_all(self.target, self.bridge, self.requires_python)
+                .context("Finding python interpreters failed")?
+        } else {
+            self.find_specified_interpreters()?
+        };
+
+        if !found.is_empty() {
+            return Ok((Candidate::from_interpreters(found), None));
+        }
+
+        // --- Step 3: Nothing found — try abi3 sysconfig fallback ---
+        if fixed_abi3.is_some() {
+            if self.target.is_windows() && !self.generate_import_lib {
+                bail!(
+                    "Need a Python interpreter to compile for Windows without \
+                     PyO3's `generate-import-lib` feature"
+                );
+            }
+            let sysconfig_interps = self
+                .find_in_sysconfig(self.user_interpreters)
+                .unwrap_or_default();
+            // If the user specified interpreters and sysconfig didn't find them
+            // either, fall through to the error below rather than silently
+            // returning an empty list.
+            if !sysconfig_interps.is_empty() || self.user_interpreters.is_empty() {
+                return Ok((
                     sysconfig_interps
                         .into_iter()
                         .map(|interpreter| Candidate {
@@ -431,40 +444,43 @@ impl<'a> InterpreterResolver<'a> {
                         })
                         .collect(),
                     None,
-                ))
+                ));
             }
-            Err(err) => Err(err),
+        }
+
+        // --- Error: nothing found anywhere ---
+        if self.find_interpreter {
+            if let Some(requires_python) = self.requires_python {
+                bail!(
+                    "Couldn't find any python interpreters with {requires_python}. \
+                     Please specify at least one with -i"
+                );
+            } else {
+                bail!(
+                    "Couldn't find any python interpreters. \
+                     Please specify at least one with -i"
+                );
+            }
+        } else {
+            let default_python;
+            let to_check: &[PathBuf] = if !self.user_interpreters.is_empty() {
+                self.user_interpreters
+            } else {
+                default_python = self.get_default_python();
+                std::slice::from_ref(&default_python)
+            };
+            let interps_str = to_check
+                .iter()
+                .map(|path| format!("'{}'", path.display()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!("Couldn't find any python interpreters from {interps_str}.");
         }
     }
 
-    /// Find native interpreters: auto-discover, user-specified, or default.
-    ///
-    /// Checks executables on the host first, falling back to bundled sysconfig
-    /// for any that aren't found.
-    fn find_native_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
-        if self.find_interpreter {
-            let interpreters =
-                super::discovery::find_all(self.target, self.bridge, self.requires_python)
-                    .context("Finding python interpreters failed")?;
-            if interpreters.is_empty() {
-                // Bail here so that `discover_native` can catch this error and
-                // try the bundled sysconfig fallback for abi3 builds.
-                if let Some(requires_python) = self.requires_python {
-                    bail!(
-                        "Couldn't find any python interpreters with {requires_python}. \
-                         Please specify at least one with -i"
-                    );
-                } else {
-                    bail!(
-                        "Couldn't find any python interpreters. \
-                         Please specify at least one with -i"
-                    );
-                }
-            }
-            return Ok(interpreters);
-        }
-
-        // Determine what to check: user-specified or default python
+    /// Check user-specified (or default) interpreters, with per-interpreter
+    /// sysconfig fallback for any that aren't found on disk.
+    fn find_specified_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
         let default_python;
         let to_check: &[PathBuf] = if !self.user_interpreters.is_empty() {
             self.user_interpreters
@@ -473,7 +489,6 @@ impl<'a> InterpreterResolver<'a> {
             std::slice::from_ref(&default_python)
         };
 
-        // Try to find each interpreter, tracking which ones are missing
         let mut found = Vec::new();
         let mut missing = Vec::new();
         for interp in to_check {
@@ -483,11 +498,8 @@ impl<'a> InterpreterResolver<'a> {
             }
         }
 
-        // Fallback to bundled sysconfig for missing interpreters
         if !missing.is_empty() {
             let sysconfig_interps = self.find_in_sysconfig(&missing)?;
-
-            // Can only use sysconfig-derived interpreter on windows if generating the import lib
             if !sysconfig_interps.is_empty()
                 && self.target.is_windows()
                 && !self.generate_import_lib
@@ -502,17 +514,7 @@ impl<'a> InterpreterResolver<'a> {
                      PyO3's `generate-import-lib` feature"
                 );
             }
-
             found.extend(sysconfig_interps);
-        }
-
-        if found.is_empty() {
-            let interps_str = to_check
-                .iter()
-                .map(|path| format!("'{}'", path.display()))
-                .collect::<Vec<_>>()
-                .join(", ");
-            bail!("Couldn't find any python interpreters from {interps_str}.");
         }
 
         Ok(found)

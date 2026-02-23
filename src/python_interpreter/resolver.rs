@@ -122,16 +122,10 @@ impl InterpreterSpec {
             )
         } else if s.starts_with(|c: char| c.is_ascii_digit()) {
             (InterpreterKind::CPython, s)
-        } else if Path::new(s).is_file() {
-            bail!(
-                "Expected a python interpreter name \
-                 (e.g. 'python3.14' or 'pypy3.11'), got path: {s}"
-            );
         } else {
-            bail!(
-                "Unsupported Python interpreter: {s}; \
-                 supported interpreters are pypy, graalpy, and python (cpython)"
-            );
+            // File paths or unrecognized names (e.g. "jython3.9") are not
+            // interpreter specs — return None so callers can handle them.
+            return Ok(None);
         };
 
         if ver_str.is_empty() {
@@ -980,11 +974,13 @@ mod tests {
     }
 
     #[test]
-    fn test_interpreter_spec_unsupported_name() {
-        let err = InterpreterSpec::parse("jython3.9").unwrap_err();
+    fn test_interpreter_spec_unrecognized_name() {
+        // Unrecognized interpreter names return None, not an error
+        assert!(InterpreterSpec::parse("jython3.9").unwrap().is_none());
         assert!(
-            err.to_string().contains("Unsupported"),
-            "expected unsupported error: {err}"
+            InterpreterSpec::parse("/usr/bin/python3")
+                .unwrap()
+                .is_none()
         );
     }
 

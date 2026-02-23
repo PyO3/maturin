@@ -173,10 +173,6 @@ pub fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
     Ok(false)
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
 /// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
 fn has_abi3(
     deps: &HashMap<&str, &Node>,

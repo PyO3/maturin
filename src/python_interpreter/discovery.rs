@@ -43,10 +43,6 @@ pub(super) struct InterpreterMetadataMessage {
     pub gil_disabled: bool,
 }
 
-// ---------------------------------------------------------------------------
-// Windows discovery
-// ---------------------------------------------------------------------------
-
 /// Manages interpreter discovery on Windows.
 ///
 /// Replaces the old `maybe_add_interp!` macro with explicit state,
@@ -258,10 +254,6 @@ fn find_all_windows(
     Ok(interpreters)
 }
 
-// ---------------------------------------------------------------------------
-// Cross-platform discovery
-// ---------------------------------------------------------------------------
-
 /// Checks whether the given command is a python interpreter and returns a
 /// [`PythonInterpreter`] if that is the case.
 ///
@@ -269,7 +261,7 @@ fn find_all_windows(
 /// skips the platform-system mismatch check for cffi bindings (cffi doesn't
 /// require the interpreter's platform to match the build target).
 #[instrument(skip_all, fields(executable = %executable.as_ref().display()))]
-pub fn check_executable(
+pub(super) fn check_executable(
     executable: impl AsRef<Path>,
     target: &Target,
     bridge: &BridgeModel,
@@ -355,7 +347,7 @@ pub fn check_executable(
 ///
 /// This does **not** discover interpreters on disk — it returns non-runnable
 /// `PythonInterpreter` values constructed from bundled sysconfig metadata.
-pub fn lookup_target(
+pub(super) fn lookup_target(
     target: &Target,
     requires_python: Option<&VersionSpecifiers>,
     bridge: Option<&BridgeModel>,
@@ -416,7 +408,7 @@ pub fn lookup_target(
 /// We have two filters: The optional requires-python from the pyproject.toml and minimum python
 /// minor either from the bindings (i.e. Cargo.toml `abi3-py{major}{minor}`) or the global
 /// default minimum minor version
-pub fn find_all(
+pub(super) fn find_all(
     target: &Target,
     bridge: &BridgeModel,
     requires_python: Option<&VersionSpecifiers>,
@@ -492,7 +484,7 @@ pub fn find_all(
 /// Checks that given list of executables are all valid python interpreters,
 /// determines the abiflags and versions of those interpreters and
 /// returns them as [PythonInterpreter]
-pub fn check_executables(
+pub(super) fn check_executables(
     executables: &[PathBuf],
     target: &Target,
     bridge: &BridgeModel,
@@ -524,10 +516,6 @@ pub fn check_executables(
 
     Ok(available_versions)
 }
-
-// ---------------------------------------------------------------------------
-// Instance methods on PythonInterpreter
-// ---------------------------------------------------------------------------
 
 impl PythonInterpreter {
     /// Run a python script using this Python interpreter.
@@ -571,10 +559,6 @@ impl PythonInterpreter {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 /// Configure a `PythonInterpreter` from the metadata message.
 ///

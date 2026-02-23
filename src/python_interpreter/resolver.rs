@@ -27,10 +27,6 @@ use tracing::debug;
 
 use crate::bridge::{Abi3Version, PyO3};
 
-// ---------------------------------------------------------------------------
-// Candidate types
-// ---------------------------------------------------------------------------
-
 /// How a candidate Python interpreter was discovered.
 ///
 /// Tracks provenance so the pipeline can make informed decisions
@@ -88,10 +84,6 @@ impl Candidate {
 /// `host_python` is only set during cross-compilation (from `PYO3_CROSS_LIB_DIR`)
 /// and is used by the caller to set `PYO3_PYTHON` / `PYTHON_SYS_EXECUTABLE`.
 type DiscoveryResult = (Vec<Candidate>, Option<PythonInterpreter>);
-
-// ---------------------------------------------------------------------------
-// Interpreter spec (parsed from user-provided strings)
-// ---------------------------------------------------------------------------
 
 /// A parsed interpreter specification from a user-provided string.
 ///
@@ -188,10 +180,6 @@ impl InterpreterSpec {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Resolver
-// ---------------------------------------------------------------------------
-
 /// Encapsulates all inputs and logic for resolving Python interpreters.
 ///
 /// Instead of 6+ overlapping free functions, this struct provides a single
@@ -241,10 +229,6 @@ impl<'a> InterpreterResolver<'a> {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Unified PyO3 pipeline
-    // -----------------------------------------------------------------------
-
     /// Resolve interpreters for pyo3/pyo3-ffi bindings (including Bin(Some(pyo3))).
     ///
     /// Follows a unified pipeline regardless of native/cross, abi3/non-abi3:
@@ -283,10 +267,6 @@ impl<'a> InterpreterResolver<'a> {
 
         Ok((interpreters, host_python))
     }
-
-    // -----------------------------------------------------------------------
-    // Discovery: unified entry point
-    // -----------------------------------------------------------------------
 
     /// Discover interpreter candidates based on the build context.
     ///
@@ -329,10 +309,6 @@ impl<'a> InterpreterResolver<'a> {
         self.discover_native(fixed_abi3)
     }
 
-    // -----------------------------------------------------------------------
-    // Discovery: cross-compile with PYO3_CROSS_LIB_DIR
-    // -----------------------------------------------------------------------
-
     /// Discover from `PYO3_CROSS_LIB_DIR` (build-details.json or sysconfigdata).
     fn discover_from_cross_lib_dir(&self, cross_lib_path: &Path) -> Result<DiscoveryResult> {
         if let Some(build_details_path) = find_build_details(cross_lib_path) {
@@ -372,10 +348,6 @@ impl<'a> InterpreterResolver<'a> {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Discovery: cross-compile without PYO3_CROSS_LIB_DIR (non-abi3)
-    // -----------------------------------------------------------------------
-
     /// Discover interpreters for cross-compilation without `PYO3_CROSS_LIB_DIR`.
     ///
     /// Uses maturin's bundled sysconfig data to construct non-runnable interpreters
@@ -391,7 +363,7 @@ impl<'a> InterpreterResolver<'a> {
         // Check if user-specified interpreters are valid file paths
         for interp in self.user_interpreters {
             if interp.components().count() > 1
-                && super::check_executable(interp, self.target, self.bridge)?.is_none()
+                && super::discovery::check_executable(interp, self.target, self.bridge)?.is_none()
             {
                 bail!("{} is not a valid python interpreter", interp.display());
             }
@@ -421,10 +393,6 @@ impl<'a> InterpreterResolver<'a> {
             None,
         ))
     }
-
-    // -----------------------------------------------------------------------
-    // Discovery: native (also used for abi3 cross without lib dir)
-    // -----------------------------------------------------------------------
 
     /// Discover interpreters on the host machine.
     ///
@@ -467,7 +435,7 @@ impl<'a> InterpreterResolver<'a> {
     /// for any that aren't found.
     fn find_native_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
         if self.find_interpreter {
-            return super::find_all(self.target, self.bridge, self.requires_python)
+            return super::discovery::find_all(self.target, self.bridge, self.requires_python)
                 .context("Finding python interpreters failed");
         }
 
@@ -491,7 +459,7 @@ impl<'a> InterpreterResolver<'a> {
         let mut found = Vec::new();
         let mut missing = Vec::new();
         for interp in to_check {
-            match super::check_executable(interp.clone(), self.target, self.bridge)? {
+            match super::discovery::check_executable(interp.clone(), self.target, self.bridge)? {
                 Some(interp) => found.push(interp),
                 None => missing.push(interp.clone()),
             }
@@ -531,10 +499,6 @@ impl<'a> InterpreterResolver<'a> {
 
         Ok(found)
     }
-
-    // -----------------------------------------------------------------------
-    // Filtering: abi3 policy
-    // -----------------------------------------------------------------------
 
     /// Filter candidates for abi3 builds.
     ///
@@ -599,10 +563,6 @@ impl<'a> InterpreterResolver<'a> {
             InterpreterSpec::try_parse_filename(&name).is_some_and(|s| s.abiflags == "t")
         })
     }
-
-    // -----------------------------------------------------------------------
-    // Finalization
-    // -----------------------------------------------------------------------
 
     /// Finalize abi3 resolution: apply platform-specific fallbacks.
     fn finalize_abi3(
@@ -700,16 +660,12 @@ impl<'a> InterpreterResolver<'a> {
         Ok(interpreters)
     }
 
-    // -----------------------------------------------------------------------
-    // Shared helpers
-    // -----------------------------------------------------------------------
-
     /// Find a host Python interpreter for cross-compilation.
     fn find_host_python(&self) -> Result<PythonInterpreter> {
         let interpreters = if !self.user_interpreters.is_empty() {
-            super::check_executables(self.user_interpreters, self.target, self.bridge)?
+            super::discovery::check_executables(self.user_interpreters, self.target, self.bridge)?
         } else {
-            super::find_all(self.target, self.bridge, self.requires_python)
+            super::discovery::find_all(self.target, self.bridge, self.requires_python)
                 .context("Finding python interpreters failed")?
         };
 
@@ -740,7 +696,7 @@ impl<'a> InterpreterResolver<'a> {
     /// corresponding sysconfig.
     fn find_in_sysconfig(&self, interpreters: &[PathBuf]) -> Result<Vec<PythonInterpreter>> {
         if interpreters.is_empty() {
-            return Ok(super::lookup_target(
+            return Ok(super::discovery::lookup_target(
                 self.target,
                 self.requires_python,
                 Some(self.bridge),
@@ -848,7 +804,7 @@ impl<'a> InterpreterResolver<'a> {
             "Failed to find a python interpreter from `{}`",
             executable.display()
         );
-        let interp = super::check_executable(executable, self.target, self.bridge)
+        let interp = super::discovery::check_executable(executable, self.target, self.bridge)
             .context(format_err!(err_message.clone()))?
             .ok_or_else(|| format_err!(err_message))?;
         eprintln!("🐍 Using {interp} to generate the {bridge_name} bindings");

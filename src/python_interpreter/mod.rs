@@ -1,5 +1,4 @@
 pub use self::config::InterpreterConfig;
-pub use self::discovery::{check_executable, check_executables, find_all, lookup_target};
 use crate::auditwheel::PlatformTag;
 use crate::{BuildContext, Target};
 use anyhow::Result;
@@ -23,10 +22,6 @@ pub const MINIMUM_PYPY_MINOR: usize = 8;
 pub const MAXIMUM_PYTHON_MINOR: usize = 14;
 /// Maximum supported PyPy minor version.
 pub const MAXIMUM_PYPY_MINOR: usize = 11;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 /// The kind of Python interpreter (CPython, PyPy, or GraalPy).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, serde::Deserialize, clap::ValueEnum)]
@@ -80,10 +75,6 @@ impl FromStr for InterpreterKind {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// PythonInterpreter
-// ---------------------------------------------------------------------------
 
 /// The location and version of an interpreter
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -278,6 +269,53 @@ impl PythonInterpreter {
             implementation_name: "cpython".to_string(),
             soabi: None,
         }
+    }
+
+    /// Checks whether the given command is a python interpreter and returns a
+    /// [`PythonInterpreter`] if that is the case.
+    ///
+    /// The `bridge` parameter is used to skip the platform-system mismatch
+    /// check for cffi bindings.
+    pub fn check_executable(
+        executable: impl AsRef<std::path::Path>,
+        target: &Target,
+        bridge: &crate::BridgeModel,
+    ) -> Result<Option<Self>> {
+        discovery::check_executable(executable, target, bridge)
+    }
+
+    /// Checks that given list of executables are all valid python interpreters,
+    /// determines the abiflags and versions of those interpreters and
+    /// returns them as [`PythonInterpreter`]s.
+    pub fn check_executables(
+        executables: &[PathBuf],
+        target: &Target,
+        bridge: &crate::BridgeModel,
+    ) -> Result<Vec<Self>> {
+        discovery::check_executables(executables, target, bridge)
+    }
+
+    /// Tries to find all installed python versions using the heuristic for the
+    /// given platform.
+    pub fn find_all(
+        target: &Target,
+        bridge: &crate::BridgeModel,
+        requires_python: Option<&pep440_rs::VersionSpecifiers>,
+    ) -> Result<Vec<Self>> {
+        discovery::find_all(target, bridge, requires_python)
+    }
+
+    /// Look up Python interpreters for a given target from maturin's bundled
+    /// sysconfig data.
+    ///
+    /// This does **not** discover interpreters on disk — it returns non-runnable
+    /// `PythonInterpreter` values constructed from bundled sysconfig metadata.
+    pub fn lookup_target(
+        target: &Target,
+        requires_python: Option<&pep440_rs::VersionSpecifiers>,
+        bridge: Option<&crate::BridgeModel>,
+    ) -> Vec<Self> {
+        discovery::lookup_target(target, requires_python, bridge)
     }
 
     /// Whether this Python interpreter support portable manylinux/musllinux wheels

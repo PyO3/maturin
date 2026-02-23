@@ -447,6 +447,8 @@ impl<'a> InterpreterResolver<'a> {
                 super::discovery::find_all(self.target, self.bridge, self.requires_python)
                     .context("Finding python interpreters failed")?;
             if interpreters.is_empty() {
+                // Bail here so that `discover_native` can catch this error and
+                // try the bundled sysconfig fallback for abi3 builds.
                 if let Some(requires_python) = self.requires_python {
                     bail!(
                         "Couldn't find any python interpreters with {requires_python}. \

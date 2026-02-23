@@ -252,6 +252,34 @@ impl PythonInterpreter {
         }
     }
 
+    /// Create a non-runnable placeholder interpreter.
+    ///
+    /// Used for abi3 builds when no real interpreter is available. The
+    /// placeholder carries just enough metadata (major/minor version,
+    /// ext_suffix) for wheel tagging to work.
+    pub(crate) fn placeholder(major: usize, minor: usize, target: &Target) -> Self {
+        PythonInterpreter {
+            config: InterpreterConfig {
+                major,
+                minor,
+                interpreter_kind: InterpreterKind::CPython,
+                abiflags: String::new(),
+                ext_suffix: if target.is_windows() {
+                    ".pyd".to_string()
+                } else {
+                    String::new()
+                },
+                pointer_width: None,
+                gil_disabled: false,
+            },
+            executable: PathBuf::new(),
+            platform: None,
+            runnable: false,
+            implementation_name: "cpython".to_string(),
+            soabi: None,
+        }
+    }
+
     /// Whether this Python interpreter support portable manylinux/musllinux wheels
     ///
     /// Returns `true` if we can not decide

@@ -308,7 +308,11 @@ impl<'a> InterpreterResolver<'a> {
                 eprintln!("⚠️  Cross-compiling is poorly supported");
                 return Ok(DiscoveryResult {
                     candidates: vec![Candidate {
-                        interpreter: self.make_fake_interpreter(major as usize, minor as usize),
+                        interpreter: PythonInterpreter::placeholder(
+                            major as usize,
+                            minor as usize,
+                            self.target,
+                        ),
                         source: CandidateSource::Placeholder,
                     }],
                     host_python: None,
@@ -629,9 +633,11 @@ impl<'a> InterpreterResolver<'a> {
             Ok(Self::candidates_to_interpreters(candidates))
         } else if self.user_interpreters.is_empty() {
             eprintln!("🐍 Not using a specific python interpreter");
-            Ok(vec![
-                self.make_fake_interpreter(major as usize, minor as usize),
-            ])
+            Ok(vec![PythonInterpreter::placeholder(
+                major as usize,
+                minor as usize,
+                self.target,
+            )])
         } else {
             bail!("Failed to find any python interpreter");
         }
@@ -684,7 +690,11 @@ impl<'a> InterpreterResolver<'a> {
             );
             let mut result = interpreters;
             if result.is_empty() {
-                result.push(self.make_fake_interpreter(major as usize, minor as usize));
+                result.push(PythonInterpreter::placeholder(
+                    major as usize,
+                    minor as usize,
+                    self.target,
+                ));
             }
             return Ok(result);
         }
@@ -859,30 +869,6 @@ impl<'a> InterpreterResolver<'a> {
                 .unwrap_or_else(|| self.target.get_python())
         } else {
             self.target.get_python()
-        }
-    }
-
-    /// Create a non-runnable placeholder interpreter for abi3 when no real one is found.
-    fn make_fake_interpreter(&self, major: usize, minor: usize) -> PythonInterpreter {
-        PythonInterpreter {
-            config: InterpreterConfig {
-                major,
-                minor,
-                interpreter_kind: InterpreterKind::CPython,
-                abiflags: String::new(),
-                ext_suffix: if self.target.is_windows() {
-                    ".pyd".to_string()
-                } else {
-                    String::new()
-                },
-                pointer_width: None,
-                gil_disabled: false,
-            },
-            executable: PathBuf::new(),
-            platform: None,
-            runnable: false,
-            implementation_name: "cpython".to_string(),
-            soabi: None,
         }
     }
 

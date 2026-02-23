@@ -128,7 +128,7 @@ impl InterpreterSpec {
             return Ok(None);
         };
 
-        if ver_str.is_empty() {
+        if ver_str.is_empty() || !ver_str.starts_with(|c: char| c.is_ascii_digit()) {
             return Ok(None);
         }
 
@@ -143,9 +143,10 @@ impl InterpreterSpec {
             bail!("Free-threaded builds are only supported for CPython, not {kind}");
         }
 
-        let (major_str, minor_str) = ver_str
-            .split_once('.')
-            .context("Invalid python interpreter version")?;
+        let (major_str, minor_str) = match ver_str.split_once('.') {
+            Some(parts) => parts,
+            None => return Ok(None), // e.g. "python3" — no minor version
+        };
         let major = major_str.parse::<usize>().with_context(|| {
             format!("Invalid python interpreter major version '{major_str}', expect a digit")
         })?;
@@ -285,11 +286,10 @@ impl<'a> InterpreterResolver<'a> {
         if self.target.cross_compiling()
             && let Some(cross_lib_dir) = env::var_os("PYO3_CROSS_LIB_DIR")
         {
-            // Abi3 Windows cross: just return a placeholder (poorly supported)
+            // Abi3 Windows cross with PYO3_CROSS_LIB_DIR: use a placeholder
             if let Some((major, minor)) = fixed_abi3
                 && self.target.is_windows()
             {
-                eprintln!("⚠️  Cross-compiling is poorly supported");
                 return Ok((
                     vec![Candidate {
                         interpreter: PythonInterpreter::placeholder(
@@ -987,6 +987,9 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+        // Windows executable names and bare "python3" without minor version
+        assert!(InterpreterSpec::parse("python.exe").unwrap().is_none());
+        assert!(InterpreterSpec::parse("python3").unwrap().is_none());
     }
 
     #[test]

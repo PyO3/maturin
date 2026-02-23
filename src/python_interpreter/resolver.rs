@@ -91,21 +91,6 @@ struct DiscoveryResult {
     host_python: Option<PythonInterpreter>,
 }
 
-/// Result of interpreter resolution.
-///
-/// In addition to the resolved interpreters, this carries the host Python
-/// path discovered during cross-compilation. The caller is responsible for
-/// setting `PYO3_PYTHON` / `PYTHON_SYS_EXECUTABLE` using this value
-/// before invoking cargo.
-#[derive(Debug)]
-pub struct ResolveResult {
-    pub interpreters: Vec<PythonInterpreter>,
-    /// Host Python interpreter found during cross-compile discovery.
-    /// The caller should set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` to
-    /// this path before building.
-    pub host_python: Option<PathBuf>,
-}
-
 // ---------------------------------------------------------------------------
 // Interpreter spec (parsed from user-provided strings)
 // ---------------------------------------------------------------------------
@@ -248,19 +233,12 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Main entry point: resolve the list of Python interpreters to build for.
     ///
-    /// Returns a [`ResolveResult`] containing the interpreters and, for
-    /// cross-compilation, the host Python path that should be used to set
-    /// `PYO3_PYTHON`.
-    pub fn resolve(&self) -> Result<ResolveResult> {
+    /// Returns the resolved interpreters and, for cross-compilation, the host
+    /// Python path that should be used to set `PYO3_PYTHON`.
+    pub fn resolve(&self) -> Result<(Vec<PythonInterpreter>, Option<PathBuf>)> {
         match self.bridge {
-            BridgeModel::Cffi => self.resolve_single("cffi").map(|i| ResolveResult {
-                interpreters: vec![i],
-                host_python: None,
-            }),
-            BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok(ResolveResult {
-                interpreters: vec![],
-                host_python: None,
-            }),
+            BridgeModel::Cffi => self.resolve_single("cffi").map(|i| (vec![i], None)),
+            BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok((vec![], None)),
             BridgeModel::PyO3(pyo3) | BridgeModel::Bin(Some(pyo3)) => self.resolve_pyo3(pyo3),
         }
     }
@@ -277,15 +255,12 @@ impl<'a> InterpreterResolver<'a> {
     /// 3. Set `PYO3_PYTHON` if cross-compiling with a host interpreter
     /// 4. Filter for abi3 (if applicable)
     /// 5. Finalize: apply fallback policies, validate result
-    fn resolve_pyo3(&self, pyo3: &PyO3) -> Result<ResolveResult> {
+    fn resolve_pyo3(&self, pyo3: &PyO3) -> Result<(Vec<PythonInterpreter>, Option<PathBuf>)> {
         // Step 1: PYO3_CONFIG_FILE is an explicit override that trumps everything
         if let Some(config_file) = env::var_os("PYO3_CONFIG_FILE") {
             let config = InterpreterConfig::from_pyo3_config(config_file.as_ref(), self.target)
                 .context("Invalid PYO3_CONFIG_FILE")?;
-            return Ok(ResolveResult {
-                interpreters: vec![PythonInterpreter::from_config(config)],
-                host_python: None,
-            });
+            return Ok((vec![PythonInterpreter::from_config(config)], None));
         }
 
         let fixed_abi3 = match &pyo3.abi3 {
@@ -308,10 +283,7 @@ impl<'a> InterpreterResolver<'a> {
             Self::candidates_to_interpreters(discovery.candidates)
         };
 
-        Ok(ResolveResult {
-            interpreters,
-            host_python,
-        })
+        Ok((interpreters, host_python))
     }
 
     // -----------------------------------------------------------------------

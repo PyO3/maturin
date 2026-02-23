@@ -4,16 +4,15 @@ use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
 use crate::compression::CompressionOptions;
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::{FeatureSpec, ToolMaturin};
-use crate::python_interpreter::{InterpreterResolver, ResolveResult};
+use crate::python_interpreter::InterpreterResolver;
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
-use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
+use crate::{BridgeModel, BuildContext, Target};
 use anyhow::{Result, bail};
 use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
 use cargo_options::heading;
-use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::env;
@@ -354,18 +353,41 @@ impl BuildContextBuilder {
         };
 
         let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
-        let interpreter = if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
-            // We don't need a python interpreter to build sdist only
-            Vec::new()
-        } else {
-            resolve_interpreters(
-                &build_options,
-                &bridge,
-                &target,
-                metadata24.requires_python.as_ref(),
-                generate_import_lib,
-            )?
-        };
+        let (interpreter, host_python) =
+            if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
+                // We don't need a python interpreter to build sdist only
+                (Vec::new(), None)
+            } else {
+                let mut user_interpreters = build_options.interpreter.clone();
+
+                // In test mode, allow MATURIN_TEST_PYTHON to override the default
+                if cfg!(test)
+                    && user_interpreters.is_empty()
+                    && !build_options.find_interpreter
+                    && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
+                {
+                    user_interpreters = vec![python.into()];
+                }
+
+                let resolver = InterpreterResolver::new(
+                    &target,
+                    &bridge,
+                    metadata24.requires_python.as_ref(),
+                    &user_interpreters,
+                    build_options.find_interpreter,
+                    generate_import_lib,
+                );
+                resolver.resolve()?
+            };
+
+        // Set PYO3_PYTHON for cross-compilation so pyo3's build script
+        // can find the host interpreter.
+        if let Some(ref host_python) = host_python {
+            unsafe {
+                env::set_var("PYO3_PYTHON", host_python);
+                env::set_var("PYTHON_SYS_EXECUTABLE", host_python);
+            }
+        }
 
         if cargo_options.args.is_empty() {
             // if not supplied on command line, try pyproject.toml
@@ -612,49 +634,6 @@ fn resolve_platform_tags(
     }
 
     Ok(platform_tags)
-}
-
-fn resolve_interpreters(
-    build_options: &BuildOptions,
-    bridge: &BridgeModel,
-    target: &Target,
-    requires_python: Option<&VersionSpecifiers>,
-    generate_import_lib: bool,
-) -> Result<Vec<PythonInterpreter>> {
-    let mut interpreter = build_options.interpreter.clone();
-
-    // In test mode, allow MATURIN_TEST_PYTHON to override the default
-    if cfg!(test)
-        && interpreter.is_empty()
-        && !build_options.find_interpreter
-        && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
-    {
-        interpreter = vec![python.into()];
-    }
-
-    let resolver = InterpreterResolver::new(
-        target,
-        bridge,
-        requires_python,
-        &interpreter,
-        build_options.find_interpreter,
-        generate_import_lib,
-    );
-    let ResolveResult {
-        interpreters,
-        host_python,
-    } = resolver.resolve()?;
-
-    // Set PYO3_PYTHON for cross-compilation so pyo3's build script
-    // can find the host interpreter.
-    if let Some(host_python) = host_python {
-        unsafe {
-            env::set_var("PYO3_PYTHON", &host_python);
-            env::set_var("PYTHON_SYS_EXECUTABLE", &host_python);
-        }
-    }
-
-    Ok(interpreters)
 }
 
 /// Checks for bridge/platform type edge cases

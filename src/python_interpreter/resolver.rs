@@ -464,17 +464,10 @@ impl<'a> InterpreterResolver<'a> {
             return Ok(interpreters);
         }
 
-        let interpreters = if !self.user_interpreters.is_empty() {
-            self.user_interpreters
-        } else {
-            // Handled via the slice below
-            &[]
-        };
-
         // Determine what to check: user-specified or default python
         let default_python;
-        let to_check: &[PathBuf] = if !interpreters.is_empty() {
-            interpreters
+        let to_check: &[PathBuf] = if !self.user_interpreters.is_empty() {
+            self.user_interpreters
         } else {
             default_python = self.get_default_python();
             std::slice::from_ref(&default_python)

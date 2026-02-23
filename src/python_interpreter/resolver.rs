@@ -443,8 +443,23 @@ impl<'a> InterpreterResolver<'a> {
     /// for any that aren't found.
     fn find_native_interpreters(&self) -> Result<Vec<PythonInterpreter>> {
         if self.find_interpreter {
-            return super::discovery::find_all(self.target, self.bridge, self.requires_python)
-                .context("Finding python interpreters failed");
+            let interpreters =
+                super::discovery::find_all(self.target, self.bridge, self.requires_python)
+                    .context("Finding python interpreters failed")?;
+            if interpreters.is_empty() {
+                if let Some(requires_python) = self.requires_python {
+                    bail!(
+                        "Couldn't find any python interpreters with {requires_python}. \
+                         Please specify at least one with -i"
+                    );
+                } else {
+                    bail!(
+                        "Couldn't find any python interpreters. \
+                         Please specify at least one with -i"
+                    );
+                }
+            }
+            return Ok(interpreters);
         }
 
         let interpreters = if !self.user_interpreters.is_empty() {

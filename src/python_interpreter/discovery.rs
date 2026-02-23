@@ -157,7 +157,7 @@ impl<'a> WindowsInterpreterFinder<'a> {
 /// As well as the version numbers, etc. of the interpreters we also have to find the
 /// pointer width to make sure that the pointer width (32-bit or 64-bit) matches across
 /// platforms.
-pub(super) fn find_all_windows(
+fn find_all_windows(
     target: &Target,
     bridge: &BridgeModel,
     requires_python: Option<&VersionSpecifiers>,
@@ -260,10 +260,6 @@ pub(super) fn find_all_windows(
 
 // ---------------------------------------------------------------------------
 // Cross-platform discovery
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Cross-platform discovery (free functions)
 // ---------------------------------------------------------------------------
 
 /// Checks whether the given command is a python interpreter and returns a

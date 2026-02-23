@@ -1,7 +1,7 @@
 pub use self::config::InterpreterConfig;
 use crate::auditwheel::PlatformTag;
 use crate::{BuildContext, Target};
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::fmt;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -316,6 +316,50 @@ impl PythonInterpreter {
         bridge: Option<&crate::BridgeModel>,
     ) -> Vec<Self> {
         discovery::lookup_target(target, requires_python, bridge)
+    }
+
+    /// Run a python script using this Python interpreter.
+    pub fn run_script(&self, script: &str) -> Result<String> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        if !self.runnable {
+            bail!("This {} isn't runnable", self);
+        }
+        let out = Command::new(&self.executable)
+            .env("PYTHONIOENCODING", "utf-8")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .and_then(|mut child| {
+                child
+                    .stdin
+                    .as_mut()
+                    .expect("piped stdin")
+                    .write_all(script.as_bytes())?;
+                child.wait_with_output()
+            });
+
+        match out {
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    bail!(
+                        "Could not find any interpreter at {}, \
+                         are you sure you have Python installed on your PATH?",
+                        self.executable.display()
+                    );
+                } else {
+                    bail!(
+                        "Failed to run the Python interpreter at {}: {}",
+                        self.executable.display(),
+                        err
+                    );
+                }
+            }
+            Ok(ok) if !ok.status.success() => bail!("Python script failed"),
+            Ok(ok) => Ok(String::from_utf8(ok.stdout)?),
+        }
     }
 
     /// Whether this Python interpreter support portable manylinux/musllinux wheels

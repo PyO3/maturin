@@ -83,13 +83,11 @@ impl Candidate {
     }
 }
 
-/// Result of interpreter discovery, before filtering/finalization.
-struct DiscoveryResult {
-    candidates: Vec<Candidate>,
-    /// Host Python interpreter found during cross-compile discovery.
-    /// Used to set `PYO3_PYTHON` and `PYTHON_SYS_EXECUTABLE` for the build.
-    host_python: Option<PythonInterpreter>,
-}
+/// Discovery result: `(candidates, host_python)`.
+///
+/// `host_python` is only set during cross-compilation (from `PYO3_CROSS_LIB_DIR`)
+/// and is used by the caller to set `PYO3_PYTHON` / `PYTHON_SYS_EXECUTABLE`.
+type DiscoveryResult = (Vec<Candidate>, Option<PythonInterpreter>);
 
 // ---------------------------------------------------------------------------
 // Interpreter spec (parsed from user-provided strings)
@@ -269,18 +267,18 @@ impl<'a> InterpreterResolver<'a> {
         };
 
         // Step 2: Discover candidates (unified for native/cross)
-        let discovery = self.discover_candidates(fixed_abi3)?;
+        let (candidates, host_python_interp) = self.discover_candidates(fixed_abi3)?;
 
         // Capture host_python for the caller to set PYO3_PYTHON
-        let host_python = discovery.host_python.as_ref().map(|h| h.executable.clone());
+        let host_python = host_python_interp.as_ref().map(|h| h.executable.clone());
 
         // Step 3-4: Filter and finalize (differs for abi3 vs non-abi3)
         let interpreters = if let Some((major, minor)) = fixed_abi3 {
-            let filtered = self.filter_for_abi3(discovery.candidates);
+            let filtered = self.filter_for_abi3(candidates);
             self.finalize_abi3(filtered, major, minor)?
         } else {
-            Self::print_found_candidates(&discovery.candidates);
-            Self::candidates_to_interpreters(discovery.candidates)
+            Self::print_found_candidates(&candidates);
+            Self::candidates_to_interpreters(candidates)
         };
 
         Ok((interpreters, host_python))
@@ -306,8 +304,8 @@ impl<'a> InterpreterResolver<'a> {
                 && self.target.is_windows()
             {
                 eprintln!("⚠️  Cross-compiling is poorly supported");
-                return Ok(DiscoveryResult {
-                    candidates: vec![Candidate {
+                return Ok((
+                    vec![Candidate {
                         interpreter: PythonInterpreter::placeholder(
                             major as usize,
                             minor as usize,
@@ -315,8 +313,8 @@ impl<'a> InterpreterResolver<'a> {
                         ),
                         source: CandidateSource::Placeholder,
                     }],
-                    host_python: None,
-                });
+                    None,
+                ));
             }
             return self.discover_from_cross_lib_dir(cross_lib_dir.as_ref());
         }
@@ -351,26 +349,26 @@ impl<'a> InterpreterResolver<'a> {
                 implementation_name,
                 soabi,
             };
-            Ok(DiscoveryResult {
-                candidates: vec![Candidate {
+            Ok((
+                vec![Candidate {
                     interpreter: interp,
                     source: CandidateSource::CrossCompileLib,
                 }],
-                host_python: Some(host_python),
-            })
+                Some(host_python),
+            ))
         } else {
             let host_python = self.find_host_python()?;
             eprintln!("🐍 Using host {host_python} for cross-compiling preparation");
             let sysconfig_path = find_sysconfigdata(cross_lib_path, self.target)?;
             let sysconfig_data = parse_sysconfigdata(&host_python, sysconfig_path)?;
             let interpreter = self.interpreter_from_sysconfigdata(&sysconfig_data)?;
-            Ok(DiscoveryResult {
-                candidates: vec![Candidate {
+            Ok((
+                vec![Candidate {
                     interpreter,
                     source: CandidateSource::CrossCompileLib,
                 }],
-                host_python: Some(host_python),
-            })
+                Some(host_python),
+            ))
         }
     }
 
@@ -412,16 +410,16 @@ impl<'a> InterpreterResolver<'a> {
                     .join(", ")
             );
         }
-        Ok(DiscoveryResult {
-            candidates: interpreters
+        Ok((
+            interpreters
                 .into_iter()
                 .map(|interpreter| Candidate {
                     interpreter,
                     source: CandidateSource::Sysconfig,
                 })
                 .collect(),
-            host_python: None,
-        })
+            None,
+        ))
     }
 
     // -----------------------------------------------------------------------
@@ -433,10 +431,7 @@ impl<'a> InterpreterResolver<'a> {
     /// For abi3 builds, falls back to sysconfig if real interpreters aren't found.
     fn discover_native(&self, fixed_abi3: Option<(u8, u8)>) -> Result<DiscoveryResult> {
         match self.find_native_interpreters() {
-            Ok(interps) => Ok(DiscoveryResult {
-                candidates: Candidate::from_interpreters(interps),
-                host_python: None,
-            }),
+            Ok(interps) => Ok((Candidate::from_interpreters(interps), None)),
             Err(err) if fixed_abi3.is_some() => {
                 // Abi3: try sysconfig fallback before giving up
                 if self.target.is_windows() && !self.generate_import_lib {
@@ -451,16 +446,16 @@ impl<'a> InterpreterResolver<'a> {
                 if sysconfig_interps.is_empty() && !self.user_interpreters.is_empty() {
                     return Err(err);
                 }
-                Ok(DiscoveryResult {
-                    candidates: sysconfig_interps
+                Ok((
+                    sysconfig_interps
                         .into_iter()
                         .map(|interpreter| Candidate {
                             interpreter,
                             source: CandidateSource::Sysconfig,
                         })
                         .collect(),
-                    host_python: None,
-                })
+                    None,
+                ))
             }
             Err(err) => Err(err),
         }

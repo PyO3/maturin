@@ -562,7 +562,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .context("Failed to build source distribution")?;
 
     // Step 2: Unpack sdist and build wheels from it
-    let (_tmp, cargo_toml) = unpack_sdist(&sdist_path)?;
+    let (_tmp, cargo_toml, pyproject_toml) = unpack_sdist(&sdist_path)?;
     let wheel_options = BuildOptions {
         out: Some(wheel_dir),
         cargo: CargoOptions {
@@ -579,6 +579,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .into_build_context()
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
+        .pyproject_toml_path(Some(pyproject_toml))
         .build()?;
     let wheels = wheel_context.build_wheels()?;
     assert!(

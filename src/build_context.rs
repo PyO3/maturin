@@ -42,13 +42,13 @@ use tracing::instrument;
 use zip::DateTime;
 
 /// Unpacks an sdist tarball into a temporary directory and returns the path
-/// to the Cargo.toml inside it, along with the tempdir handle (which must
-/// be kept alive for the duration of the build).
+/// to the Cargo.toml and pyproject.toml inside it, along with the tempdir
+/// handle (which must be kept alive for the duration of the build).
 ///
 /// The Cargo.toml path is resolved by checking `[tool.maturin.manifest-path]`
 /// in the sdist's `pyproject.toml`, falling back to `Cargo.toml` at the
 /// sdist root directory.
-pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf)> {
+pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
     let tmp = tempfile::tempdir().context("Failed to create temporary directory")?;
     let gz = flate2::read::GzDecoder::new(
         fs::File::open(sdist_path)
@@ -66,7 +66,11 @@ pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf)> {
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         .collect();
     let top_dir = match entries.len() {
-        1 => entries[0].path(),
+        // Canonicalize to resolve symlinks (e.g. /var -> /private/var on macOS).
+        // Without this, `project_root` and `python_dir` may disagree after
+        // `normalize()` is applied to only some paths, causing python source
+        // files to be silently excluded from wheels.
+        1 => dunce::canonicalize(entries[0].path()).unwrap_or_else(|_| entries[0].path()),
         n => bail!(
             "Expected exactly one top-level directory in sdist, found {}",
             n
@@ -92,7 +96,7 @@ pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf)> {
             cargo_toml.display()
         );
     }
-    Ok((tmp, cargo_toml))
+    Ok((tmp, cargo_toml, pyproject_file))
 }
 
 /// Contains all the metadata required to build the crate

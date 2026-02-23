@@ -610,6 +610,7 @@ pub struct BuildContextBuilder {
     strip: Option<bool>,
     editable: bool,
     sdist_only: bool,
+    pyproject_toml_path: Option<PathBuf>,
 }
 
 impl BuildContextBuilder {
@@ -619,6 +620,7 @@ impl BuildContextBuilder {
             strip: None,
             editable: false,
             sdist_only: false,
+            pyproject_toml_path: None,
         }
     }
 
@@ -637,12 +639,18 @@ impl BuildContextBuilder {
         self
     }
 
+    pub fn pyproject_toml_path(mut self, path: Option<PathBuf>) -> Self {
+        self.pyproject_toml_path = path;
+        self
+    }
+
     pub fn build(self) -> Result<BuildContext> {
         let Self {
             build_options,
             strip,
             editable,
             sdist_only,
+            pyproject_toml_path: explicit_pyproject_path,
         } = self;
         build_options.compression.validate();
         let ProjectResolver {
@@ -660,6 +668,7 @@ impl BuildContextBuilder {
             build_options.manifest_path.clone(),
             build_options.cargo.clone(),
             editable,
+            explicit_pyproject_path,
         )?;
         let pyproject = pyproject_toml.as_ref();
 

@@ -63,9 +63,29 @@ impl ProjectResolver {
         cargo_manifest_path: Option<PathBuf>,
         mut cargo_options: CargoOptions,
         editable_install: bool,
+        pyproject_toml_path: Option<PathBuf>,
     ) -> Result<Self> {
-        let (manifest_file, pyproject_file) =
-            Self::resolve_manifest_paths(cargo_manifest_path, &cargo_options)?;
+        let (manifest_file, pyproject_file) = if let Some(pyproject_path) = pyproject_toml_path {
+            // When an explicit pyproject.toml path is provided (e.g. from an
+            // unpacked sdist), use it directly instead of discovering it by
+            // walking up from the manifest.  This is needed when the Cargo
+            // crate is excluded from the workspace and the pyproject.toml
+            // lives outside the cargo workspace boundary.
+            let cargo_toml = cargo_manifest_path
+                .expect("manifest_path must be set when pyproject_toml_path is provided");
+            let cargo_toml = cargo_toml
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "manifest path `{}` does not exist or is invalid",
+                        cargo_toml.display()
+                    )
+                })?
+                .into_path_buf();
+            (cargo_toml, pyproject_path)
+        } else {
+            Self::resolve_manifest_paths(cargo_manifest_path, &cargo_options)?
+        };
         if !manifest_file.is_file() {
             bail!(
                 "{} is not the path to a Cargo.toml",

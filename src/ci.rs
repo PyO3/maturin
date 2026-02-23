@@ -151,7 +151,7 @@ impl GenerateCI {
             pyproject_toml,
             project_layout,
             ..
-        } = ProjectResolver::resolve(self.manifest_path.clone(), cargo_options, false)?;
+        } = ProjectResolver::resolve(self.manifest_path.clone(), cargo_options, false, None)?;
         let pyproject = pyproject_toml.as_ref();
         let extra_pyo3_features = crate::build_options::pyo3_features_from_conditional(pyproject);
         let bridge = find_bridge(

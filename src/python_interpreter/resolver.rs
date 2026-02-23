@@ -173,14 +173,19 @@ impl InterpreterSpec {
     }
 }
 
-/// Encapsulates all inputs and logic for resolving Python interpreters.
+/// Resolves which Python interpreters to build wheels for.
 ///
-/// Instead of 6+ overlapping free functions, this struct provides a single
-/// `resolve()` entry point that handles all combinations of:
+/// Given a bridge model, target platform, and optional user-specified
+/// interpreters, discovers and validates the set of Python interpreters
+/// that should be used for the build. Handles all combinations of:
+///
 /// - abi3 vs non-abi3
 /// - cross-compile vs native
 /// - Windows vs Unix
 /// - user-specified interpreters vs auto-discovery
+///
+/// Entry point: [`resolve()`](Self::resolve), which returns the list of
+/// interpreters and an optional host python path for cross-compilation.
 pub struct InterpreterResolver<'a> {
     target: &'a Target,
     bridge: &'a BridgeModel,

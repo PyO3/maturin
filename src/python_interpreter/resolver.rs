@@ -923,3 +923,137 @@ impl<'a> InterpreterResolver<'a> {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interpreter_spec_cpython_versions() {
+        let spec = InterpreterSpec::parse("python3.9").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::CPython);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 9);
+        assert_eq!(spec.abiflags, "");
+
+        let spec = InterpreterSpec::parse("python-3.12").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::CPython);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 12);
+        assert_eq!(spec.abiflags, "");
+    }
+
+    #[test]
+    fn test_interpreter_spec_bare_version() {
+        let spec = InterpreterSpec::parse("3.9").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::CPython);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 9);
+        assert_eq!(spec.abiflags, "");
+
+        let spec = InterpreterSpec::parse("3.14").unwrap().unwrap();
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 14);
+    }
+
+    #[test]
+    fn test_interpreter_spec_free_threaded() {
+        let spec = InterpreterSpec::parse("python3.14t").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::CPython);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 14);
+        assert_eq!(spec.abiflags, "t");
+
+        let spec = InterpreterSpec::parse("3.13t").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::CPython);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 13);
+        assert_eq!(spec.abiflags, "t");
+    }
+
+    #[test]
+    fn test_interpreter_spec_free_threaded_too_old() {
+        let err = InterpreterSpec::parse("python3.12t").unwrap_err();
+        assert!(
+            err.to_string().contains("3.13"),
+            "expected version constraint in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpreter_spec_pypy() {
+        let spec = InterpreterSpec::parse("pypy3.11").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::PyPy);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 11);
+        assert_eq!(spec.abiflags, "");
+
+        let spec = InterpreterSpec::parse("pypy-3.10").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::PyPy);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 10);
+    }
+
+    #[test]
+    fn test_interpreter_spec_pypy_free_threaded_rejected() {
+        let err = InterpreterSpec::parse("pypy3.11t").unwrap_err();
+        assert!(
+            err.to_string().contains("Free-threaded"),
+            "expected free-threaded error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpreter_spec_graalpy() {
+        let spec = InterpreterSpec::parse("graalpy3.10").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::GraalPy);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 10);
+
+        let spec = InterpreterSpec::parse("graalpy-3.10").unwrap().unwrap();
+        assert_eq!(spec.kind, InterpreterKind::GraalPy);
+        assert_eq!(spec.major, 3);
+        assert_eq!(spec.minor, 10);
+    }
+
+    #[test]
+    fn test_interpreter_spec_graalpy_free_threaded_rejected() {
+        let err = InterpreterSpec::parse("graalpy3.10t").unwrap_err();
+        assert!(
+            err.to_string().contains("Free-threaded"),
+            "expected free-threaded error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpreter_spec_version_less_returns_none() {
+        assert!(InterpreterSpec::parse("python").unwrap().is_none());
+        assert!(InterpreterSpec::parse("pypy").unwrap().is_none());
+        assert!(InterpreterSpec::parse("graalpy").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_interpreter_spec_unsupported_name() {
+        let err = InterpreterSpec::parse("jython3.9").unwrap_err();
+        assert!(
+            err.to_string().contains("Unsupported"),
+            "expected unsupported error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpreter_spec_try_parse_filename() {
+        let spec = InterpreterSpec::try_parse_filename("python3.14t").unwrap();
+        assert_eq!(spec.kind, InterpreterKind::CPython);
+        assert_eq!(spec.abiflags, "t");
+
+        let spec = InterpreterSpec::try_parse_filename("pypy3.10").unwrap();
+        assert_eq!(spec.kind, InterpreterKind::PyPy);
+
+        // version-less names return None
+        assert!(InterpreterSpec::try_parse_filename("python").is_none());
+
+        // unsupported names return None (not error)
+        assert!(InterpreterSpec::try_parse_filename("jython3.9").is_none());
+    }
+}

@@ -742,27 +742,19 @@ impl Target {
 
     /// Returns the path to the python executable
     ///
-    /// For windows it's always python.exe for unix it's first the venv's `python`
+    /// For windows it's always python.exe, for unix it's first the venv's `python`
     /// and then `python3`
     pub fn get_python(&self) -> PathBuf {
-        if self.is_windows() {
-            // Check VIRTUAL_ENV first to use the venv's python directly,
-            // avoiding PATH resolution that might find a different version (#2198)
-            if let Some(venv) = env::var_os("VIRTUAL_ENV") {
-                let venv_python = self.get_venv_python(venv);
-                if venv_python.exists() {
-                    return venv_python;
-                }
-            }
-            PathBuf::from("python.exe")
-        } else if let Some(venv) = env::var_os("VIRTUAL_ENV") {
+        if let Some(venv) = env::var_os("VIRTUAL_ENV") {
             // Use the full path to the venv's python to ensure we get the
             // correct version, rather than relying on PATH resolution (#2198)
             let venv_python = self.get_venv_python(&venv);
             if venv_python.exists() {
                 return venv_python;
             }
-            PathBuf::from("python")
+        }
+        if self.is_windows() {
+            PathBuf::from("python.exe")
         } else {
             PathBuf::from("python3")
         }

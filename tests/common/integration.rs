@@ -7,7 +7,7 @@ use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
 use fs4::fs_err3::FileExt;
-use maturin::{BuildOptions, PlatformTag, PythonInterpreter, Target};
+use maturin::{BuildOptions, PlatformTag, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;

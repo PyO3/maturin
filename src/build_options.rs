@@ -632,14 +632,14 @@ fn resolve_interpreters(
         interpreter = vec![python.into()];
     }
 
-    let resolver = InterpreterResolver {
+    let resolver = InterpreterResolver::new(
         target,
         bridge,
         requires_python,
-        user_interpreters: &interpreter,
-        find_interpreter: build_options.find_interpreter,
+        &interpreter,
+        build_options.find_interpreter,
         generate_import_lib,
-    };
+    );
     let ResolveResult {
         interpreters,
         host_python,
@@ -1155,14 +1155,7 @@ mod tests {
         let bridge = BridgeModel::Cffi;
         let interpreter = vec![PathBuf::from("nonexistent-python-xyz")];
 
-        let resolver = InterpreterResolver {
-            target: &target,
-            bridge: &bridge,
-            requires_python: None,
-            user_interpreters: &interpreter,
-            find_interpreter: false,
-            generate_import_lib: false,
-        };
+        let resolver = InterpreterResolver::new(&target, &bridge, None, &interpreter, false, false);
         let result = resolver.resolve();
         let err_msg = result.unwrap_err().to_string();
         assert_snapshot!(err_msg, @"Failed to find a python interpreter from `nonexistent-python-xyz`");

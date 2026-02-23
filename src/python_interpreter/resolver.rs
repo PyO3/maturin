@@ -218,15 +218,34 @@ impl InterpreterSpec {
 /// - Windows vs Unix
 /// - user-specified interpreters vs auto-discovery
 pub struct InterpreterResolver<'a> {
-    pub(crate) target: &'a Target,
-    pub(crate) bridge: &'a BridgeModel,
-    pub(crate) requires_python: Option<&'a VersionSpecifiers>,
-    pub(crate) user_interpreters: &'a [PathBuf],
-    pub(crate) find_interpreter: bool,
-    pub(crate) generate_import_lib: bool,
+    target: &'a Target,
+    bridge: &'a BridgeModel,
+    requires_python: Option<&'a VersionSpecifiers>,
+    user_interpreters: &'a [PathBuf],
+    find_interpreter: bool,
+    generate_import_lib: bool,
 }
 
 impl<'a> InterpreterResolver<'a> {
+    /// Create a new interpreter resolver with the given build context.
+    pub fn new(
+        target: &'a Target,
+        bridge: &'a BridgeModel,
+        requires_python: Option<&'a VersionSpecifiers>,
+        user_interpreters: &'a [PathBuf],
+        find_interpreter: bool,
+        generate_import_lib: bool,
+    ) -> Self {
+        Self {
+            target,
+            bridge,
+            requires_python,
+            user_interpreters,
+            find_interpreter,
+            generate_import_lib,
+        }
+    }
+
     /// Main entry point: resolve the list of Python interpreters to build for.
     ///
     /// Returns a [`ResolveResult`] containing the interpreters and, for

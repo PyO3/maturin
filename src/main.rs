@@ -426,6 +426,13 @@ fn run() -> Result<()> {
                 // Build sdist first, then build wheels from the unpacked sdist
                 // to verify that the source distribution is complete.
                 let sdist_path = build_sdist(&build, strip)?;
+                // Preserve the original output directory so that wheels built
+                // from the unpacked sdist still land in the user-visible
+                // `target/wheels` (or the explicit `--out` directory) instead
+                // of the temporary directory's target.
+                if build.out.is_none() {
+                    build.out = sdist_path.parent().map(PathBuf::from);
+                }
                 let (tmp, cargo_toml, pyproject_toml) = unpack_sdist(&sdist_path)?;
                 _sdist_tmp = Some(tmp);
                 eprintln!(
@@ -469,6 +476,13 @@ fn run() -> Result<()> {
             if !no_sdist {
                 // Build sdist first, then build wheels from the unpacked sdist
                 let path = build_sdist(&build, Some(!no_strip))?;
+                // Preserve the original output directory so that wheels built
+                // from the unpacked sdist still land in the user-visible
+                // `target/wheels` (or the explicit `--out` directory) instead
+                // of the temporary directory's target.
+                if build.out.is_none() {
+                    build.out = path.parent().map(PathBuf::from);
+                }
                 let (tmp, cargo_toml, pyproject_toml) = unpack_sdist(&path)?;
                 _sdist_tmp = Some(tmp);
                 eprintln!(

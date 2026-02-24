@@ -753,6 +753,18 @@ impl Target {
                 return venv_python;
             }
         }
+        // GitHub Actions setup-python sets pythonLocation to the install dir
+        if let Some(python_location) = env::var_os("pythonLocation") {
+            let python_location = Path::new(&python_location);
+            let python = if self.is_windows() {
+                python_location.join("python.exe")
+            } else {
+                python_location.join("bin").join("python3")
+            };
+            if python.exists() {
+                return python;
+            }
+        }
         if self.is_windows() {
             PathBuf::from("python.exe")
         } else {

@@ -257,14 +257,15 @@ impl<'a> InterpreterResolver<'a> {
 
         // Step 3-4: Filter and finalize (differs for abi3 vs non-abi3)
         let interpreters = if let Some((major, minor)) = fixed_abi3 {
-            // Only filter out non-abi3-capable interpreters (PyPy, free-threaded)
-            // during auto-discovery. When the user explicitly provided interpreters
-            // (e.g. via `develop` passing a venv python), trust their choice —
-            // the venv python filename (just "python") doesn't encode the kind/flags.
-            let filtered = if self.find_interpreter {
-                self.filter_for_abi3(candidates)
-            } else {
+            // Filter out non-abi3-capable interpreters (PyPy, free-threaded)
+            // unless the user explicitly provided them via `-i`.
+            // When `develop` passes a venv python, user_interpreters is non-empty
+            // so we trust that choice (the filename is just "python" and doesn't
+            // encode interpreter kind/flags).
+            let filtered = if !self.find_interpreter && !self.user_interpreters.is_empty() {
                 candidates
+            } else {
+                self.filter_for_abi3(candidates)
             };
             self.finalize_abi3(filtered, major, minor)?
         } else {

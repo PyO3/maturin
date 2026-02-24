@@ -753,7 +753,30 @@ fn compile_target(
 #[instrument(skip_all)]
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
+    // Acquire a shared lock on cargo's `.cargo-lock` to prevent concurrent cargo
+    // builds (e.g. from rust-analyzer) from modifying the artifact while we read it.
+    // The lock is best-effort: if it can't be acquired we proceed anyway.
+    let _cargo_lock = artifact
+        .parent()
+        .map(|p| p.join(".cargo-lock"))
+        .and_then(|p| File::open(p).ok())
+        .and_then(|f| {
+            #[allow(unused_imports)] // needed on Rust < 1.89 where std has no lock_shared
+            use fs4::fs_err3::FileExt;
+            match f.lock_shared() {
+                Ok(()) => Some(f),
+                Err(e) => {
+                    tracing::debug!("Failed to acquire .cargo-lock shared lock: {e}");
+                    None
+                }
+            }
+        });
     let fd = File::open(artifact)?;
+    // SAFETY: We hold a shared lock on cargo's .cargo-lock which prevents concurrent
+    // cargo builds from modifying this artifact. The lock is advisory on Unix, but
+    // cargo respects it. If the lock couldn't be acquired (e.g. lock file missing),
+    // a concurrent modification would at worst cause a goblin parse error, which the
+    // caller already ignores.
     let mmap = unsafe { memmap2::Mmap::map(&fd).context("mmap failed")? };
     let mut found = false;
     match goblin::Object::parse(&mmap)? {

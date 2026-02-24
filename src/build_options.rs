@@ -1147,15 +1147,17 @@ pub fn pyo3_features_from_conditional(
     };
     let crate_names: &[&'static str] = &["pyo3", "pyo3-ffi"];
     for spec in features {
-        if let FeatureSpec::Conditional { feature, .. } = spec {
-            for &crate_name in crate_names {
-                let prefix = format!("{crate_name}/");
-                if let Some(feat_name) = feature.strip_prefix(&prefix) {
-                    extra
-                        .entry(crate_name)
-                        .or_default()
-                        .push(feat_name.to_string());
-                }
+        let feature = match spec {
+            FeatureSpec::Plain(_) => continue,
+            FeatureSpec::Conditional { feature, .. } => feature,
+        };
+        for &crate_name in crate_names {
+            let prefix = format!("{crate_name}/");
+            if let Some(feat_name) = feature.strip_prefix(&prefix) {
+                extra
+                    .entry(crate_name)
+                    .or_default()
+                    .push(feat_name.to_string());
             }
         }
     }

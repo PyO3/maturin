@@ -75,7 +75,7 @@
       }
     },
     "features": {
-      "description": "List of features to activate.\nEach entry can be a plain feature name string, or a conditional object\nwith `feature` and `python-version` keys.",
+      "description": "List of features to activate.\nEach entry can be a plain feature name string, or a conditional object\nwith `feature` and optional `python-version` and `python-implementation` keys.",
       "type": [
         "array",
         "null"
@@ -309,14 +309,14 @@
       ]
     },
     "FeatureSpec": {
-      "description": "A cargo feature specification that can be either a plain feature name\nor a conditional feature that is only enabled for certain Python versions.\n\n# Examples\n\n```toml\n[tool.maturin]\nfeatures = [\n  \"some-feature\",\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\" },\n  { feature = \"pyo3/abi3-py38\", python-version = \"<3.11\" },\n]\n```",
+      "description": "A cargo feature specification that can be either a plain feature name\nor a conditional feature that is only enabled for certain Python versions\nand/or implementations.\n\n# Examples\n\n```toml\n[tool.maturin]\nfeatures = [\n  \"some-feature\",\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\" },\n  { feature = \"pyo3/abi3-py38\", python-version = \"<3.11\" },\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\", python-implementation = \"cpython\" },\n  { feature = \"pypy-compat\", python-implementation = \"pypy\" },\n]\n```",
       "anyOf": [
         {
           "description": "A plain feature name, always enabled",
           "type": "string"
         },
         {
-          "description": "A feature enabled only when the target Python version matches",
+          "description": "A feature enabled only when the conditions match",
           "type": "object",
           "properties": {
             "feature": {
@@ -326,11 +326,14 @@
             "python-version": {
               "description": "PEP 440 version specifier for the target Python version, e.g. \">=3.11\"",
               "type": "string"
+            },
+            "python-implementation": {
+              "description": "Python implementation name, e.g. \"cpython\", \"pypy\", \"graalpy\"",
+              "type": "string"
             }
           },
           "required": [
-            "feature",
-            "python-version"
+            "feature"
           ]
         }
       ]

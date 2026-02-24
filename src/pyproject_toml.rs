@@ -242,6 +242,8 @@ pub struct SbomConfig {
 ///   "some-feature",
 ///   { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
 ///   { feature = "pyo3/abi3-py38", python-version = "<3.11" },
+///   { feature = "pyo3/abi3-py311", python-version = ">=3.11", python-implementation = "cpython" },
+///   { feature = "pypy-compat", python-implementation = "pypy" },
 /// ]
 /// ```
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -250,20 +252,42 @@ pub struct SbomConfig {
 pub enum FeatureSpec {
     /// A plain feature name, always enabled
     Plain(String),
-    /// A feature enabled only when the target Python version matches
+    /// A feature enabled only when the conditions match
     Conditional {
         /// The cargo feature to enable
         feature: String,
         /// PEP 440 version specifier for the target Python version, e.g. ">=3.11"
-        #[serde(rename = "python-version")]
-        #[cfg_attr(feature = "schemars", schemars(with = "String"))]
-        python_version: VersionSpecifiers,
+        #[serde(
+            rename = "python-version",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        #[cfg_attr(feature = "schemars", schemars(with = "Option<String>"))]
+        python_version: Option<VersionSpecifiers>,
+        /// Python implementation name, e.g. "cpython", "pypy", "graalpy"
+        #[serde(
+            rename = "python-implementation",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        python_implementation: Option<String>,
     },
+}
+
+/// A conditional feature with its matching criteria.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConditionalFeature {
+    /// The cargo feature to enable
+    pub feature: String,
+    /// PEP 440 version specifier for the target Python version
+    pub python_version: Option<VersionSpecifiers>,
+    /// Python implementation name, e.g. "cpython", "pypy", "graalpy"
+    pub python_implementation: Option<String>,
 }
 
 impl FeatureSpec {
     /// Split a list of feature specs into plain features and conditional features.
-    pub fn split(specs: Vec<FeatureSpec>) -> (Vec<String>, Vec<(String, VersionSpecifiers)>) {
+    pub fn split(specs: Vec<FeatureSpec>) -> (Vec<String>, Vec<ConditionalFeature>) {
         let mut plain = Vec::new();
         let mut conditional = Vec::new();
         for spec in specs {
@@ -271,29 +295,58 @@ impl FeatureSpec {
                 FeatureSpec::Plain(f) => plain.push(f),
                 FeatureSpec::Conditional {
                     feature,
+                    python_version: None,
+                    python_implementation: None,
+                } => plain.push(feature),
+                FeatureSpec::Conditional {
+                    feature,
                     python_version,
-                } => conditional.push((feature, python_version)),
+                    python_implementation,
+                } => conditional.push(ConditionalFeature {
+                    feature,
+                    python_version,
+                    python_implementation,
+                }),
             }
         }
         (plain, conditional)
     }
 
-    /// Resolve which conditional features should be enabled for a given Python version.
-    ///
-    /// Returns the feature names whose `python-version` specifier matches the
-    /// given `(major, minor)` version.
+    /// Resolve which conditional features should be enabled for the given
+    /// build environment.
     pub fn resolve_conditional(
-        conditional_features: &[(String, VersionSpecifiers)],
-        major: usize,
-        minor: usize,
+        conditional_features: &[ConditionalFeature],
+        env: &FeatureConditionEnv,
     ) -> Vec<String> {
-        let python_version = Version::new([major as u64, minor as u64]);
+        let python_version = Version::new([env.major as u64, env.minor as u64]);
         conditional_features
             .iter()
-            .filter(|(_, specifiers)| specifiers.contains(&python_version))
-            .map(|(feature, _)| feature.clone())
+            .filter(|f| {
+                f.python_version
+                    .as_ref()
+                    .is_none_or(|s| s.contains(&python_version))
+            })
+            .filter(|f| {
+                f.python_implementation
+                    .as_ref()
+                    .is_none_or(|i| i.eq_ignore_ascii_case(env.implementation_name))
+            })
+            .map(|f| f.feature.clone())
             .collect()
     }
+}
+
+/// The build environment used to evaluate conditional features.
+///
+/// TODO: add fields like `target_os`, `target_arch`, etc. for
+/// Rust target-based conditions.
+pub struct FeatureConditionEnv<'a> {
+    /// Python major version
+    pub major: usize,
+    /// Python minor version
+    pub minor: usize,
+    /// Python implementation name, e.g. "cpython", "pypy"
+    pub implementation_name: &'a str,
 }
 
 /// The `[tool.maturin]` section of a pyproject.toml
@@ -619,7 +672,9 @@ impl PyProjectToml {
 mod tests {
     use crate::{
         PyProjectToml,
-        pyproject_toml::{FeatureSpec, Format, Formats, GlobPattern, ToolMaturin},
+        pyproject_toml::{
+            FeatureConditionEnv, FeatureSpec, Format, Formats, GlobPattern, ToolMaturin,
+        },
     };
     use expect_test::expect;
     use fs_err as fs;
@@ -889,34 +944,87 @@ mod tests {
         let specs = vec![
             FeatureSpec::Conditional {
                 feature: "pyo3/abi3-py311".to_string(),
-                python_version: ">=3.11".parse().unwrap(),
+                python_version: Some(">=3.11".parse().unwrap()),
+                python_implementation: None,
             },
             FeatureSpec::Conditional {
                 feature: "pyo3/abi3-py38".to_string(),
-                python_version: "<3.11".parse().unwrap(),
+                python_version: Some("<3.11".parse().unwrap()),
+                python_implementation: None,
             },
             FeatureSpec::Conditional {
                 feature: "fast-buffer".to_string(),
-                python_version: ">=3.11".parse().unwrap(),
+                python_version: Some(">=3.11".parse().unwrap()),
+                python_implementation: None,
             },
         ];
         let (_plain, conditional) = FeatureSpec::split(specs);
 
+        let cpython = |major, minor| FeatureConditionEnv {
+            major,
+            minor,
+            implementation_name: "cpython",
+        };
+
         // Python 3.12 should match >=3.11
-        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 12);
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 12));
         assert_eq!(resolved, vec!["pyo3/abi3-py311", "fast-buffer"]);
 
         // Python 3.11 should match >=3.11
-        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 11);
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 11));
         assert_eq!(resolved, vec!["pyo3/abi3-py311", "fast-buffer"]);
 
         // Python 3.9 should match <3.11
-        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 9);
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 9));
         assert_eq!(resolved, vec!["pyo3/abi3-py38"]);
 
         // Python 3.8 should match <3.11
-        let resolved = FeatureSpec::resolve_conditional(&conditional, 3, 8);
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 8));
         assert_eq!(resolved, vec!["pyo3/abi3-py38"]);
+    }
+
+    #[test]
+    fn test_resolve_conditional_features_with_implementation() {
+        let specs = vec![
+            FeatureSpec::Conditional {
+                feature: "pyo3/abi3-py311".to_string(),
+                python_version: Some(">=3.11".parse().unwrap()),
+                python_implementation: Some("cpython".to_string()),
+            },
+            FeatureSpec::Conditional {
+                feature: "pypy-compat".to_string(),
+                python_version: None,
+                python_implementation: Some("pypy".to_string()),
+            },
+            FeatureSpec::Conditional {
+                feature: "always-conditional".to_string(),
+                python_version: Some(">=3.10".parse().unwrap()),
+                python_implementation: None,
+            },
+        ];
+        let (_plain, conditional) = FeatureSpec::split(specs);
+
+        let env = |major, minor, impl_name| FeatureConditionEnv {
+            major,
+            minor,
+            implementation_name: impl_name,
+        };
+
+        // CPython 3.12 should match abi3 and always-conditional
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 12, "cpython"));
+        assert_eq!(resolved, vec!["pyo3/abi3-py311", "always-conditional"]);
+
+        // PyPy 3.10 should match pypy-compat and always-conditional
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 10, "pypy"));
+        assert_eq!(resolved, vec!["pypy-compat", "always-conditional"]);
+
+        // CPython 3.10 should only match always-conditional (not abi3 due to version)
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 10, "cpython"));
+        assert_eq!(resolved, vec!["always-conditional"]);
+
+        // PyPy 3.9 should only match pypy-compat (version too low for always-conditional)
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 9, "pypy"));
+        assert_eq!(resolved, vec!["pypy-compat"]);
     }
 
     #[test]
@@ -934,7 +1042,34 @@ mod tests {
                 FeatureSpec::Plain("plain-feature".to_string()),
                 FeatureSpec::Conditional {
                     feature: "pyo3/abi3-py311".to_string(),
-                    python_version: ">=3.11".parse().unwrap(),
+                    python_version: Some(">=3.11".parse().unwrap()),
+                    python_implementation: None,
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn test_feature_spec_deserialize_with_implementation() {
+        let toml_str = r#"
+            features = [
+                { feature = "pyo3/abi3-py311", python-version = ">=3.11", python-implementation = "cpython" },
+                { feature = "pypy-compat", python-implementation = "pypy" },
+            ]
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            maturin.features,
+            Some(vec![
+                FeatureSpec::Conditional {
+                    feature: "pyo3/abi3-py311".to_string(),
+                    python_version: Some(">=3.11".parse().unwrap()),
+                    python_implementation: Some("cpython".to_string()),
+                },
+                FeatureSpec::Conditional {
+                    feature: "pypy-compat".to_string(),
+                    python_version: None,
+                    python_implementation: Some("pypy".to_string()),
                 },
             ])
         );

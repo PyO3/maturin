@@ -188,7 +188,7 @@ fn cargo_build_command(
     python_interpreter: Option<&PythonInterpreter>,
     compile_target: &CompileTarget,
 ) -> Result<Command> {
-    use crate::pyproject_toml::FeatureSpec;
+    use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
 
     let target = &context.target;
 
@@ -199,16 +199,18 @@ fn cargo_build_command(
     };
     let mut cargo_options = context.cargo_options.clone();
 
-    // Resolve conditional features based on the target Python version
+    // Resolve conditional features based on the target Python version and implementation
     if let Some(interpreter) = python_interpreter {
-        let extra = FeatureSpec::resolve_conditional(
-            &context.conditional_features,
-            interpreter.major,
-            interpreter.minor,
-        );
+        let env = FeatureConditionEnv {
+            major: interpreter.major,
+            minor: interpreter.minor,
+            implementation_name: &interpreter.implementation_name,
+        };
+        let extra = FeatureSpec::resolve_conditional(&context.conditional_features, &env);
         if !extra.is_empty() {
             debug!(
-                "Enabling conditional features for Python {}.{}: {}",
+                "Enabling conditional features for Python {} {}.{}: {}",
+                interpreter.implementation_name,
                 interpreter.major,
                 interpreter.minor,
                 extra.join(", ")

@@ -14,6 +14,7 @@ use crate::compression::CompressionOptions;
 use crate::module_writer::ModuleWriter;
 use crate::module_writer::{WheelWriter, add_data, write_pth};
 use crate::project_layout::ProjectLayout;
+use crate::pyproject_toml::ConditionalFeature;
 use crate::sbom::{SbomData, generate_sbom_data, write_sboms};
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
@@ -29,7 +30,6 @@ use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
 use lddtree::Library;
 use normpath::PathExt;
-use pep440_rs::VersionSpecifiers;
 use platform_info::*;
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -156,8 +156,8 @@ pub struct BuildContext {
     pub include_import_lib: bool,
     /// Include debug info files (.pdb, .dSYM, .dwp) in the wheel
     pub include_debuginfo: bool,
-    /// Cargo features conditionally enabled based on the target Python version
-    pub conditional_features: Vec<(String, VersionSpecifiers)>,
+    /// Cargo features conditionally enabled based on the target Python version/implementation
+    pub conditional_features: Vec<ConditionalFeature>,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).

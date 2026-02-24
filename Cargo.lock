@@ -2248,9 +2248,9 @@ dependencies = [
 
 [[package]]
 name = "python-pkginfo"
-version = "0.6.6"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "464e5e2e0fb6c8c2c7aedc0cd6615258a3def4e34b417f6bf8835e76e7d441d4"
+checksum = "229fe47647d6602b9b0934b21fab8aece1c5a5aeb0a934196a14355fec656623"
 dependencies = [
  "flate2",
  "fs-err",
@@ -2258,7 +2258,7 @@ dependencies = [
  "rfc2047-decoder",
  "tar",
  "thiserror 2.0.18",
- "zip 4.6.1",
+ "zip 8.1.0",
 ]
 
 [[package]]
@@ -4227,7 +4227,6 @@ dependencies = [
  "flate2",
  "indexmap",
  "memchr",
- "zopfli",
 ]
 
 [[package]]

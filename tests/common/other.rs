@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use tar::Archive;
-use time::OffsetDateTime;
+use time::PrimitiveDateTime;
 use zip::ZipArchive;
 
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -291,11 +291,11 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
 
 pub fn check_wheel_mtimes(
     package: impl AsRef<Path>,
-    expected_mtime: Vec<OffsetDateTime>,
+    expected_mtime: Vec<PrimitiveDateTime>,
     unique_name: &str,
 ) -> Result<()> {
     let mut wheel = build_wheel_files(package, unique_name)?;
-    let mut mtimes = BTreeSet::<OffsetDateTime>::new();
+    let mut mtimes = BTreeSet::<PrimitiveDateTime>::new();
 
     for idx in 0..wheel.len() {
         let mtime = wheel.by_index(idx)?.last_modified().unwrap().try_into()?;

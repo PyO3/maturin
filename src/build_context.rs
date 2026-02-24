@@ -1567,6 +1567,7 @@ fn zip_mtime() -> DateTime {
         .and_then(|epoch| {
             let epoch: i64 = epoch.parse()?;
             let dt = time::OffsetDateTime::from_unix_timestamp(epoch)?;
+            let dt = time::PrimitiveDateTime::new(dt.date(), dt.time());
             let dt = DateTime::try_from(dt)?;
             Ok(dt)
         });

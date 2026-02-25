@@ -1048,32 +1048,34 @@ impl BuildContext {
             .cloned()
             .ok_or_else(|| anyhow!(error_msg,))?;
 
+        self.stage_artifact(&mut artifact)?;
+
         if let Some(extension_name) = extension_name {
-            // globin has an issue parsing MIPS64 ELF, see https://github.com/m4b/goblin/issues/274
+            // goblin has an issue parsing MIPS64 ELF, see https://github.com/m4b/goblin/issues/274
             // But don't fail the build just because we can't emit a warning
             let _ = warn_missing_py_init(&artifact.path, extension_name);
         }
-
-        self.copy_artifact_for_repair(&mut artifact)?;
         Ok((artifact, result.out_dirs))
     }
 
-    /// Copy an artifact to a staging directory so that auditwheel repair can
-    /// modify it in-place without altering the original cargo build output.
-    /// This prevents errors on subsequent rebuilds where cargo skips
-    /// recompilation.
+    /// Move an artifact to a private staging directory so that:
+    /// 1. `warn_missing_py_init` can safely mmap the file without risk of
+    ///    concurrent modification by cargo / rust-analyzer.
+    /// 2. Auditwheel repair can modify it in-place without altering the
+    ///    original cargo build output.
     ///
-    /// Only performs the copy when auditwheel mode is `Repair`, since that is
-    /// the only mode that modifies artifacts in-place.
-    fn copy_artifact_for_repair(&self, artifact: &mut BuildArtifact) -> Result<()> {
-        if self.editable || !matches!(self.auditwheel, AuditWheelMode::Repair) {
-            return Ok(());
-        }
+    /// Uses `fs::rename` for an atomic move (avoids copying multi-GB debug
+    /// artifacts), falling back to `fs::copy` when the rename fails (e.g.
+    /// cross-device).
+    fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
         fs::create_dir_all(&maturin_build)?;
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
-        fs::copy(artifact_path, &new_artifact_path)?;
+        if fs::rename(artifact_path, &new_artifact_path).is_err() {
+            // Rename fails across filesystem boundaries, fall back to copy
+            fs::copy(artifact_path, &new_artifact_path)?;
+        }
         artifact.path = new_artifact_path.normalize()?.into_path_buf();
         Ok(())
     }
@@ -1322,7 +1324,7 @@ impl BuildContext {
             policies.push(policy);
             ext_libs.push(external_libs);
 
-            self.copy_artifact_for_repair(&mut artifact)?;
+            self.stage_artifact(&mut artifact)?;
             artifact_paths.push(artifact);
         }
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();

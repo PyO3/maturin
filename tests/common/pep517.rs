@@ -106,6 +106,7 @@ pub fn target_has_profile(unique_name: &str, profile: &str) -> bool {
     };
     PathBuf::from(target_dir(unique_name))
         .join(profile)
+        .join("deps")
         .join(shared_library)
         .is_file()
 }

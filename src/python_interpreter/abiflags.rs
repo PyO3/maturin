@@ -125,7 +125,10 @@ pub(super) fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
         soabi_split.take(3).collect::<Vec<_>>().join("-")
     } else if !soabi.is_empty() {
         // pyston, ironpython, others?
-        soabi_split.nth(1).unwrap().to_string()
+        match soabi_split.nth(1) {
+            Some(abi) => abi.to_string(),
+            None => return None,
+        }
     } else {
         return None;
     };
@@ -156,6 +159,8 @@ mod tests {
                 Some("graalpy_38_native"),
             ),
             (".pyston-23-x86_64-linux-gnu.so", Some("23")),
+            // soabi without dashes should return None, not panic
+            (".nodashes.so", None),
         ];
         for (ext_suffix, expected) in cases {
             assert_eq!(calculate_abi_tag(ext_suffix).as_deref(), expected);

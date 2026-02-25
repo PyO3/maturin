@@ -567,8 +567,11 @@ impl<'a> InterpreterResolver<'a> {
                 .file_name()
                 .map(|f| f.to_string_lossy())
                 .unwrap_or_default();
+            // Check parsed spec first, then fall back to prefix match for
+            // version-less names like "pypy" or "/usr/bin/pypy"
             InterpreterSpec::try_parse_filename(&name)
                 .is_some_and(|s| s.kind == InterpreterKind::PyPy)
+                || name.starts_with("pypy")
         })
     }
 
@@ -726,7 +729,14 @@ impl<'a> InterpreterResolver<'a> {
             let python = interp.display().to_string();
             let spec = match InterpreterSpec::parse(&python)? {
                 Some(spec) => spec,
-                None => continue, // version-less name like bare "pypy"
+                None => {
+                    // version-less name like bare "pypy" — warn the user
+                    eprintln!(
+                        "⚠️  Warning: Skipping '{python}': could not determine version. \
+                         Specify a version like '{python}3.11'."
+                    );
+                    continue;
+                }
             };
             let sysconfig = InterpreterConfig::lookup_one(
                 self.target,

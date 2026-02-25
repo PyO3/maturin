@@ -427,9 +427,14 @@ impl<'a> InterpreterResolver<'a> {
                      PyO3's `generate-import-lib` feature"
                 );
             }
-            let sysconfig_interps = self
-                .find_in_sysconfig(self.user_interpreters)
-                .unwrap_or_default();
+            let sysconfig_result = self.find_in_sysconfig(self.user_interpreters);
+            // Auto-discovery: swallow errors, fall through to placeholder.
+            // User-specified interpreters: propagate parse errors.
+            let sysconfig_interps = if self.user_interpreters.is_empty() {
+                sysconfig_result.unwrap_or_default()
+            } else {
+                sysconfig_result?
+            };
             // If the user specified interpreters and sysconfig didn't find them
             // either, fall through to the error below rather than silently
             // returning an empty list.

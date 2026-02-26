@@ -187,7 +187,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
         if: ${{ !contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target) }}
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+      - uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
         if: contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target)
         with:
           toolchain: stable

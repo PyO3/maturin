@@ -109,7 +109,7 @@ jobs:
           version: 0.15.2
       - run: rustup target add wasm32-wasip1 # Used by the test suite
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@ad42f43f1a4106eee00d8ef193c59285af1272b0 # nextest
+        uses: taiki-e/install-action@7410117eef9b9bd416593a4ae34d1bda0b4a2766 # nextest
         with:
           tool: nextest
       - name: Install additional Rust target
@@ -294,7 +294,7 @@ jobs:
         with:
           shared-key: maturin-build
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@ad42f43f1a4106eee00d8ef193c59285af1272b0 # nextest
+        uses: taiki-e/install-action@7410117eef9b9bd416593a4ae34d1bda0b4a2766 # nextest
         with:
           tool: nextest
       - name: cargo test

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "schedule": ["before 4am on the first day of the month"],
+  "packageRules": [
+    {
+      "matchManagers": ["cargo"],
+      "groupName": "crates-io",
+      "matchPackagePatterns": ["*"]
+    }
+  ]
+}

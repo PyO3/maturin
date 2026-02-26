@@ -8,7 +8,7 @@ on:
       - "**.md"
       - ".cirrus.yml"
       - ".github/ISSUE_TEMPLATE/**"
-      - ".github/dependabot.yml"
+      - "renovate.json"
   workflow_dispatch:
 
 concurrency:
@@ -20,13 +20,13 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: |
           rustup component add rustfmt
           rustup component add clippy
       - name: cargo fmt
         run: cargo fmt --all -- --check
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: EmbarkStudios/cargo-deny-action@3fd3802e88374d3fe9159b834c7714ec57d6c979 # v2
         with:
           arguments: --all-features
       - name: cargo clippy
@@ -79,22 +79,22 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: sccache setup
-        uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
       - name: Install python packages
         run: |
           uv tool install virtualenv
           uv tool install twine
           uv tool install uniffi-bindgen==0.28.0
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: conda-incubator/setup-miniconda@fc2d68f6413eb2d87b895e92f8584b5b94a10167 # v3
         if: ${{ matrix.os != 'windows-11-arm' }}
         with:
           auto-activate-base: "false"
           activate-environment: ""
           miniconda-version: "latest"
       - id: setup-python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set PYTHON_VERSION env var
@@ -104,12 +104,14 @@ jobs:
           # remove -dev suffix
           python_version=$(echo ${{ matrix.python-version }} | sed -e s/-dev//)
           echo "PYTHON_VERSION=$python_version" >> "${GITHUB_ENV}"
-      - uses: mlugg/setup-zig@v2
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
           version: 0.15.2
       - run: rustup target add wasm32-wasip1 # Used by the test suite
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@ad42f43f1a4106eee00d8ef193c59285af1272b0 # nextest
+        with:
+          tool: nextest
       - name: Install additional Rust target
         if: startsWith(matrix.os, 'macos')
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
@@ -185,13 +187,13 @@ jobs:
     name: Build maturin
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: rustup show
       - run: rustup target add x86_64-unknown-linux-musl
       - run: sudo apt-get install musl-tools
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
       - run: cargo build --target x86_64-unknown-linux-musl --release
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: maturin-build
           path: target/x86_64-unknown-linux-musl/release/maturin
@@ -205,15 +207,15 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
         with:
           version: "v0.10.0"
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: 3.12
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: maturin-build
           path: bin
@@ -241,30 +243,30 @@ jobs:
       PYTHON_VERSION: "3.13"
       NODE_VERSION: 18
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         id: setup-python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: |
           rustup default nightly
           rustup component add rust-src
           rustup target add wasm32-unknown-emscripten
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           shared-key: maturin-build
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
       - run: uv tool install nox
       - name: Setup Pyodide
         run: nox -s setup-pyodide
-      - uses: mymindstorm/setup-emsdk@v14
+      - uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
           actions-cache-folder: emsdk-cache
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Run tests
@@ -284,15 +286,17 @@ jobs:
           set -ex
           apk add cargo python3-dev libffi-dev py3-pip curl \
             bash tar zstd git patchelf py3-virtualenv
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Fix git permissions
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           shared-key: maturin-build
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@ad42f43f1a4106eee00d8ef193c59285af1272b0 # nextest
+        with:
+          tool: nextest
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests
@@ -308,9 +312,11 @@ jobs:
         manylinux: ["manylinux_2_28"]
     container: quay.io/pypa/${{ matrix.manylinux }}_x86_64
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/download-artifact@v7
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          toolchain: stable
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: maturin-build
           path: bin
@@ -328,19 +334,19 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: false
@@ -387,14 +393,15 @@ jobs:
             python: pypy3.11
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v7
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: maturin-build
           path: bin
       - run: chmod +x bin/maturin
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
+          toolchain: stable
           targets: ${{ matrix.platform.target }}
       - name: Build wheels
         run: |
@@ -424,8 +431,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
@@ -436,14 +443,14 @@ jobs:
               - 'MANIFEST.in'
               - 'Cargo.toml'
               - '.github/workflows/test.yml'
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
       # Caching
       - name: Sccache Setup
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
         with:
           version: "v0.10.0"
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
         with:
           python-version: "3.10"
@@ -460,7 +467,7 @@ jobs:
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
       - name: Upload wheel artifacts
         if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheels-${{ runner.os }}
           path: dist
@@ -469,11 +476,11 @@ jobs:
     name: Test MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: rustup default 1.88.0
       # Caching
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
       - run: cargo build --no-default-features
       - name: cargo build
         run: cargo build --all
@@ -510,14 +517,14 @@ jobs:
             apt-packages: gcc-arm-linux-gnueabi
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Install packages
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.platform.apt-packages }}
       - run: rustup target add ${{ matrix.platform.target }}
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
       - name: cargo check
         run: cargo check --target ${{ matrix.platform.target }}
 

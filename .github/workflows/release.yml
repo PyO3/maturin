@@ -20,16 +20,16 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
         with:
           # No need to take cache size for maturin in the release pipeline
           enable-cache: "false"
       - name: Build sdist
         run: uvx maturin sdist -o dist
       - name: Upload sdist
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheels-sdist
           path: dist/*.tar.gz
@@ -66,7 +66,7 @@ jobs:
       CARGO_PROFILE_RELEASE_LTO: "fat"
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: rustup target add ${{ matrix.target }}
 
       - name: Install musl tools
@@ -130,13 +130,13 @@ jobs:
           cd -
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheels-${{ matrix.target }}
           path: dist
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: binaries-${{ matrix.target }}
           path: |
@@ -184,15 +184,16 @@ jobs:
         CARGO_HOME: /root/.cargo
         CARGO_PROFILE_RELEASE_LTO: "${{ matrix.platform.lto || 'fat' }}"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
         if: ${{ !contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target) }}
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         if: contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target)
         with:
+          toolchain: stable
           targets: ${{ matrix.platform.target }}
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
         with:
           # No need to take cache size for maturin in the release pipeline
           enable-cache: "false"
@@ -216,12 +217,12 @@ jobs:
       - name: Upload wheel artifacts
         # loongarch64 is not allowed to publish to pypi currently, see https://github.com/pypi/warehouse/blob/348117529910181cb8c14e9b5fb00fcf4dbaf07c/warehouse/forklift/legacy.py#L114-L185
         if: ${{ !contains(fromJson('["loongarch64-unknown-linux-musl"]'), matrix.platform.target) }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: binaries-${{ matrix.platform.target }}
           path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
@@ -242,18 +243,18 @@ jobs:
       url: ${{ steps.set_url.outputs.env_url }}
     needs: [sdist, build, build-musl]
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: wheels-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           subject-path: |
             ./*.tar.gz
             ./*.whl
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
       - name: Publish (dry run)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: uv publish --dry-run '*'
@@ -278,12 +279,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: binaries-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           subject-path: |
@@ -292,7 +293,7 @@ jobs:
             ./*.deb
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           files: |
             *.tar.gz
@@ -311,13 +312,13 @@ jobs:
       name: crates.io
       url: ${{ steps.set_url.outputs.env_url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: cargo publish (dry run)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: cargo publish --dry-run
       - name: Authenticate with crates.io
         if: startsWith(github.ref, 'refs/tags/')
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1
         id: auth
       - name: cargo publish
         if: startsWith(github.ref, 'refs/tags/')

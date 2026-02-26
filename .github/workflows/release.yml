@@ -81,7 +81,7 @@ jobs:
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
 
-      # Those two will also create target/${{ matrix.target }}/maturin
+      # Those two will also create target/maturin/maturin
       - name: Build wheel (linux x86_64)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
@@ -111,12 +111,19 @@ jobs:
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
+          cd target/maturin
+          7z a ../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
           cd -
 
-      - name: Archive binary (linux and macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Archive binary (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd target/maturin
+          tar czvf ../../${{ matrix.name }} ${{ github.event.repository.name }}
+          cd -
+
+      - name: Archive binary (macOS x86_64)
+        if: matrix.os == 'macos-latest'
         run: |
           cd target/${{ matrix.target }}/release
           tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
@@ -213,7 +220,7 @@ jobs:
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary
-        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/maturin maturin
       - name: Upload wheel artifacts
         # loongarch64 is not allowed to publish to pypi currently, see https://github.com/pypi/warehouse/blob/348117529910181cb8c14e9b5fb00fcf4dbaf07c/warehouse/forklift/legacy.py#L114-L185
         if: ${{ !contains(fromJson('["loongarch64-unknown-linux-musl"]'), matrix.platform.target) }}

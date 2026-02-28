@@ -1,7 +1,7 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use crate::build_context::hash_file;
+use crate::util::hash_file;
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;

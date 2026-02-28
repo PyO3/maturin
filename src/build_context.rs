@@ -19,6 +19,7 @@ use crate::sbom::{SbomData, generate_sbom_data, write_sboms};
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::target::{Arch, Os};
+use crate::util::{hash_file, zip_mtime};
 use crate::{
     BridgeModel, BuildArtifact, Metadata24, PyProjectToml, PythonInterpreter, Target,
     VirtualWriter, compile, pyproject_toml::Format, pyproject_toml::SbomConfig,
@@ -32,14 +33,11 @@ use lddtree::Library;
 use normpath::PathExt;
 use platform_info::*;
 use regex::Regex;
-use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
-use std::io;
 use std::path::{Path, PathBuf};
 use tracing::instrument;
-use zip::DateTime;
 
 /// Unpacks an sdist tarball into a temporary directory and returns the path
 /// to the Cargo.toml and pyproject.toml inside it, along with the tempdir
@@ -1367,15 +1365,6 @@ impl BuildContext {
     }
 }
 
-/// Calculate the sha256 of a file
-pub fn hash_file(path: impl AsRef<Path>) -> Result<String, io::Error> {
-    let mut file = fs::File::open(path.as_ref())?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)?;
-    let hex = format!("{:x}", hasher.finalize());
-    Ok(hex)
-}
-
 /// Get the default macOS deployment target version
 fn macosx_deployment_target(
     deploy_target: Option<&str>,
@@ -1562,22 +1551,6 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
     bail!(
         "Failed to determine Android API level. Please set the ANDROID_API_LEVEL environment variable."
     );
-}
-
-/// Returns a DateTime representing the value SOURCE_DATE_EPOCH environment variable
-/// Note that the earliest timestamp a zip file can represent is 1980-01-01
-fn zip_mtime() -> DateTime {
-    let res = env::var("SOURCE_DATE_EPOCH")
-        .context("") // Only using context() to unify the error types
-        .and_then(|epoch| {
-            let epoch: i64 = epoch.parse()?;
-            let dt = time::OffsetDateTime::from_unix_timestamp(epoch)?;
-            let dt = time::PrimitiveDateTime::new(dt.date(), dt.time());
-            let dt = DateTime::try_from(dt)?;
-            Ok(dt)
-        });
-
-    res.unwrap_or_default()
 }
 
 #[cfg(test)]

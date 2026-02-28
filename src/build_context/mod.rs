@@ -1,3 +1,7 @@
+mod builder;
+
+pub use builder::BuildContextBuilder;
+
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
@@ -834,6 +838,7 @@ impl BuildContext {
     /// The `make_generator` closure receives the writer's temp directory
     /// (needed by some generators for intermediate files) and returns the
     /// binding generator to use.
+    #[allow(clippy::too_many_arguments, clippy::needless_lifetimes)]
     fn write_wheel<'a, F>(
         &'a self,
         tag: &str,

@@ -1072,6 +1072,9 @@ impl BuildContext {
         fs::create_dir_all(&maturin_build)?;
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
+        // Remove any stale file at the destination so that `fs::rename` succeeds
+        // on Windows (where rename fails if the destination already exists).
+        let _ = fs::remove_file(&new_artifact_path);
         if fs::rename(artifact_path, &new_artifact_path).is_err() {
             // Rename fails across filesystem boundaries, fall back to copy
             fs::copy(artifact_path, &new_artifact_path)?;

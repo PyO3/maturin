@@ -94,19 +94,10 @@ fn insert_path(env_var: &str, new_path: &Path) -> String {
         .expect("PATH is not valid utf8")
 }
 
-/// Whether cargo built the shared library for the specified cargo profile in the test target
-/// directory.
+/// Whether cargo built for the specified cargo profile in the test target directory.
 pub fn target_has_profile(unique_name: &str, profile: &str) -> bool {
-    let shared_library = if cfg!(windows) {
-        "pyo3_pure.dll"
-    } else if cfg!(target_os = "macos") {
-        "libpyo3_pure.dylib"
-    } else {
-        "libpyo3_pure.so"
-    };
-    PathBuf::from(target_dir(unique_name))
-        .join(profile)
-        .join("deps")
-        .join(shared_library)
-        .is_file()
+    let profile_dir = PathBuf::from(target_dir(unique_name)).join(profile);
+    // Check for cargo's .fingerprint directory which is always created for the
+    // profile that was used, and is not affected by maturin's artifact staging.
+    profile_dir.join(".fingerprint").is_dir()
 }

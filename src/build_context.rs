@@ -169,8 +169,6 @@ impl BuildContext {
     /// correct builder.
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
-        use itertools::Itertools;
-
         fs::create_dir_all(&self.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -183,81 +181,24 @@ impl BuildContext {
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter, &sbom_data)?,
             BridgeModel::PyO3(crate::PyO3 { abi3, .. }) => match abi3 {
                 Some(Abi3Version::Version(major, minor)) => {
-                    let abi3_interps: Vec<_> = self
-                        .interpreter
-                        .iter()
-                        .filter(|interp| {
-                            interp.has_stable_api()
-                                && (interp.major as u8, interp.minor as u8) >= (*major, *minor)
-                        })
-                        .cloned()
-                        .collect();
-                    let non_abi3_interps: Vec<_> = self
-                        .interpreter
-                        .iter()
-                        .filter(|interp| {
-                            !interp.has_stable_api()
-                                || (interp.major as u8, interp.minor as u8) < (*major, *minor)
-                        })
-                        .cloned()
-                        .collect();
-                    let mut built_wheels = Vec::new();
-                    if !abi3_interps.is_empty() {
-                        built_wheels.extend(self.build_pyo3_wheel_abi3(
-                            &abi3_interps,
-                            *major,
-                            *minor,
-                            &sbom_data,
-                        )?);
-                    }
-                    if !non_abi3_interps.is_empty() {
-                        let interp_names: HashSet<_> = non_abi3_interps
-                            .iter()
-                            .map(|interp| interp.to_string())
-                            .collect();
-                        eprintln!(
-                            "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
-                            interp_names.iter().join(", ")
-                        );
-                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps, &sbom_data)?);
-                    }
-                    built_wheels
+                    self.build_abi3_wheels(*major, *minor, &sbom_data)?
                 }
                 Some(Abi3Version::CurrentPython) => {
-                    let abi3_interps: Vec<_> = self
+                    let first_abi3 = self
                         .interpreter
                         .iter()
-                        .filter(|interp| interp.has_stable_api())
-                        .cloned()
-                        .collect();
-                    let non_abi3_interps: Vec<_> = self
-                        .interpreter
-                        .iter()
-                        .filter(|interp| !interp.has_stable_api())
-                        .cloned()
-                        .collect();
-                    let mut built_wheels = Vec::new();
-                    if !abi3_interps.is_empty() {
-                        let interp = abi3_interps.first().unwrap();
-                        built_wheels.extend(self.build_pyo3_wheel_abi3(
-                            &abi3_interps,
+                        .find(|interp| interp.has_stable_api());
+                    match first_abi3 {
+                        Some(interp) => self.build_abi3_wheels(
                             interp.major as u8,
                             interp.minor as u8,
                             &sbom_data,
-                        )?);
+                        )?,
+                        None => {
+                            // No abi3-capable interpreter, build all as version-specific
+                            self.build_pyo3_wheels(&self.interpreter, &sbom_data)?
+                        }
                     }
-                    if !non_abi3_interps.is_empty() {
-                        let interp_names: HashSet<_> = non_abi3_interps
-                            .iter()
-                            .map(|interp| interp.to_string())
-                            .collect();
-                        eprintln!(
-                            "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
-                            interp_names.iter().join(", ")
-                        );
-                        built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps, &sbom_data)?);
-                    }
-                    built_wheels
                 }
                 None => self.build_pyo3_wheels(&self.interpreter, &sbom_data)?,
             },
@@ -281,6 +222,58 @@ impl BuildContext {
         }
 
         Ok(wheels)
+    }
+
+    /// Split interpreters into abi3-capable and non-abi3 groups, build the
+    /// appropriate wheel type for each group, and return all built wheels.
+    fn build_abi3_wheels(
+        &self,
+        major: u8,
+        minor: u8,
+        sbom_data: &Option<SbomData>,
+    ) -> Result<Vec<BuiltWheelMetadata>> {
+        use itertools::Itertools;
+
+        let abi3_interps: Vec<_> = self
+            .interpreter
+            .iter()
+            .filter(|interp| {
+                interp.has_stable_api()
+                    && (interp.major as u8, interp.minor as u8) >= (major, minor)
+            })
+            .cloned()
+            .collect();
+        let non_abi3_interps: Vec<_> = self
+            .interpreter
+            .iter()
+            .filter(|interp| {
+                !interp.has_stable_api()
+                    || (interp.major as u8, interp.minor as u8) < (major, minor)
+            })
+            .cloned()
+            .collect();
+
+        let mut built_wheels = Vec::new();
+        if !abi3_interps.is_empty() {
+            built_wheels.extend(self.build_pyo3_wheel_abi3(
+                &abi3_interps,
+                major,
+                minor,
+                sbom_data,
+            )?);
+        }
+        if !non_abi3_interps.is_empty() {
+            let interp_names: HashSet<_> = non_abi3_interps
+                .iter()
+                .map(|interp| interp.to_string())
+                .collect();
+            eprintln!(
+                "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
+                interp_names.iter().join(", ")
+            );
+            built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps, sbom_data)?);
+        }
+        Ok(built_wheels)
     }
 
     /// Bridge model

@@ -249,8 +249,59 @@ fn cargo_build_command(
         .unwrap_or_default();
     let original_rustflags = rustflags.flags.clone();
 
-    // We need to pass --bin / --lib
     let bridge_model = &compile_target.bridge_model;
+    configure_bin_lib_flags(
+        &mut cargo_rustc,
+        &mut rustflags,
+        compile_target,
+        bridge_model,
+        target,
+    );
+
+    configure_platform_linker_args(
+        &mut cargo_rustc,
+        &mut rustflags,
+        target,
+        bridge_model,
+        &context.module_name,
+        python_interpreter,
+    );
+
+    if context.strip {
+        // https://doc.rust-lang.org/rustc/codegen-options/index.html#strip
+        cargo_rustc
+            .args
+            .extend(["-C".to_string(), "strip=symbols".to_string()]);
+    }
+
+    configure_debuginfo_flags(&mut rustflags, target, context.include_debuginfo)?;
+
+    let mut build_command = create_build_command(context, cargo_rustc, target_triple)?;
+
+    if !rustflags.flags.is_empty() && rustflags.flags != original_rustflags {
+        build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
+    }
+
+    configure_pyo3_env(
+        &mut build_command,
+        context,
+        python_interpreter,
+        bridge_model,
+        target,
+        target_triple,
+    )?;
+
+    Ok(build_command)
+}
+
+/// Configure --bin / --lib flags and musl-related rustflags.
+fn configure_bin_lib_flags(
+    cargo_rustc: &mut cargo_options::Rustc,
+    rustflags: &mut cargo_config2::Flags,
+    compile_target: &CompileTarget,
+    bridge_model: &BridgeModel,
+    target: &Target,
+) {
     match bridge_model {
         BridgeModel::Bin(..) => {
             cargo_rustc.bin.push(compile_target.target.name.clone());
@@ -260,7 +311,7 @@ fn cargo_build_command(
             // https://github.com/rust-lang/rust/issues/59302#issue-422994250
             // We must only do this for libraries as it breaks binaries
             // For some reason this value is ignored when passed as rustc argument
-            if context.target.is_musl_libc()
+            if target.is_musl_libc()
                 && !rustflags
                     .flags
                     .iter()
@@ -272,114 +323,158 @@ fn cargo_build_command(
             }
         }
     }
+}
 
-    // https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
+/// Configure platform-specific linker arguments (macOS PyO3, Emscripten).
+fn configure_platform_linker_args(
+    cargo_rustc: &mut cargo_options::Rustc,
+    rustflags: &mut cargo_config2::Flags,
+    target: &Target,
+    bridge_model: &BridgeModel,
+    module_name: &str,
+    python_interpreter: Option<&PythonInterpreter>,
+) {
     if target.is_macos() {
         if let BridgeModel::PyO3 { .. } = bridge_model {
-            // Change LC_ID_DYLIB to the final .so name for macOS targets to avoid linking with
-            // non-existent library.
-            // See https://github.com/PyO3/setuptools-rust/issues/106 for detail
-            let module_name = &context.module_name;
-            let so_filename = if bridge_model.is_abi3() {
-                format!("{module_name}.abi3.so")
-            } else {
-                python_interpreter
-                    .expect("missing python interpreter for non-abi3 wheel build")
-                    .get_library_name(module_name)
-            };
-            let macos_dylib_install_name =
-                format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
-            let mac_args = [
-                "-C".to_string(),
-                "link-arg=-undefined".to_string(),
-                "-C".to_string(),
-                "link-arg=dynamic_lookup".to_string(),
-                "-C".to_string(),
-                macos_dylib_install_name,
-            ];
-            debug!("Setting additional linker args for macOS: {:?}", mac_args);
-            cargo_rustc.args.extend(mac_args);
+            configure_macos_pyo3_linker_args(
+                cargo_rustc,
+                bridge_model,
+                module_name,
+                python_interpreter,
+            );
         }
     } else if target.is_emscripten() {
-        // The -Z link-native-libraries=no flag is needed for older Rust versions
-        // where Emscripten builds fail without it due to the behavior that it links
-        // libc automatically.
-        // From Rust 1.93.0, it is possible to build Emscripten with stable toolchain
-        // and this flag can be and should be removed.
-        if target.rustc_version.semver < RUST_1_93_0
-            && !rustflags
-                .flags
-                .iter()
-                .any(|f| f.contains("link-native-libraries"))
-        {
-            debug!("Setting `-Z link-native-libraries=no` for Emscripten (rust < 1.93.0)");
-            rustflags.push("-Z");
-            rustflags.push("link-native-libraries=no");
-        }
-        let mut emscripten_args = Vec::new();
-        // Allow user to override these default settings
-        if !cargo_rustc
-            .args
-            .iter()
-            .any(|arg| arg.contains("SIDE_MODULE"))
-        {
-            emscripten_args.push("-C".to_string());
-            emscripten_args.push("link-arg=-sSIDE_MODULE=2".to_string());
-        }
-        if !cargo_rustc
-            .args
-            .iter()
-            .any(|arg| arg.contains("WASM_BIGINT"))
-        {
-            emscripten_args.push("-C".to_string());
-            emscripten_args.push("link-arg=-sWASM_BIGINT".to_string());
-        }
-        debug!(
-            "Setting additional linker args for Emscripten: {:?}",
-            emscripten_args
-        );
-        cargo_rustc.args.extend(emscripten_args);
+        configure_emscripten_args(cargo_rustc, rustflags, target);
     }
+}
 
-    if context.strip {
-        // https://doc.rust-lang.org/rustc/codegen-options/index.html#strip
-        cargo_rustc
-            .args
-            .extend(["-C".to_string(), "strip=symbols".to_string()]);
+/// Configure macOS-specific linker arguments for PyO3 builds.
+///
+/// Changes LC_ID_DYLIB to the final .so name to avoid linking with
+/// non-existent library.
+/// See https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
+/// See https://github.com/PyO3/setuptools-rust/issues/106 for detail
+fn configure_macos_pyo3_linker_args(
+    cargo_rustc: &mut cargo_options::Rustc,
+    bridge_model: &BridgeModel,
+    module_name: &str,
+    python_interpreter: Option<&PythonInterpreter>,
+) {
+    let so_filename = if bridge_model.is_abi3() {
+        format!("{module_name}.abi3.so")
+    } else {
+        python_interpreter
+            .expect("missing python interpreter for non-abi3 wheel build")
+            .get_library_name(module_name)
+    };
+    let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
+    let mac_args = [
+        "-C".to_string(),
+        "link-arg=-undefined".to_string(),
+        "-C".to_string(),
+        "link-arg=dynamic_lookup".to_string(),
+        "-C".to_string(),
+        macos_dylib_install_name,
+    ];
+    debug!("Setting additional linker args for macOS: {:?}", mac_args);
+    cargo_rustc.args.extend(mac_args);
+}
+
+/// Configure Emscripten-specific linker arguments and rustflags.
+fn configure_emscripten_args(
+    cargo_rustc: &mut cargo_options::Rustc,
+    rustflags: &mut cargo_config2::Flags,
+    target: &Target,
+) {
+    // The -Z link-native-libraries=no flag is needed for older Rust versions
+    // where Emscripten builds fail without it due to the behavior that it links
+    // libc automatically.
+    // From Rust 1.93.0, it is possible to build Emscripten with stable toolchain
+    // and this flag can be and should be removed.
+    if target.rustc_version.semver < RUST_1_93_0
+        && !rustflags
+            .flags
+            .iter()
+            .any(|f| f.contains("link-native-libraries"))
+    {
+        debug!("Setting `-Z link-native-libraries=no` for Emscripten (rust < 1.93.0)");
+        rustflags.push("-Z");
+        rustflags.push("link-native-libraries=no");
     }
+    let mut emscripten_args = Vec::new();
+    // Allow user to override these default settings
+    if !cargo_rustc
+        .args
+        .iter()
+        .any(|arg| arg.contains("SIDE_MODULE"))
+    {
+        emscripten_args.push("-C".to_string());
+        emscripten_args.push("link-arg=-sSIDE_MODULE=2".to_string());
+    }
+    if !cargo_rustc
+        .args
+        .iter()
+        .any(|arg| arg.contains("WASM_BIGINT"))
+    {
+        emscripten_args.push("-C".to_string());
+        emscripten_args.push("link-arg=-sWASM_BIGINT".to_string());
+    }
+    debug!(
+        "Setting additional linker args for Emscripten: {:?}",
+        emscripten_args
+    );
+    cargo_rustc.args.extend(emscripten_args);
+}
 
+/// Configure split-debuginfo rustflags when --include-debuginfo is enabled.
+fn configure_debuginfo_flags(
+    rustflags: &mut cargo_config2::Flags,
+    target: &Target,
+    include_debuginfo: bool,
+) -> Result<()> {
+    if !include_debuginfo {
+        return Ok(());
+    }
     // When including debug info, ensure split-debuginfo is set appropriately.
     // The only incompatible case is `unpacked` on Linux, where debug info is
     // scattered into .dwo files that cargo doesn't report in its output.
     // On macOS `unpacked` still produces .dSYM bundles, and `off` (embedded)
     // is fine everywhere — the debug info lives in the binary itself.
-    if context.include_debuginfo {
-        let has_split_debuginfo = rustflags
+    let has_split_debuginfo = rustflags
+        .flags
+        .iter()
+        .any(|f| f.contains("split-debuginfo"));
+    if has_split_debuginfo {
+        let has_unpacked = rustflags
             .flags
             .iter()
-            .any(|f| f.contains("split-debuginfo"));
-        if has_split_debuginfo {
-            let has_unpacked = rustflags
-                .flags
-                .iter()
-                .any(|f| f.contains("split-debuginfo=unpacked"));
-            if has_unpacked && target.is_linux() {
-                bail!(
-                    "split-debuginfo=unpacked is incompatible with --include-debuginfo on Linux \
-                     because debug info is scattered into .dwo files that cannot be included. \
-                     Use `-C split-debuginfo=packed` or `-C split-debuginfo=off` instead."
-                );
-            }
-        } else if target.is_macos() {
-            // On macOS the Cargo default is `unpacked`. Use `packed` to
-            // produce .dSYM bundles that cargo reports in its output.
-            debug!("Setting `-C split-debuginfo=packed` for --include-debuginfo on macOS");
-            rustflags.push("-C");
-            rustflags.push("split-debuginfo=packed");
+            .any(|f| f.contains("split-debuginfo=unpacked"));
+        if has_unpacked && target.is_linux() {
+            bail!(
+                "split-debuginfo=unpacked is incompatible with --include-debuginfo on Linux \
+                 because debug info is scattered into .dwo files that cannot be included. \
+                 Use `-C split-debuginfo=packed` or `-C split-debuginfo=off` instead."
+            );
         }
-        // On Linux the default is `off` (embedded), on Windows MSVC it is
-        // `packed` (.pdb) — both are fine as-is.
+    } else if target.is_macos() {
+        // On macOS the Cargo default is `unpacked`. Use `packed` to
+        // produce .dSYM bundles that cargo reports in its output.
+        debug!("Setting `-C split-debuginfo=packed` for --include-debuginfo on macOS");
+        rustflags.push("-C");
+        rustflags.push("split-debuginfo=packed");
     }
+    // On Linux the default is `off` (embedded), on Windows MSVC it is
+    // `packed` (.pdb) — both are fine as-is.
+    Ok(())
+}
+
+/// Create the build command using the appropriate backend (xwin, zig, or plain cargo).
+fn create_build_command(
+    context: &BuildContext,
+    cargo_rustc: cargo_options::Rustc,
+    target_triple: &str,
+) -> Result<Command> {
+    let target = &context.target;
 
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
@@ -411,6 +506,7 @@ fn cargo_build_command(
                 build.xwin = xwin_options;
                 build.build_command()?
             } else {
+                let mut cargo_rustc = cargo_rustc;
                 if target.user_specified {
                     cargo_rustc.target = vec![target_triple.to_string()];
                 }
@@ -419,6 +515,7 @@ fn cargo_build_command(
         }
         #[cfg(not(feature = "xwin"))]
         {
+            let mut cargo_rustc = cargo_rustc;
             if target.user_specified {
                 cargo_rustc.target = vec![target_triple.to_string()];
             }
@@ -452,6 +549,7 @@ fn cargo_build_command(
         }
         #[cfg(not(feature = "zig"))]
         {
+            let mut cargo_rustc = cargo_rustc;
             if target.user_specified {
                 cargo_rustc.target = vec![target_triple.to_string()];
             }
@@ -481,10 +579,18 @@ fn cargo_build_command(
         // but forwarding stderr is still useful in case there some non-json error
         .stderr(Stdio::inherit());
 
-    if !rustflags.flags.is_empty() && rustflags.flags != original_rustflags {
-        build_command.env("CARGO_ENCODED_RUSTFLAGS", rustflags.encode()?);
-    }
+    Ok(build_command)
+}
 
+/// Configure PyO3-related environment variables on the build command.
+fn configure_pyo3_env(
+    build_command: &mut Command,
+    context: &BuildContext,
+    python_interpreter: Option<&PythonInterpreter>,
+    bridge_model: &BridgeModel,
+    target: &Target,
+    target_triple: &str,
+) -> Result<()> {
     if bridge_model.is_abi3() {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
@@ -573,7 +679,8 @@ fn cargo_build_command(
         };
         build_command.env("MACOSX_DEPLOYMENT_TARGET", deployment_target);
     }
-    Ok(build_command)
+
+    Ok(())
 }
 
 fn compile_target(

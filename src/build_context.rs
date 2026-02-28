@@ -811,15 +811,6 @@ impl BuildContext {
         Ok(tag)
     }
 
-    /// Returns the tags for the WHEEL file for cffi wheels
-    pub fn get_py3_tags(&self, platform_tags: &[PlatformTag]) -> Result<Vec<String>> {
-        let tags = vec![format!(
-            "py3-none-{}",
-            self.get_platform_tag(platform_tags)?
-        )];
-        Ok(tags)
-    }
-
     /// Returns the tags for the platform without python version
     pub fn get_universal_tags(
         &self,
@@ -829,7 +820,7 @@ impl BuildContext {
             "py3-none-{platform}",
             platform = self.get_platform_tag(platform_tags)?
         );
-        let tags = self.get_py3_tags(platform_tags)?;
+        let tags = vec![tag.clone()];
         Ok((tag, tags))
     }
 

@@ -613,9 +613,19 @@ impl BuildContext {
         Ok((tag, tags))
     }
 
+    /// Returns user-specified platform tags, or falls back to the auditwheel
+    /// policy tag when no explicit tags were provided.
+    fn resolve_platform_tags(&self, policy: &Policy) -> Vec<PlatformTag> {
+        if self.platform_tag.is_empty() {
+            vec![policy.platform_tag()]
+        } else {
+            self.platform_tag.clone()
+        }
+    }
+
     /// Unified wheel-building pipeline for non-bin binding types.
     ///
-    /// This method handles the common 7-step pattern shared by all extension
+    /// This method handles the common 8-step pattern shared by all extension
     /// module wheels (PyO3, PyO3 abi3, CFFI, UniFfi):
     ///   1. Create WheelWriter with compression options
     ///   2. Create VirtualWriter with excludes
@@ -694,11 +704,7 @@ impl BuildContext {
         )?;
         let (policy, external_libs) =
             self.auditwheel(&artifact, &self.platform_tag, python_interpreter)?;
-        let platform_tags = if self.platform_tag.is_empty() {
-            vec![policy.platform_tag()]
-        } else {
-            self.platform_tag.clone()
-        };
+        let platform_tags = self.resolve_platform_tags(&policy);
 
         let platform = self.get_platform_tag(&platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
@@ -782,11 +788,7 @@ impl BuildContext {
             )?;
             let (policy, external_libs) =
                 self.auditwheel(&artifact, &self.platform_tag, Some(python_interpreter))?;
-            let platform_tags = if self.platform_tag.is_empty() {
-                vec![policy.platform_tag()]
-            } else {
-                self.platform_tag.clone()
-            };
+            let platform_tags = self.resolve_platform_tags(&policy);
             let (wheel_path, tag) = self.write_pyo3_wheel(
                 python_interpreter,
                 artifact,
@@ -903,11 +905,7 @@ impl BuildContext {
         let mut wheels = Vec::new();
         let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
-        let platform_tags = if self.platform_tag.is_empty() {
-            vec![policy.platform_tag()]
-        } else {
-            self.platform_tag.clone()
-        };
+        let platform_tags = self.resolve_platform_tags(&policy);
         let (wheel_path, tag) = self.write_cffi_wheel(
             artifact,
             &platform_tags,
@@ -965,11 +963,7 @@ impl BuildContext {
         let mut wheels = Vec::new();
         let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
-        let platform_tags = if self.platform_tag.is_empty() {
-            vec![policy.platform_tag()]
-        } else {
-            self.platform_tag.clone()
-        };
+        let platform_tags = self.resolve_platform_tags(&policy);
         let (wheel_path, tag) = self.write_uniffi_wheel(
             artifact,
             &platform_tags,
@@ -1081,11 +1075,7 @@ impl BuildContext {
             artifact_paths.push(artifact);
         }
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();
-        let platform_tags = if self.platform_tag.is_empty() {
-            vec![policy.platform_tag()]
-        } else {
-            self.platform_tag.clone()
-        };
+        let platform_tags = self.resolve_platform_tags(policy);
 
         let (wheel_path, tag) = self.write_bin_wheel(
             python_interpreter,

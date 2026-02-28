@@ -24,7 +24,7 @@
 #![deny(missing_docs)]
 
 pub use crate::bridge::{Abi3Version, BridgeModel, PyO3, PyO3Crate};
-pub use crate::build_context::{BuildContext, BuiltWheelMetadata, unpack_sdist};
+pub use crate::build_context::{BuildContext, BuiltWheelMetadata};
 pub use crate::build_options::{BuildOptions, CargoOptions, TargetTriple};
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{BuildArtifact, CompileResult, compile};
@@ -40,7 +40,7 @@ pub use crate::module_writer::{
 pub use crate::new_project::{GenerateProjectOptions, init_project, new_project};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
-pub use crate::source_distribution::find_path_deps;
+pub use crate::source_distribution::{find_path_deps, unpack_sdist};
 #[cfg(feature = "upload")]
 pub use crate::upload::{PublishOpt, Registry, UploadError, upload, upload_ui};
 pub use auditwheel::PlatformTag;

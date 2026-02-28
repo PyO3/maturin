@@ -49,7 +49,7 @@ pub(super) fn fun_with_abiflags(
         );
     }
 
-    if message.interpreter == "pypy" || message.interpreter == "graalvm" {
+    if matches!(message.interpreter.as_str(), "pypy" | "graalvm" | "graalpy") {
         // pypy and graalpy do not specify abi flags
         Ok("".to_string())
     } else if message.system == "windows" {

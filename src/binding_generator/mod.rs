@@ -101,7 +101,7 @@ pub(crate) struct GeneratorOutput {
 /// Note: Writing the pth to the archive is handled by [BuildContext], not here
 pub fn generate_binding<A>(
     writer: &mut VirtualWriter<WheelWriter>,
-    generator: &mut impl BindingGenerator,
+    generator: &mut (impl BindingGenerator + ?Sized),
     context: &BuildContext,
     artifacts: &[A],
     out_dirs: &HashMap<String, PathBuf>,

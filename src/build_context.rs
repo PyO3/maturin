@@ -3,8 +3,8 @@ use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{AuditWheelMode, get_policy_and_libs, patchelf, relpath};
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::binding_generator::{
-    BinBindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator, UniFfiBindingGenerator,
-    generate_binding,
+    BinBindingGenerator, BindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator,
+    UniFfiBindingGenerator, generate_binding,
 };
 use crate::bridge::Abi3Version;
 use crate::build_options::CargoOptions;
@@ -37,6 +37,7 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use tracing::instrument;
 
 /// Unpacks an sdist tarball into a temporary directory and returns the path
@@ -817,32 +818,46 @@ impl BuildContext {
         Ok((tag, tags))
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn write_pyo3_wheel_abi3(
-        &self,
-        artifact: BuildArtifact,
-        platform_tags: &[PlatformTag],
-        ext_libs: Vec<Library>,
-        major: u8,
-        min_minor: u8,
+    /// Unified wheel-building pipeline for non-bin binding types.
+    ///
+    /// This method handles the common 7-step pattern shared by all extension
+    /// module wheels (PyO3, PyO3 abi3, CFFI, UniFfi):
+    ///   1. Create WheelWriter with compression options
+    ///   2. Create VirtualWriter with excludes
+    ///   3. Add external shared libraries (auditwheel repair)
+    ///   4. Run the binding generator (install extension + python files)
+    ///   5. Write .pth file for editable installs
+    ///   6. Add data directory
+    ///   7. Write SBOM files
+    ///   8. Finish the wheel
+    ///
+    /// The `make_generator` closure receives the writer's temp directory
+    /// (needed by some generators for intermediate files) and returns the
+    /// binding generator to use.
+    fn write_wheel<'a, F>(
+        &'a self,
+        tag: &str,
+        tags: &[String],
+        artifacts: &[&BuildArtifact],
+        ext_libs: &[Vec<Library>],
+        make_generator: F,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<BuiltWheelMetadata> {
-        let platform = self.get_platform_tag(platform_tags)?;
-        let tag = format!("cp{major}{min_minor}-abi3-{platform}");
-
+    ) -> Result<PathBuf>
+    where
+        F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'a>>,
+    {
         let file_options = self
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
+        let writer = WheelWriter::new(tag, &self.out, &self.metadata24, file_options)?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
+        self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 
-        let mut generator =
-            Pyo3BindingGenerator::new(true, self.interpreter.first(), writer.temp_dir()?)
-                .context("Failed to initialize PyO3 binding generator")?;
-        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)
+        let temp_dir = writer.temp_dir()?;
+        let mut generator = make_generator(temp_dir)?;
+        generate_binding(&mut writer, generator.as_mut(), self, artifacts, out_dirs)
             .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
@@ -859,12 +874,9 @@ impl BuildContext {
             &self.metadata24.get_dist_info_dir(),
         )?;
 
-        let wheel_path = writer.finish(
-            &self.metadata24,
-            &self.project_layout.project_root,
-            std::slice::from_ref(&tag),
-        )?;
-        Ok((wheel_path, format!("cp{major}{min_minor}")))
+        let wheel_path =
+            writer.finish(&self.metadata24, &self.project_layout.project_root, tags)?;
+        Ok(wheel_path)
     }
 
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
@@ -891,12 +903,22 @@ impl BuildContext {
         } else {
             self.platform_tag.clone()
         };
-        let (wheel_path, tag) = self.write_pyo3_wheel_abi3(
-            artifact,
-            &platform_tags,
-            external_libs,
-            major,
-            min_minor,
+
+        let platform = self.get_platform_tag(&platform_tags)?;
+        let tag = format!("cp{major}{min_minor}-abi3-{platform}");
+        let tags = vec![tag.clone()];
+
+        let wheel_path = self.write_wheel(
+            &tag,
+            &tags,
+            &[&artifact],
+            &[external_libs],
+            |temp_dir| {
+                Ok(Box::new(
+                    Pyo3BindingGenerator::new(true, self.interpreter.first(), temp_dir)
+                        .context("Failed to initialize PyO3 binding generator")?,
+                ))
+            },
             sbom_data,
             &out_dirs,
         )?;
@@ -907,7 +929,7 @@ impl BuildContext {
             min_minor,
             wheel_path.display()
         );
-        wheels.push((wheel_path, tag));
+        wheels.push((wheel_path, format!("cp{major}{min_minor}")));
 
         Ok(wheels)
     }
@@ -922,39 +944,21 @@ impl BuildContext {
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(self, platform_tags)?;
+        let tags = vec![tag.clone()];
 
-        let file_options = self
-            .compression
-            .get_file_options()
-            .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
-        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
-
-        let mut generator =
-            Pyo3BindingGenerator::new(false, Some(python_interpreter), writer.temp_dir()?)
-                .context("Failed to initialize PyO3 binding generator")?;
-        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)
-            .context("Failed to add the files to the wheel")?;
-
-        self.add_pth(&mut writer)?;
-        add_data(
-            &mut writer,
-            &self.metadata24,
-            self.project_layout.data.as_deref(),
-        )?;
-
-        write_sboms(
-            self,
-            sbom_data.as_ref(),
-            &mut writer,
-            &self.metadata24.get_dist_info_dir(),
-        )?;
-
-        let wheel_path = writer.finish(
-            &self.metadata24,
-            &self.project_layout.project_root,
-            std::slice::from_ref(&tag),
+        let wheel_path = self.write_wheel(
+            &tag,
+            &tags,
+            &[&artifact],
+            &[ext_libs],
+            |temp_dir| {
+                Ok(Box::new(
+                    Pyo3BindingGenerator::new(false, Some(python_interpreter), temp_dir)
+                        .context("Failed to initialize PyO3 binding generator")?,
+                ))
+            },
+            sbom_data,
+            out_dirs,
         )?;
         Ok((
             wheel_path,
@@ -1075,37 +1079,23 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
-        let file_options = self
-            .compression
-            .get_file_options()
-            .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
-        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
-
         let interpreter = self.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
-        let mut generator = CffiBindingGenerator::new(interpreter, writer.temp_dir()?)
-            .context("Failed to initialize Cffi binding generator")?;
-        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)?;
-
-        self.add_pth(&mut writer)?;
-        add_data(
-            &mut writer,
-            &self.metadata24,
-            self.project_layout.data.as_deref(),
+        let wheel_path = self.write_wheel(
+            &tag,
+            &tags,
+            &[&artifact],
+            &[ext_libs],
+            |temp_dir| {
+                Ok(Box::new(
+                    CffiBindingGenerator::new(interpreter, temp_dir)
+                        .context("Failed to initialize Cffi binding generator")?,
+                ))
+            },
+            sbom_data,
+            out_dirs,
         )?;
-
-        write_sboms(
-            self,
-            sbom_data.as_ref(),
-            &mut writer,
-            &self.metadata24.get_dist_info_dir(),
-        )?;
-
-        let wheel_path =
-            writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 
@@ -1159,33 +1149,15 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (tag, tags) = self.get_universal_tags(platform_tags)?;
 
-        let file_options = self
-            .compression
-            .get_file_options()
-            .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(&tag, &self.out, &self.metadata24, file_options)?;
-        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.add_external_libs(&mut writer, &[&artifact], &[ext_libs])?;
-
-        let mut generator = UniFfiBindingGenerator::default();
-        generate_binding(&mut writer, &mut generator, self, &[&artifact], out_dirs)?;
-
-        self.add_pth(&mut writer)?;
-        add_data(
-            &mut writer,
-            &self.metadata24,
-            self.project_layout.data.as_deref(),
+        let wheel_path = self.write_wheel(
+            &tag,
+            &tags,
+            &[&artifact],
+            &[ext_libs],
+            |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),
+            sbom_data,
+            out_dirs,
         )?;
-
-        write_sboms(
-            self,
-            sbom_data.as_ref(),
-            &mut writer,
-            &self.metadata24.get_dist_info_dir(),
-        )?;
-
-        let wheel_path =
-            writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }
 

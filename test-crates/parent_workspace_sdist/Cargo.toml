@@ -1,0 +1,7 @@
+[workspace]
+members = ["crates/shared_crate"]
+exclude = ["crates/pysof"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"

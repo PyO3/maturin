@@ -93,6 +93,9 @@ pub struct PathDependency {
     readme: Option<PathBuf>,
     /// license-file path of the path dependency
     license_file: Option<PathBuf>,
+    /// Resolved package metadata from `cargo metadata`, used to inline
+    /// workspace-inherited fields when the workspace manifest is outside the sdist root.
+    resolved_package: Option<cargo_metadata::Package>,
 }
 
 /// Returns `true` if the file extension indicates a compiled artifact
@@ -258,6 +261,245 @@ fn rewrite_cargo_toml(
     }
 
     Ok(())
+}
+
+/// Inlines workspace-inherited fields in a path dependency's `Cargo.toml`
+/// using resolved values from `cargo metadata`.
+///
+/// This is needed when the dependency's workspace manifest falls outside the
+/// sdist root (e.g. a crate excluded from a parent workspace that depends on
+/// sibling workspace members).  Without this, `field.workspace = true` entries
+/// would fail to resolve when building from the sdist.
+fn resolve_workspace_inheritance(document: &mut DocumentMut, resolved: &cargo_metadata::Package) {
+    // Resolve `[package]` fields that support `field.workspace = true`
+    if let Some(package) = document.get_mut("package").and_then(|p| p.as_table_mut()) {
+        let version_str = resolved.version.to_string();
+        let edition_str = resolved.edition.to_string();
+        let rust_version_str = resolved.rust_version.as_ref().map(|v| v.to_string());
+        let string_fields: &[(&str, Option<&str>)] = &[
+            ("version", Some(&version_str)),
+            ("edition", Some(&edition_str)),
+            ("description", resolved.description.as_deref()),
+            ("license", resolved.license.as_deref()),
+            ("repository", resolved.repository.as_deref()),
+            ("homepage", resolved.homepage.as_deref()),
+            ("documentation", resolved.documentation.as_deref()),
+            ("rust-version", rust_version_str.as_deref()),
+        ];
+
+        for (key, value) in string_fields {
+            if is_workspace_inherited(package, key) {
+                if let Some(val) = value {
+                    package.insert(key, toml_edit::value(*val));
+                } else {
+                    package.remove(key);
+                }
+            }
+        }
+
+        // Handle array fields
+        let array_fields: &[(&str, &[String])] = &[
+            ("authors", &resolved.authors),
+            ("keywords", &resolved.keywords),
+            ("categories", &resolved.categories),
+        ];
+
+        for (key, values) in array_fields {
+            if is_workspace_inherited(package, key) {
+                if values.is_empty() {
+                    package.remove(key);
+                } else {
+                    let mut arr = toml_edit::Array::new();
+                    for v in *values {
+                        arr.push(v.as_str());
+                    }
+                    package.insert(key, toml_edit::value(arr));
+                }
+            }
+        }
+
+        // Handle readme
+        if is_workspace_inherited(package, "readme") {
+            if let Some(readme) = &resolved.readme {
+                package.insert("readme", toml_edit::value(readme.as_str()));
+            } else {
+                package.remove("readme");
+            }
+        }
+
+        // Handle license-file
+        if is_workspace_inherited(package, "license-file") {
+            if let Some(license_file) = &resolved.license_file {
+                package.insert("license-file", toml_edit::value(license_file.as_str()));
+            } else {
+                package.remove("license-file");
+            }
+        }
+    }
+
+    // Resolve `workspace = true` in dependency tables
+    resolve_workspace_deps(document, "dependencies", resolved);
+    resolve_workspace_deps(document, "dev-dependencies", resolved);
+    resolve_workspace_deps(document, "build-dependencies", resolved);
+
+    // Handle `[target.'cfg(...)'.dependencies]` etc.
+    if let Some(target) = document.get("target").and_then(|t| t.as_table()) {
+        let target_keys: Vec<String> = target.iter().map(|(k, _)| k.to_string()).collect();
+        for target_key in target_keys {
+            for dep_kind in &["dependencies", "dev-dependencies", "build-dependencies"] {
+                let table_path = format!("target.{target_key}.{dep_kind}");
+                if let Some(deps) = document
+                    .get("target")
+                    .and_then(|t| t.get(&target_key))
+                    .and_then(|t| t.get(*dep_kind))
+                    .and_then(|t| t.as_table())
+                {
+                    let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
+                    for dep_name in dep_names {
+                        if let Some(dep_table) = document
+                            .get("target")
+                            .and_then(|t| t.get(&target_key))
+                            .and_then(|t| t.get(*dep_kind))
+                            .and_then(|t| t.get(&dep_name))
+                            .and_then(|d| d.as_table_like())
+                        {
+                            if dep_table.get("workspace").and_then(|v| v.as_bool()) == Some(true) {
+                                if let Some(resolved_dep) =
+                                    find_resolved_dep(resolved, &dep_name, Some(&target_key))
+                                {
+                                    let new_entry = resolved_dep_to_toml(&resolved_dep);
+                                    if let Some(target_table) = document
+                                        .get_mut("target")
+                                        .and_then(|t| t.get_mut(&target_key))
+                                        .and_then(|t| t.get_mut(*dep_kind))
+                                        .and_then(|t| t.as_table_mut())
+                                    {
+                                        target_table.insert(&dep_name, new_entry);
+                                    }
+                                } else {
+                                    debug!(
+                                        "Could not resolve workspace dependency {dep_name} in {table_path}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Returns `true` if a `[package]` field has the form `field.workspace = true`.
+fn is_workspace_inherited(package: &toml_edit::Table, key: &str) -> bool {
+    package
+        .get(key)
+        .and_then(|v| v.as_table_like())
+        .and_then(|t| t.get("workspace"))
+        .and_then(|v| v.as_bool())
+        == Some(true)
+}
+
+/// Resolves `workspace = true` entries in a `[dependencies]`-style table.
+fn resolve_workspace_deps(
+    document: &mut DocumentMut,
+    dep_kind: &str,
+    resolved: &cargo_metadata::Package,
+) {
+    let dep_names: Vec<String> = document
+        .get(dep_kind)
+        .and_then(|t| t.as_table())
+        .map(|t| t.iter().map(|(k, _)| k.to_string()).collect())
+        .unwrap_or_default();
+
+    for dep_name in dep_names {
+        let is_workspace = document
+            .get(dep_kind)
+            .and_then(|t| t.get(&dep_name))
+            .and_then(|d| d.as_table_like())
+            .and_then(|t| t.get("workspace"))
+            .and_then(|v| v.as_bool())
+            == Some(true);
+
+        if !is_workspace {
+            continue;
+        }
+
+        if let Some(resolved_dep) = find_resolved_dep(resolved, &dep_name, None) {
+            let new_entry = resolved_dep_to_toml(&resolved_dep);
+            if let Some(deps_table) = document.get_mut(dep_kind).and_then(|t| t.as_table_mut()) {
+                deps_table.insert(&dep_name, new_entry);
+            }
+        } else {
+            debug!("Could not resolve workspace dependency {dep_name} in [{dep_kind}]");
+        }
+    }
+}
+
+/// Finds a resolved dependency by name in the package metadata.
+fn find_resolved_dep(
+    resolved: &cargo_metadata::Package,
+    name: &str,
+    target: Option<&str>,
+) -> Option<ResolvedDep> {
+    resolved.dependencies.iter().find_map(|d| {
+        // Match by name, considering renames
+        let matches_name = d.rename.as_deref() == Some(name) || d.name == name;
+        if !matches_name {
+            return None;
+        }
+        // If a target is specified, match against it
+        if let Some(target_str) = target {
+            if d.target.as_ref().map(|t| t.to_string()).as_deref() != Some(target_str) {
+                return None;
+            }
+        }
+        Some(ResolvedDep {
+            req: d.req.to_string(),
+            optional: d.optional,
+            default_features: d.uses_default_features,
+            features: d.features.clone(),
+            rename: d.rename.clone(),
+        })
+    })
+}
+
+struct ResolvedDep {
+    req: String,
+    optional: bool,
+    default_features: bool,
+    features: Vec<String>,
+    rename: Option<String>,
+}
+
+/// Converts a resolved dependency into a TOML value for Cargo.toml.
+fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
+    // Simple case: just a version string
+    if dep.default_features && !dep.optional && dep.features.is_empty() && dep.rename.is_none() {
+        return toml_edit::value(&dep.req);
+    }
+
+    let mut table = toml_edit::InlineTable::new();
+    table.insert("version", dep.req.as_str().into());
+
+    if !dep.default_features {
+        table.insert("default-features", false.into());
+    }
+    if dep.optional {
+        table.insert("optional", true.into());
+    }
+    if !dep.features.is_empty() {
+        let mut arr = toml_edit::Array::new();
+        for f in &dep.features {
+            arr.push(f.as_str());
+        }
+        table.insert("features", toml_edit::Value::Array(arr));
+    }
+    if let Some(rename) = &dep.rename {
+        table.insert("package", rename.as_str().into());
+    }
+
+    toml_edit::value(toml_edit::Value::InlineTable(table))
 }
 
 fn normalize_path(path: &Path) -> PathBuf {
@@ -564,7 +806,12 @@ enum CrateRole<'a> {
     },
     /// A path dependency. When `skip_cargo_toml` is true, the crate's Cargo.toml
     /// is the workspace manifest and will be added separately with workspace-level rewrites.
-    PathDependency { skip_cargo_toml: bool },
+    PathDependency {
+        skip_cargo_toml: bool,
+        /// When set, the dependency's workspace manifest is outside the sdist root
+        /// and workspace-inherited fields must be inlined using these resolved values.
+        resolved_package: Option<&'a cargo_metadata::Package>,
+    },
 }
 
 /// Copies the files of a crate to a source distribution, recursively adding path dependencies
@@ -725,7 +972,8 @@ fn add_crate_to_source_distribution(
     if !matches!(
         role,
         CrateRole::PathDependency {
-            skip_cargo_toml: true
+            skip_cargo_toml: true,
+            ..
         }
     ) {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
@@ -736,6 +984,13 @@ fn add_crate_to_source_distribution(
         } = &role
         {
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
+        }
+        if let CrateRole::PathDependency {
+            resolved_package: Some(resolved),
+            ..
+        } = &role
+        {
+            resolve_workspace_inheritance(&mut document, resolved);
         }
         rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         writer.add_bytes(
@@ -835,6 +1090,17 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                         )
                     })?;
 
+                let resolved_package = path_dep_metadata
+                    .packages
+                    .iter()
+                    .find(|p| p.manifest_path == dep_manifest_path)
+                    .cloned()
+                    .with_context(|| {
+                        format!(
+                            "Failed to find package for {} in cargo metadata",
+                            dep_manifest_path
+                        )
+                    })?;
                 path_deps.insert(
                     dep_name.clone(),
                     PathDependency {
@@ -845,6 +1111,7 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                             .into_std_path_buf(),
                         readme: pkg_readmes.get(&node_dep.pkg).cloned(),
                         license_file: pkg_license_files.get(&node_dep.pkg).cloned(),
+                        resolved_package: Some(resolved_package),
                     },
                 );
                 // Continue scanning the path dependency's own dependencies
@@ -1115,6 +1382,7 @@ fn add_cargo_package_files_to_sdist(
                 workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
                 readme: None,
                 license_file: None,
+                resolved_package: None,
             },
         );
         // Rewrite workspace Cargo.toml to only include relevant members,
@@ -1288,13 +1556,35 @@ fn add_path_dep(
         None
     };
 
+    // Check if the dependency's workspace manifest is outside the sdist root.
+    // When it is, we need to inline workspace-inherited fields since we can't
+    // include the parent workspace manifest in the sdist.
+    let workspace_outside_sdist =
+        if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
+            let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
+            !path_dep_workspace_manifest
+                .strip_prefix(&ctx.sdist_root)
+                .is_ok()
+        } else {
+            false
+        };
+
+    let resolved_package = if workspace_outside_sdist {
+        path_dep.resolved_package.as_ref()
+    } else {
+        None
+    };
+
     add_crate_to_source_distribution(
         writer,
         &path_dep.manifest_path,
         ctx.root_dir.join(relative_path_dep_manifest_dir),
         readme_path.as_deref(),
         license_file_path.as_deref(),
-        CrateRole::PathDependency { skip_cargo_toml },
+        CrateRole::PathDependency {
+            skip_cargo_toml,
+            resolved_package,
+        },
     )
     .with_context(|| {
         format!(
@@ -1306,14 +1596,21 @@ fn add_path_dep(
     // Handle different workspace manifest
     if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
         let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
-        let relative_path_dep_workspace_manifest = path_dep_workspace_manifest
-            .strip_prefix(&ctx.sdist_root)
-            .unwrap();
-        writer.add_file(
-            ctx.root_dir.join(relative_path_dep_workspace_manifest),
-            &path_dep_workspace_manifest,
-            false,
-        )?;
+        if let Ok(relative_path_dep_workspace_manifest) =
+            path_dep_workspace_manifest.strip_prefix(&ctx.sdist_root)
+        {
+            writer.add_file(
+                ctx.root_dir.join(relative_path_dep_workspace_manifest),
+                &path_dep_workspace_manifest,
+                false,
+            )?;
+        } else {
+            debug!(
+                "Skipping workspace manifest at {} (outside sdist root), \
+                 workspace-inherited fields have been inlined",
+                path_dep_workspace_manifest.display()
+            );
+        }
     }
     Ok(())
 }
@@ -1687,6 +1984,7 @@ default-members = ["crate-a", "crate-c"]
                 workspace_root: PathBuf::from(""),
                 readme: None,
                 license_file: None,
+                resolved_package: None,
             },
         );
         rewrite_cargo_toml(&mut document, manifest_path, &known_path_deps).unwrap();

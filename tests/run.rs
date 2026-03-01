@@ -886,6 +886,32 @@ fn lib_with_target_path_dep_sdist() {
     ))
 }
 
+/// Test sdist with path dependency from parent workspace.
+/// Reproduces the scenario where a crate is excluded from a parent workspace
+/// but depends on sibling crates that ARE in the parent workspace.
+/// Before the fix, this would panic with StripPrefixError.
+#[test]
+fn lib_with_parent_workspace_path_dep_sdist() {
+    handle_result(other::test_source_distribution(
+        "test-crates/parent_workspace_sdist/crates/pysof",
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "pysof-0.1.0/PKG-INFO",
+                "pysof-0.1.0/pyproject.toml",
+                "pysof-0.1.0/pysof/.gitignore",
+                "pysof-0.1.0/pysof/Cargo.lock",
+                "pysof-0.1.0/pysof/Cargo.toml",
+                "pysof-0.1.0/pysof/src/lib.rs",
+                "pysof-0.1.0/shared_crate/Cargo.toml",
+                "pysof-0.1.0/shared_crate/src/lib.rs",
+            }
+        "#]],
+        None,
+        "sdist-lib-with-parent-workspace-path-dep",
+    ))
+}
+
 /// Regression test for https://github.com/PyO3/maturin/issues/2202
 /// When `python-source` points outside the Rust source directory,
 /// `maturin sdist` used to panic with a `StripPrefixError`.

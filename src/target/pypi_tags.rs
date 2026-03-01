@@ -191,7 +191,7 @@ mod tests {
             ("manylinux_2_39_riscv64", true),
             // musllinux platforms
             ("musllinux_1_1_x86_64", true),
-            ("musllinux_1_1_riscv64", false),
+            ("musllinux_1_1_riscv64", true),
             // Old arm versions
             // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
             ("linux_armv6l", true),
@@ -200,6 +200,7 @@ mod tests {
             ("macosx_9_0_x86_64", false), // Invalid major version
             ("macosx_10_9_x86_64", true),
             ("macosx_11_0_arm64", true),
+            ("macosx_26_0_arm64", true),
             // iOS platforms
             ("ios_14_0_arm64_iphoneos", true),
             ("ios_14_0_x86_64_iphonesimulator", true),

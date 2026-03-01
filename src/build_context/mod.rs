@@ -822,26 +822,52 @@ impl BuildContext {
         Ok((artifact, result.out_dirs))
     }
 
-    /// Move an artifact to a private staging directory so that:
+    /// Stage an artifact into a private directory so that:
     /// 1. `warn_missing_py_init` can safely mmap the file without risk of
     ///    concurrent modification by cargo / rust-analyzer.
     /// 2. Auditwheel repair can modify it in-place without altering the
     ///    original cargo build output.
     ///
-    /// Uses `fs::rename` for an atomic move (avoids copying multi-GB debug
-    /// artifacts), falling back to `fs::copy` when the rename fails (e.g.
-    /// cross-device).
+    /// Uses `fs::rename` for an atomic move into the staging directory,
+    /// then copies the staged file back to the original location so that
+    /// users can still find the artifact at the standard cargo output
+    /// path. The copy-back uses reflink (copy-on-write) when available
+    /// for near-instant, zero-cost copies, and falls back to a regular
+    /// `fs::copy` otherwise.
+    ///
+    /// When `fs::rename` fails (e.g. cross-device), falls back to
+    /// reflink-or-copy directly; the concurrent-modification window is
+    /// unlikely in cross-device setups.
     fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
         fs::create_dir_all(&maturin_build)?;
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
-        // Remove any stale file at the destination so that `fs::rename` succeeds
-        // on Windows (where rename fails if the destination already exists).
+        // Remove any stale file at the destination so that `fs::rename`
+        // succeeds on Windows (where rename fails if the destination
+        // already exists).
         let _ = fs::remove_file(&new_artifact_path);
-        if fs::rename(artifact_path, &new_artifact_path).is_err() {
-            // Rename fails across filesystem boundaries, fall back to copy
-            fs::copy(artifact_path, &new_artifact_path)?;
+        if fs::rename(artifact_path, &new_artifact_path).is_ok() {
+            // Rename succeeded — we now own the only copy.  Put a copy
+            // back at the original location for users who expect the
+            // artifact at the standard cargo output path.  Skip if a
+            // new file already appeared (cargo / rust-analyzer rebuilt).
+            if artifact_path.exists() {
+                tracing::debug!(
+                    "Skipping copy-back: {} was recreated by another process",
+                    artifact_path.display()
+                );
+            } else if let Err(err) = reflink_or_copy(&new_artifact_path, artifact_path) {
+                eprintln!(
+                    "⚠️  Warning: failed to copy artifact back to {}: {err:#}. The staged artifact is available at {}",
+                    artifact_path.display(),
+                    new_artifact_path.display()
+                );
+            }
+        } else {
+            // Rename failed (cross-device).  Fall back to reflink/copy;
+            // concurrent modification is unlikely in this scenario.
+            reflink_or_copy(artifact_path, &new_artifact_path)?;
         }
         artifact.path = new_artifact_path.normalize()?.into_path_buf();
         Ok(())
@@ -1081,4 +1107,47 @@ impl BuildContext {
         }
         Ok(wheels)
     }
+}
+
+/// Reflink (copy-on-write) a file, preserving permissions, and fall back to
+/// a regular copy if reflink fails for any reason.
+///
+/// On macOS `clonefile` preserves all metadata natively.  On Linux
+/// `ioctl_ficlone` only clones data blocks so we must copy permissions
+/// ourselves.
+///
+/// Adapted from uv's `reflink_with_permissions` implementation:
+/// <https://github.com/astral-sh/uv/blob/main/crates/uv-fs/src/link.rs>
+/// See also: <https://github.com/astral-sh/uv/issues/18181>
+fn reflink_or_copy(from: &Path, to: &Path) -> Result<()> {
+    if reflink_with_permissions(from, to).is_err() {
+        fs::copy(from, to)?;
+    }
+    Ok(())
+}
+
+/// Attempt a reflink while preserving the source file's permissions.
+///
+/// On Linux, `ioctl_ficlone` does not copy metadata, so we reflink first
+/// then copy permissions from the source to the destination.
+/// On other platforms we delegate to `reflink_copy::reflink` which preserves
+/// metadata natively (macOS `clonefile`).
+///
+/// Based on uv's approach which uses `rustix::fs::ioctl_ficlone` directly
+/// with `fchmod` on the open file descriptor to avoid TOCTOU races.  We
+/// simplify here by calling `reflink_copy::reflink` followed by
+/// `set_permissions`, since the staged artifact lives in a private
+/// directory where TOCTOU is not a concern.
+/// <https://github.com/astral-sh/uv/blob/main/crates/uv-fs/src/link.rs>
+#[cfg(target_os = "linux")]
+fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
+    reflink_copy::reflink(from, to)?;
+    let perms = fs::metadata(from)?.permissions();
+    fs::set_permissions(to, perms)?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
+    reflink_copy::reflink(from, to)
 }

@@ -861,9 +861,10 @@ fn compile_target(
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
     let fd = File::open(artifact)?;
-    // SAFETY: The caller stages (moves/copies) the artifact into a private
-    // directory before invoking this function, so no concurrent process
-    // (e.g. cargo / rust-analyzer) can modify it while we have it mapped.
+    // SAFETY: The caller stages (moves or copies) the artifact into a
+    // private directory before invoking this function, so no concurrent
+    // process (e.g. cargo / rust-analyzer) can modify it while we have
+    // it mapped.
     let mmap = unsafe { memmap2::Mmap::map(&fd).context("mmap failed")? };
     let mut found = false;
     match goblin::Object::parse(&mmap)? {

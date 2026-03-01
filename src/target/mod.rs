@@ -742,8 +742,8 @@ impl Target {
 
     /// Returns the path to the python executable
     ///
-    /// For windows it's always python.exe, for unix it's first the venv's `python`
-    /// and then `python3`
+    /// Checks in order: `VIRTUAL_ENV`'s python, `pythonLocation` (GitHub Actions),
+    /// and finally falls back to `python.exe` (Windows) or `python3` (Unix).
     pub fn get_python(&self) -> PathBuf {
         if let Some(venv) = env::var_os("VIRTUAL_ENV") {
             // Use the full path to the venv's python to ensure we get the

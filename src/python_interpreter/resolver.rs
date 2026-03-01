@@ -106,7 +106,7 @@ impl InterpreterSpec {
     /// - `3.9` or `3.14t` (bare version, assumes CPython)
     ///
     /// Returns `None` for version-less names like `"pypy"` or `"python"`.
-    /// Returns `Err` for file paths or unrecognized formats.
+    /// Returns `Ok(None)` for file paths or unrecognized formats.
     fn parse(s: &str) -> Result<Option<Self>> {
         let (kind, ver_str) = if let Some(ver) = s.strip_prefix("pypy") {
             (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
@@ -731,14 +731,19 @@ impl<'a> InterpreterResolver<'a> {
         }
         let mut result = Vec::new();
         for interp in interpreters {
-            let python = interp.display().to_string();
-            let spec = match InterpreterSpec::parse(&python)? {
+            let interp_display = interp.display().to_string();
+            let python_name = interp
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or(&interp_display);
+            let spec = match InterpreterSpec::parse(python_name)? {
                 Some(spec) => spec,
                 None => {
                     // version-less name like bare "pypy" — warn the user
                     eprintln!(
-                        "⚠️  Warning: Skipping '{python}': could not determine version. \
-                         Specify a version like '{python}3.11'."
+                        "⚠️  Warning: Skipping '{interp_display}': could not determine version \
+                         from interpreter name '{python_name}'. \
+                         Specify a version like '{python_name}3.11'."
                     );
                     continue;
                 }

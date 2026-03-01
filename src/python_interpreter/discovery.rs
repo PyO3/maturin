@@ -241,7 +241,10 @@ fn find_all_windows(
         let key = (3, minor, false);
         if !finder.versions_found.contains(&key) {
             let executable = format!("python3.{minor}.exe");
-            finder.try_add(Path::new(&executable))?;
+            let executable_path = Path::new(&executable);
+            if !finder.mark_seen(executable_path) {
+                finder.try_add(executable_path)?;
+            }
         }
     }
 

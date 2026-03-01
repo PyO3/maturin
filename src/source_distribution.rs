@@ -970,7 +970,10 @@ fn add_cargo_package_files_to_sdist(
         })?
         .into_path_buf();
     let abs_manifest_dir = abs_manifest_path.parent().unwrap();
-    let main_crate = build_context.cargo_metadata.root_package().unwrap();
+    let main_crate = build_context
+        .cargo_metadata
+        .root_package()
+        .context("Expected cargo to return metadata with root_package")?;
     let relative_main_crate_manifest_dir = manifest_path
         .parent()
         .unwrap()

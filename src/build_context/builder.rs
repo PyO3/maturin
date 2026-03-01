@@ -459,7 +459,9 @@ pub(crate) fn filter_cargo_targets(
     bridge: BridgeModel,
     config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
 ) -> Result<Vec<CompileTarget>> {
-    let root_pkg = cargo_metadata.root_package().unwrap();
+    let root_pkg = cargo_metadata
+        .root_package()
+        .ok_or_else(|| anyhow::anyhow!("No root package found in cargo metadata"))?;
     let resolved_features: Vec<String> = cargo_metadata
         .resolve
         .as_ref()

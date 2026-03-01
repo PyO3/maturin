@@ -637,7 +637,6 @@ impl BuildContext {
     fn write_wheel<'a, F>(
         &'a self,
         tag: &str,
-        tags: &[String],
         artifacts: &[&BuildArtifact],
         ext_libs: &[Vec<Library>],
         make_generator: F,
@@ -674,8 +673,9 @@ impl BuildContext {
             &self.metadata24.get_dist_info_dir(),
         )?;
 
+        let tags = [tag.to_string()];
         let wheel_path =
-            writer.finish(&self.metadata24, &self.project_layout.project_root, tags)?;
+            writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
         Ok(wheel_path)
     }
 
@@ -702,11 +702,9 @@ impl BuildContext {
 
         let platform = self.get_platform_tag(&platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
-        let tags = vec![tag.clone()];
 
         let wheel_path = self.write_wheel(
             &tag,
-            &tags,
             &[&artifact],
             &[external_libs],
             |temp_dir| {
@@ -740,11 +738,9 @@ impl BuildContext {
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
         let tag = python_interpreter.get_tag(self, platform_tags)?;
-        let tags = vec![tag.clone()];
 
         let wheel_path = self.write_wheel(
             &tag,
-            &tags,
             &[&artifact],
             &[ext_libs],
             |temp_dir| {
@@ -869,14 +865,13 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self.get_universal_tags(platform_tags)?;
+        let (tag, _) = self.get_universal_tags(platform_tags)?;
 
         let interpreter = self.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
         let wheel_path = self.write_wheel(
             &tag,
-            &tags,
             &[&artifact],
             &[ext_libs],
             |temp_dir| {
@@ -935,11 +930,10 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, tags) = self.get_universal_tags(platform_tags)?;
+        let (tag, _) = self.get_universal_tags(platform_tags)?;
 
         let wheel_path = self.write_wheel(
             &tag,
-            &tags,
             &[&artifact],
             &[ext_libs],
             |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),

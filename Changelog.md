@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.6
+
+* Sync legacy_py.rs with upstream PyPI warehouse legacy.py ([#3053](https://github.com/PyO3/maturin/pull/3053))
+* Keep cargo build artifact at original path after staging ([#3054](https://github.com/PyO3/maturin/pull/3054))
+
 ## 1.12.5
 
 * Feat: include debug info files (.pdb, .dSYM, .dwp) in wheels ([#3024](https://github.com/pyo3/maturin/pull/3024))

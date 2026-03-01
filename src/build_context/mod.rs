@@ -125,25 +125,9 @@ impl BuildContext {
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter, &sbom_data)?,
             BridgeModel::PyO3(crate::PyO3 { abi3, .. }) => match abi3 {
                 Some(Abi3Version::Version(major, minor)) => {
-                    self.build_abi3_wheels(*major, *minor, &sbom_data)?
+                    self.build_abi3_wheels(Some((*major, *minor)), &sbom_data)?
                 }
-                Some(Abi3Version::CurrentPython) => {
-                    let first_abi3 = self
-                        .interpreter
-                        .iter()
-                        .find(|interp| interp.has_stable_api());
-                    match first_abi3 {
-                        Some(interp) => self.build_abi3_wheels(
-                            interp.major as u8,
-                            interp.minor as u8,
-                            &sbom_data,
-                        )?,
-                        None => {
-                            // No abi3-capable interpreter, build all as version-specific
-                            self.build_pyo3_wheels(&self.interpreter, &sbom_data)?
-                        }
-                    }
-                }
+                Some(Abi3Version::CurrentPython) => self.build_abi3_wheels(None, &sbom_data)?,
                 None => self.build_pyo3_wheels(&self.interpreter, &sbom_data)?,
             },
             BridgeModel::Cffi => self.build_cffi_wheel(&sbom_data)?,
@@ -170,10 +154,15 @@ impl BuildContext {
 
     /// Split interpreters into abi3-capable and non-abi3 groups, build the
     /// appropriate wheel type for each group, and return all built wheels.
+    ///
+    /// When `min_version` is `Some((major, minor))` (i.e. `Abi3Version::Version`),
+    /// interpreters below that version are excluded from the abi3 group.
+    /// When `min_version` is `None` (i.e. `Abi3Version::CurrentPython`),
+    /// all `has_stable_api()` interpreters are in the abi3 group and the
+    /// baseline version is taken from the first one.
     fn build_abi3_wheels(
         &self,
-        major: u8,
-        minor: u8,
+        min_version: Option<(u8, u8)>,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         use itertools::Itertools;
@@ -183,7 +172,9 @@ impl BuildContext {
             .iter()
             .filter(|interp| {
                 interp.has_stable_api()
-                    && (interp.major as u8, interp.minor as u8) >= (major, minor)
+                    && min_version.is_none_or(|(major, minor)| {
+                        (interp.major as u8, interp.minor as u8) >= (major, minor)
+                    })
             })
             .cloned()
             .collect();
@@ -192,13 +183,16 @@ impl BuildContext {
             .iter()
             .filter(|interp| {
                 !interp.has_stable_api()
-                    || (interp.major as u8, interp.minor as u8) < (major, minor)
+                    || min_version.is_some_and(|(major, minor)| {
+                        (interp.major as u8, interp.minor as u8) < (major, minor)
+                    })
             })
             .cloned()
             .collect();
 
         let mut built_wheels = Vec::new();
-        if !abi3_interps.is_empty() {
+        if let Some(first) = abi3_interps.first() {
+            let (major, minor) = min_version.unwrap_or((first.major as u8, first.minor as u8));
             built_wheels.extend(self.build_pyo3_wheel_abi3(
                 &abi3_interps,
                 major,

@@ -258,7 +258,7 @@ impl BuildContext {
                 }
             },
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
-                self.get_universal_tags(&[PlatformTag::Linux])?.1
+                vec![self.get_universal_tag(&[PlatformTag::Linux])?]
             }
         };
         Ok(tags)
@@ -594,17 +594,10 @@ impl BuildContext {
         )
     }
 
-    /// Returns the tags for the platform without python version
-    pub fn get_universal_tags(
-        &self,
-        platform_tags: &[PlatformTag],
-    ) -> Result<(String, Vec<String>)> {
-        let tag = format!(
-            "py3-none-{platform}",
-            platform = self.get_platform_tag(platform_tags)?
-        );
-        let tags = vec![tag.clone()];
-        Ok((tag, tags))
+    /// Returns the platform tag without python version (e.g. `py3-none-manylinux_2_17_x86_64`)
+    pub fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+        let platform = self.get_platform_tag(platform_tags)?;
+        Ok(format!("py3-none-{platform}"))
     }
 
     /// Returns user-specified platform tags, or falls back to the auditwheel
@@ -865,7 +858,7 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, _) = self.get_universal_tags(platform_tags)?;
+        let tag = self.get_universal_tag(platform_tags)?;
 
         let interpreter = self.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
@@ -930,7 +923,7 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<BuiltWheelMetadata> {
-        let (tag, _) = self.get_universal_tags(platform_tags)?;
+        let tag = self.get_universal_tag(platform_tags)?;
 
         let wheel_path = self.write_wheel(
             &tag,
@@ -992,11 +985,10 @@ impl BuildContext {
             }
         }
 
-        let (tag, tags) = match (self.bridge(), python_interpreter) {
-            (BridgeModel::Bin(None), _) => self.get_universal_tags(platform_tags)?,
+        let tag = match (self.bridge(), python_interpreter) {
+            (BridgeModel::Bin(None), _) => self.get_universal_tag(platform_tags)?,
             (BridgeModel::Bin(Some(..)), Some(python_interpreter)) => {
-                let tag = python_interpreter.get_tag(self, platform_tags)?;
-                (tag.clone(), vec![tag])
+                python_interpreter.get_tag(self, platform_tags)?
             }
             _ => unreachable!(),
         };
@@ -1027,6 +1019,7 @@ impl BuildContext {
             &mut writer,
             &metadata24.get_dist_info_dir(),
         )?;
+        let tags = [tag];
         let wheel_path = writer.finish(&metadata24, &self.project_layout.project_root, &tags)?;
         Ok((wheel_path, "py3".to_string()))
     }

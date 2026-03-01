@@ -1076,7 +1076,7 @@ fn pyo3_wheel_record_has_normalized_paths() {
     handle_result(other::check_wheel_paths(
         "test-crates/pyo3-mixed-include-exclude",
         "pyo3_mixed_include_exclude-2.1.3.dist-info/RECORD",
-        "wheel-files-pyo3-mixed-include-exclude",
+        "wheel-record-pyo3-mixed-include-exclude",
     ))
 }
 

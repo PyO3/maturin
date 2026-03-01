@@ -729,10 +729,10 @@ impl BuildContext {
         ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<BuiltWheelMetadata> {
+    ) -> Result<PathBuf> {
         let tag = python_interpreter.get_tag(self, platform_tags)?;
 
-        let wheel_path = self.write_wheel(
+        self.write_wheel(
             &tag,
             &[&artifact],
             &[ext_libs],
@@ -744,11 +744,7 @@ impl BuildContext {
             },
             sbom_data,
             out_dirs,
-        )?;
-        Ok((
-            wheel_path,
-            format!("cp{}{}", python_interpreter.major, python_interpreter.minor),
-        ))
+        )
     }
 
     /// Builds wheels for a pyo3 extension for all given python versions.
@@ -772,7 +768,7 @@ impl BuildContext {
             let (policy, external_libs) =
                 self.auditwheel(&artifact, &self.platform_tag, Some(python_interpreter))?;
             let platform_tags = self.resolve_platform_tags(&policy);
-            let (wheel_path, tag) = self.write_pyo3_wheel(
+            let wheel_path = self.write_pyo3_wheel(
                 python_interpreter,
                 artifact,
                 &platform_tags,
@@ -789,6 +785,7 @@ impl BuildContext {
                 wheel_path.display()
             );
 
+            let tag = format!("cp{}{}", python_interpreter.major, python_interpreter.minor);
             wheels.push((wheel_path, tag));
         }
 
@@ -857,13 +854,13 @@ impl BuildContext {
         ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<BuiltWheelMetadata> {
+    ) -> Result<PathBuf> {
         let tag = self.get_universal_tag(platform_tags)?;
 
         let interpreter = self.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
-        let wheel_path = self.write_wheel(
+        self.write_wheel(
             &tag,
             &[&artifact],
             &[ext_libs],
@@ -875,8 +872,7 @@ impl BuildContext {
             },
             sbom_data,
             out_dirs,
-        )?;
-        Ok((wheel_path, "py3".to_string()))
+        )
     }
 
     /// Builds a wheel with cffi bindings
@@ -888,7 +884,7 @@ impl BuildContext {
         let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
         let platform_tags = self.resolve_platform_tags(&policy);
-        let (wheel_path, tag) = self.write_cffi_wheel(
+        let wheel_path = self.write_cffi_wheel(
             artifact,
             &platform_tags,
             external_libs,
@@ -910,7 +906,7 @@ impl BuildContext {
         }
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        wheels.push((wheel_path, tag));
+        wheels.push((wheel_path, "py3".to_string()));
 
         Ok(wheels)
     }
@@ -922,18 +918,17 @@ impl BuildContext {
         ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<BuiltWheelMetadata> {
+    ) -> Result<PathBuf> {
         let tag = self.get_universal_tag(platform_tags)?;
 
-        let wheel_path = self.write_wheel(
+        self.write_wheel(
             &tag,
             &[&artifact],
             &[ext_libs],
             |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),
             sbom_data,
             out_dirs,
-        )?;
-        Ok((wheel_path, "py3".to_string()))
+        )
     }
 
     /// Builds a wheel with uniffi bindings
@@ -945,7 +940,7 @@ impl BuildContext {
         let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
         let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
         let platform_tags = self.resolve_platform_tags(&policy);
-        let (wheel_path, tag) = self.write_uniffi_wheel(
+        let wheel_path = self.write_uniffi_wheel(
             artifact,
             &platform_tags,
             external_libs,
@@ -954,7 +949,7 @@ impl BuildContext {
         )?;
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        wheels.push((wheel_path, tag));
+        wheels.push((wheel_path, "py3".to_string()));
 
         Ok(wheels)
     }
@@ -967,7 +962,7 @@ impl BuildContext {
         ext_libs: &[Vec<Library>],
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<BuiltWheelMetadata> {
+    ) -> Result<PathBuf> {
         if !self.metadata24.scripts.is_empty() {
             bail!("Defining scripts and working with a binary doesn't mix well");
         }
@@ -1021,7 +1016,7 @@ impl BuildContext {
         )?;
         let tags = [tag];
         let wheel_path = writer.finish(&metadata24, &self.project_layout.project_root, &tags)?;
-        Ok((wheel_path, "py3".to_string()))
+        Ok(wheel_path)
     }
 
     /// Builds a wheel that contains a binary
@@ -1058,7 +1053,7 @@ impl BuildContext {
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();
         let platform_tags = self.resolve_platform_tags(policy);
 
-        let (wheel_path, tag) = self.write_bin_wheel(
+        let wheel_path = self.write_bin_wheel(
             python_interpreter,
             &artifact_paths,
             &platform_tags,
@@ -1067,7 +1062,7 @@ impl BuildContext {
             &result.out_dirs,
         )?;
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        wheels.push((wheel_path, tag));
+        wheels.push((wheel_path, "py3".to_string()));
 
         Ok(wheels)
     }

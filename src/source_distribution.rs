@@ -154,24 +154,11 @@ fn resolve_and_add_file(
     Ok(abs_file)
 }
 
-/// Resolve a readme path relative to a manifest directory and add it to the sdist.
-/// See [`resolve_and_add_file`] for details.
-fn resolve_and_add_readme(
-    writer: &mut VirtualWriter<SDistWriter>,
-    readme: &Path,
-    manifest_dir: &Path,
-    target_dir: &Path,
-) -> Result<PathBuf> {
-    resolve_and_add_file(writer, readme, manifest_dir, target_dir, "readme", None)
-}
-
 fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
     let text = fs::read_to_string(path)?;
-    let document = text.parse::<toml_edit::DocumentMut>().context(format!(
-        "Failed to parse {} at {}",
-        kind,
-        path.display()
-    ))?;
+    let document = text
+        .parse::<toml_edit::DocumentMut>()
+        .with_context(|| format!("Failed to parse {} at {}", kind, path.display()))?;
     Ok(document)
 }
 
@@ -343,46 +330,37 @@ fn resolve_workspace_inheritance(document: &mut DocumentMut, resolved: &cargo_me
     resolve_workspace_deps(document, "build-dependencies", resolved);
 
     // Handle `[target.'cfg(...)'.dependencies]` etc.
-    if let Some(target) = document.get("target").and_then(|t| t.as_table()) {
+    if let Some(target) = document.get_mut("target").and_then(|t| t.as_table_mut()) {
         let target_keys: Vec<String> = target.iter().map(|(k, _)| k.to_string()).collect();
         for target_key in target_keys {
+            let Some(target_val) = target.get_mut(&target_key) else {
+                continue;
+            };
             for dep_kind in &["dependencies", "dev-dependencies", "build-dependencies"] {
-                let table_path = format!("target.{target_key}.{dep_kind}");
-                if let Some(deps) = document
-                    .get("target")
-                    .and_then(|t| t.get(&target_key))
-                    .and_then(|t| t.get(*dep_kind))
-                    .and_then(|t| t.as_table())
-                {
-                    let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
-                    for dep_name in dep_names {
-                        if let Some(dep_table) = document
-                            .get("target")
-                            .and_then(|t| t.get(&target_key))
-                            .and_then(|t| t.get(*dep_kind))
-                            .and_then(|t| t.get(&dep_name))
-                            .and_then(|d| d.as_table_like())
-                        {
-                            if dep_table.get("workspace").and_then(|v| v.as_bool()) == Some(true) {
-                                if let Some(resolved_dep) =
-                                    find_resolved_dep(resolved, &dep_name, Some(&target_key))
-                                {
-                                    let new_entry = resolved_dep_to_toml(&resolved_dep);
-                                    if let Some(target_table) = document
-                                        .get_mut("target")
-                                        .and_then(|t| t.get_mut(&target_key))
-                                        .and_then(|t| t.get_mut(*dep_kind))
-                                        .and_then(|t| t.as_table_mut())
-                                    {
-                                        target_table.insert(&dep_name, new_entry);
-                                    }
-                                } else {
-                                    debug!(
-                                        "Could not resolve workspace dependency {dep_name} in {table_path}"
-                                    );
-                                }
-                            }
-                        }
+                let Some(deps) = target_val.get_mut(*dep_kind).and_then(|t| t.as_table_mut())
+                else {
+                    continue;
+                };
+                let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
+                for dep_name in dep_names {
+                    let is_workspace = deps
+                        .get(&dep_name)
+                        .and_then(|d| d.as_table_like())
+                        .and_then(|t| t.get("workspace"))
+                        .and_then(|v| v.as_bool())
+                        == Some(true);
+                    if !is_workspace {
+                        continue;
+                    }
+                    if let Some(resolved_dep) =
+                        find_resolved_dep(resolved, &dep_name, Some(&target_key))
+                    {
+                        deps.insert(&dep_name, resolved_dep_to_toml(&resolved_dep));
+                    } else {
+                        debug!(
+                            "Could not resolve workspace dependency {dep_name} in \
+                             target.{target_key}.{dep_kind}"
+                        );
                     }
                 }
             }
@@ -679,56 +657,28 @@ fn rewrite_cargo_toml_targets(
     Ok(())
 }
 
-/// Rewrite `Cargo.toml` to find the readme in the same directory.
+/// Rewrite a `[package]` field in `Cargo.toml` to point to a file in the same directory.
 ///
-/// `package.readme` may point to any point above the package, so when we move the directory, but
-/// keep the readme position, we could get different readme files at the same archive location.
-/// Putting the readme in the same directory as the `Cargo.toml` prevents this.
-fn rewrite_cargo_toml_readme(
+/// Fields like `readme` and `license-file` may reference files above the package.
+/// When we flatten the directory structure in the sdist, the path needs updating.
+fn rewrite_cargo_toml_package_field(
     document: &mut DocumentMut,
     manifest_path: &Path,
-    readme_name: Option<&str>,
+    field: &str,
+    value: Option<&str>,
 ) -> Result<()> {
-    debug!(
-        "Rewriting Cargo.toml `package.readme` at {}",
-        manifest_path.display()
-    );
-
-    if let Some(readme_name) = readme_name {
+    if let Some(value) = value {
+        debug!(
+            "Rewriting Cargo.toml `package.{field}` at {}",
+            manifest_path.display()
+        );
         let project = document.get_mut("package").with_context(|| {
             format!(
-                "Missing `[package]` table in Cargo.toml with readme at {}",
+                "Missing `[package]` table in Cargo.toml with {field} at {}",
                 manifest_path.display()
             )
         })?;
-        project["readme"] = toml_edit::value(readme_name);
-    }
-    Ok(())
-}
-
-/// Rewrite `Cargo.toml` to find the license file in the same directory.
-///
-/// `package.license-file` may point above the package (e.g. workspace-level license),
-/// so when we flatten the directory structure in the sdist, the path needs updating.
-/// This mirrors what [`rewrite_cargo_toml_readme`] does for readmes.
-fn rewrite_cargo_toml_license_file(
-    document: &mut DocumentMut,
-    manifest_path: &Path,
-    license_file_name: Option<&str>,
-) -> Result<()> {
-    debug!(
-        "Rewriting Cargo.toml `package.license-file` at {}",
-        manifest_path.display()
-    );
-
-    if let Some(license_file_name) = license_file_name {
-        let project = document.get_mut("package").with_context(|| {
-            format!(
-                "Missing `[package]` table in Cargo.toml with license-file at {}",
-                manifest_path.display()
-            )
-        })?;
-        project["license-file"] = toml_edit::value(license_file_name);
+        project[field] = toml_edit::value(value);
     }
     Ok(())
 }
@@ -959,8 +909,8 @@ fn add_crate_to_source_distribution(
         })
         .transpose()?;
 
-    // Filter out files that were already added by resolve_and_add_readme /
-    // resolve_and_add_file (e.g. readme or license-file from Cargo.toml pointing
+    // Filter out files that were already added by resolve_and_add_file
+    // (e.g. readme or license-file from Cargo.toml pointing
     // outside the crate). `cargo package --list` may include a local copy at the
     // same target path, causing a duplicate.
     // See https://github.com/PyO3/maturin/issues/2358
@@ -977,8 +927,13 @@ fn add_crate_to_source_distribution(
         }
     ) {
         let mut document = parse_toml_file(manifest_path, "Cargo.toml")?;
-        rewrite_cargo_toml_readme(&mut document, manifest_path, readme_name)?;
-        rewrite_cargo_toml_license_file(&mut document, manifest_path, license_file_name)?;
+        rewrite_cargo_toml_package_field(&mut document, manifest_path, "readme", readme_name)?;
+        rewrite_cargo_toml_package_field(
+            &mut document,
+            manifest_path,
+            "license-file",
+            license_file_name,
+        )?;
         if let CrateRole::Root {
             known_path_deps, ..
         } = &role
@@ -1246,32 +1201,36 @@ fn add_cargo_package_files_to_sdist(
         .unwrap()
         .strip_prefix(&ctx.sdist_root)
         .unwrap();
-    // Handle possible relative readme field in Cargo.toml
-    let readme_path = if let Some(readme) = main_crate.readme.as_ref() {
-        let target_dir = root_dir.join(relative_main_crate_manifest_dir);
-        Some(resolve_and_add_readme(
-            writer,
-            readme.as_std_path(),
-            abs_manifest_dir,
-            &target_dir,
-        )?)
-    } else {
-        None
-    };
-    // Handle possible relative license-file field in Cargo.toml
-    let license_file_path = if let Some(license_file) = main_crate.license_file.as_ref() {
-        let target_dir = root_dir.join(relative_main_crate_manifest_dir);
-        Some(resolve_and_add_file(
-            writer,
-            license_file.as_std_path(),
-            abs_manifest_dir,
-            &target_dir,
-            "license-file",
-            Some(workspace_root.as_std_path()),
-        )?)
-    } else {
-        None
-    };
+    // Handle possible relative readme / license-file fields in Cargo.toml
+    let target_dir = root_dir.join(relative_main_crate_manifest_dir);
+    let readme_path = main_crate
+        .readme
+        .as_ref()
+        .map(|readme| {
+            resolve_and_add_file(
+                writer,
+                readme.as_std_path(),
+                abs_manifest_dir,
+                &target_dir,
+                "readme",
+                None,
+            )
+        })
+        .transpose()?;
+    let license_file_path = main_crate
+        .license_file
+        .as_ref()
+        .map(|lf| {
+            resolve_and_add_file(
+                writer,
+                lf.as_std_path(),
+                abs_manifest_dir,
+                &target_dir,
+                "license-file",
+                Some(workspace_root.as_std_path()),
+            )
+        })
+        .transpose()?;
     // Compute python source directories relative to the manifest directory.
     // When the crate is a workspace member in a subdirectory, `cargo package --list`
     // includes python source files that will also be added by the explicit python
@@ -1528,33 +1487,36 @@ fn add_path_dep(
     let skip_cargo_toml =
         ctx.workspace_manifest_path.as_std_path() == path_dep.manifest_path.as_path();
 
-    // Handle possible relative readme field in Cargo.toml
-    let readme_path = if let Some(readme) = path_dep.readme.as_ref() {
-        let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
-        Some(resolve_and_add_readme(
-            writer,
-            readme,
-            path_dep_manifest_dir,
-            &target_dir,
-        )?)
-    } else {
-        None
-    };
-
-    // Handle possible relative license-file field in Cargo.toml
-    let license_file_path = if let Some(license_file) = path_dep.license_file.as_ref() {
-        let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
-        Some(resolve_and_add_file(
-            writer,
-            license_file,
-            path_dep_manifest_dir,
-            &target_dir,
-            "license-file",
-            Some(&path_dep.workspace_root),
-        )?)
-    } else {
-        None
-    };
+    // Handle possible relative readme / license-file fields in Cargo.toml
+    let target_dir = ctx.root_dir.join(relative_path_dep_manifest_dir);
+    let readme_path = path_dep
+        .readme
+        .as_ref()
+        .map(|readme| {
+            resolve_and_add_file(
+                writer,
+                readme,
+                path_dep_manifest_dir,
+                &target_dir,
+                "readme",
+                None,
+            )
+        })
+        .transpose()?;
+    let license_file_path = path_dep
+        .license_file
+        .as_ref()
+        .map(|lf| {
+            resolve_and_add_file(
+                writer,
+                lf,
+                path_dep_manifest_dir,
+                &target_dir,
+                "license-file",
+                Some(&path_dep.workspace_root),
+            )
+        })
+        .transpose()?;
 
     // Check if the dependency's workspace manifest is outside the sdist root.
     // When it is, we need to inline workspace-inherited fields since we can't
@@ -1562,9 +1524,9 @@ fn add_path_dep(
     let workspace_outside_sdist =
         if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
             let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
-            !path_dep_workspace_manifest
+            path_dep_workspace_manifest
                 .strip_prefix(&ctx.sdist_root)
-                .is_ok()
+                .is_err()
         } else {
             false
         };
@@ -1939,10 +1901,10 @@ mod tests {
     }
 
     #[test]
-    fn test_rewrite_cargo_toml_license_file() {
+    fn test_rewrite_cargo_toml_package_field() {
         let manifest_path = Path::new("Cargo.toml");
 
-        // When license_file_name is Some, it should rewrite the field
+        // When value is Some, it should rewrite the field
         let toml_str = r#"
 [package]
 name = "test"
@@ -1950,16 +1912,23 @@ version = "0.1.0"
 license-file = "../../LICENSE"
 "#;
         let mut document = toml_str.parse::<DocumentMut>().unwrap();
-        rewrite_cargo_toml_license_file(&mut document, manifest_path, Some("LICENSE")).unwrap();
+        rewrite_cargo_toml_package_field(
+            &mut document,
+            manifest_path,
+            "license-file",
+            Some("LICENSE"),
+        )
+        .unwrap();
         let result = document.to_string();
         assert!(
             result.contains(r#"license-file = "LICENSE""#),
             "expected rewritten license-file, got: {result}"
         );
 
-        // When license_file_name is None, it should be a no-op
+        // When value is None, it should be a no-op
         let mut document2 = toml_str.parse::<DocumentMut>().unwrap();
-        rewrite_cargo_toml_license_file(&mut document2, manifest_path, None).unwrap();
+        rewrite_cargo_toml_package_field(&mut document2, manifest_path, "license-file", None)
+            .unwrap();
         let result2 = document2.to_string();
         assert!(
             result2.contains(r#"license-file = "../../LICENSE""#),

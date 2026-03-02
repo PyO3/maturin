@@ -1,3 +1,5 @@
+mod utils;
+
 use crate::pyproject_toml::{Format, SdistGenerator};
 use crate::{BuildContext, ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
@@ -17,6 +19,8 @@ use std::process::Command;
 use std::str;
 use toml_edit::DocumentMut;
 use tracing::{debug, trace, warn};
+
+use self::utils::{common_path_prefix, is_compiled_artifact, normalize_path, relative_path};
 
 /// Unpacks an sdist tarball into a temporary directory and returns the path
 /// to the Cargo.toml and pyproject.toml inside it, along with the tempdir
@@ -96,12 +100,6 @@ pub struct PathDependency {
     /// Resolved package metadata from `cargo metadata`, used to inline
     /// workspace-inherited fields when the workspace manifest is outside the sdist root.
     resolved_package: Option<cargo_metadata::Package>,
-}
-
-/// Returns `true` if the file extension indicates a compiled artifact
-/// that should be excluded from the source distribution.
-fn is_compiled_artifact(path: &Path) -> bool {
-    matches!(path.extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so")
 }
 
 /// Resolve a file path relative to a manifest directory and add it to the sdist
@@ -496,32 +494,6 @@ fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
     }
 
     toml_edit::value(toml_edit::Value::InlineTable(table))
-}
-
-fn normalize_path(path: &Path) -> PathBuf {
-    use std::path::Component;
-    let mut components = Vec::new();
-
-    for component in path.components() {
-        match component {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                // Only pop if there's a normal component to cancel out
-                match components.last() {
-                    Some(Component::Normal(_)) => {
-                        components.pop();
-                    }
-                    _ => {
-                        // Keep the ParentDir if path is empty or last is also ParentDir
-                        components.push(component);
-                    }
-                }
-            }
-            _ => components.push(component),
-        }
-    }
-
-    components.iter().collect()
 }
 
 // Strip targets whose source files are excluded from the sdist, matching Cargo's
@@ -1737,49 +1709,6 @@ pub fn source_distribution(
     Ok(source_distribution_path)
 }
 
-/// Find the common prefix, if any, between two paths
-///
-/// Taken from https://docs.rs/common-path/1.0.0/src/common_path/lib.rs.html#84-109
-/// License: MIT/Apache 2.0
-fn common_path_prefix<P, Q>(one: P, two: Q) -> Option<PathBuf>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let one = one.as_ref();
-    let two = two.as_ref();
-    let one = one.components();
-    let two = two.components();
-    let mut final_path = PathBuf::new();
-    let mut found = false;
-    let paths = one.zip(two);
-    for (l, r) in paths {
-        if l == r {
-            final_path.push(l.as_os_str());
-            found = true;
-        } else {
-            break;
-        }
-    }
-    if found { Some(final_path) } else { None }
-}
-
-/// Compute a relative path from `from` directory to `to` path.
-///
-/// Both paths should be absolute. Returns a relative path that, when joined
-/// with `from`, resolves to `to`.
-fn relative_path(from: &Path, to: &Path) -> PathBuf {
-    let common = common_path_prefix(from, to).unwrap_or_default();
-    let from_rest = from.strip_prefix(&common).unwrap_or(Path::new(""));
-    let to_rest = to.strip_prefix(&common).unwrap_or(to);
-    let mut result = PathBuf::new();
-    for _ in from_rest.components() {
-        result.push("..");
-    }
-    result.push(to_rest);
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1791,67 +1720,6 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::Metadata24;
-
-    #[test]
-    fn test_normalize_path() {
-        let test_cases = vec![
-            // Basic paths without normalization needed
-            ("foo/bar", "foo/bar"),
-            ("src/lib.rs", "src/lib.rs"),
-            // Remove current directory components
-            ("./foo/bar", "foo/bar"),
-            ("foo/./bar", "foo/bar"),
-            (".", ""),
-            // Parent directory that cancels with a normal component
-            ("foo/../bar", "bar"),
-            ("foo/bar/..", "foo"),
-            ("foo/bar/../baz", "foo/baz"),
-            // Leading parent directories should be preserved
-            ("../foo", "../foo"),
-            ("../../foo", "../../foo"),
-            ("../../../foo/bar", "../../../foo/bar"),
-            // More parent dirs than normal components
-            ("a/../../b", "../b"),
-            ("a/b/../../../c", "../c"),
-            ("foo/bar/baz/../../..", ""),
-            // Mix of current and parent directory components
-            ("./foo/../bar", "bar"),
-            ("foo/./bar/../baz", "foo/baz"),
-            ("./../foo/./bar", "../foo/bar"),
-            // Edge cases
-            ("", ""),
-            ("foo", "foo"),
-            ("..", ".."),
-        ];
-
-        for (input, expected) in test_cases {
-            assert_eq!(
-                normalize_path(Path::new(input)),
-                PathBuf::from(expected),
-                "normalize_path({:?}) should equal {:?}",
-                input,
-                expected
-            );
-        }
-    }
-
-    #[test]
-    fn test_relative_path() {
-        let test_cases = vec![
-            ("/a/b/c", "/a/b/d", "../d"),
-            ("/a/b", "/a/b/c/d", "c/d"),
-            ("/a/b/c", "/a/b", ".."),
-            ("/a/b/c", "/a/x/y", "../../x/y"),
-            ("/a/b", "/a/b", ""),
-        ];
-        for (from, to, expected) in test_cases {
-            assert_eq!(
-                relative_path(Path::new(from), Path::new(to)),
-                PathBuf::from(expected),
-                "relative_path({from:?}, {to:?}) should equal {expected:?}",
-            );
-        }
-    }
 
     #[test]
     fn test_resolved_dep_to_toml_path_dep() {

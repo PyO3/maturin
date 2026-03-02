@@ -305,21 +305,15 @@ fn resolve_workspace_inheritance(document: &mut DocumentMut, resolved: &cargo_me
             }
         }
 
-        // Handle readme
-        if is_workspace_inherited(package, "readme") {
-            if let Some(readme) = &resolved.readme {
-                package.insert("readme", toml_edit::value(readme.as_str()));
-            } else {
-                package.remove("readme");
-            }
-        }
-
-        // Handle license-file
-        if is_workspace_inherited(package, "license-file") {
-            if let Some(license_file) = &resolved.license_file {
-                package.insert("license-file", toml_edit::value(license_file.as_str()));
-            } else {
-                package.remove("license-file");
+        // `readme` and `license-file` are NOT inlined here because they need
+        // special handling: the file is copied into the sdist next to Cargo.toml
+        // and the path is rewritten to just the filename by the caller
+        // (`resolve_and_add_file` + `rewrite_cargo_toml_package_field`).
+        // We only need to remove the `workspace = true` marker so cargo doesn't
+        // try to look it up from a workspace that no longer exists.
+        for key in ["readme", "license-file"] {
+            if is_workspace_inherited(package, key) {
+                package.remove(key);
             }
         }
     }

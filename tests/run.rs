@@ -890,8 +890,26 @@ fn lib_with_target_path_dep_sdist() {
 /// Reproduces the scenario where a crate is excluded from a parent workspace
 /// but depends on sibling crates that ARE in the parent workspace.
 /// Before the fix, this would panic with StripPrefixError.
+///
+/// Also verifies that workspace-inherited fields (`edition.workspace = true`,
+/// `readme.workspace = true`) are correctly inlined in the path dependency's
+/// Cargo.toml when the parent workspace manifest is outside the sdist root.
 #[test]
 fn lib_with_parent_workspace_path_dep_sdist() {
+    // shared_crate uses `edition.workspace = true` and `readme.workspace = true`
+    // from the parent workspace. Since the parent workspace Cargo.toml is NOT
+    // included in the sdist, these must be inlined to their resolved values.
+    // `readme` is removed (the file is copied separately and the path rewritten),
+    // and `edition` is inlined to "2021".
+    let expected_shared_crate_cargo_toml = expect![[r#"
+        [package]
+        name = "shared_crate"
+        version = "0.1.0"
+        edition = "2021"
+        readme = "README.md"
+
+        [lib]
+    "#]];
     handle_result(other::test_source_distribution(
         "test-crates/parent_workspace_sdist/crates/pysof",
         SdistGenerator::Cargo,
@@ -904,10 +922,14 @@ fn lib_with_parent_workspace_path_dep_sdist() {
                 "pysof-0.1.0/pysof/Cargo.toml",
                 "pysof-0.1.0/pysof/src/lib.rs",
                 "pysof-0.1.0/shared_crate/Cargo.toml",
+                "pysof-0.1.0/shared_crate/README.md",
                 "pysof-0.1.0/shared_crate/src/lib.rs",
             }
         "#]],
-        None,
+        Some((
+            Path::new("pysof-0.1.0/shared_crate/Cargo.toml"),
+            expected_shared_crate_cargo_toml,
+        )),
         "sdist-lib-with-parent-workspace-path-dep",
     ))
 }

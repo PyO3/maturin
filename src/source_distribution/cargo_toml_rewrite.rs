@@ -104,6 +104,29 @@ pub(super) fn rewrite_cargo_toml(
     Ok(())
 }
 
+/// Strip all non-workspace tables from a workspace Cargo.toml.
+///
+/// When the workspace root's Cargo.toml is also a `[package]` (i.e. it's not a
+/// virtual workspace), the package's source files are typically not included in
+/// the sdist. This function strips everything except workspace-level tables
+/// (`[workspace]`, `[profile]`, `[patch]`, `[replace]`) so Cargo treats it as
+/// a virtual workspace.
+pub(super) fn strip_non_workspace_tables(document: &mut DocumentMut, manifest_path: &Path) {
+    debug!(
+        "Stripping [package] from workspace Cargo.toml at {} (source files not in sdist)",
+        manifest_path.display()
+    );
+    let package_level_keys: Vec<String> = document
+        .as_table()
+        .iter()
+        .filter(|(key, _)| !matches!(&**key, "workspace" | "profile" | "patch" | "replace"))
+        .map(|(key, _)| key.to_string())
+        .collect();
+    for key in &package_level_keys {
+        document.remove(key);
+    }
+}
+
 /// Inlines workspace-inherited fields in a path dependency's `Cargo.toml`
 /// using resolved values from `cargo metadata`.
 ///
@@ -165,7 +188,7 @@ pub(super) fn resolve_workspace_inheritance(
         // `readme` and `license-file` are NOT inlined here because they need
         // special handling: the file is copied into the sdist next to Cargo.toml
         // and the path is rewritten to just the filename by the caller
-        // (`resolve_and_add_file` + `rewrite_cargo_toml_package_field`).
+        // (`resolve_and_add_manifest_asset` + `rewrite_cargo_toml_package_field`).
         // We only need to remove the `workspace = true` marker so cargo doesn't
         // try to look it up from a workspace that no longer exists.
         for key in ["readme", "license-file"] {
@@ -302,7 +325,7 @@ fn find_resolved_dep(
     })
 }
 
-pub(super) struct ResolvedDep {
+struct ResolvedDep {
     req: String,
     optional: bool,
     default_features: bool,
@@ -316,7 +339,7 @@ pub(super) struct ResolvedDep {
 }
 
 /// Converts a resolved dependency into a TOML value for Cargo.toml.
-pub(super) fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
+fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
     // Simple case: just a version string (only for non-path, non-renamed deps)
     if dep.path.is_none()
         && dep.default_features

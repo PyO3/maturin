@@ -23,14 +23,11 @@ use tracing::{debug, trace, warn};
 use self::cargo_toml_rewrite::{
     parse_toml_file, resolve_workspace_inheritance, rewrite_cargo_toml,
     rewrite_cargo_toml_package_field, rewrite_cargo_toml_targets, rewrite_pyproject_toml,
+    strip_non_workspace_tables,
 };
 pub use self::path_deps::{PathDependency, find_path_deps};
 pub use self::unpack::unpack_sdist;
 use self::utils::{common_path_prefix, is_compiled_artifact, normalize_path};
-
-// ---------------------------------------------------------------------------
-// ManifestAsset: resolve readme / license-file referenced by Cargo.toml
-// ---------------------------------------------------------------------------
 
 /// A file (readme or license) referenced by a Cargo.toml manifest field that
 /// has been resolved to an absolute path and is ready to be added to the sdist.
@@ -107,10 +104,6 @@ fn resolve_and_add_manifest_asset(
     Ok(asset)
 }
 
-// ---------------------------------------------------------------------------
-// cargo package --list helper
-// ---------------------------------------------------------------------------
-
 /// Run `cargo package --list --allow-dirty` and return the list of files.
 fn cargo_package_file_list(manifest_path: &Path) -> Result<Vec<String>> {
     debug!(
@@ -154,10 +147,6 @@ fn cargo_package_file_list(manifest_path: &Path) -> Result<Vec<String>> {
         .collect();
     Ok(files)
 }
-
-// ---------------------------------------------------------------------------
-// Core: add a crate's files to the sdist
-// ---------------------------------------------------------------------------
 
 /// Options that vary between the root crate and path dependencies when
 /// adding crate files to the sdist.
@@ -222,11 +211,10 @@ fn add_crate_to_source_distribution(
                     prefix.join(target).display()
                 );
                 false
-            } else if !opts.skip_prefixes.is_empty()
-                && opts
-                    .skip_prefixes
-                    .iter()
-                    .any(|p| Path::new(target).starts_with(p))
+            } else if opts
+                .skip_prefixes
+                .iter()
+                .any(|p| Path::new(target).starts_with(p))
             {
                 // Skip files that will be added separately (e.g. python source files
                 // that are added by the explicit python source loop).
@@ -302,10 +290,6 @@ fn add_crate_to_source_distribution(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Git-based file listing
-// ---------------------------------------------------------------------------
-
 /// Copies git-tracked files to a source distribution.
 ///
 /// Runs `git ls-files -z` to obtain a list of files to package.
@@ -342,10 +326,6 @@ fn add_git_tracked_files_to_sdist(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Cargo-based sdist assembly (decomposed into phases)
-// ---------------------------------------------------------------------------
-
 /// Shared context for building a source distribution from cargo packages.
 ///
 /// Groups the common parameters needed when adding crates and path dependencies
@@ -356,6 +336,10 @@ struct SdistContext<'a> {
     workspace_manifest_path: camino::Utf8PathBuf,
     known_path_deps: HashMap<String, PathDependency>,
     sdist_root: PathBuf,
+    abs_manifest_dir: PathBuf,
+    relative_main_crate_manifest_dir: PathBuf,
+    project_root: PathBuf,
+    pyproject_dir: PathBuf,
 }
 
 /// Resolve sdist_root — the common ancestor of all files that need to be in the sdist.
@@ -451,15 +435,13 @@ fn add_path_dep(
     // Check if the dependency's workspace manifest is outside the sdist root.
     // When it is, we need to inline workspace-inherited fields since we can't
     // include the parent workspace manifest in the sdist.
-    let workspace_outside_sdist =
-        if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
-            let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
-            path_dep_workspace_manifest
-                .strip_prefix(&ctx.sdist_root)
-                .is_err()
-        } else {
-            false
-        };
+    let has_different_workspace =
+        path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path();
+    let path_dep_workspace_manifest =
+        has_different_workspace.then(|| path_dep.workspace_root.join("Cargo.toml"));
+    let workspace_outside_sdist = path_dep_workspace_manifest
+        .as_ref()
+        .is_some_and(|m| m.strip_prefix(&ctx.sdist_root).is_err());
 
     let resolved_package = if workspace_outside_sdist {
         path_dep.resolved_package.as_ref()
@@ -490,8 +472,7 @@ fn add_path_dep(
     })?;
 
     // Handle different workspace manifest
-    if path_dep.workspace_root.as_path() != ctx.workspace_root.as_std_path() {
-        let path_dep_workspace_manifest = path_dep.workspace_root.join("Cargo.toml");
+    if let Some(path_dep_workspace_manifest) = path_dep_workspace_manifest {
         if let Ok(relative_path_dep_workspace_manifest) =
             path_dep_workspace_manifest.strip_prefix(&ctx.sdist_root)
         {
@@ -516,39 +497,24 @@ fn add_main_crate(
     build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
-) -> Result<PathBuf> {
+) -> Result<()> {
     let manifest_path = &build_context.manifest_path;
-    let abs_manifest_path = manifest_path
-        .normalize()
-        .with_context(|| {
-            format!(
-                "manifest path `{}` does not exist or is invalid",
-                manifest_path.display()
-            )
-        })?
-        .into_path_buf();
-    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
     let main_crate = build_context
         .cargo_metadata
         .root_package()
         .context("Expected cargo to return metadata with root_package")?;
-    let relative_main_crate_manifest_dir = manifest_path
-        .parent()
-        .unwrap()
-        .strip_prefix(&ctx.sdist_root)
-        .unwrap();
 
     debug!("Adding the main crate {}", manifest_path.display());
 
     // Resolve readme / license-file
-    let target_dir = ctx.root_dir.join(relative_main_crate_manifest_dir);
+    let target_dir = ctx.root_dir.join(&ctx.relative_main_crate_manifest_dir);
     let readme = main_crate
         .readme
         .as_ref()
         .map(|readme| {
             resolve_and_add_manifest_asset(
                 writer,
-                abs_manifest_dir,
+                &ctx.abs_manifest_dir,
                 readme.as_std_path(),
                 &target_dir,
                 "readme",
@@ -562,7 +528,7 @@ fn add_main_crate(
         .map(|lf| {
             resolve_and_add_manifest_asset(
                 writer,
-                abs_manifest_dir,
+                &ctx.abs_manifest_dir,
                 lf.as_std_path(),
                 &target_dir,
                 "license-file",
@@ -576,30 +542,31 @@ fn add_main_crate(
     // includes python source files that will also be added by the explicit python
     // source loop (relative to pyproject_dir). We skip them here to avoid duplicates.
     // See https://github.com/PyO3/maturin/issues/2383
-    let skip_prefixes: Vec<PathBuf> = if !relative_main_crate_manifest_dir.as_os_str().is_empty() {
-        let mut prefixes = Vec::new();
-        if let Some(python_module) = build_context.project_layout.python_module.as_ref()
-            && let Ok(rel) = python_module.strip_prefix(abs_manifest_dir)
-        {
-            prefixes.push(rel.to_path_buf());
-        }
-        for package in &build_context.project_layout.python_packages {
-            let package_path = build_context.project_layout.python_dir.join(package);
-            if let Ok(rel) = package_path.strip_prefix(abs_manifest_dir)
-                && !prefixes.contains(&rel.to_path_buf())
+    let skip_prefixes: Vec<PathBuf> =
+        if !ctx.relative_main_crate_manifest_dir.as_os_str().is_empty() {
+            let mut prefixes = Vec::new();
+            if let Some(python_module) = build_context.project_layout.python_module.as_ref()
+                && let Ok(rel) = python_module.strip_prefix(&ctx.abs_manifest_dir)
             {
                 prefixes.push(rel.to_path_buf());
             }
-        }
-        prefixes
-    } else {
-        Vec::new()
-    };
+            for package in &build_context.project_layout.python_packages {
+                let package_path = build_context.project_layout.python_dir.join(package);
+                if let Ok(rel) = package_path.strip_prefix(&ctx.abs_manifest_dir)
+                    && !prefixes.contains(&rel.to_path_buf())
+                {
+                    prefixes.push(rel.to_path_buf());
+                }
+            }
+            prefixes
+        } else {
+            Vec::new()
+        };
 
     add_crate_to_source_distribution(
         writer,
         manifest_path,
-        &ctx.root_dir.join(relative_main_crate_manifest_dir),
+        &ctx.root_dir.join(&ctx.relative_main_crate_manifest_dir),
         readme.as_ref(),
         license_file.as_ref(),
         &AddCrateOptions {
@@ -611,7 +578,7 @@ fn add_main_crate(
         },
     )?;
 
-    Ok(abs_manifest_path)
+    Ok(())
 }
 
 /// Add Cargo.lock to the sdist.
@@ -619,10 +586,8 @@ fn add_cargo_lock(
     build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
-    abs_manifest_dir: &Path,
-    project_root: &Path,
 ) -> Result<()> {
-    let manifest_cargo_lock_path = abs_manifest_dir.join("Cargo.lock");
+    let manifest_cargo_lock_path = ctx.abs_manifest_dir.join("Cargo.lock");
     let workspace_cargo_lock = ctx.workspace_root.join("Cargo.lock").into_std_path_buf();
     let cargo_lock_path = if manifest_cargo_lock_path.exists() {
         Some(manifest_cargo_lock_path)
@@ -635,7 +600,7 @@ fn add_cargo_lock(
         build_context.cargo_options.locked || build_context.cargo_options.frozen;
 
     if let Some(cargo_lock_path) = cargo_lock_path {
-        let relative_cargo_lock = cargo_lock_path.strip_prefix(project_root).unwrap();
+        let relative_cargo_lock = cargo_lock_path.strip_prefix(&ctx.project_root).unwrap();
         writer.add_file(
             ctx.root_dir.join(relative_cargo_lock),
             &cargo_lock_path,
@@ -654,11 +619,9 @@ fn add_cargo_lock(
 
 /// Add the workspace Cargo.toml (when the crate is a workspace member).
 fn add_workspace_manifest(
+    build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
-    manifest_path: &Path,
-    abs_manifest_dir: &Path,
-    project_root: &Path,
 ) -> Result<()> {
     // Without the workspace Cargo.toml, cargo can't resolve workspace-level deps.
     // Note: when a crate is `exclude`d from a workspace, `cargo metadata` reports
@@ -673,7 +636,7 @@ fn add_workspace_manifest(
         .normalize()
         .map(|p| p.into_path_buf())
         .unwrap_or_else(|_| ctx.workspace_root.as_std_path().to_path_buf());
-    let is_in_workspace = normalized_workspace_root != abs_manifest_dir;
+    let is_in_workspace = normalized_workspace_root != ctx.abs_manifest_dir;
     if !is_in_workspace {
         return Ok(());
     }
@@ -681,13 +644,14 @@ fn add_workspace_manifest(
     let relative_workspace_cargo_toml = ctx
         .workspace_manifest_path
         .as_std_path()
-        .strip_prefix(project_root)
+        .strip_prefix(&ctx.project_root)
         .unwrap();
 
     // Collect all crates that must remain in `workspace.members`:
     // the known path dependencies plus the main Python binding crate itself.
     let mut deps_to_keep = ctx.known_path_deps.clone();
-    let main_member_name = abs_manifest_dir
+    let main_member_name = ctx
+        .abs_manifest_dir
         .strip_prefix(ctx.workspace_root)
         .unwrap()
         .to_slash()
@@ -696,7 +660,7 @@ fn add_workspace_manifest(
     deps_to_keep.insert(
         main_member_name,
         PathDependency {
-            manifest_path: manifest_path.to_path_buf(),
+            manifest_path: build_context.manifest_path.to_path_buf(),
             workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
             readme: None,
             license_file: None,
@@ -721,19 +685,7 @@ fn add_workspace_manifest(
         .values()
         .any(|dep| dep.manifest_path.as_path() == ctx.workspace_manifest_path.as_std_path());
     if !workspace_root_is_path_dep && document.contains_key("package") {
-        debug!(
-            "Stripping [package] from workspace Cargo.toml at {} (source files not in sdist)",
-            ctx.workspace_manifest_path
-        );
-        let package_level_keys: Vec<String> = document
-            .as_table()
-            .iter()
-            .filter(|(key, _)| !matches!(&**key, "workspace" | "profile" | "patch" | "replace"))
-            .map(|(key, _)| key.to_string())
-            .collect();
-        for key in &package_level_keys {
-            document.remove(key);
-        }
+        strip_non_workspace_tables(&mut document, ctx.workspace_manifest_path.as_std_path());
     }
 
     writer.add_bytes(
@@ -751,18 +703,15 @@ fn add_pyproject_toml(
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
     pyproject_toml_path: &Path,
-    relative_main_crate_manifest_dir: &Path,
-    project_root: &Path,
 ) -> Result<()> {
-    let pyproject_dir = pyproject_toml_path.parent().unwrap();
-    if pyproject_dir != ctx.sdist_root {
+    if ctx.pyproject_dir != ctx.sdist_root {
         let python_dir = &build_context.project_layout.python_dir;
         // Compute python-source relative to pyproject_dir.  When python_dir is
         // outside pyproject_dir, compute the path relative to project_root instead.
-        let relative_python_source = if python_dir != pyproject_dir {
+        let relative_python_source = if python_dir != &ctx.pyproject_dir {
             python_dir
-                .strip_prefix(pyproject_dir)
-                .or_else(|_| python_dir.strip_prefix(project_root))
+                .strip_prefix(&ctx.pyproject_dir)
+                .or_else(|_| python_dir.strip_prefix(&ctx.project_root))
                 .ok()
                 .map(|p| p.to_path_buf())
         } else {
@@ -770,7 +719,7 @@ fn add_pyproject_toml(
         };
         let rewritten_pyproject_toml = rewrite_pyproject_toml(
             pyproject_toml_path,
-            &relative_main_crate_manifest_dir.join("Cargo.toml"),
+            &ctx.relative_main_crate_manifest_dir.join("Cargo.toml"),
             relative_python_source.as_deref(),
         )?;
         writer.add_bytes(
@@ -793,9 +742,7 @@ fn add_pyproject_toml(
 fn add_python_sources(
     build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
-    root_dir: &Path,
-    pyproject_dir: &Path,
-    project_root: &Path,
+    ctx: &SdistContext<'_>,
 ) -> Result<()> {
     let mut python_packages = Vec::new();
     if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
@@ -821,18 +768,18 @@ fn add_python_sources(
             // When python-source points outside pyproject_dir, strip from
             // project_root instead (issue #2202).
             let relative = source
-                .strip_prefix(pyproject_dir)
-                .or_else(|_| source.strip_prefix(project_root))
+                .strip_prefix(&ctx.pyproject_dir)
+                .or_else(|_| source.strip_prefix(&ctx.project_root))
                 .with_context(|| {
                     format!(
                         "Python source file `{}` is outside both pyproject dir `{}` and project root `{}`",
                         source.display(),
-                        pyproject_dir.display(),
-                        project_root.display(),
+                        ctx.pyproject_dir.display(),
+                        ctx.project_root.display(),
                     )
                 })?;
             if !source.is_dir() {
-                writer.add_file(root_dir.join(relative), &source, false)?;
+                writer.add_file(ctx.root_dir.join(relative), &source, false)?;
             }
         }
     }
@@ -872,58 +819,140 @@ fn add_cargo_package_files_to_sdist(
     )?;
     debug!("Found sdist root: {}", sdist_root.display());
 
+    // Compute values upfront so they're available to all phases
+    let abs_manifest_path = manifest_path
+        .normalize()
+        .with_context(|| {
+            format!(
+                "manifest path `{}` does not exist or is invalid",
+                manifest_path.display()
+            )
+        })?
+        .into_path_buf();
+    let abs_manifest_dir = abs_manifest_path.parent().unwrap().to_path_buf();
+    let relative_main_crate_manifest_dir = manifest_path
+        .parent()
+        .unwrap()
+        .strip_prefix(&sdist_root)
+        .unwrap()
+        .to_path_buf();
+    let project_root = compute_project_root(pyproject_toml_path, &sdist_root).to_path_buf();
+    let pyproject_dir = pyproject_toml_path.parent().unwrap().to_path_buf();
+
     let ctx = SdistContext {
         root_dir,
         workspace_root,
         workspace_manifest_path,
         known_path_deps,
         sdist_root,
+        abs_manifest_dir,
+        relative_main_crate_manifest_dir,
+        project_root,
+        pyproject_dir,
     };
 
     // 1. Add local path dependencies
     for (name, path_dep) in ctx.known_path_deps.iter() {
-        add_path_dep(writer, &ctx, name, path_dep)
-            .with_context(|| format!("Failed to add path dependency {name}"))?;
+        add_path_dep(writer, &ctx, name, path_dep)?;
     }
 
     // 2. Add the main crate
-    let abs_manifest_path = add_main_crate(build_context, writer, &ctx)?;
-    let abs_manifest_dir = abs_manifest_path.parent().unwrap();
-    let relative_main_crate_manifest_dir = manifest_path
-        .parent()
-        .unwrap()
-        .strip_prefix(&ctx.sdist_root)
-        .unwrap();
-
-    // Compute the project root (needed by several subsequent phases)
-    let project_root = compute_project_root(pyproject_toml_path, &ctx.sdist_root);
-    let pyproject_dir = pyproject_toml_path.parent().unwrap();
+    add_main_crate(build_context, writer, &ctx)?;
 
     // 3. Add Cargo.lock
-    add_cargo_lock(build_context, writer, &ctx, abs_manifest_dir, project_root)?;
+    add_cargo_lock(build_context, writer, &ctx)?;
 
     // 4. Add workspace Cargo.toml (if applicable)
-    add_workspace_manifest(writer, &ctx, manifest_path, abs_manifest_dir, project_root)?;
+    add_workspace_manifest(build_context, writer, &ctx)?;
 
     // 5. Add pyproject.toml
-    add_pyproject_toml(
-        build_context,
-        writer,
-        &ctx,
-        pyproject_toml_path,
-        relative_main_crate_manifest_dir,
-        project_root,
-    )?;
+    add_pyproject_toml(build_context, writer, &ctx, pyproject_toml_path)?;
 
     // 6. Add python source files
-    add_python_sources(build_context, writer, root_dir, pyproject_dir, project_root)?;
+    add_python_sources(build_context, writer, &ctx)?;
 
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
+/// Add readme, license files, and include patterns from pyproject.toml metadata.
+///
+/// This covers files referenced by `[project]` fields (readme, license,
+/// license-files with PEP 639 glob handling) as well as explicit `include`
+/// patterns from `[tool.maturin]`.  Files already present in the writer
+/// (e.g. from Cargo.toml metadata) are skipped to avoid duplicates.
+fn add_pyproject_metadata(
+    writer: &mut VirtualWriter<SDistWriter>,
+    pyproject: &PyProjectToml,
+    pyproject_dir: &Path,
+    root_dir: &Path,
+    python_dir: &Path,
+) -> Result<()> {
+    // Add readme, license from pyproject.toml
+    // Skip if already added (e.g. from Cargo.toml metadata) to avoid duplicates.
+    // See https://github.com/PyO3/maturin/issues/2358
+    if let Some(project) = pyproject.project.as_ref() {
+        if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
+            let target = root_dir.join(readme);
+            if !writer.contains_target(&target) {
+                writer.add_file(target, pyproject_dir.join(readme), false)?;
+            }
+        }
+        if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
+            let target = root_dir.join(file);
+            if !writer.contains_target(&target) {
+                writer.add_file(target, pyproject_dir.join(file), false)?;
+            }
+        }
+        if let Some(license_files) = &project.license_files {
+            let escaped_pyproject_dir =
+                PathBuf::from(glob::Pattern::escape(pyproject_dir.to_str().unwrap()));
+            let mut seen = HashSet::new();
+            for license_glob in license_files {
+                check_pep639_glob(license_glob)?;
+                for license_path in
+                    glob::glob(&escaped_pyproject_dir.join(license_glob).to_string_lossy())?
+                {
+                    let license_path = license_path?;
+                    if !license_path.is_file() {
+                        continue;
+                    }
+                    let license_path = license_path
+                        .strip_prefix(pyproject_dir)
+                        .expect("matched path starts with glob root")
+                        .to_path_buf();
+                    if seen.insert(license_path.clone()) {
+                        debug!("Including license file `{}`", license_path.display());
+                        writer.add_file(
+                            root_dir.join(&license_path),
+                            pyproject_dir.join(&license_path),
+                            false,
+                        )?;
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(glob_patterns) = pyproject.include() {
+        for pattern in glob_patterns
+            .iter()
+            .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
+        {
+            eprintln!("📦 Including files matching \"{pattern}\"");
+            let matches = crate::module_writer::glob::resolve_include_matches(
+                pattern,
+                Format::Sdist,
+                pyproject_dir,
+                python_dir,
+            )?;
+            for m in matches {
+                writer.add_file(root_dir.join(&m.target), m.source, false)?;
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /// Creates a source distribution, packing the root crate and all local dependencies
 ///
@@ -980,71 +1009,13 @@ pub fn source_distribution(
     }
 
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
-    // Add readme, license from pyproject.toml
-    // Skip if already added (e.g. from Cargo.toml metadata) to avoid duplicates.
-    // See https://github.com/PyO3/maturin/issues/2358
-    if let Some(project) = pyproject.project.as_ref() {
-        if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
-            let target = root_dir.join(readme);
-            if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(readme), false)?;
-            }
-        }
-        if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
-            let target = root_dir.join(file);
-            if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(file), false)?;
-            }
-        }
-        if let Some(license_files) = &project.license_files {
-            let escaped_pyproject_dir =
-                PathBuf::from(glob::Pattern::escape(pyproject_dir.to_str().unwrap()));
-            let mut seen = HashSet::new();
-            for license_glob in license_files {
-                check_pep639_glob(license_glob)?;
-                for license_path in
-                    glob::glob(&escaped_pyproject_dir.join(license_glob).to_string_lossy())?
-                {
-                    let license_path = license_path?;
-                    if !license_path.is_file() {
-                        continue;
-                    }
-                    let license_path = license_path
-                        .strip_prefix(pyproject_dir)
-                        .expect("matched path starts with glob root")
-                        .to_path_buf();
-                    if seen.insert(license_path.clone()) {
-                        debug!("Including license file `{}`", license_path.display());
-                        writer.add_file(
-                            root_dir.join(&license_path),
-                            pyproject_dir.join(&license_path),
-                            false,
-                        )?;
-                    }
-                }
-            }
-        }
-    }
-
-    let python_dir = &build_context.project_layout.python_dir;
-
-    if let Some(glob_patterns) = pyproject.include() {
-        for pattern in glob_patterns
-            .iter()
-            .filter_map(|glob_pattern| glob_pattern.targets(Format::Sdist))
-        {
-            eprintln!("📦 Including files matching \"{pattern}\"");
-            let matches = crate::module_writer::glob::resolve_include_matches(
-                pattern,
-                Format::Sdist,
-                pyproject_dir,
-                python_dir,
-            )?;
-            for m in matches {
-                writer.add_file(root_dir.join(&m.target), m.source, false)?;
-            }
-        }
-    }
+    add_pyproject_metadata(
+        &mut writer,
+        pyproject,
+        pyproject_dir,
+        &root_dir,
+        &build_context.project_layout.python_dir,
+    )?;
 
     let pkg_info = root_dir.join("PKG-INFO");
     writer.add_bytes(
@@ -1064,66 +1035,23 @@ pub fn source_distribution(
     Ok(source_distribution_path)
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use fs_err as fs;
-    use ignore::overrides::Override;
-    use pep440_rs::Version;
-    use std::str::FromStr;
     use tempfile::TempDir;
-
-    use crate::Metadata24;
 
     #[test]
     fn test_resolve_manifest_asset_rejects_license_outside_allowed_root() {
         let temp_dir = TempDir::new().unwrap();
         let workspace_root = temp_dir.path().join("workspace");
         let manifest_dir = workspace_root.join("crate");
-        let out_dir = temp_dir.path().join("out");
-        fs::create_dir_all(manifest_dir.join("src")).unwrap();
-        fs::create_dir_all(&out_dir).unwrap();
-        fs::write(manifest_dir.join("src/lib.rs"), "").unwrap();
+        fs::create_dir_all(&manifest_dir).unwrap();
         fs::write(temp_dir.path().join("SECRET_LICENSE"), "secret").unwrap();
 
         let err = resolve_manifest_asset(
             &manifest_dir,
             Path::new("../../SECRET_LICENSE"),
-            "license-file",
-            Some(&workspace_root),
-        )
-        .unwrap_err();
-
-        assert!(
-            err.to_string().contains("outside allowed root"),
-            "unexpected error: {err:#}"
-        );
-    }
-
-    #[test]
-    fn test_resolve_and_add_manifest_asset_rejects_license_outside_allowed_root() {
-        let temp_dir = TempDir::new().unwrap();
-        let workspace_root = temp_dir.path().join("workspace");
-        let manifest_dir = workspace_root.join("crate");
-        let out_dir = temp_dir.path().join("out");
-        fs::create_dir_all(manifest_dir.join("src")).unwrap();
-        fs::create_dir_all(&out_dir).unwrap();
-        fs::write(manifest_dir.join("src/lib.rs"), "").unwrap();
-        fs::write(temp_dir.path().join("SECRET_LICENSE"), "secret").unwrap();
-
-        let metadata = Metadata24::new("test-pkg".to_string(), Version::from_str("1.0.0").unwrap());
-        let sdist_writer = SDistWriter::new(&out_dir, &metadata, None).unwrap();
-        let mut writer = VirtualWriter::new(sdist_writer, Override::empty());
-
-        let err = resolve_and_add_manifest_asset(
-            &mut writer,
-            &manifest_dir,
-            Path::new("../../SECRET_LICENSE"),
-            &Path::new("pkg-1.0.0").join("crate"),
             "license-file",
             Some(&workspace_root),
         )

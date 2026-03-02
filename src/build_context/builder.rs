@@ -169,10 +169,14 @@ impl BuildContextBuilder {
         }
 
         let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
-        if strip && build_options.include_debuginfo {
-            bail!("--include-debuginfo cannot be used with --strip");
-        }
-        let include_debuginfo = build_options.include_debuginfo;
+        let include_debuginfo = if strip && build_options.include_debuginfo {
+            tracing::warn!("--strip is enabled, disabling --include-debuginfo");
+            false
+        } else if strip {
+            false
+        } else {
+            build_options.include_debuginfo
+        };
         let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
             || build_options.skip_auditwheel;
         let auditwheel = build_options

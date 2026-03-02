@@ -555,65 +555,6 @@ pub(super) fn rewrite_cargo_toml_package_field(
     Ok(())
 }
 
-/// When `pyproject.toml` is inside the Cargo workspace root,
-/// we need to update `tool.maturin.manifest-path` and `tool.maturin.python-source`
-/// in `pyproject.toml`.
-pub(super) fn rewrite_pyproject_toml(
-    pyproject_toml_path: &Path,
-    relative_manifest_path: &Path,
-    relative_python_source: Option<&Path>,
-) -> Result<String> {
-    let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
-    let tool = data
-        .entry("tool")
-        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
-        .as_table_like_mut()
-        .with_context(|| {
-            format!(
-                "`[tool]` must be a table in {}",
-                pyproject_toml_path.display()
-            )
-        })?;
-    let maturin = tool
-        .entry("maturin")
-        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
-        .as_table_like_mut()
-        .with_context(|| {
-            format!(
-                "`[tool.maturin]` must be a table in {}",
-                pyproject_toml_path.display()
-            )
-        })?;
-
-    maturin.remove("manifest-path");
-    let manifest_path_str = relative_manifest_path.to_slash().with_context(|| {
-        format!(
-            "manifest-path `{}` is not valid UTF-8",
-            relative_manifest_path.display()
-        )
-    })?;
-    maturin.insert(
-        "manifest-path",
-        toml_edit::value(manifest_path_str.as_ref()),
-    );
-
-    if let Some(python_source) = relative_python_source {
-        maturin.remove("python-source");
-        let python_source_str = python_source.to_slash().with_context(|| {
-            format!(
-                "python-source path `{}` is not valid UTF-8",
-                python_source.display()
-            )
-        })?;
-        maturin.insert(
-            "python-source",
-            toml_edit::value(python_source_str.as_ref()),
-        );
-    }
-
-    Ok(data.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

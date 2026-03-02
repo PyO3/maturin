@@ -331,6 +331,7 @@ fn add_git_tracked_files_to_sdist(
 /// Groups the common parameters needed when adding crates and path dependencies
 /// to the sdist, avoiding excessive argument counts.
 struct SdistContext<'a> {
+    build_context: &'a BuildContext,
     root_dir: &'a Path,
     workspace_root: &'a Utf8Path,
     workspace_manifest_path: camino::Utf8PathBuf,
@@ -340,6 +341,64 @@ struct SdistContext<'a> {
     relative_main_crate_manifest_dir: PathBuf,
     project_root: PathBuf,
     pyproject_dir: PathBuf,
+}
+
+impl<'a> SdistContext<'a> {
+    fn new(
+        build_context: &'a BuildContext,
+        pyproject_toml_path: &Path,
+        root_dir: &'a Path,
+    ) -> Result<Self> {
+        let manifest_path = &build_context.manifest_path;
+        let workspace_root = &build_context.cargo_metadata.workspace_root;
+        let workspace_manifest_path = workspace_root.join("Cargo.toml");
+
+        let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+        debug!(
+            "Found path dependencies: {:?}",
+            known_path_deps.keys().collect::<Vec<_>>()
+        );
+
+        let sdist_root = compute_sdist_root(
+            workspace_root,
+            pyproject_toml_path,
+            &build_context.project_layout.python_dir,
+            &known_path_deps,
+        )?;
+        debug!("Found sdist root: {}", sdist_root.display());
+
+        let abs_manifest_path = manifest_path
+            .normalize()
+            .with_context(|| {
+                format!(
+                    "manifest path `{}` does not exist or is invalid",
+                    manifest_path.display()
+                )
+            })?
+            .into_path_buf();
+        let abs_manifest_dir = abs_manifest_path.parent().unwrap().to_path_buf();
+        let relative_main_crate_manifest_dir = manifest_path
+            .parent()
+            .unwrap()
+            .strip_prefix(&sdist_root)
+            .unwrap()
+            .to_path_buf();
+        let project_root = compute_project_root(pyproject_toml_path, &sdist_root).to_path_buf();
+        let pyproject_dir = pyproject_toml_path.parent().unwrap().to_path_buf();
+
+        Ok(Self {
+            build_context,
+            root_dir,
+            workspace_root,
+            workspace_manifest_path,
+            known_path_deps,
+            sdist_root,
+            abs_manifest_dir,
+            relative_main_crate_manifest_dir,
+            project_root,
+            pyproject_dir,
+        })
+    }
 }
 
 /// Resolve sdist_root — the common ancestor of all files that need to be in the sdist.
@@ -493,13 +552,10 @@ fn add_path_dep(
 }
 
 /// Add the root crate's files to the sdist.
-fn add_main_crate(
-    build_context: &BuildContext,
-    writer: &mut VirtualWriter<SDistWriter>,
-    ctx: &SdistContext<'_>,
-) -> Result<()> {
-    let manifest_path = &build_context.manifest_path;
-    let main_crate = build_context
+fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_>) -> Result<()> {
+    let manifest_path = &ctx.build_context.manifest_path;
+    let main_crate = ctx
+        .build_context
         .cargo_metadata
         .root_package()
         .context("Expected cargo to return metadata with root_package")?;
@@ -545,13 +601,13 @@ fn add_main_crate(
     let skip_prefixes: Vec<PathBuf> =
         if !ctx.relative_main_crate_manifest_dir.as_os_str().is_empty() {
             let mut prefixes = Vec::new();
-            if let Some(python_module) = build_context.project_layout.python_module.as_ref()
+            if let Some(python_module) = ctx.build_context.project_layout.python_module.as_ref()
                 && let Ok(rel) = python_module.strip_prefix(&ctx.abs_manifest_dir)
             {
                 prefixes.push(rel.to_path_buf());
             }
-            for package in &build_context.project_layout.python_packages {
-                let package_path = build_context.project_layout.python_dir.join(package);
+            for package in &ctx.build_context.project_layout.python_packages {
+                let package_path = ctx.build_context.project_layout.python_dir.join(package);
                 if let Ok(rel) = package_path.strip_prefix(&ctx.abs_manifest_dir)
                     && !prefixes.contains(&rel.to_path_buf())
                 {
@@ -582,11 +638,7 @@ fn add_main_crate(
 }
 
 /// Add Cargo.lock to the sdist.
-fn add_cargo_lock(
-    build_context: &BuildContext,
-    writer: &mut VirtualWriter<SDistWriter>,
-    ctx: &SdistContext<'_>,
-) -> Result<()> {
+fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_>) -> Result<()> {
     let manifest_cargo_lock_path = ctx.abs_manifest_dir.join("Cargo.lock");
     let workspace_cargo_lock = ctx.workspace_root.join("Cargo.lock").into_std_path_buf();
     let cargo_lock_path = if manifest_cargo_lock_path.exists() {
@@ -597,7 +649,7 @@ fn add_cargo_lock(
         None
     };
     let cargo_lock_required =
-        build_context.cargo_options.locked || build_context.cargo_options.frozen;
+        ctx.build_context.cargo_options.locked || ctx.build_context.cargo_options.frozen;
 
     if let Some(cargo_lock_path) = cargo_lock_path {
         let relative_cargo_lock = cargo_lock_path.strip_prefix(&ctx.project_root).unwrap();
@@ -619,7 +671,6 @@ fn add_cargo_lock(
 
 /// Add the workspace Cargo.toml (when the crate is a workspace member).
 fn add_workspace_manifest(
-    build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
 ) -> Result<()> {
@@ -660,7 +711,7 @@ fn add_workspace_manifest(
     deps_to_keep.insert(
         main_member_name,
         PathDependency {
-            manifest_path: build_context.manifest_path.to_path_buf(),
+            manifest_path: ctx.build_context.manifest_path.to_path_buf(),
             workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
             readme: None,
             license_file: None,
@@ -712,55 +763,7 @@ fn add_cargo_package_files_to_sdist(
     writer: &mut VirtualWriter<SDistWriter>,
     root_dir: &Path,
 ) -> Result<()> {
-    let manifest_path = &build_context.manifest_path;
-    let workspace_root = &build_context.cargo_metadata.workspace_root;
-    let workspace_manifest_path = workspace_root.join("Cargo.toml");
-
-    let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
-    debug!(
-        "Found path dependencies: {:?}",
-        known_path_deps.keys().collect::<Vec<_>>()
-    );
-
-    let sdist_root = compute_sdist_root(
-        workspace_root,
-        pyproject_toml_path,
-        &build_context.project_layout.python_dir,
-        &known_path_deps,
-    )?;
-    debug!("Found sdist root: {}", sdist_root.display());
-
-    // Compute values upfront so they're available to all phases
-    let abs_manifest_path = manifest_path
-        .normalize()
-        .with_context(|| {
-            format!(
-                "manifest path `{}` does not exist or is invalid",
-                manifest_path.display()
-            )
-        })?
-        .into_path_buf();
-    let abs_manifest_dir = abs_manifest_path.parent().unwrap().to_path_buf();
-    let relative_main_crate_manifest_dir = manifest_path
-        .parent()
-        .unwrap()
-        .strip_prefix(&sdist_root)
-        .unwrap()
-        .to_path_buf();
-    let project_root = compute_project_root(pyproject_toml_path, &sdist_root).to_path_buf();
-    let pyproject_dir = pyproject_toml_path.parent().unwrap().to_path_buf();
-
-    let ctx = SdistContext {
-        root_dir,
-        workspace_root,
-        workspace_manifest_path,
-        known_path_deps,
-        sdist_root,
-        abs_manifest_dir,
-        relative_main_crate_manifest_dir,
-        project_root,
-        pyproject_dir,
-    };
+    let ctx = SdistContext::new(build_context, pyproject_toml_path, root_dir)?;
 
     // 1. Add local path dependencies
     for (name, path_dep) in ctx.known_path_deps.iter() {
@@ -768,19 +771,19 @@ fn add_cargo_package_files_to_sdist(
     }
 
     // 2. Add the main crate
-    add_main_crate(build_context, writer, &ctx)?;
+    add_main_crate(writer, &ctx)?;
 
     // 3. Add Cargo.lock
-    add_cargo_lock(build_context, writer, &ctx)?;
+    add_cargo_lock(writer, &ctx)?;
 
     // 4. Add workspace Cargo.toml (if applicable)
-    add_workspace_manifest(build_context, writer, &ctx)?;
+    add_workspace_manifest(writer, &ctx)?;
 
     // 5. Add pyproject.toml
-    add_pyproject_toml(build_context, writer, &ctx, pyproject_toml_path)?;
+    add_pyproject_toml(writer, &ctx, pyproject_toml_path)?;
 
     // 6. Add python source files
-    add_python_sources(build_context, writer, &ctx)?;
+    add_python_sources(writer, &ctx)?;
 
     Ok(())
 }

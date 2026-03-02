@@ -1,24 +1,24 @@
 use crate::pyproject_toml::Format;
-use crate::{BuildContext, ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
+use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result};
+use path_slash::PathExt as _;
 use pyproject_toml::check_pep639_glob;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tracing::{debug, trace};
 
 use super::SdistContext;
-use super::cargo_toml_rewrite::rewrite_pyproject_toml;
+use super::cargo_toml_rewrite::parse_toml_file;
 use super::utils::is_compiled_artifact;
 
 /// Add pyproject.toml to the sdist (rewriting paths if necessary).
 pub(super) fn add_pyproject_toml(
-    build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
     pyproject_toml_path: &Path,
 ) -> Result<()> {
     if ctx.pyproject_dir != ctx.sdist_root {
-        let python_dir = &build_context.project_layout.python_dir;
+        let python_dir = &ctx.build_context.project_layout.python_dir;
         // Compute python-source relative to pyproject_dir.  When python_dir is
         // outside pyproject_dir, compute the path relative to project_root instead.
         let relative_python_source = if python_dir != &ctx.pyproject_dir {
@@ -30,7 +30,7 @@ pub(super) fn add_pyproject_toml(
         } else {
             None
         };
-        let rewritten_pyproject_toml = rewrite_pyproject_toml(
+        let rewritten = rewrite_pyproject_toml(
             pyproject_toml_path,
             &ctx.relative_main_crate_manifest_dir.join("Cargo.toml"),
             relative_python_source.as_deref(),
@@ -38,7 +38,7 @@ pub(super) fn add_pyproject_toml(
         writer.add_bytes(
             ctx.root_dir.join("pyproject.toml"),
             Some(pyproject_toml_path),
-            rewritten_pyproject_toml.as_bytes(),
+            rewritten.as_bytes(),
             false,
         )?;
     } else {
@@ -53,10 +53,10 @@ pub(super) fn add_pyproject_toml(
 
 /// Add python source files to the sdist.
 pub(super) fn add_python_sources(
-    build_context: &BuildContext,
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
 ) -> Result<()> {
+    let build_context = ctx.build_context;
     let mut python_packages = Vec::new();
     if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
         trace!("Resolved python module: {}", python_module.display());
@@ -177,4 +177,66 @@ pub(super) fn add_pyproject_metadata(
     }
 
     Ok(())
+}
+
+/// Rewrite `pyproject.toml` paths for the sdist layout.
+///
+/// When `pyproject.toml` lives inside the Cargo workspace root (not at the
+/// sdist root), we update `tool.maturin.manifest-path` and optionally
+/// `tool.maturin.python-source` so they resolve correctly from the new
+/// relative position inside the archive.
+fn rewrite_pyproject_toml(
+    pyproject_toml_path: &Path,
+    relative_manifest_path: &Path,
+    relative_python_source: Option<&Path>,
+) -> Result<String> {
+    let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
+    let tool = data
+        .entry("tool")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_like_mut()
+        .with_context(|| {
+            format!(
+                "`[tool]` must be a table in {}",
+                pyproject_toml_path.display()
+            )
+        })?;
+    let maturin = tool
+        .entry("maturin")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_like_mut()
+        .with_context(|| {
+            format!(
+                "`[tool.maturin]` must be a table in {}",
+                pyproject_toml_path.display()
+            )
+        })?;
+
+    maturin.remove("manifest-path");
+    let manifest_path_str = relative_manifest_path.to_slash().with_context(|| {
+        format!(
+            "manifest-path `{}` is not valid UTF-8",
+            relative_manifest_path.display()
+        )
+    })?;
+    maturin.insert(
+        "manifest-path",
+        toml_edit::value(manifest_path_str.as_ref()),
+    );
+
+    if let Some(python_source) = relative_python_source {
+        maturin.remove("python-source");
+        let python_source_str = python_source.to_slash().with_context(|| {
+            format!(
+                "python-source path `{}` is not valid UTF-8",
+                python_source.display()
+            )
+        })?;
+        maturin.insert(
+            "python-source",
+            toml_edit::value(python_source_str.as_ref()),
+        );
+    }
+
+    Ok(data.to_string())
 }

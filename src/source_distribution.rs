@@ -427,17 +427,26 @@ fn find_resolved_dep(
             return None;
         }
         // If a target is specified, match against it
-        if let Some(target_str) = target {
-            if d.target.as_ref().map(|t| t.to_string()).as_deref() != Some(target_str) {
-                return None;
-            }
+        if let Some(target_str) = target
+            && d.target.as_ref().map(|t| t.to_string()).as_deref() != Some(target_str)
+        {
+            return None;
         }
+        // When the dep is renamed, `d.rename` is the alias (the Cargo.toml key)
+        // and `d.name` is the real package name. We need `package = "<real_name>"`.
+        let package = d.rename.as_ref().map(|_| d.name.clone());
+        // For path deps, compute the relative path from the dependent's manifest dir
+        let path = d.path.as_ref().map(|dep_path| {
+            let manifest_dir = resolved.manifest_path.parent().unwrap();
+            relative_path(manifest_dir.as_std_path(), dep_path.as_std_path())
+        });
         Some(ResolvedDep {
             req: d.req.to_string(),
             optional: d.optional,
             default_features: d.uses_default_features,
             features: d.features.clone(),
-            rename: d.rename.clone(),
+            package,
+            path,
         })
     })
 }
@@ -447,18 +456,33 @@ struct ResolvedDep {
     optional: bool,
     default_features: bool,
     features: Vec<String>,
-    rename: Option<String>,
+    /// When the dep is renamed (aliased), the real package name.
+    /// Emitted as `package = "<name>"` in Cargo.toml.
+    package: Option<String>,
+    /// For path dependencies, the relative path from the dependent crate
+    /// to the dependency directory.
+    path: Option<PathBuf>,
 }
 
 /// Converts a resolved dependency into a TOML value for Cargo.toml.
 fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
-    // Simple case: just a version string
-    if dep.default_features && !dep.optional && dep.features.is_empty() && dep.rename.is_none() {
+    // Simple case: just a version string (only for non-path, non-renamed deps)
+    if dep.path.is_none()
+        && dep.default_features
+        && !dep.optional
+        && dep.features.is_empty()
+        && dep.package.is_none()
+    {
         return toml_edit::value(&dep.req);
     }
 
     let mut table = toml_edit::InlineTable::new();
-    table.insert("version", dep.req.as_str().into());
+    if let Some(path) = &dep.path {
+        let path_str = path.to_slash().unwrap_or_else(|| path.to_string_lossy());
+        table.insert("path", path_str.as_ref().into());
+    } else {
+        table.insert("version", dep.req.as_str().into());
+    }
 
     if !dep.default_features {
         table.insert("default-features", false.into());
@@ -473,8 +497,8 @@ fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
         }
         table.insert("features", toml_edit::Value::Array(arr));
     }
-    if let Some(rename) = &dep.rename {
-        table.insert("package", rename.as_str().into());
+    if let Some(package) = &dep.package {
+        table.insert("package", package.as_str().into());
     }
 
     toml_edit::value(toml_edit::Value::InlineTable(table))
@@ -1746,6 +1770,22 @@ where
     if found { Some(final_path) } else { None }
 }
 
+/// Compute a relative path from `from` directory to `to` path.
+///
+/// Both paths should be absolute. Returns a relative path that, when joined
+/// with `from`, resolves to `to`.
+fn relative_path(from: &Path, to: &Path) -> PathBuf {
+    let common = common_path_prefix(from, to).unwrap_or_default();
+    let from_rest = from.strip_prefix(&common).unwrap_or(Path::new(""));
+    let to_rest = to.strip_prefix(&common).unwrap_or(to);
+    let mut result = PathBuf::new();
+    for _ in from_rest.components() {
+        result.push("..");
+    }
+    result.push(to_rest);
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1799,6 +1839,64 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_relative_path() {
+        let test_cases = vec![
+            ("/a/b/c", "/a/b/d", "../d"),
+            ("/a/b", "/a/b/c/d", "c/d"),
+            ("/a/b/c", "/a/b", ".."),
+            ("/a/b/c", "/a/x/y", "../../x/y"),
+            ("/a/b", "/a/b", ""),
+        ];
+        for (from, to, expected) in test_cases {
+            assert_eq!(
+                relative_path(Path::new(from), Path::new(to)),
+                PathBuf::from(expected),
+                "relative_path({from:?}, {to:?}) should equal {expected:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_resolved_dep_to_toml_path_dep() {
+        let dep = ResolvedDep {
+            req: "*".to_string(),
+            optional: false,
+            default_features: true,
+            features: vec![],
+            package: None,
+            path: Some(PathBuf::from("../shared_crate")),
+        };
+        let item = resolved_dep_to_toml(&dep);
+        let s = item.to_string();
+        assert!(
+            s.contains(r#"path = "../shared_crate""#),
+            "expected path dep, got: {s}"
+        );
+        assert!(
+            !s.contains("version"),
+            "should not have version for path dep, got: {s}"
+        );
+    }
+
+    #[test]
+    fn test_resolved_dep_to_toml_renamed() {
+        let dep = ResolvedDep {
+            req: "1.0".to_string(),
+            optional: false,
+            default_features: true,
+            features: vec![],
+            package: Some("real_crate".to_string()),
+            path: None,
+        };
+        let item = resolved_dep_to_toml(&dep);
+        let s = item.to_string();
+        assert!(
+            s.contains(r#"package = "real_crate""#),
+            "expected package = real_crate, got: {s}"
+        );
     }
 
     #[test]

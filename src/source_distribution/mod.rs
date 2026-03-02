@@ -421,10 +421,10 @@ fn compute_sdist_root(
     }
     // Expand sdist_root to also cover python_dir when python-source points
     // outside the workspace/pyproject directory tree (issue #2202).
-    if !python_dir.starts_with(&sdist_root) {
-        if let Some(prefix) = common_path_prefix(&sdist_root, python_dir) {
-            sdist_root = prefix;
-        }
+    if !python_dir.starts_with(&sdist_root)
+        && let Some(prefix) = common_path_prefix(&sdist_root, python_dir)
+    {
+        sdist_root = prefix;
     }
     Ok(sdist_root)
 }

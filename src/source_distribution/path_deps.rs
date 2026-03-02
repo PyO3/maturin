@@ -25,35 +25,24 @@ pub struct PathDependency {
     pub(super) resolved_package: Option<cargo_metadata::Package>,
 }
 
-/// Finds all path dependencies of the crate
+/// Finds all path dependencies of the crate.
+///
+/// Walks the resolved dependency graph from `cargo metadata` and collects
+/// every transitively-reachable path dependency.  For same-workspace deps
+/// the root metadata already contains all resolved data (workspace root,
+/// package fields, readme, license-file), so no extra subprocess is needed.
+/// Only cross-workspace path deps require a separate `cargo metadata` call
+/// to discover their workspace root.
 pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathDependency>> {
     let root = cargo_metadata
         .root_package()
         .context("Expected the dependency graph to have a root package")?;
 
+    let workspace_root = &cargo_metadata.workspace_root;
+
     // Pre-build lookup indices to avoid repeated linear scans
     let packages_by_id: HashMap<&PackageId, &cargo_metadata::Package> =
         cargo_metadata.packages.iter().map(|p| (&p.id, p)).collect();
-    let pkg_readmes: HashMap<&PackageId, PathBuf> = cargo_metadata
-        .packages
-        .iter()
-        .filter_map(|package| {
-            package
-                .readme
-                .as_ref()
-                .map(|readme| (&package.id, readme.clone().into_std_path_buf()))
-        })
-        .collect();
-    let pkg_license_files: HashMap<&PackageId, PathBuf> = cargo_metadata
-        .packages
-        .iter()
-        .filter_map(|package| {
-            package
-                .license_file
-                .as_ref()
-                .map(|license_file| (&package.id, license_file.clone().into_std_path_buf()))
-        })
-        .collect();
     let resolve_nodes: HashMap<&PackageId, &[cargo_metadata::NodeDep]> = cargo_metadata
         .resolve
         .as_ref()
@@ -92,43 +81,48 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                     continue;
                 }
                 let dep_manifest_path = path.join("Cargo.toml");
-                // Path dependencies may not be in the same workspace as the root crate,
-                // thus we need to find out its workspace root from `cargo metadata`
-                let path_dep_metadata = MetadataCommand::new()
-                    .manifest_path(&dep_manifest_path)
-                    .verbose(true)
-                    // We don't need to resolve the dependency graph
-                    .no_deps()
-                    .exec()
-                    .with_context(|| {
-                        format!(
-                            "Failed to resolve workspace root for {} at '{dep_manifest_path}'",
-                            node_dep.pkg
-                        )
-                    })?;
 
-                let resolved_package = path_dep_metadata
-                    .packages
-                    .iter()
-                    .find(|p| p.manifest_path == dep_manifest_path)
-                    .cloned()
-                    .with_context(|| {
-                        format!(
-                            "Failed to find package for {} in cargo metadata",
-                            dep_manifest_path
-                        )
-                    })?;
+                // For same-workspace path deps, the root cargo metadata already
+                // contains everything we need: workspace root, resolved package
+                // fields (including workspace-inherited ones), readme, and
+                // license-file.  Only cross-workspace deps require a separate
+                // `cargo metadata` invocation to discover their workspace root.
+                let is_same_workspace = dep_manifest_path.starts_with(workspace_root);
+                let dep_workspace_root = if is_same_workspace {
+                    workspace_root.clone().into_std_path_buf()
+                } else {
+                    let path_dep_metadata = MetadataCommand::new()
+                        .manifest_path(&dep_manifest_path)
+                        .verbose(true)
+                        // We only need the workspace root, not the dep graph
+                        .no_deps()
+                        .exec()
+                        .with_context(|| {
+                            format!(
+                                "Failed to resolve workspace root for {} at '{dep_manifest_path}'",
+                                node_dep.pkg
+                            )
+                        })?;
+                    path_dep_metadata.workspace_root.into_std_path_buf()
+                };
+
+                // The root cargo metadata already resolves all package fields
+                // (including workspace-inherited ones) for every package in the
+                // dependency graph, regardless of which workspace they belong to.
                 path_deps.insert(
                     dep_name.clone(),
                     PathDependency {
-                        manifest_path: PathBuf::from(dep_manifest_path.clone()),
-                        workspace_root: path_dep_metadata
-                            .workspace_root
-                            .clone()
-                            .into_std_path_buf(),
-                        readme: pkg_readmes.get(&node_dep.pkg).cloned(),
-                        license_file: pkg_license_files.get(&node_dep.pkg).cloned(),
-                        resolved_package: Some(resolved_package),
+                        manifest_path: dep_manifest_path.into_std_path_buf(),
+                        workspace_root: dep_workspace_root,
+                        readme: dep_pkg
+                            .readme
+                            .as_ref()
+                            .map(|r| r.clone().into_std_path_buf()),
+                        license_file: dep_pkg
+                            .license_file
+                            .as_ref()
+                            .map(|l| l.clone().into_std_path_buf()),
+                        resolved_package: Some((*dep_pkg).clone()),
                     },
                 );
                 // Continue scanning the path dependency's own dependencies

@@ -181,12 +181,7 @@ impl BuildContext {
         let non_abi3_interps: Vec<_> = self
             .interpreter
             .iter()
-            .filter(|interp| {
-                !interp.has_stable_api()
-                    || min_version.is_some_and(|(major, minor)| {
-                        (interp.major as u8, interp.minor as u8) < (major, minor)
-                    })
-            })
+            .filter(|interp| !interp.has_stable_api())
             .cloned()
             .collect();
 

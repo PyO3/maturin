@@ -109,6 +109,9 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                 // The root cargo metadata already resolves all package fields
                 // (including workspace-inherited ones) for every package in the
                 // dependency graph, regardless of which workspace they belong to.
+                // Only cross-workspace deps need the resolved package stored, as
+                // it's used to inline workspace-inherited fields when the workspace
+                // manifest falls outside the sdist root.
                 path_deps.insert(
                     dep_name.clone(),
                     PathDependency {
@@ -122,7 +125,11 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
                             .license_file
                             .as_ref()
                             .map(|l| l.clone().into_std_path_buf()),
-                        resolved_package: Some((*dep_pkg).clone()),
+                        resolved_package: if is_same_workspace {
+                            None
+                        } else {
+                            Some((*dep_pkg).clone())
+                        },
                     },
                 );
                 // Continue scanning the path dependency's own dependencies

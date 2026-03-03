@@ -62,11 +62,16 @@ where
 /// Compute a relative path from `from` directory to `to` path.
 ///
 /// Both paths should be absolute. Returns a relative path that, when joined
-/// with `from`, resolves to `to`.
+/// with `from`, resolves to `to`.  If the paths share no common prefix
+/// (e.g. different Windows drive letters), the absolute `to` path is returned
+/// as-is since no relative traversal is possible.
 pub(super) fn relative_path(from: &Path, to: &Path) -> PathBuf {
-    let common = common_path_prefix(from, to).unwrap_or_default();
+    let Some(common) = common_path_prefix(from, to) else {
+        // No common prefix — fall back to the absolute target path.
+        return to.to_path_buf();
+    };
     let from_rest = from.strip_prefix(&common).unwrap_or(Path::new(""));
-    let to_rest = to.strip_prefix(&common).unwrap_or(to);
+    let to_rest = to.strip_prefix(&common).unwrap_or(Path::new(""));
     let mut result = PathBuf::new();
     for _ in from_rest.components() {
         result.push("..");
@@ -130,6 +135,8 @@ mod tests {
             ("/a/b/c", "/a/b", ".."),
             ("/a/b/c", "/a/x/y", "../../x/y"),
             ("/a/b", "/a/b", ""),
+            // No common prefix — returns the absolute target as-is
+            ("foo", "/x/y", "/x/y"),
         ];
         for (from, to, expected) in test_cases {
             assert_eq!(

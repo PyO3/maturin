@@ -899,8 +899,8 @@ fn lib_with_parent_workspace_path_dep_sdist() {
     // shared_crate uses `edition.workspace = true` and `readme.workspace = true`
     // from the parent workspace. Since the parent workspace Cargo.toml is NOT
     // included in the sdist, these must be inlined to their resolved values.
-    // `readme` is removed (the file is copied separately and the path rewritten),
-    // and `edition` is inlined to "2021".
+    // `readme` is rewritten to just the filename (the file is copied next to the
+    // manifest), and `edition` is inlined to "2021".
     let expected_shared_crate_cargo_toml = expect![[r#"
         [package]
         name = "shared_crate"

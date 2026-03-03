@@ -909,6 +909,9 @@ fn lib_with_parent_workspace_path_dep_sdist() {
         readme = "README.md"
 
         [lib]
+
+        [dev-dependencies]
+        log = "^0.4"
     "#]];
     handle_result(other::test_source_distribution(
         "test-crates/parent_workspace_sdist/crates/pysof",

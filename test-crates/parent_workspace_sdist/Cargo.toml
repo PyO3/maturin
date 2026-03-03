@@ -6,3 +6,6 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 readme = "README.md"
+
+[workspace.dependencies]
+log = "0.4"

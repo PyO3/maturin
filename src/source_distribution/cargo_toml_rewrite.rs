@@ -1,6 +1,7 @@
 use super::PathDependency;
 use super::utils::{normalize_path, relative_path};
 use anyhow::{Context, Result};
+use cargo_metadata::DependencyKind;
 use fs_err as fs;
 use path_slash::PathExt as _;
 use std::collections::{HashMap, HashSet};
@@ -226,9 +227,12 @@ pub(super) fn resolve_workspace_inheritance(
                     if !is_workspace {
                         continue;
                     }
-                    if let Some(resolved_dep) =
-                        find_resolved_dep(resolved, &dep_name, Some(&target_key))
-                    {
+                    if let Some(resolved_dep) = find_resolved_dep(
+                        resolved,
+                        &dep_name,
+                        Some(&target_key),
+                        dep_kind_from_str(dep_kind),
+                    ) {
                         deps.insert(&dep_name, resolved_dep_to_toml(&resolved_dep));
                     } else {
                         debug!(
@@ -277,7 +281,9 @@ fn resolve_workspace_deps(
             continue;
         }
 
-        if let Some(resolved_dep) = find_resolved_dep(resolved, &dep_name, None) {
+        if let Some(resolved_dep) =
+            find_resolved_dep(resolved, &dep_name, None, dep_kind_from_str(dep_kind))
+        {
             let new_entry = resolved_dep_to_toml(&resolved_dep);
             if let Some(deps_table) = document.get_mut(dep_kind).and_then(|t| t.as_table_mut()) {
                 deps_table.insert(&dep_name, new_entry);
@@ -288,16 +294,30 @@ fn resolve_workspace_deps(
     }
 }
 
+/// Maps a Cargo.toml dependency table name to the corresponding `DependencyKind`.
+fn dep_kind_from_str(dep_kind: &str) -> DependencyKind {
+    match dep_kind {
+        "dev-dependencies" => DependencyKind::Development,
+        "build-dependencies" => DependencyKind::Build,
+        _ => DependencyKind::Normal,
+    }
+}
+
 /// Finds a resolved dependency by name in the package metadata.
 fn find_resolved_dep(
     resolved: &cargo_metadata::Package,
     name: &str,
     target: Option<&str>,
+    kind: DependencyKind,
 ) -> Option<ResolvedDep> {
     resolved.dependencies.iter().find_map(|d| {
         // Match by name, considering renames
         let matches_name = d.rename.as_deref() == Some(name) || d.name == name;
         if !matches_name {
+            return None;
+        }
+        // Match by dependency kind
+        if d.kind != kind {
             return None;
         }
         // If a target is specified, match against it

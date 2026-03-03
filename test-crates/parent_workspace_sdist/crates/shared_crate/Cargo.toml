@@ -5,3 +5,6 @@ edition.workspace = true
 readme.workspace = true
 
 [lib]
+
+[dev-dependencies]
+log = { workspace = true }

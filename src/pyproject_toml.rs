@@ -429,6 +429,96 @@ pub struct ToolMaturin {
     /// Include the import library (.dll.lib) in the wheel on Windows
     #[serde(default)]
     pub include_import_lib: bool,
+    /// CI generation configuration
+    pub generate_ci: Option<GenerateCIConfig>,
+}
+
+/// The `[tool.maturin.generate-ci]` section
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct GenerateCIConfig {
+    /// GitHub Actions configuration
+    pub github: Option<GitHubCIConfig>,
+}
+
+/// The `[tool.maturin.generate-ci.github]` section
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct GitHubCIConfig {
+    /// Enable pytest
+    pub pytest: Option<bool>,
+    /// Use zig for cross compilation
+    pub zig: Option<bool>,
+    /// Skip artifact attestation
+    pub skip_attestation: Option<bool>,
+    /// Extra arguments to pass to maturin (applies to all platforms)
+    pub args: Option<String>,
+    /// Linux (manylinux) platform configuration
+    pub linux: Option<PlatformCIConfig>,
+    /// Musllinux platform configuration
+    pub musllinux: Option<PlatformCIConfig>,
+    /// Windows platform configuration
+    pub windows: Option<PlatformCIConfig>,
+    /// macOS platform configuration
+    pub macos: Option<PlatformCIConfig>,
+    /// Emscripten platform configuration
+    pub emscripten: Option<PlatformCIConfig>,
+    /// Android platform configuration
+    pub android: Option<PlatformCIConfig>,
+}
+
+/// Per-platform CI configuration
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PlatformCIConfig {
+    /// Simple list of target architectures (mutually exclusive with `target`)
+    pub targets: Option<Vec<String>>,
+    /// Detailed per-target configuration (mutually exclusive with `targets`)
+    pub target: Option<Vec<TargetCIConfig>>,
+    /// Default runner for this platform
+    pub runner: Option<String>,
+    /// Manylinux version (e.g. "auto", "2_28", "musllinux_1_2")
+    pub manylinux: Option<String>,
+    /// Container image to use
+    pub container: Option<String>,
+    /// Docker options
+    pub docker_options: Option<String>,
+    /// Rust toolchain (e.g. "nightly", "stable")
+    pub rust_toolchain: Option<String>,
+    /// Rustup components to install
+    pub rustup_components: Option<String>,
+    /// Script to run before build on Linux
+    pub before_script_linux: Option<String>,
+    /// Extra arguments to pass to maturin
+    pub args: Option<String>,
+}
+
+/// Per-target CI configuration within a platform
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct TargetCIConfig {
+    /// Target architecture (e.g. "x86_64", "aarch64")
+    pub arch: String,
+    /// Runner override for this target
+    pub runner: Option<String>,
+    /// Manylinux version override
+    pub manylinux: Option<String>,
+    /// Container image override
+    pub container: Option<String>,
+    /// Docker options override
+    pub docker_options: Option<String>,
+    /// Rust toolchain override
+    pub rust_toolchain: Option<String>,
+    /// Rustup components override
+    pub rustup_components: Option<String>,
+    /// Before-script-linux override
+    pub before_script_linux: Option<String>,
+    /// Extra arguments to pass to maturin
+    pub args: Option<String>,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -568,6 +658,11 @@ impl PyProjectToml {
         self.maturin()
             .map(|maturin| maturin.include_import_lib)
             .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.generate-ci]` in pyproject.toml
+    pub fn generate_ci(&self) -> Option<&GenerateCIConfig> {
+        self.maturin()?.generate_ci.as_ref()
     }
 
     /// Warn about `build-system.requires` mismatching expectations.
@@ -1084,5 +1179,69 @@ mod tests {
         "#;
         let result: Result<ToolMaturin, _> = toml::from_str(toml_str);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_ci_config_deserialization() {
+        let toml_str = r#"
+            [generate-ci.github]
+            pytest = true
+            zig = true
+            skip-attestation = false
+
+            [generate-ci.github.linux]
+            runner = "ubuntu-22.04"
+            manylinux = "2_28"
+            targets = ["x86_64", "aarch64"]
+
+            [generate-ci.github.macos]
+            targets = ["aarch64"]
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        let ci = maturin.generate_ci.unwrap();
+        let gh = ci.github.unwrap();
+        assert_eq!(gh.pytest, Some(true));
+        assert_eq!(gh.zig, Some(true));
+        assert_eq!(gh.skip_attestation, Some(false));
+        let linux = gh.linux.unwrap();
+        assert_eq!(linux.runner, Some("ubuntu-22.04".to_string()));
+        assert_eq!(linux.manylinux, Some("2_28".to_string()));
+        assert_eq!(
+            linux.targets,
+            Some(vec!["x86_64".to_string(), "aarch64".to_string()])
+        );
+        let macos = gh.macos.unwrap();
+        assert_eq!(macos.targets, Some(vec!["aarch64".to_string()]));
+        assert!(gh.windows.is_none());
+    }
+
+    #[test]
+    fn test_generate_ci_config_detailed_targets() {
+        let toml_str = r#"
+            [[generate-ci.github.linux.target]]
+            arch = "x86_64"
+            manylinux = "2_28"
+
+            [[generate-ci.github.linux.target]]
+            arch = "aarch64"
+            runner = "self-hosted-arm64"
+            manylinux = "2_17"
+            before-script-linux = "yum install -y openssl-devel"
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        let ci = maturin.generate_ci.unwrap();
+        let gh = ci.github.unwrap();
+        let linux = gh.linux.unwrap();
+        assert!(linux.targets.is_none());
+        let detailed = linux.target.unwrap();
+        assert_eq!(detailed.len(), 2);
+        assert_eq!(detailed[0].arch, "x86_64");
+        assert_eq!(detailed[0].manylinux, Some("2_28".to_string()));
+        assert_eq!(detailed[1].arch, "aarch64");
+        assert_eq!(detailed[1].runner, Some("self-hosted-arm64".to_string()));
+        assert_eq!(
+            detailed[1].before_script_linux,
+            Some("yum install -y openssl-devel".to_string())
+        );
     }
 }

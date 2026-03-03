@@ -462,16 +462,21 @@ jobs:\n",
                     Platform::All => {}
                     Platform::ManyLinux => {
                         // Test on host for x86_64 GNU targets
+                        conf.push_str(
+                            "      - uses: astral-sh/setup-uv@v7
+        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
+",
+                        );
                         conf.push_str(&format!(
                             "      - name: pytest
         if: ${{{{ startsWith(matrix.platform.target, 'x86_64') }}}}
         shell: bash
         run: |
           set -e
-          python3 -m venv .venv
+          uv venv .venv
           source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
-          pip install pytest
+          uv pip install {project_name} --no-index --no-deps --find-links dist --reinstall
+          uv pip install {project_name} pytest
           {chdir}pytest
 "
                         ));
@@ -490,7 +495,8 @@ jobs:\n",
             pip3 install -U pip pytest
           run: |
             set -e
-            pip3 install {project_name} --find-links dist --force-reinstall
+            pip3 install {project_name} --no-index --no-deps --find-links dist --force-reinstall
+            pip3 install {project_name}
             {chdir}pytest
 "
                                             ));
@@ -505,8 +511,8 @@ jobs:\n",
             apk add py3-pip py3-virtualenv
             python3 -m virtualenv .venv
             source .venv/bin/activate
-            pip install {project_name} --no-index --find-links dist --force-reinstall
-            pip install pytest
+            pip install {project_name} --no-index --no-deps --find-links dist --force-reinstall
+            pip install {project_name} pytest
             {chdir}pytest
           '
 "
@@ -525,35 +531,43 @@ jobs:\n",
             set -e
             python3 -m virtualenv .venv
             source .venv/bin/activate
-            pip install pytest
-            pip install {project_name} --find-links dist --force-reinstall
+            pip install {project_name} --no-index --no-deps --find-links dist --force-reinstall
+            pip install {project_name} pytest
             {chdir}pytest
 "
                         ));
                     }
                     Platform::Windows => {
+                        conf.push_str(
+                            "      - uses: astral-sh/setup-uv@v7
+",
+                        );
                         conf.push_str(&format!(
                             "      - name: pytest
         shell: bash
         run: |
           set -e
-          python3 -m venv .venv
+          uv venv .venv
           source .venv/Scripts/activate
-          pip install {project_name} --find-links dist --force-reinstall
-          pip install pytest
+          uv pip install {project_name} --no-index --no-deps --find-links dist --reinstall
+          uv pip install {project_name} pytest
           {chdir}pytest
 "
                         ));
                     }
                     Platform::Macos => {
+                        conf.push_str(
+                            "      - uses: astral-sh/setup-uv@v7
+",
+                        );
                         conf.push_str(&format!(
                             "      - name: pytest
         run: |
           set -e
-          python3 -m venv .venv
+          uv venv .venv
           source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
-          pip install pytest
+          uv pip install {project_name} --no-index --no-deps --find-links dist --reinstall
+          uv pip install {project_name} pytest
           {chdir}pytest
 "
                         ));
@@ -571,8 +585,8 @@ jobs:\n",
           set -e
           pyodide venv .venv
           source .venv/bin/activate
-          pip install {project_name} --find-links dist --force-reinstall
-          pip install pytest
+          pip install {project_name} --no-index --no-deps --find-links dist --force-reinstall
+          pip install {project_name} pytest
           {chdir}python -m pytest
 "
                         ));
@@ -1415,15 +1429,17 @@ mod tests {
                     with:
                       name: wheels-linux-${{ matrix.platform.target }}
                       path: dist
+                  - uses: astral-sh/setup-uv@v7
+                    if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
                   - name: pytest
                     if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
                     shell: bash
                     run: |
                       set -e
-                      python3 -m venv .venv
+                      uv venv .venv
                       source .venv/bin/activate
-                      pip install example --find-links dist --force-reinstall
-                      pip install pytest
+                      uv pip install example --no-index --no-deps --find-links dist --reinstall
+                      uv pip install example pytest
                       pytest
                   - name: pytest
                     if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
@@ -1438,7 +1454,8 @@ mod tests {
                         pip3 install -U pip pytest
                       run: |
                         set -e
-                        pip3 install example --find-links dist --force-reinstall
+                        pip3 install example --no-index --no-deps --find-links dist --force-reinstall
+                        pip3 install example
                         pytest
 
               musllinux:
@@ -1479,8 +1496,8 @@ mod tests {
                         apk add py3-pip py3-virtualenv
                         python3 -m virtualenv .venv
                         source .venv/bin/activate
-                        pip install example --no-index --find-links dist --force-reinstall
-                        pip install pytest
+                        pip install example --no-index --no-deps --find-links dist --force-reinstall
+                        pip install example pytest
                         pytest
                       '
                   - name: pytest
@@ -1496,8 +1513,8 @@ mod tests {
                         set -e
                         python3 -m virtualenv .venv
                         source .venv/bin/activate
-                        pip install pytest
-                        pip install example --find-links dist --force-reinstall
+                        pip install example --no-index --no-deps --find-links dist --force-reinstall
+                        pip install example pytest
                         pytest
 
               windows:
@@ -1531,14 +1548,15 @@ mod tests {
                     with:
                       name: wheels-windows-${{ matrix.platform.target }}
                       path: dist
+                  - uses: astral-sh/setup-uv@v7
                   - name: pytest
                     shell: bash
                     run: |
                       set -e
-                      python3 -m venv .venv
+                      uv venv .venv
                       source .venv/Scripts/activate
-                      pip install example --find-links dist --force-reinstall
-                      pip install pytest
+                      uv pip install example --no-index --no-deps --find-links dist --reinstall
+                      uv pip install example pytest
                       pytest
 
               macos:
@@ -1566,13 +1584,14 @@ mod tests {
                     with:
                       name: wheels-macos-${{ matrix.platform.target }}
                       path: dist
+                  - uses: astral-sh/setup-uv@v7
                   - name: pytest
                     run: |
                       set -e
-                      python3 -m venv .venv
+                      uv venv .venv
                       source .venv/bin/activate
-                      pip install example --find-links dist --force-reinstall
-                      pip install pytest
+                      uv pip install example --no-index --no-deps --find-links dist --reinstall
+                      uv pip install example pytest
                       pytest
 
               sdist:

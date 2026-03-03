@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use cargo_metadata::{Metadata, MetadataCommand, PackageId};
-use std::collections::HashMap;
+use cargo_metadata::{Dependency, Metadata, MetadataCommand, NodeDep, Package, PackageId};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 /// Path dependency information.
@@ -23,6 +23,49 @@ pub struct PathDependency {
     /// Resolved package metadata from `cargo metadata`, used to inline
     /// workspace-inherited fields when the workspace manifest is outside the sdist root.
     pub(super) resolved_package: Option<cargo_metadata::Package>,
+}
+
+/// Returns true when a declared dependency matches one of the resolved node kinds.
+fn dep_kind_matches_node(dependency: &Dependency, node_dep: &NodeDep) -> bool {
+    if node_dep.dep_kinds.is_empty() {
+        return true;
+    }
+    node_dep.dep_kinds.iter().any(|dep_kind| {
+        dep_kind.kind == dependency.kind && dep_kind.target.as_ref() == dependency.target.as_ref()
+    })
+}
+
+/// Finds the declared path dependency in `package.dependencies` corresponding
+/// to a resolved `NodeDep`.
+fn find_declared_path_dependency<'a>(
+    package: &'a Package,
+    dep_pkg: &Package,
+    node_dep: &NodeDep,
+) -> Option<&'a Dependency> {
+    let mut candidates: Vec<&Dependency> = package
+        .dependencies
+        .iter()
+        .filter(|dependency| {
+            dependency.path.is_some()
+                && dep_pkg.name == dependency.name
+                && dep_kind_matches_node(dependency, node_dep)
+        })
+        .collect();
+
+    if candidates.is_empty() {
+        return None;
+    }
+
+    // Prefer exact key/rename match (`node_dep.name` is the dependency key
+    // used in the resolve graph), but fall back to the first kind-matching
+    // candidate for older metadata edge cases.
+    candidates
+        .iter()
+        .find(|dependency| {
+            dependency.rename.as_deref().unwrap_or(&dependency.name) == node_dep.name.as_str()
+        })
+        .copied()
+        .or_else(|| candidates.pop())
 }
 
 /// Finds all path dependencies of the crate.
@@ -53,7 +96,8 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
         .collect();
 
     // Scan the dependency graph for path dependencies
-    let mut path_deps = HashMap::new();
+    let mut path_deps: HashMap<String, PathDependency> = HashMap::new();
+    let mut visited_path_packages: HashSet<PackageId> = HashSet::new();
     let mut stack: Vec<&cargo_metadata::Package> = vec![root];
     while let Some(top) = stack.pop() {
         let node_deps = resolve_nodes
@@ -63,79 +107,86 @@ pub fn find_path_deps(cargo_metadata: &Metadata) -> Result<HashMap<String, PathD
             let dep_pkg = packages_by_id
                 .get(&node_dep.pkg)
                 .with_context(|| format!("missing package metadata for {}", node_dep.pkg))?;
-            // Match the resolved dependency back to the declared dependency
-            // to check if it's a path dependency.
-            let dependency = top
-                .dependencies
-                .iter()
-                .find(|d| d.name == dep_pkg.name.as_ref())
-                .with_context(|| {
-                    format!(
-                        "could not find dependency {} in package {}",
-                        dep_pkg.name, top.id
-                    )
-                })?;
-            if let Some(path) = &dependency.path {
-                let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
-                if path_deps.contains_key(dep_name) {
-                    continue;
-                }
-                let dep_manifest_path = path.join("Cargo.toml");
 
-                // For same-workspace path deps, the root cargo metadata already
-                // contains everything we need: workspace root, resolved package
-                // fields (including workspace-inherited ones), readme, and
-                // license-file.  Only cross-workspace deps require a separate
-                // `cargo metadata` invocation to discover their workspace root.
-                let is_same_workspace = dep_manifest_path.starts_with(workspace_root);
-                let dep_workspace_root = if is_same_workspace {
-                    workspace_root.clone().into_std_path_buf()
-                } else {
-                    let path_dep_metadata = MetadataCommand::new()
-                        .manifest_path(&dep_manifest_path)
-                        .verbose(true)
-                        // We only need the workspace root, not the dep graph
-                        .no_deps()
-                        .exec()
-                        .with_context(|| {
-                            format!(
-                                "Failed to resolve workspace root for {} at '{dep_manifest_path}'",
-                                node_dep.pkg
-                            )
-                        })?;
-                    path_dep_metadata.workspace_root.into_std_path_buf()
-                };
+            // Match the resolved dependency back to the declared path dependency.
+            let Some(dependency) = find_declared_path_dependency(top, dep_pkg, node_dep) else {
+                continue;
+            };
 
-                // The root cargo metadata already resolves all package fields
-                // (including workspace-inherited ones) for every package in the
-                // dependency graph, regardless of which workspace they belong to.
-                // Only cross-workspace deps need the resolved package stored, as
-                // it's used to inline workspace-inherited fields when the workspace
-                // manifest falls outside the sdist root.
-                path_deps.insert(
-                    dep_name.clone(),
-                    PathDependency {
-                        manifest_path: dep_manifest_path.into_std_path_buf(),
-                        workspace_root: dep_workspace_root,
-                        readme: dep_pkg
-                            .readme
-                            .as_ref()
-                            .map(|r| r.clone().into_std_path_buf()),
-                        license_file: dep_pkg
-                            .license_file
-                            .as_ref()
-                            .map(|l| l.clone().into_std_path_buf()),
-                        resolved_package: if is_same_workspace {
-                            None
-                        } else {
-                            Some((*dep_pkg).clone())
-                        },
+            // Process each unique path dependency package only once. This avoids
+            // dropping transitive dependencies when different crates reuse the
+            // same dependency alias/key.
+            if !visited_path_packages.insert(node_dep.pkg.clone()) {
+                continue;
+            }
+
+            let dep_name = dependency.rename.as_ref().unwrap_or(&dependency.name);
+            let dep_manifest_path = dependency
+                .path
+                .as_ref()
+                .expect("find_declared_path_dependency only returns path deps")
+                .join("Cargo.toml");
+
+            // For same-workspace path deps, the root cargo metadata already
+            // contains everything we need: workspace root, resolved package
+            // fields (including workspace-inherited ones), readme, and
+            // license-file.  Only cross-workspace deps require a separate
+            // `cargo metadata` invocation to discover their workspace root.
+            let is_same_workspace = dep_manifest_path.starts_with(workspace_root);
+            let dep_workspace_root = if is_same_workspace {
+                workspace_root.clone().into_std_path_buf()
+            } else {
+                let path_dep_metadata = MetadataCommand::new()
+                    .manifest_path(&dep_manifest_path)
+                    .verbose(true)
+                    // We only need the workspace root, not the dep graph
+                    .no_deps()
+                    .exec()
+                    .with_context(|| {
+                        format!(
+                            "Failed to resolve workspace root for {} at '{dep_manifest_path}'",
+                            node_dep.pkg
+                        )
+                    })?;
+                path_dep_metadata.workspace_root.into_std_path_buf()
+            };
+
+            let dep_manifest_path = dep_manifest_path.into_std_path_buf();
+            let dep_key = match path_deps.get(dep_name) {
+                Some(existing) if existing.manifest_path == dep_manifest_path => dep_name.clone(),
+                Some(_) => format!("{dep_name}@{}", node_dep.pkg),
+                None => dep_name.clone(),
+            };
+
+            // The root cargo metadata already resolves all package fields
+            // (including workspace-inherited ones) for every package in the
+            // dependency graph, regardless of which workspace they belong to.
+            // Only cross-workspace deps need the resolved package stored, as
+            // it's used to inline workspace-inherited fields when the workspace
+            // manifest falls outside the sdist root.
+            path_deps.insert(
+                dep_key,
+                PathDependency {
+                    manifest_path: dep_manifest_path,
+                    workspace_root: dep_workspace_root,
+                    readme: dep_pkg
+                        .readme
+                        .as_ref()
+                        .map(|r| r.clone().into_std_path_buf()),
+                    license_file: dep_pkg
+                        .license_file
+                        .as_ref()
+                        .map(|l| l.clone().into_std_path_buf()),
+                    resolved_package: if is_same_workspace {
+                        None
+                    } else {
+                        Some((*dep_pkg).clone())
                     },
-                );
-                // Continue scanning the path dependency's own dependencies
-                if let Some(&dep_package) = packages_by_id.get(&node_dep.pkg) {
-                    stack.push(dep_package)
-                }
+                },
+            );
+            // Continue scanning the path dependency's own dependencies.
+            if let Some(&dep_package) = packages_by_id.get(&node_dep.pkg) {
+                stack.push(dep_package)
             }
         }
     }
@@ -215,5 +266,116 @@ mod tests {
         let path_deps = find_path_deps(&cargo_metadata).unwrap();
         let dep = path_deps.get("dep").expect("missing path dependency");
         assert_eq!(dep.license_file.as_deref(), Some(Path::new("../LICENSE")));
+    }
+
+    #[test]
+    fn test_find_path_deps_keeps_distinct_crates_with_same_alias() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let root_dir = temp_dir.path();
+
+        for crate_dir in ["root", "a", "b", "dep_a", "dep_b"] {
+            let dir = root_dir.join(crate_dir);
+            fs::create_dir_all(dir.join("src")).unwrap();
+            fs::write(dir.join("src/lib.rs"), "").unwrap();
+        }
+
+        fs::write(
+            root_dir.join("root/Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "root"
+                version = "0.1.0"
+                edition = "2021"
+
+                [dependencies]
+                a = { path = "../a" }
+                b = { path = "../b" }
+                "#
+            ),
+        )
+        .unwrap();
+
+        fs::write(
+            root_dir.join("a/Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "a"
+                version = "0.1.0"
+                edition = "2021"
+
+                [dependencies]
+                shared = { package = "dep_a", path = "../dep_a" }
+                "#
+            ),
+        )
+        .unwrap();
+
+        fs::write(
+            root_dir.join("b/Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "b"
+                version = "0.1.0"
+                edition = "2021"
+
+                [dependencies]
+                shared = { package = "dep_b", path = "../dep_b" }
+                "#
+            ),
+        )
+        .unwrap();
+
+        fs::write(
+            root_dir.join("dep_a/Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "dep_a"
+                version = "0.1.0"
+                edition = "2021"
+                "#
+            ),
+        )
+        .unwrap();
+
+        fs::write(
+            root_dir.join("dep_b/Cargo.toml"),
+            indoc::indoc!(
+                r#"
+                [package]
+                name = "dep_b"
+                version = "0.1.0"
+                edition = "2021"
+                "#
+            ),
+        )
+        .unwrap();
+
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(root_dir.join("root/Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        let path_deps = find_path_deps(&cargo_metadata).unwrap();
+        let manifests: Vec<PathBuf> = path_deps
+            .values()
+            .map(|dep| dep.manifest_path.clone())
+            .collect();
+
+        assert!(
+            manifests
+                .iter()
+                .any(|path| path.ends_with("dep_a/Cargo.toml")),
+            "dep_a path dependency missing: {manifests:#?}"
+        );
+        assert!(
+            manifests
+                .iter()
+                .any(|path| path.ends_with("dep_b/Cargo.toml")),
+            "dep_b path dependency missing: {manifests:#?}"
+        );
     }
 }

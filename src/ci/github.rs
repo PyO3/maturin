@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use anyhow::{Result, bail};
@@ -135,11 +135,35 @@ fn default_rust_toolchain(platform: Platform) -> Option<&'static str> {
     }
 }
 
+/// Resolve a field using the chain: per-target → platform-level → default.
+fn resolve_optional(
+    per_target: Option<&str>,
+    platform_level: Option<&str>,
+    default: Option<&str>,
+) -> Option<String> {
+    per_target
+        .or(platform_level)
+        .or(default)
+        .map(|s| s.to_string())
+}
+
 /// Validate a PlatformCIConfig: `targets` and `target` are mutually exclusive.
 fn validate_platform_config(platform_name: &str, config: &PlatformCIConfig) -> Result<()> {
     if config.targets.is_some() && config.target.is_some() {
         bail!(
             "[tool.maturin.generate-ci.github.{}]: `targets` and `[[target]]` are mutually exclusive",
+            platform_name
+        );
+    }
+    if matches!(config.targets.as_ref(), Some(targets) if targets.is_empty()) {
+        bail!(
+            "[tool.maturin.generate-ci.github.{}]: `targets` must not be empty",
+            platform_name
+        );
+    }
+    if matches!(config.target.as_ref(), Some(targets) if targets.is_empty()) {
+        bail!(
+            "[tool.maturin.generate-ci.github.{}]: `[[target]]` must not be empty",
             platform_name
         );
     }
@@ -158,30 +182,23 @@ pub(crate) fn resolve_platform_targets(
     }
 
     // Determine arch list
-    let arch_list: Vec<String> = if let Some(config) = platform_config {
-        if let Some(ref detailed) = config.target {
-            // Detailed form: use the arch from each TargetCIConfig
-            detailed.iter().map(|t| t.arch.clone()).collect()
-        } else if let Some(ref simple) = config.targets {
-            simple.clone()
-        } else {
-            // Platform section exists but no targets/target specified: use defaults
-            default_targets(platform)
-                .into_iter()
-                .map(|s| s.to_string())
-                .collect()
-        }
-    } else {
-        // No platform config at all: use defaults
-        default_targets(platform)
-            .into_iter()
+    let arch_list: Vec<String> = match platform_config {
+        Some(config) if config.target.is_some() => config
+            .target
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|t| t.arch.clone())
+            .collect(),
+        Some(config) if config.targets.is_some() => config.targets.clone().unwrap(),
+        _ => default_targets(platform)
+            .iter()
             .map(|s| s.to_string())
-            .collect()
+            .collect(),
     };
 
     let mut resolved = Vec::new();
     for arch in &arch_list {
-        let hardcoded_runner = default_runner(platform, arch);
         let python_arch = default_python_arch(platform, arch);
 
         // Find per-target config if using detailed form
@@ -191,54 +208,56 @@ pub(crate) fn resolve_platform_targets(
                 .and_then(|targets| targets.iter().find(|t| &t.arch == arch))
         });
 
-        // Resolution chain: per-target → platform-level → hardcoded
-        let runner = per_target
-            .and_then(|t| t.runner.clone())
-            .or_else(|| platform_config.and_then(|c| c.runner.clone()))
-            .unwrap_or_else(|| hardcoded_runner.to_string());
+        // Shorthand accessors for the resolution chain
+        let pt = |f: fn(&crate::pyproject_toml::TargetCIConfig) -> &Option<String>| {
+            per_target.and_then(|t| f(t).as_deref())
+        };
+        let pl = |f: fn(&PlatformCIConfig) -> &Option<String>| {
+            platform_config.and_then(|c| f(c).as_deref())
+        };
 
-        let manylinux = per_target
-            .and_then(|t| t.manylinux.clone())
-            .or_else(|| platform_config.and_then(|c| c.manylinux.clone()))
-            .or_else(|| default_manylinux(platform).map(|s| s.to_string()));
-
-        let container = per_target
-            .and_then(|t| t.container.clone())
-            .or_else(|| platform_config.and_then(|c| c.container.clone()));
-
-        let docker_options = per_target
-            .and_then(|t| t.docker_options.clone())
-            .or_else(|| platform_config.and_then(|c| c.docker_options.clone()));
-
-        let rust_toolchain = per_target
-            .and_then(|t| t.rust_toolchain.clone())
-            .or_else(|| platform_config.and_then(|c| c.rust_toolchain.clone()))
-            .or_else(|| default_rust_toolchain(platform).map(|s| s.to_string()));
-
-        let rustup_components = per_target
-            .and_then(|t| t.rustup_components.clone())
-            .or_else(|| platform_config.and_then(|c| c.rustup_components.clone()));
-
-        let before_script_linux = per_target
-            .and_then(|t| t.before_script_linux.clone())
-            .or_else(|| platform_config.and_then(|c| c.before_script_linux.clone()));
-
-        let extra_args = per_target
-            .and_then(|t| t.args.clone())
-            .or_else(|| platform_config.and_then(|c| c.args.clone()))
-            .or_else(|| github_config.and_then(|c| c.args.clone()));
+        let runner = resolve_optional(
+            pt(|t| &t.runner),
+            pl(|c| &c.runner),
+            Some(default_runner(platform, arch)),
+        )
+        .unwrap();
 
         resolved.push(ResolvedTarget {
             runner,
             target: arch.clone(),
             python_arch,
-            manylinux,
-            container,
-            docker_options,
-            rust_toolchain,
-            rustup_components,
-            before_script_linux,
-            extra_args,
+            manylinux: resolve_optional(
+                pt(|t| &t.manylinux),
+                pl(|c| &c.manylinux),
+                default_manylinux(platform),
+            ),
+            container: resolve_optional(pt(|t| &t.container), pl(|c| &c.container), None),
+            docker_options: resolve_optional(
+                pt(|t| &t.docker_options),
+                pl(|c| &c.docker_options),
+                None,
+            ),
+            rust_toolchain: resolve_optional(
+                pt(|t| &t.rust_toolchain),
+                pl(|c| &c.rust_toolchain),
+                default_rust_toolchain(platform),
+            ),
+            rustup_components: resolve_optional(
+                pt(|t| &t.rustup_components),
+                pl(|c| &c.rustup_components),
+                None,
+            ),
+            before_script_linux: resolve_optional(
+                pt(|t| &t.before_script_linux),
+                pl(|c| &c.before_script_linux),
+                None,
+            ),
+            extra_args: resolve_optional(
+                pt(|t| &t.args),
+                pl(|c| &c.args),
+                github_config.and_then(|c| c.args.as_deref()),
+            ),
         });
     }
 
@@ -252,23 +271,12 @@ pub(crate) fn resolve_config(
     bridge_model: &BridgeModel,
 ) -> Result<ResolvedCIConfig> {
     // Booleans: CLI flags override pyproject (CLI flag = true wins, else pyproject, else false)
-    let pytest = if cli.pytest {
-        true
-    } else {
-        github_config.and_then(|c| c.pytest).unwrap_or(false)
-    };
-    let zig = if cli.zig {
-        true
-    } else {
-        github_config.and_then(|c| c.zig).unwrap_or(false)
-    };
-    let skip_attestation = if cli.skip_attestation {
-        true
-    } else {
-        github_config
+    let pytest = cli.pytest || github_config.and_then(|c| c.pytest).unwrap_or(false);
+    let zig = cli.zig || github_config.and_then(|c| c.zig).unwrap_or(false);
+    let skip_attestation = cli.skip_attestation
+        || github_config
             .and_then(|c| c.skip_attestation)
-            .unwrap_or(false)
-    };
+            .unwrap_or(false);
 
     // Platform selection: CLI --platform wins, else pyproject platform presence, else defaults
     let cli_has_platforms = !cli.platforms.is_empty();
@@ -285,9 +293,11 @@ pub(crate) fn resolve_config(
                         Platform::defaults()
                     }
                 } else {
-                    vec![*p]
+                    std::slice::from_ref(p)
                 }
             })
+            .filter(|p| !bridge_model.is_bin() || !matches!(p, Platform::Emscripten))
+            .copied()
             .collect()
     } else if let Some(gh) = github_config {
         // Check if any platform sub-tables exist
@@ -320,19 +330,16 @@ pub(crate) fn resolve_config(
             plats
         } else {
             // No platform sub-tables: use defaults
-            Platform::defaults().into_iter().collect()
+            Platform::defaults().iter().copied().collect()
         }
     } else {
         // No pyproject config at all: use defaults
-        Platform::defaults().into_iter().collect()
+        Platform::defaults().iter().copied().collect()
     };
 
     // Resolve targets for each platform
-    let mut platform_targets = std::collections::BTreeMap::new();
+    let mut platform_targets = BTreeMap::new();
     for &platform in &platforms {
-        if bridge_model.is_bin() && matches!(platform, Platform::Emscripten) {
-            continue;
-        }
         let platform_config = github_config.and_then(|gh| match platform {
             Platform::ManyLinux => gh.linux.as_ref(),
             Platform::Musllinux => gh.musllinux.as_ref(),
@@ -350,7 +357,6 @@ pub(crate) fn resolve_config(
         pytest,
         zig,
         skip_attestation,
-        platforms,
         platform_targets,
     })
 }
@@ -425,9 +431,6 @@ jobs:\n",
     let mut needs = Vec::new();
 
     for (&platform, targets) in &resolved.platform_targets {
-        if bridge_model.is_bin() && matches!(platform, Platform::Emscripten) {
-            continue;
-        }
         let plat_name = platform.to_string();
         needs.push(plat_name.clone());
         conf.push_str(&format!(
@@ -831,7 +834,10 @@ jobs:\n",
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 "#,
     );
-    if resolved.platforms.contains(&Platform::Emscripten) {
+    if resolved
+        .platform_targets
+        .contains_key(&Platform::Emscripten)
+    {
         conf.push_str(
             "      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
@@ -1980,6 +1986,21 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_github_bin_skips_cli_emscripten() {
+        let cli = GenerateCI {
+            platforms: vec![Platform::Emscripten],
+            ..Default::default()
+        };
+        let resolved = super::resolve_config(&cli, None, &BridgeModel::Bin(None)).unwrap();
+
+        assert!(
+            !resolved
+                .platform_targets
+                .contains_key(&Platform::Emscripten)
+        );
+    }
+
+    #[test]
     fn test_generate_github_pyproject_simple_targets() {
         // Test: pyproject specifies only linux and macos with limited targets
         use crate::pyproject_toml::{GitHubCIConfig, PlatformCIConfig};
@@ -2286,9 +2307,9 @@ mod tests {
         let resolved = super::resolve_config(&cli, Some(&github_config), &bridge).unwrap();
 
         // Platform should be only windows (from CLI)
-        assert!(resolved.platforms.contains(&Platform::Windows));
-        assert!(!resolved.platforms.contains(&Platform::ManyLinux));
-        assert!(!resolved.platforms.contains(&Platform::Macos));
+        assert!(resolved.platform_targets.contains_key(&Platform::Windows));
+        assert!(!resolved.platform_targets.contains_key(&Platform::ManyLinux));
+        assert!(!resolved.platform_targets.contains_key(&Platform::Macos));
 
         // Booleans come from pyproject since CLI didn't set them (CLI flags are false = "not set")
         assert!(resolved.pytest);

@@ -1,7 +1,6 @@
 /// GitHub Actions CI generation
 pub mod github;
 
-use std::collections::BTreeSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -43,8 +42,8 @@ pub enum Platform {
 }
 
 impl Platform {
-    pub(crate) fn defaults() -> Vec<Self> {
-        vec![
+    pub(crate) fn defaults() -> &'static [Self] {
+        &[
             Platform::ManyLinux,
             Platform::Musllinux,
             Platform::Windows,
@@ -52,8 +51,8 @@ impl Platform {
         ]
     }
 
-    pub(crate) fn all() -> Vec<Self> {
-        vec![
+    pub(crate) fn all() -> &'static [Self] {
+        &[
             Platform::ManyLinux,
             Platform::Musllinux,
             Platform::Windows,
@@ -99,7 +98,6 @@ pub(crate) struct ResolvedCIConfig {
     pub pytest: bool,
     pub zig: bool,
     pub skip_attestation: bool,
-    pub platforms: BTreeSet<Platform>,
     pub platform_targets: std::collections::BTreeMap<Platform, Vec<ResolvedTarget>>,
 }
 

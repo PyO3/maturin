@@ -407,6 +407,17 @@
       "description": "The `[tool.maturin.generate-ci.github]` section",
       "type": "object",
       "properties": {
+        "android": {
+          "description": "Android platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "args": {
           "description": "Extra arguments to pass to maturin (applies to all platforms)",
           "type": [

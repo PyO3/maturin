@@ -1,0 +1,256 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: x86_64
+          - runner: ubuntu-22.04
+            target: x86
+          - runner: ubuntu-22.04
+            target: aarch64
+          - runner: ubuntu-22.04
+            target: armv7
+          - runner: ubuntu-22.04
+            target: s390x
+          - runner: ubuntu-22.04
+            target: ppc64le
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter --zig
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: auto
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-linux-${{ matrix.platform.target }}
+          path: dist
+      - uses: astral-sh/setup-uv@v7
+        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
+      - name: pytest
+        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
+        shell: bash
+        run: |
+          set -e
+          uv venv .venv
+          source .venv/bin/activate
+          uv pip install example --no-index --no-deps --find-links dist --reinstall
+          uv pip install example pytest
+          pytest
+      - name: pytest
+        if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.platform.target }}
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
+            pip3 install -U pip pytest
+          run: |
+            set -e
+            pip3 install example --no-index --no-deps --find-links dist --force-reinstall
+            pip3 install example
+            pytest
+
+  musllinux:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: x86_64
+          - runner: ubuntu-22.04
+            target: x86
+          - runner: ubuntu-22.04
+            target: aarch64
+          - runner: ubuntu-22.04
+            target: armv7
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: musllinux_1_2
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-musllinux-${{ matrix.platform.target }}
+          path: dist
+      - name: pytest
+        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
+        run: |
+          set -e
+          docker run --rm -v ${{ github.workspace }}:/io -w /io alpine:latest sh -c '
+            apk add py3-pip py3-virtualenv
+            python3 -m virtualenv .venv
+            source .venv/bin/activate
+            pip install example --no-index --no-deps --find-links dist --force-reinstall
+            pip install example pytest
+            pytest
+          '
+      - name: pytest
+        if: ${{ !startsWith(matrix.platform.target, 'x86') }}
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.platform.target }}
+          distro: alpine_latest
+          githubToken: ${{ github.token }}
+          install: |
+            apk add py3-virtualenv
+          run: |
+            set -e
+            python3 -m virtualenv .venv
+            source .venv/bin/activate
+            pip install example --no-index --no-deps --find-links dist --force-reinstall
+            pip install example pytest
+            pytest
+
+  windows:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: windows-latest
+            target: x64
+            python_arch: x64
+          - runner: windows-latest
+            target: x86
+            python_arch: x86
+          - runner: windows-11-arm
+            target: aarch64
+            python_arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.13
+          architecture: ${{ matrix.platform.python_arch }}
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-windows-${{ matrix.platform.target }}
+          path: dist
+      - uses: astral-sh/setup-uv@v7
+      - name: pytest
+        shell: bash
+        run: |
+          set -e
+          uv venv .venv
+          source .venv/Scripts/activate
+          uv pip install example --no-index --no-deps --find-links dist --reinstall
+          uv pip install example pytest
+          pytest
+
+  macos:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: macos-15-intel
+            target: x86_64
+          - runner: macos-latest
+            target: aarch64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-macos-${{ matrix.platform.target }}
+          path: dist
+      - uses: astral-sh/setup-uv@v7
+      - name: pytest
+        run: |
+          set -e
+          uv venv .venv
+          source .venv/bin/activate
+          uv pip install example --no-index --no-deps --find-links dist --reinstall
+          uv pip install example pytest
+          pytest
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-sdist
+          path: dist
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    needs: [linux, musllinux, windows, macos, sdist]
+    permissions:
+      # Use to sign the release artifacts
+      id-token: write
+      # Used to upload release artifacts
+      contents: write
+      # Used to generate artifact attestation
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v7
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'wheels-*/*'
+      - name: Install uv
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: astral-sh/setup-uv@v7
+      - name: Publish to PyPI
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: uv publish 'wheels-*/*'
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

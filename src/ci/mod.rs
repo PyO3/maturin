@@ -61,6 +61,68 @@ impl Platform {
             Platform::Android,
         ]
     }
+
+    pub(crate) fn default_runner(self, arch: &str) -> &'static str {
+        match self {
+            Platform::ManyLinux | Platform::Musllinux | Platform::Emscripten => "ubuntu-22.04",
+            Platform::Android => "ubuntu-latest",
+            Platform::Windows => {
+                if arch == "aarch64" {
+                    "windows-11-arm"
+                } else {
+                    "windows-latest"
+                }
+            }
+            Platform::Macos => {
+                if arch == "x86_64" {
+                    "macos-15-intel"
+                } else {
+                    "macos-latest"
+                }
+            }
+            Platform::All => "ubuntu-22.04",
+        }
+    }
+
+    pub(crate) fn default_python_arch(self, arch: &str) -> Option<String> {
+        match self {
+            Platform::Windows => {
+                if arch == "aarch64" {
+                    Some("arm64".to_string())
+                } else {
+                    Some(arch.to_string())
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn default_targets(self) -> &'static [&'static str] {
+        match self {
+            Platform::ManyLinux => &["x86_64", "x86", "aarch64", "armv7", "s390x", "ppc64le"],
+            Platform::Musllinux => &["x86_64", "x86", "aarch64", "armv7"],
+            Platform::Windows => &["x64", "x86", "aarch64"],
+            Platform::Macos => &["x86_64", "aarch64"],
+            Platform::Emscripten => &["wasm32-unknown-emscripten"],
+            Platform::Android => &["aarch64-linux-android", "x86_64-linux-android"],
+            Platform::All => &[],
+        }
+    }
+
+    pub(crate) fn default_manylinux(self) -> Option<&'static str> {
+        match self {
+            Platform::ManyLinux => Some("auto"),
+            Platform::Musllinux => Some("musllinux_1_2"),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn default_rust_toolchain(self) -> Option<&'static str> {
+        match self {
+            Platform::Emscripten => Some("nightly"),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Platform {

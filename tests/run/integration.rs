@@ -169,13 +169,13 @@ fn integration_cases(#[case] case: IntegrationCase<'_>) {
 
 #[test]
 #[cfg_attr(target_os = "macos", ignore)]
-fn integration_pyo3_pure_conda() {
+fn integration_pyo3_mixed_conda() {
     // Don't run it on macOS, too slow.
     if has_conda() {
         handle_result(integration::test_integration_conda(
             "test-crates/pyo3-mixed",
             None,
-            "integration-pyo3-pure-conda",
+            "integration-pyo3-mixed-conda",
         ));
     }
 }

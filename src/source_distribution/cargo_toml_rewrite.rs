@@ -6,7 +6,7 @@ use fs_err as fs;
 use path_slash::PathExt as _;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use toml_edit::DocumentMut;
+use toml_edit::{DocumentMut, Table};
 use tracing::debug;
 use url::Url;
 
@@ -139,127 +139,17 @@ pub(super) fn strip_non_workspace_tables(document: &mut DocumentMut, manifest_pa
 pub(super) fn resolve_workspace_inheritance(
     document: &mut DocumentMut,
     resolved: &cargo_metadata::Package,
-    workspace_manifest_path: &Path,
+    workspace_package: Option<&Table>,
 ) -> Result<()> {
-    let workspace_package = parse_workspace_package_table(workspace_manifest_path)?;
-
-    // Resolve `[package]` fields that support `field.workspace = true`
-    if let Some(package) = document.get_mut("package").and_then(|p| p.as_table_mut()) {
-        let version_str = resolved.version.to_string();
-        let edition_str = resolved.edition.to_string();
-        let rust_version_str = resolved.rust_version.as_ref().map(|v| v.to_string());
-        let string_fields: &[(&str, Option<&str>)] = &[
-            ("version", Some(&version_str)),
-            ("edition", Some(&edition_str)),
-            ("description", resolved.description.as_deref()),
-            ("license", resolved.license.as_deref()),
-            ("repository", resolved.repository.as_deref()),
-            ("homepage", resolved.homepage.as_deref()),
-            ("documentation", resolved.documentation.as_deref()),
-            ("rust-version", rust_version_str.as_deref()),
-        ];
-
-        for (key, value) in string_fields {
-            if is_workspace_inherited(package, key) {
-                if let Some(val) = value {
-                    package.insert(key, toml_edit::value(*val));
-                } else {
-                    package.remove(key);
-                }
-            }
-        }
-
-        // Handle array fields resolved by cargo metadata.
-        let array_fields: &[(&str, &[String])] = &[
-            ("authors", &resolved.authors),
-            ("keywords", &resolved.keywords),
-            ("categories", &resolved.categories),
-        ];
-
-        for (key, values) in array_fields {
-            if is_workspace_inherited(package, key) {
-                if values.is_empty() {
-                    package.remove(key);
-                } else {
-                    let mut arr = toml_edit::Array::new();
-                    for v in *values {
-                        arr.push(v.as_str());
-                    }
-                    package.insert(key, toml_edit::value(arr));
-                }
-            }
-        }
-
-        // Handle fields that cargo metadata does not expose on `Package`.
-        for key in ["publish", "include", "exclude"] {
-            inherit_workspace_package_item(package, key, workspace_package.as_ref())?;
-        }
-
-        // `readme` and `license-file` are NOT inlined here because they need
-        // special handling: the file is copied into the sdist next to Cargo.toml
-        // and the path is rewritten to just the filename by the caller
-        // (`resolve_and_add_manifest_asset` + `rewrite_cargo_toml_package_field`).
-        // We only need to remove the `workspace = true` marker so cargo doesn't
-        // try to look it up from a workspace that no longer exists.
-        for key in ["readme", "license-file"] {
-            if is_workspace_inherited(package, key) {
-                package.remove(key);
-            }
-        }
-    }
-
-    // Resolve `workspace = true` in dependency tables
-    resolve_workspace_deps(document, "dependencies", resolved);
-    resolve_workspace_deps(document, "dev-dependencies", resolved);
-    resolve_workspace_deps(document, "build-dependencies", resolved);
-
-    // Handle `[target.'cfg(...)'.dependencies]` etc.
-    if let Some(target) = document.get_mut("target").and_then(|t| t.as_table_mut()) {
-        let target_keys: Vec<String> = target.iter().map(|(k, _)| k.to_string()).collect();
-        for target_key in target_keys {
-            let Some(target_val) = target.get_mut(&target_key) else {
-                continue;
-            };
-            for dep_kind in &["dependencies", "dev-dependencies", "build-dependencies"] {
-                let Some(deps) = target_val.get_mut(*dep_kind).and_then(|t| t.as_table_mut())
-                else {
-                    continue;
-                };
-                let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
-                for dep_name in dep_names {
-                    let is_workspace = deps
-                        .get(&dep_name)
-                        .and_then(|d| d.as_table_like())
-                        .and_then(|t| t.get("workspace"))
-                        .and_then(|v| v.as_bool())
-                        == Some(true);
-                    if !is_workspace {
-                        continue;
-                    }
-                    if let Some(resolved_dep) = find_resolved_dep(
-                        resolved,
-                        &dep_name,
-                        Some(&target_key),
-                        dep_kind_from_str(dep_kind),
-                    ) {
-                        deps.insert(&dep_name, resolved_dep_to_toml(&resolved_dep));
-                    } else {
-                        debug!(
-                            "Could not resolve workspace dependency {dep_name} in \
-                             target.{target_key}.{dep_kind}"
-                        );
-                    }
-                }
-            }
-        }
-    }
-
+    resolve_workspace_package_fields(document, resolved, workspace_package)?;
+    resolve_workspace_dependency_tables(document, resolved);
+    resolve_workspace_target_dependency_tables(document, resolved);
     Ok(())
 }
 
-fn parse_workspace_package_table(
+pub(super) fn parse_workspace_package_table(
     workspace_manifest_path: &Path,
-) -> Result<Option<toml_edit::Table>> {
+) -> Result<Option<Table>> {
     let document = parse_toml_file(workspace_manifest_path, "workspace Cargo.toml")?;
     Ok(document
         .get("workspace")
@@ -269,10 +159,131 @@ fn parse_workspace_package_table(
         .cloned())
 }
 
+fn resolve_workspace_package_fields(
+    document: &mut DocumentMut,
+    resolved: &cargo_metadata::Package,
+    workspace_package: Option<&Table>,
+) -> Result<()> {
+    let Some(package) = document.get_mut("package").and_then(|p| p.as_table_mut()) else {
+        return Ok(());
+    };
+
+    let version_str = resolved.version.to_string();
+    let edition_str = resolved.edition.to_string();
+    let rust_version_str = resolved.rust_version.as_ref().map(|v| v.to_string());
+    let string_fields: &[(&str, Option<&str>)] = &[
+        ("version", Some(&version_str)),
+        ("edition", Some(&edition_str)),
+        ("description", resolved.description.as_deref()),
+        ("license", resolved.license.as_deref()),
+        ("repository", resolved.repository.as_deref()),
+        ("homepage", resolved.homepage.as_deref()),
+        ("documentation", resolved.documentation.as_deref()),
+        ("rust-version", rust_version_str.as_deref()),
+    ];
+
+    for (key, value) in string_fields {
+        if is_workspace_inherited(package, key) {
+            if let Some(val) = value {
+                package.insert(key, toml_edit::value(*val));
+            } else {
+                package.remove(key);
+            }
+        }
+    }
+
+    let array_fields: &[(&str, &[String])] = &[
+        ("authors", &resolved.authors),
+        ("keywords", &resolved.keywords),
+        ("categories", &resolved.categories),
+    ];
+
+    for (key, values) in array_fields {
+        if is_workspace_inherited(package, key) {
+            if values.is_empty() {
+                package.remove(key);
+            } else {
+                let mut arr = toml_edit::Array::new();
+                for v in *values {
+                    arr.push(v.as_str());
+                }
+                package.insert(key, toml_edit::value(arr));
+            }
+        }
+    }
+
+    for key in ["publish", "include", "exclude"] {
+        inherit_workspace_package_item(package, key, workspace_package)?;
+    }
+
+    for key in ["readme", "license-file"] {
+        if is_workspace_inherited(package, key) {
+            package.remove(key);
+        }
+    }
+
+    Ok(())
+}
+
+fn resolve_workspace_dependency_tables(
+    document: &mut DocumentMut,
+    resolved: &cargo_metadata::Package,
+) {
+    for dep_kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
+        resolve_workspace_deps(document, dep_kind, resolved);
+    }
+}
+
+fn resolve_workspace_target_dependency_tables(
+    document: &mut DocumentMut,
+    resolved: &cargo_metadata::Package,
+) {
+    let Some(target) = document.get_mut("target").and_then(|t| t.as_table_mut()) else {
+        return;
+    };
+
+    let target_keys: Vec<String> = target.iter().map(|(k, _)| k.to_string()).collect();
+    for target_key in target_keys {
+        let Some(target_val) = target.get_mut(&target_key) else {
+            continue;
+        };
+        for dep_kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
+            let Some(deps) = target_val.get_mut(dep_kind).and_then(|t| t.as_table_mut()) else {
+                continue;
+            };
+            let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
+            for dep_name in dep_names {
+                let is_workspace = deps
+                    .get(&dep_name)
+                    .and_then(|d| d.as_table_like())
+                    .and_then(|t| t.get("workspace"))
+                    .and_then(|v| v.as_bool())
+                    == Some(true);
+                if !is_workspace {
+                    continue;
+                }
+                if let Some(resolved_dep) = find_resolved_dep(
+                    resolved,
+                    &dep_name,
+                    Some(&target_key),
+                    dep_kind_from_str(dep_kind),
+                ) {
+                    deps.insert(&dep_name, resolved_dep_to_toml(&resolved_dep));
+                } else {
+                    debug!(
+                        "Could not resolve workspace dependency {dep_name} in \
+                         target.{target_key}.{dep_kind}"
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn inherit_workspace_package_item(
-    package: &mut toml_edit::Table,
+    package: &mut Table,
     key: &str,
-    workspace_package: Option<&toml_edit::Table>,
+    workspace_package: Option<&Table>,
 ) -> Result<()> {
     if !is_workspace_inherited(package, key) {
         return Ok(());
@@ -351,6 +362,14 @@ struct GitSource {
     rev: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+enum DepSource {
+    CratesIo,
+    Path(PathBuf),
+    Git(GitSource),
+    Registry(String),
+}
+
 /// Finds a resolved dependency by name in the package metadata.
 fn find_resolved_dep(
     resolved: &cargo_metadata::Package,
@@ -359,43 +378,41 @@ fn find_resolved_dep(
     kind: DependencyKind,
 ) -> Option<ResolvedDep> {
     resolved.dependencies.iter().find_map(|d| {
-        // Match by name, considering renames
         let matches_name = d.rename.as_deref() == Some(name) || d.name == name;
         if !matches_name {
             return None;
         }
-        // Match by dependency kind
         if d.kind != kind {
             return None;
         }
-        // If a target is specified, match against it
         if let Some(target_str) = target
             && d.target.as_ref().map(|t| t.to_string()).as_deref() != Some(target_str)
         {
             return None;
         }
-        // When the dep is renamed, `d.rename` is the alias (the Cargo.toml key)
-        // and `d.name` is the real package name. We need `package = "<real_name>"`.
+
         let package = d.rename.as_ref().map(|_| d.name.clone());
-        // For path deps, compute the relative path from the dependent's manifest dir.
-        let path = d.path.as_ref().map(|dep_path| {
+        let source = if let Some(dep_path) = d.path.as_ref() {
             let manifest_dir = resolved.manifest_path.parent().unwrap();
-            relative_path(manifest_dir.as_std_path(), dep_path.as_std_path())
-        });
-        let git = d.source.as_ref().and_then(parse_git_source);
-        let registry_index = match (&path, &git, &d.registry) {
-            (None, None, Some(registry)) => Some(registry.clone()),
-            _ => None,
+            DepSource::Path(relative_path(
+                manifest_dir.as_std_path(),
+                dep_path.as_std_path(),
+            ))
+        } else if let Some(git) = d.source.as_ref().and_then(parse_git_source) {
+            DepSource::Git(git)
+        } else if let Some(registry) = &d.registry {
+            DepSource::Registry(registry.clone())
+        } else {
+            DepSource::CratesIo
         };
+
         Some(ResolvedDep {
             req: d.req.to_string(),
             optional: d.optional,
             default_features: d.uses_default_features,
             features: d.features.clone(),
             package,
-            path,
-            git,
-            registry_index,
+            source,
         })
     })
 }
@@ -440,21 +457,12 @@ struct ResolvedDep {
     /// When the dep is renamed (aliased), the real package name.
     /// Emitted as `package = "<name>"` in Cargo.toml.
     package: Option<String>,
-    /// For path dependencies, the relative path from the dependent crate
-    /// to the dependency directory.
-    path: Option<PathBuf>,
-    /// For git dependencies, preserve the git source information.
-    git: Option<GitSource>,
-    /// For alternate registries, preserve the resolved registry index URL.
-    registry_index: Option<String>,
+    source: DepSource,
 }
 
 /// Converts a resolved dependency into a TOML value for Cargo.toml.
 fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
-    // Simple case: just a version string (only for plain crates.io deps).
-    if dep.path.is_none()
-        && dep.git.is_none()
-        && dep.registry_index.is_none()
+    if matches!(dep.source, DepSource::CratesIo)
         && dep.default_features
         && !dep.optional
         && dep.features.is_empty()
@@ -464,29 +472,36 @@ fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
     }
 
     let mut table = toml_edit::InlineTable::new();
-    if let Some(path) = &dep.path {
-        let path_str = path.to_slash().unwrap_or_else(|| path.to_string_lossy());
-        table.insert("path", path_str.as_ref().into());
-    }
-    if let Some(git) = &dep.git {
-        table.insert("git", git.url.as_str().into());
-        if let Some(branch) = &git.branch {
-            table.insert("branch", branch.as_str().into());
+    match &dep.source {
+        DepSource::CratesIo => {
+            table.insert("version", dep.req.as_str().into());
         }
-        if let Some(tag) = &git.tag {
-            table.insert("tag", tag.as_str().into());
+        DepSource::Path(path) => {
+            let path_str = path.to_slash().unwrap_or_else(|| path.to_string_lossy());
+            table.insert("path", path_str.as_ref().into());
+            if dep.req != "*" {
+                table.insert("version", dep.req.as_str().into());
+            }
         }
-        if let Some(rev) = &git.rev {
-            table.insert("rev", rev.as_str().into());
+        DepSource::Git(git) => {
+            table.insert("git", git.url.as_str().into());
+            if let Some(branch) = &git.branch {
+                table.insert("branch", branch.as_str().into());
+            }
+            if let Some(tag) = &git.tag {
+                table.insert("tag", tag.as_str().into());
+            }
+            if let Some(rev) = &git.rev {
+                table.insert("rev", rev.as_str().into());
+            }
+            if dep.req != "*" {
+                table.insert("version", dep.req.as_str().into());
+            }
         }
-    }
-    if let Some(registry_index) = &dep.registry_index {
-        table.insert("registry-index", registry_index.as_str().into());
-    }
-    let has_explicit_source =
-        dep.path.is_some() || dep.git.is_some() || dep.registry_index.is_some();
-    if dep.req != "*" || !has_explicit_source {
-        table.insert("version", dep.req.as_str().into());
+        DepSource::Registry(registry_index) => {
+            table.insert("registry-index", registry_index.as_str().into());
+            table.insert("version", dep.req.as_str().into());
+        }
     }
 
     if !dep.default_features {
@@ -698,9 +713,7 @@ mod tests {
             default_features: true,
             features: vec![],
             package: None,
-            path: Some(PathBuf::from("../shared_crate")),
-            git: None,
-            registry_index: None,
+            source: DepSource::Path(PathBuf::from("../shared_crate")),
         };
         let item = resolved_dep_to_toml(&dep);
         let s = item.to_string();
@@ -722,9 +735,7 @@ mod tests {
             default_features: true,
             features: vec![],
             package: Some("real_crate".to_string()),
-            path: None,
-            git: None,
-            registry_index: None,
+            source: DepSource::CratesIo,
         };
         let item = resolved_dep_to_toml(&dep);
         let s = item.to_string();
@@ -742,14 +753,12 @@ mod tests {
             default_features: true,
             features: vec![],
             package: None,
-            path: None,
-            git: Some(GitSource {
+            source: DepSource::Git(GitSource {
                 url: "https://example.com/repo.git".to_string(),
                 branch: Some("main".to_string()),
                 tag: None,
                 rev: None,
             }),
-            registry_index: None,
         };
         let item = resolved_dep_to_toml(&dep);
         let s = item.to_string();
@@ -775,9 +784,7 @@ mod tests {
             default_features: true,
             features: vec![],
             package: None,
-            path: None,
-            git: None,
-            registry_index: Some("https://example.com/index".to_string()),
+            source: DepSource::Registry("https://example.com/index".to_string()),
         };
         let item = resolved_dep_to_toml(&dep);
         let s = item.to_string();
@@ -788,6 +795,28 @@ mod tests {
         assert!(
             s.contains(r#"version = "1.0""#),
             "expected version, got: {s}"
+        );
+    }
+
+    #[test]
+    fn test_resolved_dep_to_toml_registry_dep_keeps_wildcard_version() {
+        let dep = ResolvedDep {
+            req: "*".to_string(),
+            optional: false,
+            default_features: true,
+            features: vec![],
+            package: None,
+            source: DepSource::Registry("https://example.com/index".to_string()),
+        };
+        let item = resolved_dep_to_toml(&dep);
+        let s = item.to_string();
+        assert!(
+            s.contains(r#"registry-index = "https://example.com/index""#),
+            "expected registry-index, got: {s}"
+        );
+        assert!(
+            s.contains(r#"version = "*""#),
+            "registry deps must retain a version requirement, got: {s}"
         );
     }
 

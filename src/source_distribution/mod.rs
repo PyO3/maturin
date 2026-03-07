@@ -21,8 +21,9 @@ use std::str;
 use tracing::{debug, trace, warn};
 
 use self::cargo_toml_rewrite::{
-    parse_toml_file, resolve_workspace_inheritance, rewrite_cargo_toml,
-    rewrite_cargo_toml_package_field, rewrite_cargo_toml_targets, strip_non_workspace_tables,
+    parse_toml_file, parse_workspace_package_table, resolve_workspace_inheritance,
+    rewrite_cargo_toml, rewrite_cargo_toml_package_field, rewrite_cargo_toml_targets,
+    strip_non_workspace_tables,
 };
 pub use self::path_deps::{PathDependency, find_path_deps};
 use self::pyproject::{add_pyproject_metadata, add_pyproject_toml, add_python_sources};
@@ -166,9 +167,10 @@ struct AddCrateOptions<'a> {
     /// When set, the dependency's workspace manifest is outside the sdist root
     /// and workspace-inherited fields must be inlined using these resolved values.
     resolved_package: Option<&'a cargo_metadata::Package>,
-    /// Workspace manifest for `resolved_package`, used to inline fields that
-    /// cargo metadata does not expose directly (for example `include`/`exclude`).
-    workspace_manifest_path: Option<&'a Path>,
+    /// Cached `[workspace.package]` table for `resolved_package`, used to inline
+    /// fields that cargo metadata does not expose directly (for example
+    /// `include`/`exclude`).
+    workspace_package: Option<&'a toml_edit::Table>,
 }
 
 /// Copies the files of a single crate to the source distribution.
@@ -274,10 +276,7 @@ fn add_crate_to_source_distribution(
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         }
         if let Some(resolved) = opts.resolved_package {
-            let workspace_manifest_path = opts
-                .workspace_manifest_path
-                .context("missing workspace manifest path for resolved package")?;
-            resolve_workspace_inheritance(&mut document, resolved, workspace_manifest_path)?;
+            resolve_workspace_inheritance(&mut document, resolved, opts.workspace_package)?;
         }
         rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
@@ -347,6 +346,7 @@ struct SdistContext<'a> {
     relative_main_crate_manifest_dir: PathBuf,
     project_root: PathBuf,
     pyproject_dir: PathBuf,
+    workspace_package_cache: HashMap<PathBuf, toml_edit::Table>,
 }
 
 impl<'a> SdistContext<'a> {
@@ -391,6 +391,8 @@ impl<'a> SdistContext<'a> {
             .to_path_buf();
         let project_root = compute_project_root(pyproject_toml_path, &sdist_root).to_path_buf();
         let pyproject_dir = pyproject_toml_path.parent().unwrap().to_path_buf();
+        let workspace_package_cache =
+            build_workspace_package_cache(&known_path_deps, workspace_root)?;
 
         Ok(Self {
             build_context,
@@ -403,8 +405,29 @@ impl<'a> SdistContext<'a> {
             relative_main_crate_manifest_dir,
             project_root,
             pyproject_dir,
+            workspace_package_cache,
         })
     }
+}
+
+fn build_workspace_package_cache(
+    known_path_deps: &HashMap<String, PathDependency>,
+    root_workspace: &Utf8Path,
+) -> Result<HashMap<PathBuf, toml_edit::Table>> {
+    let mut cache = HashMap::new();
+    for path_dep in known_path_deps.values() {
+        if path_dep.workspace_root.as_path() == root_workspace.as_std_path() {
+            continue;
+        }
+        let workspace_manifest_path = path_dep.workspace_root.join("Cargo.toml");
+        if cache.contains_key(&workspace_manifest_path) {
+            continue;
+        }
+        if let Some(workspace_package) = parse_workspace_package_table(&workspace_manifest_path)? {
+            cache.insert(workspace_manifest_path, workspace_package);
+        }
+    }
+    Ok(cache)
 }
 
 /// Resolve sdist_root — the common ancestor of all files that need to be in the sdist.
@@ -526,7 +549,9 @@ fn add_path_dep(
             skip_prefixes: Vec::new(),
             skip_cargo_toml,
             resolved_package,
-            workspace_manifest_path: path_dep_workspace_manifest.as_deref(),
+            workspace_package: path_dep_workspace_manifest
+                .as_ref()
+                .and_then(|path| ctx.workspace_package_cache.get(path.as_path())),
         },
     )
     .with_context(|| {
@@ -638,7 +663,7 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
             skip_prefixes,
             skip_cargo_toml: false,
             resolved_package: None,
-            workspace_manifest_path: None,
+            workspace_package: None,
         },
     )?;
 

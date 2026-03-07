@@ -25,6 +25,8 @@ use std::time::Duration;
     backend: TestInstallBackend::Pip,
     prereq_packages: &[],
 })]
+// These cffi mixed fixtures generate package files in-tree, so develop tests copy each
+// fixture to a per-case workspace and prune any generated paths before building.
 #[case::cffi_mixed_include_exclude(DevelopCase {
     id: "develop-cffi-mixed-include-exclude",
     package: "test-crates/cffi-mixed-include-exclude",

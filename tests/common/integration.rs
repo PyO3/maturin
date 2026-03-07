@@ -26,6 +26,8 @@ pub struct IntegrationCase<'a> {
     pub target: Option<&'a str>,
 }
 
+// The zig wrappers consult CARGO_BIN_EXE_cargo-zigbuild via process env, so zig builds run in a
+// subprocess where that override can be scoped to the command instead of mutating global state.
 fn build_wheels_with_subprocess(
     cli: &[std::ffi::OsString],
     wheel_dir: &Path,

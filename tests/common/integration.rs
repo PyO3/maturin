@@ -16,13 +16,23 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
+/// A table-driven wheel build/install integration scenario.
+///
+/// The case id is used to derive wheel output, cargo target, and virtualenv paths, so it should
+/// remain stable and descriptive when possible.
 #[derive(Clone, Copy)]
 pub struct IntegrationCase<'a> {
+    /// Stable identifier used for derived test paths and failure messages.
     pub id: &'a str,
+    /// Repo-relative path to the package under test.
     pub package: &'a str,
+    /// Optional copied-workspace configuration for fixtures that generate files in-tree.
     pub package_copy: Option<TestPackageCopy<'a>>,
+    /// Optional explicit bindings override passed to `maturin build`.
     pub bindings: Option<&'a str>,
+    /// Whether this case should exercise the zig-backed build path when available.
     pub zig: bool,
+    /// Optional explicit compilation target for the build.
     pub target: Option<&'a str>,
 }
 

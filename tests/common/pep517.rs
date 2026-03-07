@@ -8,12 +8,21 @@ pub fn target_dir(unique_name: &str) -> String {
     case_target_dir(unique_name).display().to_string()
 }
 
+/// A table-driven PEP 517 installation scenario.
+///
+/// The case id is used to derive the cargo target directory, so it should stay stable and
+/// descriptive when possible.
 #[derive(Clone, Copy)]
 pub struct Pep517Case<'a> {
+    /// Stable identifier used for derived test paths and failure messages.
     pub id: &'a str,
+    /// Repo-relative path to the package under test.
     pub package: &'a str,
+    /// The environment kind used for installation and verification.
     pub env_kind: TestEnvKind,
+    /// Whether the package should be installed in editable mode.
     pub editable: bool,
+    /// Extra Python packages that must be installed into the test environment first.
     pub prereq_packages: &'a [&'a str],
 }
 

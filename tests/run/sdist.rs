@@ -8,10 +8,16 @@ use std::process::Command;
 use url::Url;
 use which::which;
 
+/// A table-driven source distribution scenario.
+///
+/// The case id is used to derive isolated output paths and failure messages for helper calls.
 #[derive(Clone, Copy)]
 struct SdistCase<'a> {
+    /// Stable identifier used for derived test paths and failure messages.
     id: &'a str,
+    /// Repo-relative path to the package under test.
     package: &'a str,
+    /// Which sdist generator implementation the case exercises.
     generator: SdistGenerator,
 }
 

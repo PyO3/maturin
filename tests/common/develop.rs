@@ -5,14 +5,25 @@ use crate::common::{
 use anyhow::Result;
 use maturin::{CargoOptions, DevelopOptions, develop};
 
+/// A table-driven `maturin develop` scenario.
+///
+/// The case id is used to derive isolated virtualenv and cargo target paths, so it should stay
+/// stable and descriptive when possible.
 #[derive(Clone, Copy)]
 pub struct DevelopCase<'a> {
+    /// Stable identifier used for derived test paths and failure messages.
     pub id: &'a str,
+    /// Repo-relative path to the package under test.
     pub package: &'a str,
+    /// Optional copied-workspace configuration for fixtures that generate files in-tree.
     pub package_copy: Option<TestPackageCopy<'a>>,
+    /// Optional explicit bindings override passed to `maturin develop`.
     pub bindings: Option<&'a str>,
+    /// The environment kind used for installation and verification.
     pub env_kind: TestEnvKind,
+    /// Whether the case installs through pip-compatible or uv-compatible flow.
     pub backend: TestInstallBackend,
+    /// Extra Python packages that must be installed into the test environment first.
     pub prereq_packages: &'a [&'a str],
 }
 

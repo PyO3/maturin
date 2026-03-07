@@ -30,9 +30,18 @@ pub struct PreparedEnv {
     pub python: PathBuf,
 }
 
+/// Copy a fixture into an isolated per-case workspace before running the test.
+///
+/// Most cases run directly from `test-crates/...`, but some mixed-layout fixtures write generated
+/// files back into their source tree. Those cases use a copied workspace under
+/// `test-crates/case-packages/<case_id>` so parallel runs do not mutate the shared fixture.
 #[derive(Clone, Copy)]
 pub struct TestPackageCopy<'a> {
+    /// Additional repo-relative fixture roots to copy alongside the primary package, such as path
+    /// dependencies that live outside the package tree.
     pub extra_copy_paths: &'a [&'a str],
+    /// Repo-relative generated files or directories to remove from the copied workspace before the
+    /// test starts so each run begins from the checked-in fixture state.
     pub prune_copy_paths: &'a [&'a str],
 }
 
@@ -320,6 +329,8 @@ pub fn prepare_case_package(
     package_copy: Option<TestPackageCopy<'_>>,
 ) -> Result<PathBuf> {
     if let Some(package_copy) = package_copy {
+        // Rebuild the isolated workspace from the checked-in fixture on every run so tests do not
+        // inherit generated files from previous cases.
         let isolated_root = repo_test_crates_dir().join("case-packages").join(case_id);
         remove_if_exists(&isolated_root)?;
 

@@ -584,9 +584,14 @@ fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
 
 // Strip targets whose source files are excluded from the sdist, matching Cargo's
 // behavior when `package.include`/`package.exclude` or tool.maturin excludes remove them.
+//
+// We rely on `cargo metadata` for target discovery and source paths, and only
+// use the packaged file set to determine which of those discovered targets
+// still exist in the sdist.
 pub(super) fn rewrite_cargo_toml_targets(
     document: &mut DocumentMut,
     manifest_path: &Path,
+    package_metadata: &cargo_metadata::Package,
     packaged_files: &HashSet<PathBuf>,
 ) -> Result<()> {
     debug!(
@@ -595,16 +600,7 @@ pub(super) fn rewrite_cargo_toml_targets(
     );
 
     let manifest_dir = manifest_path.parent().unwrap();
-    let package_name = document
-        .get("package")
-        .and_then(|item| item.as_table())
-        .and_then(|table| table.get("name"))
-        .and_then(|item| item.as_str())
-        .map(str::to_string);
 
-    // We need to normalize paths without accessing the filesystem (which might not match
-    // the manifest context) and without resolving symlinks. This matches `cargo package --list`
-    // behavior which outputs normalized paths.
     let normalize = |path: &Path| -> PathBuf {
         let path = if path.is_absolute() {
             path.strip_prefix(manifest_dir).unwrap_or(path)
@@ -614,67 +610,63 @@ pub(super) fn rewrite_cargo_toml_targets(
         normalize_path(path)
     };
 
-    let has_packaged_path =
-        |paths: &[PathBuf]| -> bool { paths.iter().any(|path| packaged_files.contains(path)) };
+    let target_src_path =
+        |target: &cargo_metadata::Target| normalize(target.src_path.as_std_path());
+    let is_packaged_target =
+        |target: &cargo_metadata::Target| packaged_files.contains(&target_src_path(target));
 
-    // Cargo's implicit target path rules when `path` is not set:
-    // - lib: src/lib.rs
-    // - bin: src/bin/<name>.rs or src/bin/<name>/main.rs (src/main.rs only for implicit default bin)
-    // - example/test/bench: <dir>/<name>.rs or <dir>/<name>/main.rs
-    let candidate_paths_for_target =
-        |kind: &str, name: Option<&str>, path: Option<&str>, package_name: Option<&str>| {
-            if let Some(path) = path {
-                return vec![normalize(Path::new(path))];
+    let matches_kind = |target: &cargo_metadata::Target, kind: &str| match kind {
+        "lib" => target.kind.iter().any(|kind| {
+            matches!(
+                kind,
+                cargo_metadata::TargetKind::Lib
+                    | cargo_metadata::TargetKind::RLib
+                    | cargo_metadata::TargetKind::DyLib
+                    | cargo_metadata::TargetKind::CDyLib
+                    | cargo_metadata::TargetKind::StaticLib
+                    | cargo_metadata::TargetKind::ProcMacro
+            )
+        }),
+        "bin" => target.is_bin(),
+        "example" => target.is_example(),
+        "test" => target.is_test(),
+        "bench" => target.is_bench(),
+        _ => false,
+    };
+
+    let find_matching_target = |kind: &str, name: Option<&str>, path: Option<&str>| {
+        let normalized_path = path.map(|path| normalize(Path::new(path)));
+        package_metadata.targets.iter().find(|target| {
+            if !matches_kind(target, kind) {
+                return false;
             }
-
-            let name = name.or(package_name);
-            match (kind, name) {
-                ("lib", _) => vec![normalize(Path::new("src/lib.rs"))],
-                ("bin", Some(name)) => {
-                    vec![
-                        normalize(Path::new(&format!("src/bin/{name}.rs"))),
-                        normalize(Path::new(&format!("src/bin/{name}/main.rs"))),
-                    ]
-                }
-                ("bin", None) => vec![normalize(Path::new("src/main.rs"))],
-                ("example", Some(name)) => vec![
-                    normalize(Path::new(&format!("examples/{name}.rs"))),
-                    normalize(Path::new(&format!("examples/{name}/main.rs"))),
-                ],
-                ("test", Some(name)) => vec![
-                    normalize(Path::new(&format!("tests/{name}.rs"))),
-                    normalize(Path::new(&format!("tests/{name}/main.rs"))),
-                ],
-                ("bench", Some(name)) => vec![
-                    normalize(Path::new(&format!("benches/{name}.rs"))),
-                    normalize(Path::new(&format!("benches/{name}/main.rs"))),
-                ],
-                _ => Vec::new(),
+            if let Some(path) = normalized_path.as_ref()
+                && &target_src_path(target) != path
+            {
+                return false;
             }
-        };
+            if kind == "lib" {
+                return name.is_none_or(|name| target.name == name);
+            }
+            name.is_some_and(|name| target.name == name)
+        })
+    };
 
-    let package_name = package_name.as_deref();
-
-    let mut drop_lib = false;
     if let Some(lib) = document.get("lib").and_then(|item| item.as_table()) {
         let name = lib.get("name").and_then(|item| item.as_str());
         let path = lib.get("path").and_then(|item| item.as_str());
-        let candidates = candidate_paths_for_target("lib", name, path, package_name);
-        if !candidates.is_empty() && !has_packaged_path(&candidates) {
+        if let Some(target) = find_matching_target("lib", name, path)
+            && !is_packaged_target(target)
+        {
             debug!(
                 "Stripping [lib] target {:?} from {}",
                 name.or(path),
                 manifest_path.display()
             );
-            drop_lib = true;
+            document.remove("lib");
         }
     }
 
-    if drop_lib {
-        document.remove("lib");
-    }
-
-    let mut removed_bins = Vec::new();
     for (key, kind) in [
         ("bin", "bin"),
         ("example", "example"),
@@ -690,18 +682,14 @@ pub(super) fn rewrite_cargo_toml_targets(
                 let target = targets.get(idx).unwrap();
                 let name = target.get("name").and_then(|item| item.as_str());
                 let path = target.get("path").and_then(|item| item.as_str());
-                let candidates = candidate_paths_for_target(kind, name, path, package_name);
-                if !candidates.is_empty() && !has_packaged_path(&candidates) {
+                let should_remove = find_matching_target(kind, name, path)
+                    .is_some_and(|target| !is_packaged_target(target));
+                if should_remove {
                     debug!(
                         "Stripping {key} target {:?} from {}",
                         name.or(path),
                         manifest_path.display()
                     );
-                    if kind == "bin"
-                        && let Some(name) = name
-                    {
-                        removed_bins.push(name.to_string());
-                    }
                     targets.remove(idx);
                 } else {
                     idx += 1;
@@ -713,14 +701,25 @@ pub(super) fn rewrite_cargo_toml_targets(
         }
     }
 
-    // If we removed any binaries, we must check if they were the `default-run` target.
-    // If so, we remove `default-run` to prevent `cargo run` from failing with a missing target.
-    if !removed_bins.is_empty()
-        && let Some(package) = document
-            .get_mut("package")
-            .and_then(|item| item.as_table_mut())
+    let packaged_bin_names: HashSet<&str> = package_metadata
+        .targets
+        .iter()
+        .filter(|target| target.is_bin() && is_packaged_target(target))
+        .map(|target| target.name.as_str())
+        .collect();
+
+    // Remove `default-run` when its target was excluded from the sdist. This
+    // uses cargo metadata rather than hand-rolled path inference, so it also
+    // handles implicit default bins like `src/main.rs`.
+    if let Some(package) = document
+        .get_mut("package")
+        .and_then(|item| item.as_table_mut())
         && let Some(default_run) = package.get("default-run").and_then(|item| item.as_str())
-        && removed_bins.iter().any(|name| name == default_run)
+        && package_metadata
+            .targets
+            .iter()
+            .any(|target| target.is_bin() && target.name == default_run)
+        && !packaged_bin_names.contains(default_run)
     {
         debug!(
             "Stripping [package.default-run] target {:?} from {}",

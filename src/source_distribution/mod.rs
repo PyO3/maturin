@@ -164,9 +164,9 @@ struct AddCrateOptions<'a> {
     /// When true, skip writing the (rewritten) Cargo.toml — the workspace
     /// manifest will be added separately with workspace-level rewrites.
     skip_cargo_toml: bool,
-    /// When set, the dependency's workspace manifest is outside the sdist root
-    /// and workspace-inherited fields must be inlined using these resolved values.
-    resolved_package: Option<&'a cargo_metadata::Package>,
+    /// Cargo metadata for this crate, used for target discovery and, when needed,
+    /// inlining workspace-inherited values.
+    package_metadata: &'a cargo_metadata::Package,
     /// Cached inheritance data from the dependency's parent workspace manifest,
     /// used for the pieces cargo metadata does not expose directly.
     workspace_inheritance: Option<&'a WorkspaceManifestInheritance>,
@@ -274,10 +274,19 @@ fn add_crate_to_source_distribution(
         if let Some(known_path_deps) = opts.known_path_deps {
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         }
-        if let Some(resolved) = opts.resolved_package {
-            resolve_workspace_inheritance(&mut document, resolved, opts.workspace_inheritance)?;
+        if opts.workspace_inheritance.is_some() {
+            resolve_workspace_inheritance(
+                &mut document,
+                opts.package_metadata,
+                opts.workspace_inheritance,
+            )?;
         }
-        rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
+        rewrite_cargo_toml_targets(
+            &mut document,
+            manifest_path,
+            opts.package_metadata,
+            &packaged_files,
+        )?;
         let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
         writer.add_bytes(
             cargo_toml_path,
@@ -531,11 +540,22 @@ fn add_path_dep(
         .as_ref()
         .is_some_and(|m| m.strip_prefix(&ctx.sdist_root).is_err());
 
-    let resolved_package = if workspace_outside_sdist {
-        path_dep.resolved_package.as_ref()
-    } else {
-        None
-    };
+    let package_metadata = path_dep
+        .resolved_package
+        .as_ref()
+        .or_else(|| {
+            ctx.build_context
+                .cargo_metadata
+                .packages
+                .iter()
+                .find(|pkg| pkg.manifest_path.as_std_path() == path_dep.manifest_path.as_path())
+        })
+        .with_context(|| {
+            format!(
+                "Failed to find cargo metadata for path dependency at {}",
+                path_dep.manifest_path.display()
+            )
+        })?;
 
     add_crate_to_source_distribution(
         writer,
@@ -548,10 +568,13 @@ fn add_path_dep(
             known_path_deps: None,
             skip_prefixes: Vec::new(),
             skip_cargo_toml,
-            resolved_package,
-            workspace_inheritance: path_dep_workspace_manifest
-                .as_ref()
-                .and_then(|path| ctx.workspace_manifest_cache.get(path.as_path())),
+            package_metadata,
+            workspace_inheritance: workspace_outside_sdist.then(|| {
+                path_dep_workspace_manifest
+                    .as_ref()
+                    .and_then(|path| ctx.workspace_manifest_cache.get(path.as_path()))
+                    .expect("workspace inheritance cache missing entry")
+            }),
         },
     )
     .with_context(|| {
@@ -662,7 +685,7 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
             known_path_deps: Some(&ctx.known_path_deps),
             skip_prefixes,
             skip_cargo_toml: false,
-            resolved_package: None,
+            package_metadata: main_crate,
             workspace_inheritance: None,
         },
     )?;

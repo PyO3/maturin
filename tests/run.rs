@@ -113,6 +113,69 @@ fn sdist_excludes_default_run() {
     ))
 }
 
+#[test]
+fn sdist_excludes_implicit_default_run() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("hello-world");
+    common::other::copy_dir_recursive(Path::new("test-crates/hello-world"), &project_dir).unwrap();
+
+    let cargo_toml_path = project_dir.join("Cargo.toml");
+    let cargo_toml = fs_err::read_to_string(&cargo_toml_path)
+        .unwrap()
+        .replace("../../README.md", "../README.md");
+    fs_err::write(&cargo_toml_path, cargo_toml).unwrap();
+    fs_err::write(temp_dir.path().join("README.md"), "Cargo readme").unwrap();
+
+    let pyproject_toml_path = project_dir.join("pyproject.toml");
+    let pyproject_toml = fs_err::read_to_string(&pyproject_toml_path)
+        .unwrap()
+        .replace("exclude = [", "exclude = [\n  \"src/main.rs\",");
+    fs_err::write(&pyproject_toml_path, pyproject_toml).unwrap();
+
+    let expected_cargo_toml = expect![[r#"
+        [package]
+        name = "hello-world"
+        version = "0.1.0"
+        authors = ["konstin <konstin@mailbox.org>"]
+        edition = "2021"
+        # Test references to out-of-project files
+        readme = "README.md"
+
+        [dependencies]
+
+        [[bench]]
+        name = "included_bench"
+
+        [[example]]
+        name = "included_example"
+    "#]];
+
+    handle_result(other::test_source_distribution(
+        &project_dir,
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "hello_world-0.1.0/Cargo.lock",
+                "hello_world-0.1.0/Cargo.toml",
+                "hello_world-0.1.0/LICENSE",
+                "hello_world-0.1.0/PKG-INFO",
+                "hello_world-0.1.0/README.md",
+                "hello_world-0.1.0/benches/included_bench.rs",
+                "hello_world-0.1.0/check_installed/check_installed.py",
+                "hello_world-0.1.0/examples/included_example.rs",
+                "hello_world-0.1.0/licenses/AUTHORS.txt",
+                "hello_world-0.1.0/pyproject.toml",
+                "hello_world-0.1.0/src/bin/foo.rs",
+            }
+        "#]],
+        Some((
+            Path::new("hello_world-0.1.0/Cargo.toml"),
+            expected_cargo_toml,
+        )),
+        "sdist-hello-world-implicit-default-run",
+    ))
+}
+
 mod common;
 
 #[test]

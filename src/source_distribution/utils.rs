@@ -61,13 +61,14 @@ where
 
 /// Compute a relative path from `from` directory to `to` path.
 ///
-/// Both paths should be absolute. Returns a relative path that, when joined
-/// with `from`, resolves to `to`.  If the paths share no common prefix
-/// (e.g. different Windows drive letters), the absolute `to` path is returned
-/// as-is since no relative traversal is possible.
+/// Both absolute and relative inputs are supported. Returns a relative path
+/// that, when joined with `from`, resolves to `to`. If the paths share no
+/// common prefix (for example, different Windows drive letters or disjoint
+/// top-level components), the original `to` path is returned unchanged since
+/// no relative traversal is possible.
 pub(super) fn relative_path(from: &Path, to: &Path) -> PathBuf {
     let Some(common) = common_path_prefix(from, to) else {
-        // No common prefix — fall back to the absolute target path.
+        // No common prefix — fall back to the target path as-is.
         return to.to_path_buf();
     };
     let from_rest = from.strip_prefix(&common).unwrap_or(Path::new(""));

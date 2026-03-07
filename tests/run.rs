@@ -176,6 +176,99 @@ fn sdist_excludes_implicit_default_run() {
     ))
 }
 
+#[test]
+fn sdist_excludes_explicit_build_script() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("buildrs-repro");
+    fs_err::create_dir_all(project_dir.join("src")).unwrap();
+    fs_err::write(project_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(project_dir.join("build.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(
+        project_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "buildrs-repro"
+            version = "0.1.0"
+            edition = "2021"
+            build = "build.rs"
+
+            [[bin]]
+            name = "buildrs-repro"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [project]
+            name = "buildrs-repro"
+            version = "0.1.0"
+
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            bindings = "bin"
+            exclude = ["build.rs"]
+            "#
+        ),
+    )
+    .unwrap();
+
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(project_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = build_context
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let sdist_root = cargo_toml.parent().unwrap();
+    assert!(
+        !sdist_root.join("build.rs").exists(),
+        "build.rs should not be packaged when excluded"
+    );
+    let rewritten_manifest = fs_err::read_to_string(&cargo_toml).unwrap();
+    assert!(
+        !rewritten_manifest.contains("build = \"build.rs\""),
+        "expected explicit build script to be removed, got:\n{rewritten_manifest}"
+    );
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "cargo metadata failed for unpacked sdist\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
 mod common;
 
 #[test]

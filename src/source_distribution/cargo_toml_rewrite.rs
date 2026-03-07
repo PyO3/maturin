@@ -708,25 +708,48 @@ pub(super) fn rewrite_cargo_toml_targets(
         .map(|target| target.name.as_str())
         .collect();
 
-    // Remove `default-run` when its target was excluded from the sdist. This
-    // uses cargo metadata rather than hand-rolled path inference, so it also
-    // handles implicit default bins like `src/main.rs`.
     if let Some(package) = document
         .get_mut("package")
         .and_then(|item| item.as_table_mut())
-        && let Some(default_run) = package.get("default-run").and_then(|item| item.as_str())
-        && package_metadata
-            .targets
-            .iter()
-            .any(|target| target.is_bin() && target.name == default_run)
-        && !packaged_bin_names.contains(default_run)
     {
-        debug!(
-            "Stripping [package.default-run] target {:?} from {}",
-            default_run,
-            manifest_path.display()
-        );
-        package.remove("default-run");
+        // Remove `build` when the explicitly-configured build script source was
+        // excluded from the sdist. Cargo treats explicit `package.build = ...`
+        // differently from implicit `build.rs`: if the path is configured but the
+        // file is missing, manifest loading fails.
+        if let Some(build_path) = package.get("build").and_then(|item| item.as_str()) {
+            let normalized_build_path = normalize(Path::new(build_path));
+            let explicit_build_missing = package_metadata.targets.iter().any(|target| {
+                target.is_custom_build()
+                    && target_src_path(target) == normalized_build_path
+                    && !is_packaged_target(target)
+            });
+            if explicit_build_missing {
+                debug!(
+                    "Stripping [package.build] target {:?} from {}",
+                    build_path,
+                    manifest_path.display()
+                );
+                package.remove("build");
+            }
+        }
+
+        // Remove `default-run` when its target was excluded from the sdist. This
+        // uses cargo metadata rather than hand-rolled path inference, so it also
+        // handles implicit default bins like `src/main.rs`.
+        if let Some(default_run) = package.get("default-run").and_then(|item| item.as_str())
+            && package_metadata
+                .targets
+                .iter()
+                .any(|target| target.is_bin() && target.name == default_run)
+            && !packaged_bin_names.contains(default_run)
+        {
+            debug!(
+                "Stripping [package.default-run] target {:?} from {}",
+                default_run,
+                manifest_path.display()
+            );
+            package.remove("default-run");
+        }
     }
 
     Ok(())

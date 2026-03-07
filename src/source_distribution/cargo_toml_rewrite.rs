@@ -139,24 +139,42 @@ pub(super) fn strip_non_workspace_tables(document: &mut DocumentMut, manifest_pa
 pub(super) fn resolve_workspace_inheritance(
     document: &mut DocumentMut,
     resolved: &cargo_metadata::Package,
-    workspace_package: Option<&Table>,
+    workspace_inheritance: Option<&WorkspaceManifestInheritance>,
 ) -> Result<()> {
-    resolve_workspace_package_fields(document, resolved, workspace_package)?;
+    resolve_workspace_package_fields(
+        document,
+        resolved,
+        workspace_inheritance.and_then(|inheritance| inheritance.package.as_ref()),
+    )?;
     resolve_workspace_dependency_tables(document, resolved);
     resolve_workspace_target_dependency_tables(document, resolved);
+    resolve_workspace_lints(
+        document,
+        workspace_inheritance.and_then(|inheritance| inheritance.lints.as_ref()),
+    )?;
     Ok(())
 }
 
-pub(super) fn parse_workspace_package_table(
+#[derive(Debug, Clone, Default)]
+pub(super) struct WorkspaceManifestInheritance {
+    pub(super) package: Option<Table>,
+    pub(super) lints: Option<toml_edit::Item>,
+}
+
+pub(super) fn parse_workspace_manifest_inheritance(
     workspace_manifest_path: &Path,
-) -> Result<Option<Table>> {
+) -> Result<WorkspaceManifestInheritance> {
     let document = parse_toml_file(workspace_manifest_path, "workspace Cargo.toml")?;
-    Ok(document
-        .get("workspace")
-        .and_then(|item| item.as_table())
-        .and_then(|workspace| workspace.get("package"))
-        .and_then(|item| item.as_table())
-        .cloned())
+    let workspace = document.get("workspace").and_then(|item| item.as_table());
+    Ok(WorkspaceManifestInheritance {
+        package: workspace
+            .and_then(|workspace| workspace.get("package"))
+            .and_then(|item| item.as_table())
+            .cloned(),
+        lints: workspace
+            .and_then(|workspace| workspace.get("lints"))
+            .cloned(),
+    })
 }
 
 fn resolve_workspace_package_fields(
@@ -212,7 +230,26 @@ fn resolve_workspace_package_fields(
         }
     }
 
-    for key in ["publish", "include", "exclude"] {
+    // `cargo metadata` already resolves `publish`, unlike `include`/`exclude`.
+    if is_workspace_inherited(package, "publish") {
+        match resolved.publish.as_ref() {
+            None => {
+                package.remove("publish");
+            }
+            Some(registries) if registries.is_empty() => {
+                package.insert("publish", toml_edit::value(false));
+            }
+            Some(registries) => {
+                let mut arr = toml_edit::Array::new();
+                for registry in registries {
+                    arr.push(registry.as_str());
+                }
+                package.insert("publish", toml_edit::value(arr));
+            }
+        }
+    }
+
+    for key in ["include", "exclude"] {
         inherit_workspace_package_item(package, key, workspace_package)?;
     }
 
@@ -278,6 +315,27 @@ fn resolve_workspace_target_dependency_tables(
             }
         }
     }
+}
+
+fn resolve_workspace_lints(
+    document: &mut DocumentMut,
+    workspace_lints: Option<&toml_edit::Item>,
+) -> Result<()> {
+    let inherits_workspace_lints = document
+        .get("lints")
+        .and_then(|item| item.as_table_like())
+        .and_then(|table| table.get("workspace"))
+        .and_then(|value| value.as_bool())
+        == Some(true);
+    if !inherits_workspace_lints {
+        return Ok(());
+    }
+
+    let Some(item) = workspace_lints else {
+        bail!("Failed to resolve workspace-inherited `lints`");
+    };
+    document.as_table_mut().insert("lints", item.clone());
+    Ok(())
 }
 
 fn inherit_workspace_package_item(

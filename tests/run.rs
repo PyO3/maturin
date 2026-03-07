@@ -1159,6 +1159,162 @@ fn lib_with_parent_workspace_git_dep_sdist() {
     );
 }
 
+/// Regression test for workspace-inherited lints from a parent workspace.
+///
+/// When a path dependency uses `[lints] workspace = true` and the parent
+/// workspace manifest is outside the sdist root, maturin must inline
+/// `[workspace.lints]` into the dependency manifest.
+#[test]
+fn lib_with_parent_workspace_lints_sdist() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_root = temp_dir.path().join("workspace");
+    let pyapp_dir = workspace_root.join("crates/pyapp");
+    let shared_dir = workspace_root.join("crates/shared_crate");
+    fs_err::create_dir_all(pyapp_dir.join("src")).unwrap();
+    fs_err::create_dir_all(shared_dir.join("src")).unwrap();
+    fs_err::write(workspace_root.join("README.md"), "workspace readme\n").unwrap();
+    fs_err::write(
+        workspace_root.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            members = ["crates/shared_crate"]
+            exclude = ["crates/pyapp"]
+            resolver = "2"
+
+            [workspace.package]
+            edition = "2021"
+            readme = "README.md"
+
+            [workspace.lints.rust]
+            unsafe_code = "forbid"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        shared_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "shared_crate"
+            version = "0.1.0"
+            edition.workspace = true
+            readme.workspace = true
+
+            [lib]
+
+            [lints]
+            workspace = true
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(shared_dir.join("src/lib.rs"), "pub fn hello() {}\n").unwrap();
+    fs_err::write(
+        pyapp_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "pyapp"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.27.0", features = ["extension-module"] }
+            shared_crate = { path = "../shared_crate" }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pyapp_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn pyapp(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                shared_crate::hello();
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pyapp_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "pyapp"
+            version = "0.1.0"
+            "#
+        ),
+    )
+    .unwrap();
+
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(pyapp_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = build_context
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
+    let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
+    let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();
+    assert!(
+        rewritten_shared_manifest.contains("[lints.rust]"),
+        "expected rewritten lints table, got:\n{rewritten_shared_manifest}"
+    );
+    assert!(
+        rewritten_shared_manifest.contains("unsafe_code = \"forbid\""),
+        "expected workspace lint to be inlined, got:\n{rewritten_shared_manifest}"
+    );
+    assert!(
+        !rewritten_shared_manifest.contains("workspace = true"),
+        "expected workspace lint inheritance to be removed, got:\n{rewritten_shared_manifest}"
+    );
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "cargo metadata failed for unpacked sdist\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
 /// Regression test for https://github.com/PyO3/maturin/issues/2202
 /// When `python-source` points outside the Rust source directory,
 /// `maturin sdist` used to panic with a `StripPrefixError`.

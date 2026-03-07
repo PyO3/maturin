@@ -40,8 +40,8 @@ fn integration_pyo3_bin() {
     zig: false,
     target: None,
 })]
-// These cffi mixed fixtures generate package files in-tree, so integration tests copy each
-// fixture to a per-case workspace and prune any generated paths before building.
+// Keep the old mixed-layout regression coverage after moving these integration cases from pyo3 to
+// cffi. The fixtures generate package files in-tree, so each case runs from a copied workspace.
 #[case::cffi_mixed_include_exclude(IntegrationCase {
     id: "integration-cffi-mixed-include-exclude",
     package: "test-crates/cffi-mixed-include-exclude",

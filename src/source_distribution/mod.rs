@@ -166,6 +166,9 @@ struct AddCrateOptions<'a> {
     /// When set, the dependency's workspace manifest is outside the sdist root
     /// and workspace-inherited fields must be inlined using these resolved values.
     resolved_package: Option<&'a cargo_metadata::Package>,
+    /// Workspace manifest for `resolved_package`, used to inline fields that
+    /// cargo metadata does not expose directly (for example `include`/`exclude`).
+    workspace_manifest_path: Option<&'a Path>,
 }
 
 /// Copies the files of a single crate to the source distribution.
@@ -271,7 +274,10 @@ fn add_crate_to_source_distribution(
             rewrite_cargo_toml(&mut document, manifest_path, known_path_deps)?;
         }
         if let Some(resolved) = opts.resolved_package {
-            resolve_workspace_inheritance(&mut document, resolved);
+            let workspace_manifest_path = opts
+                .workspace_manifest_path
+                .context("missing workspace manifest path for resolved package")?;
+            resolve_workspace_inheritance(&mut document, resolved, workspace_manifest_path)?;
         }
         rewrite_cargo_toml_targets(&mut document, manifest_path, &packaged_files)?;
         let cargo_toml_path = prefix.join(manifest_path.file_name().unwrap());
@@ -520,6 +526,7 @@ fn add_path_dep(
             skip_prefixes: Vec::new(),
             skip_cargo_toml,
             resolved_package,
+            workspace_manifest_path: path_dep_workspace_manifest.as_deref(),
         },
     )
     .with_context(|| {
@@ -631,6 +638,7 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
             skip_prefixes,
             skip_cargo_toml: false,
             resolved_package: None,
+            workspace_manifest_path: None,
         },
     )?;
 

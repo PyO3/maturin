@@ -1,6 +1,6 @@
 use super::PathDependency;
 use super::utils::{normalize_path, relative_path};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use cargo_metadata::DependencyKind;
 use fs_err as fs;
 use path_slash::PathExt as _;
@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use toml_edit::DocumentMut;
 use tracing::debug;
+use url::Url;
 
 pub(super) fn parse_toml_file(path: &Path, kind: &str) -> Result<toml_edit::DocumentMut> {
     let text = fs::read_to_string(path)?;
@@ -133,12 +134,15 @@ pub(super) fn strip_non_workspace_tables(document: &mut DocumentMut, manifest_pa
 ///
 /// This is needed when the dependency's workspace manifest falls outside the
 /// sdist root (e.g. a crate excluded from a parent workspace that depends on
-/// sibling workspace members).  Without this, `field.workspace = true` entries
+/// sibling workspace members). Without this, `field.workspace = true` entries
 /// would fail to resolve when building from the sdist.
 pub(super) fn resolve_workspace_inheritance(
     document: &mut DocumentMut,
     resolved: &cargo_metadata::Package,
-) {
+    workspace_manifest_path: &Path,
+) -> Result<()> {
+    let workspace_package = parse_workspace_package_table(workspace_manifest_path)?;
+
     // Resolve `[package]` fields that support `field.workspace = true`
     if let Some(package) = document.get_mut("package").and_then(|p| p.as_table_mut()) {
         let version_str = resolved.version.to_string();
@@ -165,7 +169,7 @@ pub(super) fn resolve_workspace_inheritance(
             }
         }
 
-        // Handle array fields
+        // Handle array fields resolved by cargo metadata.
         let array_fields: &[(&str, &[String])] = &[
             ("authors", &resolved.authors),
             ("keywords", &resolved.keywords),
@@ -184,6 +188,11 @@ pub(super) fn resolve_workspace_inheritance(
                     package.insert(key, toml_edit::value(arr));
                 }
             }
+        }
+
+        // Handle fields that cargo metadata does not expose on `Package`.
+        for key in ["publish", "include", "exclude"] {
+            inherit_workspace_package_item(package, key, workspace_package.as_ref())?;
         }
 
         // `readme` and `license-file` are NOT inlined here because they need
@@ -244,6 +253,37 @@ pub(super) fn resolve_workspace_inheritance(
             }
         }
     }
+
+    Ok(())
+}
+
+fn parse_workspace_package_table(
+    workspace_manifest_path: &Path,
+) -> Result<Option<toml_edit::Table>> {
+    let document = parse_toml_file(workspace_manifest_path, "workspace Cargo.toml")?;
+    Ok(document
+        .get("workspace")
+        .and_then(|item| item.as_table())
+        .and_then(|workspace| workspace.get("package"))
+        .and_then(|item| item.as_table())
+        .cloned())
+}
+
+fn inherit_workspace_package_item(
+    package: &mut toml_edit::Table,
+    key: &str,
+    workspace_package: Option<&toml_edit::Table>,
+) -> Result<()> {
+    if !is_workspace_inherited(package, key) {
+        return Ok(());
+    }
+
+    let Some(item) = workspace_package.and_then(|workspace_package| workspace_package.get(key))
+    else {
+        bail!("Failed to resolve workspace-inherited `package.{key}`");
+    };
+    package.insert(key, item.clone());
+    Ok(())
 }
 
 /// Returns `true` if a `[package]` field has the form `field.workspace = true`.
@@ -303,6 +343,14 @@ fn dep_kind_from_str(dep_kind: &str) -> DependencyKind {
     }
 }
 
+#[derive(Debug, Clone)]
+struct GitSource {
+    url: String,
+    branch: Option<String>,
+    tag: Option<String>,
+    rev: Option<String>,
+}
+
 /// Finds a resolved dependency by name in the package metadata.
 fn find_resolved_dep(
     resolved: &cargo_metadata::Package,
@@ -329,11 +377,16 @@ fn find_resolved_dep(
         // When the dep is renamed, `d.rename` is the alias (the Cargo.toml key)
         // and `d.name` is the real package name. We need `package = "<real_name>"`.
         let package = d.rename.as_ref().map(|_| d.name.clone());
-        // For path deps, compute the relative path from the dependent's manifest dir
+        // For path deps, compute the relative path from the dependent's manifest dir.
         let path = d.path.as_ref().map(|dep_path| {
             let manifest_dir = resolved.manifest_path.parent().unwrap();
             relative_path(manifest_dir.as_std_path(), dep_path.as_std_path())
         });
+        let git = d.source.as_ref().and_then(parse_git_source);
+        let registry_index = match (&path, &git, &d.registry) {
+            (None, None, Some(registry)) => Some(registry.clone()),
+            _ => None,
+        };
         Some(ResolvedDep {
             req: d.req.to_string(),
             optional: d.optional,
@@ -341,8 +394,42 @@ fn find_resolved_dep(
             features: d.features.clone(),
             package,
             path,
+            git,
+            registry_index,
         })
     })
+}
+
+fn parse_git_source(source: &cargo_metadata::Source) -> Option<GitSource> {
+    let source = source.repr.strip_prefix("git+")?;
+    let mut url = Url::parse(source).ok()?;
+
+    let mut git = GitSource {
+        url: String::new(),
+        branch: None,
+        tag: None,
+        rev: None,
+    };
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "branch" => git.branch = Some(value.into_owned()),
+            "tag" => git.tag = Some(value.into_owned()),
+            "rev" => git.rev = Some(value.into_owned()),
+            _ => {}
+        }
+    }
+    if git.branch.is_none()
+        && git.tag.is_none()
+        && git.rev.is_none()
+        && let Some(fragment) = url.fragment()
+        && !fragment.is_empty()
+    {
+        git.rev = Some(fragment.to_string());
+    }
+    url.set_query(None);
+    url.set_fragment(None);
+    git.url = url.into();
+    Some(git)
 }
 
 struct ResolvedDep {
@@ -356,12 +443,18 @@ struct ResolvedDep {
     /// For path dependencies, the relative path from the dependent crate
     /// to the dependency directory.
     path: Option<PathBuf>,
+    /// For git dependencies, preserve the git source information.
+    git: Option<GitSource>,
+    /// For alternate registries, preserve the resolved registry index URL.
+    registry_index: Option<String>,
 }
 
 /// Converts a resolved dependency into a TOML value for Cargo.toml.
 fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
-    // Simple case: just a version string (only for non-path, non-renamed deps)
+    // Simple case: just a version string (only for plain crates.io deps).
     if dep.path.is_none()
+        && dep.git.is_none()
+        && dep.registry_index.is_none()
         && dep.default_features
         && !dep.optional
         && dep.features.is_empty()
@@ -374,7 +467,25 @@ fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
     if let Some(path) = &dep.path {
         let path_str = path.to_slash().unwrap_or_else(|| path.to_string_lossy());
         table.insert("path", path_str.as_ref().into());
-    } else {
+    }
+    if let Some(git) = &dep.git {
+        table.insert("git", git.url.as_str().into());
+        if let Some(branch) = &git.branch {
+            table.insert("branch", branch.as_str().into());
+        }
+        if let Some(tag) = &git.tag {
+            table.insert("tag", tag.as_str().into());
+        }
+        if let Some(rev) = &git.rev {
+            table.insert("rev", rev.as_str().into());
+        }
+    }
+    if let Some(registry_index) = &dep.registry_index {
+        table.insert("registry-index", registry_index.as_str().into());
+    }
+    let has_explicit_source =
+        dep.path.is_some() || dep.git.is_some() || dep.registry_index.is_some();
+    if dep.req != "*" || !has_explicit_source {
         table.insert("version", dep.req.as_str().into());
     }
 
@@ -588,6 +699,8 @@ mod tests {
             features: vec![],
             package: None,
             path: Some(PathBuf::from("../shared_crate")),
+            git: None,
+            registry_index: None,
         };
         let item = resolved_dep_to_toml(&dep);
         let s = item.to_string();
@@ -610,12 +723,71 @@ mod tests {
             features: vec![],
             package: Some("real_crate".to_string()),
             path: None,
+            git: None,
+            registry_index: None,
         };
         let item = resolved_dep_to_toml(&dep);
         let s = item.to_string();
         assert!(
             s.contains(r#"package = "real_crate""#),
             "expected package = real_crate, got: {s}"
+        );
+    }
+
+    #[test]
+    fn test_resolved_dep_to_toml_git_dep() {
+        let dep = ResolvedDep {
+            req: "*".to_string(),
+            optional: false,
+            default_features: true,
+            features: vec![],
+            package: None,
+            path: None,
+            git: Some(GitSource {
+                url: "https://example.com/repo.git".to_string(),
+                branch: Some("main".to_string()),
+                tag: None,
+                rev: None,
+            }),
+            registry_index: None,
+        };
+        let item = resolved_dep_to_toml(&dep);
+        let s = item.to_string();
+        assert!(
+            s.contains(r#"git = "https://example.com/repo.git""#),
+            "expected git source, got: {s}"
+        );
+        assert!(
+            s.contains(r#"branch = "main""#),
+            "expected git branch, got: {s}"
+        );
+        assert!(
+            !s.contains("version"),
+            "should not add version = \"*\" for plain git dep, got: {s}"
+        );
+    }
+
+    #[test]
+    fn test_resolved_dep_to_toml_registry_dep() {
+        let dep = ResolvedDep {
+            req: "1.0".to_string(),
+            optional: false,
+            default_features: true,
+            features: vec![],
+            package: None,
+            path: None,
+            git: None,
+            registry_index: Some("https://example.com/index".to_string()),
+        };
+        let item = resolved_dep_to_toml(&dep);
+        let s = item.to_string();
+        assert!(
+            s.contains(r#"registry-index = "https://example.com/index""#),
+            "expected registry-index, got: {s}"
+        );
+        assert!(
+            s.contains(r#"version = "1.0""#),
+            "expected version, got: {s}"
         );
     }
 

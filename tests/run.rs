@@ -6,11 +6,14 @@ use common::{
     test_python_implementation,
 };
 use expect_test::expect;
+use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
+use maturin::{BuildOptions, CargoOptions, unpack_sdist};
 use rstest::rstest;
 use serial_test::serial;
 use std::env;
 use std::path::Path;
+use std::process::Command;
 use std::time::Duration;
 use time::macros::datetime;
 use which::which;
@@ -892,21 +895,25 @@ fn lib_with_target_path_dep_sdist() {
 /// Before the fix, this would panic with StripPrefixError.
 ///
 /// Also verifies that workspace-inherited fields (`edition.workspace = true`,
-/// `readme.workspace = true`) are correctly inlined in the path dependency's
-/// Cargo.toml when the parent workspace manifest is outside the sdist root.
+/// `readme.workspace = true`, `publish.workspace = true`, `include.workspace = true`)
+/// are correctly inlined in the path dependency's Cargo.toml when the parent
+/// workspace manifest is outside the sdist root.
 #[test]
 fn lib_with_parent_workspace_path_dep_sdist() {
-    // shared_crate uses `edition.workspace = true` and `readme.workspace = true`
-    // from the parent workspace. Since the parent workspace Cargo.toml is NOT
-    // included in the sdist, these must be inlined to their resolved values.
-    // `readme` is rewritten to just the filename (the file is copied next to the
-    // manifest), and `edition` is inlined to "2021".
+    // shared_crate inherits package metadata from the parent workspace. Since
+    // the parent workspace Cargo.toml is NOT included in the sdist, these
+    // fields must be materialized in the path dependency manifest itself.
+    // `readme` is rewritten to just the filename (the file is copied next to
+    // the manifest), `edition` is inlined to "2021", `publish` stays false,
+    // and `include` is copied from `[workspace.package]`.
     let expected_shared_crate_cargo_toml = expect![[r#"
         [package]
         name = "shared_crate"
         version = "0.1.0"
         edition = "2021"
         readme = "README.md"
+        publish = false
+        include = ["src/**", "README.md", "Cargo.toml"]
 
         [lib]
 
@@ -935,6 +942,216 @@ fn lib_with_parent_workspace_path_dep_sdist() {
         )),
         "sdist-lib-with-parent-workspace-path-dep",
     ))
+}
+
+/// Regression test for workspace-inherited git dependencies from a parent workspace.
+///
+/// When a path dependency inherits `git` dependencies via `[workspace.dependencies]`
+/// and the workspace manifest is outside the sdist root, maturin must rewrite the
+/// dependency using `git = ...` instead of collapsing it to a plain version.
+#[test]
+fn lib_with_parent_workspace_git_dep_sdist() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let git_dep_dir = temp_dir.path().join("gitdep");
+    fs_err::create_dir_all(git_dep_dir.join("src")).unwrap();
+    fs_err::write(
+        git_dep_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "gitdep"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(git_dep_dir.join("src/lib.rs"), "pub fn from_git() {}\n").unwrap();
+    assert!(
+        Command::new("git")
+            .args(["init", "--initial-branch=main", "-q"])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .args([
+                "-c",
+                "user.name=maturin-tests",
+                "-c",
+                "user.email=maturin-tests@example.com",
+                "commit",
+                "-q",
+                "-m",
+                "init",
+            ])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+
+    let workspace_root = temp_dir.path().join("workspace");
+    let pysof_dir = workspace_root.join("crates/pysof");
+    let shared_dir = workspace_root.join("crates/shared_crate");
+    fs_err::create_dir_all(pysof_dir.join("src")).unwrap();
+    fs_err::create_dir_all(shared_dir.join("src")).unwrap();
+    fs_err::write(workspace_root.join("README.md"), "workspace readme\n").unwrap();
+    fs_err::write(
+        workspace_root.join("Cargo.toml"),
+        format!(
+            indoc!(
+                r#"
+                [workspace]
+                members = ["crates/shared_crate"]
+                exclude = ["crates/pysof"]
+                resolver = "2"
+
+                [workspace.package]
+                edition = "2021"
+                readme = "README.md"
+
+                [workspace.dependencies]
+                gitdep = {{ git = "file://{}", branch = "main" }}
+                "#
+            ),
+            git_dep_dir.display()
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        shared_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "shared_crate"
+            version = "0.1.0"
+            edition.workspace = true
+            readme.workspace = true
+
+            [lib]
+
+            [dependencies]
+            gitdep = { workspace = true }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        shared_dir.join("src/lib.rs"),
+        "pub fn use_git() { gitdep::from_git(); }\n",
+    )
+    .unwrap();
+    fs_err::write(
+        pysof_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "pysof"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.27.0", features = ["extension-module"] }
+            shared_crate = { path = "../shared_crate" }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pysof_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn pysof(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                shared_crate::use_git();
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pysof_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "pysof"
+            version = "0.1.0"
+            "#
+        ),
+    )
+    .unwrap();
+
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(pysof_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = build_context
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
+    let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
+    let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();
+    assert!(
+        rewritten_shared_manifest.contains("git = \"file://"),
+        "expected git source in rewritten manifest, got:\n{rewritten_shared_manifest}"
+    );
+    assert!(
+        rewritten_shared_manifest.contains("branch = \"main\""),
+        "expected git branch in rewritten manifest, got:\n{rewritten_shared_manifest}"
+    );
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "cargo metadata failed for unpacked sdist\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
 }
 
 /// Regression test for https://github.com/PyO3/maturin/issues/2202

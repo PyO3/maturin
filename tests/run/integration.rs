@@ -10,6 +10,7 @@ use std::path::Path;
 fn integration_pyo3_bin() {
     let python_implementation = test_python_implementation().unwrap();
     if python_implementation == "pypy" || python_implementation == "graalpy" {
+        // PyPy & GraalPy do not support the auto-initialize feature of pyo3.
         return;
     }
 
@@ -169,6 +170,7 @@ fn integration_cases(#[case] case: IntegrationCase<'_>) {
 #[test]
 #[cfg_attr(target_os = "macos", ignore)]
 fn integration_pyo3_pure_conda() {
+    // Don't run it on macOS, too slow.
     if has_conda() {
         handle_result(integration::test_integration_conda(
             "test-crates/pyo3-mixed",

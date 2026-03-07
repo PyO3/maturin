@@ -122,6 +122,8 @@ use std::time::Duration;
     backend: TestInstallBackend::Pip,
     prereq_packages: &[],
 })]
+/// Test editable install of a project with both a binary and a Python module.
+/// This is a regression test for https://github.com/PyO3/maturin/issues/2933
 #[case::bin_with_python_module(DevelopCase {
     id: "develop-bin-with-python-module",
     package: "test-crates/bin-with-python-module",
@@ -238,6 +240,7 @@ fn develop_uniffi_cases(#[case] case: DevelopCase<'_>) {
 })]
 #[test]
 fn develop_uv_cases(#[case] case: DevelopCase<'_>) {
+    // Only run uv tests on platforms that have wheels on PyPI or when a uv binary is found.
     if !cfg!(any(
         target_os = "linux",
         target_os = "macos",

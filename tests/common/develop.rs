@@ -21,22 +21,26 @@ pub struct DevelopCase<'a> {
 pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
     let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
     let package = package_path.as_path();
+    let uv = matches!(case.backend, TestInstallBackend::Uv);
+    let supported_uv_platform = cfg!(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ));
+    let prereq_packages = if uv && !supported_uv_platform && has_uv() {
+        &[][..]
+    } else {
+        case.prereq_packages
+    };
     let PreparedEnv {
         root: venv_dir,
         python,
-    } = prepare_test_env(case.id, case.env_kind, case.prereq_packages, None)?;
+    } = prepare_test_env(case.id, case.env_kind, prereq_packages, None)?;
 
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
 
-    let uv = matches!(case.backend, TestInstallBackend::Uv);
-    if uv
-        && !cfg!(any(
-            target_os = "linux",
-            target_os = "macos",
-            target_os = "windows"
-        ))
-    {
+    if uv && !supported_uv_platform {
         assert!(has_uv(), "uv backend requires uv binary on this platform");
     }
 

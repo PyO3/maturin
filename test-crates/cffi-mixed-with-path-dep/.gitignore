@@ -1,1 +1,2 @@
 *.py[cdo]
+cffi_mixed_with_path_dep/cffi_mixed_with_path_dep/

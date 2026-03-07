@@ -1108,6 +1108,11 @@ fn lib_with_parent_workspace_path_dep_sdist() {
 /// dependency using `git = ...` instead of collapsing it to a plain version.
 #[test]
 fn lib_with_parent_workspace_git_dep_sdist() {
+    if which("git").is_err() {
+        eprintln!("Skipping lib_with_parent_workspace_git_dep_sdist: git not found");
+        return;
+    }
+
     let temp_dir = tempfile::tempdir().unwrap();
     let git_dep_dir = temp_dir.path().join("gitdep");
     fs_err::create_dir_all(git_dep_dir.join("src")).unwrap();

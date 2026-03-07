@@ -146,8 +146,16 @@ pub(super) fn resolve_workspace_inheritance(
         resolved,
         workspace_inheritance.and_then(|inheritance| inheritance.package.as_ref()),
     )?;
-    resolve_workspace_dependency_tables(document, resolved);
-    resolve_workspace_target_dependency_tables(document, resolved);
+    resolve_workspace_dependency_tables(
+        document,
+        resolved,
+        workspace_inheritance.and_then(|inheritance| inheritance.dependencies.as_ref()),
+    );
+    resolve_workspace_target_dependency_tables(
+        document,
+        resolved,
+        workspace_inheritance.and_then(|inheritance| inheritance.dependencies.as_ref()),
+    );
     resolve_workspace_lints(
         document,
         workspace_inheritance.and_then(|inheritance| inheritance.lints.as_ref()),
@@ -158,6 +166,7 @@ pub(super) fn resolve_workspace_inheritance(
 #[derive(Debug, Clone, Default)]
 pub(super) struct WorkspaceManifestInheritance {
     pub(super) package: Option<Table>,
+    pub(super) dependencies: Option<Table>,
     pub(super) lints: Option<toml_edit::Item>,
 }
 
@@ -169,6 +178,10 @@ pub(super) fn parse_workspace_manifest_inheritance(
     Ok(WorkspaceManifestInheritance {
         package: workspace
             .and_then(|workspace| workspace.get("package"))
+            .and_then(|item| item.as_table())
+            .cloned(),
+        dependencies: workspace
+            .and_then(|workspace| workspace.get("dependencies"))
             .and_then(|item| item.as_table())
             .cloned(),
         lints: workspace
@@ -265,15 +278,17 @@ fn resolve_workspace_package_fields(
 fn resolve_workspace_dependency_tables(
     document: &mut DocumentMut,
     resolved: &cargo_metadata::Package,
+    workspace_dependencies: Option<&Table>,
 ) {
     for dep_kind in ["dependencies", "dev-dependencies", "build-dependencies"] {
-        resolve_workspace_deps(document, dep_kind, resolved);
+        resolve_workspace_deps(document, dep_kind, resolved, workspace_dependencies);
     }
 }
 
 fn resolve_workspace_target_dependency_tables(
     document: &mut DocumentMut,
     resolved: &cargo_metadata::Package,
+    workspace_dependencies: Option<&Table>,
 ) {
     let Some(target) = document.get_mut("target").and_then(|t| t.as_table_mut()) else {
         return;
@@ -305,7 +320,13 @@ fn resolve_workspace_target_dependency_tables(
                     Some(&target_key),
                     dep_kind_from_str(dep_kind),
                 ) {
-                    deps.insert(&dep_name, resolved_dep_to_toml(&resolved_dep));
+                    deps.insert(
+                        &dep_name,
+                        resolved_dep_to_toml(
+                            &resolved_dep,
+                            workspace_dependencies.and_then(|deps| deps.get(&dep_name)),
+                        ),
+                    );
                 } else {
                     debug!(
                         "Could not resolve workspace dependency {dep_name} in \
@@ -370,6 +391,7 @@ fn resolve_workspace_deps(
     document: &mut DocumentMut,
     dep_kind: &str,
     resolved: &cargo_metadata::Package,
+    workspace_dependencies: Option<&Table>,
 ) {
     let dep_names: Vec<String> = document
         .get(dep_kind)
@@ -393,7 +415,10 @@ fn resolve_workspace_deps(
         if let Some(resolved_dep) =
             find_resolved_dep(resolved, &dep_name, None, dep_kind_from_str(dep_kind))
         {
-            let new_entry = resolved_dep_to_toml(&resolved_dep);
+            let new_entry = resolved_dep_to_toml(
+                &resolved_dep,
+                workspace_dependencies.and_then(|deps| deps.get(&dep_name)),
+            );
             if let Some(deps_table) = document.get_mut(dep_kind).and_then(|t| t.as_table_mut()) {
                 deps_table.insert(&dep_name, new_entry);
             }
@@ -518,8 +543,50 @@ struct ResolvedDep {
     source: DepSource,
 }
 
+fn merge_registry_workspace_dependency(
+    original: &toml_edit::Item,
+    dep: &ResolvedDep,
+) -> toml_edit::Item {
+    let mut item = original.clone();
+    let Some(table) = item.as_table_like_mut() else {
+        // Cargo manifests use `registry = "<name>"`, but cargo metadata only
+        // exposes the registry index URL. If we cannot recover the original
+        // table form from `[workspace.dependencies]`, fall back to a plain
+        // version requirement instead of emitting the invalid
+        // `registry-index = ...` key.
+        return toml_edit::value(dep.req.as_str());
+    };
+
+    table.insert("version", toml_edit::value(dep.req.as_str()));
+    if dep.optional {
+        table.insert("optional", toml_edit::value(true));
+    } else {
+        table.remove("optional");
+    }
+    if !dep.default_features {
+        table.insert("default-features", toml_edit::value(false));
+    }
+    if !dep.features.is_empty() {
+        let mut arr = toml_edit::Array::new();
+        for f in &dep.features {
+            arr.push(f.as_str());
+        }
+        table.insert("features", toml_edit::value(arr));
+    } else {
+        table.remove("features");
+    }
+    if let Some(package) = &dep.package {
+        table.insert("package", toml_edit::value(package.as_str()));
+    }
+
+    item
+}
+
 /// Converts a resolved dependency into a TOML value for Cargo.toml.
-fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
+fn resolved_dep_to_toml(
+    dep: &ResolvedDep,
+    workspace_dependency: Option<&toml_edit::Item>,
+) -> toml_edit::Item {
     if matches!(dep.source, DepSource::CratesIo)
         && dep.default_features
         && !dep.optional
@@ -556,9 +623,10 @@ fn resolved_dep_to_toml(dep: &ResolvedDep) -> toml_edit::Item {
                 table.insert("version", dep.req.as_str().into());
             }
         }
-        DepSource::Registry(registry_index) => {
-            table.insert("registry-index", registry_index.as_str().into());
-            table.insert("version", dep.req.as_str().into());
+        DepSource::Registry(_registry_index) => {
+            return workspace_dependency
+                .map(|item| merge_registry_workspace_dependency(item, dep))
+                .unwrap_or_else(|| toml_edit::value(dep.req.as_str()));
         }
     }
 
@@ -795,7 +863,7 @@ mod tests {
             package: None,
             source: DepSource::Path(PathBuf::from("../shared_crate")),
         };
-        let item = resolved_dep_to_toml(&dep);
+        let item = resolved_dep_to_toml(&dep, None);
         let s = item.to_string();
         assert!(
             s.contains(r#"path = "../shared_crate""#),
@@ -817,7 +885,7 @@ mod tests {
             package: Some("real_crate".to_string()),
             source: DepSource::CratesIo,
         };
-        let item = resolved_dep_to_toml(&dep);
+        let item = resolved_dep_to_toml(&dep, None);
         let s = item.to_string();
         assert!(
             s.contains(r#"package = "real_crate""#),
@@ -840,7 +908,7 @@ mod tests {
                 rev: None,
             }),
         };
-        let item = resolved_dep_to_toml(&dep);
+        let item = resolved_dep_to_toml(&dep, None);
         let s = item.to_string();
         assert!(
             s.contains(r#"git = "https://example.com/repo.git""#),
@@ -857,7 +925,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolved_dep_to_toml_registry_dep() {
+    fn test_resolved_dep_to_toml_registry_dep_falls_back_to_version_only() {
         let dep = ResolvedDep {
             req: "1.0".to_string(),
             optional: false,
@@ -866,37 +934,42 @@ mod tests {
             package: None,
             source: DepSource::Registry("https://example.com/index".to_string()),
         };
-        let item = resolved_dep_to_toml(&dep);
-        let s = item.to_string();
-        assert!(
-            s.contains(r#"registry-index = "https://example.com/index""#),
-            "expected registry-index, got: {s}"
-        );
-        assert!(
-            s.contains(r#"version = "1.0""#),
-            "expected version, got: {s}"
-        );
+        let item = resolved_dep_to_toml(&dep, None);
+        assert_eq!(item.to_string(), "\"1.0\"");
     }
 
     #[test]
-    fn test_resolved_dep_to_toml_registry_dep_keeps_wildcard_version() {
+    fn test_resolved_dep_to_toml_registry_dep_preserves_registry_name() {
         let dep = ResolvedDep {
-            req: "*".to_string(),
-            optional: false,
+            req: "1.5".to_string(),
+            optional: true,
             default_features: true,
-            features: vec![],
+            features: vec!["unicode".to_string()],
             package: None,
             source: DepSource::Registry("https://example.com/index".to_string()),
         };
-        let item = resolved_dep_to_toml(&dep);
+        let workspace_dep: toml_edit::Item =
+            r#"{ version = "1.0", registry = "custom", features = ["std"] }"#
+                .parse::<toml_edit::Value>()
+                .unwrap()
+                .into();
+        let item = resolved_dep_to_toml(&dep, Some(&workspace_dep));
         let s = item.to_string();
         assert!(
-            s.contains(r#"registry-index = "https://example.com/index""#),
-            "expected registry-index, got: {s}"
+            s.contains(r#"registry = "custom""#),
+            "expected registry name, got: {s}"
         );
         assert!(
-            s.contains(r#"version = "*""#),
-            "registry deps must retain a version requirement, got: {s}"
+            s.contains(r#"version = "1.5""#),
+            "expected version, got: {s}"
+        );
+        assert!(
+            s.contains(r#"optional = true"#),
+            "expected optional, got: {s}"
+        );
+        assert!(
+            s.contains(r#"features = ["unicode"]"#),
+            "expected merged features, got: {s}"
         );
     }
 

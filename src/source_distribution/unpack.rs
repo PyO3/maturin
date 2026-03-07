@@ -17,6 +17,9 @@ pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf, Pa
             .with_context(|| format!("Failed to open sdist {}", sdist_path.display()))?,
     );
     let mut archive = tar::Archive::new(gz);
+    // `tar` already validates unpack destinations and rejects entries that
+    // would escape `tmp.path()` (for example via `..` traversal or unsafe link
+    // targets), so an additional path-safety layer is not required here.
     archive
         .unpack(tmp.path())
         .context("Failed to unpack source distribution")?;

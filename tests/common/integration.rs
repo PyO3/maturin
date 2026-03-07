@@ -26,17 +26,50 @@ pub struct IntegrationCase<'a> {
     pub target: Option<&'a str>,
 }
 
-/// For each installed python version, this builds a wheel, creates a virtualenv if it
-/// doesn't exist, installs the package and runs check_installed.py
-pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
-    // Pass CARGO_BIN_EXE_maturin for testing purpose
-    unsafe {
-        env::set_var(
+fn build_wheels_with_subprocess(
+    cli: &[std::ffi::OsString],
+    wheel_dir: &Path,
+) -> Result<Vec<PathBuf>> {
+    if wheel_dir.is_dir() {
+        fs_err::remove_dir_all(wheel_dir)?;
+    }
+    fs_err::create_dir_all(wheel_dir)?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(cli)
+        .env(
             "CARGO_BIN_EXE_cargo-zigbuild",
             env!("CARGO_BIN_EXE_maturin"),
         )
-    };
+        .output()
+        .context("failed to invoke maturin build for zig integration test")?;
+    if !output.status.success() {
+        bail!(
+            "maturin build failed with {}.\n--- Stdout:\n{}\n--- Stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?.trim(),
+            str::from_utf8(&output.stderr)?.trim(),
+        );
+    }
 
+    let mut wheels = fs_err::read_dir(wheel_dir)?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "whl"))
+        .collect::<Vec<_>>();
+    wheels.sort();
+    if wheels.is_empty() {
+        bail!(
+            "maturin build succeeded but produced no wheels in {}",
+            wheel_dir.display()
+        );
+    }
+    Ok(wheels)
+}
+
+/// For each installed python version, this builds a wheel, creates a virtualenv if it
+/// doesn't exist, installs the package and runs check_installed.py
+pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
     let package = package_path.as_path();
     let package_string = package.join("Cargo.toml").display().to_string();
@@ -53,7 +86,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         "--target-dir".into(),
         target_dir.into_os_string(),
         "--out".into(),
-        shed.into_os_string(),
+        shed.clone().into_os_string(),
     ];
 
     if let Some(bindings) = case.bindings {
@@ -90,12 +123,13 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     let cffi_venv = venvs_dir.join(cffi_provider);
 
     // on PyPy, we should use the bundled cffi
-    if let Some(interp) = python_interp
+    let build_python = if let Some(interp) = python_interp
         .as_ref()
         .filter(|interp| interp.contains("pypy"))
     {
         cli.push("--interpreter".into());
         cli.push(interp.into());
+        Some(PathBuf::from(interp))
     } else {
         // Install cffi in a separate environment
 
@@ -138,6 +172,62 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         file.unlock()?;
         cli.push("--interpreter".into());
         cli.push(python.as_os_str().to_owned());
+        Some(python)
+    };
+
+    if test_zig {
+        // Zig wrappers read CARGO_BIN_EXE_cargo-zigbuild from the process environment. Run the
+        // build in a subprocess so the override is scoped to that command instead of mutating
+        // the global test process environment.
+        let wheels = build_wheels_with_subprocess(&cli, &shed)?;
+        for filename in wheels {
+            check_for_duplicates(&filename)?;
+            let mut venv_name = format!("{}-py3", case.id);
+            if let Some(target) = case.target {
+                venv_name = format!("{venv_name}-{target}");
+            }
+            let PreparedEnv {
+                root: venv_dir,
+                python,
+            } = prepare_test_env(&venv_name, TestEnvKind::Venv, &[], build_python.clone())?;
+
+            let command = [
+                "-m",
+                "pip",
+                "--disable-pip-version-check",
+                "--no-cache-dir",
+                "install",
+                "--force-reinstall",
+            ];
+            let output = Command::new(&python)
+                .args(command)
+                .arg(dunce::simplified(&filename))
+                .output()
+                .context(format!("pip install failed with {python:?}"))?;
+            if !output.status.success() {
+                let full_command = format!("{} {}", python.display(), command.join(" "));
+                bail!(
+                    "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+                    venv_dir.display(),
+                    full_command,
+                    output.status,
+                    str::from_utf8(&output.stdout)?.trim(),
+                    str::from_utf8(&output.stderr)?.trim(),
+                );
+            }
+            if !output.stderr.is_empty() {
+                bail!(
+                    "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+                    &command,
+                    output.status,
+                    str::from_utf8(&output.stdout)?.trim(),
+                    str::from_utf8(&output.stderr)?.trim(),
+                );
+            }
+
+            check_installed(package, &python)?;
+        }
+        return Ok(());
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;

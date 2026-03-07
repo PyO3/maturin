@@ -6,13 +6,17 @@ use common::{
     test_python_implementation,
 };
 use expect_test::expect;
+use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
+use maturin::{BuildOptions, CargoOptions, unpack_sdist};
 use rstest::rstest;
 use serial_test::serial;
 use std::env;
 use std::path::Path;
+use std::process::Command;
 use std::time::Duration;
 use time::macros::datetime;
+use url::Url;
 use which::which;
 
 #[test]
@@ -107,6 +111,162 @@ fn sdist_excludes_default_run() {
         )),
         "sdist-hello-world-default-run",
     ))
+}
+
+#[test]
+fn sdist_excludes_implicit_default_run() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("hello-world");
+    common::other::copy_dir_recursive(Path::new("test-crates/hello-world"), &project_dir).unwrap();
+
+    let cargo_toml_path = project_dir.join("Cargo.toml");
+    let cargo_toml = fs_err::read_to_string(&cargo_toml_path)
+        .unwrap()
+        .replace("../../README.md", "../README.md");
+    fs_err::write(&cargo_toml_path, cargo_toml).unwrap();
+    fs_err::write(temp_dir.path().join("README.md"), "Cargo readme").unwrap();
+
+    let pyproject_toml_path = project_dir.join("pyproject.toml");
+    let pyproject_toml = fs_err::read_to_string(&pyproject_toml_path)
+        .unwrap()
+        .replace("exclude = [", "exclude = [\n  \"src/main.rs\",");
+    fs_err::write(&pyproject_toml_path, pyproject_toml).unwrap();
+
+    let expected_cargo_toml = expect![[r#"
+        [package]
+        name = "hello-world"
+        version = "0.1.0"
+        authors = ["konstin <konstin@mailbox.org>"]
+        edition = "2021"
+        # Test references to out-of-project files
+        readme = "README.md"
+
+        [dependencies]
+
+        [[bench]]
+        name = "included_bench"
+
+        [[example]]
+        name = "included_example"
+    "#]];
+
+    handle_result(other::test_source_distribution(
+        &project_dir,
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "hello_world-0.1.0/Cargo.lock",
+                "hello_world-0.1.0/Cargo.toml",
+                "hello_world-0.1.0/LICENSE",
+                "hello_world-0.1.0/PKG-INFO",
+                "hello_world-0.1.0/README.md",
+                "hello_world-0.1.0/benches/included_bench.rs",
+                "hello_world-0.1.0/check_installed/check_installed.py",
+                "hello_world-0.1.0/examples/included_example.rs",
+                "hello_world-0.1.0/licenses/AUTHORS.txt",
+                "hello_world-0.1.0/pyproject.toml",
+                "hello_world-0.1.0/src/bin/foo.rs",
+            }
+        "#]],
+        Some((
+            Path::new("hello_world-0.1.0/Cargo.toml"),
+            expected_cargo_toml,
+        )),
+        "sdist-hello-world-implicit-default-run",
+    ))
+}
+
+#[test]
+fn sdist_excludes_explicit_build_script() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("buildrs-repro");
+    fs_err::create_dir_all(project_dir.join("src")).unwrap();
+    fs_err::write(project_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(project_dir.join("build.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(
+        project_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "buildrs-repro"
+            version = "0.1.0"
+            edition = "2021"
+            build = "build.rs"
+
+            [[bin]]
+            name = "buildrs-repro"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [project]
+            name = "buildrs-repro"
+            version = "0.1.0"
+
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            bindings = "bin"
+            exclude = ["build.rs"]
+            "#
+        ),
+    )
+    .unwrap();
+
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(project_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = build_context
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let sdist_root = cargo_toml.parent().unwrap();
+    assert!(
+        !sdist_root.join("build.rs").exists(),
+        "build.rs should not be packaged when excluded"
+    );
+    let rewritten_manifest = fs_err::read_to_string(&cargo_toml).unwrap();
+    assert!(
+        !rewritten_manifest.contains("build = \"build.rs\""),
+        "expected explicit build script to be removed, got:\n{rewritten_manifest}"
+    );
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "cargo metadata failed for unpacked sdist\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
 }
 
 mod common;
@@ -884,6 +1044,436 @@ fn lib_with_target_path_dep_sdist() {
         )),
         "sdist-lib-with-target-path-dep",
     ))
+}
+
+/// Test sdist with path dependency from parent workspace.
+/// Reproduces the scenario where a crate is excluded from a parent workspace
+/// but depends on sibling crates that ARE in the parent workspace.
+/// Before the fix, this would panic with StripPrefixError.
+///
+/// Also verifies that workspace-inherited fields (`edition.workspace = true`,
+/// `readme.workspace = true`, `publish.workspace = true`, `include.workspace = true`)
+/// are correctly inlined in the path dependency's Cargo.toml when the parent
+/// workspace manifest is outside the sdist root.
+#[test]
+fn lib_with_parent_workspace_path_dep_sdist() {
+    // shared_crate inherits package metadata from the parent workspace. Since
+    // the parent workspace Cargo.toml is NOT included in the sdist, these
+    // fields must be materialized in the path dependency manifest itself.
+    // `readme` is rewritten to just the filename (the file is copied next to
+    // the manifest), `edition` is inlined to "2021", `publish` stays false,
+    // and `include` is copied from `[workspace.package]`.
+    let expected_shared_crate_cargo_toml = expect![[r#"
+        [package]
+        name = "shared_crate"
+        version = "0.1.0"
+        edition = "2021"
+        readme = "README.md"
+        publish = false
+        include = ["src/**", "README.md", "Cargo.toml"]
+
+        [lib]
+
+        [dev-dependencies]
+        log = "^0.4"
+    "#]];
+    handle_result(other::test_source_distribution(
+        "test-crates/parent_workspace_sdist/crates/pysof",
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "pysof-0.1.0/PKG-INFO",
+                "pysof-0.1.0/pyproject.toml",
+                "pysof-0.1.0/pysof/.gitignore",
+                "pysof-0.1.0/pysof/Cargo.lock",
+                "pysof-0.1.0/pysof/Cargo.toml",
+                "pysof-0.1.0/pysof/src/lib.rs",
+                "pysof-0.1.0/shared_crate/Cargo.toml",
+                "pysof-0.1.0/shared_crate/README.md",
+                "pysof-0.1.0/shared_crate/src/lib.rs",
+            }
+        "#]],
+        Some((
+            Path::new("pysof-0.1.0/shared_crate/Cargo.toml"),
+            expected_shared_crate_cargo_toml,
+        )),
+        "sdist-lib-with-parent-workspace-path-dep",
+    ))
+}
+
+/// Regression test for workspace-inherited git dependencies from a parent workspace.
+///
+/// When a path dependency inherits `git` dependencies via `[workspace.dependencies]`
+/// and the workspace manifest is outside the sdist root, maturin must rewrite the
+/// dependency using `git = ...` instead of collapsing it to a plain version.
+#[test]
+fn lib_with_parent_workspace_git_dep_sdist() {
+    if which("git").is_err() {
+        eprintln!("Skipping lib_with_parent_workspace_git_dep_sdist: git not found");
+        return;
+    }
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let git_dep_dir = temp_dir.path().join("gitdep");
+    fs_err::create_dir_all(git_dep_dir.join("src")).unwrap();
+    fs_err::write(
+        git_dep_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "gitdep"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(git_dep_dir.join("src/lib.rs"), "pub fn from_git() {}\n").unwrap();
+    assert!(
+        Command::new("git")
+            .args(["init", "--initial-branch=main", "-q"])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .args([
+                "-c",
+                "user.name=maturin-tests",
+                "-c",
+                "user.email=maturin-tests@example.com",
+                "commit",
+                "-q",
+                "-m",
+                "init",
+            ])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+
+    let git_dep_url = Url::from_directory_path(&git_dep_dir)
+        .expect("git dependency path should convert to file:// URL")
+        .to_string();
+
+    let workspace_root = temp_dir.path().join("workspace");
+    let pysof_dir = workspace_root.join("crates/pysof");
+    let shared_dir = workspace_root.join("crates/shared_crate");
+    fs_err::create_dir_all(pysof_dir.join("src")).unwrap();
+    fs_err::create_dir_all(shared_dir.join("src")).unwrap();
+    fs_err::write(workspace_root.join("README.md"), "workspace readme\n").unwrap();
+    fs_err::write(
+        workspace_root.join("Cargo.toml"),
+        format!(
+            indoc!(
+                r#"
+                [workspace]
+                members = ["crates/shared_crate"]
+                exclude = ["crates/pysof"]
+                resolver = "2"
+
+                [workspace.package]
+                edition = "2021"
+                readme = "README.md"
+
+                [workspace.dependencies]
+                gitdep = {{ git = "{}", branch = "main" }}
+                "#
+            ),
+            git_dep_url
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        shared_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "shared_crate"
+            version = "0.1.0"
+            edition.workspace = true
+            readme.workspace = true
+
+            [lib]
+
+            [dependencies]
+            gitdep = { workspace = true }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        shared_dir.join("src/lib.rs"),
+        "pub fn use_git() { gitdep::from_git(); }\n",
+    )
+    .unwrap();
+    fs_err::write(
+        pysof_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "pysof"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.27.0", features = ["extension-module"] }
+            shared_crate = { path = "../shared_crate" }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pysof_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn pysof(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                shared_crate::use_git();
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pysof_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "pysof"
+            version = "0.1.0"
+            "#
+        ),
+    )
+    .unwrap();
+
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(pysof_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = build_context
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
+    let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
+    let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();
+    assert!(
+        rewritten_shared_manifest.contains("git = \"file://"),
+        "expected git source in rewritten manifest, got:\n{rewritten_shared_manifest}"
+    );
+    assert!(
+        rewritten_shared_manifest.contains("branch = \"main\""),
+        "expected git branch in rewritten manifest, got:\n{rewritten_shared_manifest}"
+    );
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "cargo metadata failed for unpacked sdist\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+/// Regression test for workspace-inherited lints from a parent workspace.
+///
+/// When a path dependency uses `[lints] workspace = true` and the parent
+/// workspace manifest is outside the sdist root, maturin must inline
+/// `[workspace.lints]` into the dependency manifest.
+#[test]
+fn lib_with_parent_workspace_lints_sdist() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_root = temp_dir.path().join("workspace");
+    let pyapp_dir = workspace_root.join("crates/pyapp");
+    let shared_dir = workspace_root.join("crates/shared_crate");
+    fs_err::create_dir_all(pyapp_dir.join("src")).unwrap();
+    fs_err::create_dir_all(shared_dir.join("src")).unwrap();
+    fs_err::write(workspace_root.join("README.md"), "workspace readme\n").unwrap();
+    fs_err::write(
+        workspace_root.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            members = ["crates/shared_crate"]
+            exclude = ["crates/pyapp"]
+            resolver = "2"
+
+            [workspace.package]
+            edition = "2021"
+            readme = "README.md"
+
+            [workspace.lints.rust]
+            unsafe_code = "forbid"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        shared_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "shared_crate"
+            version = "0.1.0"
+            edition.workspace = true
+            readme.workspace = true
+
+            [lib]
+
+            [lints]
+            workspace = true
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(shared_dir.join("src/lib.rs"), "pub fn hello() {}\n").unwrap();
+    fs_err::write(
+        pyapp_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "pyapp"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.27.0", features = ["extension-module"] }
+            shared_crate = { path = "../shared_crate" }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pyapp_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn pyapp(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                shared_crate::hello();
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        pyapp_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "pyapp"
+            version = "0.1.0"
+            "#
+        ),
+    )
+    .unwrap();
+
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        out: Some(sdist_dir),
+        cargo: CargoOptions {
+            manifest_path: Some(pyapp_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = build_context
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
+    let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
+    let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();
+    assert!(
+        rewritten_shared_manifest.contains("[lints.rust]"),
+        "expected rewritten lints table, got:\n{rewritten_shared_manifest}"
+    );
+    assert!(
+        rewritten_shared_manifest.contains("unsafe_code = \"forbid\""),
+        "expected workspace lint to be inlined, got:\n{rewritten_shared_manifest}"
+    );
+    assert!(
+        !rewritten_shared_manifest.contains("workspace = true"),
+        "expected workspace lint inheritance to be removed, got:\n{rewritten_shared_manifest}"
+    );
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "cargo metadata failed for unpacked sdist\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
 }
 
 /// Regression test for https://github.com/PyO3/maturin/issues/2202

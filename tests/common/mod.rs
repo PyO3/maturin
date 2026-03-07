@@ -5,7 +5,7 @@ use normpath::PathExt as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{env, io, str};
+use std::{env, str};
 
 pub mod develop;
 pub mod errors;
@@ -17,6 +17,49 @@ pub mod pep517;
 pub enum TestInstallBackend {
     Pip,
     Uv,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TestEnvKind {
+    Venv,
+    Conda { major: usize, minor: usize },
+}
+
+pub struct PreparedEnv {
+    pub root: PathBuf,
+    pub python: PathBuf,
+}
+
+pub fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+pub fn repo_test_crates_dir() -> PathBuf {
+    repo_root().join("test-crates")
+}
+
+pub fn case_target_dir(case_id: &str) -> PathBuf {
+    repo_test_crates_dir().join("targets").join(case_id)
+}
+
+pub fn case_wheel_dir(case_id: &str) -> PathBuf {
+    repo_test_crates_dir().join("wheels").join(case_id)
+}
+
+pub fn is_ci() -> bool {
+    env::var("GITHUB_ACTIONS").is_ok()
+}
+
+pub fn has_conda() -> bool {
+    which::which("conda").is_ok()
+}
+
+pub fn has_uv() -> bool {
+    which::which("uv").is_ok()
+}
+
+pub fn has_uniffi_bindgen() -> bool {
+    which::which("uniffi-bindgen").is_ok()
 }
 
 /// Check that the package is either not installed or works correctly
@@ -59,30 +102,6 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Replaces the real cargo with cargo-mock if the mock crate has been compiled
-///
-/// If the mock crate hasn't been compile this does nothing
-pub fn maybe_mock_cargo() {
-    // libtest spawns multiple threads to run the tests in parallel, but all of those threads share
-    // the same environment variables, so this uses the also global stdout lock to
-    // make this region exclusive
-    let stdout = io::stdout();
-    let handle = stdout.lock();
-    let mock_cargo_path = PathBuf::from("test-crates/cargo-mock/target/release/");
-    if mock_cargo_path.join("cargo").is_file() || mock_cargo_path.join("cargo.exe").is_file() {
-        let old_path = env::var_os("PATH").expect("PATH must be set");
-        let mut path_split: Vec<PathBuf> = env::split_paths(&old_path).collect();
-        // Another thread might have already modified the path
-        if mock_cargo_path != path_split[0] {
-            path_split.insert(0, mock_cargo_path);
-            let new_path =
-                env::join_paths(path_split).expect("Expected to be able to re-join PATH");
-            unsafe { env::set_var("PATH", new_path) };
-        }
-    }
-    drop(handle);
 }
 
 /// Better error formatting
@@ -136,7 +155,7 @@ pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(
 }
 
 pub fn create_named_virtualenv(venv_name: &str, interp: Option<PathBuf>) -> Result<PathBuf> {
-    let venv_dir = PathBuf::from("test-crates")
+    let venv_dir = repo_test_crates_dir()
         .normalize()?
         .into_path_buf()
         .join("venvs")
@@ -172,6 +191,28 @@ pub fn create_named_virtualenv(venv_name: &str, interp: Option<PathBuf>) -> Resu
         );
     }
     Ok(venv_dir)
+}
+
+pub fn install_pip_packages(python: &Path, packages: &[&str]) -> Result<()> {
+    if packages.is_empty() {
+        return Ok(());
+    }
+
+    let output = Command::new(python)
+        .args(["-m", "pip", "install", "--disable-pip-version-check"])
+        .args(packages)
+        .output()?;
+    if !output.status.success() {
+        bail!(
+            "Failed to install {:?}: {}\n---stdout:\n{}---stderr:\n{}",
+            packages,
+            output.status,
+            str::from_utf8(&output.stdout)?,
+            str::from_utf8(&output.stderr)?
+        );
+    }
+
+    Ok(())
 }
 
 /// Creates conda environments
@@ -216,6 +257,34 @@ pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathB
     let target = Target::from_target_triple(None)?;
     let python = target.get_venv_python(&result.prefix);
     Ok((result.prefix, python))
+}
+
+pub fn prepare_test_env(
+    case_id: &str,
+    env_kind: TestEnvKind,
+    prereq_packages: &[&str],
+    python_interp: Option<PathBuf>,
+) -> Result<PreparedEnv> {
+    let (root, python) = match env_kind {
+        TestEnvKind::Venv => create_virtualenv(case_id, python_interp)?,
+        TestEnvKind::Conda { major, minor } => {
+            create_conda_env(&format!("maturin-{case_id}"), major, minor)?
+        }
+    };
+    install_pip_packages(&python, prereq_packages)?;
+    Ok(PreparedEnv { root, python })
+}
+
+pub fn manifest_path_for_package(package: &Path) -> PathBuf {
+    let pyproject_file = package.join("pyproject.toml");
+    if pyproject_file.is_file()
+        && let Ok(pyproject) = maturin::pyproject_toml::PyProjectToml::new(&pyproject_file)
+        && let Some(manifest_path) = pyproject.manifest_path()
+    {
+        return package.join(manifest_path);
+    }
+
+    package.join("Cargo.toml")
 }
 
 /// Path to the python interpreter for testing

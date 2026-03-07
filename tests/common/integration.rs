@@ -1,5 +1,6 @@
 use crate::common::{
-    check_installed, create_named_virtualenv, create_virtualenv, maybe_mock_cargo, test_python_path,
+    PreparedEnv, TestEnvKind, case_target_dir, case_wheel_dir, check_installed,
+    create_named_virtualenv, prepare_test_env, test_python_path,
 };
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "zig")]
@@ -15,17 +16,18 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
+#[derive(Clone, Copy)]
+pub struct IntegrationCase<'a> {
+    pub id: &'a str,
+    pub package: &'a str,
+    pub bindings: Option<&'a str>,
+    pub zig: bool,
+    pub target: Option<&'a str>,
+}
+
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
 /// doesn't exist, installs the package and runs check_installed.py
-pub fn test_integration(
-    package: impl AsRef<Path>,
-    bindings: Option<String>,
-    unique_name: &str,
-    zig: bool,
-    target: Option<&str>,
-) -> Result<()> {
-    maybe_mock_cargo();
-
+pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     // Pass CARGO_BIN_EXE_maturin for testing purpose
     unsafe {
         env::set_var(
@@ -34,11 +36,12 @@ pub fn test_integration(
         )
     };
 
-    let package_string = package.as_ref().join("Cargo.toml").display().to_string();
+    let package = Path::new(case.package);
+    let package_string = package.join("Cargo.toml").display().to_string();
 
     // The first argument is ignored by clap
-    let shed = format!("test-crates/wheels/{unique_name}");
-    let target_dir = format!("test-crates/targets/{unique_name}");
+    let shed = case_wheel_dir(case.id);
+    let target_dir = case_target_dir(case.id);
     let python_interp = test_python_path();
     let mut cli: Vec<std::ffi::OsString> = vec![
         "build".into(),
@@ -46,17 +49,17 @@ pub fn test_integration(
         "--manifest-path".into(),
         package_string.into(),
         "--target-dir".into(),
-        target_dir.into(),
+        target_dir.into_os_string(),
         "--out".into(),
-        shed.into(),
+        shed.into_os_string(),
     ];
 
-    if let Some(ref bindings) = bindings {
+    if let Some(bindings) = case.bindings {
         cli.push("--bindings".into());
         cli.push(bindings.into());
     }
 
-    if let Some(target) = target {
+    if let Some(target) = case.target {
         cli.push("--target".into());
         cli.push(target.into())
     }
@@ -66,7 +69,7 @@ pub fn test_integration(
     #[cfg(not(feature = "zig"))]
     let zig_found = false;
 
-    let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
+    let test_zig = if case.zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
         cli.push("--zig".into());
         true
     } else {
@@ -176,18 +179,25 @@ pub fn test_integration(
             assert!(filename.to_string_lossy().ends_with(&file_suffix))
         }
         let mut venv_name = if supported_version == "py3" {
-            format!("{unique_name}-py3")
+            format!("{}-py3", case.id)
         } else {
             format!(
                 "{}-py{}.{}",
-                unique_name, python_interpreter.major, python_interpreter.minor,
+                case.id, python_interpreter.major, python_interpreter.minor,
             )
         };
-        if let Some(target) = target {
+        if let Some(target) = case.target {
             venv_name = format!("{venv_name}-{target}");
         }
-        let (venv_dir, python) =
-            create_virtualenv(&venv_name, Some(python_interpreter.executable.clone()))?;
+        let PreparedEnv {
+            root: venv_dir,
+            python,
+        } = prepare_test_env(
+            &venv_name,
+            TestEnvKind::Venv,
+            &[],
+            Some(python_interpreter.executable.clone()),
+        )?;
 
         let command = [
             "-m",
@@ -223,13 +233,17 @@ pub fn test_integration(
             );
         }
 
-        check_installed(package.as_ref(), &python)?;
+        check_installed(package, &python)?;
     }
 
     Ok(())
 }
 
-pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_integration_conda(
+    package: impl AsRef<Path>,
+    bindings: Option<&str>,
+    case_id: &str,
+) -> Result<()> {
     use crate::common::create_conda_env;
     use std::path::PathBuf;
     use std::process::Stdio;
@@ -240,7 +254,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     // tests are executed with these environments
     let mut interpreters = Vec::new();
     for minor in 9..=12 {
-        let (_, venv_python) = create_conda_env(&format!("A-maturin-env-3{minor}"), 3, minor)?;
+        let (_, venv_python) = create_conda_env(&format!("maturin-{case_id}-3{minor}"), 3, minor)?;
         interpreters.push(venv_python);
     }
 
@@ -256,10 +270,15 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         cli.push(interp.to_str().unwrap().into());
     }
 
-    if let Some(ref bindings) = bindings {
+    if let Some(bindings) = bindings {
         cli.push("--bindings".into());
         cli.push(bindings.into());
     }
+
+    cli.push("--target-dir".into());
+    cli.push(case_target_dir(case_id).into_os_string());
+    cli.push("--out".into());
+    cli.push(case_wheel_dir(case_id).into_os_string());
 
     let options = BuildOptions::try_parse_from(cli)?;
 
@@ -273,7 +292,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
     for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.interpreter) {
         let executable = python_interpreter.executable;
-        if executable.to_str().unwrap().contains("maturin-env-") {
+        if executable.to_string_lossy().contains(case_id) {
             conda_wheels.push((filename.clone(), executable))
         }
     }

@@ -1,32 +1,28 @@
-use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
+use crate::common::{PreparedEnv, TestEnvKind, case_target_dir, check_installed, prepare_test_env};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 
 pub fn target_dir(unique_name: &str) -> String {
-    format!(
-        "{}/test-crates/targets/{unique_name}",
-        env!("CARGO_MANIFEST_DIR")
-    )
+    case_target_dir(unique_name).display().to_string()
+}
+
+#[derive(Clone, Copy)]
+pub struct Pep517Case<'a> {
+    pub id: &'a str,
+    pub package: &'a str,
+    pub env_kind: TestEnvKind,
+    pub editable: bool,
+    pub prereq_packages: &'a [&'a str],
 }
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// pip install to install it and checks it is working
-pub fn test_pep517(
-    package: impl AsRef<Path>,
-    unique_name: &str,
-    conda: bool,
-    editable: bool,
-) -> Result<Output> {
-    maybe_mock_cargo();
-
-    let package = package.as_ref();
-    let (_venv_dir, python) = if conda {
-        create_conda_env(&format!("maturin-{unique_name}"), 3, 10)?
-    } else {
-        create_virtualenv(unique_name, None)?
-    };
+pub fn test_pep517(case: &Pep517Case<'_>) -> Result<Output> {
+    let package = Path::new(case.package);
+    let PreparedEnv { python, .. } =
+        prepare_test_env(case.id, case.env_kind, case.prereq_packages, None)?;
 
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
@@ -48,13 +44,13 @@ pub fn test_pep517(
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "pip", "install", "-vvv", "--no-build-isolation"]);
 
-    if editable {
+    if case.editable {
         cmd.arg("--editable");
     }
 
     cmd.arg(package.to_str().expect("package is utf8 path"));
 
-    let target_dir = target_dir(unique_name);
+    let target_dir = target_dir(case.id);
     cmd.env("CARGO_TARGET_DIR", target_dir);
 
     // Building with `--no-build-isolation` means that `maturin` needs to be on PATH _and_

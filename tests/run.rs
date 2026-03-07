@@ -16,6 +16,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 use time::macros::datetime;
+use url::Url;
 use which::which;
 
 #[test]
@@ -1003,6 +1004,10 @@ fn lib_with_parent_workspace_git_dep_sdist() {
             .success()
     );
 
+    let git_dep_url = Url::from_directory_path(&git_dep_dir)
+        .expect("git dependency path should convert to file:// URL")
+        .to_string();
+
     let workspace_root = temp_dir.path().join("workspace");
     let pysof_dir = workspace_root.join("crates/pysof");
     let shared_dir = workspace_root.join("crates/shared_crate");
@@ -1024,10 +1029,10 @@ fn lib_with_parent_workspace_git_dep_sdist() {
                 readme = "README.md"
 
                 [workspace.dependencies]
-                gitdep = {{ git = "file://{}", branch = "main" }}
+                gitdep = {{ git = "{}", branch = "main" }}
                 "#
             ),
-            git_dep_dir.display()
+            git_dep_url
         ),
     )
     .unwrap();

@@ -1,6 +1,6 @@
 use crate::common::{
-    PreparedEnv, TestEnvKind, case_target_dir, case_wheel_dir, check_installed,
-    create_named_virtualenv, prepare_test_env, test_python_path,
+    PreparedEnv, TestEnvKind, TestPackageCopy, case_target_dir, case_wheel_dir, check_installed,
+    create_named_virtualenv, prepare_case_package, prepare_test_env, test_python_path,
 };
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "zig")]
@@ -20,6 +20,7 @@ use std::str;
 pub struct IntegrationCase<'a> {
     pub id: &'a str,
     pub package: &'a str,
+    pub package_copy: Option<TestPackageCopy<'a>>,
     pub bindings: Option<&'a str>,
     pub zig: bool,
     pub target: Option<&'a str>,
@@ -36,7 +37,8 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         )
     };
 
-    let package = Path::new(case.package);
+    let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
+    let package = package_path.as_path();
     let package_string = package.join("Cargo.toml").display().to_string();
 
     // The first argument is ignored by clap

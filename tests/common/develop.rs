@@ -1,15 +1,15 @@
 use crate::common::{
-    PreparedEnv, TestEnvKind, TestInstallBackend, case_target_dir, check_installed, has_uv,
-    manifest_path_for_package, prepare_test_env,
+    PreparedEnv, TestEnvKind, TestInstallBackend, TestPackageCopy, case_target_dir,
+    check_installed, has_uv, manifest_path_for_package, prepare_case_package, prepare_test_env,
 };
 use anyhow::Result;
 use maturin::{CargoOptions, DevelopOptions, develop};
-use std::path::Path;
 
 #[derive(Clone, Copy)]
 pub struct DevelopCase<'a> {
     pub id: &'a str,
     pub package: &'a str,
+    pub package_copy: Option<TestPackageCopy<'a>>,
     pub bindings: Option<&'a str>,
     pub env_kind: TestEnvKind,
     pub backend: TestInstallBackend,
@@ -19,7 +19,8 @@ pub struct DevelopCase<'a> {
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "maturin develop" to install it and checks it is working
 pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
-    let package = Path::new(case.package);
+    let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
+    let package = package_path.as_path();
     let PreparedEnv {
         root: venv_dir,
         python,

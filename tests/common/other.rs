@@ -18,8 +18,17 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     for entry in fs_err::read_dir(src)? {
         let entry = entry?;
         let name = entry.file_name();
+        let name_str = name.to_string_lossy();
         // Skip build artifacts and caches
-        if name.to_str() == Some("target") {
+        if name_str == "target"
+            || name_str == "__pycache__"
+            || name_str.ends_with(".pyc")
+            || name_str.ends_with(".pyd")
+            || name_str.ends_with(".so")
+            || name_str.ends_with(".dll")
+            || name_str.ends_with(".dylib")
+            || name_str.ends_with(".dSYM")
+        {
             continue;
         }
         let src_path = entry.path();

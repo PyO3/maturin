@@ -1,0 +1,9 @@
+[package]
+name = "cffi-mixed-submodule"
+version = "0.1.0"
+authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+edition = "2021"
+
+[lib]
+name = "cffi_mixed_submodule"
+crate-type = ["cdylib"]

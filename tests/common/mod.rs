@@ -30,6 +30,12 @@ pub struct PreparedEnv {
     pub python: PathBuf,
 }
 
+#[derive(Clone, Copy)]
+pub struct TestPackageCopy<'a> {
+    pub extra_copy_paths: &'a [&'a str],
+    pub prune_copy_paths: &'a [&'a str],
+}
+
 pub fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -285,6 +291,56 @@ pub fn manifest_path_for_package(package: &Path) -> PathBuf {
     }
 
     package.join("Cargo.toml")
+}
+
+fn fixture_root_for_package(package: &Path) -> Result<PathBuf> {
+    let mut components = package.components();
+    let Some(test_crates) = components.next() else {
+        bail!("Package path {package:?} has no components");
+    };
+    let Some(fixture) = components.next() else {
+        bail!("Package path {package:?} is missing a fixture root");
+    };
+
+    Ok(PathBuf::from(test_crates.as_os_str()).join(fixture.as_os_str()))
+}
+
+fn remove_if_exists(path: &Path) -> Result<()> {
+    if path.is_dir() {
+        fs::remove_dir_all(path)?;
+    } else if path.is_file() {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+pub fn prepare_case_package(
+    case_id: &str,
+    package: &str,
+    package_copy: Option<TestPackageCopy<'_>>,
+) -> Result<PathBuf> {
+    if let Some(package_copy) = package_copy {
+        let isolated_root = repo_test_crates_dir().join("case-packages").join(case_id);
+        remove_if_exists(&isolated_root)?;
+
+        let fixture_root = fixture_root_for_package(Path::new(package))?;
+        let copy_roots = std::iter::once(fixture_root)
+            .chain(package_copy.extra_copy_paths.iter().map(PathBuf::from));
+
+        for copy_root in copy_roots {
+            let src = repo_root().join(&copy_root);
+            let dst = isolated_root.join(&copy_root);
+            other::copy_dir_recursive(&src, &dst)?;
+        }
+
+        for prune_path in package_copy.prune_copy_paths {
+            remove_if_exists(&isolated_root.join(prune_path))?;
+        }
+
+        return Ok(isolated_root.join(package));
+    }
+
+    Ok(repo_root().join(package))
 }
 
 /// Path to the python interpreter for testing

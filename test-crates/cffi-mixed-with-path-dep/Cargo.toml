@@ -1,0 +1,12 @@
+[package]
+authors = []
+name = "cffi-mixed-with-path-dep"
+version = "2.1.3"
+edition = "2021"
+
+[dependencies]
+some_path_dep = { path = "../some_path_dep" }
+
+[lib]
+name = "cffi_mixed_with_path_dep"
+crate-type = ["cdylib"]

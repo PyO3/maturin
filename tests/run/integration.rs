@@ -1,7 +1,8 @@
 use crate::common::integration::{self, IntegrationCase};
 use crate::common::other;
 use crate::common::{
-    handle_result, has_conda, has_uniffi_bindgen, is_ci, test_python_implementation,
+    TestPackageCopy, handle_result, has_conda, has_uniffi_bindgen, is_ci,
+    test_python_implementation,
 };
 use std::path::Path;
 
@@ -15,6 +16,7 @@ fn integration_pyo3_bin() {
     handle_result(integration::test_integration(&IntegrationCase {
         id: "integration-pyo3-bin",
         package: "test-crates/pyo3-bin",
+        package_copy: None,
         bindings: None,
         zig: false,
         target: None,
@@ -25,6 +27,7 @@ fn integration_pyo3_bin() {
 #[case::pyo3_pure(IntegrationCase {
     id: "integration-pyo3-pure",
     package: "test-crates/pyo3-pure",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -32,48 +35,78 @@ fn integration_pyo3_bin() {
 #[case::pyo3_mixed(IntegrationCase {
     id: "integration-pyo3-mixed",
     package: "test-crates/pyo3-mixed",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
 })]
-#[case::pyo3_mixed_include_exclude(IntegrationCase {
-    id: "integration-pyo3-mixed-include-exclude",
-    package: "test-crates/pyo3-mixed-include-exclude",
+#[case::cffi_mixed_include_exclude(IntegrationCase {
+    id: "integration-cffi-mixed-include-exclude",
+    package: "test-crates/cffi-mixed-include-exclude",
+    package_copy: Some(TestPackageCopy {
+        extra_copy_paths: &[],
+        prune_copy_paths: &[
+            "test-crates/cffi-mixed-include-exclude/cffi_mixed_include_exclude/cffi_mixed_include_exclude",
+            "test-crates/cffi-mixed-include-exclude/cffi_mixed_include_exclude/generated_info.txt",
+        ],
+    }),
     bindings: None,
     zig: false,
     target: None,
 })]
-#[case::pyo3_mixed_submodule(IntegrationCase {
-    id: "integration-pyo3-mixed-submodule",
-    package: "test-crates/pyo3-mixed-submodule",
+#[case::cffi_mixed_submodule(IntegrationCase {
+    id: "integration-cffi-mixed-submodule",
+    package: "test-crates/cffi-mixed-submodule",
+    package_copy: Some(TestPackageCopy {
+        extra_copy_paths: &[],
+        prune_copy_paths: &["test-crates/cffi-mixed-submodule/cffi_mixed_submodule/rust_module/rust"],
+    }),
     bindings: None,
     zig: false,
     target: None,
 })]
-#[case::pyo3_mixed_with_path_dep(IntegrationCase {
-    id: "integration-pyo3-mixed-with-path-dep",
-    package: "test-crates/pyo3-mixed-with-path-dep",
+#[case::cffi_mixed_with_path_dep(IntegrationCase {
+    id: "integration-cffi-mixed-with-path-dep",
+    package: "test-crates/cffi-mixed-with-path-dep",
+    package_copy: Some(TestPackageCopy {
+        extra_copy_paths: &["test-crates/some_path_dep", "test-crates/transitive_path_dep"],
+        prune_copy_paths: &[
+            "test-crates/cffi-mixed-with-path-dep/cffi_mixed_with_path_dep/cffi_mixed_with_path_dep",
+        ],
+    }),
     bindings: None,
     zig: false,
     target: None,
 })]
-#[case::pyo3_mixed_implicit(IntegrationCase {
-    id: "integration-pyo3-mixed-implicit",
-    package: "test-crates/pyo3-mixed-implicit",
+#[case::cffi_mixed_implicit(IntegrationCase {
+    id: "integration-cffi-mixed-implicit",
+    package: "test-crates/cffi-mixed-implicit",
+    package_copy: Some(TestPackageCopy {
+        extra_copy_paths: &[],
+        prune_copy_paths: &["test-crates/cffi-mixed-implicit/python/cffi_mixed_implicit/some_rust/rust"],
+    }),
     bindings: None,
     zig: false,
     target: None,
 })]
-#[case::pyo3_mixed_py_subdir(IntegrationCase {
-    id: "integration-pyo3-mixed-py-subdir",
-    package: "test-crates/pyo3-mixed-py-subdir",
+#[case::cffi_mixed_py_subdir(IntegrationCase {
+    id: "integration-cffi-mixed-py-subdir",
+    package: "test-crates/cffi-mixed-py-subdir",
+    package_copy: Some(TestPackageCopy {
+        extra_copy_paths: &[],
+        prune_copy_paths: &["test-crates/cffi-mixed-py-subdir/python/cffi_mixed_py_subdir/_cffi_mixed"],
+    }),
     bindings: None,
     zig: cfg!(unix),
     target: None,
 })]
-#[case::pyo3_mixed_src_layout(IntegrationCase {
-    id: "integration-pyo3-mixed-src",
-    package: "test-crates/pyo3-mixed-src/rust",
+#[case::cffi_mixed_src_layout(IntegrationCase {
+    id: "integration-cffi-mixed-src",
+    package: "test-crates/cffi-mixed-src/rust",
+    package_copy: Some(TestPackageCopy {
+        extra_copy_paths: &[],
+        prune_copy_paths: &["test-crates/cffi-mixed-src/src/cffi_mixed_src/cffi_mixed_src"],
+    }),
     bindings: None,
     zig: false,
     target: None,
@@ -81,6 +114,7 @@ fn integration_pyo3_bin() {
 #[case::uniffi_pure_proc_macro(IntegrationCase {
     id: "integration-uniffi-pure-proc-macro",
     package: "test-crates/uniffi-pure-proc-macro",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -88,6 +122,7 @@ fn integration_pyo3_bin() {
 #[case::hello_world(IntegrationCase {
     id: "integration-hello-world",
     package: "test-crates/hello-world",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -95,6 +130,7 @@ fn integration_pyo3_bin() {
 #[case::pyo3_ffi_pure(IntegrationCase {
     id: "integration-pyo3-ffi-pure",
     package: "test-crates/pyo3-ffi-pure",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -102,6 +138,7 @@ fn integration_pyo3_bin() {
 #[case::with_data(IntegrationCase {
     id: "integration-with-data",
     package: "test-crates/with-data",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -109,6 +146,7 @@ fn integration_pyo3_bin() {
 #[case::readme_duplication(IntegrationCase {
     id: "integration-readme-duplication",
     package: "test-crates/readme-duplication/readme-py",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -116,6 +154,7 @@ fn integration_pyo3_bin() {
 #[case::workspace_inverted_order(IntegrationCase {
     id: "integration-workspace-inverted-order",
     package: "test-crates/workspace-inverted-order/path-dep-with-root",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -141,6 +180,7 @@ fn integration_pyo3_pure_conda() {
 #[case::cffi_pure(IntegrationCase {
     id: "integration-cffi-pure",
     package: "test-crates/cffi-pure",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -148,6 +188,7 @@ fn integration_pyo3_pure_conda() {
 #[case::cffi_mixed(IntegrationCase {
     id: "integration-cffi-mixed",
     package: "test-crates/cffi-mixed",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -164,6 +205,7 @@ fn integration_cffi_cases(#[case] case: IntegrationCase<'_>) {
 #[case::uniffi_pure(IntegrationCase {
     id: "integration-uniffi-pure",
     package: "test-crates/uniffi-pure",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -171,6 +213,7 @@ fn integration_cffi_cases(#[case] case: IntegrationCase<'_>) {
 #[case::uniffi_mixed(IntegrationCase {
     id: "integration-uniffi-mixed",
     package: "test-crates/uniffi-mixed",
+    package_copy: None,
     bindings: None,
     zig: false,
     target: None,
@@ -199,6 +242,7 @@ fn integration_wasm_hello_world() {
     handle_result(integration::test_integration(&IntegrationCase {
         id: "integration-wasm-hello-world",
         package: "test-crates/hello-world",
+        package_copy: None,
         bindings: None,
         zig: false,
         target: Some("wasm32-wasip1"),

@@ -60,8 +60,12 @@ impl ProjectGenerator<'_> {
                 metadata: None,
             }),
         };
-        let ci_config =
-            GenerateCI::default().generate_github(&project_name, &bridge_model, true)?;
+        let ci_config = crate::ci::github::generate_github_from_cli(
+            &GenerateCI::default(),
+            &project_name,
+            &bridge_model,
+            true,
+        )?;
 
         Ok(Self {
             env,

@@ -75,7 +75,7 @@
       }
     },
     "features": {
-      "description": "List of features to activate.\nEach entry can be a plain feature name string, or a conditional object\nwith `feature` and optional `python-version` and `python-implementation` keys.",
+      "description": "List of features to activate.\nEach entry can be a plain feature name string, or a conditional object\nwith `feature` and `python-version` keys.",
       "type": [
         "array",
         "null"
@@ -89,6 +89,17 @@
       "type": [
         "boolean",
         "null"
+      ]
+    },
+    "generate-ci": {
+      "description": "CI generation configuration",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GenerateCIConfig"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "include": {
@@ -309,7 +320,7 @@
       ]
     },
     "FeatureSpec": {
-      "description": "A cargo feature specification that can be either a plain feature name\nor a conditional feature that is only enabled for certain Python versions\nand/or implementations.\n\n# Examples\n\n```toml\n[tool.maturin]\nfeatures = [\n  \"some-feature\",\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\" },\n  { feature = \"pyo3/abi3-py38\", python-version = \"<3.11\" },\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\", python-implementation = \"cpython\" },\n  { feature = \"pypy-compat\", python-implementation = \"pypy\" },\n]\n```",
+      "description": "A cargo feature specification that can be either a plain feature name\nor a conditional feature that is only enabled for certain Python versions.\n\n# Examples\n\n```toml\n[tool.maturin]\nfeatures = [\n  \"some-feature\",\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\" },\n  { feature = \"pyo3/abi3-py38\", python-version = \"<3.11\" },\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\", python-implementation = \"cpython\" },\n  { feature = \"pypy-compat\", python-implementation = \"pypy\" },\n]\n```",
       "anyOf": [
         {
           "description": "A plain feature name, always enabled",
@@ -323,13 +334,19 @@
               "description": "The cargo feature to enable",
               "type": "string"
             },
-            "python-version": {
-              "description": "PEP 440 version specifier for the target Python version, e.g. \">=3.11\"",
-              "type": "string"
-            },
             "python-implementation": {
               "description": "Python implementation name, e.g. \"cpython\", \"pypy\", \"graalpy\"",
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "python-version": {
+              "description": "PEP 440 version specifier for the target Python version, e.g. \">=3.11\"",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
@@ -368,6 +385,123 @@
           }
         }
       ]
+    },
+    "GenerateCIConfig": {
+      "description": "The `[tool.maturin.generate-ci]` section",
+      "type": "object",
+      "properties": {
+        "github": {
+          "description": "GitHub Actions configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitHubCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "GitHubCIConfig": {
+      "description": "The `[tool.maturin.generate-ci.github]` section",
+      "type": "object",
+      "properties": {
+        "android": {
+          "description": "Android platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "args": {
+          "description": "Extra arguments to pass to maturin (applies to all platforms)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emscripten": {
+          "description": "Emscripten platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linux": {
+          "description": "Linux (manylinux) platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "macos": {
+          "description": "macOS platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "musllinux": {
+          "description": "Musllinux platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pytest": {
+          "description": "Enable pytest",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "skip-attestation": {
+          "description": "Skip artifact attestation",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "windows": {
+          "description": "Windows platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zig": {
+          "description": "Use zig for cross compilation",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
     },
     "GlobPattern": {
       "description": "A glob pattern for the include and exclude configuration.\n\nSee [PyProjectToml::include] and [PyProject::exclude].\n\nBased on <https://python-poetry.org/docs/pyproject/#include-and-exclude>.",
@@ -436,6 +570,88 @@
           "const": "out-dir"
         }
       ]
+    },
+    "PlatformCIConfig": {
+      "description": "Per-platform CI configuration",
+      "type": "object",
+      "properties": {
+        "args": {
+          "description": "Extra arguments to pass to maturin",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "before-script-linux": {
+          "description": "Script to run before build on Linux",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "container": {
+          "description": "Container image to use",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "docker-options": {
+          "description": "Docker options",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manylinux": {
+          "description": "Manylinux version (e.g. \"auto\", \"2_28\", \"musllinux_1_2\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner": {
+          "description": "Default runner for this platform",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rust-toolchain": {
+          "description": "Rust toolchain (e.g. \"nightly\", \"stable\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rustup-components": {
+          "description": "Rustup components to install",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "description": "Detailed per-target configuration (mutually exclusive with `targets`)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/TargetCIConfig"
+          }
+        },
+        "targets": {
+          "description": "Simple list of target architectures (mutually exclusive with `target`)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "PlatformTag": {
       "description": "Decides how to handle manylinux and musllinux compliance",
@@ -561,6 +777,75 @@
           "type": "string",
           "const": "git"
         }
+      ]
+    },
+    "TargetCIConfig": {
+      "description": "Per-target CI configuration within a platform",
+      "type": "object",
+      "properties": {
+        "arch": {
+          "description": "Target architecture (e.g. \"x86_64\", \"aarch64\")",
+          "type": "string"
+        },
+        "args": {
+          "description": "Extra arguments to pass to maturin",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "before-script-linux": {
+          "description": "Before-script-linux override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "container": {
+          "description": "Container image override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "docker-options": {
+          "description": "Docker options override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manylinux": {
+          "description": "Manylinux version override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner": {
+          "description": "Runner override for this target",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rust-toolchain": {
+          "description": "Rust toolchain override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rustup-components": {
+          "description": "Rustup components override",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "arch"
       ]
     },
     "TargetConfig": {

@@ -246,24 +246,42 @@ pub fn add_data(
                     .build()
                 {
                     let file = file?;
-                    #[cfg(unix)]
-                    let mode = file.metadata()?.permissions().mode();
-                    #[cfg(not(unix))]
-                    let mode = 0o644;
-                    let relative = metadata24
-                        .get_data_dir()
-                        .join(file.path().strip_prefix(data).unwrap());
+                    let relative_path = file.path().strip_prefix(data).with_context(|| {
+                        format!(
+                            "Data file {} is not under data dir {}",
+                            file.path().display(),
+                            data.display()
+                        )
+                    })?;
+                    let relative = metadata24.get_data_dir().join(relative_path);
 
                     if file.path_is_symlink() {
                         // Copy the actual file contents, not the link, so that you can create a
                         // data directory by joining different data sources
-                        let source = fs::read_link(file.path())?;
-                        writer.add_file(
-                            relative,
-                            source.parent().unwrap(),
-                            permission_is_executable(mode),
-                        )?;
+                        let link_target = fs::read_link(file.path())?;
+                        let source = if link_target.is_absolute() {
+                            link_target
+                        } else {
+                            file.path()
+                                .parent()
+                                .with_context(|| {
+                                    format!(
+                                        "Data symlink {} has no parent directory",
+                                        file.path().display()
+                                    )
+                                })?
+                                .join(link_target)
+                        };
+                        #[cfg(unix)]
+                        let mode = source.metadata()?.permissions().mode();
+                        #[cfg(not(unix))]
+                        let mode = 0o644;
+                        writer.add_file(relative, source, permission_is_executable(mode))?;
                     } else if file.path().is_file() {
+                        #[cfg(unix)]
+                        let mode = file.metadata()?.permissions().mode();
+                        #[cfg(not(unix))]
+                        let mode = 0o644;
                         writer.add_file(relative, file.path(), permission_is_executable(mode))?;
                     } else if file.path().is_dir() {
                         // Intentionally ignored
@@ -492,10 +510,26 @@ pub(crate) fn default_permission(executable: bool) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Read as _;
+    #[cfg(unix)]
+    use std::os::unix::fs::{PermissionsExt as _, symlink};
+
+    use anyhow::Result;
+    use fs_err as fs;
+    use ignore::overrides::Override;
+    use pep440_rs::Version;
+    use tempfile::TempDir;
+    use zip::ZipArchive;
+    use zip::write::SimpleFileOptions;
+
+    use super::VirtualWriter;
+    use super::WheelWriter;
+    use super::add_data;
     use super::wheel_file;
+    use crate::Metadata24;
 
     #[test]
-    fn wheel_file_compressed_tags() -> Result<(), Box<dyn std::error::Error>> {
+    fn wheel_file_compressed_tags() -> Result<()> {
         let expected = format!(
             "Wheel-Version: 1.0
 Generator: {name} ({version})
@@ -516,6 +550,61 @@ Tag: cp37-abi3-manylinux2014_x86_64
         ])?;
         assert_eq!(expected, actual);
 
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn add_data_resolves_symlink_targets_and_uses_source_permissions() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
+        let source = tmp_dir.path().join("README.md");
+        fs::write(&source, b"hello from symlink target")?;
+        fs::set_permissions(&source, std::fs::Permissions::from_mode(0o644))?;
+
+        let data_dir = tmp_dir.path().join("test-pkg.data");
+        let linked_dir = data_dir.join("data/data");
+        fs::create_dir_all(&linked_dir)?;
+        symlink("../../../README.md", linked_dir.join("README.md"))?;
+
+        let metadata = Metadata24::new("test-pkg".to_string(), Version::new([1, 0]));
+        let wheel_dir = tmp_dir.path().join("dist");
+        fs::create_dir_all(&wheel_dir)?;
+
+        let wheel_writer = WheelWriter::new(
+            "py3-none-any",
+            &wheel_dir,
+            &metadata,
+            SimpleFileOptions::default(),
+        )?;
+        let mut writer = VirtualWriter::new(wheel_writer, Override::empty());
+        let wheel_path = {
+            add_data(&mut writer, &metadata, Some(&data_dir))?;
+            writer.finish(&metadata, tmp_dir.path(), &["py3-none-any".to_string()])?
+        };
+
+        let mut wheel = ZipArchive::new(fs::File::open(&wheel_path)?)?;
+        let entry_name = metadata
+            .get_data_dir()
+            .join("data/data/README.md")
+            .to_string_lossy()
+            .replace('\\', "/");
+        {
+            let mut entry = wheel.by_name(&entry_name)?;
+            assert_eq!(entry.unix_mode().map(|mode| mode & 0o777), Some(0o644));
+
+            let mut content = String::new();
+            entry.read_to_string(&mut content)?;
+            assert_eq!(content, "hello from symlink target");
+        }
+
+        let record_name = metadata
+            .get_dist_info_dir()
+            .join("RECORD")
+            .to_string_lossy()
+            .replace('\\', "/");
+        assert!(wheel.by_name(&record_name).is_ok());
+
+        tmp_dir.close()?;
         Ok(())
     }
 }

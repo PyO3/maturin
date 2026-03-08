@@ -1,32 +1,54 @@
-use crate::common::{check_installed, create_conda_env, create_virtualenv, maybe_mock_cargo};
+use crate::common::{PreparedEnv, TestEnvKind, case_target_dir, check_installed, prepare_test_env};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str;
 
 pub fn target_dir(unique_name: &str) -> String {
-    format!(
-        "{}/test-crates/targets/{unique_name}",
-        env!("CARGO_MANIFEST_DIR")
-    )
+    case_target_dir(unique_name).display().to_string()
+}
+
+/// A table-driven PEP 517 installation scenario.
+///
+/// The case id is used to derive the cargo target directory, so it should stay stable and
+/// descriptive when possible.
+#[derive(Clone, Copy)]
+pub struct Pep517Case<'a> {
+    /// Stable identifier used for derived test paths and failure messages.
+    pub id: &'a str,
+    /// Repo-relative path to the package under test.
+    pub package: &'a str,
+    /// The environment kind used for installation and verification.
+    pub env_kind: TestEnvKind,
+    /// Whether the package should be installed in editable mode.
+    pub editable: bool,
+    /// Extra Python packages that must be installed into the test environment first.
+    pub prereq_packages: &'a [&'a str],
+}
+
+impl<'a> Pep517Case<'a> {
+    pub fn new(id: &'a str, package: &'a str) -> Self {
+        Self {
+            id,
+            package,
+            env_kind: TestEnvKind::Venv,
+            editable: false,
+            prereq_packages: &[],
+        }
+    }
+
+    pub fn editable(mut self) -> Self {
+        self.editable = true;
+        self
+    }
 }
 
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// pip install to install it and checks it is working
-pub fn test_pep517(
-    package: impl AsRef<Path>,
-    unique_name: &str,
-    conda: bool,
-    editable: bool,
-) -> Result<Output> {
-    maybe_mock_cargo();
-
-    let package = package.as_ref();
-    let (_venv_dir, python) = if conda {
-        create_conda_env(&format!("maturin-{unique_name}"), 3, 10)?
-    } else {
-        create_virtualenv(unique_name, None)?
-    };
+pub fn test_pep517(case: &Pep517Case<'_>) -> Result<Output> {
+    let package = Path::new(case.package);
+    let PreparedEnv { python, .. } =
+        prepare_test_env(case.id, case.env_kind, case.prereq_packages, None)?;
 
     // Ensure the test doesn't wrongly pass
     check_installed(package, &python).unwrap_err();
@@ -48,13 +70,13 @@ pub fn test_pep517(
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "pip", "install", "-vvv", "--no-build-isolation"]);
 
-    if editable {
+    if case.editable {
         cmd.arg("--editable");
     }
 
     cmd.arg(package.to_str().expect("package is utf8 path"));
 
-    let target_dir = target_dir(unique_name);
+    let target_dir = target_dir(case.id);
     cmd.env("CARGO_TARGET_DIR", target_dir);
 
     // Building with `--no-build-isolation` means that `maturin` needs to be on PATH _and_

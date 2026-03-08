@@ -18,8 +18,17 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     for entry in fs_err::read_dir(src)? {
         let entry = entry?;
         let name = entry.file_name();
+        let name_str = name.to_string_lossy();
         // Skip build artifacts and caches
-        if name.to_str() == Some("target") {
+        if name_str == "target"
+            || name_str == "__pycache__"
+            || name_str.ends_with(".pyc")
+            || name_str.ends_with(".pyd")
+            || name_str.ends_with(".so")
+            || name_str.ends_with(".dll")
+            || name_str.ends_with(".dylib")
+            || name_str.ends_with(".dSYM")
+        {
             continue;
         }
         let src_path = entry.path();
@@ -148,16 +157,14 @@ pub fn build_source_distribution(
     unique_name: &str,
 ) -> Result<Archive<GzDecoder<File>>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
-    let sdist_directory = Path::new("test-crates").join("wheels").join(unique_name);
+    let sdist_directory = crate::common::case_wheel_dir(unique_name);
 
     let build_options = BuildOptions {
         out: Some(sdist_directory),
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
-            target_dir: Some(PathBuf::from(
-                "test-crates/targets/test_workspace_cargo_lock",
-            )),
+            target_dir: Some(crate::common::case_target_dir(unique_name)),
             ..Default::default()
         },
         ..Default::default()
@@ -325,19 +332,27 @@ pub fn check_wheel_files(
     expected_files: Vec<&str>,
     unique_name: &str,
 ) -> Result<()> {
+    assert_eq!(
+        wheel_files(package, unique_name)?,
+        expected_files
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>()
+    );
+    Ok(())
+}
+
+pub fn wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<BTreeSet<String>> {
     let wheel = build_wheel_files(package, unique_name)?;
     let drop_platform_specific_files = |file: &&str| -> bool {
         !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so" || ext == "pdb" || ext == "dwp")
             && !file.contains(".dSYM/")
     };
-    assert_eq!(
-        wheel
-            .file_names()
-            .filter(drop_platform_specific_files)
-            .collect::<BTreeSet<_>>(),
-        expected_files.into_iter().collect::<BTreeSet<_>>()
-    );
-    Ok(())
+    Ok(wheel
+        .file_names()
+        .filter(drop_platform_specific_files)
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>())
 }
 
 #[cfg(feature = "sbom")]

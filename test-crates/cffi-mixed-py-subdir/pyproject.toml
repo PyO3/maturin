@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "cffi-mixed-py-subdir"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Rust"
+]
+requires-python = ">=3.6"
+dependencies = ["cffi"]
+dynamic = ["version", "description"]  # Allow description from Cargo.toml to be used
+
+[tool.maturin]
+bindings = "cffi"
+module-name = "cffi_mixed_py_subdir._cffi_mixed"
+python-source = "python"
+include = ["assets/extra_data.txt"]

@@ -1,5 +1,7 @@
 use crate::common::{
-    check_installed, create_named_virtualenv, create_virtualenv, maybe_mock_cargo, test_python_path,
+    PreparedEnv, TestEnvKind, TestPackageCopy, case_target_dir, case_wheel_dir, check_installed,
+    cleanup_case, create_named_virtualenv, prepare_case_package, prepare_test_env,
+    test_python_path,
 };
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "zig")]
@@ -7,7 +9,7 @@ use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
 use fs4::fs_err3::FileExt;
-use maturin::{BuildOptions, PlatformTag, Target};
+use maturin::{BuildOptions, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;
@@ -15,30 +17,149 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
-/// For each installed python version, this builds a wheel, creates a virtualenv if it
-/// doesn't exist, installs the package and runs check_installed.py
-pub fn test_integration(
-    package: impl AsRef<Path>,
-    bindings: Option<String>,
-    unique_name: &str,
-    zig: bool,
-    target: Option<&str>,
-) -> Result<()> {
-    maybe_mock_cargo();
+/// A table-driven wheel build/install integration scenario.
+///
+/// The case id is used to derive wheel output, cargo target, and virtualenv paths, so it should
+/// remain stable and descriptive when possible.
+#[derive(Clone, Copy)]
+pub struct IntegrationCase<'a> {
+    /// Stable identifier used for derived test paths and failure messages.
+    pub id: &'a str,
+    /// Repo-relative path to the package under test.
+    pub package: &'a str,
+    /// Optional copied-workspace configuration for fixtures that generate files in-tree.
+    pub package_copy: Option<TestPackageCopy<'a>>,
+    /// Optional explicit bindings override passed to `maturin build`.
+    pub bindings: Option<&'a str>,
+    /// Whether this case should exercise the zig-backed build path when available.
+    pub zig: bool,
+    /// Optional explicit compilation target for the build.
+    pub target: Option<&'a str>,
+}
 
-    // Pass CARGO_BIN_EXE_maturin for testing purpose
-    unsafe {
-        env::set_var(
+impl<'a> IntegrationCase<'a> {
+    pub fn new(id: &'a str, package: &'a str) -> Self {
+        Self {
+            id,
+            package,
+            package_copy: None,
+            bindings: None,
+            zig: false,
+            target: None,
+        }
+    }
+
+    pub fn copied(mut self, copy: TestPackageCopy<'a>) -> Self {
+        self.package_copy = Some(copy);
+        self
+    }
+
+    pub fn zig(mut self) -> Self {
+        self.zig = true;
+        self
+    }
+
+    pub fn target(mut self, target: &'a str) -> Self {
+        self.target = Some(target);
+        self
+    }
+}
+
+// The zig wrappers consult CARGO_BIN_EXE_cargo-zigbuild via process env, so zig builds run in a
+// subprocess where that override can be scoped to the command instead of mutating global state.
+fn build_wheels_with_subprocess(
+    cli: &[std::ffi::OsString],
+    wheel_dir: &Path,
+) -> Result<Vec<PathBuf>> {
+    if wheel_dir.is_dir() {
+        fs_err::remove_dir_all(wheel_dir)?;
+    }
+    fs_err::create_dir_all(wheel_dir)?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(cli)
+        .env(
             "CARGO_BIN_EXE_cargo-zigbuild",
             env!("CARGO_BIN_EXE_maturin"),
         )
-    };
+        .output()
+        .context("failed to invoke maturin build for zig integration test")?;
+    if !output.status.success() {
+        bail!(
+            "maturin build failed with {}.\n--- Stdout:\n{}\n--- Stderr:\n{}",
+            output.status,
+            str::from_utf8(&output.stdout)?.trim(),
+            str::from_utf8(&output.stderr)?.trim(),
+        );
+    }
 
-    let package_string = package.as_ref().join("Cargo.toml").display().to_string();
+    let mut wheels = fs_err::read_dir(wheel_dir)?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "whl"))
+        .collect::<Vec<_>>();
+    wheels.sort();
+    if wheels.is_empty() {
+        bail!(
+            "maturin build succeeded but produced no wheels in {}",
+            wheel_dir.display()
+        );
+    }
+    Ok(wheels)
+}
+
+fn install_and_check_wheel(
+    package: &Path,
+    wheel: &Path,
+    venv_dir: &Path,
+    python: &Path,
+) -> Result<()> {
+    let command = [
+        "-m",
+        "pip",
+        "--disable-pip-version-check",
+        "--no-cache-dir",
+        "install",
+        "--force-reinstall",
+    ];
+    let output = Command::new(python)
+        .args(command)
+        .arg(dunce::simplified(wheel))
+        .output()
+        .context(format!("pip install failed with {python:?}"))?;
+    if !output.status.success() {
+        let full_command = format!("{} {}", python.display(), command.join(" "));
+        bail!(
+            "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            venv_dir.display(),
+            full_command,
+            output.status,
+            str::from_utf8(&output.stdout)?.trim(),
+            str::from_utf8(&output.stderr)?.trim(),
+        );
+    }
+    if !output.stderr.is_empty() {
+        bail!(
+            "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            &command,
+            output.status,
+            str::from_utf8(&output.stdout)?.trim(),
+            str::from_utf8(&output.stderr)?.trim(),
+        );
+    }
+    check_installed(package, python)
+}
+
+/// For each installed python version, this builds a wheel, creates a virtualenv if it
+/// doesn't exist, installs the package and runs check_installed.py
+pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
+    let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
+    let package = package_path.as_path();
+    let package_string = package.join("Cargo.toml").display().to_string();
 
     // The first argument is ignored by clap
-    let shed = format!("test-crates/wheels/{unique_name}");
-    let target_dir = format!("test-crates/targets/{unique_name}");
+    let shed = case_wheel_dir(case.id);
+    let target_dir = case_target_dir(case.id);
     let python_interp = test_python_path();
     let mut cli: Vec<std::ffi::OsString> = vec![
         "build".into(),
@@ -46,17 +167,17 @@ pub fn test_integration(
         "--manifest-path".into(),
         package_string.into(),
         "--target-dir".into(),
-        target_dir.into(),
+        target_dir.into_os_string(),
         "--out".into(),
-        shed.into(),
+        shed.clone().into_os_string(),
     ];
 
-    if let Some(ref bindings) = bindings {
+    if let Some(bindings) = case.bindings {
         cli.push("--bindings".into());
         cli.push(bindings.into());
     }
 
-    if let Some(target) = target {
+    if let Some(target) = case.target {
         cli.push("--target".into());
         cli.push(target.into())
     }
@@ -66,7 +187,7 @@ pub fn test_integration(
     #[cfg(not(feature = "zig"))]
     let zig_found = false;
 
-    let test_zig = if zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
+    let test_zig = if case.zig && (env::var("GITHUB_ACTIONS").is_ok() || zig_found) {
         cli.push("--zig".into());
         true
     } else {
@@ -85,12 +206,13 @@ pub fn test_integration(
     let cffi_venv = venvs_dir.join(cffi_provider);
 
     // on PyPy, we should use the bundled cffi
-    if let Some(interp) = python_interp
+    let build_python = if let Some(interp) = python_interp
         .as_ref()
         .filter(|interp| interp.contains("pypy"))
     {
         cli.push("--interpreter".into());
         cli.push(interp.into());
+        Some(PathBuf::from(interp))
     } else {
         // Install cffi in a separate environment
 
@@ -133,6 +255,29 @@ pub fn test_integration(
         file.unlock()?;
         cli.push("--interpreter".into());
         cli.push(python.as_os_str().to_owned());
+        Some(python)
+    };
+
+    if test_zig {
+        // Zig wrappers read CARGO_BIN_EXE_cargo-zigbuild from the process environment. Run the
+        // build in a subprocess so the override is scoped to that command instead of mutating
+        // the global test process environment.
+        let wheels = build_wheels_with_subprocess(&cli, &shed)?;
+        for filename in wheels {
+            check_for_duplicates(&filename)?;
+            let mut venv_name = format!("{}-py3", case.id);
+            if let Some(target) = case.target {
+                venv_name = format!("{venv_name}-{target}");
+            }
+            let PreparedEnv {
+                env_dir: venv_dir,
+                python,
+            } = prepare_test_env(&venv_name, TestEnvKind::Venv, &[], build_python.clone())?;
+
+            install_and_check_wheel(package, &filename, &venv_dir, &python)?;
+        }
+        cleanup_case(case.id);
+        return Ok(());
     }
 
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
@@ -161,75 +306,39 @@ pub fn test_integration(
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
         check_for_duplicates(filename)?;
-        if test_zig
-            && build_context.target.is_linux()
-            && !build_context.target.is_musl_libc()
-            && build_context.target.get_minimum_manylinux_tag() != PlatformTag::Linux
-        {
-            let rustc_ver = rustc_version::version()?;
-            let python_arch = build_context.target.get_python_arch();
-            let file_suffix = if rustc_ver >= semver::Version::new(1, 64, 0) {
-                format!("manylinux_2_17_{python_arch}.manylinux2014_{python_arch}.whl")
-            } else {
-                format!("manylinux_2_12_{python_arch}.manylinux2010_{python_arch}.whl")
-            };
-            assert!(filename.to_string_lossy().ends_with(&file_suffix))
-        }
         let mut venv_name = if supported_version == "py3" {
-            format!("{unique_name}-py3")
+            format!("{}-py3", case.id)
         } else {
             format!(
                 "{}-py{}.{}",
-                unique_name, python_interpreter.major, python_interpreter.minor,
+                case.id, python_interpreter.major, python_interpreter.minor,
             )
         };
-        if let Some(target) = target {
+        if let Some(target) = case.target {
             venv_name = format!("{venv_name}-{target}");
         }
-        let (venv_dir, python) =
-            create_virtualenv(&venv_name, Some(python_interpreter.executable.clone()))?;
+        let PreparedEnv {
+            env_dir: venv_dir,
+            python,
+        } = prepare_test_env(
+            &venv_name,
+            TestEnvKind::Venv,
+            &[],
+            Some(python_interpreter.executable.clone()),
+        )?;
 
-        let command = [
-            "-m",
-            "pip",
-            "--disable-pip-version-check",
-            "--no-cache-dir",
-            "install",
-            "--force-reinstall",
-        ];
-        let output = Command::new(&python)
-            .args(command)
-            .arg(dunce::simplified(filename))
-            .output()
-            .context(format!("pip install failed with {python:?}"))?;
-        if !output.status.success() {
-            let full_command = format!("{} {}", python.display(), command.join(" "));
-            bail!(
-                "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-                venv_dir.display(),
-                full_command,
-                output.status,
-                str::from_utf8(&output.stdout)?.trim(),
-                str::from_utf8(&output.stderr)?.trim(),
-            );
-        }
-        if !output.stderr.is_empty() {
-            bail!(
-                "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-                &command,
-                output.status,
-                str::from_utf8(&output.stdout)?.trim(),
-                str::from_utf8(&output.stderr)?.trim(),
-            );
-        }
-
-        check_installed(package.as_ref(), &python)?;
+        install_and_check_wheel(package, filename, &venv_dir, &python)?;
     }
 
+    cleanup_case(case.id);
     Ok(())
 }
 
-pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String>) -> Result<()> {
+pub fn test_integration_conda(
+    package: impl AsRef<Path>,
+    bindings: Option<&str>,
+    case_id: &str,
+) -> Result<()> {
     use crate::common::create_conda_env;
     use std::path::PathBuf;
     use std::process::Stdio;
@@ -240,7 +349,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     // tests are executed with these environments
     let mut interpreters = Vec::new();
     for minor in 9..=12 {
-        let (_, venv_python) = create_conda_env(&format!("A-maturin-env-3{minor}"), 3, minor)?;
+        let (_, venv_python) = create_conda_env(&format!("maturin-{case_id}-3{minor}"), 3, minor)?;
         interpreters.push(venv_python);
     }
 
@@ -256,10 +365,15 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         cli.push(interp.to_str().unwrap().into());
     }
 
-    if let Some(ref bindings) = bindings {
+    if let Some(bindings) = bindings {
         cli.push("--bindings".into());
         cli.push(bindings.into());
     }
+
+    cli.push("--target-dir".into());
+    cli.push(case_target_dir(case_id).into_os_string());
+    cli.push("--out".into());
+    cli.push(case_wheel_dir(case_id).into_os_string());
 
     let options = BuildOptions::try_parse_from(cli)?;
 
@@ -273,7 +387,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
     for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.interpreter) {
         let executable = python_interpreter.executable;
-        if executable.to_str().unwrap().contains("maturin-env-") {
+        if executable.to_string_lossy().contains(case_id) {
             conda_wheels.push((filename.clone(), executable))
         }
     }
@@ -301,6 +415,7 @@ pub fn test_integration_conda(package: impl AsRef<Path>, bindings: Option<String
         check_installed(package.as_ref(), &executable)?;
     }
 
+    cleanup_case(case_id);
     Ok(())
 }
 

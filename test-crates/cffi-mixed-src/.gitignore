@@ -1,0 +1,3 @@
+*.py[cdo]
+target/
+src/cffi_mixed_src/cffi_mixed_src/

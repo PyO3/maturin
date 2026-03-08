@@ -592,7 +592,7 @@ fn build_sdist(build: &BuildOptions, strip: Option<bool>) -> Result<PathBuf> {
 }
 
 /// Result of unpacking an sdist for wheel building
-struct UnpackedSdist {
+struct UnpackedBuild {
     /// Must be kept alive for the duration of the build
     _tmpdir: tempfile::TempDir,
     pyproject_toml_path: Option<PathBuf>,
@@ -604,7 +604,7 @@ struct UnpackedSdist {
 fn unpack_sdist_for_build(
     build: &mut BuildOptions,
     strip: Option<bool>,
-) -> Result<(PathBuf, UnpackedSdist)> {
+) -> Result<(PathBuf, UnpackedBuild)> {
     let sdist_path = build_sdist(build, strip)?;
     // Preserve the original output directory so that wheels built
     // from the unpacked sdist still land in the user-visible
@@ -613,17 +613,17 @@ fn unpack_sdist_for_build(
     if build.out.is_none() {
         build.out = sdist_path.parent().map(PathBuf::from);
     }
-    let (tmp, cargo_toml, pyproject_toml) = unpack_sdist(&sdist_path)?;
+    let unpacked = unpack_sdist(&sdist_path)?;
     eprintln!(
         "📦 Building wheels from source distribution at {}",
-        cargo_toml.parent().unwrap().display()
+        unpacked.cargo_toml.parent().unwrap().display()
     );
-    build.cargo.manifest_path = Some(cargo_toml);
+    build.cargo.manifest_path = Some(unpacked.cargo_toml);
     Ok((
         sdist_path,
-        UnpackedSdist {
-            _tmpdir: tmp,
-            pyproject_toml_path: Some(pyproject_toml),
+        UnpackedBuild {
+            _tmpdir: unpacked.tmpdir,
+            pyproject_toml_path: Some(unpacked.pyproject_toml),
         },
     ))
 }

@@ -27,7 +27,7 @@ use self::cargo_toml_rewrite::{
 };
 pub use self::path_deps::{PathDependency, find_path_deps};
 use self::pyproject::{add_pyproject_metadata, add_pyproject_toml, add_python_sources};
-pub use self::unpack::unpack_sdist;
+pub use self::unpack::{UnpackedSdist, unpack_sdist};
 use self::utils::{common_path_prefix, is_compiled_artifact, normalize_path};
 
 /// A file (readme or license) referenced by a Cargo.toml manifest field that

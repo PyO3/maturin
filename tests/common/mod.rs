@@ -101,6 +101,28 @@ pub fn case_wheel_dir(case_id: &str) -> PathBuf {
     repo_test_crates_dir().join("wheels").join(case_id)
 }
 
+/// Remove the target and wheel directories for a test case to reclaim disk space.
+///
+/// Controlled by the `MATURIN_TEST_CLEANUP` environment variable. When set to `1` or `true`,
+/// the cargo target directory and wheel output directory for the given case are deleted after the
+/// test completes. This is useful in CI where disk space is limited and many test cases can
+/// accumulate gigabytes of build artifacts.
+pub fn cleanup_case(case_id: &str) {
+    if env::var("MATURIN_TEST_CLEANUP")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        let target_dir = case_target_dir(case_id);
+        if target_dir.is_dir() {
+            let _ = fs::remove_dir_all(&target_dir);
+        }
+        let wheel_dir = case_wheel_dir(case_id);
+        if wheel_dir.is_dir() {
+            let _ = fs::remove_dir_all(&wheel_dir);
+        }
+    }
+}
+
 pub fn is_ci() -> bool {
     env::var("GITHUB_ACTIONS").is_ok()
 }

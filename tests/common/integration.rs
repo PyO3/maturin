@@ -1,6 +1,7 @@
 use crate::common::{
     PreparedEnv, TestEnvKind, TestPackageCopy, case_target_dir, case_wheel_dir, check_installed,
-    create_named_virtualenv, prepare_case_package, prepare_test_env, test_python_path,
+    cleanup_case, create_named_virtualenv, prepare_case_package, prepare_test_env,
+    test_python_path,
 };
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "zig")]
@@ -275,6 +276,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
 
             install_and_check_wheel(package, &filename, &venv_dir, &python)?;
         }
+        cleanup_case(case.id);
         return Ok(());
     }
 
@@ -328,6 +330,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         install_and_check_wheel(package, filename, &venv_dir, &python)?;
     }
 
+    cleanup_case(case.id);
     Ok(())
 }
 
@@ -412,6 +415,7 @@ pub fn test_integration_conda(
         check_installed(package.as_ref(), &executable)?;
     }
 
+    cleanup_case(case_id);
     Ok(())
 }
 

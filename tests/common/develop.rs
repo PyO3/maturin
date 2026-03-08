@@ -1,6 +1,7 @@
 use crate::common::{
     PreparedEnv, TestEnvKind, TestInstallBackend, TestPackageCopy, case_target_dir,
-    check_installed, has_uv, manifest_path_for_package, prepare_case_package, prepare_test_env,
+    check_installed, cleanup_case, has_uv, manifest_path_for_package, prepare_case_package,
+    prepare_test_env,
 };
 use anyhow::Result;
 use maturin::{CargoOptions, DevelopOptions, develop};
@@ -112,5 +113,6 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
     develop(develop_options, &venv_dir)?;
 
     check_installed(package, &python)?;
+    cleanup_case(case.id);
     Ok(())
 }

@@ -27,6 +27,43 @@ pub struct DevelopCase<'a> {
     pub prereq_packages: &'a [&'a str],
 }
 
+impl<'a> DevelopCase<'a> {
+    pub fn pip(id: &'a str, package: &'a str) -> Self {
+        Self {
+            id,
+            package,
+            package_copy: None,
+            bindings: None,
+            env_kind: TestEnvKind::Venv,
+            backend: TestInstallBackend::Pip,
+            prereq_packages: &[],
+        }
+    }
+
+    pub fn uv(id: &'a str, package: &'a str) -> Self {
+        Self {
+            backend: TestInstallBackend::Uv,
+            prereq_packages: &["uv"],
+            ..Self::pip(id, package)
+        }
+    }
+
+    pub fn copied(mut self, copy: TestPackageCopy<'a>) -> Self {
+        self.package_copy = Some(copy);
+        self
+    }
+
+    pub fn prereqs(mut self, packages: &'a [&'a str]) -> Self {
+        self.prereq_packages = packages;
+        self
+    }
+
+    pub fn conda(mut self, major: usize, minor: usize) -> Self {
+        self.env_kind = TestEnvKind::Conda { major, minor };
+        self
+    }
+}
+
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// "maturin develop" to install it and checks it is working
 pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
@@ -44,7 +81,7 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         case.prereq_packages
     };
     let PreparedEnv {
-        root: venv_dir,
+        env_dir: venv_dir,
         python,
     } = prepare_test_env(case.id, case.env_kind, prereq_packages, None)?;
 

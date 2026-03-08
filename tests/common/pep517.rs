@@ -26,6 +26,23 @@ pub struct Pep517Case<'a> {
     pub prereq_packages: &'a [&'a str],
 }
 
+impl<'a> Pep517Case<'a> {
+    pub fn new(id: &'a str, package: &'a str) -> Self {
+        Self {
+            id,
+            package,
+            env_kind: TestEnvKind::Venv,
+            editable: false,
+            prereq_packages: &[],
+        }
+    }
+
+    pub fn editable(mut self) -> Self {
+        self.editable = true;
+        self
+    }
+}
+
 /// Creates a virtualenv and activates it, checks that the package isn't installed, uses
 /// pip install to install it and checks it is working
 pub fn test_pep517(case: &Pep517Case<'_>) -> Result<Output> {

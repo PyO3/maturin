@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use maturin::Target;
 use normpath::PathExt as _;
@@ -26,7 +26,7 @@ pub enum TestEnvKind {
 }
 
 pub struct PreparedEnv {
-    pub root: PathBuf,
+    pub env_dir: PathBuf,
     pub python: PathBuf,
 }
 
@@ -44,6 +44,46 @@ pub struct TestPackageCopy<'a> {
     /// test starts so each run begins from the checked-in fixture state.
     pub prune_copy_paths: &'a [&'a str],
 }
+
+pub const CFFI_MIXED_INCLUDE_EXCLUDE_COPY: TestPackageCopy<'static> = TestPackageCopy {
+    extra_copy_paths: &[],
+    prune_copy_paths: &[
+        "test-crates/cffi-mixed-include-exclude/cffi_mixed_include_exclude/cffi_mixed_include_exclude",
+        "test-crates/cffi-mixed-include-exclude/cffi_mixed_include_exclude/generated_info.txt",
+    ],
+};
+
+pub const CFFI_MIXED_SUBMODULE_COPY: TestPackageCopy<'static> = TestPackageCopy {
+    extra_copy_paths: &[],
+    prune_copy_paths: &["test-crates/cffi-mixed-submodule/cffi_mixed_submodule/rust_module/rust"],
+};
+
+pub const CFFI_MIXED_WITH_PATH_DEP_COPY: TestPackageCopy<'static> = TestPackageCopy {
+    extra_copy_paths: &[
+        "test-crates/some_path_dep",
+        "test-crates/transitive_path_dep",
+    ],
+    prune_copy_paths: &[
+        "test-crates/cffi-mixed-with-path-dep/cffi_mixed_with_path_dep/cffi_mixed_with_path_dep",
+    ],
+};
+
+pub const CFFI_MIXED_IMPLICIT_COPY: TestPackageCopy<'static> = TestPackageCopy {
+    extra_copy_paths: &[],
+    prune_copy_paths: &[
+        "test-crates/cffi-mixed-implicit/python/cffi_mixed_implicit/some_rust/rust",
+    ],
+};
+
+pub const CFFI_MIXED_PY_SUBDIR_COPY: TestPackageCopy<'static> = TestPackageCopy {
+    extra_copy_paths: &[],
+    prune_copy_paths: &["test-crates/cffi-mixed-py-subdir/python/cffi_mixed_py_subdir/_cffi_mixed"],
+};
+
+pub const CFFI_MIXED_SRC_COPY: TestPackageCopy<'static> = TestPackageCopy {
+    extra_copy_paths: &[],
+    prune_copy_paths: &["test-crates/cffi-mixed-src/src/cffi_mixed_src/cffi_mixed_src"],
+};
 
 pub fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -287,7 +327,10 @@ pub fn prepare_test_env(
         }
     };
     install_pip_packages(&python, prereq_packages)?;
-    Ok(PreparedEnv { root, python })
+    Ok(PreparedEnv {
+        env_dir: root,
+        python,
+    })
 }
 
 pub fn manifest_path_for_package(package: &Path) -> PathBuf {
@@ -303,15 +346,14 @@ pub fn manifest_path_for_package(package: &Path) -> PathBuf {
 }
 
 fn fixture_root_for_package(package: &Path) -> Result<PathBuf> {
-    let mut components = package.components();
-    let Some(test_crates) = components.next() else {
-        bail!("Package path {package:?} has no components");
-    };
-    let Some(fixture) = components.next() else {
-        bail!("Package path {package:?} is missing a fixture root");
-    };
-
-    Ok(PathBuf::from(test_crates.as_os_str()).join(fixture.as_os_str()))
+    let rel = package
+        .strip_prefix("test-crates")
+        .with_context(|| format!("package path {package:?} must be under test-crates/"))?;
+    let fixture = rel
+        .components()
+        .next()
+        .with_context(|| format!("package path {package:?} is missing a fixture name"))?;
+    Ok(Path::new("test-crates").join(fixture.as_os_str()))
 }
 
 fn remove_if_exists(path: &Path) -> Result<()> {

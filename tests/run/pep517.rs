@@ -1,15 +1,9 @@
+use crate::common::handle_result;
 use crate::common::pep517::{Pep517Case, target_has_profile, test_pep517};
-use crate::common::{TestEnvKind, handle_result};
 
 #[test]
 fn pep517_default_profile() {
-    let case = Pep517Case {
-        id: "pep517-pyo3-pure",
-        package: "test-crates/pyo3-pure",
-        env_kind: TestEnvKind::Venv,
-        editable: false,
-        prereq_packages: &[],
-    };
+    let case = Pep517Case::new("pep517-pyo3-pure", "test-crates/pyo3-pure");
     handle_result(test_pep517(&case));
 
     assert!(target_has_profile(case.id, "release"));
@@ -18,13 +12,7 @@ fn pep517_default_profile() {
 
 #[test]
 fn pep517_editable_profile() {
-    let case = Pep517Case {
-        id: "pep517-pyo3-pure-editable",
-        package: "test-crates/pyo3-pure",
-        env_kind: TestEnvKind::Venv,
-        editable: true,
-        prereq_packages: &[],
-    };
+    let case = Pep517Case::new("pep517-pyo3-pure-editable", "test-crates/pyo3-pure").editable();
     handle_result(test_pep517(&case));
 
     assert!(!target_has_profile(case.id, "release"));

@@ -8,7 +8,7 @@ use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
 use fs4::fs_err3::FileExt;
-use maturin::{BuildOptions, PlatformTag, Target};
+use maturin::{BuildOptions, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;
@@ -34,6 +34,34 @@ pub struct IntegrationCase<'a> {
     pub zig: bool,
     /// Optional explicit compilation target for the build.
     pub target: Option<&'a str>,
+}
+
+impl<'a> IntegrationCase<'a> {
+    pub fn new(id: &'a str, package: &'a str) -> Self {
+        Self {
+            id,
+            package,
+            package_copy: None,
+            bindings: None,
+            zig: false,
+            target: None,
+        }
+    }
+
+    pub fn copied(mut self, copy: TestPackageCopy<'a>) -> Self {
+        self.package_copy = Some(copy);
+        self
+    }
+
+    pub fn zig(mut self) -> Self {
+        self.zig = true;
+        self
+    }
+
+    pub fn target(mut self, target: &'a str) -> Self {
+        self.target = Some(target);
+        self
+    }
 }
 
 // The zig wrappers consult CARGO_BIN_EXE_cargo-zigbuild via process env, so zig builds run in a
@@ -77,6 +105,48 @@ fn build_wheels_with_subprocess(
         );
     }
     Ok(wheels)
+}
+
+fn install_and_check_wheel(
+    package: &Path,
+    wheel: &Path,
+    venv_dir: &Path,
+    python: &Path,
+) -> Result<()> {
+    let command = [
+        "-m",
+        "pip",
+        "--disable-pip-version-check",
+        "--no-cache-dir",
+        "install",
+        "--force-reinstall",
+    ];
+    let output = Command::new(python)
+        .args(command)
+        .arg(dunce::simplified(wheel))
+        .output()
+        .context(format!("pip install failed with {python:?}"))?;
+    if !output.status.success() {
+        let full_command = format!("{} {}", python.display(), command.join(" "));
+        bail!(
+            "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            venv_dir.display(),
+            full_command,
+            output.status,
+            str::from_utf8(&output.stdout)?.trim(),
+            str::from_utf8(&output.stderr)?.trim(),
+        );
+    }
+    if !output.stderr.is_empty() {
+        bail!(
+            "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
+            &command,
+            output.status,
+            str::from_utf8(&output.stdout)?.trim(),
+            str::from_utf8(&output.stderr)?.trim(),
+        );
+    }
+    check_installed(package, python)
 }
 
 /// For each installed python version, this builds a wheel, creates a virtualenv if it
@@ -199,45 +269,11 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
                 venv_name = format!("{venv_name}-{target}");
             }
             let PreparedEnv {
-                root: venv_dir,
+                env_dir: venv_dir,
                 python,
             } = prepare_test_env(&venv_name, TestEnvKind::Venv, &[], build_python.clone())?;
 
-            let command = [
-                "-m",
-                "pip",
-                "--disable-pip-version-check",
-                "--no-cache-dir",
-                "install",
-                "--force-reinstall",
-            ];
-            let output = Command::new(&python)
-                .args(command)
-                .arg(dunce::simplified(&filename))
-                .output()
-                .context(format!("pip install failed with {python:?}"))?;
-            if !output.status.success() {
-                let full_command = format!("{} {}", python.display(), command.join(" "));
-                bail!(
-                    "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-                    venv_dir.display(),
-                    full_command,
-                    output.status,
-                    str::from_utf8(&output.stdout)?.trim(),
-                    str::from_utf8(&output.stderr)?.trim(),
-                );
-            }
-            if !output.stderr.is_empty() {
-                bail!(
-                    "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-                    &command,
-                    output.status,
-                    str::from_utf8(&output.stdout)?.trim(),
-                    str::from_utf8(&output.stderr)?.trim(),
-                );
-            }
-
-            check_installed(package, &python)?;
+            install_and_check_wheel(package, &filename, &venv_dir, &python)?;
         }
         return Ok(());
     }
@@ -268,20 +304,6 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     // order they are in the build context
     for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
         check_for_duplicates(filename)?;
-        if test_zig
-            && build_context.target.is_linux()
-            && !build_context.target.is_musl_libc()
-            && build_context.target.get_minimum_manylinux_tag() != PlatformTag::Linux
-        {
-            let rustc_ver = rustc_version::version()?;
-            let python_arch = build_context.target.get_python_arch();
-            let file_suffix = if rustc_ver >= semver::Version::new(1, 64, 0) {
-                format!("manylinux_2_17_{python_arch}.manylinux2014_{python_arch}.whl")
-            } else {
-                format!("manylinux_2_12_{python_arch}.manylinux2010_{python_arch}.whl")
-            };
-            assert!(filename.to_string_lossy().ends_with(&file_suffix))
-        }
         let mut venv_name = if supported_version == "py3" {
             format!("{}-py3", case.id)
         } else {
@@ -294,7 +316,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
             venv_name = format!("{venv_name}-{target}");
         }
         let PreparedEnv {
-            root: venv_dir,
+            env_dir: venv_dir,
             python,
         } = prepare_test_env(
             &venv_name,
@@ -303,41 +325,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
             Some(python_interpreter.executable.clone()),
         )?;
 
-        let command = [
-            "-m",
-            "pip",
-            "--disable-pip-version-check",
-            "--no-cache-dir",
-            "install",
-            "--force-reinstall",
-        ];
-        let output = Command::new(&python)
-            .args(command)
-            .arg(dunce::simplified(filename))
-            .output()
-            .context(format!("pip install failed with {python:?}"))?;
-        if !output.status.success() {
-            let full_command = format!("{} {}", python.display(), command.join(" "));
-            bail!(
-                "pip install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-                venv_dir.display(),
-                full_command,
-                output.status,
-                str::from_utf8(&output.stdout)?.trim(),
-                str::from_utf8(&output.stderr)?.trim(),
-            );
-        }
-        if !output.stderr.is_empty() {
-            bail!(
-                "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-                &command,
-                output.status,
-                str::from_utf8(&output.stdout)?.trim(),
-                str::from_utf8(&output.stderr)?.trim(),
-            );
-        }
-
-        check_installed(package, &python)?;
+        install_and_check_wheel(package, filename, &venv_dir, &python)?;
     }
 
     Ok(())

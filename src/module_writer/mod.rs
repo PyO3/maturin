@@ -40,8 +40,6 @@ mod private {
     pub trait Sealed {}
 }
 
-const EMPTY: Vec<u8> = vec![];
-
 /// Allows writing the module to a wheel or add it directly to the virtualenv
 pub trait ModuleWriterInternal: private::Sealed {
     /// Adds an entry into the archive
@@ -74,7 +72,7 @@ pub trait ModuleWriter: private::Sealed {
     /// Add an empty file to the target path
     #[inline]
     fn add_empty_file(&mut self, target: impl AsRef<Path>) -> Result<()> {
-        self.add_bytes(target, None, EMPTY, false)
+        self.add_bytes(target, None, Vec::new(), false)
     }
 }
 
@@ -180,7 +178,7 @@ pub fn write_python_part(
             let mode = 0o644;
             writer
                 .add_file(relative, &absolute, permission_is_executable(mode))
-                .context(format!("File to add file from {}", absolute.display()))?;
+                .context(format!("Failed to add file from {}", absolute.display()))?;
         }
     }
 

@@ -230,52 +230,60 @@ pub fn add_data(
                 );
             }
             debug!("Adding data from {}", subdir.path().display());
-            (|| {
-                for file in WalkBuilder::new(subdir.path())
-                    .standard_filters(false)
-                    .build()
-                {
-                    let file = file?;
-                    let relative_path = file.path().strip_prefix(data).with_context(|| {
-                        format!(
-                            "Data file {} is not under data dir {}",
-                            file.path().display(),
-                            data.display()
-                        )
-                    })?;
-                    let relative = metadata24.get_data_dir().join(relative_path);
+            add_data_subdir(writer, &subdir.path(), data, metadata24)
+                .with_context(|| format!("Failed to include data from {}", data.display()))?
+        }
+    }
+    Ok(())
+}
 
-                    if file.path_is_symlink() {
-                        // Copy the actual file contents, not the link, so that you can create a
-                        // data directory by joining different data sources
-                        let link_target = fs::read_link(file.path())?;
-                        let source = if link_target.is_absolute() {
-                            link_target
-                        } else {
-                            file.path()
-                                .parent()
-                                .with_context(|| {
-                                    format!(
-                                        "Data symlink {} has no parent directory",
-                                        file.path().display()
-                                    )
-                                })?
-                                .join(link_target)
-                        };
-                        let mode = file_permission_mode(&source)?;
-                        writer.add_file(relative, source, permission_is_executable(mode))?;
-                    } else if file.path().is_file() {
-                        let mode = file_permission_mode(file.path())?;
-                        writer.add_file(relative, file.path(), permission_is_executable(mode))?;
-                    } else if file.path().is_dir() {
-                        // Intentionally ignored
-                    } else {
-                        bail!("Can't handle data dir entry {}", file.path().display());
-                    }
-                }
-                Ok(())
-            })()
-            .with_context(|| format!("Failed to include data from {}", data.display()))?
+/// Walk a single data subdirectory and add its files to the writer.
+fn add_data_subdir(
+    writer: &mut impl ModuleWriter,
+    subdir_path: &Path,
+    data: &Path,
+    metadata24: &Metadata24,
+) -> Result<()> {
+    for file in WalkBuilder::new(subdir_path)
+        .standard_filters(false)
+        .build()
+    {
+        let file = file?;
+        let relative_path = file.path().strip_prefix(data).with_context(|| {
+            format!(
+                "Data file {} is not under data dir {}",
+                file.path().display(),
+                data.display()
+            )
+        })?;
+        let relative = metadata24.get_data_dir().join(relative_path);
+
+        if file.path_is_symlink() {
+            // Copy the actual file contents, not the link, so that you can create a
+            // data directory by joining different data sources
+            let link_target = fs::read_link(file.path())?;
+            let source = if link_target.is_absolute() {
+                link_target
+            } else {
+                file.path()
+                    .parent()
+                    .with_context(|| {
+                        format!(
+                            "Data symlink {} has no parent directory",
+                            file.path().display()
+                        )
+                    })?
+                    .join(link_target)
+            };
+            let mode = file_permission_mode(&source)?;
+            writer.add_file(relative, source, permission_is_executable(mode))?;
+        } else if file.path().is_file() {
+            let mode = file_permission_mode(file.path())?;
+            writer.add_file(relative, file.path(), permission_is_executable(mode))?;
+        } else if file.path().is_dir() {
+            // Intentionally ignored
+        } else {
+            bail!("Can't handle data dir entry {}", file.path().display());
         }
     }
     Ok(())

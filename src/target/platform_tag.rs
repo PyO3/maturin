@@ -11,6 +11,7 @@ use crate::PyProjectToml;
 use crate::auditwheel::PlatformTag;
 use crate::target::{Arch, Os, Target};
 use anyhow::{Context, Result, anyhow, bail};
+use once_cell::sync::Lazy;
 use platform_info::*;
 use regex::Regex;
 use std::env;
@@ -375,9 +376,9 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
     }
 
     // Search for android(\d+) in clues
-    let re = Regex::new(r"android(\d+)")?;
+    static ANDROID_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"android(\d+)").unwrap());
     for clue in clues {
-        if let Some(caps) = re.captures(&clue) {
+        if let Some(caps) = ANDROID_RE.captures(&clue) {
             return Ok(caps[1].to_string());
         }
     }

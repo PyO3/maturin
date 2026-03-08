@@ -11,6 +11,7 @@ use super::{
 use crate::target::Arch;
 use crate::{BridgeModel, Target};
 use anyhow::{Context, Result, bail, format_err};
+use once_cell::sync::Lazy;
 use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
@@ -171,7 +172,11 @@ fn find_all_windows(
         // x86_64: ' -3.10-64 * C:\Users\xxx\AppData\Local\Programs\Python\Python310\python.exe'
         // x86_64: ' -3.11 * C:\Users\xxx\AppData\Local\Programs\Python\Python310\python.exe'
         // arm64:  ' -V:3.11-arm64 * C:\Users\xxx\AppData\Local\Programs\Python\Python311-arm64\python.exe
-        let expr = Regex::new(r" -(V:)?(\d).(\d+)-?(arm)?(\d*)\s*\*?\s*(.*)?").unwrap();
+        let expr = {
+            static RE: Lazy<Regex> =
+                Lazy::new(|| Regex::new(r" -(V:)?(\d).(\d+)-?(arm)?(\d*)\s*\*?\s*(.*)?").unwrap());
+            &*RE
+        };
         let stdout = str::from_utf8(&output.stdout).unwrap();
         for line in stdout.lines() {
             if let Some(capture) = expr.captures(line) {
@@ -212,7 +217,11 @@ fn find_all_windows(
         // The regex has three parts: The first matches the name and skips
         // comments, the second skips the part in between and the third
         // extracts the path
-        let re = Regex::new(r"^([^#].*?)[\s*]+([\w\\:.-]+)\s*$").unwrap();
+        let re = {
+            static RE: Lazy<Regex> =
+                Lazy::new(|| Regex::new(r"^([^#].*?)[\s*]+([\w\\:.-]+)\s*$").unwrap());
+            &*RE
+        };
         let mut paths = vec![];
         for i in lines {
             if let Some(capture) = re.captures(i) {

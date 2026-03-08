@@ -268,12 +268,16 @@ fn generate_project(
 }
 
 mod package_name_validations {
+    use once_cell::sync::Lazy;
+    use regex::Regex;
+
     // based on: https://github.com/pypi/warehouse/blob/8f79d90a310f0243ab15f52c41de093708a61dfd/warehouse/packaging/models.py#L211C9-L214C10
     pub fn pypi_check_name(name: &str) -> anyhow::Result<()> {
         // The `(?i)` flag was added to make the regex case-insensitive
-        let pattern = regex::Regex::new(r"^((?i)[A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$").unwrap();
+        static PATTERN: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"^((?i)[A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$").unwrap());
 
-        if !pattern.is_match(name) {
+        if !PATTERN.is_match(name) {
             anyhow::bail!("The name `{}` is not a valid package name", name)
         }
         Ok(())

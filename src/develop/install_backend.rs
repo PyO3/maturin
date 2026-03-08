@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail, ensure};
 use fs_err as fs;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -47,11 +48,13 @@ impl InstallBackend {
             "failed to get version of install backend"
         );
         let stdout = str::from_utf8(&output.stdout)?;
+        static PIP_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"pip ([\w\.]+).*").unwrap());
+        static UV_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"uv ([\w\.]+).*").unwrap());
         let re = match self {
-            InstallBackend::Pip { .. } => Regex::new(r"pip ([\w\.]+).*"),
-            InstallBackend::Uv { .. } => Regex::new(r"uv ([\w\.]+).*"),
+            InstallBackend::Pip { .. } => &*PIP_VERSION_RE,
+            InstallBackend::Uv { .. } => &*UV_VERSION_RE,
         };
-        match re.expect("regex should be valid").captures(stdout) {
+        match re.captures(stdout) {
             Some(captures) => Ok(semver::Version::parse(&captures[1])
                 .with_context(|| format!("failed to parse semver from {stdout:?}"))?),
             _ => {

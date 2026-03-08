@@ -13,6 +13,7 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 use cargo_options::heading;
 use fs_err as fs;
 use install_backend::{InstallBackend, check_pip_exists, find_uv_bin, find_uv_python, is_uv_venv};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;
 use std::path::PathBuf;
@@ -241,12 +242,12 @@ fn configure_as_editable(
 }
 
 fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
-    if let Some(Some(location)) = Regex::new(r"Location: ([^\r\n]*)")?
-        .captures(pip_show_output)
-        .map(|c| c.get(1))
-        && let Some(Some(direct_url_path)) = Regex::new(r"  (.*direct_url.json)")?
-            .captures(pip_show_output)
-            .map(|c| c.get(1))
+    static LOCATION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Location: ([^\r\n]*)").unwrap());
+    static DIRECT_URL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"  (.*direct_url.json)").unwrap());
+
+    if let Some(Some(location)) = LOCATION_RE.captures(pip_show_output).map(|c| c.get(1))
+        && let Some(Some(direct_url_path)) =
+            DIRECT_URL_RE.captures(pip_show_output).map(|c| c.get(1))
     {
         return Ok(Some(
             PathBuf::from(location.as_str()).join(direct_url_path.as_str()),

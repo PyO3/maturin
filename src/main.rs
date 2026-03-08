@@ -12,8 +12,9 @@ use clap::CommandFactory;
 use clap::{Parser, Subcommand};
 use ignore::overrides::Override;
 use maturin::{
-    BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter, Target, TargetTriple,
-    UnpackedSdist, VirtualWriter, develop, find_path_deps, unpack_sdist, write_dist_info,
+    BridgeModel, BuildContext, BuildOptions, CargoOptions, DevelopOptions, PathWriter, Target,
+    TargetTriple, UnpackedSdist, VirtualWriter, develop, find_path_deps, unpack_sdist,
+    write_dist_info,
 };
 #[cfg(feature = "schemars")]
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
@@ -280,6 +281,13 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
 fn pep517(subcommand: Pep517Command) -> Result<()> {
+    /// PEP 517 builds default to release profile.
+    fn ensure_release_profile(context: &mut BuildContext) {
+        if context.cargo_options.profile.is_none() {
+            context.cargo_options.profile = Some("release".to_string());
+        }
+    }
+
     match subcommand {
         Pep517Command::WriteDistInfo {
             build_options,
@@ -292,11 +300,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .strip(strip_opt.strip)
                 .editable(false)
                 .build()?;
-
-            // TBD: does `--profile release` do anything here?
-            if context.cargo_options.profile.is_none() {
-                context.cargo_options.profile = Some("release".to_string());
-            }
+            ensure_release_profile(&mut context);
 
             let mut writer =
                 VirtualWriter::new(PathWriter::from_path(metadata_directory), Override::empty());
@@ -319,9 +323,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .strip(strip_opt.strip)
                 .editable(editable)
                 .build()?;
-            if build_context.cargo_options.profile.is_none() {
-                build_context.cargo_options.profile = Some("release".to_string());
-            }
+            ensure_release_profile(&mut build_context);
             let wheels = build_context.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());

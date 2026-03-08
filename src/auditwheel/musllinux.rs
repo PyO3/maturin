@@ -8,7 +8,14 @@ use std::process::{Command, Stdio};
 
 /// Find musl libc path from executable's ELF header
 pub fn find_musl_libc() -> Result<Option<PathBuf>> {
-    let buffer = fs::read("/bin/ls")?;
+    // Try /bin/ls first; fall back to /usr/bin/ls for distros that don't
+    // symlink /bin -> /usr/bin.
+    let ls_path = if Path::new("/bin/ls").exists() {
+        Path::new("/bin/ls")
+    } else {
+        Path::new("/usr/bin/ls")
+    };
+    let buffer = fs::read(ls_path)?;
     let elf = Elf::parse(&buffer)?;
     Ok(elf.interpreter.map(PathBuf::from))
 }

@@ -309,7 +309,6 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::ModuleWriter;
-    use crate::module_writer::EMPTY;
     use crate::module_writer::mock_writer::MockWriter;
 
     use super::VirtualWriter;
@@ -334,12 +333,12 @@ mod tests {
         excludes.add("!test2")?;
         let mut writer = VirtualWriter::new(MockWriter::default(), excludes.build()?);
 
-        writer.add_bytes("test1", Some(Path::new("test1")), EMPTY, true)?;
-        writer.add_bytes("test3", Some(Path::new("test3")), EMPTY, true)?;
+        writer.add_bytes("test1", Some(Path::new("test1")), Vec::new(), true)?;
+        writer.add_bytes("test3", Some(Path::new("test3")), Vec::new(), true)?;
         assert!(writer.tracker.is_empty());
-        writer.add_bytes("yes", Some(Path::new("yes")), EMPTY, true)?;
+        writer.add_bytes("yes", Some(Path::new("yes")), Vec::new(), true)?;
         assert!(!writer.tracker.is_empty());
-        writer.add_bytes("test2", Some(Path::new("test2")), EMPTY, true)?;
+        writer.add_bytes("test2", Some(Path::new("test2")), Vec::new(), true)?;
         assert_eq!(writer.tracker.len(), 2);
         let files = writer.finish()?;
         tmp_dir.close()?;

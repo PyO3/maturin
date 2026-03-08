@@ -614,7 +614,7 @@ fn check_external_libs_policy(
     let arch = target.target_arch().to_string();
     let mut platform_policies = if policy.name.starts_with("musllinux") {
         MUSLLINUX_POLICIES.clone()
-    } else if policy.name.starts_with("manylinjux") {
+    } else if policy.name.starts_with("manylinux") {
         MANYLINUX_POLICIES.clone()
     } else {
         get_default_platform_policies()

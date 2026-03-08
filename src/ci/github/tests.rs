@@ -3,7 +3,7 @@ use semver::Version;
 
 use super::{generate_github, generate_github_from_cli, resolve_config};
 use crate::ci::{GenerateCI, Platform};
-use crate::pyproject_toml::{GitHubCIConfig, PlatformCIConfig, TargetCIConfig};
+use crate::pyproject_toml::{CIConfigOverrides, GitHubCIConfig, PlatformCIConfig, TargetCIConfig};
 use crate::{Abi3Version, BridgeModel, PyO3, bridge::PyO3Crate};
 
 const PROJECT_NAME: &str = "example";
@@ -52,14 +52,7 @@ fn pyo3_bridge(abi3: Option<Abi3Version>) -> BridgeModel {
 fn target(arch: &str) -> TargetCIConfig {
     TargetCIConfig {
         arch: arch.to_string(),
-        runner: None,
-        manylinux: None,
-        container: None,
-        docker_options: None,
-        rust_toolchain: None,
-        rustup_components: None,
-        before_script_linux: None,
-        args: None,
+        overrides: CIConfigOverrides::default(),
     }
 }
 
@@ -180,17 +173,20 @@ fn test_generate_github_pyproject_simple_targets() {
 #[test]
 fn test_generate_github_pyproject_detailed_targets() {
     let mut aarch64 = target("aarch64");
-    aarch64.runner = Some("self-hosted-arm64".to_string());
-    aarch64.manylinux = Some("2_17".to_string());
-    aarch64.before_script_linux = Some("yum install -y openssl-devel".to_string());
+    aarch64.overrides.runner = Some("self-hosted-arm64".to_string());
+    aarch64.overrides.manylinux = Some("2_17".to_string());
+    aarch64.overrides.before_script_linux = Some("yum install -y openssl-devel".to_string());
 
     let github_config = GitHubCIConfig {
         pytest: None,
         zig: None,
         skip_attestation: None,
         linux: Some(PlatformCIConfig {
-            runner: Some("ubuntu-22.04".to_string()),
-            manylinux: Some("2_28".to_string()),
+            overrides: CIConfigOverrides {
+                runner: Some("ubuntu-22.04".to_string()),
+                manylinux: Some("2_28".to_string()),
+                ..Default::default()
+            },
             target: Some(vec![target("x86_64"), aarch64]),
             ..Default::default()
         }),
@@ -305,7 +301,10 @@ fn test_generate_github_pyproject_mutual_exclusion_error() {
 fn test_generate_github_pyproject_platform_level_runner() {
     let github_config = GitHubCIConfig {
         linux: Some(PlatformCIConfig {
-            runner: Some("self-hosted-linux".to_string()),
+            overrides: CIConfigOverrides {
+                runner: Some("self-hosted-linux".to_string()),
+                ..Default::default()
+            },
             targets: Some(vec!["x86_64".to_string(), "aarch64".to_string()]),
             ..Default::default()
         }),
@@ -326,7 +325,10 @@ fn test_generate_github_pyproject_platform_level_runner() {
 fn test_generate_github_pyproject_uniform_manylinux() {
     let github_config = GitHubCIConfig {
         linux: Some(PlatformCIConfig {
-            manylinux: Some("2_28".to_string()),
+            overrides: CIConfigOverrides {
+                manylinux: Some("2_28".to_string()),
+                ..Default::default()
+            },
             targets: Some(vec!["x86_64".to_string(), "aarch64".to_string()]),
             ..Default::default()
         }),

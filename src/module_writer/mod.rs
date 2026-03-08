@@ -1,6 +1,4 @@
 use std::fmt::Write as _;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -172,10 +170,7 @@ pub fn write_python_part(
                 debug!("Ignoring develop build artifact {}", relative.display());
                 continue;
             }
-            #[cfg(unix)]
-            let mode = absolute.metadata()?.permissions().mode();
-            #[cfg(not(unix))]
-            let mode = 0o644;
+            let mode = file_permission_mode(&absolute)?;
             writer
                 .add_file(relative, &absolute, permission_is_executable(mode))
                 .context(format!("Failed to add file from {}", absolute.display()))?;
@@ -198,10 +193,7 @@ pub fn write_python_part(
                     python_dir,
                 )?;
                 for m in matches {
-                    #[cfg(unix)]
-                    let mode = m.source.metadata()?.permissions().mode();
-                    #[cfg(not(unix))]
-                    let mode = 0o644;
+                    let mode = file_permission_mode(m.source.as_ref())?;
                     writer.add_file(m.target, m.source, permission_is_executable(mode))?;
                 }
             }
@@ -270,16 +262,10 @@ pub fn add_data(
                                 })?
                                 .join(link_target)
                         };
-                        #[cfg(unix)]
-                        let mode = source.metadata()?.permissions().mode();
-                        #[cfg(not(unix))]
-                        let mode = 0o644;
+                        let mode = file_permission_mode(&source)?;
                         writer.add_file(relative, source, permission_is_executable(mode))?;
                     } else if file.path().is_file() {
-                        #[cfg(unix)]
-                        let mode = file.metadata()?.permissions().mode();
-                        #[cfg(not(unix))]
-                        let mode = 0o644;
+                        let mode = file_permission_mode(file.path())?;
                         writer.add_file(relative, file.path(), permission_is_executable(mode))?;
                     } else if file.path().is_dir() {
                         // Intentionally ignored
@@ -496,6 +482,21 @@ fn entry_points_txt(
 #[inline]
 pub(crate) fn permission_is_executable(mode: u32) -> bool {
     (0o100 & mode) == 0o100
+}
+
+/// Returns the Unix permission mode of a file, or 0o644 on non-Unix platforms.
+#[inline]
+pub(crate) fn file_permission_mode(path: &std::path::Path) -> std::io::Result<u32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        Ok(path.metadata()?.permissions().mode())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(0o644)
+    }
 }
 
 #[inline]

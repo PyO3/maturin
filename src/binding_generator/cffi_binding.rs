@@ -22,7 +22,6 @@ use crate::PythonInterpreter;
 use crate::archive_source::ArchiveSource;
 use crate::archive_source::GeneratedSourceData;
 use crate::binding_generator::ArtifactTarget;
-use crate::target::Os;
 
 use super::BindingGenerator;
 use super::GeneratorOutput;
@@ -52,11 +51,7 @@ impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
         let cffi_module_file_name = {
             let extension_name = &context.project_layout.extension_name;
             // https://cffi.readthedocs.io/en/stable/embedding.html#issues-about-using-the-so
-            match context.target.target_os() {
-                Os::Macos => format!("lib{extension_name}.dylib"),
-                Os::Windows => format!("{extension_name}.dll"),
-                _ => format!("lib{extension_name}.so"),
-            }
+            super::cdylib_filename(extension_name, context.target.target_os())
         };
         let base_path = if context.project_layout.python_module.is_some() {
             module.join(&context.project_layout.extension_name)

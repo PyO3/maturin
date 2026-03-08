@@ -238,8 +238,7 @@ impl BuildContextBuilder {
             .unwrap_or_else(|| cargo_metadata.target_directory.clone().into_std_path_buf());
 
         let config_targets = pyproject.and_then(|x| x.targets());
-        let compile_targets =
-            filter_cargo_targets(&cargo_metadata, bridge, config_targets.as_deref())?;
+        let compile_targets = filter_cargo_targets(&cargo_metadata, bridge, config_targets)?;
         if compile_targets.is_empty() {
             bail!(
                 "No Cargo targets to build, please check your bindings configuration in pyproject.toml."

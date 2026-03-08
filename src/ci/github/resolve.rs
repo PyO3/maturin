@@ -4,7 +4,7 @@ use anyhow::{Result, bail};
 
 use super::super::{GenerateCI, Platform, ResolvedCIConfig, ResolvedTarget};
 use crate::BridgeModel;
-use crate::pyproject_toml::{GitHubCIConfig, PlatformCIConfig, TargetCIConfig};
+use crate::pyproject_toml::{CIConfigOverrides, GitHubCIConfig, PlatformCIConfig, TargetCIConfig};
 
 /// Resolve a field using the chain: per-target → platform-level → default.
 fn resolve_optional(
@@ -127,16 +127,16 @@ pub(crate) fn resolve_platform_targets(
         let per_target = find_target_config(platform_config, &arch);
         let python_arch = platform.default_python_arch(&arch);
 
-        let pt = |field: fn(&TargetCIConfig) -> &Option<String>| {
-            per_target.and_then(|target| field(target).as_deref())
+        let pt = |field: fn(&CIConfigOverrides) -> &Option<String>| {
+            per_target.and_then(|target| field(&target.overrides).as_deref())
         };
-        let pl = |field: fn(&PlatformCIConfig) -> &Option<String>| {
-            platform_config.and_then(|config| field(config).as_deref())
+        let pl = |field: fn(&CIConfigOverrides) -> &Option<String>| {
+            platform_config.and_then(|config| field(&config.overrides).as_deref())
         };
 
         let runner = resolve_optional(
-            pt(|target| &target.runner),
-            pl(|config| &config.runner),
+            pt(|o| &o.runner),
+            pl(|o| &o.runner),
             Some(platform.default_runner(&arch)),
         )
         .unwrap();
@@ -146,38 +146,34 @@ pub(crate) fn resolve_platform_targets(
             target: arch,
             python_arch,
             manylinux: resolve_optional(
-                pt(|target| &target.manylinux),
-                pl(|config| &config.manylinux),
+                pt(|o| &o.manylinux),
+                pl(|o| &o.manylinux),
                 platform.default_manylinux(),
             ),
-            container: resolve_optional(
-                pt(|target| &target.container),
-                pl(|config| &config.container),
-                None,
-            ),
+            container: resolve_optional(pt(|o| &o.container), pl(|o| &o.container), None),
             docker_options: resolve_optional(
-                pt(|target| &target.docker_options),
-                pl(|config| &config.docker_options),
+                pt(|o| &o.docker_options),
+                pl(|o| &o.docker_options),
                 None,
             ),
             rust_toolchain: resolve_optional(
-                pt(|target| &target.rust_toolchain),
-                pl(|config| &config.rust_toolchain),
+                pt(|o| &o.rust_toolchain),
+                pl(|o| &o.rust_toolchain),
                 platform.default_rust_toolchain(),
             ),
             rustup_components: resolve_optional(
-                pt(|target| &target.rustup_components),
-                pl(|config| &config.rustup_components),
+                pt(|o| &o.rustup_components),
+                pl(|o| &o.rustup_components),
                 None,
             ),
             before_script_linux: resolve_optional(
-                pt(|target| &target.before_script_linux),
-                pl(|config| &config.before_script_linux),
+                pt(|o| &o.before_script_linux),
+                pl(|o| &o.before_script_linux),
                 None,
             ),
             extra_args: resolve_optional(
-                pt(|target| &target.args),
-                pl(|config| &config.args),
+                pt(|o| &o.args),
+                pl(|o| &o.args),
                 github_config.and_then(|config| config.args.as_deref()),
             ),
         });

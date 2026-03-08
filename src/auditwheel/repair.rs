@@ -1,4 +1,4 @@
-use super::audit::AuditWheelError;
+use super::audit::{AuditWheelError, is_dynamic_linker};
 use crate::auditwheel::Policy;
 use anyhow::Result;
 use lddtree::DependencyAnalyzer;
@@ -19,12 +19,8 @@ pub fn find_external_libs(
     let mut ext_libs = Vec::new();
     for (_, lib) in deps.libraries {
         let name = &lib.name;
-        // Skip dynamic linker/loader and white-listed libs
-        if name.starts_with("ld-linux")
-            || name == "ld64.so.2"
-            || name == "ld64.so.1"
-            // musl libc, eg: libc.musl-aarch64.so.1
-            || name.starts_with("ld-musl")
+        // Skip dynamic linker/loader, musl libc, and white-listed libs
+        if is_dynamic_linker(name)
             || name.starts_with("libc.")
             || policy.lib_whitelist.contains(name)
         {

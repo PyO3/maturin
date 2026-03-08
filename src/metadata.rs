@@ -8,7 +8,7 @@ use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::{
     ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
 };
-use pyproject_toml::{License, check_pep639_glob};
+use pyproject_toml::{Contact, License, check_pep639_glob};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -362,52 +362,22 @@ impl Metadata24 {
             }
 
             if let Some(authors) = &project.authors {
-                let mut names = Vec::with_capacity(authors.len());
-                let mut emails = Vec::with_capacity(authors.len());
-                for author in authors {
-                    match (author.name(), author.email()) {
-                        (Some(name), Some(email)) => {
-                            emails.push(escape_email_with_display_name(name, email));
-                        }
-                        (Some(name), None) => {
-                            names.push(name);
-                        }
-                        (None, Some(email)) => {
-                            emails.push(email.to_string());
-                        }
-                        (None, None) => {}
-                    }
+                let (names, emails) = split_contacts(authors);
+                if names.is_some() {
+                    self.author = names;
                 }
-                if !names.is_empty() {
-                    self.author = Some(names.join(", "));
-                }
-                if !emails.is_empty() {
-                    self.author_email = Some(emails.join(", "));
+                if emails.is_some() {
+                    self.author_email = emails;
                 }
             }
 
             if let Some(maintainers) = &project.maintainers {
-                let mut names = Vec::with_capacity(maintainers.len());
-                let mut emails = Vec::with_capacity(maintainers.len());
-                for maintainer in maintainers {
-                    match (maintainer.name(), maintainer.email()) {
-                        (Some(name), Some(email)) => {
-                            emails.push(escape_email_with_display_name(name, email));
-                        }
-                        (Some(name), None) => {
-                            names.push(name);
-                        }
-                        (None, Some(email)) => {
-                            emails.push(email.to_string());
-                        }
-                        (None, None) => {}
-                    }
+                let (names, emails) = split_contacts(maintainers);
+                if names.is_some() {
+                    self.maintainer = names;
                 }
-                if !names.is_empty() {
-                    self.maintainer = Some(names.join(", "));
-                }
-                if !emails.is_empty() {
-                    self.maintainer_email = Some(emails.join(", "));
+                if emails.is_some() {
+                    self.maintainer_email = emails;
                 }
             }
 
@@ -770,6 +740,38 @@ impl Metadata24 {
             &self.get_version_escaped()
         ))
     }
+}
+
+/// Split a list of contacts (authors or maintainers) into separate
+/// name and email strings, following PEP 621 conventions.
+fn split_contacts(contacts: &[Contact]) -> (Option<String>, Option<String>) {
+    let mut names = Vec::with_capacity(contacts.len());
+    let mut emails = Vec::with_capacity(contacts.len());
+    for contact in contacts {
+        match (contact.name(), contact.email()) {
+            (Some(name), Some(email)) => {
+                emails.push(escape_email_with_display_name(name, email));
+            }
+            (Some(name), None) => {
+                names.push(name.to_string());
+            }
+            (None, Some(email)) => {
+                emails.push(email.to_string());
+            }
+            (None, None) => {}
+        }
+    }
+    let names = if names.is_empty() {
+        None
+    } else {
+        Some(names.join(", "))
+    };
+    let emails = if emails.is_empty() {
+        None
+    } else {
+        Some(emails.join(", "))
+    };
+    (names, emails)
 }
 
 /// Escape email addresses with display name if necessary

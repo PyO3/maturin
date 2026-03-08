@@ -2,13 +2,14 @@ use crate::auditwheel::{AuditWheelMode, PlatformTag};
 use crate::bridge::{find_bridge, is_generating_import_lib};
 use crate::build_options::{BuildOptions, TargetTriple};
 use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
+use crate::metadata::Metadata24;
 use crate::project_layout::ProjectResolver;
-use crate::pyproject_toml::FeatureSpec;
-use crate::python_interpreter::InterpreterResolver;
+use crate::pyproject_toml::{FeatureSpec, SbomConfig};
+use crate::python_interpreter::{InterpreterResolver, PythonInterpreter};
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
-use crate::{BridgeModel, BuildContext, Target};
+use crate::{BridgeModel, BuildContext, PyProjectToml, Target};
 use anyhow::{Result, bail};
 use cargo_metadata::CrateType;
 use cargo_metadata::Metadata;
@@ -122,33 +123,14 @@ impl BuildContextBuilder {
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
 
-        let generate_import_lib = is_generating_import_lib(&cargo_metadata)?;
-        let (interpreter, host_python) =
-            if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
-                // We don't need a python interpreter to build sdist only
-                (Vec::new(), None)
-            } else {
-                let mut user_interpreters = build_options.interpreter.clone();
-
-                // In test mode, allow MATURIN_TEST_PYTHON to override the default
-                if cfg!(test)
-                    && user_interpreters.is_empty()
-                    && !build_options.find_interpreter
-                    && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
-                {
-                    user_interpreters = vec![python.into()];
-                }
-
-                let resolver = InterpreterResolver::new(
-                    &target,
-                    &bridge,
-                    metadata24.requires_python.as_ref(),
-                    &user_interpreters,
-                    build_options.find_interpreter,
-                    generate_import_lib,
-                );
-                resolver.resolve()?
-            };
+        let (interpreter, host_python) = Self::resolve_interpreters(
+            &build_options,
+            sdist_only,
+            &target,
+            &bridge,
+            &metadata24,
+            &cargo_metadata,
+        )?;
 
         // Set PYO3_PYTHON for cross-compilation so pyo3's build script
         // can find the host interpreter.
@@ -168,44 +150,17 @@ impl BuildContextBuilder {
             }
         }
 
-        let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
-        let include_debuginfo = if strip && build_options.include_debuginfo {
-            tracing::warn!("--strip is enabled, disabling --include-debuginfo");
-            false
-        } else if strip {
-            false
-        } else {
-            build_options.include_debuginfo
-        };
-        let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
-            || build_options.skip_auditwheel;
-        let auditwheel = build_options
-            .auditwheel
-            .or_else(|| pyproject.and_then(|x| x.auditwheel()))
-            .unwrap_or(if skip_auditwheel {
-                AuditWheelMode::Skip
-            } else {
-                AuditWheelMode::Repair
-            });
+        let (strip, include_debuginfo, auditwheel) =
+            Self::resolve_build_flags(strip, &build_options, pyproject);
 
-        // Check if PyPI validation is needed before we move platform_tag
+        let sbom = Self::resolve_sbom_config(&build_options, pyproject);
+
+        // Check if PyPI validation is needed from the original user input,
+        // since resolve_platform_tags filters out PlatformTag::Pypi
         let pypi_validation = build_options
             .platform_tag
             .iter()
             .any(|platform_tag| platform_tag == &PlatformTag::Pypi);
-
-        let sbom = {
-            let mut config = pyproject
-                .and_then(|x| x.maturin())
-                .and_then(|x| x.sbom.clone())
-                .unwrap_or_default();
-            if !build_options.sbom_include.is_empty() {
-                let includes = config.include.get_or_insert_with(Vec::new);
-                includes.extend(build_options.sbom_include.iter().cloned());
-                includes.dedup();
-            }
-            Some(config)
-        };
 
         let platform_tags = resolve_platform_tags(
             build_options.platform_tag,
@@ -249,8 +204,6 @@ impl BuildContextBuilder {
         let include_import_lib = pyproject
             .map(|p| p.include_import_lib())
             .unwrap_or_default();
-        // Extract conditional features from pyproject.toml if CLI features
-        // didn't override (i.e. pyproject features were actually used)
         let conditional_features = if pyproject_toml_maturin_options.contains(&"features") {
             pyproject_toml
                 .as_ref()
@@ -291,6 +244,85 @@ impl BuildContextBuilder {
             include_debuginfo,
             conditional_features,
         })
+    }
+
+    /// Resolve Python interpreters for the build.
+    fn resolve_interpreters(
+        build_options: &BuildOptions,
+        sdist_only: bool,
+        target: &Target,
+        bridge: &BridgeModel,
+        metadata24: &Metadata24,
+        cargo_metadata: &cargo_metadata::Metadata,
+    ) -> Result<(Vec<PythonInterpreter>, Option<PathBuf>)> {
+        let generate_import_lib = is_generating_import_lib(cargo_metadata)?;
+        if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
+            return Ok((Vec::new(), None));
+        }
+
+        let mut user_interpreters = build_options.interpreter.clone();
+        if cfg!(test)
+            && user_interpreters.is_empty()
+            && !build_options.find_interpreter
+            && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
+        {
+            user_interpreters = vec![python.into()];
+        }
+
+        let resolver = InterpreterResolver::new(
+            target,
+            bridge,
+            metadata24.requires_python.as_ref(),
+            &user_interpreters,
+            build_options.find_interpreter,
+            generate_import_lib,
+        );
+        resolver.resolve()
+    }
+
+    /// Resolve strip, debuginfo, and auditwheel mode from CLI + pyproject.toml.
+    fn resolve_build_flags(
+        strip: Option<bool>,
+        build_options: &BuildOptions,
+        pyproject: Option<&PyProjectToml>,
+    ) -> (bool, bool, AuditWheelMode) {
+        let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
+        let include_debuginfo = if strip && build_options.include_debuginfo {
+            tracing::warn!("--strip is enabled, disabling --include-debuginfo");
+            false
+        } else if strip {
+            false
+        } else {
+            build_options.include_debuginfo
+        };
+        let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
+            || build_options.skip_auditwheel;
+        let auditwheel = build_options
+            .auditwheel
+            .or_else(|| pyproject.and_then(|x| x.auditwheel()))
+            .unwrap_or(if skip_auditwheel {
+                AuditWheelMode::Skip
+            } else {
+                AuditWheelMode::Repair
+            });
+        (strip, include_debuginfo, auditwheel)
+    }
+
+    /// Resolve SBOM configuration from CLI + pyproject.toml.
+    fn resolve_sbom_config(
+        build_options: &BuildOptions,
+        pyproject: Option<&PyProjectToml>,
+    ) -> Option<SbomConfig> {
+        let mut config = pyproject
+            .and_then(|x| x.maturin())
+            .and_then(|x| x.sbom.clone())
+            .unwrap_or_default();
+        if !build_options.sbom_include.is_empty() {
+            let includes = config.include.get_or_insert_with(Vec::new);
+            includes.extend(build_options.sbom_include.iter().cloned());
+            includes.dedup();
+        }
+        Some(config)
     }
 }
 

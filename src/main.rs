@@ -281,7 +281,7 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
 fn pep517(subcommand: Pep517Command) -> Result<()> {
-    /// PEP 517 builds default to release profile.
+    // PEP 517 builds default to release profile.
     fn ensure_release_profile(context: &mut BuildContext) {
         if context.cargo_options.profile.is_none() {
             context.cargo_options.profile = Some("release".to_string());

@@ -868,32 +868,32 @@ impl BuildContext {
         Ok(())
     }
 
-    fn write_cffi_wheel(
-        &self,
-        artifact: BuildArtifact,
-        platform_tags: &[PlatformTag],
-        ext_libs: Vec<Library>,
+    /// Shared build pipeline for cdylib-based bindings (CFFI, UniFfi).
+    ///
+    /// Compiles the cdylib, runs auditwheel, resolves platform tags, writes
+    /// the wheel via `write_wheel`, and returns the built wheel metadata.
+    #[allow(clippy::needless_lifetimes)] // false positive
+    fn build_cdylib_wheel<'a, F>(
+        &'a self,
+        make_generator: F,
         sbom_data: &Option<SbomData>,
-        out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<PathBuf> {
-        let tag = self.get_universal_tag(platform_tags)?;
-
-        let interpreter = self.interpreter.first().ok_or_else(|| {
-            anyhow!("A python interpreter is required for cffi builds but one was not provided")
-        })?;
-        self.write_wheel(
+    ) -> Result<(PathBuf, HashMap<String, PathBuf>)>
+    where
+        F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'a>>,
+    {
+        let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
+        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
+        let platform_tags = self.resolve_platform_tags(&policy);
+        let tag = self.get_universal_tag(&platform_tags)?;
+        let wheel_path = self.write_wheel(
             &tag,
             &[&artifact],
-            &[ext_libs],
-            |temp_dir| {
-                Ok(Box::new(
-                    CffiBindingGenerator::new(interpreter, temp_dir)
-                        .context("Failed to initialize Cffi binding generator")?,
-                ))
-            },
+            &[external_libs],
+            make_generator,
             sbom_data,
-            out_dirs,
-        )
+            &out_dirs,
+        )?;
+        Ok((wheel_path, out_dirs))
     }
 
     /// Builds a wheel with cffi bindings
@@ -901,16 +901,17 @@ impl BuildContext {
         &self,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
-        let mut wheels = Vec::new();
-        let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
-        let platform_tags = self.resolve_platform_tags(&policy);
-        let wheel_path = self.write_cffi_wheel(
-            artifact,
-            &platform_tags,
-            external_libs,
+        let interpreter = self.interpreter.first().ok_or_else(|| {
+            anyhow!("A python interpreter is required for cffi builds but one was not provided")
+        })?;
+        let (wheel_path, _) = self.build_cdylib_wheel(
+            |temp_dir| {
+                Ok(Box::new(
+                    CffiBindingGenerator::new(interpreter, temp_dir)
+                        .context("Failed to initialize Cffi binding generator")?,
+                ))
+            },
             sbom_data,
-            &out_dirs,
         )?;
 
         // Warn if cffi isn't specified in the requirements
@@ -927,29 +928,7 @@ impl BuildContext {
         }
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        wheels.push((wheel_path, "py3".to_string()));
-
-        Ok(wheels)
-    }
-
-    fn write_uniffi_wheel(
-        &self,
-        artifact: BuildArtifact,
-        platform_tags: &[PlatformTag],
-        ext_libs: Vec<Library>,
-        sbom_data: &Option<SbomData>,
-        out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<PathBuf> {
-        let tag = self.get_universal_tag(platform_tags)?;
-
-        self.write_wheel(
-            &tag,
-            &[&artifact],
-            &[ext_libs],
-            |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),
-            sbom_data,
-            out_dirs,
-        )
+        Ok(vec![(wheel_path, "py3".to_string())])
     }
 
     /// Builds a wheel with uniffi bindings
@@ -957,22 +936,13 @@ impl BuildContext {
         &self,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
-        let mut wheels = Vec::new();
-        let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
-        let platform_tags = self.resolve_platform_tags(&policy);
-        let wheel_path = self.write_uniffi_wheel(
-            artifact,
-            &platform_tags,
-            external_libs,
+        let (wheel_path, _) = self.build_cdylib_wheel(
+            |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),
             sbom_data,
-            &out_dirs,
         )?;
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        wheels.push((wheel_path, "py3".to_string()));
-
-        Ok(wheels)
+        Ok(vec![(wheel_path, "py3".to_string())])
     }
 
     fn write_bin_wheel(

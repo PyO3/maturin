@@ -28,6 +28,22 @@ use tracing::{debug, instrument};
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
+/// Shared `--strip` CLI option used by multiple commands.
+#[derive(Debug, clap::Args)]
+struct StripOption {
+    /// Strip the library for minimum file size.
+    /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
+    #[arg(
+        long,
+        env = "MATURIN_STRIP",
+        // `--strip` without a value is treated as `--strip true`
+        default_missing_value = "true",
+        num_args = 0..=1,
+        require_equals = false
+    )]
+    strip: Option<bool>,
+}
+
 #[derive(Debug, Parser)]
 #[command(
     version,
@@ -64,17 +80,8 @@ enum Command {
         /// Build artifacts in release mode, with optimizations
         #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
         release: bool,
-        /// Strip the library for minimum file size.
-        /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
-        #[arg(
-            long,
-            env = "MATURIN_STRIP",
-            // `--strip` without a value is treated as `--strip true`
-            default_missing_value = "true",
-            num_args = 0..=1,
-            require_equals = false
-        )]
-        strip: Option<bool>,
+        #[command(flatten)]
+        strip_opt: StripOption,
         /// Build a source distribution and build wheels from it.
         ///
         /// This verifies that the source distribution is complete and can be
@@ -196,34 +203,16 @@ enum Pep517Command {
         /// The metadata_directory argument to prepare_metadata_for_build_wheel
         #[arg(long = "metadata-directory")]
         metadata_directory: PathBuf,
-        /// Strip the library for minimum file size.
-        /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
-        #[arg(
-            long,
-            env = "MATURIN_STRIP",
-            // `--strip` without a value is treated as `--strip true`
-            default_missing_value = "true",
-            num_args = 0..=1,
-            require_equals = false
-        )]
-        strip: Option<bool>,
+        #[command(flatten)]
+        strip_opt: StripOption,
     },
     #[command(name = "build-wheel")]
     /// Implementation of build_wheel
     BuildWheel {
         #[command(flatten)]
         build_options: BuildOptions,
-        /// Strip the library for minimum file size.
-        /// Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`).
-        #[arg(
-            long,
-            env = "MATURIN_STRIP",
-            // `--strip` without a value is treated as `--strip true`
-            default_missing_value = "true",
-            num_args = 0..=1,
-            require_equals = false
-        )]
-        strip: Option<bool>,
+        #[command(flatten)]
+        strip_opt: StripOption,
         /// Build editable wheels
         #[arg(long)]
         editable: bool,
@@ -295,12 +284,12 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
         Pep517Command::WriteDistInfo {
             build_options,
             metadata_directory,
-            strip,
+            strip_opt,
         } => {
             assert_eq!(build_options.interpreter.len(), 1);
             let mut context = build_options
                 .into_build_context()
-                .strip(strip)
+                .strip(strip_opt.strip)
                 .editable(false)
                 .build()?;
 
@@ -322,12 +311,12 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
         }
         Pep517Command::BuildWheel {
             build_options,
-            strip,
+            strip_opt,
             editable,
         } => {
             let mut build_context = build_options
                 .into_build_context()
-                .strip(strip)
+                .strip(strip_opt.strip)
                 .editable(editable)
                 .build()?;
             if build_context.cargo_options.profile.is_none() {
@@ -412,9 +401,10 @@ fn run() -> Result<()> {
         Command::Build {
             mut build,
             release,
-            strip,
+            strip_opt,
             sdist,
         } => {
+            let strip = strip_opt.strip;
             // set profile to release if specified; `--release` and `--profile` are mutually exclusive
             if release {
                 build.profile = Some("release".to_string());
@@ -423,24 +413,9 @@ fn run() -> Result<()> {
             let _sdist_tmp;
             let sdist_pyproject_path;
             if sdist {
-                // Build sdist first, then build wheels from the unpacked sdist
-                // to verify that the source distribution is complete.
-                let sdist_path = build_sdist(&build, strip)?;
-                // Preserve the original output directory so that wheels built
-                // from the unpacked sdist still land in the user-visible
-                // `target/wheels` (or the explicit `--out` directory) instead
-                // of the temporary directory's target.
-                if build.out.is_none() {
-                    build.out = sdist_path.parent().map(PathBuf::from);
-                }
-                let (tmp, cargo_toml, pyproject_toml) = unpack_sdist(&sdist_path)?;
-                _sdist_tmp = Some(tmp);
-                eprintln!(
-                    "📦 Building wheels from source distribution at {}",
-                    cargo_toml.parent().unwrap().display()
-                );
-                build.cargo.manifest_path = Some(cargo_toml);
-                sdist_pyproject_path = Some(pyproject_toml);
+                let (_, unpacked) = unpack_sdist_for_build(&mut build, strip)?;
+                _sdist_tmp = Some(unpacked._tmpdir);
+                sdist_pyproject_path = unpacked.pyproject_toml_path;
             } else {
                 _sdist_tmp = None;
                 sdist_pyproject_path = None;
@@ -474,23 +449,9 @@ fn run() -> Result<()> {
             let mut sdist_path = None;
             let sdist_pyproject_path;
             if !no_sdist {
-                // Build sdist first, then build wheels from the unpacked sdist
-                let path = build_sdist(&build, Some(!no_strip))?;
-                // Preserve the original output directory so that wheels built
-                // from the unpacked sdist still land in the user-visible
-                // `target/wheels` (or the explicit `--out` directory) instead
-                // of the temporary directory's target.
-                if build.out.is_none() {
-                    build.out = path.parent().map(PathBuf::from);
-                }
-                let (tmp, cargo_toml, pyproject_toml) = unpack_sdist(&path)?;
-                _sdist_tmp = Some(tmp);
-                eprintln!(
-                    "📦 Building wheels from source distribution at {}",
-                    cargo_toml.parent().unwrap().display()
-                );
-                build.cargo.manifest_path = Some(cargo_toml);
-                sdist_pyproject_path = Some(pyproject_toml);
+                let (path, unpacked) = unpack_sdist_for_build(&mut build, Some(!no_strip))?;
+                _sdist_tmp = Some(unpacked._tmpdir);
+                sdist_pyproject_path = unpacked.pyproject_toml_path;
                 sdist_path = Some(path);
             } else {
                 _sdist_tmp = None;
@@ -628,6 +589,43 @@ fn build_sdist(build: &BuildOptions, strip: Option<bool>) -> Result<PathBuf> {
         .build_source_distribution()?
         .context("Failed to build source distribution, pyproject.toml not found")?;
     Ok(sdist_path)
+}
+
+/// Result of unpacking an sdist for wheel building
+struct UnpackedSdist {
+    /// Must be kept alive for the duration of the build
+    _tmpdir: tempfile::TempDir,
+    pyproject_toml_path: Option<PathBuf>,
+}
+
+/// Build an sdist, unpack it, and point build options at the unpacked source.
+///
+/// Returns the sdist path and the temporary directory holding the unpacked tree.
+fn unpack_sdist_for_build(
+    build: &mut BuildOptions,
+    strip: Option<bool>,
+) -> Result<(PathBuf, UnpackedSdist)> {
+    let sdist_path = build_sdist(build, strip)?;
+    // Preserve the original output directory so that wheels built
+    // from the unpacked sdist still land in the user-visible
+    // `target/wheels` (or the explicit `--out` directory) instead
+    // of the temporary directory's target.
+    if build.out.is_none() {
+        build.out = sdist_path.parent().map(PathBuf::from);
+    }
+    let (tmp, cargo_toml, pyproject_toml) = unpack_sdist(&sdist_path)?;
+    eprintln!(
+        "📦 Building wheels from source distribution at {}",
+        cargo_toml.parent().unwrap().display()
+    );
+    build.cargo.manifest_path = Some(cargo_toml);
+    Ok((
+        sdist_path,
+        UnpackedSdist {
+            _tmpdir: tmp,
+            pyproject_toml_path: Some(pyproject_toml),
+        },
+    ))
 }
 
 #[cfg(not(debug_assertions))]

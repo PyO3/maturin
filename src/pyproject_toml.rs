@@ -469,16 +469,13 @@ pub struct GitHubCIConfig {
     pub android: Option<PlatformCIConfig>,
 }
 
-/// Per-platform CI configuration
+/// Shared CI configuration overrides used by both platform-level and
+/// per-target CI configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct PlatformCIConfig {
-    /// Simple list of target architectures (mutually exclusive with `target`)
-    pub targets: Option<Vec<String>>,
-    /// Detailed per-target configuration (mutually exclusive with `targets`)
-    pub target: Option<Vec<TargetCIConfig>>,
-    /// Default runner for this platform
+pub struct CIConfigOverrides {
+    /// Runner override
     pub runner: Option<String>,
     /// Manylinux version (e.g. "auto", "2_28", "musllinux_1_2")
     pub manylinux: Option<String>,
@@ -496,6 +493,20 @@ pub struct PlatformCIConfig {
     pub args: Option<String>,
 }
 
+/// Per-platform CI configuration
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PlatformCIConfig {
+    /// Simple list of target architectures (mutually exclusive with `target`)
+    pub targets: Option<Vec<String>>,
+    /// Detailed per-target configuration (mutually exclusive with `targets`)
+    pub target: Option<Vec<TargetCIConfig>>,
+    /// Platform-level overrides
+    #[serde(flatten)]
+    pub overrides: CIConfigOverrides,
+}
+
 /// Per-target CI configuration within a platform
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -503,22 +514,9 @@ pub struct PlatformCIConfig {
 pub struct TargetCIConfig {
     /// Target architecture (e.g. "x86_64", "aarch64")
     pub arch: String,
-    /// Runner override for this target
-    pub runner: Option<String>,
-    /// Manylinux version override
-    pub manylinux: Option<String>,
-    /// Container image override
-    pub container: Option<String>,
-    /// Docker options override
-    pub docker_options: Option<String>,
-    /// Rust toolchain override
-    pub rust_toolchain: Option<String>,
-    /// Rustup components override
-    pub rustup_components: Option<String>,
-    /// Before-script-linux override
-    pub before_script_linux: Option<String>,
-    /// Extra arguments to pass to maturin
-    pub args: Option<String>,
+    /// Per-target overrides
+    #[serde(flatten)]
+    pub overrides: CIConfigOverrides,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -638,8 +636,9 @@ impl PyProjectToml {
     }
 
     /// Returns the value of `[tool.maturin.targets]` in pyproject.toml
-    pub fn targets(&self) -> Option<Vec<CargoTarget>> {
-        self.maturin().and_then(|maturin| maturin.targets.clone())
+    pub fn targets(&self) -> Option<&[CargoTarget]> {
+        self.maturin()
+            .and_then(|maturin| maturin.targets.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.target.<target>]` in pyproject.toml
@@ -1204,8 +1203,8 @@ mod tests {
         assert_eq!(gh.zig, Some(true));
         assert_eq!(gh.skip_attestation, Some(false));
         let linux = gh.linux.unwrap();
-        assert_eq!(linux.runner, Some("ubuntu-22.04".to_string()));
-        assert_eq!(linux.manylinux, Some("2_28".to_string()));
+        assert_eq!(linux.overrides.runner, Some("ubuntu-22.04".to_string()));
+        assert_eq!(linux.overrides.manylinux, Some("2_28".to_string()));
         assert_eq!(
             linux.targets,
             Some(vec!["x86_64".to_string(), "aarch64".to_string()])
@@ -1236,11 +1235,14 @@ mod tests {
         let detailed = linux.target.unwrap();
         assert_eq!(detailed.len(), 2);
         assert_eq!(detailed[0].arch, "x86_64");
-        assert_eq!(detailed[0].manylinux, Some("2_28".to_string()));
+        assert_eq!(detailed[0].overrides.manylinux, Some("2_28".to_string()));
         assert_eq!(detailed[1].arch, "aarch64");
-        assert_eq!(detailed[1].runner, Some("self-hosted-arm64".to_string()));
         assert_eq!(
-            detailed[1].before_script_linux,
+            detailed[1].overrides.runner,
+            Some("self-hosted-arm64".to_string())
+        );
+        assert_eq!(
+            detailed[1].overrides.before_script_linux,
             Some("yum install -y openssl-devel".to_string())
         );
     }

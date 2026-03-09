@@ -36,6 +36,19 @@ pub use cffi_binding::CffiBindingGenerator;
 pub use pyo3_binding::Pyo3BindingGenerator;
 pub use uniffi_binding::UniFfiBindingGenerator;
 
+use crate::target::Os;
+
+/// Returns the platform-specific cdylib filename for the given library name.
+///
+/// For example, `cdylib_filename("foo", Os::Macos)` returns `"libfoo.dylib"`.
+pub(crate) fn cdylib_filename(name: &str, os: Os) -> String {
+    match os {
+        Os::Macos => format!("lib{name}.dylib"),
+        Os::Windows => format!("{name}.dll"),
+        _ => format!("lib{name}.so"),
+    }
+}
+
 /// A trait to generate the binding files to be included in the built module
 ///
 /// This trait is used to generate the support files necessary to build a python

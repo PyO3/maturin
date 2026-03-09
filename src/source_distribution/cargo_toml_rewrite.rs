@@ -303,37 +303,14 @@ fn resolve_workspace_target_dependency_tables(
             let Some(deps) = target_val.get_mut(dep_kind).and_then(|t| t.as_table_mut()) else {
                 continue;
             };
-            let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
-            for dep_name in dep_names {
-                let is_workspace = deps
-                    .get(&dep_name)
-                    .and_then(|d| d.as_table_like())
-                    .and_then(|t| t.get("workspace"))
-                    .and_then(|v| v.as_bool())
-                    == Some(true);
-                if !is_workspace {
-                    continue;
-                }
-                if let Some(resolved_dep) = find_resolved_dep(
-                    resolved,
-                    &dep_name,
-                    Some(&target_key),
-                    dep_kind_from_str(dep_kind),
-                ) {
-                    deps.insert(
-                        &dep_name,
-                        resolved_dep_to_toml(
-                            &resolved_dep,
-                            workspace_dependencies.and_then(|deps| deps.get(&dep_name)),
-                        ),
-                    );
-                } else {
-                    debug!(
-                        "Could not resolve workspace dependency {dep_name} in \
-                         target.{target_key}.{dep_kind}"
-                    );
-                }
-            }
+            resolve_workspace_dep_entries(
+                deps,
+                resolved,
+                workspace_dependencies,
+                Some(&target_key),
+                dep_kind_from_str(dep_kind),
+                &format!("target.{target_key}.{dep_kind}"),
+            );
         }
     }
 }
@@ -387,45 +364,60 @@ fn is_workspace_inherited(package: &toml_edit::Table, key: &str) -> bool {
 }
 
 /// Resolves `workspace = true` entries in a `[dependencies]`-style table.
+/// Resolve workspace-inherited dependencies in a single dependency table.
+///
+/// This is the shared inner loop used by both top-level dependency tables
+/// (e.g. `[dependencies]`) and target-specific ones (e.g. `[target.*.dependencies]`).
+fn resolve_workspace_dep_entries(
+    deps: &mut Table,
+    resolved: &cargo_metadata::Package,
+    workspace_dependencies: Option<&Table>,
+    target: Option<&str>,
+    dep_kind: DependencyKind,
+    label: &str,
+) {
+    let dep_names: Vec<String> = deps.iter().map(|(k, _)| k.to_string()).collect();
+    for dep_name in dep_names {
+        let is_workspace = deps
+            .get(&dep_name)
+            .and_then(|d| d.as_table_like())
+            .and_then(|t| t.get("workspace"))
+            .and_then(|v| v.as_bool())
+            == Some(true);
+        if !is_workspace {
+            continue;
+        }
+        if let Some(resolved_dep) = find_resolved_dep(resolved, &dep_name, target, dep_kind) {
+            deps.insert(
+                &dep_name,
+                resolved_dep_to_toml(
+                    &resolved_dep,
+                    workspace_dependencies.and_then(|d| d.get(&dep_name)),
+                ),
+            );
+        } else {
+            debug!("Could not resolve workspace dependency {dep_name} in {label}");
+        }
+    }
+}
+
 fn resolve_workspace_deps(
     document: &mut DocumentMut,
     dep_kind: &str,
     resolved: &cargo_metadata::Package,
     workspace_dependencies: Option<&Table>,
 ) {
-    let dep_names: Vec<String> = document
-        .get(dep_kind)
-        .and_then(|t| t.as_table())
-        .map(|t| t.iter().map(|(k, _)| k.to_string()).collect())
-        .unwrap_or_default();
-
-    for dep_name in dep_names {
-        let is_workspace = document
-            .get(dep_kind)
-            .and_then(|t| t.get(&dep_name))
-            .and_then(|d| d.as_table_like())
-            .and_then(|t| t.get("workspace"))
-            .and_then(|v| v.as_bool())
-            == Some(true);
-
-        if !is_workspace {
-            continue;
-        }
-
-        if let Some(resolved_dep) =
-            find_resolved_dep(resolved, &dep_name, None, dep_kind_from_str(dep_kind))
-        {
-            let new_entry = resolved_dep_to_toml(
-                &resolved_dep,
-                workspace_dependencies.and_then(|deps| deps.get(&dep_name)),
-            );
-            if let Some(deps_table) = document.get_mut(dep_kind).and_then(|t| t.as_table_mut()) {
-                deps_table.insert(&dep_name, new_entry);
-            }
-        } else {
-            debug!("Could not resolve workspace dependency {dep_name} in [{dep_kind}]");
-        }
-    }
+    let Some(deps_table) = document.get_mut(dep_kind).and_then(|t| t.as_table_mut()) else {
+        return;
+    };
+    resolve_workspace_dep_entries(
+        deps_table,
+        resolved,
+        workspace_dependencies,
+        None,
+        dep_kind_from_str(dep_kind),
+        &format!("[{dep_kind}]"),
+    );
 }
 
 /// Maps a Cargo.toml dependency table name to the corresponding `DependencyKind`.

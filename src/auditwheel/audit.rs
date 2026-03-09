@@ -20,8 +20,13 @@ use tracing::debug;
 static IS_LIBPYTHON: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^libpython3\.\d+m?u?t?\.so\.\d+\.\d+$").unwrap());
 
-fn is_dynamic_linker(name: &str) -> bool {
-    name.starts_with("ld-linux") || name == "ld64.so.2" || name == "ld64.so.1"
+/// Returns `true` if the given shared-library name is a dynamic linker
+/// (e.g. `ld-linux-x86-64.so.2`, `ld64.so.2`, `ld-musl-*.so.1`).
+pub(crate) fn is_dynamic_linker(name: &str) -> bool {
+    name.starts_with("ld-linux")
+        || name == "ld64.so.2"
+        || name == "ld64.so.1"
+        || name.starts_with("ld-musl")
 }
 
 /// Error raised during auditing an elf file for manylinux/musllinux compatibility

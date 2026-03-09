@@ -5,13 +5,27 @@ use std::process::Command;
 
 static MISSING_PATCHELF_ERROR: &str = "Failed to execute 'patchelf', did you install it? Hint: Try `pip install maturin[patchelf]` (or just `pip install patchelf`)";
 
-/// Verify patchelf version
-pub fn verify_patchelf() -> Result<()> {
+/// Run a patchelf command with the given arguments.
+///
+/// Returns `Ok(stdout)` on success, or an error with the stderr message.
+fn run_patchelf(args: &[&OsStr]) -> Result<Vec<u8>> {
     let output = Command::new("patchelf")
-        .arg("--version")
+        .args(args)
         .output()
         .context(MISSING_PATCHELF_ERROR)?;
-    let version = String::from_utf8(output.stdout)
+    if !output.status.success() {
+        bail!(
+            "patchelf failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(output.stdout)
+}
+
+/// Verify patchelf version
+pub fn verify_patchelf() -> Result<()> {
+    let stdout = run_patchelf(&[OsStr::new("--version")])?;
+    let version = String::from_utf8(stdout)
         .context("Failed to parse patchelf version")?
         .trim()
         .to_string();
@@ -33,64 +47,42 @@ pub fn replace_needed<O: AsRef<OsStr>, N: AsRef<OsStr>>(
     file: impl AsRef<Path>,
     old_new_pairs: &[(O, N)],
 ) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
+    let mut args: Vec<&OsStr> = Vec::new();
     for (old, new) in old_new_pairs {
-        cmd.arg("--replace-needed").arg(old).arg(new);
+        args.push(OsStr::new("--replace-needed"));
+        args.push(old.as_ref());
+        args.push(new.as_ref());
     }
-    cmd.arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --replace-needed failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    args.push(file.as_ref().as_os_str());
+    run_patchelf(&args)?;
     Ok(())
 }
 
 /// Change `SONAME` of a dynamic library
 pub fn set_soname<S: AsRef<OsStr>>(file: impl AsRef<Path>, soname: &S) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--set-soname").arg(soname).arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --set-soname failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    run_patchelf(&[
+        OsStr::new("--set-soname"),
+        soname.as_ref(),
+        file.as_ref().as_os_str(),
+    ])?;
     Ok(())
 }
 
 /// Remove a `RPATH` from executables and libraries
 pub fn remove_rpath(file: impl AsRef<Path>) -> Result<()> {
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--remove-rpath").arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --remove-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    run_patchelf(&[OsStr::new("--remove-rpath"), file.as_ref().as_os_str()])?;
     Ok(())
 }
 
 /// Change the `RPATH` of executables and libraries
 pub fn set_rpath<S: AsRef<OsStr>>(file: impl AsRef<Path>, rpath: &S) -> Result<()> {
     remove_rpath(&file)?;
-    let mut cmd = Command::new("patchelf");
-    cmd.arg("--force-rpath")
-        .arg("--set-rpath")
-        .arg(rpath)
-        .arg(file.as_ref());
-    let output = cmd.output().context(MISSING_PATCHELF_ERROR)?;
-    if !output.status.success() {
-        bail!(
-            "patchelf --set-rpath failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    run_patchelf(&[
+        OsStr::new("--force-rpath"),
+        OsStr::new("--set-rpath"),
+        rpath.as_ref(),
+        file.as_ref().as_os_str(),
+    ])?;
     Ok(())
 }
 

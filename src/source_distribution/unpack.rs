@@ -4,6 +4,7 @@ use fs_err as fs;
 use std::path::{Path, PathBuf};
 
 /// The result of unpacking an sdist tarball.
+#[derive(Debug)]
 pub struct UnpackedSdist {
     /// Must be kept alive for the duration of the build.
     pub tmpdir: tempfile::TempDir,

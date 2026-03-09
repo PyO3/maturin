@@ -13,7 +13,7 @@ use clap::{Parser, Subcommand};
 use ignore::overrides::Override;
 use maturin::{
     BridgeModel, BuildOptions, CargoOptions, DevelopOptions, PathWriter, Target, TargetTriple,
-    VirtualWriter, develop, find_path_deps, unpack_sdist, write_dist_info,
+    UnpackedSdist, VirtualWriter, develop, find_path_deps, unpack_sdist, write_dist_info,
 };
 #[cfg(feature = "schemars")]
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
@@ -613,17 +613,21 @@ fn unpack_sdist_for_build(
     if build.out.is_none() {
         build.out = sdist_path.parent().map(PathBuf::from);
     }
-    let unpacked = unpack_sdist(&sdist_path)?;
+    let UnpackedSdist {
+        tmpdir,
+        cargo_toml,
+        pyproject_toml,
+    } = unpack_sdist(&sdist_path)?;
     eprintln!(
         "📦 Building wheels from source distribution at {}",
-        unpacked.cargo_toml.parent().unwrap().display()
+        cargo_toml.parent().unwrap().display()
     );
-    build.cargo.manifest_path = Some(unpacked.cargo_toml);
+    build.cargo.manifest_path = Some(cargo_toml);
     Ok((
         sdist_path,
         UnpackedBuild {
-            _tmpdir: unpacked.tmpdir,
-            pyproject_toml_path: Some(unpacked.pyproject_toml),
+            _tmpdir: tmpdir,
+            pyproject_toml_path: Some(pyproject_toml),
         },
     ))
 }

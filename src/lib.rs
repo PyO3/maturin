@@ -40,7 +40,7 @@ pub use crate::module_writer::{
 pub use crate::new_project::{GenerateProjectOptions, init_project, new_project};
 pub use crate::pyproject_toml::PyProjectToml;
 pub use crate::python_interpreter::PythonInterpreter;
-pub use crate::source_distribution::{find_path_deps, unpack_sdist};
+pub use crate::source_distribution::{UnpackedSdist, find_path_deps, unpack_sdist};
 #[cfg(feature = "upload")]
 pub use crate::upload::{PublishOpt, Registry, UploadError, upload, upload_ui};
 pub use auditwheel::PlatformTag;

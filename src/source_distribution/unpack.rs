@@ -3,6 +3,17 @@ use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use std::path::{Path, PathBuf};
 
+/// The result of unpacking an sdist tarball.
+#[derive(Debug)]
+pub struct UnpackedSdist {
+    /// Must be kept alive for the duration of the build.
+    pub tmpdir: tempfile::TempDir,
+    /// Path to Cargo.toml inside the unpacked sdist.
+    pub cargo_toml: PathBuf,
+    /// Path to pyproject.toml inside the unpacked sdist.
+    pub pyproject_toml: PathBuf,
+}
+
 /// Unpacks an sdist tarball into a temporary directory and returns the path
 /// to the Cargo.toml and pyproject.toml inside it, along with the tempdir
 /// handle (which must be kept alive for the duration of the build).
@@ -10,7 +21,7 @@ use std::path::{Path, PathBuf};
 /// The Cargo.toml path is resolved by checking `[tool.maturin.manifest-path]`
 /// in the sdist's `pyproject.toml`, falling back to `Cargo.toml` at the
 /// sdist root directory.
-pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
+pub fn unpack_sdist(sdist_path: &Path) -> Result<UnpackedSdist> {
     let tmp = tempfile::tempdir().context("Failed to create temporary directory")?;
     let gz = flate2::read::GzDecoder::new(
         fs::File::open(sdist_path)
@@ -61,5 +72,9 @@ pub fn unpack_sdist(sdist_path: &Path) -> Result<(tempfile::TempDir, PathBuf, Pa
             cargo_toml.display()
         );
     }
-    Ok((tmp, cargo_toml, pyproject_file))
+    Ok(UnpackedSdist {
+        tmpdir: tmp,
+        cargo_toml,
+        pyproject_toml: pyproject_file,
+    })
 }

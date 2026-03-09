@@ -577,7 +577,11 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .context("Failed to build source distribution")?;
 
     // Step 2: Unpack sdist and build wheels from it
-    let (_tmp, cargo_toml, pyproject_toml) = unpack_sdist(&sdist_path)?;
+    let maturin::UnpackedSdist {
+        tmpdir: _tmp,
+        cargo_toml,
+        pyproject_toml,
+    } = unpack_sdist(&sdist_path)?;
     let wheel_options = BuildOptions {
         out: Some(wheel_dir),
         cargo: CargoOptions {

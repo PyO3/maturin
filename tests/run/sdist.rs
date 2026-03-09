@@ -240,7 +240,11 @@ fn sdist_excludes_explicit_build_script() {
         .unwrap()
         .expect("failed to build sdist");
 
-    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let maturin::UnpackedSdist {
+        tmpdir: _tmp,
+        cargo_toml,
+        pyproject_toml: _pyproject_toml,
+    } = unpack_sdist(&sdist_path).unwrap();
     let sdist_root = cargo_toml.parent().unwrap();
     assert!(
         !sdist_root.join("build.rs").exists(),
@@ -666,7 +670,11 @@ fn lib_with_parent_workspace_git_dep_sdist() {
         .unwrap()
         .expect("failed to build sdist");
 
-    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let maturin::UnpackedSdist {
+        tmpdir: _tmp,
+        cargo_toml,
+        pyproject_toml: _pyproject_toml,
+    } = unpack_sdist(&sdist_path).unwrap();
     let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
     let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
     let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();
@@ -802,7 +810,11 @@ fn lib_with_parent_workspace_lints_sdist() {
         .unwrap()
         .expect("failed to build sdist");
 
-    let (_tmp, cargo_toml, _pyproject_toml) = unpack_sdist(&sdist_path).unwrap();
+    let maturin::UnpackedSdist {
+        tmpdir: _tmp,
+        cargo_toml,
+        pyproject_toml: _pyproject_toml,
+    } = unpack_sdist(&sdist_path).unwrap();
     let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
     let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
     let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();

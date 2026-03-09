@@ -164,9 +164,9 @@ impl Arch {
 }
 
 // Returns the set of supported architectures for each operating system
-fn get_supported_architectures(os: &Os) -> Vec<Arch> {
+fn get_supported_architectures(os: &Os) -> &'static [Arch] {
     match os {
-        Os::Android => vec![
+        Os::Android => &[
             Arch::Aarch64,
             Arch::Armv5teL,
             Arch::Armv6L,
@@ -174,7 +174,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::X86,
             Arch::X86_64,
         ],
-        Os::Linux => vec![
+        Os::Linux => &[
             Arch::Aarch64,
             Arch::Armv5teL,
             Arch::Armv6L,
@@ -194,10 +194,10 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Sparc64,
             Arch::LoongArch64,
         ],
-        Os::Windows => vec![Arch::X86, Arch::X86_64, Arch::Aarch64],
-        Os::Macos => vec![Arch::Aarch64, Arch::X86_64],
-        Os::Ios => vec![Arch::Aarch64, Arch::X86_64],
-        Os::FreeBsd | Os::NetBsd => vec![
+        Os::Windows => &[Arch::X86, Arch::X86_64, Arch::Aarch64],
+        Os::Macos => &[Arch::Aarch64, Arch::X86_64],
+        Os::Ios => &[Arch::Aarch64, Arch::X86_64],
+        Os::FreeBsd | Os::NetBsd => &[
             Arch::Aarch64,
             Arch::Armv6L,
             Arch::Armv7L,
@@ -212,7 +212,7 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Mipsel,
             Arch::Sparc64,
         ],
-        Os::OpenBsd => vec![
+        Os::OpenBsd => &[
             Arch::X86,
             Arch::X86_64,
             Arch::Aarch64,
@@ -224,14 +224,14 @@ fn get_supported_architectures(os: &Os) -> Vec<Arch> {
             Arch::Riscv64,
             Arch::Sparc64,
         ],
-        Os::Dragonfly => vec![Arch::X86_64],
-        Os::Illumos => vec![Arch::X86_64],
-        Os::Haiku => vec![Arch::X86_64],
-        Os::Solaris => vec![Arch::X86_64, Arch::Sparc64, Arch::Sparcv9],
-        Os::Emscripten | Os::Wasi => vec![Arch::Wasm32],
-        Os::Aix => vec![Arch::Powerpc64],
-        Os::Hurd => vec![Arch::X86, Arch::X86_64],
-        Os::Cygwin => vec![Arch::X86, Arch::X86_64],
+        Os::Dragonfly => &[Arch::X86_64],
+        Os::Illumos => &[Arch::X86_64],
+        Os::Haiku => &[Arch::X86_64],
+        Os::Solaris => &[Arch::X86_64, Arch::Sparc64, Arch::Sparcv9],
+        Os::Emscripten | Os::Wasi => &[Arch::Wasm32],
+        Os::Aix => &[Arch::Powerpc64],
+        Os::Hurd => &[Arch::X86, Arch::X86_64],
+        Os::Cygwin => &[Arch::X86, Arch::X86_64],
     }
 }
 

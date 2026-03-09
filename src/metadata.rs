@@ -3,6 +3,7 @@ use anyhow::{Context, Result, bail, format_err};
 use fs_err as fs;
 use indexmap::IndexMap;
 use normpath::PathExt;
+use once_cell::sync::Lazy;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::{
     ExtraName, ExtraOperator, MarkerExpression, MarkerTree, MarkerValueExtra, Requirement,
@@ -742,8 +743,8 @@ impl Metadata24 {
     ///
     /// See https://packaging.python.org/en/latest/specifications/binary-distribution-format/#escaping-and-unicode
     pub fn get_distribution_escaped(&self) -> String {
-        let re = Regex::new(r"[-_.]+").unwrap();
-        re.replace_all(&self.name, "_").to_lowercase()
+        static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[-_.]+").unwrap());
+        RE.replace_all(&self.name, "_").to_lowercase()
     }
 
     /// Returns the version encoded according to PEP 427, Section "Escaping

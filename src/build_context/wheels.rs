@@ -169,7 +169,7 @@ impl BuildContext {
             &[external_libs],
             |temp_dir| {
                 Ok(Box::new(
-                    Pyo3BindingGenerator::new(true, self.interpreter.first(), temp_dir)
+                    Pyo3BindingGenerator::new(true, python_interpreter, temp_dir)
                         .context("Failed to initialize PyO3 binding generator")?,
                 ))
             },

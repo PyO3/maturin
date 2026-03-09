@@ -170,7 +170,9 @@ impl BuildContext {
             })?;
             // Generate a new soname with a short hash
             let short_hash = &hash_file(&lib_path)?[..8];
-            let (file_stem, file_ext) = lib.name.split_once('.').unwrap();
+            let (file_stem, file_ext) = lib.name.split_once('.').with_context(|| {
+                format!("Unexpected library name without extension: {}", lib.name)
+            })?;
             let new_soname = if !file_stem.ends_with(&format!("-{short_hash}")) {
                 format!("{file_stem}-{short_hash}.{file_ext}")
             } else {
@@ -278,7 +280,7 @@ impl BuildContext {
         let artifact_dir = match self.bridge() {
             // cffi bindings that contains '.' in the module name will be split into directories
             BridgeModel::Cffi => self.module_name.split(".").collect::<PathBuf>(),
-            // For namespace packages the modules the modules resides resides at ${module_name}.so
+            // For namespace packages the modules reside at ${module_name}.so
             // where periods are replaced with slashes so for example my.namespace.module would reside
             // at my/namespace/module.so
             _ if self.module_name.contains(".") => {

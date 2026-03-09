@@ -230,7 +230,7 @@ pub fn add_data(
                 );
             }
             debug!("Adding data from {}", subdir.path().display());
-            add_data_subdir(writer, &subdir.path(), data, metadata24)
+            add_data_subdir(writer, subdir.path().as_path(), data, metadata24)
                 .with_context(|| format!("Failed to include data from {}", data.display()))?
         }
     }

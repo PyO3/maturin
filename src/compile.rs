@@ -265,6 +265,10 @@ fn cargo_build_command(
         bridge_model,
         &context.module_name,
         python_interpreter,
+        #[cfg(feature = "zig")]
+        context.zig,
+        #[cfg(feature = "zig")]
+        &context.target_dir,
     );
 
     if context.strip {
@@ -325,7 +329,8 @@ fn configure_bin_lib_flags(
     }
 }
 
-/// Configure platform-specific linker arguments (macOS PyO3, Emscripten).
+/// Configure platform-specific linker arguments (macOS PyO3, Emscripten, Windows GNU + zig).
+#[allow(clippy::too_many_arguments)]
 fn configure_platform_linker_args(
     cargo_rustc: &mut cargo_options::Rustc,
     rustflags: &mut cargo_config2::Flags,
@@ -333,6 +338,8 @@ fn configure_platform_linker_args(
     bridge_model: &BridgeModel,
     module_name: &str,
     python_interpreter: Option<&PythonInterpreter>,
+    #[cfg(feature = "zig")] zig: bool,
+    #[cfg(feature = "zig")] target_dir: &Path,
 ) {
     if target.is_macos() {
         if let BridgeModel::PyO3 { .. } = bridge_model {
@@ -345,6 +352,35 @@ fn configure_platform_linker_args(
         }
     } else if target.is_emscripten() {
         configure_emscripten_args(cargo_rustc, rustflags, target);
+    }
+
+    // When using zig as the linker for windows-gnu targets, the PyInit symbol
+    // is not exported. Work around this by generating a .def file that explicitly
+    // exports the symbol.
+    // See https://github.com/PyO3/maturin/issues/922
+    #[cfg(feature = "zig")]
+    if zig
+        && target.is_windows()
+        && !target.is_msvc()
+        && matches!(
+            bridge_model,
+            BridgeModel::PyO3 { .. } | BridgeModel::Cffi | BridgeModel::UniFfi
+        )
+    {
+        let py_init = format!("PyInit_{module_name}");
+        let maturin_dir = ensure_target_maturin_dir(target_dir);
+        let def_path = maturin_dir.join(format!("{module_name}.def"));
+        let def_contents = format!("LIBRARY {module_name}\nEXPORTS\n    {py_init}\n");
+        if let Err(e) = fs::write(&def_path, def_contents) {
+            eprintln!("⚠️  Warning: Failed to write .def file for zig windows-gnu workaround: {e}");
+        } else {
+            debug!(
+                "Generated .def file at {} for zig windows-gnu export workaround",
+                def_path.display()
+            );
+            rustflags.push("-C");
+            rustflags.push(format!("link-arg={}", def_path.display()));
+        }
     }
 }
 
@@ -632,12 +668,11 @@ fn configure_pyo3_env(
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
             let pyo3_config = interpreter.pyo3_config_file();
-            let maturin_target_dir = context.target_dir.join(env!("CARGO_PKG_NAME"));
+            let maturin_target_dir = ensure_target_maturin_dir(&context.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
                 target_triple, interpreter.major, interpreter.minor
             ));
-            fs::create_dir_all(&maturin_target_dir)?;
             // We don't want to rewrite the file every time as that will make cargo
             // trigger a rebuild of the project every time
             let existing_pyo3_config = fs::read_to_string(&config_file).unwrap_or_default();
@@ -928,6 +963,14 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Ensures the `maturin` subdirectory inside the target directory exists
+/// and returns its path. This directory is used for maturin-generated artifacts.
+pub(crate) fn ensure_target_maturin_dir(target_dir: &Path) -> PathBuf {
+    let dir = target_dir.join(env!("CARGO_PKG_NAME"));
+    let _ = fs::create_dir_all(&dir);
+    dir
 }
 
 fn pyo3_version(cargo_metadata: &cargo_metadata::Metadata) -> Option<(u64, u64, u64)> {

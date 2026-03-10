@@ -321,8 +321,7 @@ impl BuildContext {
     /// reflink-or-copy directly; the concurrent-modification window is
     /// unlikely in cross-device setups.
     pub(super) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
-        let maturin_build = self.target_dir.join(env!("CARGO_PKG_NAME"));
-        fs::create_dir_all(&maturin_build)?;
+        let maturin_build = crate::compile::ensure_target_maturin_dir(&self.target_dir);
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
         // Remove any stale file at the destination so that `fs::rename`

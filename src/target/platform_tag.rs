@@ -9,6 +9,7 @@
 
 use crate::PyProjectToml;
 use crate::auditwheel::PlatformTag;
+use crate::target::legacy_py::ALLOWED_PLATFORMS;
 use crate::target::{Arch, Os, Target};
 use anyhow::{Context, Result, anyhow, bail};
 use once_cell::sync::Lazy;
@@ -64,7 +65,12 @@ pub fn get_platform_tag(
             for platform_tag in platform_tags {
                 tags.push(format!("{platform_tag}_{arch}"));
                 for alias in platform_tag.aliases() {
-                    tags.push(format!("{alias}_{arch}"));
+                    let alias_tag = format!("{alias}_{arch}");
+                    // Only add legacy aliases if they're in PyPI's static allow-list,
+                    // e.g. manylinux2014 was never defined for riscv64
+                    if ALLOWED_PLATFORMS.contains(&alias_tag.as_str()) {
+                        tags.push(alias_tag);
+                    }
                 }
             }
             tags.join(".")

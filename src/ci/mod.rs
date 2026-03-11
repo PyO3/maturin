@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use clap::{ArgAction, Parser, ValueEnum};
 use fs_err as fs;
+use pep440_rs::{Operator, VersionSpecifiers};
 
 use crate::CargoOptions;
 use crate::bridge::find_bridge;
@@ -208,6 +209,33 @@ impl Default for GenerateCI {
     }
 }
 
+/// Extract the minimum Python 3 minor version from a `requires-python` specifier.
+///
+/// For example, `>=3.13` → `Some(13)`, `>=3.12,<4` → `Some(12)`.
+/// Returns `None` if there is no lower bound or it is not a Python 3.x specifier.
+fn min_python3_minor(requires_python: &VersionSpecifiers) -> Option<u8> {
+    requires_python
+        .iter()
+        .filter(|spec| {
+            matches!(
+                spec.operator(),
+                Operator::GreaterThanEqual | Operator::GreaterThan | Operator::Equal
+            )
+        })
+        .filter(|spec| spec.version().release().first() == Some(&3))
+        .filter_map(|spec| {
+            let minor = *spec.version().release().get(1)?;
+            let minor = if matches!(spec.operator(), Operator::GreaterThan) {
+                // >3.12 means minimum is 3.13
+                minor + 1
+            } else {
+                minor
+            };
+            u8::try_from(minor).ok()
+        })
+        .max()
+}
+
 impl GenerateCI {
     /// Execute this command
     pub fn execute(&self) -> Result<()> {
@@ -246,10 +274,23 @@ impl GenerateCI {
             .and_then(|p| p.generate_ci())
             .and_then(|ci| ci.github.as_ref());
 
+        // Extract minimum Python 3 minor version from requires-python
+        let min_python_minor = pyproject
+            .and_then(|p| p.project.as_ref())
+            .and_then(|proj| proj.requires_python.as_ref())
+            .and_then(min_python3_minor);
+
         match self.ci {
             Provider::GitHub => {
                 let resolved = github::resolve_config(self, github_config, &bridge)?;
-                github::generate_github(self, &resolved, project_name, &bridge, sdist)
+                github::generate_github(
+                    self,
+                    &resolved,
+                    project_name,
+                    &bridge,
+                    sdist,
+                    min_python_minor,
+                )
             }
         }
     }
@@ -279,5 +320,23 @@ impl GenerateCI {
             fs::write(&self.output, conf)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_min_python3_minor() {
+        let parse = |s: &str| s.parse::<VersionSpecifiers>().unwrap();
+
+        assert_eq!(min_python3_minor(&parse(">=3.12")), Some(12));
+        assert_eq!(min_python3_minor(&parse(">=3.13")), Some(13));
+        assert_eq!(min_python3_minor(&parse(">=3.12,<4")), Some(12));
+        assert_eq!(min_python3_minor(&parse(">3.12")), Some(13));
+        assert_eq!(min_python3_minor(&parse(">=3.8")), Some(8));
+        assert_eq!(min_python3_minor(&parse("<4")), None);
+        assert_eq!(min_python3_minor(&parse("!=3.5")), None);
     }
 }

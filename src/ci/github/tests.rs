@@ -63,7 +63,7 @@ fn render_with_config(
     sdist: bool,
 ) -> String {
     let resolved = resolve_config(cli, github_config, bridge).unwrap();
-    generate_github(cli, &resolved, PROJECT_NAME, bridge, sdist).unwrap()
+    generate_github(cli, &resolved, PROJECT_NAME, bridge, sdist, None).unwrap()
 }
 
 #[test]
@@ -338,7 +338,7 @@ fn test_generate_github_pyproject_uniform_manylinux() {
     let cli = GenerateCI::default();
     let bridge = pyo3_bridge(None);
     let resolved = resolve_config(&cli, Some(&github_config), &bridge).unwrap();
-    let conf = generate_github(&cli, &resolved, PROJECT_NAME, &bridge, false).unwrap();
+    let conf = generate_github(&cli, &resolved, PROJECT_NAME, &bridge, false, None).unwrap();
 
     assert!(conf.contains("          manylinux: 2_28\n"));
     assert!(!conf.contains("matrix.platform.manylinux"));

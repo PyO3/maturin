@@ -64,7 +64,7 @@ pub(crate) fn generate_github_from_cli(
     sdist: bool,
 ) -> Result<String> {
     let resolved = resolve_config(cli, None, bridge_model)?;
-    generate_github(cli, &resolved, project_name, bridge_model, sdist)
+    generate_github(cli, &resolved, project_name, bridge_model, sdist, None)
 }
 
 struct RenderContext<'a> {
@@ -74,6 +74,8 @@ struct RenderContext<'a> {
     is_abi3: bool,
     is_bin: bool,
     setup_python: bool,
+    /// Minimum Python 3 minor version from `requires-python` (e.g. 13 for `>=3.13`).
+    min_python_minor: Option<u8>,
 }
 
 /// Generate GitHub Actions CI configuration.
@@ -83,6 +85,7 @@ pub(crate) fn generate_github(
     project_name: &str,
     bridge_model: &BridgeModel,
     sdist: bool,
+    min_python_minor: Option<u8>,
 ) -> Result<String> {
     let is_abi3 = bridge_model.is_abi3();
     let is_bin = bridge_model.is_bin();
@@ -102,6 +105,7 @@ pub(crate) fn generate_github(
         is_abi3,
         is_bin,
         setup_python,
+        min_python_minor,
     };
 
     let mut conf = workflow_header();
@@ -219,7 +223,13 @@ fn emit_platform_job(
 
     if context.resolved.pytest {
         let chdir = pytest_chdir_prefix(context.cli);
-        emit_pytest_steps(&mut y, platform, context.project_name, &chdir);
+        emit_pytest_steps(
+            &mut y,
+            platform,
+            context.project_name,
+            &chdir,
+            context.min_python_minor,
+        );
     }
 }
 
@@ -535,10 +545,16 @@ fn gha_expr(expr: &str) -> String {
 }
 
 /// Emit pytest steps for a given platform.
-fn emit_pytest_steps(y: &mut Yaml, platform: Platform, project_name: &str, chdir: &str) {
+fn emit_pytest_steps(
+    y: &mut Yaml,
+    platform: Platform,
+    project_name: &str,
+    chdir: &str,
+    min_python_minor: Option<u8>,
+) {
     match platform {
         Platform::All | Platform::Android => {}
-        Platform::ManyLinux => emit_manylinux_pytest(y, project_name, chdir),
+        Platform::ManyLinux => emit_manylinux_pytest(y, project_name, chdir, min_python_minor),
         Platform::Musllinux => emit_musllinux_pytest(y, project_name, chdir),
         Platform::Windows => {
             emit_uv_pytest(
@@ -557,8 +573,16 @@ fn emit_pytest_steps(y: &mut Yaml, platform: Platform, project_name: &str, chdir
     }
 }
 
+/// Ubuntu 24.04 ships Python 3.12; versions above this need the deadsnakes PPA.
+const UBUNTU_2404_PYTHON_MINOR: u8 = 12;
+
 /// Emit pytest steps for manylinux: host test (x86_64) + QEMU cross-arch test.
-fn emit_manylinux_pytest(y: &mut Yaml, project_name: &str, chdir: &str) {
+fn emit_manylinux_pytest(
+    y: &mut Yaml,
+    project_name: &str,
+    chdir: &str,
+    min_python_minor: Option<u8>,
+) {
     let if_x86_64 = gha_expr(&format!("startsWith({MATRIX_TARGET}, 'x86_64')"));
 
     y.line("- uses: astral-sh/setup-uv@v7")
@@ -575,6 +599,9 @@ fn emit_manylinux_pytest(y: &mut Yaml, project_name: &str, chdir: &str) {
         Some("bash"),
     );
 
+    let needs_deadsnakes =
+        matches!(min_python_minor, Some(minor) if minor > UBUNTU_2404_PYTHON_MINOR);
+
     y.line("- name: pytest")
         .indent()
         .line(format!(
@@ -587,21 +614,38 @@ fn emit_manylinux_pytest(y: &mut Yaml, project_name: &str, chdir: &str) {
         .line("with:")
         .indent();
     y.line(format!("arch: {}", gha_expr(MATRIX_TARGET)));
-    y.line("distro: ubuntu22.04");
+    y.line("distro: ubuntu24.04");
     y.line(format!("githubToken: {}", gha_expr(GITHUB_TOKEN)));
     y.line("install: |");
     y.indent();
     y.line("apt-get update");
-    y.line("apt-get install -y --no-install-recommends python3 python3-pip");
-    y.line("pip3 install -U pip pytest");
+    if needs_deadsnakes {
+        let minor = min_python_minor.unwrap();
+        y.line("apt-get install -y --no-install-recommends software-properties-common");
+        y.line("add-apt-repository -y ppa:deadsnakes/ppa");
+        y.line("apt-get update");
+        y.line(format!(
+            "apt-get install -y --no-install-recommends python3.{minor} python3.{minor}-venv"
+        ));
+    } else {
+        y.line("apt-get install -y --no-install-recommends python3 python3-venv");
+    }
     y.dedent();
     y.line("run: |");
     y.indent();
     y.line("set -e");
+    if needs_deadsnakes {
+        let minor = min_python_minor.unwrap();
+        y.line(format!("python3.{minor} -m venv .venv"));
+    } else {
+        y.line("python3 -m venv .venv");
+    }
+    y.line("source .venv/bin/activate");
+    y.line("pip install pytest");
     y.line(format!(
-        "pip3 install {project_name} --no-index --no-deps --find-links dist --force-reinstall"
+        "pip install {project_name} --no-index --no-deps --find-links dist --force-reinstall"
     ));
-    y.line(format!("pip3 install {project_name}"));
+    y.line(format!("pip install {project_name}"));
     y.line(format!("{chdir}pytest"));
     y.dedent_by(3);
 }

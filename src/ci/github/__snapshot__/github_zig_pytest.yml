@@ -65,16 +65,18 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{ matrix.platform.target }}
-          distro: ubuntu22.04
+          distro: ubuntu24.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip pytest
+            apt-get install -y --no-install-recommends python3 python3-venv
           run: |
             set -e
-            pip3 install example --no-index --no-deps --find-links dist --force-reinstall
-            pip3 install example
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip install pytest
+            pip install example --no-index --no-deps --find-links dist --force-reinstall
+            pip install example
             pytest
 
   musllinux:

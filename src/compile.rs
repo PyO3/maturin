@@ -345,6 +345,7 @@ fn configure_platform_linker_args(
         if let BridgeModel::PyO3 { .. } = bridge_model {
             configure_macos_pyo3_linker_args(
                 cargo_rustc,
+                rustflags,
                 bridge_model,
                 module_name,
                 python_interpreter,
@@ -392,10 +393,33 @@ fn configure_platform_linker_args(
 /// See https://github.com/PyO3/setuptools-rust/issues/106 for detail
 fn configure_macos_pyo3_linker_args(
     cargo_rustc: &mut cargo_options::Rustc,
+    rustflags: &mut cargo_config2::Flags,
     bridge_model: &BridgeModel,
     module_name: &str,
     python_interpreter: Option<&PythonInterpreter>,
 ) {
+    // Pass -undefined dynamic_lookup via CARGO_ENCODED_RUSTFLAGS so they apply
+    // to all crates in the dependency graph, not just the top-level crate.
+    // This fixes link errors when a dependency also uses pyo3 with a cdylib target.
+    // See https://github.com/PyO3/maturin/issues/1080
+    let has_undefined = rustflags
+        .flags
+        .iter()
+        .any(|f| f == "link-arg=-undefined" || f == "-Clink-arg=-undefined");
+    let has_dynamic_lookup = rustflags
+        .flags
+        .iter()
+        .any(|f| f == "link-arg=dynamic_lookup" || f == "-Clink-arg=dynamic_lookup");
+    if !has_undefined {
+        rustflags.push("-C");
+        rustflags.push("link-arg=-undefined");
+    }
+    if !has_dynamic_lookup {
+        rustflags.push("-C");
+        rustflags.push("link-arg=dynamic_lookup");
+    }
+
+    // install_name is specific to the top-level output, so keep it in cargo_rustc.args
     let so_filename = if bridge_model.is_abi3() {
         format!("{module_name}.abi3.so")
     } else {
@@ -404,16 +428,12 @@ fn configure_macos_pyo3_linker_args(
             .get_library_name(module_name)
     };
     let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
-    let mac_args = [
-        "-C".to_string(),
-        "link-arg=-undefined".to_string(),
-        "-C".to_string(),
-        "link-arg=dynamic_lookup".to_string(),
-        "-C".to_string(),
-        macos_dylib_install_name,
-    ];
-    debug!("Setting additional linker args for macOS: {:?}", mac_args);
-    cargo_rustc.args.extend(mac_args);
+    let install_name_args = ["-C".to_string(), macos_dylib_install_name];
+    debug!(
+        "Setting macOS install_name via cargo rustc args: {:?}",
+        install_name_args
+    );
+    cargo_rustc.args.extend(install_name_args);
 }
 
 /// Configure Emscripten-specific linker arguments and rustflags.

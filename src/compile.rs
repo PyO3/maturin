@@ -402,13 +402,19 @@ fn configure_macos_pyo3_linker_args(
     // to all crates in the dependency graph, not just the top-level crate.
     // This fixes link errors when a dependency also uses pyo3 with a cdylib target.
     // See https://github.com/PyO3/maturin/issues/1080
-    let has_undefined_dynamic_lookup = rustflags
+    let has_undefined = rustflags
         .flags
         .iter()
         .any(|f| f == "link-arg=-undefined" || f == "-Clink-arg=-undefined");
-    if !has_undefined_dynamic_lookup {
+    let has_dynamic_lookup = rustflags
+        .flags
+        .iter()
+        .any(|f| f == "link-arg=dynamic_lookup" || f == "-Clink-arg=dynamic_lookup");
+    if !has_undefined {
         rustflags.push("-C");
         rustflags.push("link-arg=-undefined");
+    }
+    if !has_dynamic_lookup {
         rustflags.push("-C");
         rustflags.push("link-arg=dynamic_lookup");
     }

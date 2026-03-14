@@ -108,9 +108,15 @@ def _build_wheel(
 
     command = [*base_command, *options]
 
+    env = _get_env()
+    if metadata_directory is not None:
+        if env is None:
+            env = os.environ.copy()
+        env["MATURIN_PEP517_METADATA_DIR"] = metadata_directory
+
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
-    result = subprocess.run(command, stdout=subprocess.PIPE, env=_get_env())
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=env)
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:

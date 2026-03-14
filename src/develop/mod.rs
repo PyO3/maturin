@@ -1,4 +1,4 @@
-mod install_backend;
+pub(crate) mod install_backend;
 
 use crate::BuildContext;
 use crate::BuildOptions;

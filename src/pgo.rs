@@ -1,3 +1,4 @@
+use crate::develop::install_backend::{find_uv_bin, find_uv_python};
 use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use std::path::{Path, PathBuf};
@@ -118,7 +119,7 @@ impl PgoContext {
 
     /// Run the PGO instrumentation workload.
     ///
-    /// 1. Create a temporary venv
+    /// 1. Create a temporary venv (using `uv` when available, otherwise `python -m venv`)
     /// 2. Install the instrumented wheel
     /// 3. Install dependencies
     /// 4. Run the instrumentation command
@@ -131,14 +132,31 @@ impl PgoContext {
         let venv_dir = TempDir::new().context("Failed to create temporary venv directory")?;
         let venv_path = venv_dir.path();
 
+        // Detect uv: try the binary first, then the Python module
+        let uv = find_uv_python(python).or_else(|_| find_uv_bin()).ok();
+
         // Create venv
-        let status = Command::new(python)
-            .args(["-m", "venv"])
-            .arg(venv_path)
-            .status()
-            .context("Failed to create virtual environment")?;
-        if !status.success() {
-            bail!("Failed to create virtual environment (exit status: {status})");
+        if let Some((uv_path, uv_args)) = &uv {
+            debug!("Creating venv with uv");
+            let status = Command::new(uv_path)
+                .args(uv_args.iter().copied())
+                .args(["venv", "--python"])
+                .arg(python)
+                .arg(venv_path)
+                .status()
+                .context("Failed to create virtual environment with uv")?;
+            if !status.success() {
+                bail!("Failed to create virtual environment with uv (exit status: {status})");
+            }
+        } else {
+            let status = Command::new(python)
+                .args(["-m", "venv"])
+                .arg(venv_path)
+                .status()
+                .context("Failed to create virtual environment")?;
+            if !status.success() {
+                bail!("Failed to create virtual environment (exit status: {status})");
+            }
         }
         debug!("Created temporary venv at {}", venv_path.display());
 
@@ -155,11 +173,12 @@ impl PgoContext {
 
         // Install the instrumented wheel
         eprintln!("📦 Installing instrumented wheel into temporary venv...");
-        let status = Command::new(&venv_python)
-            .args(["-m", "pip", "install", "--force-reinstall", "--no-deps"])
-            .arg(wheel_path)
-            .status()
-            .context("Failed to install instrumented wheel")?;
+        let status = self.pip_install(
+            &uv,
+            &venv_python,
+            &["--force-reinstall", "--no-deps"],
+            &[wheel_path],
+        )?;
         if !status.success() {
             bail!("Failed to install instrumented wheel (exit status: {status})");
         }
@@ -167,45 +186,43 @@ impl PgoContext {
         // Install requires_dist dependencies
         if !build_context.metadata24.requires_dist.is_empty() {
             debug!("Installing requires_dist dependencies");
-            let mut args = vec!["-m".to_string(), "pip".to_string(), "install".to_string()];
-            args.extend(
-                build_context
-                    .metadata24
-                    .requires_dist
-                    .iter()
-                    .map(|x| x.to_string()),
-            );
-            let status = Command::new(&venv_python)
-                .args(&args)
-                .status()
-                .context("Failed to install dependencies")?;
+            let deps: Vec<String> = build_context
+                .metadata24
+                .requires_dist
+                .iter()
+                .map(|x| x.to_string())
+                .collect();
+            let dep_refs: Vec<&Path> = deps.iter().map(|s| Path::new(s.as_str())).collect();
+            let status = self.pip_install(&uv, &venv_python, &[], &dep_refs)?;
             if !status.success() {
                 bail!("Failed to install dependencies (exit status: {status})");
             }
         }
 
-        // Install dev dependency group if present
-        let has_dev_group = build_context
-            .pyproject_toml
-            .as_ref()
-            .and_then(|p| p.dependency_groups.as_ref())
-            .is_some_and(|dg| dg.0.contains_key("dev"));
-        if has_dev_group {
-            let project_dir = build_context
-                .pyproject_toml_path
-                .parent()
-                .context("Failed to get project directory")?;
-            debug!("Installing dev dependency group");
-            let status = Command::new(&venv_python)
-                .args(["-m", "pip", "install", "--group", "dev"])
-                .current_dir(project_dir)
-                .status()
-                .context("Failed to install dev dependency group")?;
-            if !status.success() {
-                eprintln!(
-                    "⚠️  Warning: failed to install dev dependency group \
-                     (pip >= 25.1 required for --group support)"
-                );
+        // Install dev dependency group if present (pip only — uv doesn't support --group yet)
+        if uv.is_none() {
+            let has_dev_group = build_context
+                .pyproject_toml
+                .as_ref()
+                .and_then(|p| p.dependency_groups.as_ref())
+                .is_some_and(|dg| dg.0.contains_key("dev"));
+            if has_dev_group {
+                let project_dir = build_context
+                    .pyproject_toml_path
+                    .parent()
+                    .context("Failed to get project directory")?;
+                debug!("Installing dev dependency group");
+                let status = Command::new(&venv_python)
+                    .args(["-m", "pip", "install", "--group", "dev"])
+                    .current_dir(project_dir)
+                    .status()
+                    .context("Failed to install dev dependency group")?;
+                if !status.success() {
+                    eprintln!(
+                        "⚠️  Warning: failed to install dev dependency group \
+                         (pip >= 25.1 required for --group support)"
+                    );
+                }
             }
         }
 
@@ -258,6 +275,34 @@ impl PgoContext {
 
         eprintln!("✅ PGO instrumentation completed successfully");
         Ok(())
+    }
+
+    /// Run `pip install` or `uv pip install` depending on what's available.
+    fn pip_install(
+        &self,
+        uv: &Option<(PathBuf, Vec<&'static str>)>,
+        venv_python: &Path,
+        extra_args: &[&str],
+        packages: &[&Path],
+    ) -> Result<std::process::ExitStatus> {
+        let status = if let Some((uv_path, uv_args)) = uv {
+            Command::new(uv_path)
+                .args(uv_args.iter().copied())
+                .args(["pip", "install", "--python"])
+                .arg(venv_python)
+                .args(extra_args)
+                .args(packages)
+                .status()
+                .context("Failed to run uv pip install")?
+        } else {
+            Command::new(venv_python)
+                .args(["-m", "pip", "install"])
+                .args(extra_args)
+                .args(packages)
+                .status()
+                .context("Failed to run pip install")?
+        };
+        Ok(status)
     }
 
     /// Merge .profraw files into a single .profdata file

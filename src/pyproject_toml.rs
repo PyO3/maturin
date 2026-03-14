@@ -429,6 +429,10 @@ pub struct ToolMaturin {
     /// Include the import library (.dll.lib) in the wheel on Windows
     #[serde(default)]
     pub include_import_lib: bool,
+    /// Command to run for PGO profile generation.
+    /// Executed in a temporary virtualenv with the instrumented wheel installed.
+    /// Example: `python -m pytest tests/benchmarks`
+    pub pgo_command: Option<String>,
     /// CI generation configuration
     pub generate_ci: Option<GenerateCIConfig>,
 }
@@ -583,6 +587,11 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.bindings]` in pyproject.toml
     pub fn bindings(&self) -> Option<&str> {
         self.maturin()?.bindings.as_deref()
+    }
+
+    /// Returns the PGO training command from `[tool.maturin]`
+    pub fn pgo_command(&self) -> Option<&str> {
+        self.maturin().and_then(|m| m.pgo_command.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml

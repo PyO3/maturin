@@ -29,6 +29,7 @@ pub struct BuildContextBuilder {
     editable: bool,
     sdist_only: bool,
     pyproject_toml_path: Option<PathBuf>,
+    pgo: bool,
 }
 
 impl BuildContextBuilder {
@@ -39,6 +40,7 @@ impl BuildContextBuilder {
             editable: false,
             sdist_only: false,
             pyproject_toml_path: None,
+            pgo: false,
         }
     }
 
@@ -62,6 +64,11 @@ impl BuildContextBuilder {
         self
     }
 
+    pub fn pgo(mut self, pgo: bool) -> Self {
+        self.pgo = pgo;
+        self
+    }
+
     #[instrument(skip_all)]
     pub fn build(self) -> Result<BuildContext> {
         let Self {
@@ -70,6 +77,7 @@ impl BuildContextBuilder {
             editable,
             sdist_only,
             pyproject_toml_path: explicit_pyproject_path,
+            pgo,
         } = self;
         build_options.compression.validate();
         let ProjectResolver {
@@ -215,6 +223,20 @@ impl BuildContextBuilder {
             Vec::new()
         };
 
+        let pgo_command = if pgo {
+            let cmd = pyproject
+                .and_then(|p| p.pgo_command())
+                .map(|s| s.to_string());
+            if cmd.is_none() {
+                bail!(
+                    "--pgo requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml"
+                );
+            }
+            cmd
+        } else {
+            None
+        };
+
         Ok(BuildContext {
             target,
             compile_targets,
@@ -243,6 +265,8 @@ impl BuildContextBuilder {
             include_import_lib,
             include_debuginfo,
             conditional_features,
+            pgo_phase: None,
+            pgo_command,
         })
     }
 

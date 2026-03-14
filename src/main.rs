@@ -89,6 +89,13 @@ enum Command {
         /// used to build the project from source.
         #[arg(long)]
         sdist: bool,
+        /// Build with Profile-Guided Optimization (PGO).
+        ///
+        /// Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
+        /// This performs a three-phase build: instrumented build, profile training,
+        /// and optimized rebuild.
+        #[arg(long)]
+        pgo: bool,
         #[command(flatten)]
         build: BuildOptions,
     },
@@ -105,6 +112,11 @@ enum Command {
         /// Don't build a source distribution
         #[arg(long = "no-sdist")]
         no_sdist: bool,
+        /// Build with Profile-Guided Optimization (PGO).
+        ///
+        /// Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
+        #[arg(long)]
+        pgo: bool,
         #[command(flatten)]
         publish: PublishOpt,
         #[command(flatten)]
@@ -405,6 +417,7 @@ fn run() -> Result<()> {
             release,
             strip_opt,
             sdist,
+            pgo,
         } => {
             let strip = strip_opt.strip;
             // set profile to release if specified; `--release` and `--profile` are mutually exclusive
@@ -427,6 +440,7 @@ fn run() -> Result<()> {
                 .strip(strip)
                 .editable(false)
                 .pyproject_toml_path(sdist_pyproject_path)
+                .pgo(pgo)
                 .build()?;
             let wheels = build_context.build_wheels()?;
             assert!(!wheels.is_empty());
@@ -438,6 +452,7 @@ fn run() -> Result<()> {
             debug,
             no_strip,
             no_sdist,
+            pgo,
         } => {
             // set profile to dev if specified; `--debug` and `--profile` are mutually exclusive
             //
@@ -465,6 +480,7 @@ fn run() -> Result<()> {
                 .strip(Some(!no_strip))
                 .editable(false)
                 .pyproject_toml_path(sdist_pyproject_path)
+                .pgo(pgo)
                 .build()?;
 
             // ensure profile always set when publishing

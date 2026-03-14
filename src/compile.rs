@@ -249,6 +249,22 @@ fn cargo_build_command(
         .unwrap_or_default();
     let original_rustflags = rustflags.flags.clone();
 
+    // Inject PGO flags if a PGO build phase is active
+    if let Some(ref pgo_phase) = context.pgo_phase {
+        match pgo_phase {
+            crate::pgo::PgoPhase::Generate(profdata_dir) => {
+                rustflags
+                    .flags
+                    .push(format!("-Cprofile-generate={}", profdata_dir.display()));
+            }
+            crate::pgo::PgoPhase::Use(profdata_path) => {
+                rustflags
+                    .flags
+                    .push(format!("-Cprofile-use={}", profdata_path.display()));
+            }
+        }
+    }
+
     let bridge_model = &compile_target.bridge_model;
     configure_bin_lib_flags(
         &mut cargo_rustc,

@@ -214,6 +214,34 @@ impl BuildContext {
         )
     }
 
+    /// Compile, audit, and write a single PyO3 wheel for one interpreter.
+    ///
+    /// This is the core pipeline shared by [`build_pyo3_wheels`] and the
+    /// per-interpreter PGO path in [`build_wheels_pgo_per_interpreter`].
+    pub(super) fn build_single_pyo3_wheel(
+        &self,
+        python_interpreter: &PythonInterpreter,
+        sbom_data: &Option<SbomData>,
+    ) -> Result<BuiltWheelMetadata> {
+        let (artifact, out_dirs) = self.compile_cdylib(
+            Some(python_interpreter),
+            Some(&self.project_layout.extension_name),
+        )?;
+        let (policy, external_libs) =
+            self.auditwheel(&artifact, &self.platform_tag, Some(python_interpreter))?;
+        let platform_tags = self.resolve_platform_tags(&policy);
+        let wheel_path = self.write_pyo3_wheel(
+            python_interpreter,
+            artifact,
+            &platform_tags,
+            external_libs,
+            sbom_data,
+            &out_dirs,
+        )?;
+        let tag = format!("cp{}{}", python_interpreter.major, python_interpreter.minor);
+        Ok((wheel_path, tag))
+    }
+
     /// Builds wheels for a pyo3 extension for all given python versions.
     /// Return type is the same as [BuildContext::build_wheels()]
     ///
@@ -228,21 +256,7 @@ impl BuildContext {
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         for python_interpreter in interpreters {
-            let (artifact, out_dirs) = self.compile_cdylib(
-                Some(python_interpreter),
-                Some(&self.project_layout.extension_name),
-            )?;
-            let (policy, external_libs) =
-                self.auditwheel(&artifact, &self.platform_tag, Some(python_interpreter))?;
-            let platform_tags = self.resolve_platform_tags(&policy);
-            let wheel_path = self.write_pyo3_wheel(
-                python_interpreter,
-                artifact,
-                &platform_tags,
-                external_libs,
-                sbom_data,
-                &out_dirs,
-            )?;
+            let (wheel_path, tag) = self.build_single_pyo3_wheel(python_interpreter, sbom_data)?;
             eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
@@ -251,8 +265,6 @@ impl BuildContext {
                 python_interpreter.abiflags,
                 wheel_path.display()
             );
-
-            let tag = format!("cp{}{}", python_interpreter.major, python_interpreter.minor);
             wheels.push((wheel_path, tag));
         }
 

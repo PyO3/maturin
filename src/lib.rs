@@ -59,12 +59,14 @@ pub mod ci;
 mod compile;
 mod compression;
 mod cross_compile;
-mod develop;
+pub(crate) mod develop;
 mod generate_json_schema;
 mod metadata;
 mod module_writer;
 #[cfg(feature = "scaffolding")]
 mod new_project;
+/// Profile-Guided Optimization (PGO) orchestration
+pub(crate) mod pgo;
 mod project_layout;
 pub mod pyproject_toml;
 mod python_interpreter;

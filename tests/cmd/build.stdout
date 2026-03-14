@@ -20,6 +20,12 @@ Options:
           This verifies that the source distribution is complete and can be used to build the
           project from source.
 
+      --pgo
+          Build with Profile-Guided Optimization (PGO).
+          
+          Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml. This performs a
+          three-phase build: instrumented build, profile training, and optimized rebuild.
+
       --compatibility [<compatibility>...]
           Control the platform tag and PyPI compatibility.
           

@@ -172,10 +172,13 @@ pub fn check_installed(package: &Path, python: &Path) -> Result<()> {
         );
     }
 
-    let message = str::from_utf8(&output.stdout).unwrap().trim();
+    let stdout = str::from_utf8(&output.stdout).unwrap().trim();
+    // Check the last line only: some interpreters (e.g. PyPy) may emit
+    // extra debug output to stdout before our print("SUCCESS").
+    let last_line = stdout.lines().last().unwrap_or("");
 
-    if message != "SUCCESS" {
-        panic!("Not SUCCESS: {message}");
+    if last_line != "SUCCESS" {
+        panic!("Not SUCCESS: {stdout}");
     }
 
     Ok(())

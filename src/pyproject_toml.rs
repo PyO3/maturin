@@ -1255,4 +1255,47 @@ mod tests {
             Some("yum install -y openssl-devel".to_string())
         );
     }
+
+    #[test]
+    fn test_pgo_command() {
+        let tmp_dir = TempDir::new().unwrap();
+        let pyproject_file = tmp_dir.path().join("pyproject.toml");
+
+        fs::write(
+            &pyproject_file,
+            r#"[build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            pgo-command = "python -m pytest tests/benchmarks"
+            "#,
+        )
+        .unwrap();
+        let pyproject = PyProjectToml::new(pyproject_file).unwrap();
+        assert_eq!(
+            pyproject.pgo_command(),
+            Some("python -m pytest tests/benchmarks")
+        );
+    }
+
+    #[test]
+    fn test_pgo_command_absent() {
+        let tmp_dir = TempDir::new().unwrap();
+        let pyproject_file = tmp_dir.path().join("pyproject.toml");
+
+        fs::write(
+            &pyproject_file,
+            r#"[build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            manylinux = "2010"
+            "#,
+        )
+        .unwrap();
+        let pyproject = PyProjectToml::new(pyproject_file).unwrap();
+        assert_eq!(pyproject.pgo_command(), None);
+    }
 }

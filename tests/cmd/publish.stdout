@@ -16,6 +16,11 @@ Options:
       --no-sdist
           Don't build a source distribution
 
+      --pgo
+          Build with Profile-Guided Optimization (PGO).
+          
+          Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
+
   -r, --repository <REPOSITORY>
           The repository (package index) to upload the package to. Should be a section in the config
           file.

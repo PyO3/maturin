@@ -210,11 +210,14 @@ impl BuildContext {
 
         let pgo_ctx = PgoContext::new(pgo_command.to_owned())?;
 
-        // Phase 1: Instrumented build
+        // Phase 1: Build a single instrumented wheel for training.
+        // We only need one wheel for profiling — the compiled native code is
+        // identical across interpreters for abi3/cffi/uniffi/bin builds.
         eprintln!("📊 Phase 1/3: Building instrumented wheel...");
         let mut instrumented_ctx = self.clone_for_pgo(PgoPhase::Generate(
             pgo_ctx.profdata_dir_path().to_path_buf(),
         ));
+        instrumented_ctx.interpreter = vec![self.interpreter[0].clone()];
         let instrumented_out =
             tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
         instrumented_ctx.out = instrumented_out.path().to_path_buf();

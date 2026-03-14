@@ -226,11 +226,6 @@ impl PgoContext {
             }
         }
 
-        // Run the instrumentation command
-        if self.pgo_command.is_empty() {
-            bail!("PGO command is empty");
-        }
-
         eprintln!("🏃 Running instrumentation command: {}", self.pgo_command);
         let profraw_pattern = self
             .profdata_dir
@@ -242,6 +237,8 @@ impl PgoContext {
         let current_path = std::env::var("PATH").unwrap_or_default();
         let sep = if cfg!(windows) { ";" } else { ":" };
         let path_env = format!("{}{sep}{current_path}", venv_bin_dir.display());
+
+        let project_dir = build_context.project_layout.project_root.as_path();
 
         // Run through the system shell with the venv's bin dir prepended to PATH,
         // so that `python`, `pytest`, etc. resolve to the venv's copies.
@@ -255,7 +252,8 @@ impl PgoContext {
             cmd
         };
 
-        cmd.env("LLVM_PROFILE_FILE", &profraw_pattern)
+        cmd.current_dir(project_dir)
+            .env("LLVM_PROFILE_FILE", &profraw_pattern)
             .env("PATH", &path_env)
             .env("VIRTUAL_ENV", venv_path);
 
@@ -311,10 +309,13 @@ impl PgoContext {
 
         let llvm_profdata = Self::find_llvm_profdata()?;
 
-        // Collect .profraw files explicitly
+        // Collect .profraw files, propagating any IO errors
         let profraws: Vec<PathBuf> = fs::read_dir(self.profdata_dir.path())
             .context("Failed to read profdata directory")?
-            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .context("Failed to read entry in profdata directory")?
+            .into_iter()
+            .map(|e| e.path())
             .filter(|path| path.extension().is_some_and(|ext| ext == "profraw"))
             .collect();
 

@@ -193,7 +193,7 @@ impl BuildContext {
             fs::set_permissions(&dest_path, perms)?;
 
             patchelf::set_soname(&dest_path, &new_soname)?;
-            if !lib.rpath.is_empty() || !lib.runpath.is_empty() {
+            if !lib.rpath.is_empty() {
                 patchelf::set_rpath(&dest_path, &libs_dir)?;
             }
             soname_map.insert(

@@ -2,7 +2,7 @@ use crate::common::{handle_result, other};
 use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
-use maturin::{BuildOptions, CargoOptions, unpack_sdist};
+use maturin::{BuildOptions, CargoOptions, OutputOptions, unpack_sdist};
 use std::path::Path;
 use std::process::Command;
 use url::Url;
@@ -219,7 +219,10 @@ fn sdist_excludes_explicit_build_script() {
 
     let sdist_dir = temp_dir.path().join("dist");
     let build_options = BuildOptions {
-        out: Some(sdist_dir),
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(project_dir.join("Cargo.toml")),
             quiet: true,
@@ -649,7 +652,10 @@ fn lib_with_parent_workspace_git_dep_sdist() {
 
     let sdist_dir = temp_dir.path().join("dist");
     let build_options = BuildOptions {
-        out: Some(sdist_dir),
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(pysof_dir.join("Cargo.toml")),
             quiet: true,
@@ -789,7 +795,10 @@ fn lib_with_parent_workspace_lints_sdist() {
 
     let sdist_dir = temp_dir.path().join("dist");
     let build_options = BuildOptions {
-        out: Some(sdist_dir),
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(pyapp_dir.join("Cargo.toml")),
             quiet: true,

@@ -4,7 +4,9 @@ use expect_test::Expect;
 use flate2::read::GzDecoder;
 use fs_err::File;
 use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
-use maturin::{BuildOptions, CargoOptions, PlatformTag, unpack_sdist};
+use maturin::{
+    BuildOptions, CargoOptions, OutputOptions, PlatformOptions, PlatformTag, unpack_sdist,
+};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::io::Read;
@@ -160,7 +162,10 @@ pub fn build_source_distribution(
     let sdist_directory = crate::common::case_wheel_dir(unique_name);
 
     let build_options = BuildOptions {
-        out: Some(sdist_directory),
+        output: OutputOptions {
+            out: Some(sdist_directory),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
@@ -178,7 +183,7 @@ pub fn build_source_distribution(
         .build()?;
 
     // Override the sdist generator for testing
-    let mut pyproject_toml = build_context.pyproject_toml.take().unwrap();
+    let mut pyproject_toml = build_context.project.pyproject_toml.take().unwrap();
     let mut tool = pyproject_toml.tool.clone().unwrap_or_default();
     if let Some(ref mut tool_maturin) = tool.maturin {
         tool_maturin.sdist_generator = sdist_generator;
@@ -189,7 +194,7 @@ pub fn build_source_distribution(
         });
     }
     pyproject_toml.tool = Some(tool);
-    build_context.pyproject_toml = Some(pyproject_toml);
+    build_context.project.pyproject_toml = Some(pyproject_toml);
 
     let (path, _) = build_context
         .build_source_distribution()?
@@ -270,14 +275,20 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
     let wheel_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
     let build_options = BuildOptions {
-        out: Some(wheel_directory),
+        output: OutputOptions {
+            out: Some(wheel_directory),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
             target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
             ..Default::default()
         },
-        platform_tag: vec![PlatformTag::Linux],
+        platform: PlatformOptions {
+            platform_tag: vec![PlatformTag::Linux],
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -557,7 +568,10 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
 
     // Step 1: Build the sdist
     let sdist_options = BuildOptions {
-        out: Some(sdist_dir),
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(package.join("Cargo.toml")),
             quiet: true,
@@ -583,7 +597,10 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         pyproject_toml,
     } = unpack_sdist(&sdist_path)?;
     let wheel_options = BuildOptions {
-        out: Some(wheel_dir),
+        output: OutputOptions {
+            out: Some(wheel_dir),
+            ..Default::default()
+        },
         cargo: CargoOptions {
             manifest_path: Some(cargo_toml),
             quiet: true,

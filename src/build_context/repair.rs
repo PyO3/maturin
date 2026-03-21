@@ -322,7 +322,7 @@ impl BuildContext {
     ///
     /// When `fs::rename` fails (e.g. cross-device), falls back to
     /// reflink-or-copy directly; the concurrent-modification window is
-    /// Scenario.
+    /// unlikely in cross-device setups.
     pub(super) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
         let artifact_path = &artifact.path;

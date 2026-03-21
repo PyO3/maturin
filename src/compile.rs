@@ -67,7 +67,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<CompileResult> {
-    if context.universal2 {
+    if context.project.universal2 {
         compile_universal2(context, python_interpreter, targets)
     } else {
         compile_targets(context, python_interpreter, targets)
@@ -81,12 +81,12 @@ fn compile_universal2(
     targets: &[CompileTarget],
 ) -> Result<CompileResult> {
     let mut aarch64_context = context.clone();
-    aarch64_context.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
+    aarch64_context.project.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
 
     let aarch64_result = compile_targets(&aarch64_context, python_interpreter, targets)
         .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
-    x86_64_context.target = Target::from_resolved_target_triple("x86_64-apple-darwin")?;
+    x86_64_context.project.target = Target::from_resolved_target_triple("x86_64-apple-darwin")?;
 
     let x86_64_result = compile_targets(&x86_64_context, python_interpreter, targets)
         .context("Failed to build a x86_64 library through cargo")?;
@@ -190,14 +190,14 @@ fn cargo_build_command(
 ) -> Result<Command> {
     use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
 
-    let target = &context.target;
+    let target = &context.project.target;
 
     let user_specified_target = if target.user_specified {
         Some(target.target_triple().to_string())
     } else {
         None
     };
-    let mut cargo_options = context.cargo_options.clone();
+    let mut cargo_options = context.project.cargo_options.clone();
 
     // Resolve conditional features based on the target Python version and implementation
     if let Some(interpreter) = python_interpreter {
@@ -206,7 +206,7 @@ fn cargo_build_command(
             minor: interpreter.minor,
             implementation_name: &interpreter.implementation_name,
         };
-        let extra = FeatureSpec::resolve_conditional(&context.conditional_features, &env);
+        let extra = FeatureSpec::resolve_conditional(&context.project.conditional_features, &env);
         if !extra.is_empty() {
             debug!(
                 "Enabling conditional features for Python {} {}.{}: {}",
@@ -250,7 +250,7 @@ fn cargo_build_command(
     let original_rustflags = rustflags.flags.clone();
 
     // Inject PGO flags if a PGO build phase is active
-    if let Some(ref pgo_phase) = context.pgo_phase {
+    if let Some(ref pgo_phase) = context.artifact.pgo_phase {
         match pgo_phase {
             crate::pgo::PgoPhase::Generate(profdata_dir) => {
                 rustflags
@@ -546,7 +546,7 @@ fn create_build_command(
     cargo_rustc: cargo_options::Rustc,
     target_triple: &str,
 ) -> Result<Command> {
-    let target = &context.target;
+    let target = &context.project.target;
 
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
@@ -731,7 +731,10 @@ fn configure_pyo3_env(
     }
 
     // Set default macOS deployment target version for non-editable builds
-    if !context.editable && target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
+    if !context.project.editable
+        && target.is_macos()
+        && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none()
+    {
         let target_config = context
             .project
             .pyproject_toml

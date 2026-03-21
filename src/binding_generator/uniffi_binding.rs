@@ -46,7 +46,7 @@ impl BindingGenerator for UniFfiBindingGenerator {
             context.project.manifest_path.parent().unwrap(),
             &context.project.target_dir,
             &context.project.module_name,
-            context.target.target_os(),
+            context.project.target.target_os(),
             &artifact.path,
         )?;
         let artifact_target = ArtifactTarget::ExtensionModule(base_path.join(cdylib));

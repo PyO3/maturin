@@ -69,7 +69,7 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
         module: &Path,
     ) -> Result<GeneratorOutput> {
         let ext_name = &context.project.project_layout.extension_name;
-        let target = &context.target;
+        let target = &context.project.target;
 
         let so_filename = match self.binding_type {
             BindingType::Abi3(interpreter) => {

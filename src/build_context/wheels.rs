@@ -134,7 +134,8 @@ impl BuildContext {
         )?;
 
         write_sboms(
-            self,
+            &self.project,
+            &self.artifact,
             sbom_data.as_ref(),
             &mut writer,
             &self.project.metadata24.get_dist_info_dir(),
@@ -170,7 +171,7 @@ impl BuildContext {
             self.auditwheel(&artifact, &self.python.platform_tag, python_interpreter)?;
         let platform_tags = self.resolve_platform_tags(&policy);
 
-        let platform = self.get_platform_tag(&platform_tags)?;
+        let platform = self.project.get_platform_tag(&platform_tags)?;
         let tag = format!("cp{major}{min_minor}-abi3-{platform}");
 
         let wheel_path = self.write_wheel(
@@ -207,7 +208,7 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<PathBuf> {
-        let tag = python_interpreter.get_tag(self, platform_tags)?;
+        let tag = python_interpreter.get_tag(&self.project, platform_tags)?;
 
         self.write_wheel(
             &tag,
@@ -293,8 +294,7 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
     ) -> Result<(BuildArtifact, HashMap<String, PathBuf>)> {
-        let result = compile(self, python_interpreter, &self.compile_targets)
-            .context("Failed to build a native library through cargo")?;
+        let result = compile(self, python_interpreter, &self.project.compile_targets)?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
         let artifacts = result.artifacts.first().context(error_msg)?;
@@ -406,7 +406,7 @@ impl BuildContext {
             bail!("Defining scripts and working with a binary doesn't mix well");
         }
 
-        if self.target.is_wasi() {
+        if self.project.target.is_wasi() {
             eprintln!("⚠️  Warning: wasi support is experimental");
             if !self.project.metadata24.entry_points.is_empty() {
                 bail!("You can't define entrypoints yourself for a binary project");
@@ -419,10 +419,10 @@ impl BuildContext {
             }
         }
 
-        let tag = match (self.bridge(), python_interpreter) {
+        let tag = match (self.project.bridge(), python_interpreter) {
             (BridgeModel::Bin(None), _) => self.get_universal_tag(platform_tags)?,
             (BridgeModel::Bin(Some(..)), Some(python_interpreter)) => {
-                python_interpreter.get_tag(self, platform_tags)?
+                python_interpreter.get_tag(&self.project, platform_tags)?
             }
             _ => unreachable!(),
         };
@@ -449,7 +449,8 @@ impl BuildContext {
             self.project.project_layout.data.as_deref(),
         )?;
         write_sboms(
-            self,
+            &self.project,
+            &self.artifact,
             sbom_data.as_ref(),
             &mut writer,
             &metadata24.get_dist_info_dir(),
@@ -472,8 +473,7 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let result = compile(self, python_interpreter, &self.compile_targets)
-            .context("Failed to build a native library through cargo")?;
+        let result = compile(self, python_interpreter, &self.project.compile_targets)?;
         if result.artifacts.is_empty() {
             bail!("Cargo didn't build a binary")
         }

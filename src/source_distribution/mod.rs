@@ -5,7 +5,7 @@ mod unpack;
 mod utils;
 
 use crate::pyproject_toml::SdistGenerator;
-use crate::{BuildContext, ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
+use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
 use cargo_metadata::camino::{self, Utf8Path};
 use ignore::overrides::Override;
@@ -344,7 +344,7 @@ fn add_git_tracked_files_to_sdist(
 /// Groups the common parameters needed when adding crates and path dependencies
 /// to the sdist, avoiding excessive argument counts.
 struct SdistContext<'a> {
-    build_context: &'a BuildContext,
+    project: &'a crate::ProjectContext,
     root_dir: &'a Path,
     workspace_root: &'a Utf8Path,
     workspace_manifest_path: camino::Utf8PathBuf,
@@ -356,18 +356,17 @@ struct SdistContext<'a> {
     pyproject_dir: PathBuf,
     workspace_manifest_cache: HashMap<PathBuf, WorkspaceManifestInheritance>,
 }
-
 impl<'a> SdistContext<'a> {
     fn new(
-        build_context: &'a BuildContext,
+        project: &'a crate::ProjectContext,
         pyproject_toml_path: &Path,
         root_dir: &'a Path,
     ) -> Result<Self> {
-        let manifest_path = &build_context.project.manifest_path;
-        let workspace_root = &build_context.project.cargo_metadata.workspace_root;
+        let manifest_path = &project.manifest_path;
+        let workspace_root = &project.cargo_metadata.workspace_root;
         let workspace_manifest_path = workspace_root.join("Cargo.toml");
 
-        let known_path_deps = find_path_deps(&build_context.project.cargo_metadata)?;
+        let known_path_deps = find_path_deps(&project.cargo_metadata)?;
         debug!(
             "Found path dependencies: {:?}",
             known_path_deps.keys().collect::<Vec<_>>()
@@ -376,7 +375,7 @@ impl<'a> SdistContext<'a> {
         let sdist_root = compute_sdist_root(
             workspace_root,
             pyproject_toml_path,
-            &build_context.project.project_layout.python_dir,
+            &project.project_layout.python_dir,
             &known_path_deps,
         )?;
         debug!("Found sdist root: {}", sdist_root.display());
@@ -403,7 +402,7 @@ impl<'a> SdistContext<'a> {
             build_workspace_manifest_cache(&known_path_deps, workspace_root)?;
 
         Ok(Self {
-            build_context,
+            project,
             root_dir,
             workspace_root,
             workspace_manifest_path,
@@ -544,8 +543,7 @@ fn add_path_dep(
         .resolved_package
         .as_ref()
         .or_else(|| {
-            ctx.build_context
-                .project
+            ctx.project
                 .cargo_metadata
                 .packages
                 .iter()
@@ -609,9 +607,8 @@ fn add_path_dep(
 
 /// Add the root crate's files to the sdist.
 fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_>) -> Result<()> {
-    let manifest_path = &ctx.build_context.project.manifest_path;
+    let manifest_path = &ctx.project.manifest_path;
     let main_crate = ctx
-        .build_context
         .project
         .cargo_metadata
         .root_package()
@@ -658,23 +655,13 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
     let skip_prefixes: Vec<PathBuf> =
         if !ctx.relative_main_crate_manifest_dir.as_os_str().is_empty() {
             let mut prefixes = Vec::new();
-            if let Some(python_module) = ctx
-                .build_context
-                .project
-                .project_layout
-                .python_module
-                .as_ref()
+            if let Some(python_module) = ctx.project.project_layout.python_module.as_ref()
                 && let Ok(rel) = python_module.strip_prefix(&ctx.abs_manifest_dir)
             {
                 prefixes.push(rel.to_path_buf());
             }
-            for package in &ctx.build_context.project.project_layout.python_packages {
-                let package_path = ctx
-                    .build_context
-                    .project
-                    .project_layout
-                    .python_dir
-                    .join(package);
+            for package in &ctx.project.project_layout.python_packages {
+                let package_path = ctx.project.project_layout.python_dir.join(package);
                 if let Ok(rel) = package_path.strip_prefix(&ctx.abs_manifest_dir)
                     && !prefixes.contains(&rel.to_path_buf())
                 {
@@ -716,8 +703,7 @@ fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
     } else {
         None
     };
-    let cargo_lock_required =
-        ctx.build_context.cargo_options.locked || ctx.build_context.cargo_options.frozen;
+    let cargo_lock_required = ctx.project.cargo_options.locked || ctx.project.cargo_options.frozen;
 
     if let Some(cargo_lock_path) = cargo_lock_path {
         let relative_cargo_lock = cargo_lock_path.strip_prefix(&ctx.project_root).unwrap();
@@ -779,7 +765,7 @@ fn add_workspace_manifest(
     deps_to_keep.insert(
         main_member_name,
         PathDependency {
-            manifest_path: ctx.build_context.project.manifest_path.to_path_buf(),
+            manifest_path: ctx.project.manifest_path.to_path_buf(),
             workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
             readme: None,
             license_file: None,
@@ -826,12 +812,12 @@ fn add_workspace_manifest(
 /// 5. pyproject.toml
 /// 6. Python sources
 fn add_cargo_package_files_to_sdist(
-    build_context: &BuildContext,
+    project: &crate::ProjectContext,
     pyproject_toml_path: &Path,
     writer: &mut VirtualWriter<SDistWriter>,
     root_dir: &Path,
 ) -> Result<()> {
-    let ctx = SdistContext::new(build_context, pyproject_toml_path, root_dir)?;
+    let ctx = SdistContext::new(project, pyproject_toml_path, root_dir)?;
 
     // 1. Add local path dependencies
     for (name, path_dep) in ctx.known_path_deps.iter() {
@@ -863,18 +849,18 @@ fn add_cargo_package_files_to_sdist(
 /// and in
 /// https://packaging.python.org/specifications/source-distribution-format/#source-distribution-file-format
 pub fn source_distribution(
-    build_context: &BuildContext,
+    project: &crate::ProjectContext,
+    artifact: &crate::ArtifactContext,
     pyproject: &PyProjectToml,
     excludes: Override,
 ) -> Result<PathBuf> {
-    let pyproject_toml_path = build_context
-        .project
+    let pyproject_toml_path = project
         .pyproject_toml_path
         .normalize()
         .with_context(|| {
             format!(
                 "pyproject.toml path `{}` does not exist or is invalid",
-                build_context.project.pyproject_toml_path.display()
+                project.pyproject_toml_path.display()
             )
         })?
         .into_path_buf();
@@ -890,8 +876,8 @@ pub fn source_distribution(
                 Ok(val) => Some(val),
             });
 
-    let metadata24 = &build_context.project.metadata24;
-    let writer = SDistWriter::new(&build_context.artifact.out, metadata24, source_date_epoch)?;
+    let metadata24 = &project.metadata24;
+    let writer = SDistWriter::new(&artifact.out, metadata24, source_date_epoch)?;
     let mut writer = VirtualWriter::new(writer, excludes);
     let root_dir = PathBuf::from(format!(
         "{}-{}",
@@ -900,12 +886,9 @@ pub fn source_distribution(
     ));
 
     match pyproject.sdist_generator() {
-        SdistGenerator::Cargo => add_cargo_package_files_to_sdist(
-            build_context,
-            &pyproject_toml_path,
-            &mut writer,
-            &root_dir,
-        )?,
+        SdistGenerator::Cargo => {
+            add_cargo_package_files_to_sdist(project, &pyproject_toml_path, &mut writer, &root_dir)?
+        }
         SdistGenerator::Git => {
             add_git_tracked_files_to_sdist(&pyproject_toml_path, &mut writer, &root_dir)?
         }
@@ -917,7 +900,7 @@ pub fn source_distribution(
         pyproject,
         pyproject_dir,
         &root_dir,
-        &build_context.project.project_layout.python_dir,
+        &project.project_layout.python_dir,
     )?;
 
     let pkg_info = root_dir.join("PKG-INFO");

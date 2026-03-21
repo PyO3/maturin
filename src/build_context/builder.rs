@@ -240,9 +240,8 @@ impl BuildContextBuilder {
         };
 
         Ok(BuildContext {
-            target,
-            compile_targets,
             project: crate::build_context::ProjectContext {
+                target,
                 project_layout,
                 pyproject_toml_path,
                 pyproject_toml,
@@ -252,6 +251,11 @@ impl BuildContextBuilder {
                 manifest_path: cargo_toml_path,
                 target_dir,
                 cargo_metadata,
+                universal2,
+                editable,
+                cargo_options,
+                conditional_features,
+                compile_targets,
             },
             artifact: crate::build_context::ArtifactContext {
                 out: wheel_dir,
@@ -260,6 +264,8 @@ impl BuildContextBuilder {
                 sbom,
                 include_import_lib,
                 include_debuginfo,
+                pgo_phase: None,
+                pgo_command,
             },
             python: crate::build_context::PythonContext {
                 auditwheel,
@@ -269,12 +275,6 @@ impl BuildContextBuilder {
                 interpreter,
                 pypi_validation,
             },
-            cargo_options,
-            universal2,
-            editable,
-            conditional_features,
-            pgo_phase: None,
-            pgo_command,
         })
     }
 

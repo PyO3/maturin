@@ -31,7 +31,7 @@ impl BuildContext {
 
         if let Some(python_interpreter) = python_interpreter
             && platform_tag.is_empty()
-            && self.target.is_linux()
+            && self.project.target.is_linux()
             && !python_interpreter.support_portable_wheels()
         {
             eprintln!(
@@ -54,12 +54,12 @@ impl BuildContext {
         others.sort();
 
         // only bin bindings allow linking to libpython, extension modules must not
-        let allow_linking_libpython = self.bridge().is_bin();
-        if self.bridge().is_bin() && !musllinux.is_empty() {
+        let allow_linking_libpython = self.project.bridge().is_bin();
+        if self.project.bridge().is_bin() && !musllinux.is_empty() {
             return get_policy_and_libs(
                 artifact,
                 Some(musllinux[0]),
-                &self.target,
+                &self.project.target,
                 &self.project.manifest_path,
                 allow_linking_libpython,
             );
@@ -69,7 +69,7 @@ impl BuildContext {
         get_policy_and_libs(
             artifact,
             tag,
-            &self.target,
+            &self.project.target,
             &self.project.manifest_path,
             allow_linking_libpython,
         )
@@ -80,7 +80,7 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable && self.target.is_linux() && !artifacts.is_empty() {
+        if self.project.editable && self.project.target.is_linux() && !artifacts.is_empty() {
             for artifact in artifacts {
                 let artifact = artifact.borrow();
                 if artifact.linked_paths.is_empty() {
@@ -115,7 +115,7 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable {
+        if self.project.editable {
             return self.add_rpath(artifacts);
         }
         if ext_libs.iter().all(|libs| libs.is_empty()) {
@@ -262,7 +262,8 @@ impl BuildContext {
             if auditwheel_sbom_enabled {
                 // Obtain the sysroot so whichprovides can strip cross-compilation
                 // prefixes when querying the host package manager.
-                let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
+                let sysroot =
+                    get_sysroot_path(&self.project.target).unwrap_or_else(|_| PathBuf::from("/"));
                 if let Some(sbom_json) = crate::auditwheel::sbom::create_auditwheel_sbom(
                     &self.project.metadata24.name,
                     &self.project.metadata24.version.to_string(),
@@ -279,7 +280,7 @@ impl BuildContext {
             }
         }
 
-        let artifact_dir = match self.bridge() {
+        let artifact_dir = match self.project.bridge() {
             // cffi bindings that contains '.' in the module name will be split into directories
             BridgeModel::Cffi => self.project.module_name.split(".").collect::<PathBuf>(),
             // For namespace packages the modules reside at ${module_name}.so

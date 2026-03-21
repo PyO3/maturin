@@ -295,8 +295,8 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
 fn pep517(subcommand: Pep517Command) -> Result<()> {
     // PEP 517 builds default to release profile.
     fn ensure_release_profile(context: &mut BuildContext) {
-        if context.cargo_options.profile.is_none() {
-            context.cargo_options.profile = Some("release".to_string());
+        if context.project.cargo_options.profile.is_none() {
+            context.project.cargo_options.profile = Some("release".to_string());
         }
     }
 
@@ -490,6 +490,7 @@ fn run() -> Result<()> {
             // (respect pyproject.toml if set)
             // don't need to check `debug` here, set above to take precedence if set
             let profile = build_context
+                .project
                 .cargo_options
                 .profile
                 .get_or_insert_with(|| "release".to_string());

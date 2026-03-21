@@ -123,7 +123,7 @@ where
     A: Borrow<BuildArtifact>,
 {
     // 1. Install the python files
-    if !context.editable {
+    if !context.project.editable {
         write_python_part(
             writer,
             &context.project.project_layout,
@@ -158,7 +158,7 @@ where
             additional_files,
         } = generator.generate_bindings(context, artifact, &module)?;
 
-        match (context.editable, &base_path) {
+        match (context.project.editable, &base_path) {
             (true, Some(base_path)) => {
                 let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
                 // Compute the directory where debug info files should be placed.
@@ -341,7 +341,7 @@ where
                     out_dir.display()
                 );
             }
-            match (context.editable, &base_path) {
+            match (context.project.editable, &base_path) {
                 (true, Some(base_path)) => {
                     for m in matches {
                         let target = base_path.join(&m.target);

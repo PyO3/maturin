@@ -348,9 +348,10 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     }
 
     let interpreter =
-        PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
-            || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
-        )?;
+        PythonInterpreter::check_executable(&python, &target, build_context.project.bridge())?
+            .ok_or_else(|| {
+                anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+            })?;
 
     let uv_venv = is_uv_venv(venv_dir);
     let uv_info = if uv || uv_venv {

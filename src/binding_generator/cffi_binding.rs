@@ -51,7 +51,7 @@ impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
         let cffi_module_file_name = {
             let extension_name = &context.project.project_layout.extension_name;
             // https://cffi.readthedocs.io/en/stable/embedding.html#issues-about-using-the-so
-            super::cdylib_filename(extension_name, context.target.target_os())
+            super::cdylib_filename(extension_name, context.project.target.target_os())
         };
         let base_path = if context.project.project_layout.python_module.is_some() {
             module.join(&context.project.project_layout.extension_name)

@@ -156,6 +156,9 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: 3.14t
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:

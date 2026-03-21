@@ -186,7 +186,12 @@ fn emit_platform_job(
     y.line("steps:")
         .indent()
         .line("- uses: actions/checkout@v6");
-    emit_platform_setup(&mut y, platform, context.setup_python);
+    emit_platform_setup(
+        &mut y,
+        platform,
+        context.setup_python,
+        context.min_python_minor,
+    );
 
     let maturin_args = build_maturin_args(
         context.cli,
@@ -208,7 +213,7 @@ fn emit_platform_job(
     );
 
     if context.is_abi3 {
-        emit_free_threaded_setup(&mut y, platform);
+        emit_free_threaded_setup(&mut y, platform, context.min_python_minor);
         emit_build_step(
             &mut y,
             "Build free-threaded wheels",
@@ -256,11 +261,16 @@ fn emit_target_matrix(y: &mut Yaml, targets: &[ResolvedTarget]) {
     y.dedent_by(3);
 }
 
-fn emit_platform_setup(y: &mut Yaml, platform: Platform, setup_python: bool) {
+fn emit_platform_setup(
+    y: &mut Yaml,
+    platform: Platform,
+    setup_python: bool,
+    min_python_minor: Option<u8>,
+) {
     match platform {
         Platform::Emscripten => emit_emscripten_setup(y),
         Platform::Android => {}
-        _ if setup_python => emit_python_setup(y, platform),
+        _ if setup_python => emit_python_setup(y, platform, min_python_minor),
         _ => {}
     }
 }
@@ -295,11 +305,12 @@ fn emit_emscripten_setup(y: &mut Yaml) {
         .line("- run: pip install pyodide-build");
 }
 
-fn emit_python_setup(y: &mut Yaml, platform: Platform) {
-    let python_version = if matches!(platform, Platform::Windows) {
-        "3.13"
-    } else {
-        "3.x"
+fn emit_python_setup(y: &mut Yaml, platform: Platform, min_python_minor: Option<u8>) {
+    let python_version = match (platform, min_python_minor) {
+        (Platform::Windows, Some(minor)) if minor >= 13 => format!("3.{minor}"),
+        (Platform::Windows, _) => "3.13".to_string(),
+        (_, Some(minor)) => format!("3.{minor}"),
+        _ => "3.x".to_string(),
     };
 
     y.line("- uses: actions/setup-python@v6")
@@ -316,21 +327,29 @@ fn emit_python_setup(y: &mut Yaml, platform: Platform) {
     y.dedent_by(2);
 }
 
-fn emit_free_threaded_setup(y: &mut Yaml, platform: Platform) {
-    if !matches!(platform, Platform::Windows) {
+fn emit_free_threaded_setup(y: &mut Yaml, platform: Platform, min_python_minor: Option<u8>) {
+    if !matches!(platform, Platform::Windows | Platform::Macos) {
         return;
     }
+
+    let python_version = if matches!(min_python_minor, Some(minor) if minor > 14) {
+        format!("3.{}t", min_python_minor.unwrap())
+    } else {
+        "3.14t".to_string()
+    };
 
     y.line("- uses: actions/setup-python@v6")
         .indent()
         .line("with:")
         .indent()
-        .line("python-version: 3.14t")
-        .line(format!(
+        .line(format!("python-version: {python_version}"));
+    if matches!(platform, Platform::Windows) {
+        y.line(format!(
             "architecture: {}",
             gha_expr("matrix.platform.python_arch")
-        ))
-        .dedent_by(2);
+        ));
+    }
+    y.dedent_by(2);
 }
 
 fn build_maturin_args(
@@ -483,7 +502,7 @@ fn emit_release_steps(y: &mut Yaml, resolved: &ResolvedCIConfig) {
         .platform_targets
         .contains_key(&Platform::Emscripten)
     {
-        emit_release_wasm_upload_step(y);
+        emit_release_github_upload_step(y);
     }
 }
 
@@ -523,7 +542,7 @@ fn emit_release_publish_steps(y: &mut Yaml) {
     y.dedent_by(2);
 }
 
-fn emit_release_wasm_upload_step(y: &mut Yaml) {
+fn emit_release_github_upload_step(y: &mut Yaml) {
     y.line("- name: Upload to GitHub Release");
     y.indent();
     y.line("uses: softprops/action-gh-release@v1");

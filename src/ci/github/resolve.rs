@@ -133,44 +133,20 @@ pub(crate) fn resolve_platform_targets(
         let pl = |field: fn(&CIConfigOverrides) -> &Option<String>| {
             platform_config.and_then(|config| field(&config.overrides).as_deref())
         };
-
-        let runner = resolve_optional(
-            pt(|o| &o.runner),
-            pl(|o| &o.runner),
-            Some(platform.default_runner(&arch)),
-        )
-        .unwrap();
+        let rf = |field: fn(&CIConfigOverrides) -> &Option<String>, default: Option<&str>| {
+            resolve_optional(pt(field), pl(field), default)
+        };
 
         resolved.push(ResolvedTarget {
-            runner,
+            runner: rf(|o| &o.runner, Some(platform.default_runner(&arch))).unwrap(),
             target: arch,
             python_arch,
-            manylinux: resolve_optional(
-                pt(|o| &o.manylinux),
-                pl(|o| &o.manylinux),
-                platform.default_manylinux(),
-            ),
-            container: resolve_optional(pt(|o| &o.container), pl(|o| &o.container), None),
-            docker_options: resolve_optional(
-                pt(|o| &o.docker_options),
-                pl(|o| &o.docker_options),
-                None,
-            ),
-            rust_toolchain: resolve_optional(
-                pt(|o| &o.rust_toolchain),
-                pl(|o| &o.rust_toolchain),
-                platform.default_rust_toolchain(),
-            ),
-            rustup_components: resolve_optional(
-                pt(|o| &o.rustup_components),
-                pl(|o| &o.rustup_components),
-                None,
-            ),
-            before_script_linux: resolve_optional(
-                pt(|o| &o.before_script_linux),
-                pl(|o| &o.before_script_linux),
-                None,
-            ),
+            manylinux: rf(|o| &o.manylinux, platform.default_manylinux()),
+            container: rf(|o| &o.container, None),
+            docker_options: rf(|o| &o.docker_options, None),
+            rust_toolchain: rf(|o| &o.rust_toolchain, platform.default_rust_toolchain()),
+            rustup_components: rf(|o| &o.rustup_components, None),
+            before_script_linux: rf(|o| &o.before_script_linux, None),
             extra_args: resolve_optional(
                 pt(|o| &o.args),
                 pl(|o| &o.args),

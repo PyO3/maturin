@@ -1,4 +1,4 @@
-use crate::build_options::{CargoOptions, extract_cargo_metadata_args};
+use crate::cargo_options::CargoOptions;
 use crate::{CargoToml, Metadata24, PyProjectToml};
 use anyhow::{Context, Result, bail, format_err};
 use cargo_metadata::{Metadata, MetadataCommand};
@@ -360,7 +360,7 @@ impl ProjectResolver {
         cargo_options: &CargoOptions,
     ) -> Result<Metadata> {
         debug!("Resolving cargo metadata from {:?}", manifest_path);
-        let cargo_metadata_extra_args = extract_cargo_metadata_args(cargo_options)?;
+        let cargo_metadata_extra_args = cargo_options.cargo_metadata_args()?;
         let result = MetadataCommand::new()
             // Force resolving metadata using cargo instead of instead of $CARGO env var
             // to avoid getting wrong file path like target directory, for example `cross` would

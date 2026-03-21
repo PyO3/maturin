@@ -32,8 +32,8 @@ impl BindingGenerator for UniFfiBindingGenerator {
         artifact: &BuildArtifact,
         module: &Path,
     ) -> Result<GeneratorOutput> {
-        let base_path = if context.project_layout.python_module.is_some() {
-            module.join(&context.project_layout.extension_name)
+        let base_path = if context.project.project_layout.python_module.is_some() {
+            module.join(&context.project.project_layout.extension_name)
         } else {
             module.to_path_buf()
         };
@@ -43,9 +43,9 @@ impl BindingGenerator for UniFfiBindingGenerator {
             cdylib,
             path: binding_dir,
         } = generate_uniffi_bindings(
-            context.manifest_path.parent().unwrap(),
-            &context.target_dir,
-            &context.module_name,
+            context.project.manifest_path.parent().unwrap(),
+            &context.project.target_dir,
+            &context.project.module_name,
             context.target.target_os(),
             &artifact.path,
         )?;

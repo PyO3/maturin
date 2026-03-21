@@ -101,7 +101,7 @@ impl BuildContextBuilder {
 
         let bridge = find_bridge(
             &cargo_metadata,
-            build_options.bindings.as_deref().or_else(|| {
+            build_options.python.bindings.as_deref().or_else(|| {
                 pyproject.and_then(|x| {
                     if x.bindings().is_some() {
                         pyproject_toml_maturin_options.push("bindings");
@@ -123,10 +123,10 @@ impl BuildContextBuilder {
 
         let (target, universal2) = resolve_target(
             build_options.target.clone(),
-            build_options.interpreter.first(),
+            build_options.python.interpreter.first(),
         )?;
 
-        let wheel_dir = match build_options.out {
+        let wheel_dir = match build_options.output.out {
             Some(ref dir) => dir.clone(),
             None => PathBuf::from(&cargo_metadata.target_directory).join("wheels"),
         };
@@ -166,18 +166,19 @@ impl BuildContextBuilder {
         // Check if PyPI validation is needed from the original user input,
         // since resolve_platform_tags filters out PlatformTag::Pypi
         let pypi_validation = build_options
+            .platform
             .platform_tag
             .iter()
             .any(|platform_tag| platform_tag == &PlatformTag::Pypi);
 
         let platform_tags = resolve_platform_tags(
-            build_options.platform_tag,
+            build_options.platform.platform_tag,
             &target,
             &bridge,
             pyproject,
             &mut pyproject_toml_maturin_options,
             #[cfg(feature = "zig")]
-            build_options.zig,
+            build_options.platform.zig,
         )?;
 
         validate_bridge_type(&bridge, &target, &platform_tags)?;
@@ -241,30 +242,36 @@ impl BuildContextBuilder {
         Ok(BuildContext {
             target,
             compile_targets,
-            project_layout,
-            pyproject_toml_path,
-            pyproject_toml,
-            metadata24,
-            crate_name,
-            module_name,
-            manifest_path: cargo_toml_path,
-            target_dir,
-            out: wheel_dir,
-            strip,
-            auditwheel,
-            #[cfg(feature = "zig")]
-            zig: build_options.zig,
-            platform_tag: platform_tags,
-            interpreter,
-            cargo_metadata,
+            project: crate::build_context::ProjectContext {
+                project_layout,
+                pyproject_toml_path,
+                pyproject_toml,
+                metadata24,
+                crate_name,
+                module_name,
+                manifest_path: cargo_toml_path,
+                target_dir,
+                cargo_metadata,
+            },
+            artifact: crate::build_context::ArtifactContext {
+                out: wheel_dir,
+                strip,
+                compression: build_options.compression,
+                sbom,
+                include_import_lib,
+                include_debuginfo,
+            },
+            python: crate::build_context::PythonContext {
+                auditwheel,
+                #[cfg(feature = "zig")]
+                zig: build_options.platform.zig,
+                platform_tag: platform_tags,
+                interpreter,
+                pypi_validation,
+            },
+            cargo_options,
             universal2,
             editable,
-            cargo_options,
-            compression: build_options.compression,
-            pypi_validation,
-            sbom,
-            include_import_lib,
-            include_debuginfo,
             conditional_features,
             pgo_phase: None,
             pgo_command,
@@ -285,10 +292,10 @@ impl BuildContextBuilder {
             return Ok((Vec::new(), None));
         }
 
-        let mut user_interpreters = build_options.interpreter.clone();
+        let mut user_interpreters = build_options.python.interpreter.clone();
         if cfg!(test)
             && user_interpreters.is_empty()
-            && !build_options.find_interpreter
+            && !build_options.python.find_interpreter
             && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
         {
             user_interpreters = vec![python.into()];
@@ -299,7 +306,7 @@ impl BuildContextBuilder {
             bridge,
             metadata24.requires_python.as_ref(),
             &user_interpreters,
-            build_options.find_interpreter,
+            build_options.python.find_interpreter,
             generate_import_lib,
         );
         resolver.resolve()
@@ -312,17 +319,18 @@ impl BuildContextBuilder {
         pyproject: Option<&PyProjectToml>,
     ) -> (bool, bool, AuditWheelMode) {
         let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
-        let include_debuginfo = if strip && build_options.include_debuginfo {
+        let include_debuginfo = if strip && build_options.output.include_debuginfo {
             tracing::warn!("--strip is enabled, disabling --include-debuginfo");
             false
         } else if strip {
             false
         } else {
-            build_options.include_debuginfo
+            build_options.output.include_debuginfo
         };
         let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
-            || build_options.skip_auditwheel;
+            || build_options.platform.skip_auditwheel;
         let auditwheel = build_options
+            .platform
             .auditwheel
             .or_else(|| pyproject.and_then(|x| x.auditwheel()))
             .unwrap_or(if skip_auditwheel {
@@ -342,9 +350,9 @@ impl BuildContextBuilder {
             .and_then(|x| x.maturin())
             .and_then(|x| x.sbom.clone())
             .unwrap_or_default();
-        if !build_options.sbom_include.is_empty() {
+        if !build_options.output.sbom_include.is_empty() {
             let includes = config.include.get_or_insert_with(Vec::new);
-            includes.extend(build_options.sbom_include.iter().cloned());
+            includes.extend(build_options.output.sbom_include.iter().cloned());
             includes.dedup();
         }
         Some(config)

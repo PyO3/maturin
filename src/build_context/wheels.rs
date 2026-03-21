@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
+use itertools::Itertools;
 use lddtree::Library;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -33,9 +34,8 @@ impl BuildContext {
         min_version: Option<(u8, u8)>,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
-        use itertools::Itertools;
-
         let abi3_interps: Vec<_> = self
+            .python
             .interpreter
             .iter()
             .filter(|interp| {
@@ -47,6 +47,7 @@ impl BuildContext {
             .cloned()
             .collect();
         let non_abi3_interps: Vec<_> = self
+            .python
             .interpreter
             .iter()
             .filter(|interp| !interp.has_stable_api())
@@ -107,10 +108,16 @@ impl BuildContext {
         F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'a>>,
     {
         let file_options = self
+            .artifact
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(tag, &self.out, &self.metadata24, file_options)?;
+        let writer = WheelWriter::new(
+            tag,
+            &self.artifact.out,
+            &self.project.metadata24,
+            file_options,
+        )?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.add_external_libs(&mut writer, artifacts, ext_libs)?;
 
@@ -122,20 +129,23 @@ impl BuildContext {
         self.add_pth(&mut writer)?;
         add_data(
             &mut writer,
-            &self.metadata24,
-            self.project_layout.data.as_deref(),
+            &self.project.metadata24,
+            self.project.project_layout.data.as_deref(),
         )?;
 
         write_sboms(
             self,
             sbom_data.as_ref(),
             &mut writer,
-            &self.metadata24.get_dist_info_dir(),
+            &self.project.metadata24.get_dist_info_dir(),
         )?;
 
         let tags = [tag.to_string()];
-        let wheel_path =
-            writer.finish(&self.metadata24, &self.project_layout.project_root, &tags)?;
+        let wheel_path = writer.finish(
+            &self.project.metadata24,
+            &self.project.project_layout.project_root,
+            &tags,
+        )?;
         Ok(wheel_path)
     }
 
@@ -154,10 +164,10 @@ impl BuildContext {
         let python_interpreter = interpreters.first();
         let (artifact, out_dirs) = self.compile_cdylib(
             python_interpreter,
-            Some(&self.project_layout.extension_name),
+            Some(&self.project.project_layout.extension_name),
         )?;
         let (policy, external_libs) =
-            self.auditwheel(&artifact, &self.platform_tag, python_interpreter)?;
+            self.auditwheel(&artifact, &self.python.platform_tag, python_interpreter)?;
         let platform_tags = self.resolve_platform_tags(&policy);
 
         let platform = self.get_platform_tag(&platform_tags)?;
@@ -225,10 +235,13 @@ impl BuildContext {
     ) -> Result<BuiltWheelMetadata> {
         let (artifact, out_dirs) = self.compile_cdylib(
             Some(python_interpreter),
-            Some(&self.project_layout.extension_name),
+            Some(&self.project.project_layout.extension_name),
         )?;
-        let (policy, external_libs) =
-            self.auditwheel(&artifact, &self.platform_tag, Some(python_interpreter))?;
+        let (policy, external_libs) = self.auditwheel(
+            &artifact,
+            &self.python.platform_tag,
+            Some(python_interpreter),
+        )?;
         let platform_tags = self.resolve_platform_tags(&policy);
         let wheel_path = self.write_pyo3_wheel(
             python_interpreter,
@@ -315,7 +328,8 @@ impl BuildContext {
         F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'a>>,
     {
         let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
+        let (policy, external_libs) =
+            self.auditwheel(&artifact, &self.python.platform_tag, None)?;
         let platform_tags = self.resolve_platform_tags(&policy);
         let tag = self.get_universal_tag(&platform_tags)?;
         let wheel_path = self.write_wheel(
@@ -334,7 +348,7 @@ impl BuildContext {
         &self,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
-        let interpreter = self.interpreter.first().ok_or_else(|| {
+        let interpreter = self.python.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
         let (wheel_path, _) = self.build_cdylib_wheel(
@@ -349,6 +363,7 @@ impl BuildContext {
 
         // Warn if cffi isn't specified in the requirements
         if !self
+            .project
             .metadata24
             .requires_dist
             .iter()
@@ -387,17 +402,17 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<PathBuf> {
-        if !self.metadata24.scripts.is_empty() {
+        if !self.project.metadata24.scripts.is_empty() {
             bail!("Defining scripts and working with a binary doesn't mix well");
         }
 
         if self.target.is_wasi() {
             eprintln!("⚠️  Warning: wasi support is experimental");
-            if !self.metadata24.entry_points.is_empty() {
+            if !self.project.metadata24.entry_points.is_empty() {
                 bail!("You can't define entrypoints yourself for a binary project");
             }
 
-            if self.project_layout.python_module.is_some() {
+            if self.project.project_layout.python_module.is_some() {
                 // TODO: Can we have python code and the wasm launchers coexisting
                 // without clashes?
                 bail!("Sorry, adding python code to a wasm binary is currently not supported")
@@ -412,12 +427,13 @@ impl BuildContext {
             _ => unreachable!(),
         };
 
-        let mut metadata24 = self.metadata24.clone();
+        let mut metadata24 = self.project.metadata24.clone();
         let file_options = self
+            .artifact
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(&tag, &self.out, &metadata24, file_options)?;
+        let writer = WheelWriter::new(&tag, &self.artifact.out, &metadata24, file_options)?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
 
         self.add_external_libs(&mut writer, artifacts, ext_libs)?;
@@ -430,7 +446,7 @@ impl BuildContext {
         add_data(
             &mut writer,
             &metadata24,
-            self.project_layout.data.as_deref(),
+            self.project.project_layout.data.as_deref(),
         )?;
         write_sboms(
             self,
@@ -439,7 +455,11 @@ impl BuildContext {
             &metadata24.get_dist_info_dir(),
         )?;
         let tags = [tag];
-        let wheel_path = writer.finish(&metadata24, &self.project_layout.project_root, &tags)?;
+        let wheel_path = writer.finish(
+            &metadata24,
+            &self.project.project_layout.project_root,
+            &tags,
+        )?;
         Ok(wheel_path)
     }
 
@@ -467,7 +487,8 @@ impl BuildContext {
                 .cloned()
                 .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-            let (policy, external_libs) = self.auditwheel(&artifact, &self.platform_tag, None)?;
+            let (policy, external_libs) =
+                self.auditwheel(&artifact, &self.python.platform_tag, None)?;
             policies.push(policy);
             ext_libs.push(external_libs);
 

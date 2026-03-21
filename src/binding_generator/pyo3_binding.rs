@@ -68,7 +68,7 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
         artifact: &BuildArtifact,
         module: &Path,
     ) -> Result<GeneratorOutput> {
-        let ext_name = &context.project_layout.extension_name;
+        let ext_name = &context.project.project_layout.extension_name;
         let target = &context.target;
 
         let so_filename = match self.binding_type {
@@ -106,7 +106,7 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
             None
         };
 
-        let additional_files = match context.project_layout.python_module {
+        let additional_files = match context.project.project_layout.python_module {
             Some(_) => None,
             None => {
                 let mut files = HashMap::new();

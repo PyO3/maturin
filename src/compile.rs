@@ -1,6 +1,6 @@
 #[cfg(feature = "zig")]
 use crate::PlatformTag;
-use crate::target::{RUST_1_64_0, RUST_1_93_0};
+use crate::target::{RUST_1_64_0, RUST_1_93_0, rustc_macosx_target_version};
 use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -243,7 +243,7 @@ fn cargo_build_command(
 
     let target_triple = target.target_triple();
 
-    let manifest_dir = context.manifest_path.parent().unwrap();
+    let manifest_dir = context.project.manifest_path.parent().unwrap();
     let mut rustflags = cargo_config2::Config::load_with_cwd(manifest_dir)?
         .rustflags(target_triple)?
         .unwrap_or_default();
@@ -279,22 +279,22 @@ fn cargo_build_command(
         &mut rustflags,
         target,
         bridge_model,
-        &context.module_name,
+        &context.project.module_name,
         python_interpreter,
         #[cfg(feature = "zig")]
-        context.zig,
+        context.python.zig,
         #[cfg(feature = "zig")]
-        &context.target_dir,
+        &context.project.target_dir,
     );
 
-    if context.strip {
+    if context.artifact.strip {
         // https://doc.rust-lang.org/rustc/codegen-options/index.html#strip
         cargo_rustc
             .args
             .extend(["-C".to_string(), "strip=symbols".to_string()]);
     }
 
-    configure_debuginfo_flags(&mut rustflags, target, context.include_debuginfo)?;
+    configure_debuginfo_flags(&mut rustflags, target, context.artifact.include_debuginfo)?;
 
     let mut build_command = create_build_command(context, cargo_rustc, target_triple)?;
 
@@ -597,7 +597,7 @@ fn create_build_command(
         #[cfg(feature = "zig")]
         {
             let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
-            if !context.zig {
+            if !context.python.zig {
                 build.disable_zig_linker = true;
                 if target.user_specified {
                     build.target = vec![target_triple.to_string()];
@@ -606,7 +606,12 @@ fn create_build_command(
                 println!("🛠️ Using zig for cross-compiling to {target_triple}");
                 build.enable_zig_ar = true;
                 let zig_triple = if target.is_linux() && !target.is_musl_libc() {
-                    match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
+                    match context
+                        .python
+                        .platform_tag
+                        .iter()
+                        .find(|tag| tag.is_manylinux())
+                    {
                         Some(PlatformTag::Manylinux { major, minor }) => {
                             format!("{target_triple}.{major}.{minor}")
                         }
@@ -630,7 +635,7 @@ fn create_build_command(
     };
 
     #[cfg(feature = "zig")]
-    if context.zig {
+    if context.python.zig {
         // Pass zig command to downstream, eg. python3-dll-a
         if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
             if zig_args.is_empty() {
@@ -668,7 +673,7 @@ fn configure_pyo3_env(
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
         if !is_pypy_or_graalpy && !target.is_windows() {
-            let pyo3_ver = pyo3_version(&context.cargo_metadata)
+            let pyo3_ver = pyo3_version(&context.project.cargo_metadata)
                 .context("Failed to get pyo3 version from cargo metadata")?;
             if pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
                 // This will make old pyo3's build script only set some predefined linker
@@ -704,7 +709,7 @@ fn configure_pyo3_env(
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
             let pyo3_config = interpreter.pyo3_config_file();
-            let maturin_target_dir = ensure_target_maturin_dir(&context.target_dir);
+            let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
                 target_triple, interpreter.major, interpreter.minor
@@ -727,9 +732,8 @@ fn configure_pyo3_env(
 
     // Set default macOS deployment target version for non-editable builds
     if !context.editable && target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
-        use crate::target::rustc_macosx_target_version;
-
         let target_config = context
+            .project
             .pyproject_toml
             .as_ref()
             .and_then(|x| x.target_config(target_triple));
@@ -782,6 +786,7 @@ fn compile_target(
         match message {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let package_in_metadata = context
+                    .project
                     .cargo_metadata
                     .packages
                     .iter()
@@ -805,7 +810,7 @@ fn compile_target(
                 };
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
-                if crate_name.as_ref() == context.crate_name {
+                if crate_name.as_ref() == context.project.crate_name {
                     let num_crate_types = artifact.target.crate_types.len();
                     let mut filenames_iter = artifact.filenames.into_iter();
                     for crate_type in artifact.target.crate_types {
@@ -813,6 +818,7 @@ fn compile_target(
                             let path = if using_cross && filename.starts_with("/target") {
                                 // Convert cross target path in docker back to path on host
                                 context
+                                    .project
                                     .cargo_metadata
                                     .target_directory
                                     .join(filename.strip_prefix("/target").unwrap())
@@ -885,6 +891,7 @@ fn compile_target(
                 // Capture OUT_DIR for each package
                 if !msg.out_dir.as_os_str().is_empty() {
                     let pkg_name = context
+                        .project
                         .cargo_metadata
                         .packages
                         .iter()

@@ -18,7 +18,7 @@ pub(super) fn add_pyproject_toml(
     pyproject_toml_path: &Path,
 ) -> Result<()> {
     if ctx.pyproject_dir != ctx.sdist_root {
-        let python_dir = &ctx.build_context.project_layout.python_dir;
+        let python_dir = &ctx.build_context.project.project_layout.python_dir;
         // Compute python-source relative to pyproject_dir.  When python_dir is
         // outside pyproject_dir, compute the path relative to project_root instead.
         let relative_python_source = if python_dir != &ctx.pyproject_dir {
@@ -58,12 +58,16 @@ pub(super) fn add_python_sources(
 ) -> Result<()> {
     let build_context = ctx.build_context;
     let mut python_packages = Vec::new();
-    if let Some(python_module) = build_context.project_layout.python_module.as_ref() {
+    if let Some(python_module) = build_context.project.project_layout.python_module.as_ref() {
         trace!("Resolved python module: {}", python_module.display());
         python_packages.push(python_module.to_path_buf());
     }
-    for package in &build_context.project_layout.python_packages {
-        let package_path = build_context.project_layout.python_dir.join(package);
+    for package in &build_context.project.project_layout.python_packages {
+        let package_path = build_context
+            .project
+            .project_layout
+            .python_dir
+            .join(package);
         if python_packages.contains(&package_path) {
             continue;
         }

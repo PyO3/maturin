@@ -184,9 +184,10 @@ impl PgoContext {
         }
 
         // Install requires_dist dependencies
-        if !build_context.metadata24.requires_dist.is_empty() {
+        if !build_context.project.metadata24.requires_dist.is_empty() {
             debug!("Installing requires_dist dependencies");
             let deps: Vec<String> = build_context
+                .project
                 .metadata24
                 .requires_dist
                 .iter()
@@ -202,12 +203,14 @@ impl PgoContext {
         // Install dev dependency group if present (pip only — uv doesn't support --group yet)
         if uv.is_none() {
             let has_dev_group = build_context
+                .project
                 .pyproject_toml
                 .as_ref()
                 .and_then(|p| p.dependency_groups.as_ref())
                 .is_some_and(|dg| dg.0.contains_key("dev"));
             if has_dev_group {
                 let project_dir = build_context
+                    .project
                     .pyproject_toml_path
                     .parent()
                     .context("Failed to get project directory")?;
@@ -238,7 +241,7 @@ impl PgoContext {
         let sep = if cfg!(windows) { ";" } else { ":" };
         let path_env = format!("{}{sep}{current_path}", venv_bin_dir.display());
 
-        let project_dir = build_context.project_layout.project_root.as_path();
+        let project_dir = build_context.project.project_layout.project_root.as_path();
 
         // Run through the system shell with the venv's bin dir prepended to PATH,
         // so that `python`, `pytest`, etc. resolve to the venv's copies.

@@ -24,8 +24,11 @@
 #![deny(missing_docs)]
 
 pub use crate::bridge::{Abi3Version, BridgeModel, PyO3, PyO3Crate};
-pub use crate::build_context::{BuildContext, BuiltWheelMetadata};
-pub use crate::build_options::{BuildOptions, CargoOptions, TargetTriple};
+pub use crate::build_context::{
+    ArtifactContext, BuildContext, BuiltWheelMetadata, ProjectContext, PythonContext,
+};
+pub use crate::build_options::{BuildOptions, OutputOptions, PlatformOptions, PythonOptions};
+pub use crate::cargo_options::{CargoOptions, TargetTriple};
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{BuildArtifact, CompileResult, compile};
 pub use crate::compression::{CompressionMethod, CompressionOptions};
@@ -52,6 +55,8 @@ mod binding_generator;
 mod bridge;
 mod build_context;
 mod build_options;
+/// Cargo build options
+pub mod cargo_options;
 mod cargo_toml;
 #[cfg(feature = "scaffolding")]
 /// Generate CI configuration

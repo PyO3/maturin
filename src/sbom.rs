@@ -26,7 +26,7 @@ pub struct SbomData {
 /// It can be explicitly disabled via `[tool.maturin.sbom] rust = false`.
 /// Returns `None` when the `sbom` feature is not compiled in.
 pub fn generate_sbom_data(context: &BuildContext) -> Result<Option<SbomData>> {
-    let sbom_config = context.sbom.as_ref();
+    let sbom_config = context.artifact.sbom.as_ref();
 
     // Check if Rust SBOM generation is explicitly disabled
     let rust_sbom_enabled = sbom_config.and_then(|c| c.rust).unwrap_or(true);
@@ -47,7 +47,7 @@ pub fn generate_sbom_data(context: &BuildContext) -> Result<Option<SbomData>> {
         // cargo_metadata 0.23. The Metadata structs are incompatible at the
         // type level but share the same JSON representation, so we bridge
         // them via a serde round-trip.
-        let json = serde_json::to_value(&context.cargo_metadata)?;
+        let json = serde_json::to_value(&context.project.cargo_metadata)?;
         let metadata = serde_json::from_value(json)
             .context("Failed to convert cargo metadata for SBOM generation")?;
         let sboms = SbomGenerator::create_sboms(metadata, &config)
@@ -58,7 +58,7 @@ pub fn generate_sbom_data(context: &BuildContext) -> Result<Option<SbomData>> {
             // Only keep the SBOM for the crate being built into a wheel.
             // Each member's SBOM already contains the full transitive
             // dependency graph, so filtering is safe.
-            if sbom.package_name != context.crate_name {
+            if sbom.package_name != context.project.crate_name {
                 continue;
             }
             let mut buf = Vec::new();
@@ -128,7 +128,7 @@ pub fn write_sboms(
     writer: &mut impl ModuleWriter,
     dist_info_dir: &Path,
 ) -> Result<()> {
-    let sbom_config = context.sbom.as_ref();
+    let sbom_config = context.artifact.sbom.as_ref();
 
     // 1. Write pre-generated Rust SBOMs
     if let Some(data) = sbom_data {
@@ -142,6 +142,7 @@ pub fn write_sboms(
     if let Some(include) = sbom_config.and_then(|c| c.include.as_ref()) {
         // Canonicalize project root once and enforce all includes stay within it.
         let project_root = context
+            .project
             .project_layout
             .project_root
             .canonicalize()

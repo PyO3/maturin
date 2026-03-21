@@ -49,12 +49,12 @@ impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
         module: &Path,
     ) -> Result<GeneratorOutput> {
         let cffi_module_file_name = {
-            let extension_name = &context.project_layout.extension_name;
+            let extension_name = &context.project.project_layout.extension_name;
             // https://cffi.readthedocs.io/en/stable/embedding.html#issues-about-using-the-so
             super::cdylib_filename(extension_name, context.target.target_os())
         };
-        let base_path = if context.project_layout.python_module.is_some() {
-            module.join(&context.project_layout.extension_name)
+        let base_path = if context.project.project_layout.python_module.is_some() {
+            module.join(&context.project.project_layout.extension_name)
         } else {
             module.to_path_buf()
         };
@@ -72,8 +72,8 @@ impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
         );
 
         let declarations = generate_cffi_declarations(
-            context.manifest_path.parent().unwrap(),
-            &context.target_dir,
+            context.project.manifest_path.parent().unwrap(),
+            &context.project.target_dir,
             &self.interpreter.executable,
             &self.tempdir,
         )?;

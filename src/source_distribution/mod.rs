@@ -363,11 +363,11 @@ impl<'a> SdistContext<'a> {
         pyproject_toml_path: &Path,
         root_dir: &'a Path,
     ) -> Result<Self> {
-        let manifest_path = &build_context.manifest_path;
-        let workspace_root = &build_context.cargo_metadata.workspace_root;
+        let manifest_path = &build_context.project.manifest_path;
+        let workspace_root = &build_context.project.cargo_metadata.workspace_root;
         let workspace_manifest_path = workspace_root.join("Cargo.toml");
 
-        let known_path_deps = find_path_deps(&build_context.cargo_metadata)?;
+        let known_path_deps = find_path_deps(&build_context.project.cargo_metadata)?;
         debug!(
             "Found path dependencies: {:?}",
             known_path_deps.keys().collect::<Vec<_>>()
@@ -376,7 +376,7 @@ impl<'a> SdistContext<'a> {
         let sdist_root = compute_sdist_root(
             workspace_root,
             pyproject_toml_path,
-            &build_context.project_layout.python_dir,
+            &build_context.project.project_layout.python_dir,
             &known_path_deps,
         )?;
         debug!("Found sdist root: {}", sdist_root.display());
@@ -545,6 +545,7 @@ fn add_path_dep(
         .as_ref()
         .or_else(|| {
             ctx.build_context
+                .project
                 .cargo_metadata
                 .packages
                 .iter()
@@ -608,9 +609,10 @@ fn add_path_dep(
 
 /// Add the root crate's files to the sdist.
 fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_>) -> Result<()> {
-    let manifest_path = &ctx.build_context.manifest_path;
+    let manifest_path = &ctx.build_context.project.manifest_path;
     let main_crate = ctx
         .build_context
+        .project
         .cargo_metadata
         .root_package()
         .context("Expected cargo to return metadata with root_package")?;
@@ -656,13 +658,23 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
     let skip_prefixes: Vec<PathBuf> =
         if !ctx.relative_main_crate_manifest_dir.as_os_str().is_empty() {
             let mut prefixes = Vec::new();
-            if let Some(python_module) = ctx.build_context.project_layout.python_module.as_ref()
+            if let Some(python_module) = ctx
+                .build_context
+                .project
+                .project_layout
+                .python_module
+                .as_ref()
                 && let Ok(rel) = python_module.strip_prefix(&ctx.abs_manifest_dir)
             {
                 prefixes.push(rel.to_path_buf());
             }
-            for package in &ctx.build_context.project_layout.python_packages {
-                let package_path = ctx.build_context.project_layout.python_dir.join(package);
+            for package in &ctx.build_context.project.project_layout.python_packages {
+                let package_path = ctx
+                    .build_context
+                    .project
+                    .project_layout
+                    .python_dir
+                    .join(package);
                 if let Ok(rel) = package_path.strip_prefix(&ctx.abs_manifest_dir)
                     && !prefixes.contains(&rel.to_path_buf())
                 {
@@ -767,7 +779,7 @@ fn add_workspace_manifest(
     deps_to_keep.insert(
         main_member_name,
         PathDependency {
-            manifest_path: ctx.build_context.manifest_path.to_path_buf(),
+            manifest_path: ctx.build_context.project.manifest_path.to_path_buf(),
             workspace_root: ctx.workspace_root.as_std_path().to_path_buf(),
             readme: None,
             license_file: None,
@@ -856,12 +868,13 @@ pub fn source_distribution(
     excludes: Override,
 ) -> Result<PathBuf> {
     let pyproject_toml_path = build_context
+        .project
         .pyproject_toml_path
         .normalize()
         .with_context(|| {
             format!(
                 "pyproject.toml path `{}` does not exist or is invalid",
-                build_context.pyproject_toml_path.display()
+                build_context.project.pyproject_toml_path.display()
             )
         })?
         .into_path_buf();
@@ -877,8 +890,8 @@ pub fn source_distribution(
                 Ok(val) => Some(val),
             });
 
-    let metadata24 = &build_context.metadata24;
-    let writer = SDistWriter::new(&build_context.out, metadata24, source_date_epoch)?;
+    let metadata24 = &build_context.project.metadata24;
+    let writer = SDistWriter::new(&build_context.artifact.out, metadata24, source_date_epoch)?;
     let mut writer = VirtualWriter::new(writer, excludes);
     let root_dir = PathBuf::from(format!(
         "{}-{}",
@@ -904,7 +917,7 @@ pub fn source_distribution(
         pyproject,
         pyproject_dir,
         &root_dir,
-        &build_context.project_layout.python_dir,
+        &build_context.project.project_layout.python_dir,
     )?;
 
     let pkg_info = root_dir.join("PKG-INFO");

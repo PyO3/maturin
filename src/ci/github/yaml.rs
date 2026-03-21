@@ -15,9 +15,7 @@ impl<'a> Yaml<'a> {
 
     /// Write a single line at the current indentation level.
     pub(super) fn line(&mut self, s: impl AsRef<str>) -> &mut Self {
-        for _ in 0..self.level {
-            self.out.push_str("  ");
-        }
+        self.out.push_str(&"  ".repeat(self.level));
         self.out.push_str(s.as_ref());
         self.out.push('\n');
         self

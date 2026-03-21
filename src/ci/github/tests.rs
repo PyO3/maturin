@@ -385,3 +385,22 @@ fn test_generate_github_android_bin() {
     assert!(conf.contains("  android:\n"));
     assert!(conf.contains("  linux:\n"));
 }
+
+#[test]
+fn test_generate_github_min_python_minor() {
+    let cli = GenerateCI::default();
+    let bridge = pyo3_bridge(None);
+    let resolved = resolve_config(&cli, None, &bridge).unwrap();
+
+    // Test with min_python_minor = 14
+    let conf = generate_github(&cli, &resolved, PROJECT_NAME, &bridge, false, Some(14)).unwrap();
+    assert!(conf.contains("python-version: 3.14"));
+    // Since 14 <= 14, free-threaded remains 3.14t if it was abi3
+    // But this bridge is NOT abi3, so no free-threaded wheels.
+
+    let abi3_bridge = pyo3_bridge(Some(Abi3Version::Version(3, 7)));
+    let conf_abi3 =
+        generate_github(&cli, &resolved, PROJECT_NAME, &abi3_bridge, false, Some(15)).unwrap();
+    assert!(conf_abi3.contains("python-version: 3.15"));
+    assert!(conf_abi3.contains("python-version: 3.15t"));
+}

@@ -29,7 +29,11 @@ use normpath::PathExt;
 use std::path::PathBuf;
 use tracing::instrument;
 
-/// Project context
+/// The input part of the build context.
+///
+/// Contains static information about the project being built, such as its
+/// filesystem layout, manifest paths, and resolved metadata. This information
+/// is generally independent of the target Python interpreter.
 #[derive(Clone, Debug)]
 pub struct ProjectContext {
     /// The platform, i.e. os and pointer width
@@ -83,7 +87,11 @@ impl ProjectContext {
     }
 }
 
-/// Artifact context
+/// The output part of the build context.
+///
+/// Manages configuration for the final artifacts produced by the build,
+/// such as output directories, symbol stripping, compression settings,
+/// and SBOM generation.
 #[derive(Clone, Debug)]
 pub struct ArtifactContext {
     /// The directory to store the built wheels in
@@ -104,7 +112,11 @@ pub struct ArtifactContext {
     pub pgo_command: Option<String>,
 }
 
-/// Python context
+/// The constraint part of the build context.
+///
+/// Defines the target environment where the built artifacts will run,
+/// including the resolved Python interpreters, platform tags, and
+/// compatibility requirements (e.g. auditwheel).
 #[derive(Clone, Debug)]
 pub struct PythonContext {
     /// Checking the linked libraries for manylinux compliance
@@ -120,7 +132,10 @@ pub struct PythonContext {
     pub pypi_validation: bool,
 }
 
-/// Contains all the metadata required to build the crate
+/// The complete build context, partitioned into modular sub-contexts.
+///
+/// This structure reflects the build lifecycle:
+/// **Input (Project) → Constraints (Python) → Output (Artifact).**
 #[derive(Clone)]
 pub struct BuildContext {
     /// Project context

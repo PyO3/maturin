@@ -7,7 +7,9 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use tracing::instrument;
 
-/// Options for configuring the Python environment and bindings
+/// Options for configuring the target Python environment and bindings.
+///
+/// These options define the 'Constraints' of the build.
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct PythonOptions {
@@ -25,7 +27,9 @@ pub struct PythonOptions {
     pub bindings: Option<String>,
 }
 
-/// Options for configuring platform tags and auditwheel
+/// Options for configuring platform tags and binary compatibility.
+///
+/// These options define the 'Constraints' of the build related to the OS and libc.
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct PlatformOptions {
@@ -71,7 +75,9 @@ pub struct PlatformOptions {
     pub zig: bool,
 }
 
-/// Options for controlling output artifacts and metadata
+/// Options for controlling final build artifacts and their metadata.
+///
+/// These options define the 'Output' part of the build.
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct OutputOptions {
@@ -92,7 +98,10 @@ pub struct OutputOptions {
     pub sbom_include: Vec<PathBuf>,
 }
 
-/// High level API for building wheels from a crate which is also used for the CLI
+/// High level API for building wheels from a crate, also used for the CLI.
+///
+/// This struct is the primary entry point for build configuration and is
+/// partitioned into modular sub-groups reflecting the build lifecycle.
 #[derive(Debug, Default, Serialize, Deserialize, clap::Parser, Clone, Eq, PartialEq)]
 #[serde(default)]
 pub struct BuildOptions {

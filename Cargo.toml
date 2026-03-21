@@ -54,7 +54,7 @@ rustflags = "0.1.6"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 sha2 = "0.10.3"
-tar = "0.4.38"
+tar = "0.4.45"
 tempfile = "3.2.0"
 toml = "0.9.11"
 toml_edit = "0.24.0"

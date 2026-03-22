@@ -51,8 +51,8 @@ impl PgoContext {
 
     /// Orchestrate a three-phase PGO build: instrumented → instrumentation → optimized.
     pub fn build_wheels_pgo(
-        &self,
         orchestrator: &BuildOrchestrator,
+        pgo_command: String,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let needs_per_interpreter_pgo = matches!(
             orchestrator.context().project.bridge(),
@@ -65,9 +65,10 @@ impl PgoContext {
         Self::find_llvm_profdata()?;
 
         if needs_per_interpreter_pgo {
-            self.build_wheels_pgo_per_interpreter(orchestrator)
+            Self::build_wheels_pgo_per_interpreter(orchestrator, pgo_command)
         } else {
-            self.build_wheels_pgo_single_pass(orchestrator)
+            let pgo_ctx = Self::new(pgo_command)?;
+            pgo_ctx.build_wheels_pgo_single_pass(orchestrator)
         }
     }
 
@@ -122,8 +123,8 @@ impl PgoContext {
 
     /// Per-interpreter PGO for non-abi3 PyO3 builds.
     fn build_wheels_pgo_per_interpreter(
-        &self,
         orchestrator: &BuildOrchestrator,
+        pgo_command: String,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let context = orchestrator.context();
         fs::create_dir_all(&context.artifact.out)
@@ -143,7 +144,7 @@ impl PgoContext {
             );
 
             // Create a fresh PGO context for each interpreter cycle
-            let pgo_cycle_ctx = Self::new(self.pgo_command.clone())?;
+            let pgo_cycle_ctx = Self::new(pgo_command.clone())?;
 
             // Phase 1: Build instrumented wheel for this interpreter
             eprintln!("  📊 Phase 1/3: Building instrumented wheel...");

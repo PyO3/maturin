@@ -51,13 +51,12 @@ impl<'a> BuildOrchestrator<'a> {
         self.context
     }
 
-    /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
+    /// Checks which kind of bindings we have (pyo3/rust-cpython or cffi or bin) and calls the
     /// correct builder.
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         if let Some(pgo_command) = &self.context.artifact.pgo_command {
-            let pgo_ctx = PgoContext::new(pgo_command.clone())?;
-            return pgo_ctx.build_wheels_pgo(self);
+            return PgoContext::build_wheels_pgo(self, pgo_command.clone());
         }
         self.build_wheels_inner()
     }

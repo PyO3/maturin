@@ -39,6 +39,7 @@ pub enum Pep517Command {
         editable: bool,
     },
     /// The implementation of build_sdist
+    #[command(name = "write-sdist")]
     WriteSDist {
         /// The sdist_directory argument to build_sdist
         #[arg(long = "sdist-directory")]

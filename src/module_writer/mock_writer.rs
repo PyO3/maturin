@@ -16,6 +16,7 @@ use crate::BuildOptions;
 use crate::CargoOptions;
 use crate::Metadata24;
 use crate::archive_source::ArchiveSource;
+use crate::build_orchestrator::BuildOrchestrator;
 use crate::write_dist_info;
 
 use super::ModuleWriterInternal;
@@ -72,11 +73,12 @@ fn metadata_hello_world_pep639() -> Result<()> {
     let context = build_options.into_build_context().build().unwrap();
 
     let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
+    let orchestrator = BuildOrchestrator::new(&context);
     write_dist_info(
         &mut writer,
         &context.project.project_layout.project_root,
         &context.project.metadata24,
-        &context.tags_from_bridge().unwrap(),
+        &orchestrator.tags_from_bridge().unwrap(),
     )
     .unwrap();
 

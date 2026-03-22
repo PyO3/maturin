@@ -31,7 +31,7 @@ pub fn find_bridge(
         .iter()
         .filter_map(|pkg| {
             let name = pkg.name.as_ref();
-            if name == "pyo3" || name == "pyo3-ffi" || name == "cpython" || name == "uniffi" {
+            if name == "pyo3" || name == "pyo3-ffi" || name == "uniffi" {
                 Some((name, pkg))
             } else {
                 None

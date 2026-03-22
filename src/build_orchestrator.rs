@@ -51,7 +51,7 @@ impl<'a> BuildOrchestrator<'a> {
         self.context
     }
 
-    /// Checks which kind of bindings we have (pyo3/rust-cpython or cffi or bin) and calls the
+    /// Checks which kind of bindings we have (pyo3 or cffi or bin) and calls the
     /// correct builder.
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {

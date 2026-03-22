@@ -49,7 +49,7 @@ impl PgoContext {
         &self.merged_profdata
     }
 
-    /// Orchestrate a three-phase PGO build: instrumented → instrumentation → optimized.
+    /// Orchestrate a three-phase PGO build: instrumented -> instrumentation -> optimized.
     pub fn build_wheels_pgo(
         orchestrator: &BuildOrchestrator,
         pgo_command: String,

@@ -19,6 +19,8 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "test-crates/targets/pyo3_no_extension_module",
         "--out",
         "test-crates/targets/pyo3_no_extension_module",
+        "--auditwheel",
+        "check",
     ];
 
     let options = BuildOptions::try_parse_from(cli)?;

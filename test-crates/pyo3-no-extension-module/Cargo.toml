@@ -6,6 +6,9 @@ description = "Does not use the extension-module feature, thus erroneously linki
 edition = "2021"
 
 [dependencies]
+# We pin pyo3 to 0.25.0 here because newer versions (0.26+) use PYO3_BUILD_EXTENSION_MODULE
+# environment variable which maturin sets, effectively preventing the "links libpython" error
+# even if extension-module feature is missing.
 pyo3 = { version = "0.25.0", default-features = false }
 
 [lib]

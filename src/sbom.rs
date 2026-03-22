@@ -75,7 +75,8 @@ pub fn generate_sbom_data(
 
     #[cfg(not(feature = "sbom"))]
     {
-        let _ = rust_sbom_enabled;
+        _ = project;
+        _ = rust_sbom_enabled;
         Ok(None)
     }
 }

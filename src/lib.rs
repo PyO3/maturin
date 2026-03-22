@@ -78,6 +78,8 @@ mod python_interpreter;
 mod sbom;
 mod source_distribution;
 mod target;
+#[cfg(test)]
+mod test_utils;
 #[cfg(feature = "upload")]
 mod upload;
 pub(crate) mod util;

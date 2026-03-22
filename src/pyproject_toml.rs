@@ -773,6 +773,7 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::test_crate_path;
     use crate::{
         PyProjectToml,
         pyproject_toml::{
@@ -852,7 +853,8 @@ mod tests {
 
     #[test]
     fn test_warn_missing_maturin_version() {
-        let with_constraint = PyProjectToml::new("test-crates/pyo3-pure/pyproject.toml").unwrap();
+        let with_constraint =
+            PyProjectToml::new(test_crate_path("pyo3-pure").join("pyproject.toml")).unwrap();
         assert!(with_constraint.warn_bad_maturin_version());
         let without_constraint_dir = TempDir::new().unwrap();
         let pyproject_file = without_constraint_dir.path().join("pyproject.toml");

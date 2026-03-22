@@ -153,16 +153,16 @@ mod tests {
     use super::*;
     use crate::bridge::{Abi3Version, PyO3, PyO3Crate, find_bridge};
     use crate::python_interpreter::InterpreterResolver;
+    use crate::test_utils::test_crate_path;
     use crate::{BridgeModel, Target};
     use cargo_metadata::MetadataCommand;
     use insta::assert_snapshot;
     use pretty_assertions::assert_eq;
-    use std::path::Path;
 
     #[test]
     fn test_find_bridge_pyo3() {
         let pyo3_mixed = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/pyo3-mixed").join("Cargo.toml"))
+            .manifest_path(test_crate_path("pyo3-mixed").join("Cargo.toml"))
             .exec()
             .unwrap();
 
@@ -181,7 +181,7 @@ mod tests {
         use crate::bridge::{PyO3Metadata, PyO3VersionMetadata};
 
         let pyo3_pure = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/pyo3-pure").join("Cargo.toml"))
+            .manifest_path(test_crate_path("pyo3-pure").join("Cargo.toml"))
             .exec()
             .unwrap();
 
@@ -207,14 +207,14 @@ mod tests {
     #[test]
     fn test_find_bridge_pyo3_feature() {
         let pyo3_pure = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
+            .manifest_path(test_crate_path("pyo3-feature").join("Cargo.toml"))
             .exec()
             .unwrap();
 
         assert!(find_bridge(&pyo3_pure, None, None).is_err());
 
         let pyo3_pure = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/pyo3-feature").join("Cargo.toml"))
+            .manifest_path(test_crate_path("pyo3-feature").join("Cargo.toml"))
             .other_options(vec!["--features=pyo3".to_string()])
             .exec()
             .unwrap();
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_find_bridge_cffi() {
         let cffi_pure = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/cffi-pure").join("Cargo.toml"))
+            .manifest_path(test_crate_path("cffi-pure").join("Cargo.toml"))
             .exec()
             .unwrap();
 
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_find_bridge_bin() {
         let hello_world = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/hello-world").join("Cargo.toml"))
+            .manifest_path(test_crate_path("hello-world").join("Cargo.toml"))
             .exec()
             .unwrap();
 
@@ -263,7 +263,7 @@ mod tests {
         assert!(find_bridge(&hello_world, Some("pyo3"), None).is_err());
 
         let pyo3_bin = MetadataCommand::new()
-            .manifest_path(Path::new("test-crates/pyo3-bin").join("Cargo.toml"))
+            .manifest_path(test_crate_path("pyo3-bin").join("Cargo.toml"))
             .exec()
             .unwrap();
         assert!(matches!(

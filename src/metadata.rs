@@ -842,6 +842,7 @@ fn fold_header(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::test_crate_path;
     use cargo_metadata::MetadataCommand;
     use expect_test::{Expect, expect};
     use indoc::indoc;
@@ -966,7 +967,7 @@ A test project
 
     #[test]
     fn test_merge_metadata_from_pyproject_toml() {
-        let manifest_dir = PathBuf::from("test-crates").join("pyo3-pure");
+        let manifest_dir = test_crate_path("pyo3-pure");
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -982,7 +983,7 @@ A test project
         );
         assert_eq!(
             metadata.description,
-            Some(fs_err::read_to_string("test-crates/pyo3-pure/README.md").unwrap())
+            Some(fs_err::read_to_string(manifest_dir.join("README.md")).unwrap())
         );
         assert_eq!(metadata.classifiers, &["Programming Language :: Rust"]);
         assert_eq!(
@@ -1015,7 +1016,7 @@ A test project
 
     #[test]
     fn test_merge_metadata_from_pyproject_toml_with_customized_python_source_dir() {
-        let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed-py-subdir");
+        let manifest_dir = test_crate_path("pyo3-mixed-py-subdir");
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -1036,7 +1037,7 @@ A test project
 
     #[test]
     fn test_implicit_readme() {
-        let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
+        let manifest_dir = test_crate_path("pyo3-mixed");
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -1051,7 +1052,7 @@ A test project
 
     #[test]
     fn test_pep639() {
-        let manifest_dir = PathBuf::from("test-crates").join("pyo3-mixed");
+        let manifest_dir = test_crate_path("pyo3-mixed");
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()
@@ -1068,7 +1069,7 @@ A test project
 
     #[test]
     fn test_merge_metadata_from_pyproject_dynamic_license_test() {
-        let manifest_dir = PathBuf::from("test-crates").join("license-test");
+        let manifest_dir = test_crate_path("license-test");
         let cargo_metadata = MetadataCommand::new()
             .manifest_path(manifest_dir.join("Cargo.toml"))
             .exec()

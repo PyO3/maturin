@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use super::BuildContext;
 
 impl BuildContext {
-    pub(crate) fn repair_wheel(
+    pub(crate) fn auditwheel(
         &self,
         artifact: &BuildArtifact,
         platform_tag: &[PlatformTag],
@@ -106,7 +106,7 @@ impl BuildContext {
         Ok(())
     }
 
-    pub(crate) fn repair_libs<A>(
+    pub(crate) fn add_external_libs<A>(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
         artifacts: &[A],

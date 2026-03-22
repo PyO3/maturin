@@ -4,7 +4,7 @@ mod repair;
 pub use builder::BuildContextBuilder;
 
 use crate::auditwheel::AuditWheelMode;
-use crate::auditwheel::{PlatformTag, Policy};
+use crate::auditwheel::PlatformTag;
 use crate::cargo_options::CargoOptions;
 use crate::compile::CompileTarget;
 use crate::compression::CompressionOptions;
@@ -16,7 +16,6 @@ use crate::{
 };
 use anyhow::Result;
 use cargo_metadata::Metadata;
-use lddtree::Library;
 use std::path::PathBuf;
 
 /// The input part of the build context.
@@ -141,25 +140,3 @@ pub struct BuildContext {
 /// For bindings the version tag contains the Python interpreter version
 /// they bind against (e.g. `cp37`).
 pub type BuiltWheelMetadata = (PathBuf, String);
-
-impl BuildContext {
-    /// Checks if we need to run auditwheel and does it if so
-    pub(crate) fn auditwheel(
-        &self,
-        artifact: &crate::BuildArtifact,
-        platform_tag: &[PlatformTag],
-        python_interpreter: Option<&PythonInterpreter>,
-    ) -> Result<(Policy, Vec<Library>)> {
-        self.repair_wheel(artifact, platform_tag, python_interpreter)
-    }
-
-    /// Add external shared libraries to the wheel
-    pub(crate) fn add_external_libs(
-        &self,
-        writer: &mut crate::VirtualWriter<crate::module_writer::WheelWriter>,
-        artifacts: &[&crate::BuildArtifact],
-        ext_libs: &[Vec<Library>],
-    ) -> Result<()> {
-        self.repair_libs(writer, artifacts, ext_libs)
-    }
-}

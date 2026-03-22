@@ -41,18 +41,24 @@ impl<'a> BuildOrchestrator<'a> {
         Self { context }
     }
 
+    /// Returns the underlying build context.
+    pub fn context(&self) -> &BuildContext {
+        self.context
+    }
+
     /// Checks which kind of bindings we have (pyo3/rust-cypthon or cffi or bin) and calls the
     /// correct builder.
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
-        if self.context.artifact.pgo_command.is_some() {
-            return self.build_wheels_pgo();
+        if let Some(pgo_command) = &self.context.artifact.pgo_command {
+            let pgo_ctx = PgoContext::new(pgo_command.clone())?;
+            return pgo_ctx.build_wheels_pgo(self);
         }
         self.build_wheels_inner()
     }
 
     /// Standard wheel build pipeline (no PGO).
-    fn build_wheels_inner(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub(crate) fn build_wheels_inner(&self) -> Result<Vec<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -94,174 +100,13 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(wheels)
     }
 
-    /// PGO three-phase build: instrumented → instrumentation → optimized.
-    fn build_wheels_pgo(&self) -> Result<Vec<BuiltWheelMetadata>> {
-        let pgo_command = self
-            .context
-            .artifact
-            .pgo_command
-            .as_ref()
-            .expect("pgo_command must be set when build_wheels_pgo is called");
-
-        let needs_per_interpreter_pgo = matches!(
-            self.context.project.bridge(),
-            BridgeModel::PyO3(crate::PyO3 { abi3: None, .. })
-        );
-
-        eprintln!("🚀 Starting PGO build...");
-
-        // Verify llvm-profdata is available before starting
-        PgoContext::find_llvm_profdata()?;
-
-        if needs_per_interpreter_pgo {
-            self.build_wheels_pgo_per_interpreter(pgo_command)
-        } else {
-            self.build_wheels_pgo_single_pass(pgo_command)
-        }
-    }
-
     /// Clone the context with PGO disabled (to prevent recursion) and
     /// the given PGO phase set.
-    fn clone_context_for_pgo(&self, phase: PgoPhase) -> BuildContext {
+    pub(crate) fn clone_context_for_pgo(&self, phase: PgoPhase) -> BuildContext {
         let mut ctx = self.context.clone();
         ctx.artifact.pgo_command = None;
         ctx.artifact.pgo_phase = Some(phase);
         ctx
-    }
-
-    /// Single-pass PGO for abi3, cffi, uniffi, and bin builds.
-    fn build_wheels_pgo_single_pass(&self, pgo_command: &str) -> Result<Vec<BuiltWheelMetadata>> {
-        let instrumentation_python = self
-            .context
-            .python
-            .interpreter
-            .first()
-            .context(
-                "PGO builds require a Python interpreter. \
-                 Please specify one with `--interpreter`.",
-            )?
-            .executable
-            .clone();
-
-        let pgo_ctx = PgoContext::new(pgo_command.to_owned())?;
-
-        // Phase 1: Build a single instrumented wheel for training.
-        eprintln!("📊 Phase 1/3: Building instrumented wheel...");
-        let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
-            pgo_ctx.profdata_dir_path().to_path_buf(),
-        ));
-        instrumented_ctx.python.interpreter = vec![self.context.python.interpreter[0].clone()];
-        let instrumented_out =
-            tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
-        instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
-
-        let orchestrator = BuildOrchestrator::new(&instrumented_ctx);
-        let instrumented_wheels = orchestrator.build_wheels_inner()?;
-
-        // Phase 2: Instrumentation
-        eprintln!("🔬 Phase 2/3: Running PGO instrumentation...");
-        let instrumented_wheel_path = &instrumented_wheels
-            .first()
-            .context("No instrumented wheel was built")?
-            .0;
-        pgo_ctx.run_instrumentation(
-            &instrumentation_python,
-            instrumented_wheel_path,
-            self.context,
-        )?;
-        pgo_ctx.merge_profiles()?;
-
-        // Phase 3: Optimized build
-        eprintln!("⚡ Phase 3/3: Building PGO-optimized wheel...");
-        let optimized_ctx =
-            self.clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
-        let orchestrator = BuildOrchestrator::new(&optimized_ctx);
-        let wheels = orchestrator.build_wheels_inner()?;
-
-        eprintln!("🎉 PGO build complete!");
-        Ok(wheels)
-    }
-
-    /// Per-interpreter PGO for non-abi3 PyO3 builds.
-    fn build_wheels_pgo_per_interpreter(
-        &self,
-        pgo_command: &str,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
-        fs::create_dir_all(&self.context.artifact.out)
-            .context("Failed to create the target directory for the wheels")?;
-
-        let sbom_data = generate_sbom_data(&self.context.project, &self.context.artifact)?;
-        let mut wheels = Vec::new();
-
-        for (i, python_interpreter) in self.context.python.interpreter.iter().enumerate() {
-            eprintln!(
-                "📊 [{}/{}] PGO cycle for {} {}.{}...",
-                i + 1,
-                self.context.python.interpreter.len(),
-                python_interpreter.interpreter_kind,
-                python_interpreter.major,
-                python_interpreter.minor,
-            );
-
-            let pgo_ctx = PgoContext::new(pgo_command.to_owned())?;
-
-            // Phase 1: Build instrumented wheel for this interpreter
-            eprintln!("  📊 Phase 1/3: Building instrumented wheel...");
-            let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
-                pgo_ctx.profdata_dir_path().to_path_buf(),
-            ));
-            let instrumented_out = tempfile::TempDir::new()
-                .context("Failed to create temp dir for instrumented wheel")?;
-            instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
-
-            let orchestrator = BuildOrchestrator::new(&instrumented_ctx);
-            let (instrumented_wheel_path, _) =
-                orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
-
-            // Phase 2: Run instrumentation with this interpreter
-            eprintln!("  🔬 Phase 2/3: Running PGO instrumentation...");
-            pgo_ctx.run_instrumentation(
-                &python_interpreter.executable,
-                &instrumented_wheel_path,
-                self.context,
-            )?;
-            pgo_ctx.merge_profiles()?;
-
-            // Phase 3: Build optimized wheel for this interpreter
-            eprintln!("  ⚡ Phase 3/3: Building PGO-optimized wheel...");
-            let optimized_ctx = self
-                .clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
-            let orchestrator = BuildOrchestrator::new(&optimized_ctx);
-            let (wheel_path, tag) =
-                orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
-
-            eprintln!(
-                "  📦 Built PGO-optimized wheel for {} {}.{}{} to {}",
-                python_interpreter.interpreter_kind,
-                python_interpreter.major,
-                python_interpreter.minor,
-                python_interpreter.abiflags,
-                wheel_path.display()
-            );
-            wheels.push((wheel_path, tag));
-        }
-
-        // Validate wheel filenames against PyPI platform tag rules if requested
-        if self.context.python.pypi_validation {
-            for (wheel_path, _) in &wheels {
-                let filename = wheel_path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .ok_or_else(|| anyhow!("Invalid wheel filename: {:?}", wheel_path))?;
-
-                if let Err(error) = validate_wheel_filename_for_pypi(filename) {
-                    bail!("PyPI validation failed: {}", error);
-                }
-            }
-        }
-
-        eprintln!("🎉 PGO build complete!");
-        Ok(wheels)
     }
 
     /// Builds a source distribution and returns the same metadata as [BuildOrchestrator::build_wheels]
@@ -576,7 +421,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Compile, audit, and write a single PyO3 wheel for one interpreter.
-    pub(super) fn build_single_pyo3_wheel(
+    pub(crate) fn build_single_pyo3_wheel(
         &self,
         python_interpreter: &PythonInterpreter,
         sbom_data: &Option<SbomData>,

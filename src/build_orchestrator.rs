@@ -5,9 +5,9 @@ use crate::binding_generator::{
 };
 use crate::bridge::Abi3Version;
 use crate::compile::warn_missing_py_init;
-use crate::module_writer::{WheelWriter, add_data, write_pth};
+use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
-use crate::sbom::{SbomData, generate_sbom_data, write_sboms};
+use crate::sbom::{SbomData, resolve_sbom_include};
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::util::zip_mtime;
@@ -23,9 +23,14 @@ use itertools::Itertools;
 use lddtree::Library;
 use normpath::PathExt;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use tracing::instrument;
+
+#[cfg(feature = "sbom")]
+use cargo_cyclonedx::config::SbomConfig as CyclonedxConfig;
+#[cfg(feature = "sbom")]
+use cargo_cyclonedx::generator::SbomGenerator;
 
 /// Orchestrates the build process using the data provided by [BuildContext].
 ///
@@ -64,7 +69,7 @@ impl<'a> BuildOrchestrator<'a> {
 
         // Generate SBOM data once for all wheels (the Rust dependency graph
         // is the same regardless of the target Python interpreter).
-        let sbom_data = generate_sbom_data(&self.context.project, &self.context.artifact)?;
+        let sbom_data = self.generate_sbom_data()?;
 
         let wheels = match self.context.project.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None, &sbom_data)?,
@@ -327,9 +332,7 @@ impl<'a> BuildOrchestrator<'a> {
             self.context.project.project_layout.data.as_deref(),
         )?;
 
-        write_sboms(
-            &self.context.project,
-            &self.context.artifact,
+        self.write_sboms(
             sbom_data.as_ref(),
             &mut writer,
             &self.context.project.metadata24.get_dist_info_dir(),
@@ -638,13 +641,13 @@ impl<'a> BuildOrchestrator<'a> {
             &metadata24,
             self.context.project.project_layout.data.as_deref(),
         )?;
-        write_sboms(
-            &self.context.project,
-            &self.context.artifact,
+
+        self.write_sboms(
             sbom_data.as_ref(),
             &mut writer,
             &metadata24.get_dist_info_dir(),
         )?;
+
         let tags = [tag];
         let wheel_path = writer.finish(
             &metadata24,
@@ -717,5 +720,108 @@ impl<'a> BuildOrchestrator<'a> {
             wheels.extend(self.build_bin_wheel(Some(python_interpreter), sbom_data)?);
         }
         Ok(wheels)
+    }
+
+    /// Generate Rust SBOMs once from the build context.
+    pub fn generate_sbom_data(&self) -> Result<Option<SbomData>> {
+        let sbom_config = self.context.artifact.sbom.as_ref();
+
+        // Check if Rust SBOM generation is explicitly disabled
+        let rust_sbom_enabled = sbom_config.and_then(|c| c.rust).unwrap_or(true);
+
+        #[cfg(feature = "sbom")]
+        {
+            if !rust_sbom_enabled {
+                return Ok(Some(SbomData {
+                    rust_sboms: Vec::new(),
+                }));
+            }
+
+            let config = CyclonedxConfig {
+                target: Some(cargo_cyclonedx::config::Target::AllTargets),
+                ..CyclonedxConfig::empty_config()
+            };
+            // cargo-cyclonedx depends on cargo_metadata 0.18, while maturin uses
+            // cargo_metadata 0.23. The Metadata structs are incompatible at the
+            // type level but share the same JSON representation, so we bridge
+            // them via a serde round-trip.
+            let json = serde_json::to_value(&self.context.project.cargo_metadata)?;
+            let metadata = serde_json::from_value(json)
+                .context("Failed to convert cargo metadata for SBOM generation")?;
+            let sboms = SbomGenerator::create_sboms(metadata, &config)
+                .map_err(|e| anyhow::anyhow!("Failed to generate Rust SBOM: {}", e))?;
+
+            let mut rust_sboms = Vec::new();
+            for sbom in sboms {
+                // Only keep the SBOM for the crate being built into a wheel.
+                // Each member's SBOM already contains the full transitive
+                // dependency graph, so filtering is safe.
+                if sbom.package_name != self.context.project.crate_name {
+                    continue;
+                }
+                let mut buf = Vec::new();
+                sbom.bom
+                    .output_as_json_v1_5(&mut buf)
+                    .map_err(|e| anyhow::anyhow!("Failed to serialize SBOM: {}", e))?;
+                rust_sboms.push((sbom.package_name, buf));
+            }
+
+            Ok(Some(SbomData { rust_sboms }))
+        }
+
+        #[cfg(not(feature = "sbom"))]
+        {
+            let _ = rust_sbom_enabled;
+            Ok(None)
+        }
+    }
+
+    /// Writes SBOMs into the wheel via the given writer.
+    pub fn write_sboms(
+        &self,
+        sbom_data: Option<&SbomData>,
+        writer: &mut impl ModuleWriter,
+        dist_info_dir: &Path,
+    ) -> Result<()> {
+        let sbom_config = self.context.artifact.sbom.as_ref();
+
+        // 1. Write pre-generated Rust SBOMs
+        if let Some(data) = sbom_data {
+            for (package_name, json_bytes) in &data.rust_sboms {
+                let target = dist_info_dir.join(format!("sboms/{package_name}.cyclonedx.json"));
+                writer.add_bytes(&target, None, json_bytes.clone(), false)?;
+            }
+        }
+
+        // 2. Include additional SBOM files (only when explicitly configured)
+        if let Some(include) = sbom_config.and_then(|c| c.include.as_ref()) {
+            // Canonicalize project root once and enforce all includes stay within it.
+            let project_root = self
+                .context
+                .project
+                .project_layout
+                .project_root
+                .canonicalize()
+                .context("Failed to canonicalize project root for SBOM includes")?;
+
+            let mut seen_filenames = HashSet::new();
+            for path in include {
+                let resolved_path = resolve_sbom_include(path, &project_root)?;
+
+                let filename = resolved_path.file_name().context("Invalid SBOM path")?;
+                if !seen_filenames.insert(filename.to_os_string()) {
+                    anyhow::bail!(
+                        "Duplicate SBOM filename '{}' from include path '{}'. \
+                         Multiple includes must have unique filenames.",
+                        filename.to_string_lossy(),
+                        path.display()
+                    );
+                }
+                let target = dist_info_dir.join("sboms").join(filename);
+                writer.add_file(&target, &resolved_path, false)?;
+            }
+        }
+
+        Ok(())
     }
 }

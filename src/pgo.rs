@@ -1,5 +1,5 @@
 use crate::develop::install_backend::{find_uv_bin, find_uv_python};
-use crate::{BridgeModel, BuildContext, BuildOrchestrator, BuiltWheelMetadata};
+use crate::{BridgeModel, BuildOrchestrator, BuiltWheelMetadata};
 use anyhow::{Context, Result, anyhow, bail};
 use fs_err as fs;
 use std::path::{Path, PathBuf};
@@ -129,7 +129,7 @@ impl PgoContext {
         fs::create_dir_all(&context.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
-        let sbom_data = crate::sbom::generate_sbom_data(&context.project, &context.artifact)?;
+        let sbom_data = orchestrator.generate_sbom_data()?;
         let mut wheels = Vec::new();
 
         for (i, python_interpreter) in context.python.interpreter.iter().enumerate() {

@@ -157,7 +157,6 @@ mod tests {
     use cargo_metadata::MetadataCommand;
     use insta::assert_snapshot;
     use pretty_assertions::assert_eq;
-    use std::path::Path;
 
     #[test]
     fn test_find_bridge_pyo3() {

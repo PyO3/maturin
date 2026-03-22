@@ -1,6 +1,6 @@
 pub use self::config::InterpreterConfig;
+use crate::Target;
 use crate::auditwheel::PlatformTag;
-use crate::{BuildContext, Target};
 use anyhow::{Result, bail};
 use std::fmt;
 use std::ops::Deref;
@@ -129,10 +129,14 @@ impl PythonInterpreter {
     /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
     ///
     /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
-    pub fn get_tag(&self, context: &BuildContext, platform_tags: &[PlatformTag]) -> Result<String> {
+    pub fn get_tag(
+        &self,
+        project: &crate::ProjectContext,
+        platform_tags: &[PlatformTag],
+    ) -> Result<String> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
-        let target = &context.target;
+        let target = &project.target;
         let use_sysconfig_platform = target.is_windows()
             || (target.is_linux() && platform_tags.iter().any(|tag| !tag.is_portable()))
             || target.is_illumos();
@@ -140,10 +144,10 @@ impl PythonInterpreter {
             if let Some(platform) = self.platform.clone() {
                 platform
             } else {
-                context.get_platform_tag(platform_tags)?
+                project.get_platform_tag(platform_tags)?
             }
         } else {
-            context.get_platform_tag(platform_tags)?
+            project.get_platform_tag(platform_tags)?
         };
         let tag = if self.implementation_name.parse::<InterpreterKind>().is_err() {
             // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston

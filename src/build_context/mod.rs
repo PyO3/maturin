@@ -7,7 +7,7 @@ pub use builder::BuildContextBuilder;
 use crate::auditwheel::AuditWheelMode;
 use crate::auditwheel::{PlatformTag, Policy};
 use crate::bridge::Abi3Version;
-use crate::build_options::CargoOptions;
+use crate::cargo_options::CargoOptions;
 use crate::compile::CompileTarget;
 use crate::compression::CompressionOptions;
 use crate::module_writer::{WheelWriter, write_pth};
@@ -29,45 +29,31 @@ use normpath::PathExt;
 use std::path::PathBuf;
 use tracing::instrument;
 
-/// Contains all the metadata required to build the crate
-#[derive(Clone)]
-pub struct BuildContext {
+/// The input part of the build context.
+///
+/// Contains static information about the project being built, such as its
+/// filesystem layout, manifest paths, and resolved metadata. This information
+/// is generally independent of the target Python interpreter.
+#[derive(Clone, Debug)]
+pub struct ProjectContext {
     /// The platform, i.e. os and pointer width
     pub target: Target,
-    /// List of Cargo targets to compile
-    pub compile_targets: Vec<CompileTarget>,
     /// Whether this project is pure rust or rust mixed with python
     pub project_layout: ProjectLayout,
     /// The path to pyproject.toml. Required for the source distribution
     pub pyproject_toml_path: PathBuf,
     /// Parsed pyproject.toml if any
     pub pyproject_toml: Option<PyProjectToml>,
-    /// Python Package Metadata 2.3
+    /// Python Package Metadata 2.4
     pub metadata24: Metadata24,
     /// The name of the crate
     pub crate_name: String,
-    /// The name of the module can be distinct from the package name, mostly
-    /// because package names normally contain minuses while module names
-    /// have underscores. The package name is part of metadata24
+    /// The name of the module
     pub module_name: String,
     /// The path to the Cargo.toml. Required for the cargo invocations
     pub manifest_path: PathBuf,
     /// Directory for all generated artifacts
     pub target_dir: PathBuf,
-    /// The directory to store the built wheels in. Defaults to a new "wheels"
-    /// directory in the project's target directory
-    pub out: PathBuf,
-    /// Strip the library for minimum file size
-    pub strip: bool,
-    /// Checking the linked libraries for manylinux/musllinux compliance
-    pub auditwheel: AuditWheelMode,
-    /// When compiling for manylinux, use zig as linker to ensure glibc version compliance
-    #[cfg(feature = "zig")]
-    pub zig: bool,
-    /// Whether to use the manylinux/musllinux or use the native linux tag (off)
-    pub platform_tag: Vec<PlatformTag>,
-    /// The available python interpreter
-    pub interpreter: Vec<PythonInterpreter>,
     /// Cargo.toml as resolved by [cargo_metadata]
     pub cargo_metadata: Metadata,
     /// Whether to use universal2 or use the native macOS tag (off)
@@ -76,22 +62,88 @@ pub struct BuildContext {
     pub editable: bool,
     /// Cargo build options
     pub cargo_options: CargoOptions,
+    /// Cargo features conditionally enabled based on the target Python version/implementation
+    pub conditional_features: Vec<ConditionalFeature>,
+    /// List of Cargo targets to compile
+    pub compile_targets: Vec<CompileTarget>,
+}
+
+impl ProjectContext {
+    /// Bridge model
+    pub fn bridge(&self) -> &BridgeModel {
+        // FIXME: currently we only allow multiple bin targets so bridges are all the same
+        &self.compile_targets[0].bridge_model
+    }
+
+    /// Returns the platform part of the tag for the wheel name
+    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+        crate::target::get_platform_tag(
+            &self.target,
+            platform_tags,
+            self.universal2,
+            self.pyproject_toml.as_ref(),
+            &self.manifest_path,
+        )
+    }
+}
+
+/// The output part of the build context.
+///
+/// Manages configuration for the final artifacts produced by the build,
+/// such as output directories, symbol stripping, compression settings,
+/// and SBOM generation.
+#[derive(Clone, Debug)]
+pub struct ArtifactContext {
+    /// The directory to store the built wheels in
+    pub out: PathBuf,
+    /// Strip the library for minimum file size
+    pub strip: bool,
     /// Compression options
     pub compression: CompressionOptions,
-    /// Whether to validate wheels against PyPI platform tag rules
-    pub pypi_validation: bool,
     /// SBOM configuration
     pub sbom: Option<SbomConfig>,
-    /// Include the import library (.dll.lib) in the wheel on Windows
+    /// Include the import library in the wheel on Windows
     pub include_import_lib: bool,
     /// Include debug info files (.pdb, .dSYM, .dwp) in the wheel
     pub include_debuginfo: bool,
-    /// Cargo features conditionally enabled based on the target Python version/implementation
-    pub conditional_features: Vec<ConditionalFeature>,
     /// Current PGO build phase (if PGO is enabled)
     pub pgo_phase: Option<PgoPhase>,
     /// PGO training command from pyproject.toml (only set when --pgo is passed)
     pub pgo_command: Option<String>,
+}
+
+/// The constraint part of the build context.
+///
+/// Defines the target environment where the built artifacts will run,
+/// including the resolved Python interpreters, platform tags, and
+/// compatibility requirements (e.g. auditwheel).
+#[derive(Clone, Debug)]
+pub struct PythonContext {
+    /// Checking the linked libraries for manylinux compliance
+    pub auditwheel: AuditWheelMode,
+    /// When compiling for manylinux, use zig as linker
+    #[cfg(feature = "zig")]
+    pub zig: bool,
+    /// Whether to use the manylinux/musllinux or use the native linux tag
+    pub platform_tag: Vec<PlatformTag>,
+    /// The available python interpreters
+    pub interpreter: Vec<PythonInterpreter>,
+    /// Whether to validate wheels against PyPI platform tag rules
+    pub pypi_validation: bool,
+}
+
+/// The complete build context, partitioned into modular sub-contexts.
+///
+/// This structure reflects the build lifecycle:
+/// **Input (Project) → Constraints (Python) → Output (Artifact).**
+#[derive(Clone)]
+pub struct BuildContext {
+    /// Project context
+    pub project: ProjectContext,
+    /// Artifact context
+    pub artifact: ArtifactContext,
+    /// Python context
+    pub python: PythonContext,
 }
 
 /// The wheel file location and its Python version tag (e.g. `py3`).
@@ -105,7 +157,7 @@ impl BuildContext {
     /// correct builder.
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
-        if self.pgo_command.is_some() {
+        if self.artifact.pgo_command.is_some() {
             return self.build_wheels_pgo();
         }
         self.build_wheels_inner()
@@ -113,29 +165,31 @@ impl BuildContext {
 
     /// Standard wheel build pipeline (no PGO).
     fn build_wheels_inner(&self) -> Result<Vec<BuiltWheelMetadata>> {
-        fs::create_dir_all(&self.out)
+        fs::create_dir_all(&self.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
         // Generate SBOM data once for all wheels (the Rust dependency graph
         // is the same regardless of the target Python interpreter).
-        let sbom_data = generate_sbom_data(self)?;
+        let sbom_data = generate_sbom_data(&self.project, &self.artifact)?;
 
-        let wheels = match self.bridge() {
+        let wheels = match self.project.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None, &sbom_data)?,
-            BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&self.interpreter, &sbom_data)?,
+            BridgeModel::Bin(Some(..)) => {
+                self.build_bin_wheels(&self.python.interpreter, &sbom_data)?
+            }
             BridgeModel::PyO3(crate::PyO3 { abi3, .. }) => match abi3 {
                 Some(Abi3Version::Version(major, minor)) => {
                     self.build_abi3_wheels(Some((*major, *minor)), &sbom_data)?
                 }
                 Some(Abi3Version::CurrentPython) => self.build_abi3_wheels(None, &sbom_data)?,
-                None => self.build_pyo3_wheels(&self.interpreter, &sbom_data)?,
+                None => self.build_pyo3_wheels(&self.python.interpreter, &sbom_data)?,
             },
             BridgeModel::Cffi => self.build_cffi_wheel(&sbom_data)?,
             BridgeModel::UniFfi => self.build_uniffi_wheel(&sbom_data)?,
         };
 
         // Validate wheel filenames against PyPI platform tag rules if requested
-        if self.pypi_validation {
+        if self.python.pypi_validation {
             for wheel in &wheels {
                 let filename = wheel
                     .0
@@ -165,12 +219,13 @@ impl BuildContext {
     /// code is identical across interpreters, so one PGO cycle suffices.
     fn build_wheels_pgo(&self) -> Result<Vec<BuiltWheelMetadata>> {
         let pgo_command = self
+            .artifact
             .pgo_command
             .as_ref()
             .expect("pgo_command must be set when build_wheels_pgo is called");
 
         let needs_per_interpreter_pgo = matches!(
-            self.bridge(),
+            self.project.bridge(),
             BridgeModel::PyO3(crate::PyO3 { abi3: None, .. })
         );
 
@@ -190,8 +245,8 @@ impl BuildContext {
     /// the given PGO phase set.
     fn clone_for_pgo(&self, phase: PgoPhase) -> Self {
         let mut ctx = self.clone();
-        ctx.pgo_command = None;
-        ctx.pgo_phase = Some(phase);
+        ctx.artifact.pgo_command = None;
+        ctx.artifact.pgo_phase = Some(phase);
         ctx
     }
 
@@ -199,6 +254,7 @@ impl BuildContext {
     /// compiled artifact is the same regardless of the Python interpreter.
     fn build_wheels_pgo_single_pass(&self, pgo_command: &str) -> Result<Vec<BuiltWheelMetadata>> {
         let instrumentation_python = self
+            .python
             .interpreter
             .first()
             .context(
@@ -217,10 +273,10 @@ impl BuildContext {
         let mut instrumented_ctx = self.clone_for_pgo(PgoPhase::Generate(
             pgo_ctx.profdata_dir_path().to_path_buf(),
         ));
-        instrumented_ctx.interpreter = vec![self.interpreter[0].clone()];
+        instrumented_ctx.python.interpreter = vec![self.python.interpreter[0].clone()];
         let instrumented_out =
             tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
-        instrumented_ctx.out = instrumented_out.path().to_path_buf();
+        instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
         let instrumented_wheels = instrumented_ctx.build_wheels_inner()?;
 
         // Phase 2: Instrumentation
@@ -249,17 +305,17 @@ impl BuildContext {
         &self,
         pgo_command: &str,
     ) -> Result<Vec<BuiltWheelMetadata>> {
-        fs::create_dir_all(&self.out)
+        fs::create_dir_all(&self.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
-        let sbom_data = generate_sbom_data(self)?;
+        let sbom_data = generate_sbom_data(&self.project, &self.artifact)?;
         let mut wheels = Vec::new();
 
-        for (i, python_interpreter) in self.interpreter.iter().enumerate() {
+        for (i, python_interpreter) in self.python.interpreter.iter().enumerate() {
             eprintln!(
                 "📊 [{}/{}] PGO cycle for {} {}.{}...",
                 i + 1,
-                self.interpreter.len(),
+                self.python.interpreter.len(),
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
                 python_interpreter.minor,
@@ -274,7 +330,7 @@ impl BuildContext {
             ));
             let instrumented_out = tempfile::TempDir::new()
                 .context("Failed to create temp dir for instrumented wheel")?;
-            instrumented_ctx.out = instrumented_out.path().to_path_buf();
+            instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
             let (instrumented_wheel_path, _) =
                 instrumented_ctx.build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
 
@@ -306,7 +362,7 @@ impl BuildContext {
         }
 
         // Validate wheel filenames against PyPI platform tag rules if requested
-        if self.pypi_validation {
+        if self.python.pypi_validation {
             for (wheel_path, _) in &wheels {
                 let filename = wheel_path
                     .file_name()
@@ -323,22 +379,20 @@ impl BuildContext {
         Ok(wheels)
     }
 
-    /// Bridge model
-    pub fn bridge(&self) -> &BridgeModel {
-        // FIXME: currently we only allow multiple bin targets so bridges are all the same
-        &self.compile_targets[0].bridge_model
-    }
-
     /// Builds a source distribution and returns the same metadata as [BuildContext::build_wheels]
     pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>> {
-        fs::create_dir_all(&self.out)
+        fs::create_dir_all(&self.artifact.out)
             .context("Failed to create the target directory for the source distribution")?;
 
-        match self.pyproject_toml.as_ref() {
+        match self.project.pyproject_toml.as_ref() {
             Some(pyproject) => {
-                let sdist_path =
-                    source_distribution(self, pyproject, self.excludes(Format::Sdist)?)
-                        .context("Failed to build source distribution")?;
+                let sdist_path = source_distribution(
+                    &self.project,
+                    &self.artifact,
+                    pyproject,
+                    self.excludes(Format::Sdist)?,
+                )
+                .context("Failed to build source distribution")?;
                 Ok(Some((sdist_path, "source".to_string())))
             }
             None => Ok(None),
@@ -347,15 +401,15 @@ impl BuildContext {
 
     /// Return the tags of the wheel that this build context builds.
     pub fn tags_from_bridge(&self) -> Result<Vec<String>> {
-        let tags = match self.bridge() {
+        let tags = match self.project.bridge() {
             BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => match bindings.abi3 {
                 Some(Abi3Version::Version(major, minor)) => {
-                    let platform = self.get_platform_tag(&[PlatformTag::Linux])?;
+                    let platform = self.project.get_platform_tag(&[PlatformTag::Linux])?;
                     vec![format!("cp{major}{minor}-abi3-{platform}")]
                 }
                 Some(Abi3Version::CurrentPython) => {
-                    let interp = &self.interpreter[0];
-                    let platform = self.get_platform_tag(&[PlatformTag::Linux])?;
+                    let interp = &self.python.interpreter[0];
+                    let platform = self.project.get_platform_tag(&[PlatformTag::Linux])?;
                     vec![format!(
                         "cp{major}{minor}-abi3-{platform}",
                         major = interp.major,
@@ -363,7 +417,7 @@ impl BuildContext {
                     )]
                 }
                 None => {
-                    vec![self.interpreter[0].get_tag(self, &[PlatformTag::Linux])?]
+                    vec![self.python.interpreter[0].get_tag(&self.project, &[PlatformTag::Linux])?]
                 }
             },
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
@@ -374,19 +428,23 @@ impl BuildContext {
     }
 
     fn add_pth(&self, writer: &mut VirtualWriter<WheelWriter>) -> Result<()> {
-        if self.editable {
-            write_pth(writer, &self.project_layout, &self.metadata24)?;
+        if self.project.editable {
+            write_pth(
+                writer,
+                &self.project.project_layout,
+                &self.project.metadata24,
+            )?;
         }
         Ok(())
     }
 
     fn excludes(&self, format: Format) -> Result<Override> {
-        let project_dir = match self.pyproject_toml_path.normalize() {
+        let project_dir = match self.project.pyproject_toml_path.normalize() {
             Ok(pyproject_toml_path) => pyproject_toml_path.into_path_buf(),
-            Err(_) => self.manifest_path.normalize()?.into_path_buf(),
+            Err(_) => self.project.manifest_path.normalize()?.into_path_buf(),
         };
         let mut excludes = OverrideBuilder::new(project_dir.parent().unwrap());
-        if let Some(pyproject) = self.pyproject_toml.as_ref()
+        if let Some(pyproject) = self.project.pyproject_toml.as_ref()
             && let Some(glob_patterns) = &pyproject.exclude()
         {
             for glob in glob_patterns
@@ -400,39 +458,28 @@ impl BuildContext {
         if matches!(format, Format::Sdist) {
             let glob_pattern = format!(
                 "{}{}{}-*.tar.gz",
-                self.out.display(),
+                self.artifact.out.display(),
                 std::path::MAIN_SEPARATOR,
-                &self.metadata24.get_distribution_escaped(),
+                &self.project.metadata24.get_distribution_escaped(),
             );
             excludes.add(&glob_pattern)?;
         }
         Ok(excludes.build()?)
     }
 
-    /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
-        crate::target::get_platform_tag(
-            &self.target,
-            platform_tags,
-            self.universal2,
-            self.pyproject_toml.as_ref(),
-            &self.manifest_path,
-        )
-    }
-
     /// Returns the platform tag without python version (e.g. `py3-none-manylinux_2_17_x86_64`)
     pub fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
-        let platform = self.get_platform_tag(platform_tags)?;
+        let platform = self.project.get_platform_tag(platform_tags)?;
         Ok(format!("py3-none-{platform}"))
     }
 
     /// Returns user-specified platform tags, or falls back to the auditwheel
     /// policy tag when no explicit tags were provided.
     fn resolve_platform_tags(&self, policy: &Policy) -> Vec<PlatformTag> {
-        if self.platform_tag.is_empty() {
+        if self.python.platform_tag.is_empty() {
             vec![policy.platform_tag()]
         } else {
-            self.platform_tag.clone()
+            self.python.platform_tag.clone()
         }
     }
 }

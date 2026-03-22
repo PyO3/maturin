@@ -1,6 +1,6 @@
 #[cfg(feature = "zig")]
 use crate::PlatformTag;
-use crate::target::{RUST_1_64_0, RUST_1_93_0};
+use crate::target::{RUST_1_64_0, RUST_1_93_0, rustc_macosx_target_version};
 use crate::{BridgeModel, BuildContext, PythonInterpreter, Target};
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -67,7 +67,7 @@ pub fn compile(
     python_interpreter: Option<&PythonInterpreter>,
     targets: &[CompileTarget],
 ) -> Result<CompileResult> {
-    if context.universal2 {
+    if context.project.universal2 {
         compile_universal2(context, python_interpreter, targets)
     } else {
         compile_targets(context, python_interpreter, targets)
@@ -81,12 +81,12 @@ fn compile_universal2(
     targets: &[CompileTarget],
 ) -> Result<CompileResult> {
     let mut aarch64_context = context.clone();
-    aarch64_context.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
+    aarch64_context.project.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
 
     let aarch64_result = compile_targets(&aarch64_context, python_interpreter, targets)
         .context("Failed to build a aarch64 library through cargo")?;
     let mut x86_64_context = context.clone();
-    x86_64_context.target = Target::from_resolved_target_triple("x86_64-apple-darwin")?;
+    x86_64_context.project.target = Target::from_resolved_target_triple("x86_64-apple-darwin")?;
 
     let x86_64_result = compile_targets(&x86_64_context, python_interpreter, targets)
         .context("Failed to build a x86_64 library through cargo")?;
@@ -190,14 +190,14 @@ fn cargo_build_command(
 ) -> Result<Command> {
     use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
 
-    let target = &context.target;
+    let target = &context.project.target;
 
     let user_specified_target = if target.user_specified {
         Some(target.target_triple().to_string())
     } else {
         None
     };
-    let mut cargo_options = context.cargo_options.clone();
+    let mut cargo_options = context.project.cargo_options.clone();
 
     // Resolve conditional features based on the target Python version and implementation
     if let Some(interpreter) = python_interpreter {
@@ -206,7 +206,7 @@ fn cargo_build_command(
             minor: interpreter.minor,
             implementation_name: &interpreter.implementation_name,
         };
-        let extra = FeatureSpec::resolve_conditional(&context.conditional_features, &env);
+        let extra = FeatureSpec::resolve_conditional(&context.project.conditional_features, &env);
         if !extra.is_empty() {
             debug!(
                 "Enabling conditional features for Python {} {}.{}: {}",
@@ -243,14 +243,14 @@ fn cargo_build_command(
 
     let target_triple = target.target_triple();
 
-    let manifest_dir = context.manifest_path.parent().unwrap();
+    let manifest_dir = context.project.manifest_path.parent().unwrap();
     let mut rustflags = cargo_config2::Config::load_with_cwd(manifest_dir)?
         .rustflags(target_triple)?
         .unwrap_or_default();
     let original_rustflags = rustflags.flags.clone();
 
     // Inject PGO flags if a PGO build phase is active
-    if let Some(ref pgo_phase) = context.pgo_phase {
+    if let Some(ref pgo_phase) = context.artifact.pgo_phase {
         match pgo_phase {
             crate::pgo::PgoPhase::Generate(profdata_dir) => {
                 rustflags
@@ -279,22 +279,22 @@ fn cargo_build_command(
         &mut rustflags,
         target,
         bridge_model,
-        &context.module_name,
+        &context.project.module_name,
         python_interpreter,
         #[cfg(feature = "zig")]
-        context.zig,
+        context.python.zig,
         #[cfg(feature = "zig")]
-        &context.target_dir,
+        &context.project.target_dir,
     );
 
-    if context.strip {
+    if context.artifact.strip {
         // https://doc.rust-lang.org/rustc/codegen-options/index.html#strip
         cargo_rustc
             .args
             .extend(["-C".to_string(), "strip=symbols".to_string()]);
     }
 
-    configure_debuginfo_flags(&mut rustflags, target, context.include_debuginfo)?;
+    configure_debuginfo_flags(&mut rustflags, target, context.artifact.include_debuginfo)?;
 
     let mut build_command = create_build_command(context, cargo_rustc, target_triple)?;
 
@@ -546,7 +546,7 @@ fn create_build_command(
     cargo_rustc: cargo_options::Rustc,
     target_triple: &str,
 ) -> Result<Command> {
-    let target = &context.target;
+    let target = &context.project.target;
 
     let mut build_command = if target.is_msvc() && target.cross_compiling() {
         #[cfg(feature = "xwin")]
@@ -597,7 +597,7 @@ fn create_build_command(
         #[cfg(feature = "zig")]
         {
             let mut build = cargo_zigbuild::Rustc::from(cargo_rustc);
-            if !context.zig {
+            if !context.python.zig {
                 build.disable_zig_linker = true;
                 if target.user_specified {
                     build.target = vec![target_triple.to_string()];
@@ -606,7 +606,12 @@ fn create_build_command(
                 println!("🛠️ Using zig for cross-compiling to {target_triple}");
                 build.enable_zig_ar = true;
                 let zig_triple = if target.is_linux() && !target.is_musl_libc() {
-                    match context.platform_tag.iter().find(|tag| tag.is_manylinux()) {
+                    match context
+                        .python
+                        .platform_tag
+                        .iter()
+                        .find(|tag| tag.is_manylinux())
+                    {
                         Some(PlatformTag::Manylinux { major, minor }) => {
                             format!("{target_triple}.{major}.{minor}")
                         }
@@ -630,7 +635,7 @@ fn create_build_command(
     };
 
     #[cfg(feature = "zig")]
-    if context.zig {
+    if context.python.zig {
         // Pass zig command to downstream, eg. python3-dll-a
         if let Ok((zig_cmd, zig_args)) = cargo_zigbuild::Zig::find_zig() {
             if zig_args.is_empty() {
@@ -668,7 +673,7 @@ fn configure_pyo3_env(
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
         if !is_pypy_or_graalpy && !target.is_windows() {
-            let pyo3_ver = pyo3_version(&context.cargo_metadata)
+            let pyo3_ver = pyo3_version(&context.project.cargo_metadata)
                 .context("Failed to get pyo3 version from cargo metadata")?;
             if pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
                 // This will make old pyo3's build script only set some predefined linker
@@ -704,7 +709,7 @@ fn configure_pyo3_env(
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
             let pyo3_config = interpreter.pyo3_config_file();
-            let maturin_target_dir = ensure_target_maturin_dir(&context.target_dir);
+            let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
                 target_triple, interpreter.major, interpreter.minor
@@ -726,10 +731,12 @@ fn configure_pyo3_env(
     }
 
     // Set default macOS deployment target version for non-editable builds
-    if !context.editable && target.is_macos() && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
-        use crate::target::rustc_macosx_target_version;
-
+    if !context.project.editable
+        && target.is_macos()
+        && env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none()
+    {
         let target_config = context
+            .project
             .pyproject_toml
             .as_ref()
             .and_then(|x| x.target_config(target_triple));
@@ -782,6 +789,7 @@ fn compile_target(
         match message {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
                 let package_in_metadata = context
+                    .project
                     .cargo_metadata
                     .packages
                     .iter()
@@ -805,7 +813,7 @@ fn compile_target(
                 };
 
                 // Extract the location of the .so/.dll/etc. from cargo's json output
-                if crate_name.as_ref() == context.crate_name {
+                if crate_name.as_ref() == context.project.crate_name {
                     let num_crate_types = artifact.target.crate_types.len();
                     let mut filenames_iter = artifact.filenames.into_iter();
                     for crate_type in artifact.target.crate_types {
@@ -813,6 +821,7 @@ fn compile_target(
                             let path = if using_cross && filename.starts_with("/target") {
                                 // Convert cross target path in docker back to path on host
                                 context
+                                    .project
                                     .cargo_metadata
                                     .target_directory
                                     .join(filename.strip_prefix("/target").unwrap())
@@ -885,6 +894,7 @@ fn compile_target(
                 // Capture OUT_DIR for each package
                 if !msg.out_dir.as_os_str().is_empty() {
                     let pkg_name = context
+                        .project
                         .cargo_metadata
                         .packages
                         .iter()

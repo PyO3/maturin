@@ -123,16 +123,17 @@ where
     A: Borrow<BuildArtifact>,
 {
     // 1. Install the python files
-    if !context.editable {
+    if !context.project.editable {
         write_python_part(
             writer,
-            &context.project_layout,
-            context.pyproject_toml.as_ref(),
+            &context.project.project_layout,
+            context.project.pyproject_toml.as_ref(),
         )
         .context("Failed to add the python module to the package")?;
     }
 
     let base_path = context
+        .project
         .project_layout
         .python_module
         .as_ref()
@@ -140,12 +141,13 @@ where
 
     let module = match &base_path {
         Some(base_path) => context
+            .project
             .project_layout
             .rust_module
             .strip_prefix(base_path)
             .unwrap()
             .to_path_buf(),
-        None => PathBuf::from(&context.project_layout.extension_name),
+        None => PathBuf::from(&context.project.project_layout.extension_name),
     };
 
     for artifact in artifacts {
@@ -156,7 +158,7 @@ where
             additional_files,
         } = generator.generate_bindings(context, artifact, &module)?;
 
-        match (context.editable, &base_path) {
+        match (context.project.editable, &base_path) {
             (true, Some(base_path)) => {
                 let source = artifact_source_override.unwrap_or_else(|| artifact.path.clone());
                 // Compute the directory where debug info files should be placed.
@@ -223,7 +225,7 @@ where
 
                 // 4a. Install import library on Windows
                 if let Some(import_lib) = &artifact.import_lib_path
-                    && context.include_import_lib
+                    && context.artifact.include_import_lib
                 {
                     let target = base_path.join(import_lib.file_name().unwrap());
                     fs::create_dir_all(target.parent().unwrap())?;
@@ -233,7 +235,7 @@ where
 
                 // 5a. Install debug info files
                 if let Some(debuginfo) = &artifact.debuginfo_path
-                    && context.include_debuginfo
+                    && context.artifact.include_debuginfo
                 {
                     install_debuginfo_editable(debuginfo, &debuginfo_base)?;
                 }
@@ -260,7 +262,7 @@ where
 
                 // 4b. Install import library on Windows
                 if let Some(import_lib) = &artifact.import_lib_path
-                    && context.include_import_lib
+                    && context.artifact.include_import_lib
                 {
                     let dest = module.join(import_lib.file_name().unwrap());
                     debug!("Adding import library to archive {}", dest.display());
@@ -269,7 +271,7 @@ where
 
                 // 5b. Install debug info files
                 if let Some(debuginfo) = &artifact.debuginfo_path
-                    && context.include_debuginfo
+                    && context.artifact.include_debuginfo
                 {
                     // Binary artifacts go into the `.data/scripts/` directory.
                     // The wheel spec only permits regular files in `scripts/`, so
@@ -300,9 +302,10 @@ where
     }
 
     // 4. Install type stubs
-    if context.project_layout.python_module.is_none() {
-        let ext_name = &context.project_layout.extension_name;
+    if context.project.project_layout.python_module.is_none() {
+        let ext_name = &context.project.project_layout.extension_name;
         let type_stub = context
+            .project
             .project_layout
             .rust_module
             .join(format!("{ext_name}.pyi"));
@@ -314,11 +317,11 @@ where
     }
 
     // 5. Include files from OUT_DIR
-    if let Some(pyproject) = context.pyproject_toml.as_ref()
+    if let Some(pyproject) = context.project.pyproject_toml.as_ref()
         && let Some(glob_patterns) = pyproject.include()
     {
         for inc in glob_patterns.iter().filter_map(|p| p.as_out_dir_include()) {
-            let pkg_name = inc.crate_name.unwrap_or(&context.crate_name);
+            let pkg_name = inc.crate_name.unwrap_or(&context.project.crate_name);
             let out_dir = out_dirs.get(pkg_name).with_context(|| {
                 format!(
                     "No OUT_DIR found for crate \"{pkg_name}\". \
@@ -338,7 +341,7 @@ where
                     out_dir.display()
                 );
             }
-            match (context.editable, &base_path) {
+            match (context.project.editable, &base_path) {
                 (true, Some(base_path)) => {
                     for m in matches {
                         let target = base_path.join(&m.target);

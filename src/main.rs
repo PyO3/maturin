@@ -12,9 +12,9 @@ use clap::CommandFactory;
 use clap::{Parser, Subcommand};
 use ignore::overrides::Override;
 use maturin::{
-    BridgeModel, BuildContext, BuildOptions, CargoOptions, DevelopOptions, PathWriter, Target,
-    TargetTriple, UnpackedSdist, VirtualWriter, develop, find_path_deps, unpack_sdist,
-    write_dist_info,
+    BridgeModel, BuildContext, BuildOptions, CargoOptions, DevelopOptions, OutputOptions,
+    PathWriter, Target, TargetTriple, UnpackedSdist, VirtualWriter, develop, find_path_deps,
+    unpack_sdist, write_dist_info,
 };
 #[cfg(feature = "schemars")]
 use maturin::{GenerateJsonSchemaOptions, generate_json_schema};
@@ -295,8 +295,8 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
 fn pep517(subcommand: Pep517Command) -> Result<()> {
     // PEP 517 builds default to release profile.
     fn ensure_release_profile(context: &mut BuildContext) {
-        if context.cargo_options.profile.is_none() {
-            context.cargo_options.profile = Some("release".to_string());
+        if context.project.cargo_options.profile.is_none() {
+            context.project.cargo_options.profile = Some("release".to_string());
         }
     }
 
@@ -306,7 +306,7 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             metadata_directory,
             strip_opt,
         } => {
-            assert_eq!(build_options.interpreter.len(), 1);
+            assert_eq!(build_options.python.interpreter.len(), 1);
             let mut context = build_options
                 .into_build_context()
                 .strip(strip_opt.strip)
@@ -318,8 +318,8 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
                 VirtualWriter::new(PathWriter::from_path(metadata_directory), Override::empty());
             let dist_info_dir = write_dist_info(
                 &mut writer,
-                &context.project_layout.project_root,
-                &context.metadata24,
+                &context.project.project_layout.project_root,
+                &context.project.metadata24,
                 &context.tags_from_bridge()?,
             )?;
             writer.finish()?;
@@ -345,7 +345,10 @@ fn pep517(subcommand: Pep517Command) -> Result<()> {
             manifest_path,
         } => {
             let build_options = BuildOptions {
-                out: Some(sdist_directory),
+                output: OutputOptions {
+                    out: Some(sdist_directory),
+                    ..Default::default()
+                },
                 cargo: CargoOptions {
                     manifest_path,
                     // Enable all features to ensure all optional path dependencies are packaged
@@ -487,6 +490,7 @@ fn run() -> Result<()> {
             // (respect pyproject.toml if set)
             // don't need to check `debug` here, set above to take precedence if set
             let profile = build_context
+                .project
                 .cargo_options
                 .profile
                 .get_or_insert_with(|| "release".to_string());
@@ -540,7 +544,10 @@ fn run() -> Result<()> {
                 .map(|path_deps| !path_deps.is_empty())
                 .unwrap_or(false); // If we can't get metadata, don't force all features
             let build_options = BuildOptions {
-                out,
+                output: OutputOptions {
+                    out,
+                    ..Default::default()
+                },
                 cargo: CargoOptions {
                     manifest_path,
                     // Only enable all features when we have local path dependencies
@@ -628,8 +635,8 @@ fn unpack_sdist_for_build(
     // from the unpacked sdist still land in the user-visible
     // `target/wheels` (or the explicit `--out` directory) instead
     // of the temporary directory's target.
-    if build.out.is_none() {
-        build.out = sdist_path.parent().map(PathBuf::from);
+    if build.output.out.is_none() {
+        build.output.out = sdist_path.parent().map(PathBuf::from);
     }
     let UnpackedSdist {
         tmpdir,

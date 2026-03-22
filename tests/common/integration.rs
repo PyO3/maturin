@@ -289,18 +289,18 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     let wheels = build_context.build_wheels()?;
 
     // For abi3 on unix, we didn't use a python interpreter, but we need one here
-    let interpreter = if build_context.interpreter.is_empty() {
+    let interpreter = if build_context.python.interpreter.is_empty() {
         let error_message = "python3 should be a python interpreter";
         let venv_interpreter = maturin::PythonInterpreter::check_executable(
             python_interp.as_deref().unwrap_or("python3"),
-            &build_context.target,
-            build_context.bridge(),
+            &build_context.project.target,
+            build_context.project.bridge(),
         )
         .context(error_message)?
         .context(error_message)?;
         vec![venv_interpreter]
     } else {
-        build_context.interpreter
+        build_context.python.interpreter
     };
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
@@ -385,7 +385,7 @@ pub fn test_integration_conda(
     let wheels = build_context.build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
-    for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.interpreter) {
+    for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.python.interpreter) {
         let executable = python_interpreter.executable;
         if executable.to_string_lossy().contains(case_id) {
             conda_wheels.push((filename.clone(), executable))

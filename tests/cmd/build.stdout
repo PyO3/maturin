@@ -26,6 +26,18 @@ Options:
           Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml. This performs a
           three-phase build: instrumented build, profile training, and optimized rebuild.
 
+  -i, --interpreter [<INTERPRETER>...]
+          The python versions to build wheels for, given as the executables of interpreters such as
+          `python3.9` or `/usr/bin/python3.8`
+
+  -f, --find-interpreter
+          Find interpreters from the host machine
+
+  -b, --bindings <BINDINGS>
+          Which kind of bindings to use
+          
+          [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
+
       --compatibility [<compatibility>...]
           Control the platform tag and PyPI compatibility.
           
@@ -43,22 +55,6 @@ Options:
           
           The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched.
 
-  -i, --interpreter [<INTERPRETER>...]
-          The python versions to build wheels for, given as the executables of interpreters such as
-          `python3.9` or `/usr/bin/python3.8`
-
-  -f, --find-interpreter
-          Find interpreters from the host machine
-
-  -b, --bindings <BINDINGS>
-          Which kind of bindings to use
-          
-          [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
-
-  -o, --out <OUT>
-          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
-          project's target directory
-
       --auditwheel <AUDITWHEEL>
           Audit wheel for manylinux compliance
 
@@ -74,10 +70,18 @@ Options:
           
           Make sure you installed zig with `pip install maturin[zig]`
 
+  -o, --out <OUT>
+          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+          project's target directory
+
       --include-debuginfo
           Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux) in the wheel.
           When enabled, maturin automatically configures split-debuginfo=packed so that separate
           debug info files are produced
+
+      --sbom-include <SBOM_INCLUDE>...
+          Additional SBOM files to include in the `.dist-info/sboms` directory. Can be specified
+          multiple times
 
   -q, --quiet
           Do not print cargo log messages
@@ -99,10 +103,6 @@ Options:
 
       --future-incompat-report
           Outputs a future incompatibility report at the end of the build (unstable)
-
-      --sbom-include <SBOM_INCLUDE>...
-          Additional SBOM files to include in the `.dist-info/sboms` directory. Can be specified
-          multiple times
 
       --compression-method <COMPRESSION_METHOD>
           Zip compression method. Only Stored and Deflated are currently compatible with all package

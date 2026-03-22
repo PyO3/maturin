@@ -25,13 +25,13 @@ impl BuildContext {
         platform_tag: &[PlatformTag],
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Result<(Policy, Vec<Library>)> {
-        if matches!(self.auditwheel, AuditWheelMode::Skip) {
+        if matches!(self.python.auditwheel, AuditWheelMode::Skip) {
             return Ok((Policy::default(), Vec::new()));
         }
 
         if let Some(python_interpreter) = python_interpreter
             && platform_tag.is_empty()
-            && self.target.is_linux()
+            && self.project.target.is_linux()
             && !python_interpreter.support_portable_wheels()
         {
             eprintln!(
@@ -54,13 +54,13 @@ impl BuildContext {
         others.sort();
 
         // only bin bindings allow linking to libpython, extension modules must not
-        let allow_linking_libpython = self.bridge().is_bin();
-        if self.bridge().is_bin() && !musllinux.is_empty() {
+        let allow_linking_libpython = self.project.bridge().is_bin();
+        if self.project.bridge().is_bin() && !musllinux.is_empty() {
             return get_policy_and_libs(
                 artifact,
                 Some(musllinux[0]),
-                &self.target,
-                &self.manifest_path,
+                &self.project.target,
+                &self.project.manifest_path,
                 allow_linking_libpython,
             );
         }
@@ -69,8 +69,8 @@ impl BuildContext {
         get_policy_and_libs(
             artifact,
             tag,
-            &self.target,
-            &self.manifest_path,
+            &self.project.target,
+            &self.project.manifest_path,
             allow_linking_libpython,
         )
     }
@@ -80,7 +80,7 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable && self.target.is_linux() && !artifacts.is_empty() {
+        if self.project.editable && self.project.target.is_linux() && !artifacts.is_empty() {
             for artifact in artifacts {
                 let artifact = artifact.borrow();
                 if artifact.linked_paths.is_empty() {
@@ -115,7 +115,7 @@ impl BuildContext {
     where
         A: Borrow<BuildArtifact>,
     {
-        if self.editable {
+        if self.project.editable {
             return self.add_rpath(artifacts);
         }
         if ext_libs.iter().all(|libs| libs.is_empty()) {
@@ -140,7 +140,7 @@ impl BuildContext {
             }
         }
 
-        if matches!(self.auditwheel, AuditWheelMode::Check) {
+        if matches!(self.python.auditwheel, AuditWheelMode::Check) {
             bail!(
                 "Your library is not manylinux/musllinux compliant because it requires copying the above libraries. \
                  Re-run with `--auditwheel=repair` to copy them."
@@ -155,7 +155,7 @@ impl BuildContext {
         // conflicts with other packages in the same namespace.
         let libs_dir = PathBuf::from(format!(
             "{}.libs",
-            self.metadata24.get_distribution_escaped()
+            self.project.metadata24.get_distribution_escaped()
         ));
 
         let temp_dir = writer.temp_dir()?;
@@ -254,6 +254,7 @@ impl BuildContext {
         #[cfg(feature = "sbom")]
         {
             let auditwheel_sbom_enabled = self
+                .artifact
                 .sbom
                 .as_ref()
                 .and_then(|c| c.auditwheel)
@@ -261,14 +262,16 @@ impl BuildContext {
             if auditwheel_sbom_enabled {
                 // Obtain the sysroot so whichprovides can strip cross-compilation
                 // prefixes when querying the host package manager.
-                let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
+                let sysroot =
+                    get_sysroot_path(&self.project.target).unwrap_or_else(|_| PathBuf::from("/"));
                 if let Some(sbom_json) = crate::auditwheel::sbom::create_auditwheel_sbom(
-                    &self.metadata24.name,
-                    &self.metadata24.version.to_string(),
+                    &self.project.metadata24.name,
+                    &self.project.metadata24.version.to_string(),
                     &grafted_paths,
                     &sysroot,
                 ) {
                     let sbom_path = self
+                        .project
                         .metadata24
                         .get_dist_info_dir()
                         .join("sboms/auditwheel.cdx.json");
@@ -277,19 +280,19 @@ impl BuildContext {
             }
         }
 
-        let artifact_dir = match self.bridge() {
+        let artifact_dir = match self.project.bridge() {
             // cffi bindings that contains '.' in the module name will be split into directories
-            BridgeModel::Cffi => self.module_name.split(".").collect::<PathBuf>(),
+            BridgeModel::Cffi => self.project.module_name.split(".").collect::<PathBuf>(),
             // For namespace packages the modules reside at ${module_name}.so
             // where periods are replaced with slashes so for example my.namespace.module would reside
             // at my/namespace/module.so
-            _ if self.module_name.contains(".") => {
-                let mut path = self.module_name.split(".").collect::<PathBuf>();
+            _ if self.project.module_name.contains(".") => {
+                let mut path = self.project.module_name.split(".").collect::<PathBuf>();
                 path.pop();
                 path
             }
             // For other bindings artifact .so file usually resides at ${module_name}/${module_name}.so
-            _ => PathBuf::from(&self.module_name),
+            _ => PathBuf::from(&self.project.module_name),
         };
         for artifact in artifacts {
             let artifact = artifact.borrow();
@@ -321,7 +324,7 @@ impl BuildContext {
     /// reflink-or-copy directly; the concurrent-modification window is
     /// unlikely in cross-device setups.
     pub(super) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
-        let maturin_build = crate::compile::ensure_target_maturin_dir(&self.target_dir);
+        let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
         // Remove any stale file at the destination so that `fs::rename`

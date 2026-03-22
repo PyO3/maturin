@@ -74,8 +74,8 @@ fn metadata_hello_world_pep639() -> Result<()> {
     let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
     write_dist_info(
         &mut writer,
-        &context.project_layout.project_root,
-        &context.metadata24,
+        &context.project.project_layout.project_root,
+        &context.project.metadata24,
         &context.tags_from_bridge().unwrap(),
     )
     .unwrap();

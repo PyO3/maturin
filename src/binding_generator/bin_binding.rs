@@ -47,7 +47,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
         let artifact_target = ArtifactTarget::Binary(scripts_dir.join(&bin_name));
 
         let mut additional_files = None;
-        if context.target.is_wasi() {
+        if context.project.target.is_wasi() {
             update_entry_points(self.metadata, &bin_name)?;
 
             let mut files = HashMap::new();

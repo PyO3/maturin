@@ -1,7 +1,5 @@
 pub(crate) mod install_backend;
 
-use crate::BuildContext;
-use crate::BuildOptions;
 use crate::PlatformTag;
 use crate::PythonInterpreter;
 use crate::Target;
@@ -9,6 +7,7 @@ use crate::auditwheel::AuditWheelMode;
 use crate::build_options::CargoOptions;
 use crate::compression::CompressionOptions;
 use crate::target::detect_arch_from_python;
+use crate::{BuildContext, BuildOptions, OutputOptions, PlatformOptions, PythonOptions};
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use cargo_options::heading;
 use fs_err as fs;
@@ -91,7 +90,7 @@ fn install_dependencies(
     venv_dir: &Path,
     install_backend: &InstallBackend,
 ) -> Result<()> {
-    if !build_context.metadata24.requires_dist.is_empty() {
+    if !build_context.project.metadata24.requires_dist.is_empty() {
         let mut extra_names = Vec::with_capacity(extras.len());
         for extra in extras {
             extra_names.push(
@@ -100,17 +99,24 @@ fn install_dependencies(
             );
         }
         let mut args = vec!["install".to_string()];
-        args.extend(build_context.metadata24.requires_dist.iter().map(|x| {
-            let mut pkg = x.clone();
-            // Remove extra marker to make it installable with pip:
-            //
-            // * ` and extra == 'EXTRA_NAME'`
-            // * `; extra == 'EXTRA_NAME'`
-            //
-            // Keep in sync with `Metadata23::merge_pyproject_toml()`
-            pkg.marker = pkg.marker.simplify_extras(&extra_names);
-            pkg.to_string()
-        }));
+        args.extend(
+            build_context
+                .project
+                .metadata24
+                .requires_dist
+                .iter()
+                .map(|x| {
+                    let mut pkg = x.clone();
+                    // Remove extra marker to make it installable with pip:
+                    //
+                    // * ` and extra == 'EXTRA_NAME'`
+                    // * `; extra == 'EXTRA_NAME'`
+                    //
+                    // Keep in sync with `Metadata23::merge_pyproject_toml()`
+                    pkg.marker = pkg.marker.simplify_extras(&extra_names);
+                    pkg.to_string()
+                }),
+        );
         let status = install_backend
             .make_command(python)
             .args(&args)
@@ -127,6 +133,7 @@ fn install_dependencies(
     }
     let effective_groups = if groups.is_empty() {
         let has_dev_group = build_context
+            .project
             .pyproject_toml
             .as_ref()
             .and_then(|p| p.dependency_groups.as_ref())
@@ -223,13 +230,14 @@ fn configure_as_editable(
     println!("✏️ Setting installed package as editable");
     install_backend.check_supports_show_files(python)?;
     let mut cmd = install_backend.make_command(python);
-    let cmd = cmd.args(["show", "--files", &build_context.metadata24.name]);
+    let cmd = cmd.args(["show", "--files", &build_context.project.metadata24.name]);
     debug!("running {:?}", cmd);
     let output = cmd.output()?;
     ensure!(output.status.success(), "failed to list package files");
     if let Some(direct_url_path) = parse_direct_url_path(&String::from_utf8_lossy(&output.stdout))?
     {
         let project_dir = build_context
+            .project
             .pyproject_toml_path
             .parent()
             .ok_or_else(|| anyhow!("failed to get project directory"))?;
@@ -296,21 +304,27 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let wheel_dir = TempDir::new().context("Failed to create temporary directory")?;
 
     let build_options = BuildOptions {
-        platform_tag: vec![PlatformTag::Linux],
-        interpreter: vec![python.clone()],
-        find_interpreter: false,
-        bindings,
-        out: Some(wheel_dir.path().to_path_buf()),
-        auditwheel: Some(AuditWheelMode::Skip),
-        skip_auditwheel: false,
-        #[cfg(feature = "zig")]
-        zig: false,
+        python: PythonOptions {
+            interpreter: vec![python.clone()],
+            find_interpreter: false,
+            bindings,
+        },
+        platform: PlatformOptions {
+            platform_tag: vec![PlatformTag::Linux],
+            auditwheel: Some(AuditWheelMode::Skip),
+            skip_auditwheel: false,
+            #[cfg(feature = "zig")]
+            zig: false,
+        },
+        output: OutputOptions {
+            out: Some(wheel_dir.path().to_path_buf()),
+            include_debuginfo: !strip,
+            sbom_include: Vec::new(),
+        },
         cargo: CargoOptions {
             target: target_triple,
             ..cargo_options
         },
-        include_debuginfo: !strip,
-        sbom_include: Vec::new(),
         compression,
     };
 
@@ -322,6 +336,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     // Ensure that version information is present, https://github.com/PyO3/maturin/issues/2416
     if build_context
+        .project
         .pyproject_toml
         .as_ref()
         .is_some_and(|p| !p.warn_invalid_version_info())
@@ -333,9 +348,10 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     }
 
     let interpreter =
-        PythonInterpreter::check_executable(&python, &target, build_context.bridge())?.ok_or_else(
-            || anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ"),
-        )?;
+        PythonInterpreter::check_executable(&python, &target, build_context.project.bridge())?
+            .ok_or_else(|| {
+                anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
+            })?;
 
     let uv_venv = is_uv_venv(venv_dir);
     let uv_info = if uv || uv_venv {
@@ -390,7 +406,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             )?;
             eprintln!(
                 "🛠 Installed {}-{}",
-                build_context.metadata24.name, build_context.metadata24.version
+                build_context.project.metadata24.name, build_context.project.metadata24.version
             );
         }
     }

@@ -336,7 +336,7 @@ fn workspace_members_non_local_dep_sdist() {
         readme = "README.md"
 
         [dependencies]
-        pyo3 = { version = "0.27.0", features = [
+        pyo3 = { version = "0.28.2", features = [
             "abi3-py37",
             "generate-import-lib",
         ] }
@@ -408,7 +408,7 @@ fn lib_with_target_path_dep_sdist() {
         crate-type = ["cdylib"]
 
         [dependencies]
-        pyo3 = "0.27.0"
+        pyo3 = "0.28.2"
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }
@@ -613,7 +613,7 @@ fn lib_with_parent_workspace_git_dep_sdist() {
             crate-type = ["cdylib"]
 
             [dependencies]
-            pyo3 = { version = "0.27.0", features = ["extension-module"] }
+            pyo3 = { version = "0.28.2", features = ["extension-module"] }
             shared_crate = { path = "../shared_crate" }
             "#
         ),
@@ -756,7 +756,7 @@ fn lib_with_parent_workspace_lints_sdist() {
             crate-type = ["cdylib"]
 
             [dependencies]
-            pyo3 = { version = "0.27.0", features = ["extension-module"] }
+            pyo3 = { version = "0.28.2", features = ["extension-module"] }
             shared_crate = { path = "../shared_crate" }
             "#
         ),

@@ -234,7 +234,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Split interpreters into abi3-capable and non-abi3 groups, build the
     /// appropriate wheel type for each group, and return all built wheels.
-    pub fn build_abi3_wheels(
+    pub(crate) fn build_abi3_wheels(
         &self,
         min_version: Option<(u8, u8)>,
         sbom_data: &Option<SbomData>,
@@ -723,7 +723,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Generate Rust SBOMs once from the build context.
-    pub fn generate_sbom_data(&self) -> Result<Option<SbomData>> {
+    pub(crate) fn generate_sbom_data(&self) -> Result<Option<SbomData>> {
         let sbom_config = self.context.artifact.sbom.as_ref();
 
         // Check if Rust SBOM generation is explicitly disabled
@@ -777,7 +777,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Writes SBOMs into the wheel via the given writer.
-    pub fn write_sboms(
+    pub(crate) fn write_sboms(
         &self,
         sbom_data: Option<&SbomData>,
         writer: &mut impl ModuleWriter,

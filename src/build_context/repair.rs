@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use super::BuildContext;
 
 impl BuildContext {
-    pub(super) fn auditwheel(
+    pub(crate) fn repair_wheel(
         &self,
         artifact: &BuildArtifact,
         platform_tag: &[PlatformTag],
@@ -106,7 +106,7 @@ impl BuildContext {
         Ok(())
     }
 
-    pub(super) fn add_external_libs<A>(
+    pub(crate) fn repair_libs<A>(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
         artifacts: &[A],
@@ -323,7 +323,7 @@ impl BuildContext {
     /// When `fs::rename` fails (e.g. cross-device), falls back to
     /// reflink-or-copy directly; the concurrent-modification window is
     /// unlikely in cross-device setups.
-    pub(super) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
+    pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
         let artifact_path = &artifact.path;
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());

@@ -1,6 +1,6 @@
 use crate::commands::utils::unpack_sdist_for_build;
 use anyhow::Result;
-use maturin::{BuildOptions, PublishOpt, upload_ui};
+use maturin::{BuildOptions, BuildOrchestrator, PublishOpt, upload_ui};
 
 pub fn publish(
     mut build: BuildOptions,
@@ -51,7 +51,8 @@ pub fn publish(
         eprintln!("⚠️  Warning: You're publishing debug wheels");
     }
 
-    let mut wheels = build_context.build_wheels()?;
+    let orchestrator = BuildOrchestrator::new(&build_context);
+    let mut wheels = orchestrator.build_wheels()?;
     if let Some(sdist_path) = sdist_path {
         wheels.push((sdist_path, "source".to_string()));
     }

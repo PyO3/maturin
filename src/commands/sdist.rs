@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use maturin::{BuildOptions, CargoOptions, OutputOptions, find_path_deps};
+use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, find_path_deps};
 use std::path::PathBuf;
 
 pub fn sdist(manifest_path: Option<PathBuf>, out: Option<PathBuf>) -> Result<()> {
@@ -39,7 +39,9 @@ pub fn sdist(manifest_path: Option<PathBuf>, out: Option<PathBuf>) -> Result<()>
         .editable(false)
         .sdist_only(true)
         .build()?;
-    build_context
+
+    let orchestrator = BuildOrchestrator::new(&build_context);
+    orchestrator
         .build_source_distribution()?
         .context("Failed to build source distribution, pyproject.toml not found")?;
     Ok(())

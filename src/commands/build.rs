@@ -1,7 +1,7 @@
 use crate::commands::StripOption;
 use crate::commands::utils::unpack_sdist_for_build;
 use anyhow::Result;
-use maturin::BuildOptions;
+use maturin::{BuildOptions, BuildOrchestrator};
 
 pub fn build(
     mut build: BuildOptions,
@@ -33,7 +33,9 @@ pub fn build(
         .pyproject_toml_path(sdist_pyproject_path)
         .pgo(pgo)
         .build()?;
-    let wheels = build_context.build_wheels()?;
+
+    let orchestrator = BuildOrchestrator::new(&build_context);
+    let wheels = orchestrator.build_wheels()?;
     assert!(!wheels.is_empty());
     Ok(())
 }

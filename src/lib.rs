@@ -28,6 +28,7 @@ pub use crate::build_context::{
     ArtifactContext, BuildContext, BuiltWheelMetadata, ProjectContext, PythonContext,
 };
 pub use crate::build_options::{BuildOptions, OutputOptions, PlatformOptions, PythonOptions};
+pub use crate::build_orchestrator::BuildOrchestrator;
 pub use crate::cargo_options::{CargoOptions, TargetTriple};
 pub use crate::cargo_toml::CargoToml;
 pub use crate::compile::{BuildArtifact, CompileResult, compile};
@@ -55,6 +56,7 @@ mod binding_generator;
 mod bridge;
 mod build_context;
 mod build_options;
+mod build_orchestrator;
 /// Cargo build options
 pub mod cargo_options;
 mod cargo_toml;

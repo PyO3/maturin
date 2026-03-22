@@ -294,7 +294,8 @@ impl BuildContext {
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
     ) -> Result<(BuildArtifact, HashMap<String, PathBuf>)> {
-        let result = compile(self, python_interpreter, &self.project.compile_targets)?;
+        let result = compile(self, python_interpreter, &self.project.compile_targets)
+            .context("Failed to build a native library through cargo")?;
         let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
                  in the lib section of your Cargo.toml?";
         let artifacts = result.artifacts.first().context(error_msg)?;
@@ -473,7 +474,8 @@ impl BuildContext {
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let result = compile(self, python_interpreter, &self.project.compile_targets)?;
+        let result = compile(self, python_interpreter, &self.project.compile_targets)
+            .context("Failed to build a native library through cargo")?;
         if result.artifacts.is_empty() {
             bail!("Cargo didn't build a binary")
         }

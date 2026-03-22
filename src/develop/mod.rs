@@ -325,7 +325,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             target: target_triple,
             ..cargo_options
         },
-        compression: CompressionOptions::default(),
+        compression,
     };
 
     let build_context = build_options

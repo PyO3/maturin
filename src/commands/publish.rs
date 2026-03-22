@@ -1,7 +1,9 @@
 use crate::commands::utils::unpack_sdist_for_build;
 use anyhow::Result;
 use maturin::{BuildOptions, BuildOrchestrator, PublishOpt, upload_ui};
+use tracing::instrument;
 
+#[instrument(skip_all)]
 pub fn publish(
     mut build: BuildOptions,
     mut publish: PublishOpt,

@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, find_path_deps};
 use std::path::PathBuf;
+use tracing::instrument;
 
+#[instrument(skip_all)]
 pub fn sdist(manifest_path: Option<PathBuf>, out: Option<PathBuf>) -> Result<()> {
     // Get cargo metadata to check for path dependencies
     let cargo_metadata_result = cargo_metadata::MetadataCommand::new()

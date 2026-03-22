@@ -2,7 +2,9 @@ use crate::commands::StripOption;
 use crate::commands::utils::unpack_sdist_for_build;
 use anyhow::Result;
 use maturin::{BuildOptions, BuildOrchestrator};
+use tracing::instrument;
 
+#[instrument(skip_all)]
 pub fn build(
     mut build: BuildOptions,
     release: bool,

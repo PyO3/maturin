@@ -6,6 +6,7 @@ use maturin::{
     VirtualWriter, write_dist_info,
 };
 use std::path::PathBuf;
+use tracing::instrument;
 
 use crate::commands::StripOption;
 
@@ -51,6 +52,7 @@ pub enum Pep517Command {
 /// Dispatches into the native implementations of the PEP 517 functions
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
+#[instrument(skip_all)]
 pub fn pep517(subcommand: Pep517Command) -> Result<()> {
     // PEP 517 builds default to release profile.
     fn ensure_release_profile(context: &mut BuildContext) {

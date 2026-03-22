@@ -63,6 +63,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Standard wheel build pipeline (no PGO).
+    #[instrument(skip_all)]
     pub(crate) fn build_wheels_inner(&self) -> Result<Vec<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
@@ -115,6 +116,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Builds a source distribution and returns the same metadata as [BuildOrchestrator::build_wheels]
+    #[instrument(skip_all)]
     pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the source distribution")?;
@@ -234,6 +236,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Split interpreters into abi3-capable and non-abi3 groups, build the
     /// appropriate wheel type for each group, and return all built wheels.
+    #[instrument(skip_all)]
     pub(crate) fn build_abi3_wheels(
         &self,
         min_version: Option<(u8, u8)>,
@@ -285,6 +288,8 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(built_wheels)
     }
 
+    /// The internal wheel-writing loop. Handles metadata generation, file compression,
+    /// and writing the final .whl archive to the output directory.
     #[allow(clippy::too_many_arguments, clippy::needless_lifetimes)]
     fn write_wheel<'b, F>(
         &'b self,
@@ -349,6 +354,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
     /// for it
+    #[instrument(skip_all)]
     pub fn build_pyo3_wheel_abi3(
         &self,
         interpreters: &[PythonInterpreter],
@@ -397,6 +403,7 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(wheels)
     }
 
+    /// Writes a PyO3 wheel for a specific Python interpreter.
     fn write_pyo3_wheel(
         &self,
         python_interpreter: &PythonInterpreter,
@@ -424,6 +431,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Compile, audit, and write a single PyO3 wheel for one interpreter.
+    #[instrument(skip_all)]
     pub(crate) fn build_single_pyo3_wheel(
         &self,
         python_interpreter: &PythonInterpreter,
@@ -452,6 +460,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Builds wheels for a pyo3 extension for all given python versions.
+    #[instrument(skip_all)]
     pub fn build_pyo3_wheels(
         &self,
         interpreters: &[PythonInterpreter],
@@ -475,6 +484,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Runs cargo build, extracts the cdylib from the output and returns the path to it
+    #[instrument(skip_all)]
     pub fn compile_cdylib(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
@@ -503,6 +513,7 @@ impl<'a> BuildOrchestrator<'a> {
         Ok((artifact, result.out_dirs))
     }
 
+    /// Compiles a cdylib and builds a wheel for it.
     #[allow(clippy::needless_lifetimes)]
     fn build_cdylib_wheel<'b, F>(
         &'b self,
@@ -530,6 +541,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Builds a wheel with cffi bindings
+    #[instrument(skip_all)]
     pub fn build_cffi_wheel(
         &self,
         sbom_data: &Option<SbomData>,
@@ -566,6 +578,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Builds a wheel with uniffi bindings
+    #[instrument(skip_all)]
     pub fn build_uniffi_wheel(
         &self,
         sbom_data: &Option<SbomData>,
@@ -579,6 +592,7 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(vec![(wheel_path, "py3".to_string())])
     }
 
+    /// Internal implementation for writing a binary wheel.
     fn write_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
@@ -658,6 +672,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Builds a wheel that contains a binary
+    #[instrument(skip_all)]
     pub fn build_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
@@ -710,6 +725,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Builds wheels for a binary project for all given python versions.
+    #[instrument(skip_all)]
     pub fn build_bin_wheels(
         &self,
         interpreters: &[PythonInterpreter],
@@ -723,6 +739,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Generate Rust SBOMs once from the build context.
+    #[instrument(skip_all)]
     pub(crate) fn generate_sbom_data(&self) -> Result<Option<SbomData>> {
         let sbom_config = self.context.artifact.sbom.as_ref();
 

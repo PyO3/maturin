@@ -5,7 +5,6 @@ pub use builder::BuildContextBuilder;
 
 use crate::auditwheel::AuditWheelMode;
 use crate::auditwheel::{PlatformTag, Policy};
-use crate::bridge::Abi3Version;
 use crate::cargo_options::CargoOptions;
 use crate::compile::CompileTarget;
 use crate::compression::CompressionOptions;
@@ -144,40 +143,6 @@ pub struct BuildContext {
 pub type BuiltWheelMetadata = (PathBuf, String);
 
 impl BuildContext {
-    /// Return the tags of the wheel that this build context builds.
-    pub fn tags_from_bridge(&self) -> Result<Vec<String>> {
-        let tags = match self.project.bridge() {
-            BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => match bindings.abi3 {
-                Some(Abi3Version::Version(major, minor)) => {
-                    let platform = self.project.get_platform_tag(&[PlatformTag::Linux])?;
-                    vec![format!("cp{major}{minor}-abi3-{platform}")]
-                }
-                Some(Abi3Version::CurrentPython) => {
-                    let interp = &self.python.interpreter[0];
-                    let platform = self.project.get_platform_tag(&[PlatformTag::Linux])?;
-                    vec![format!(
-                        "cp{major}{minor}-abi3-{platform}",
-                        major = interp.major,
-                        minor = interp.minor
-                    )]
-                }
-                None => {
-                    vec![self.python.interpreter[0].get_tag(&self.project, &[PlatformTag::Linux])?]
-                }
-            },
-            BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
-                vec![self.get_universal_tag(&[PlatformTag::Linux])?]
-            }
-        };
-        Ok(tags)
-    }
-
-    /// Returns the platform tag without python version (e.g. `py3-none-manylinux_2_17_x86_64`)
-    pub fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
-        let platform = self.project.get_platform_tag(platform_tags)?;
-        Ok(format!("py3-none-{platform}"))
-    }
-
     /// Checks if we need to run auditwheel and does it if so
     pub(crate) fn auditwheel(
         &self,

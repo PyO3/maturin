@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use maturin::{BuildOptions, UnpackedSdist, unpack_sdist};
+use maturin::{BuildOptions, BuildOrchestrator, UnpackedSdist, unpack_sdist};
 use std::path::PathBuf;
 
 /// Result of unpacking an sdist for wheel building
@@ -18,7 +18,9 @@ pub fn build_sdist(build: &BuildOptions, strip: Option<bool>) -> Result<PathBuf>
         .editable(false)
         .sdist_only(true)
         .build()?;
-    let (sdist_path, _) = sdist_context
+
+    let orchestrator = BuildOrchestrator::new(&sdist_context);
+    let (sdist_path, _) = orchestrator
         .build_source_distribution()?
         .context("Failed to build source distribution, pyproject.toml not found")?;
     Ok(sdist_path)

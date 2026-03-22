@@ -15,7 +15,12 @@ pub enum PgoPhase {
     Use(PathBuf),
 }
 
-/// Manages the PGO build lifecycle: profdata directory, llvm-profdata resolution, instrumentation
+/// Manages the PGO profiling environment: profdata directory, llvm-profdata
+/// resolution, instrumentation execution, and profile merging.
+///
+/// Build orchestration (the three-phase PGO loop) lives in
+/// [`BuildOrchestrator`](crate::BuildOrchestrator); this struct is only
+/// responsible for the profiling toolchain mechanics.
 pub struct PgoContext {
     /// Temporary directory for .profraw files
     profdata_dir: TempDir,
@@ -27,7 +32,7 @@ pub struct PgoContext {
 
 impl PgoContext {
     /// Create a new PGO context with a temporary directory for profile data
-    pub fn new(pgo_command: String) -> Result<Self> {
+    pub(crate) fn new(pgo_command: String) -> Result<Self> {
         let profdata_dir =
             TempDir::new().context("Failed to create temporary directory for PGO profdata")?;
         let merged_profdata = profdata_dir.path().join("merged.profdata");
@@ -39,12 +44,12 @@ impl PgoContext {
     }
 
     /// Returns the path to the profdata directory
-    pub fn profdata_dir_path(&self) -> &Path {
+    pub(crate) fn profdata_dir_path(&self) -> &Path {
         self.profdata_dir.path()
     }
 
     /// Returns the path to the merged profdata file
-    pub fn merged_profdata_path(&self) -> &Path {
+    pub(crate) fn merged_profdata_path(&self) -> &Path {
         &self.merged_profdata
     }
 
@@ -53,7 +58,7 @@ impl PgoContext {
     /// Strategy:
     /// 1. Look in the rustup toolchain sysroot
     /// 2. Fall back to PATH
-    pub fn find_llvm_profdata() -> Result<PathBuf> {
+    pub(crate) fn find_llvm_profdata() -> Result<PathBuf> {
         // Try rustup toolchain first
         if let Ok(path) = Self::find_llvm_profdata_from_rustup() {
             return Ok(path);
@@ -123,7 +128,7 @@ impl PgoContext {
     /// 2. Install the instrumented wheel
     /// 3. Install dependencies
     /// 4. Run the instrumentation command
-    pub fn run_instrumentation(
+    pub(crate) fn run_instrumentation(
         &self,
         python: &Path,
         wheel_path: &Path,
@@ -307,7 +312,7 @@ impl PgoContext {
     }
 
     /// Merge .profraw files into a single .profdata file
-    pub fn merge_profiles(&self) -> Result<()> {
+    pub(crate) fn merge_profiles(&self) -> Result<()> {
         eprintln!("🔗 Merging PGO profiles...");
 
         let llvm_profdata = Self::find_llvm_profdata()?;

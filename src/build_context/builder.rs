@@ -1,7 +1,7 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
 use crate::bridge::{find_bridge, is_generating_import_lib};
 use crate::build_options::{BuildOptions, TargetTriple};
-use crate::compile::{CompileTarget, LIB_CRATE_TYPES};
+use crate::compile::filter_cargo_targets;
 use crate::metadata::Metadata24;
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::{FeatureSpec, SbomConfig};
@@ -11,8 +11,6 @@ use crate::target::{
 };
 use crate::{BridgeModel, BuildContext, PyProjectToml, Target};
 use anyhow::{Result, bail};
-use cargo_metadata::CrateType;
-use cargo_metadata::Metadata;
 use std::collections::HashSet;
 use std::env;
 use std::path::PathBuf;
@@ -519,91 +517,4 @@ fn validate_bridge_type(
         }
     }
     Ok(())
-}
-
-/// Filter cargo targets based on bridge model and optional configuration.
-pub(crate) fn filter_cargo_targets(
-    cargo_metadata: &Metadata,
-    bridge: BridgeModel,
-    config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
-) -> Result<Vec<CompileTarget>> {
-    let root_pkg = cargo_metadata
-        .root_package()
-        .ok_or_else(|| anyhow::anyhow!("No root package found in cargo metadata"))?;
-    let resolved_features: Vec<String> = cargo_metadata
-        .resolve
-        .as_ref()
-        .and_then(|resolve| resolve.nodes.iter().find(|&node| node.id == root_pkg.id))
-        .map(|node| node.features.iter().map(|f| f.to_string()).collect())
-        .unwrap_or_default();
-    let mut targets: Vec<_> = root_pkg
-        .targets
-        .iter()
-        .filter(|&target| match bridge {
-            BridgeModel::Bin(_) => {
-                let is_bin = target.is_bin();
-                if target.required_features.is_empty() {
-                    is_bin
-                } else {
-                    // Check all required features are enabled for this bin target
-                    is_bin
-                        && target
-                            .required_features
-                            .iter()
-                            .all(|f| resolved_features.contains(f))
-                }
-            }
-            _ => target.crate_types.contains(&CrateType::CDyLib),
-        })
-        .map(|target| CompileTarget {
-            target: target.clone(),
-            bridge_model: bridge.clone(),
-        })
-        .collect();
-    if targets.is_empty() && !bridge.is_bin() {
-        // No `crate-type = ["cdylib"]` in `Cargo.toml`
-        // Let's try compile one of the target with `--crate-type cdylib`
-        let lib_target = root_pkg.targets.iter().find(|target| {
-            target
-                .crate_types
-                .iter()
-                .any(|crate_type| LIB_CRATE_TYPES.contains(crate_type))
-        });
-        if let Some(target) = lib_target {
-            targets.push(CompileTarget {
-                target: target.clone(),
-                bridge_model: bridge,
-            });
-        }
-    }
-
-    // Filter targets by config_targets
-    if let Some(config_targets) = config_targets {
-        targets.retain(|CompileTarget { target, .. }| {
-            config_targets.iter().any(|config_target| {
-                let name_eq = config_target.name == target.name;
-                match &config_target.kind {
-                    Some(kind) => name_eq && target.crate_types.contains(&CrateType::from(*kind)),
-                    None => name_eq,
-                }
-            })
-        });
-        if targets.is_empty() {
-            bail!(
-                "No Cargo targets matched by `package.metadata.maturin.targets`, please check your `Cargo.toml`"
-            );
-        } else {
-            let target_names = targets
-                .iter()
-                .map(|CompileTarget { target, .. }| target.name.as_str())
-                .collect::<Vec<_>>();
-            eprintln!(
-                "🎯 Found {} Cargo targets in `Cargo.toml`: {}",
-                targets.len(),
-                target_names.join(", ")
-            );
-        }
-    }
-
-    Ok(targets)
 }

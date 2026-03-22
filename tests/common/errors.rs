@@ -1,7 +1,7 @@
 use anyhow::format_err;
 use anyhow::{Result, bail};
 use clap::Parser;
-use maturin::BuildOptions;
+use maturin::{BuildOptions, BuildOrchestrator};
 use pretty_assertions::assert_eq;
 use std::path::Path;
 use std::process::Command;
@@ -22,12 +22,12 @@ pub fn pyo3_no_extension_module() -> Result<()> {
     ];
 
     let options = BuildOptions::try_parse_from(cli)?;
-    let result = options
+    let build_context = options
         .into_build_context()
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
-        .build()?
-        .build_wheels();
+        .build()?;
+    let result = BuildOrchestrator::new(&build_context).build_wheels();
     if let Err(err) = result {
         if !(err
             .source()
@@ -96,12 +96,12 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "test-crates/targets/invalid_manylinux_does_not_panic",
     ];
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let result = options
+    let build_context = options
         .into_build_context()
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
-        .build()?
-        .build_wheels();
+        .build()?;
+    let result = BuildOrchestrator::new(&build_context).build_wheels();
     if let Err(err) = result {
         assert_eq!(err.to_string(), "Error ensuring manylinux_2_99 compliance");
         let err_string = err
@@ -205,12 +205,12 @@ pub fn pypi_compatibility_linux_tag() -> Result<()> {
         "python3.12", // Add interpreter to bypass interpreter detection
     ];
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let result = options
+    let build_context = options
         .into_build_context()
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
-        .build()?
-        .build_wheels();
+        .build()?;
+    let result = BuildOrchestrator::new(&build_context).build_wheels();
 
     if let Err(err) = result {
         let err_string = err.to_string();

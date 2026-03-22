@@ -10,14 +10,15 @@ use maturin::{BridgeModel, Target, TargetTriple};
 use maturin::{GenerateProjectOptions, ci::GenerateCI};
 #[cfg(feature = "upload")]
 use std::path::PathBuf;
+use tracing::instrument;
 
-pub mod build;
-pub mod develop;
-pub mod pep517;
+pub(crate) mod build;
+pub(crate) mod develop;
+pub(crate) mod pep517;
 #[cfg(feature = "upload")]
-pub mod publish;
-pub mod sdist;
-pub mod utils;
+pub(crate) mod publish;
+pub(crate) mod sdist;
+pub(crate) mod utils;
 
 /// Shared `--strip` CLI option used by multiple commands.
 #[derive(Debug, clap::Args, Clone, Copy)]
@@ -37,11 +38,13 @@ pub struct StripOption {
 
 /// Generate shell completions
 #[cfg(feature = "cli-completion")]
+#[instrument(skip_all)]
 pub fn completions(shell: clap_complete_command::Shell, cmd: &mut clap::Command) {
     shell.generate(cmd, &mut std::io::stdout());
 }
 
 /// Search and list the available python installations
+#[instrument(skip_all)]
 pub fn list_python(target: Option<TargetTriple>) -> Result<()> {
     let found = if target.is_some() {
         let target = Target::from_target_triple(target.as_ref())?;
@@ -60,30 +63,35 @@ pub fn list_python(target: Option<TargetTriple>) -> Result<()> {
 
 /// Create a new cargo project in an existing directory
 #[cfg(feature = "scaffolding")]
+#[instrument(skip_all)]
 pub fn init_project(path: Option<String>, options: GenerateProjectOptions) -> Result<()> {
     maturin::init_project(path, options)
 }
 
 /// Create a new cargo project
 #[cfg(feature = "scaffolding")]
+#[instrument(skip_all)]
 pub fn new_project(path: String, options: GenerateProjectOptions) -> Result<()> {
     maturin::new_project(path, options)
 }
 
 /// Generate CI configuration
 #[cfg(feature = "scaffolding")]
+#[instrument(skip_all)]
 pub fn generate_ci(generate_ci: GenerateCI) -> Result<()> {
     generate_ci.execute()
 }
 
 /// Generate the JSON schema for the `pyproject.toml` file.
 #[cfg(feature = "schemars")]
+#[instrument(skip_all)]
 pub fn generate_json_schema(args: GenerateJsonSchemaOptions) -> Result<()> {
     maturin::generate_json_schema(args)
 }
 
 /// Upload python packages to pypi
 #[cfg(feature = "upload")]
+#[instrument(skip_all)]
 pub fn upload(mut publish: PublishOpt, files: Vec<PathBuf>) -> Result<()> {
     if files.is_empty() {
         eprintln!("⚠️  Warning: No files given, exiting.");
@@ -97,6 +105,7 @@ pub fn upload(mut publish: PublishOpt, files: Vec<PathBuf>) -> Result<()> {
 
 /// Zig linker wrapper
 #[cfg(feature = "zig")]
+#[instrument(skip_all)]
 pub fn zig(subcommand: cargo_zigbuild::Zig) -> Result<()> {
     subcommand
         .execute()

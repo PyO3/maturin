@@ -2,10 +2,11 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use ignore::overrides::Override;
 use maturin::{
-    BuildContext, BuildOptions, CargoOptions, OutputOptions, PathWriter, VirtualWriter,
-    write_dist_info,
+    BuildContext, BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, PathWriter,
+    VirtualWriter, write_dist_info,
 };
 use std::path::PathBuf;
+use tracing::instrument;
 
 use crate::commands::StripOption;
 
@@ -52,6 +53,7 @@ pub enum Pep517Command {
 /// Dispatches into the native implementations of the PEP 517 functions
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
+#[instrument(skip_all)]
 pub fn pep517(subcommand: Pep517Command) -> Result<()> {
     // PEP 517 builds default to release profile.
     fn ensure_release_profile(context: &mut BuildContext) {
@@ -76,11 +78,13 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
 
             let mut writer =
                 VirtualWriter::new(PathWriter::from_path(metadata_directory), Override::empty());
+
+            let orchestrator = BuildOrchestrator::new(&context);
             let dist_info_dir = write_dist_info(
                 &mut writer,
                 &context.project.project_layout.project_root,
                 &context.project.metadata24,
-                &context.tags_from_bridge()?,
+                &orchestrator.tags_from_bridge()?,
             )?;
             writer.finish()?;
             println!("{}", dist_info_dir.display());
@@ -96,7 +100,9 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .editable(editable)
                 .build()?;
             ensure_release_profile(&mut build_context);
-            let wheels = build_context.build_wheels()?;
+
+            let orchestrator = BuildOrchestrator::new(&build_context);
+            let wheels = orchestrator.build_wheels()?;
             assert_eq!(wheels.len(), 1);
             println!("{}", wheels[0].0.to_str().unwrap());
         }
@@ -124,7 +130,9 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .editable(false)
                 .sdist_only(true)
                 .build()?;
-            let (path, _) = build_context
+
+            let orchestrator = BuildOrchestrator::new(&build_context);
+            let (path, _) = orchestrator
                 .build_source_distribution()?
                 .context("Failed to build source distribution, pyproject.toml not found")?;
             println!("{}", path.file_name().unwrap().to_str().unwrap());

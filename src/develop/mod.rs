@@ -7,7 +7,9 @@ use crate::auditwheel::AuditWheelMode;
 use crate::build_options::CargoOptions;
 use crate::compression::CompressionOptions;
 use crate::target::detect_arch_from_python;
-use crate::{BuildContext, BuildOptions, OutputOptions, PlatformOptions, PythonOptions};
+use crate::{
+    BuildContext, BuildOptions, BuildOrchestrator, OutputOptions, PlatformOptions, PythonOptions,
+};
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use cargo_options::heading;
 use fs_err as fs;
@@ -394,7 +396,8 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         )?;
     }
 
-    let wheels = build_context.build_wheels()?;
+    let orchestrator = BuildOrchestrator::new(&build_context);
+    let wheels = orchestrator.build_wheels()?;
     if !skip_install {
         for (filename, _supported_version) in wheels.iter() {
             install_wheel(

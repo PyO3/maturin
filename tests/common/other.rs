@@ -5,7 +5,8 @@ use flate2::read::GzDecoder;
 use fs_err::File;
 use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
 use maturin::{
-    BuildOptions, CargoOptions, OutputOptions, PlatformOptions, PlatformTag, unpack_sdist,
+    BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, PlatformOptions, PlatformTag,
+    unpack_sdist,
 };
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
@@ -109,7 +110,7 @@ pub fn test_musl() -> Result<bool> {
     if built_lib.is_file() {
         fs::remove_file(&built_lib)?;
     }
-    let wheels = build_context.build_wheels()?;
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
     assert_eq!(wheels.len(), 1);
 
     // Ensure that we've actually built for musl
@@ -147,7 +148,7 @@ pub fn test_workspace_cargo_lock() -> Result<()> {
         .strip(Some(false))
         .editable(false)
         .build()?;
-    let source_distribution = build_context.build_source_distribution()?;
+    let source_distribution = BuildOrchestrator::new(&build_context).build_source_distribution()?;
     assert!(source_distribution.is_some());
 
     Ok(())
@@ -196,7 +197,7 @@ pub fn build_source_distribution(
     pyproject_toml.tool = Some(tool);
     build_context.project.pyproject_toml = Some(pyproject_toml);
 
-    let (path, _) = build_context
+    let (path, _) = BuildOrchestrator::new(&build_context)
         .build_source_distribution()?
         .context("Failed to build source distribution")?;
 
@@ -297,7 +298,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         .strip(Some(false))
         .editable(false)
         .build()?;
-    let wheels = build_context
+    let wheels = BuildOrchestrator::new(&build_context)
         .build_wheels()
         .context("Failed to build wheels")?;
     assert!(!wheels.is_empty());
@@ -529,7 +530,7 @@ pub fn test_unreadable_dir() -> Result<()> {
         .editable(false)
         .sdist_only(true)
         .build()?;
-    sdist_context.build_source_distribution()?;
+    BuildOrchestrator::new(&sdist_context).build_source_distribution()?;
 
     // Test wheel build
     let wheel_options = BuildOptions::try_parse_from([
@@ -548,7 +549,7 @@ pub fn test_unreadable_dir() -> Result<()> {
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
-    let wheel_result = wheel_context.build_wheels();
+    let wheel_result = BuildOrchestrator::new(&wheel_context).build_wheels();
 
     // Restore permissions before temp_dir cleanup
     fs_err::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o755))?;
@@ -586,7 +587,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .editable(false)
         .sdist_only(true)
         .build()?;
-    let (sdist_path, _) = sdist_context
+    let (sdist_path, _) = BuildOrchestrator::new(&sdist_context)
         .build_source_distribution()?
         .context("Failed to build source distribution")?;
 
@@ -617,7 +618,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .editable(false)
         .pyproject_toml_path(Some(pyproject_toml))
         .build()?;
-    let wheels = wheel_context.build_wheels()?;
+    let wheels = BuildOrchestrator::new(&wheel_context).build_wheels()?;
     assert!(
         !wheels.is_empty(),
         "Expected at least one wheel to be built"

@@ -2,8 +2,9 @@ use anyhow::{Context, Result, bail};
 use maturin::{DevelopOptions, Target, develop};
 use std::env;
 use std::path::PathBuf;
-use tracing::debug;
+use tracing::{debug, instrument};
 
+#[instrument(skip_all)]
 pub fn develop_cmd(develop_options: DevelopOptions) -> Result<()> {
     let target = Target::from_target_triple(develop_options.cargo_options.target.as_ref())?;
     let venv_dir = detect_venv(&target)?;

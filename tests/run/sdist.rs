@@ -2,7 +2,7 @@ use crate::common::{handle_result, other};
 use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
-use maturin::{BuildOptions, CargoOptions, OutputOptions, unpack_sdist};
+use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
 use std::path::Path;
 use std::process::Command;
 use url::Url;
@@ -238,7 +238,7 @@ fn sdist_excludes_explicit_build_script() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = build_context
+    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
         .expect("failed to build sdist");
@@ -671,7 +671,7 @@ fn lib_with_parent_workspace_git_dep_sdist() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = build_context
+    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
         .expect("failed to build sdist");
@@ -814,7 +814,7 @@ fn lib_with_parent_workspace_lints_sdist() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = build_context
+    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
         .expect("failed to build sdist");

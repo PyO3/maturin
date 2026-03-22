@@ -9,7 +9,7 @@ use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
 use fs4::fs_err3::FileExt;
-use maturin::{BuildOptions, Target};
+use maturin::{BuildOptions, BuildOrchestrator, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;
@@ -286,7 +286,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
-    let wheels = build_context.build_wheels()?;
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
 
     // For abi3 on unix, we didn't use a python interpreter, but we need one here
     let interpreter = if build_context.python.interpreter.is_empty() {
@@ -382,7 +382,7 @@ pub fn test_integration_conda(
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build()?;
-    let wheels = build_context.build_wheels()?;
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
     for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.python.interpreter) {

@@ -71,17 +71,16 @@ impl<'a> BuildOrchestrator<'a> {
         // is the same regardless of the target Python interpreter).
         let sbom_data = self.generate_sbom_data()?;
 
+        let interpreters: Vec<_> = self.context.python.interpreter.iter().collect();
         let wheels = match self.context.project.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None, &sbom_data)?,
-            BridgeModel::Bin(Some(..)) => {
-                self.build_bin_wheels(&self.context.python.interpreter, &sbom_data)?
-            }
+            BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&interpreters, &sbom_data)?,
             BridgeModel::PyO3(crate::PyO3 { abi3, .. }) => match abi3 {
                 Some(Abi3Version::Version(major, minor)) => {
                     self.build_abi3_wheels(Some((*major, *minor)), &sbom_data)?
                 }
                 Some(Abi3Version::CurrentPython) => self.build_abi3_wheels(None, &sbom_data)?,
-                None => self.build_pyo3_wheels(&self.context.python.interpreter, &sbom_data)?,
+                None => self.build_pyo3_wheels(&interpreters, &sbom_data)?,
             },
             BridgeModel::Cffi => self.build_cffi_wheel(&sbom_data)?,
             BridgeModel::UniFfi => self.build_uniffi_wheel(&sbom_data)?,
@@ -252,7 +251,6 @@ impl<'a> BuildOrchestrator<'a> {
                         (interp.major as u8, interp.minor as u8) >= (major, minor)
                     })
             })
-            .cloned()
             .collect();
         let non_abi3_interps: Vec<_> = self
             .context
@@ -260,7 +258,6 @@ impl<'a> BuildOrchestrator<'a> {
             .interpreter
             .iter()
             .filter(|interp| !interp.has_stable_api())
-            .cloned()
             .collect();
 
         let mut built_wheels = Vec::new();
@@ -354,15 +351,15 @@ impl<'a> BuildOrchestrator<'a> {
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
     /// for it
     #[instrument(skip_all)]
-    pub fn build_pyo3_wheel_abi3(
+    pub(crate) fn build_pyo3_wheel_abi3(
         &self,
-        interpreters: &[PythonInterpreter],
+        interpreters: &[&PythonInterpreter],
         major: u8,
         min_minor: u8,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        let python_interpreter = interpreters.first();
+        let python_interpreter = interpreters.first().copied();
         let (artifact, out_dirs) = self.compile_cdylib(
             python_interpreter,
             Some(&self.context.project.project_layout.extension_name),
@@ -460,13 +457,13 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds wheels for a pyo3 extension for all given python versions.
     #[instrument(skip_all)]
-    pub fn build_pyo3_wheels(
+    pub(crate) fn build_pyo3_wheels(
         &self,
-        interpreters: &[PythonInterpreter],
+        interpreters: &[&PythonInterpreter],
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        for python_interpreter in interpreters {
+        for &python_interpreter in interpreters {
             let (wheel_path, tag) = self.build_single_pyo3_wheel(python_interpreter, sbom_data)?;
             eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
@@ -725,13 +722,13 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds wheels for a binary project for all given python versions.
     #[instrument(skip_all)]
-    pub fn build_bin_wheels(
+    pub(crate) fn build_bin_wheels(
         &self,
-        interpreters: &[PythonInterpreter],
+        interpreters: &[&PythonInterpreter],
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
-        for python_interpreter in interpreters {
+        for &python_interpreter in interpreters {
             wheels.extend(self.build_bin_wheel(Some(python_interpreter), sbom_data)?);
         }
         Ok(wheels)

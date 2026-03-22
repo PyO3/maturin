@@ -7,7 +7,7 @@ use crate::bridge::Abi3Version;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
-use crate::sbom::{SbomData, resolve_sbom_include};
+use crate::sbom::SbomData;
 use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::util::zip_mtime;
@@ -26,11 +26,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use tracing::instrument;
-
-#[cfg(feature = "sbom")]
-use cargo_cyclonedx::config::SbomConfig as CyclonedxConfig;
-#[cfg(feature = "sbom")]
-use cargo_cyclonedx::generator::SbomGenerator;
 
 /// Orchestrates the build process using the data provided by [BuildContext].
 ///
@@ -56,9 +51,156 @@ impl<'a> BuildOrchestrator<'a> {
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
         if let Some(pgo_command) = &self.context.artifact.pgo_command {
-            return PgoContext::build_wheels_pgo(self, pgo_command.clone());
+            let needs_per_interpreter_pgo = matches!(
+                self.context.project.bridge(),
+                BridgeModel::PyO3(crate::PyO3 { abi3: None, .. })
+            );
+
+            eprintln!("🚀 Starting PGO build...");
+            PgoContext::find_llvm_profdata()?;
+
+            return if needs_per_interpreter_pgo {
+                self.build_wheels_pgo_per_interpreter(pgo_command.clone())
+            } else {
+                self.build_wheels_pgo_single_pass(pgo_command.clone())
+            };
         }
         self.build_wheels_inner()
+    }
+
+    /// Single-pass PGO for abi3, cffi, uniffi, and bin builds.
+    fn build_wheels_pgo_single_pass(&self, pgo_command: String) -> Result<Vec<BuiltWheelMetadata>> {
+        let pgo_ctx = PgoContext::new(pgo_command)?;
+
+        let instrumentation_python = self
+            .context
+            .python
+            .interpreter
+            .first()
+            .context(
+                "PGO builds require a Python interpreter. \
+                 Please specify one with `--interpreter`.",
+            )?
+            .executable
+            .clone();
+
+        // Phase 1: Build a single instrumented wheel for training.
+        eprintln!("📊 Phase 1/3: Building instrumented wheel...");
+        let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
+            pgo_ctx.profdata_dir_path().to_path_buf(),
+        ));
+        instrumented_ctx.python.interpreter = vec![self.context.python.interpreter[0].clone()];
+        let instrumented_out =
+            tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
+        instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
+
+        let instrumented_orchestrator = BuildOrchestrator::new(&instrumented_ctx);
+        let instrumented_wheels = instrumented_orchestrator.build_wheels_inner()?;
+
+        // Phase 2: Instrumentation
+        eprintln!("🔬 Phase 2/3: Running PGO instrumentation...");
+        let instrumented_wheel_path = &instrumented_wheels
+            .first()
+            .context("No instrumented wheel was built")?
+            .0;
+        pgo_ctx.run_instrumentation(
+            &instrumentation_python,
+            instrumented_wheel_path,
+            self.context,
+        )?;
+        pgo_ctx.merge_profiles()?;
+
+        // Phase 3: Optimized build
+        eprintln!("⚡ Phase 3/3: Building PGO-optimized wheel...");
+        let optimized_ctx =
+            self.clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
+        let optimized_orchestrator = BuildOrchestrator::new(&optimized_ctx);
+        let wheels = optimized_orchestrator.build_wheels_inner()?;
+
+        eprintln!("🎉 PGO build complete!");
+        Ok(wheels)
+    }
+
+    /// Per-interpreter PGO for non-abi3 PyO3 builds.
+    fn build_wheels_pgo_per_interpreter(
+        &self,
+        pgo_command: String,
+    ) -> Result<Vec<BuiltWheelMetadata>> {
+        fs::create_dir_all(&self.context.artifact.out)
+            .context("Failed to create the target directory for the wheels")?;
+
+        let sbom_data = self.generate_sbom_data()?;
+        let mut wheels = Vec::new();
+
+        for (i, python_interpreter) in self.context.python.interpreter.iter().enumerate() {
+            eprintln!(
+                "📊 [{}/{}] PGO cycle for {} {}.{}...",
+                i + 1,
+                self.context.python.interpreter.len(),
+                python_interpreter.interpreter_kind,
+                python_interpreter.major,
+                python_interpreter.minor,
+            );
+
+            let pgo_ctx = PgoContext::new(pgo_command.clone())?;
+
+            // Phase 1: Build instrumented wheel for this interpreter
+            eprintln!("  📊 Phase 1/3: Building instrumented wheel...");
+            let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
+                pgo_ctx.profdata_dir_path().to_path_buf(),
+            ));
+            let instrumented_out = tempfile::TempDir::new()
+                .context("Failed to create temp dir for instrumented wheel")?;
+            instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
+
+            let instrumented_orchestrator = BuildOrchestrator::new(&instrumented_ctx);
+            let (instrumented_wheel_path, _) = instrumented_orchestrator
+                .build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
+
+            // Phase 2: Run instrumentation with this interpreter
+            eprintln!("  🔬 Phase 2/3: Running PGO instrumentation...");
+            pgo_ctx.run_instrumentation(
+                &python_interpreter.executable,
+                &instrumented_wheel_path,
+                self.context,
+            )?;
+            pgo_ctx.merge_profiles()?;
+
+            // Phase 3: Build optimized wheel for this interpreter
+            eprintln!("  ⚡ Phase 3/3: Building PGO-optimized wheel...");
+            let optimized_ctx = self
+                .clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
+            let optimized_orchestrator = BuildOrchestrator::new(&optimized_ctx);
+            let (wheel_path, tag) =
+                optimized_orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
+
+            eprintln!(
+                "  📦 Built PGO-optimized wheel for {} {}.{}{} to {}",
+                python_interpreter.interpreter_kind,
+                python_interpreter.major,
+                python_interpreter.minor,
+                python_interpreter.abiflags,
+                wheel_path.display()
+            );
+            wheels.push((wheel_path, tag));
+        }
+
+        // Validate wheel filenames against PyPI platform tag rules if requested
+        if self.context.python.pypi_validation {
+            for (wheel_path, _) in &wheels {
+                let filename = wheel_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| anyhow!("Invalid wheel filename: {:?}", wheel_path))?;
+
+                if let Err(error) = crate::target::validate_wheel_filename_for_pypi(filename) {
+                    bail!("PyPI validation failed: {}", error);
+                }
+            }
+        }
+
+        eprintln!("🎉 PGO build complete!");
+        Ok(wheels)
     }
 
     /// Standard wheel build pipeline (no PGO).
@@ -217,7 +359,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Returns the platform tag without python version (e.g. `py3-none-manylinux_2_17_x86_64`)
-    pub fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+    fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
         let platform = self.context.project.get_platform_tag(platform_tags)?;
         Ok(format!("py3-none-{platform}"))
     }
@@ -481,7 +623,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Runs cargo build, extracts the cdylib from the output and returns the path to it
     #[instrument(skip_all)]
-    pub fn compile_cdylib(
+    pub(crate) fn compile_cdylib(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         extension_name: Option<&str>,
@@ -538,10 +680,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds a wheel with cffi bindings
     #[instrument(skip_all)]
-    pub fn build_cffi_wheel(
-        &self,
-        sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    fn build_cffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheelMetadata>> {
         let interpreter = self.context.python.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
@@ -575,10 +714,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds a wheel with uniffi bindings
     #[instrument(skip_all)]
-    pub fn build_uniffi_wheel(
-        &self,
-        sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    fn build_uniffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheelMetadata>> {
         let (wheel_path, _) = self.build_cdylib_wheel(
             |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),
             sbom_data,
@@ -669,7 +805,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds a wheel that contains a binary
     #[instrument(skip_all)]
-    pub fn build_bin_wheel(
+    fn build_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         sbom_data: &Option<SbomData>,
@@ -735,58 +871,8 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Generate Rust SBOMs once from the build context.
-    #[instrument(skip_all)]
     pub(crate) fn generate_sbom_data(&self) -> Result<Option<SbomData>> {
-        let sbom_config = self.context.artifact.sbom.as_ref();
-
-        // Check if Rust SBOM generation is explicitly disabled
-        let rust_sbom_enabled = sbom_config.and_then(|c| c.rust).unwrap_or(true);
-
-        #[cfg(feature = "sbom")]
-        {
-            if !rust_sbom_enabled {
-                return Ok(Some(SbomData {
-                    rust_sboms: Vec::new(),
-                }));
-            }
-
-            let config = CyclonedxConfig {
-                target: Some(cargo_cyclonedx::config::Target::AllTargets),
-                ..CyclonedxConfig::empty_config()
-            };
-            // cargo-cyclonedx depends on cargo_metadata 0.18, while maturin uses
-            // cargo_metadata 0.23. The Metadata structs are incompatible at the
-            // type level but share the same JSON representation, so we bridge
-            // them via a serde round-trip.
-            let json = serde_json::to_value(&self.context.project.cargo_metadata)?;
-            let metadata = serde_json::from_value(json)
-                .context("Failed to convert cargo metadata for SBOM generation")?;
-            let sboms = SbomGenerator::create_sboms(metadata, &config)
-                .map_err(|e| anyhow::anyhow!("Failed to generate Rust SBOM: {}", e))?;
-
-            let mut rust_sboms = Vec::new();
-            for sbom in sboms {
-                // Only keep the SBOM for the crate being built into a wheel.
-                // Each member's SBOM already contains the full transitive
-                // dependency graph, so filtering is safe.
-                if sbom.package_name != self.context.project.crate_name {
-                    continue;
-                }
-                let mut buf = Vec::new();
-                sbom.bom
-                    .output_as_json_v1_5(&mut buf)
-                    .map_err(|e| anyhow::anyhow!("Failed to serialize SBOM: {}", e))?;
-                rust_sboms.push((sbom.package_name, buf));
-            }
-
-            Ok(Some(SbomData { rust_sboms }))
-        }
-
-        #[cfg(not(feature = "sbom"))]
-        {
-            let _ = rust_sbom_enabled;
-            Ok(None)
-        }
+        SbomData::generate(self.context)
     }
 
     /// Writes SBOMs into the wheel via the given writer.
@@ -796,45 +882,6 @@ impl<'a> BuildOrchestrator<'a> {
         writer: &mut impl ModuleWriter,
         dist_info_dir: &Path,
     ) -> Result<()> {
-        let sbom_config = self.context.artifact.sbom.as_ref();
-
-        // 1. Write pre-generated Rust SBOMs
-        if let Some(data) = sbom_data {
-            for (package_name, json_bytes) in &data.rust_sboms {
-                let target = dist_info_dir.join(format!("sboms/{package_name}.cyclonedx.json"));
-                writer.add_bytes(&target, None, json_bytes.clone(), false)?;
-            }
-        }
-
-        // 2. Include additional SBOM files (only when explicitly configured)
-        if let Some(include) = sbom_config.and_then(|c| c.include.as_ref()) {
-            // Canonicalize project root once and enforce all includes stay within it.
-            let project_root = self
-                .context
-                .project
-                .project_layout
-                .project_root
-                .canonicalize()
-                .context("Failed to canonicalize project root for SBOM includes")?;
-
-            let mut seen_filenames = HashSet::new();
-            for path in include {
-                let resolved_path = resolve_sbom_include(path, &project_root)?;
-
-                let filename = resolved_path.file_name().context("Invalid SBOM path")?;
-                if !seen_filenames.insert(filename.to_os_string()) {
-                    anyhow::bail!(
-                        "Duplicate SBOM filename '{}' from include path '{}'. \
-                         Multiple includes must have unique filenames.",
-                        filename.to_string_lossy(),
-                        path.display()
-                    );
-                }
-                let target = dist_info_dir.join("sboms").join(filename);
-                writer.add_file(&target, &resolved_path, false)?;
-            }
-        }
-
-        Ok(())
+        SbomData::write(sbom_data, self.context, writer, dist_info_dir)
     }
 }

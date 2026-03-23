@@ -9,7 +9,10 @@ use crate::python_interpreter::{InterpreterResolver, PythonInterpreter};
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
-use crate::{BridgeModel, BuildContext, PyProjectToml, Target};
+use crate::{
+    ArtifactContext, BridgeModel, BuildContext, ProjectContext, PyProjectToml, PythonContext,
+    Target,
+};
 use anyhow::{Result, bail};
 use std::collections::HashSet;
 use std::env;
@@ -238,7 +241,7 @@ impl BuildContextBuilder {
         };
 
         Ok(BuildContext {
-            project: crate::build_context::ProjectContext {
+            project: ProjectContext {
                 target,
                 project_layout,
                 pyproject_toml_path,
@@ -255,7 +258,7 @@ impl BuildContextBuilder {
                 conditional_features,
                 compile_targets,
             },
-            artifact: crate::build_context::ArtifactContext {
+            artifact: ArtifactContext {
                 out: wheel_dir,
                 strip,
                 compression: build_options.compression,
@@ -264,8 +267,9 @@ impl BuildContextBuilder {
                 include_debuginfo,
                 pgo_phase: None,
                 pgo_command,
+                generate_stubs: build_options.generate_stubs,
             },
-            python: crate::build_context::PythonContext {
+            python: PythonContext {
                 auditwheel,
                 #[cfg(feature = "zig")]
                 zig: build_options.platform.zig,

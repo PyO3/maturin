@@ -99,6 +99,8 @@ pub struct ArtifactContext {
     pub pgo_phase: Option<PgoPhase>,
     /// PGO training command from pyproject.toml (only set when --pgo is passed)
     pub pgo_command: Option<String>,
+    /// Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its "experimental-inspect" feature
+    pub generate_stubs: bool,
 }
 
 /// The constraint part of the build context.
@@ -125,7 +127,7 @@ pub struct PythonContext {
 ///
 /// This structure reflects the build lifecycle:
 /// **Input (Project) → Constraints (Python) → Output (Artifact).**
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BuildContext {
     /// Project context
     pub project: ProjectContext,

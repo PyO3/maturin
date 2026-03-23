@@ -310,9 +310,15 @@ where
             .rust_module
             .join(format!("{ext_name}.pyi"));
         if type_stub.exists() {
-            eprintln!("📖 Found type stub file at {ext_name}.pyi");
-            writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
-            writer.add_empty_file(module.join("py.typed"))?;
+            if context.artifact.generate_stubs {
+                eprintln!(
+                    "⚠️  Warning: Ignoring the type stub file at {ext_name}.pyi, stubs are automatically generated instead"
+                );
+            } else {
+                eprintln!("📖 Found type stub file at {ext_name}.pyi");
+                writer.add_file(module.join("__init__.pyi"), type_stub, false)?;
+                writer.add_empty_file(module.join("py.typed"))?;
+            }
         }
     }
 

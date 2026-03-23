@@ -35,6 +35,8 @@ pub struct IntegrationCase<'a> {
     pub zig: bool,
     /// Optional explicit compilation target for the build.
     pub target: Option<&'a str>,
+    /// Do introspection to generate type stubs
+    pub generate_stubs: bool,
 }
 
 impl<'a> IntegrationCase<'a> {
@@ -46,6 +48,7 @@ impl<'a> IntegrationCase<'a> {
             bindings: None,
             zig: false,
             target: None,
+            generate_stubs: false,
         }
     }
 
@@ -61,6 +64,11 @@ impl<'a> IntegrationCase<'a> {
 
     pub fn target(mut self, target: &'a str) -> Self {
         self.target = Some(target);
+        self
+    }
+
+    pub fn generate_stubs(mut self) -> Self {
+        self.generate_stubs = true;
         self
     }
 }
@@ -257,6 +265,10 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         cli.push(python.as_os_str().to_owned());
         Some(python)
     };
+
+    if case.generate_stubs {
+        cli.push("--generate-stubs".into());
+    }
 
     if test_zig {
         // Zig wrappers read CARGO_BIN_EXE_cargo-zigbuild from the process environment. Run the

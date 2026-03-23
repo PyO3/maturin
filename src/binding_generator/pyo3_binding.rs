@@ -9,6 +9,7 @@ use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
 use anyhow::bail;
+use pyo3_introspection::{introspect_cdylib, module_stub_files};
 use tempfile::TempDir;
 use tracing::debug;
 
@@ -123,6 +124,28 @@ if hasattr({ext_name}, "__all__"):
                     executable: false,
                 };
                 files.insert(module.join("__init__.py"), ArchiveSource::Generated(source));
+                if context.artifact.generate_stubs {
+                    let module_introspection = introspect_cdylib(&artifact.path, ext_name).context("Failed to introspect the built libraries to generate type stubs, have you enabled the \"experimental-inspect\" PyO3 Cargo feature?")?;
+                    eprintln!("📖 Type stub extracted from the built binary");
+                    for (path, stub_content) in module_stub_files(&module_introspection) {
+                        files.insert(
+                            module.join(path),
+                            ArchiveSource::Generated(GeneratedSourceData {
+                                data: stub_content.into_bytes(),
+                                path: None,
+                                executable: false,
+                            }),
+                        );
+                    }
+                    files.insert(
+                        module.join("py.typed"),
+                        ArchiveSource::Generated(GeneratedSourceData {
+                            data: Vec::new(),
+                            path: None,
+                            executable: false,
+                        }),
+                    );
+                }
                 Some(files)
             }
         };

@@ -109,6 +109,7 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         },
         uv,
         compression: Default::default(),
+        generate_stubs: false,
     };
     develop(develop_options, &venv_dir)?;
 

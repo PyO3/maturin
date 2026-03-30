@@ -38,6 +38,8 @@ pub fn build(
 
     let orchestrator = BuildOrchestrator::new(&build_context);
     let wheels = orchestrator.build_wheels()?;
-    assert!(!wheels.is_empty());
+    if wheels.is_empty() {
+        anyhow::bail!("No wheels were built");
+    }
     Ok(())
 }

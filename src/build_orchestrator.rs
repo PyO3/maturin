@@ -402,6 +402,36 @@ impl<'a> BuildOrchestrator<'a> {
             .filter(|interp| !interp.has_stable_api())
             .collect();
 
+        if abi3_interps.is_empty() && non_abi3_interps.is_empty() {
+            let interp_names: Vec<_> = self
+                .context
+                .python
+                .interpreter
+                .iter()
+                .map(|interp| {
+                    format!(
+                        "{} {}.{}",
+                        interp.interpreter_kind, interp.major, interp.minor
+                    )
+                })
+                .collect();
+            if let Some((major, minor)) = min_version {
+                bail!(
+                    "None of the found Python interpreters ({}) are compatible with the abi3 \
+                     minimum version (>= {}.{}). Please install a compatible Python interpreter.",
+                    interp_names.join(", "),
+                    major,
+                    minor,
+                );
+            } else {
+                bail!(
+                    "No compatible Python interpreters found for abi3 build. \
+                     Found: {}",
+                    interp_names.join(", "),
+                );
+            }
+        }
+
         let mut built_wheels = Vec::new();
         if let Some(first) = abi3_interps.first() {
             let (major, minor) = min_version.unwrap_or((first.major as u8, first.minor as u8));

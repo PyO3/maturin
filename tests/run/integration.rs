@@ -71,6 +71,14 @@ fn integration_pyo3_bin() {
     "integration-workspace-inverted-order",
     "test-crates/workspace-inverted-order/path-dep-with-root",
 ))]
+#[case::pyo3_stub_generation(IntegrationCase::new(
+    "integration-pyo3-stub-generation",
+    "test-crates/pyo3-stub-generation",
+).generate_stubs())]
+#[cfg_attr(unix, case::pyo3_stub_generation_zig(IntegrationCase::new(
+    "integration-pyo3-stub-generation-zig",
+    "test-crates/pyo3-stub-generation",
+).generate_stubs().zig()))]
 #[test]
 fn integration_cases(#[case] case: IntegrationCase<'_>) {
     handle_result(integration::test_integration(&case));

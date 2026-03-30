@@ -157,6 +157,10 @@ Options:
       --compression-level <COMPRESSION_LEVEL>
           Zip compression level. Defaults to method default
 
+      --generate-stubs
+          Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its
+          "experimental-inspect" feature
+
   -h, --help
           Print help (see a summary with '-h')
 

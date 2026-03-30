@@ -1677,6 +1677,7 @@ dependencies = [
  "pep508_rs",
  "platform-info",
  "pretty_assertions",
+ "pyo3-introspection",
  "pyproject-toml",
  "python-pkginfo",
  "reflink-copy",
@@ -2218,6 +2219,18 @@ dependencies = [
  "phf",
  "thiserror 2.0.18",
  "unicase",
+]
+
+[[package]]
+name = "pyo3-introspection"
+version = "0.28.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc11f40a1f5ec62a36963d4b4b0c051fac90c879c640baa975f45cd01afd3c38"
+dependencies = [
+ "anyhow",
+ "goblin",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

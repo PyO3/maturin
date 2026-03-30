@@ -74,6 +74,7 @@ semver = "1.0.22"
 target-lexicon = "0.13.3"
 indexmap = "2.2.3"
 pyproject-toml = { version = "0.13.5", features = ["pep639-glob"] }
+pyo3-introspection = "0.28"
 python-pkginfo = "0.6.8"
 textwrap = "0.16.1"
 ignore = "0.4.20"

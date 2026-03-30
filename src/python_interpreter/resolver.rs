@@ -521,6 +521,20 @@ impl<'a> InterpreterResolver<'a> {
             found.extend(sysconfig_interps);
         }
 
+        // When using the default interpreter (not user-specified), filter by
+        // requires-python so we don't pick up an incompatible interpreter
+        // that just happens to be first on PATH (fixes #3107).
+        if self.user_interpreters.is_empty()
+            && let Some(requires_python) = self.requires_python
+        {
+            found.retain(|interp| {
+                requires_python.contains(&pep440_rs::Version::new([
+                    interp.major as u64,
+                    interp.minor as u64,
+                ]))
+            });
+        }
+
         Ok(found)
     }
 

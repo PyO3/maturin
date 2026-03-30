@@ -406,7 +406,7 @@ impl<'a> BuildOrchestrator<'a> {
             .filter(|interp| !interp.has_stable_api())
             .collect();
 
-        if abi3_interps.is_empty() && non_abi3_interps.is_empty() {
+        if stable_abi_interps.is_empty() && version_specific_abi_interps.is_empty() {
             let interp_names: Vec<_> = self
                 .context
                 .python

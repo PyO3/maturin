@@ -4,10 +4,12 @@
 //! to determine which binding model (pyo3, cffi, uniffi, bin) to use,
 //! whether abi3 is enabled, and whether `generate-import-lib` is active.
 
-use super::{Abi3Version, BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw};
-use crate::PyProjectToml;
+use super::{
+    BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi, StableAbiKind, StableAbiVersion,
+};
 use crate::pyproject_toml::FeatureSpec;
-use anyhow::{Context, Result, bail};
+use crate::PyProjectToml;
+use anyhow::{bail, Context, Result};
 use cargo_metadata::{CrateType, Metadata, Node, PackageId, TargetKind};
 use std::collections::{HashMap, HashSet};
 
@@ -122,13 +124,14 @@ pub fn find_bridge(
                 }
             }
 
-            return if let Some(abi3_version) = has_abi3(&deps, &extra_pyo3_features)? {
-                eprintln!("🔗 Found {lib} bindings with abi3 support");
+            return if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features)? {
+                let kind = stable_abi.kind;
+                eprintln!("🔗 Found {lib} bindings with {kind} support");
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
                     version: pyo3.version.clone(),
-                    abi3: Some(abi3_version),
+                    stable_abi: Some(stable_abi),
                     metadata: pyo3.metadata.clone(),
                 };
                 Ok(BridgeModel::PyO3(bindings))
@@ -173,11 +176,23 @@ pub fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
     Ok(false)
 }
 
-/// pyo3 supports building abi3 wheels if the unstable-api feature is not selected
-fn has_abi3(
+fn has_stable_abi(
     deps: &HashMap<&str, &Node>,
     extra_features: &HashMap<&str, Vec<String>>,
-) -> Result<Option<Abi3Version>> {
+) -> Result<Option<StableAbi>> {
+    let abi3 = has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3)?;
+    if abi3.is_some() {
+        return Ok(abi3);
+    }
+    Ok(None)
+}
+
+/// pyo3 supports building stable abi wheels if the unstable-api feature is not selected
+fn has_stable_abi_from_kind(
+    deps: &HashMap<&str, &Node>,
+    extra_features: &HashMap<&str, Vec<String>>,
+    abi_kind: StableAbiKind,
+) -> Result<Option<StableAbi>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
         let lib = lib.as_str();
         if let Some(&pyo3_crate) = deps.get(lib) {
@@ -191,24 +206,38 @@ fn has_abi3(
                 .chain(extra.into_iter().flatten().map(String::as_str))
                 .collect();
 
-            let abi3_selected = all_features.contains(&"abi3");
+            let abi_str = format!("{abi_kind}");
+            let search_str = format!("{abi_kind}-py");
+            let stable_abi_selected = all_features.contains(&abi_str.as_str());
+            let offset = search_str.len();
+            let filter_len = offset + 2;
 
-            let min_abi3_version = all_features
+            let min_stable_abi_version = all_features
                 .iter()
-                .filter(|&&x| x.starts_with("abi3-py") && x.len() >= "abi3-pyxx".len())
+                .filter(|&&x| x.starts_with(search_str.as_str()) && x.len() >= filter_len)
                 .map(|x| {
                     Ok((
-                        (x.as_bytes()[7] as char).to_string().parse::<u8>()?,
-                        x[8..].parse::<u8>()?,
+                        (x.as_bytes()[offset] as char).to_string().parse::<u8>()?,
+                        x[offset + 1..].parse::<u8>()?,
                     ))
                 })
                 .collect::<Result<Vec<(u8, u8)>>>()
                 .context(format!("Bogus {lib} cargo features"))?
                 .into_iter()
                 .min();
-            match min_abi3_version {
-                Some((major, minor)) => return Ok(Some(Abi3Version::Version(major, minor))),
-                None if abi3_selected => return Ok(Some(Abi3Version::CurrentPython)),
+            match min_stable_abi_version {
+                Some((major, minor)) => {
+                    return Ok(Some(StableAbi {
+                        kind: abi_kind,
+                        version: StableAbiVersion::Version(major, minor),
+                    }));
+                }
+                None if stable_abi_selected => {
+                    return Ok(Some(StableAbi {
+                        kind: abi_kind,
+                        version: StableAbiVersion::CurrentPython,
+                    }));
+                }
                 None => {}
             }
         }
@@ -238,7 +267,7 @@ fn find_pyo3_bindings(
         Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version,
-            abi3: None,
+            stable_abi: None,
             metadata,
         }))
     } else if deps.get("pyo3-ffi").is_some() {
@@ -252,7 +281,7 @@ fn find_pyo3_bindings(
         Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3Ffi,
             version,
-            abi3: None,
+            stable_abi: None,
             metadata,
         }))
     } else {

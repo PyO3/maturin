@@ -25,7 +25,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use tracing::debug;
 
-use crate::bridge::{Abi3Version, PyO3};
+use crate::bridge::{PyO3, StableAbiVersion};
 
 /// How a candidate Python interpreter was discovered.
 ///
@@ -244,8 +244,11 @@ impl<'a> InterpreterResolver<'a> {
             return Ok((vec![PythonInterpreter::from_config(config)], None));
         }
 
-        let fixed_abi3 = match &pyo3.abi3 {
-            Some(Abi3Version::Version(major, minor)) => Some((*major, *minor)),
+        let fixed_abi3 = match &pyo3.stable_abi {
+            Some(stable_abi) => match stable_abi.version {
+                StableAbiVersion::Version(major, minor) => Some((major, minor)),
+                _ => None,
+            },
             _ => None,
         };
 

@@ -664,7 +664,7 @@ mod tests {
             Some(&BridgeModel::PyO3(PyO3 {
                 crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
-                abi3: None,
+                stable_abi: None,
                 metadata: None,
             })),
         )
@@ -742,7 +742,7 @@ mod tests {
             Some(&BridgeModel::PyO3(PyO3 {
                 crate_name: PyO3Crate::PyO3,
                 version: semver::Version::new(0, 23, 0),
-                abi3: None,
+                stable_abi: None,
                 metadata: None,
             })),
         )
@@ -779,7 +779,7 @@ mod tests {
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version: semver::Version::new(0, 26, 0),
-            abi3: None,
+            stable_abi: None,
             metadata: None,
         });
 
@@ -905,7 +905,7 @@ mod tests {
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version: semver::Version::new(0, 26, 0),
-            abi3: None,
+            stable_abi: None,
             metadata: None,
         });
 

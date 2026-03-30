@@ -5,22 +5,22 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::rc::Rc;
 
-use anyhow::anyhow;
-use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
+use anyhow::anyhow;
+use anyhow::bail;
 use pyo3_introspection::{introspect_cdylib, module_stub_files};
 use tempfile::TempDir;
 use tracing::debug;
 
-use crate::archive_source::ArchiveSource;
-use crate::archive_source::GeneratedSourceData;
-use crate::binding_generator::ArtifactTarget;
 use crate::BuildArtifact;
 use crate::BuildContext;
 use crate::PythonInterpreter;
 use crate::StableAbiKind;
 use crate::Target;
+use crate::archive_source::ArchiveSource;
+use crate::archive_source::GeneratedSourceData;
+use crate::binding_generator::ArtifactTarget;
 
 use super::BindingGenerator;
 use super::GeneratorOutput;

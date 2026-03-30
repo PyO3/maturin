@@ -7,9 +7,9 @@
 use super::{
     BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi, StableAbiKind, StableAbiVersion,
 };
-use crate::pyproject_toml::FeatureSpec;
 use crate::PyProjectToml;
-use anyhow::{bail, Context, Result};
+use crate::pyproject_toml::FeatureSpec;
+use anyhow::{Context, Result, bail};
 use cargo_metadata::{CrateType, Metadata, Node, PackageId, TargetKind};
 use std::collections::{HashMap, HashSet};
 

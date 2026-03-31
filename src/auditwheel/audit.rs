@@ -1,6 +1,6 @@
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{MANYLINUX_POLICIES, MUSLLINUX_POLICIES, Policy};
-use crate::auditwheel::{PlatformTag, find_external_libs};
+use crate::auditwheel::PlatformTag;
 use crate::compile::BuildArtifact;
 use crate::target::{Arch, Target};
 use anyhow::{Context, Result, bail};
@@ -499,6 +499,33 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
         }
     }
     Ok(PathBuf::from("/"))
+}
+
+/// Find external shared library dependencies (Linux/ELF specific)
+#[allow(clippy::result_large_err)]
+pub fn find_external_libs(
+    artifact: impl AsRef<Path>,
+    policy: &Policy,
+    sysroot: PathBuf,
+    ld_paths: Vec<PathBuf>,
+) -> Result<Vec<lddtree::Library>, AuditWheelError> {
+    let dep_analyzer = lddtree::DependencyAnalyzer::new(sysroot).library_paths(ld_paths);
+    let deps = dep_analyzer
+        .analyze(artifact)
+        .map_err(AuditWheelError::DependencyAnalysisError)?;
+    let mut ext_libs = Vec::new();
+    for (_, lib) in deps.libraries {
+        let name = &lib.name;
+        // Skip dynamic linker/loader, musl libc, and white-listed libs
+        if is_dynamic_linker(name)
+            || name.starts_with("libc.")
+            || policy.lib_whitelist.contains(name)
+        {
+            continue;
+        }
+        ext_libs.push(lib);
+    }
+    Ok(ext_libs)
 }
 
 /// For the given compilation result, return the manylinux platform and the external libs

@@ -63,9 +63,13 @@ pub trait WheelRepairer {
     /// 2. Set appropriate metadata on grafted libraries (soname, install ID, etc.)
     /// 3. Update cross-references between grafted libraries
     /// 4. Perform any final steps (e.g., code signing on macOS)
+    ///
+    /// `ext_libs` is parallel to `artifacts`: `ext_libs[i]` lists the external
+    /// libraries that `artifacts[i]` depends on.
     fn patch(
         &self,
         artifacts: &[&BuildArtifact],
+        ext_libs: &[Vec<lddtree::Library>],
         grafted: &[GraftedLib],
         libs_dir: &Path,
         artifact_dir: &Path,

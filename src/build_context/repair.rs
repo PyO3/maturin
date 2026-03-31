@@ -192,7 +192,7 @@ impl BuildContext {
 
         let artifact_dir = self.get_artifact_dir();
         let artifact_refs: Vec<&BuildArtifact> = artifacts.iter().map(|a| a.borrow()).collect();
-        repairer.patch(&artifact_refs, &grafted, &libs_dir, &artifact_dir)?;
+        repairer.patch(&artifact_refs, ext_libs, &grafted, &libs_dir, &artifact_dir)?;
 
         // Add grafted libraries to the wheel
         for lib in &grafted {

@@ -432,10 +432,6 @@ fn auditwheel_rs(
     Ok((policy, should_repair))
 }
 
-// ---------------------------------------------------------------------------
-// ElfRepairer – WheelRepairer implementation
-// ---------------------------------------------------------------------------
-
 /// Linux/ELF wheel repairer (auditwheel equivalent).
 ///
 /// Bundles external `.so` files and rewrites ELF metadata (SONAME, DT_NEEDED,
@@ -475,6 +471,7 @@ impl WheelRepairer for ElfRepairer {
     fn patch(
         &self,
         artifacts: &[&BuildArtifact],
+        ext_libs: &[Vec<Library>],
         grafted: &[GraftedLib],
         libs_dir: &Path,
         artifact_dir: &Path,
@@ -499,8 +496,19 @@ impl WheelRepairer for ElfRepairer {
         }
 
         // Rewrite DT_NEEDED in each artifact to reference new sonames.
-        let replacements: Vec<_> = name_map.iter().map(|(k, v)| (*k, v.to_string())).collect();
-        for artifact in artifacts {
+        // Only replace entries that the artifact actually depends on to avoid
+        // unnecessary patchelf invocations and errors when an old name is
+        // absent from a given binary.
+        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
+            let artifact_deps: HashSet<&str> = artifact_ext_libs
+                .iter()
+                .map(|lib| lib.name.as_str())
+                .collect();
+            let replacements: Vec<_> = name_map
+                .iter()
+                .filter(|(old, _)| artifact_deps.contains(**old))
+                .map(|(k, v)| (*k, v.to_string()))
+                .collect();
             if !replacements.is_empty() {
                 patchelf::replace_needed(&artifact.path, &replacements)?;
             }
@@ -534,10 +542,6 @@ impl WheelRepairer for ElfRepairer {
         Ok(())
     }
 }
-
-// ---------------------------------------------------------------------------
-// Dependency discovery & policy adjustment
-// ---------------------------------------------------------------------------
 
 /// Find external shared library dependencies (Linux/ELF specific).
 ///

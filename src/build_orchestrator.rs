@@ -286,15 +286,15 @@ impl<'a> BuildOrchestrator<'a> {
                 let interp = &self.context.python.interpreter[0];
                 match bindings.stable_abi {
                     Some(stable_abi) => {
-                        let wheel_tag = stable_abi.kind.wheel_tag();
+                        let abi_tag = stable_abi.kind.wheel_tag();
 
                         match stable_abi.version {
                             StableAbiVersion::Version(major, minor) => {
-                                vec![format!("cp{major}{minor}-{wheel_tag}-{platform}")]
+                                vec![format!("cp{major}{minor}-{abi_tag}-{platform}")]
                             }
                             StableAbiVersion::CurrentPython => {
                                 vec![format!(
-                                    "cp{major}{minor}-{wheel_tag}-{platform}",
+                                    "cp{major}{minor}-{abi_tag}-{platform}",
                                     major = interp.major,
                                     minor = interp.minor
                                 )]

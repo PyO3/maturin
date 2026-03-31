@@ -184,7 +184,7 @@ fn has_stable_abi(
     if abi3.is_some() {
         return Ok(abi3);
     }
-    Ok(None)
+    has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3t)
 }
 
 /// pyo3 supports building stable abi wheels if the unstable-api feature is not selected

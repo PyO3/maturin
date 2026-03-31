@@ -1,3 +1,5 @@
+#[cfg(feature = "auditwheel")]
+use crate::auditwheel::MacOSRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
@@ -48,8 +50,14 @@ impl BuildContext {
                 allow_linking_libpython,
             }))
         } else if self.project.target.is_macos() {
-            // TODO: MacOSRepairer (Phase 2)
-            None
+            #[cfg(feature = "auditwheel")]
+            {
+                Some(Box::new(MacOSRepairer))
+            }
+            #[cfg(not(feature = "auditwheel"))]
+            {
+                None
+            }
         } else {
             None
         }

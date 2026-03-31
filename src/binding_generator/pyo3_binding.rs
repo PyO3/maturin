@@ -38,6 +38,7 @@ pub struct Pyo3BindingGenerator<'a> {
 
 enum BindingType<'a> {
     Abi3(Option<&'a PythonInterpreter>),
+    Abi3t(Option<&'a PythonInterpreter>),
     VersionSpecific(&'a PythonInterpreter),
 }
 
@@ -50,6 +51,7 @@ impl<'a> Pyo3BindingGenerator<'a> {
         let binding_type = match stable_abi {
             Some(kind) => match kind {
                 StableAbiKind::Abi3 => BindingType::Abi3(interpreter),
+                StableAbiKind::Abi3t => BindingType::Abi3t(interpreter),
             },
             None => {
                 let interpreter = interpreter.ok_or_else(|| {
@@ -102,6 +104,7 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
 
         let so_filename = match self.binding_type {
             BindingType::Abi3(interpreter) => ext_suffix(target, interpreter, ext_name, "abi3"),
+            BindingType::Abi3t(interpreter) => ext_suffix(target, interpreter, ext_name, "abi3t"),
             BindingType::VersionSpecific(interpreter) => interpreter.get_library_name(ext_name),
         };
         let artifact_target = ArtifactTarget::ExtensionModule(module.join(so_filename));

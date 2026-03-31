@@ -4,7 +4,7 @@ use semver::Version;
 use super::{generate_github, generate_github_from_cli, resolve_config};
 use crate::ci::{GenerateCI, Platform};
 use crate::pyproject_toml::{CIConfigOverrides, GitHubCIConfig, PlatformCIConfig, TargetCIConfig};
-use crate::{Abi3Version, BridgeModel, PyO3, bridge::PyO3Crate};
+use crate::{BridgeModel, PyO3, StableAbi, bridge::PyO3Crate};
 
 const PROJECT_NAME: &str = "example";
 
@@ -40,11 +40,11 @@ fn assert_snapshot(output: &str, snapshot: &str) {
     }
 }
 
-fn pyo3_bridge(abi3: Option<Abi3Version>) -> BridgeModel {
+fn pyo3_bridge(stable_abi: Option<StableAbi>) -> BridgeModel {
     BridgeModel::PyO3(PyO3 {
         crate_name: PyO3Crate::PyO3,
         version: Version::new(0, 23, 0),
-        abi3,
+        stable_abi,
         metadata: None,
     })
 }
@@ -83,7 +83,7 @@ fn test_generate_github_abi3() {
     let conf = generate_github_from_cli(
         &GenerateCI::default(),
         PROJECT_NAME,
-        &pyo3_bridge(Some(Abi3Version::Version(3, 7))),
+        &pyo3_bridge(Some(StableAbi::from_abi3_version(3, 7))),
         false,
     )
     .unwrap();
@@ -99,7 +99,7 @@ fn test_generate_github_no_attestations() {
     let conf = generate_github_from_cli(
         &cli,
         PROJECT_NAME,
-        &pyo3_bridge(Some(Abi3Version::Version(3, 7))),
+        &pyo3_bridge(Some(StableAbi::from_abi3_version(3, 7))),
         false,
     )
     .unwrap();
@@ -398,7 +398,7 @@ fn test_generate_github_min_python_minor() {
     // Since 14 <= 14, free-threaded remains 3.14t if it was abi3
     // But this bridge is NOT abi3, so no free-threaded wheels.
 
-    let abi3_bridge = pyo3_bridge(Some(Abi3Version::Version(3, 7)));
+    let abi3_bridge = pyo3_bridge(Some(StableAbi::from_abi3_version(3, 7)));
     let conf_abi3 =
         generate_github(&cli, &resolved, PROJECT_NAME, &abi3_bridge, false, Some(15)).unwrap();
     assert!(conf_abi3.contains("python-version: 3.15"));

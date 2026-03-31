@@ -114,14 +114,68 @@ impl TryFrom<PyO3MetadataRaw> for PyO3Metadata {
     }
 }
 
-/// Python version to use as the abi3 target.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Abi3Version {
-    /// abi3 wheels will have a minimum Python version matching the version of
-    /// the current Python interpreter
+/// struct describing ABI layout to use for build
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StableAbi {
+    /// The "kind" of stable ABI. Either abi3 or abi3t currently.
+    pub kind: StableAbiKind,
+    /// The minimum Python version to build for.
+    pub version: StableAbiVersion,
+}
+
+impl StableAbi {
+    /// Create a StableAbi instance from a known abi3 version
+    pub fn from_abi3_version(major: u8, minor: u8) -> StableAbi {
+        StableAbi {
+            kind: StableAbiKind::Abi3,
+            version: StableAbiVersion::Version(major, minor),
+        }
+    }
+}
+
+/// Python version to use as the abi3/abi3t target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StableAbiVersion {
+    /// Stable ABI wheels will have a minimum Python version matching the
+    /// version of the current Python interpreter
     CurrentPython,
-    /// abi3 wheels will have a fixed minimum Python version
+    /// Stable ABI wheels will have a fixed user-specified minimum Python
+    /// version
     Version(u8, u8),
+}
+
+impl StableAbiVersion {
+    /// Convert `StableAbiVersion` into an Option, where CurrentPython maps None
+    pub fn min_version(&self) -> Option<(u8, u8)> {
+        match self {
+            StableAbiVersion::CurrentPython => None,
+            StableAbiVersion::Version(major, minor) => Some((*major, *minor)),
+        }
+    }
+}
+
+/// The "kind" of stable ABI. Either abi3 or abi3t currently.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StableAbiKind {
+    /// The original stable ABI, supporting Python 3.2 and up
+    Abi3,
+}
+
+impl fmt::Display for StableAbiKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StableAbiKind::Abi3 => write!(f, "abi3"),
+        }
+    }
+}
+
+impl StableAbiKind {
+    /// The tag to use for wheel building
+    pub fn wheel_tag(&self) -> &str {
+        match self {
+            StableAbiKind::Abi3 => "abi3",
+        }
+    }
 }
 
 /// The name and version of the pyo3 bindings crate
@@ -132,7 +186,7 @@ pub struct PyO3 {
     /// pyo3 bindings crate version
     pub version: semver::Version,
     /// abi3 support
-    pub abi3: Option<Abi3Version>,
+    pub stable_abi: Option<StableAbi>,
     /// pyo3 metadata
     pub metadata: Option<PyO3Metadata>,
 }
@@ -150,8 +204,12 @@ impl PyO3 {
         } else {
             MINIMUM_PYTHON_MINOR
         };
-        if let Some(Abi3Version::Version(_, abi3_minor)) = self.abi3.as_ref() {
-            min_minor.max(*abi3_minor as usize)
+        if let Some(stable_abi) = self.stable_abi.as_ref() {
+            if let StableAbiVersion::Version(_, abi3_minor) = stable_abi.version {
+                min_minor.max(abi3_minor as usize)
+            } else {
+                min_minor
+            }
         } else {
             min_minor
         }
@@ -279,10 +337,14 @@ impl BridgeModel {
 
     /// Is using abi3
     pub fn is_abi3(&self) -> bool {
-        match self.pyo3() {
-            Some(pyo3) => pyo3.abi3.is_some(),
-            None => false,
-        }
+        self.pyo3()
+            .and_then(|pyo3| match pyo3.stable_abi {
+                Some(stable_abi) => match stable_abi.kind {
+                    StableAbiKind::Abi3 => Some(true),
+                },
+                None => None,
+            })
+            .is_some_and(|x| x)
     }
 
     /// free-threaded Python support

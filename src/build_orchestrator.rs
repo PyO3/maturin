@@ -3,7 +3,6 @@ use crate::binding_generator::{
     BinBindingGenerator, BindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator,
     UniFfiBindingGenerator, generate_binding,
 };
-use crate::bridge::Abi3Version;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
@@ -12,8 +11,8 @@ use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::util::zip_mtime;
 use crate::{
-    BridgeModel, BuildArtifact, BuildContext, BuiltWheelMetadata, PythonInterpreter, VirtualWriter,
-    compile, pyproject_toml::Format,
+    BridgeModel, BuildArtifact, BuildContext, BuiltWheelMetadata, PythonInterpreter, StableAbi,
+    StableAbiKind, StableAbiVersion, VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -53,7 +52,10 @@ impl<'a> BuildOrchestrator<'a> {
         if let Some(pgo_command) = &self.context.artifact.pgo_command {
             let needs_per_interpreter_pgo = matches!(
                 self.context.project.bridge(),
-                BridgeModel::PyO3(crate::PyO3 { abi3: None, .. })
+                BridgeModel::PyO3(crate::PyO3 {
+                    stable_abi: None,
+                    ..
+                })
             );
 
             eprintln!("🚀 Starting PGO build...");
@@ -217,11 +219,8 @@ impl<'a> BuildOrchestrator<'a> {
         let wheels = match self.context.project.bridge() {
             BridgeModel::Bin(None) => self.build_bin_wheel(None, &sbom_data)?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&interpreters, &sbom_data)?,
-            BridgeModel::PyO3(crate::PyO3 { abi3, .. }) => match abi3 {
-                Some(Abi3Version::Version(major, minor)) => {
-                    self.build_abi3_wheels(Some((*major, *minor)), &sbom_data)?
-                }
-                Some(Abi3Version::CurrentPython) => self.build_abi3_wheels(None, &sbom_data)?,
+            BridgeModel::PyO3(crate::PyO3 { stable_abi, .. }) => match stable_abi {
+                Some(stable_abi) => self.build_stable_abi_wheels(stable_abi, &sbom_data)?,
                 None => self.build_pyo3_wheels(&interpreters, &sbom_data)?,
             },
             BridgeModel::Cffi => self.build_cffi_wheel(&sbom_data)?,
@@ -279,33 +278,37 @@ impl<'a> BuildOrchestrator<'a> {
     /// Return the tags of the wheel that this build context builds.
     pub fn tags_from_bridge(&self) -> Result<Vec<String>> {
         let tags = match self.context.project.bridge() {
-            BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => match bindings.abi3 {
-                Some(Abi3Version::Version(major, minor)) => {
-                    let platform = self
-                        .context
-                        .project
-                        .get_platform_tag(&[PlatformTag::Linux])?;
-                    vec![format!("cp{major}{minor}-abi3-{platform}")]
+            BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => {
+                let platform = self
+                    .context
+                    .project
+                    .get_platform_tag(&[PlatformTag::Linux])?;
+                let interp = &self.context.python.interpreter[0];
+                match bindings.stable_abi {
+                    Some(stable_abi) => {
+                        let wheel_tag = stable_abi.kind.wheel_tag();
+
+                        match stable_abi.version {
+                            StableAbiVersion::Version(major, minor) => {
+                                vec![format!("cp{major}{minor}-{wheel_tag}-{platform}")]
+                            }
+                            StableAbiVersion::CurrentPython => {
+                                vec![format!(
+                                    "cp{major}{minor}-{wheel_tag}-{platform}",
+                                    major = interp.major,
+                                    minor = interp.minor
+                                )]
+                            }
+                        }
+                    }
+                    None => {
+                        vec![
+                            self.context.python.interpreter[0]
+                                .get_tag(&self.context.project, &[PlatformTag::Linux])?,
+                        ]
+                    }
                 }
-                Some(Abi3Version::CurrentPython) => {
-                    let interp = &self.context.python.interpreter[0];
-                    let platform = self
-                        .context
-                        .project
-                        .get_platform_tag(&[PlatformTag::Linux])?;
-                    vec![format!(
-                        "cp{major}{minor}-abi3-{platform}",
-                        major = interp.major,
-                        minor = interp.minor
-                    )]
-                }
-                None => {
-                    vec![
-                        self.context.python.interpreter[0]
-                            .get_tag(&self.context.project, &[PlatformTag::Linux])?,
-                    ]
-                }
-            },
+            }
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
                 vec![self.get_universal_tag(&[PlatformTag::Linux])?]
             }
@@ -377,12 +380,13 @@ impl<'a> BuildOrchestrator<'a> {
     /// Split interpreters into abi3-capable and non-abi3 groups, build the
     /// appropriate wheel type for each group, and return all built wheels.
     #[instrument(skip_all)]
-    pub(crate) fn build_abi3_wheels(
+    pub(crate) fn build_stable_abi_wheels(
         &self,
-        min_version: Option<(u8, u8)>,
+        stable_abi: &StableAbi,
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
-        let abi3_interps: Vec<_> = self
+        let min_version = stable_abi.version.min_version();
+        let stable_abi_interps: Vec<_> = self
             .context
             .python
             .interpreter
@@ -394,7 +398,7 @@ impl<'a> BuildOrchestrator<'a> {
                     })
             })
             .collect();
-        let non_abi3_interps: Vec<_> = self
+        let version_specific_abi_interps: Vec<_> = self
             .context
             .python
             .interpreter
@@ -402,7 +406,7 @@ impl<'a> BuildOrchestrator<'a> {
             .filter(|interp| !interp.has_stable_api())
             .collect();
 
-        if abi3_interps.is_empty() && non_abi3_interps.is_empty() {
+        if stable_abi_interps.is_empty() && version_specific_abi_interps.is_empty() {
             let interp_names: Vec<_> = self
                 .context
                 .python
@@ -433,25 +437,27 @@ impl<'a> BuildOrchestrator<'a> {
         }
 
         let mut built_wheels = Vec::new();
-        if let Some(first) = abi3_interps.first() {
+        if let Some(first) = stable_abi_interps.first() {
             let (major, minor) = min_version.unwrap_or((first.major as u8, first.minor as u8));
-            built_wheels.extend(self.build_pyo3_wheel_abi3(
-                &abi3_interps,
+            built_wheels.extend(self.build_pyo3_wheel_stable_abi(
+                &stable_abi_interps,
+                stable_abi.kind,
                 major,
                 minor,
                 sbom_data,
             )?);
         }
-        if !non_abi3_interps.is_empty() {
-            let interp_names: HashSet<_> = non_abi3_interps
+        if !version_specific_abi_interps.is_empty() {
+            let interp_names: HashSet<_> = version_specific_abi_interps
                 .iter()
                 .map(|interp| interp.to_string())
                 .collect();
             eprintln!(
-                "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
+                "⚠️ Warning: {} does not yet support {} so the build artifacts will be version-specific.",
+                stable_abi.kind,
                 interp_names.iter().join(", ")
             );
-            built_wheels.extend(self.build_pyo3_wheels(&non_abi3_interps, sbom_data)?);
+            built_wheels.extend(self.build_pyo3_wheels(&version_specific_abi_interps, sbom_data)?);
         }
         Ok(built_wheels)
     }
@@ -523,9 +529,10 @@ impl<'a> BuildOrchestrator<'a> {
     /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
     /// for it
     #[instrument(skip_all)]
-    pub(crate) fn build_pyo3_wheel_abi3(
+    pub(crate) fn build_pyo3_wheel_stable_abi(
         &self,
         interpreters: &[&PythonInterpreter],
+        stable_abi_kind: StableAbiKind,
         major: u8,
         min_minor: u8,
         sbom_data: &Option<SbomData>,
@@ -544,7 +551,8 @@ impl<'a> BuildOrchestrator<'a> {
         let platform_tags = self.resolve_platform_tags(&policy);
 
         let platform = self.context.project.get_platform_tag(&platform_tags)?;
-        let tag = format!("cp{major}{min_minor}-abi3-{platform}");
+        let abi_tag = stable_abi_kind.wheel_tag();
+        let tag = format!("cp{major}{min_minor}-{abi_tag}-{platform}");
 
         let wheel_path = self.write_wheel(
             &tag,
@@ -552,7 +560,7 @@ impl<'a> BuildOrchestrator<'a> {
             &[external_libs],
             |temp_dir| {
                 Ok(Box::new(
-                    Pyo3BindingGenerator::new(true, python_interpreter, temp_dir)
+                    Pyo3BindingGenerator::new(Some(stable_abi_kind), python_interpreter, temp_dir)
                         .context("Failed to initialize PyO3 binding generator")?,
                 ))
             },
@@ -561,7 +569,7 @@ impl<'a> BuildOrchestrator<'a> {
         )?;
 
         eprintln!(
-            "📦 Built wheel for abi3 Python ≥ {}.{} to {}",
+            "📦 Built wheel for {stable_abi_kind} Python ≥ {}.{} to {}",
             major,
             min_minor,
             wheel_path.display()
@@ -589,7 +597,7 @@ impl<'a> BuildOrchestrator<'a> {
             &[ext_libs],
             |temp_dir| {
                 Ok(Box::new(
-                    Pyo3BindingGenerator::new(false, Some(python_interpreter), temp_dir)
+                    Pyo3BindingGenerator::new(None, Some(python_interpreter), temp_dir)
                         .context("Failed to initialize PyO3 binding generator")?,
                 ))
             },

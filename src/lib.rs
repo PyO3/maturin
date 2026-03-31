@@ -23,7 +23,7 @@
 
 #![deny(missing_docs)]
 
-pub use crate::bridge::{Abi3Version, BridgeModel, PyO3, PyO3Crate};
+pub use crate::bridge::{BridgeModel, PyO3, PyO3Crate, StableAbi, StableAbiKind, StableAbiVersion};
 pub use crate::build_context::{
     ArtifactContext, BuildContext, BuiltWheelMetadata, ProjectContext, PythonContext,
 };

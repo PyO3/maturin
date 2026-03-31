@@ -10,7 +10,7 @@
 use super::audit::{get_sysroot_path, relpath};
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{MANYLINUX_POLICIES, MUSLLINUX_POLICIES, Policy};
-use super::repair::{GraftedLib, WheelRepairer};
+use super::repair::{AuditedArtifact, GraftedLib, WheelRepairer};
 use super::{PlatformTag, patchelf};
 use crate::compile::BuildArtifact;
 use crate::target::{Arch, Target};
@@ -470,8 +470,7 @@ impl WheelRepairer for ElfRepairer {
 
     fn patch(
         &self,
-        artifacts: &[&BuildArtifact],
-        ext_libs: &[Vec<Library>],
+        audited: &[AuditedArtifact],
         grafted: &[GraftedLib],
         libs_dir: &Path,
         artifact_dir: &Path,
@@ -499,8 +498,9 @@ impl WheelRepairer for ElfRepairer {
         // Only replace entries that the artifact actually depends on to avoid
         // unnecessary patchelf invocations and errors when an old name is
         // absent from a given binary.
-        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
-            let artifact_deps: HashSet<&str> = artifact_ext_libs
+        for aa in audited {
+            let artifact_deps: HashSet<&str> = aa
+                .external_libs
                 .iter()
                 .map(|lib| lib.name.as_str())
                 .collect();
@@ -510,7 +510,7 @@ impl WheelRepairer for ElfRepairer {
                 .map(|(k, v)| (*k, v.to_string()))
                 .collect();
             if !replacements.is_empty() {
-                patchelf::replace_needed(&artifact.path, &replacements)?;
+                patchelf::replace_needed(&aa.artifact.path, &replacements)?;
             }
         }
 
@@ -531,12 +531,12 @@ impl WheelRepairer for ElfRepairer {
         }
 
         // Set RPATH on artifacts to find the libs directory
-        for artifact in artifacts {
-            let mut new_rpaths = patchelf::get_rpath(&artifact.path)?;
+        for aa in audited {
+            let mut new_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
             let new_rpath = Path::new("$ORIGIN").join(relpath(libs_dir, artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
             let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&artifact.path, &new_rpath)?;
+            patchelf::set_rpath(&aa.artifact.path, &new_rpath)?;
         }
 
         Ok(())

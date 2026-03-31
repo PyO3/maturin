@@ -10,10 +10,30 @@
 use crate::compile::BuildArtifact;
 use crate::util::hash_file;
 use anyhow::{Context, Result};
+use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
+
+/// A build artifact bundled with the external shared libraries it depends on.
+///
+/// Keeps the artifact and its per-artifact dependency list together so they
+/// cannot accidentally get out of sync when passed through the wheel-writing
+/// pipeline.
+pub struct AuditedArtifact {
+    /// The build artifact.
+    pub artifact: BuildArtifact,
+    /// External shared libraries this artifact depends on that must be
+    /// bundled into the wheel.
+    pub external_libs: Vec<lddtree::Library>,
+}
+
+impl Borrow<BuildArtifact> for AuditedArtifact {
+    fn borrow(&self) -> &BuildArtifact {
+        &self.artifact
+    }
+}
 
 /// A library prepared for grafting into a wheel.
 ///
@@ -63,13 +83,9 @@ pub trait WheelRepairer {
     /// 2. Set appropriate metadata on grafted libraries (soname, install ID, etc.)
     /// 3. Update cross-references between grafted libraries
     /// 4. Perform any final steps (e.g., code signing on macOS)
-    ///
-    /// `ext_libs` is parallel to `artifacts`: `ext_libs[i]` lists the external
-    /// libraries that `artifacts[i]` depends on.
     fn patch(
         &self,
-        artifacts: &[&BuildArtifact],
-        ext_libs: &[Vec<lddtree::Library>],
+        audited: &[AuditedArtifact],
         grafted: &[GraftedLib],
         libs_dir: &Path,
         artifact_dir: &Path,
@@ -97,7 +113,7 @@ pub trait WheelRepairer {
 /// file is referenced via multiple install names (common on macOS), only one
 /// copy is made, but all original names are recorded as aliases.
 pub fn prepare_grafted_libs(
-    ext_libs: &[Vec<lddtree::Library>],
+    audited: &[AuditedArtifact],
     temp_dir: &Path,
 ) -> Result<(Vec<GraftedLib>, HashSet<PathBuf>)> {
     let mut grafted = Vec::new();
@@ -105,7 +121,7 @@ pub fn prepare_grafted_libs(
     let mut realpath_to_idx: std::collections::HashMap<PathBuf, usize> =
         std::collections::HashMap::new();
 
-    for lib in ext_libs.iter().flatten() {
+    for lib in audited.iter().flat_map(|a| &a.external_libs) {
         let source_path = lib.realpath.clone().with_context(|| {
             format!(
                 "Cannot repair wheel, because required library {} could not be located.",

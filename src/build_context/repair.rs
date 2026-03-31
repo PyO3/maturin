@@ -1,8 +1,8 @@
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
-    AuditWheelMode, ElfRepairer, PlatformTag, Policy, WheelRepairer, log_grafted_libs, patchelf,
-    prepare_grafted_libs,
+    AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
+    log_grafted_libs, patchelf, prepare_grafted_libs,
 };
 #[cfg(feature = "sbom")]
 use crate::module_writer::ModuleWriter;
@@ -12,7 +12,6 @@ use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use lddtree::Library;
 use normpath::PathExt;
-use std::borrow::Borrow;
 use std::path::{Path, PathBuf};
 
 use super::BuildContext;
@@ -105,28 +104,24 @@ impl BuildContext {
     }
 
     /// Add library search paths in Cargo target directory rpath when building in editable mode
-    fn add_rpath<A>(&self, artifacts: &[A]) -> Result<()>
-    where
-        A: Borrow<BuildArtifact>,
-    {
-        if self.project.editable && self.project.target.is_linux() && !artifacts.is_empty() {
-            for artifact in artifacts {
-                let artifact = artifact.borrow();
-                if artifact.linked_paths.is_empty() {
+    fn add_rpath(&self, audited: &[AuditedArtifact]) -> Result<()> {
+        if self.project.editable && self.project.target.is_linux() && !audited.is_empty() {
+            for aa in audited {
+                if aa.artifact.linked_paths.is_empty() {
                     continue;
                 }
-                let old_rpaths = patchelf::get_rpath(&artifact.path)?;
+                let old_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
                 let mut new_rpaths = old_rpaths.clone();
-                for path in &artifact.linked_paths {
+                for path in &aa.artifact.linked_paths {
                     if !old_rpaths.contains(path) {
                         new_rpaths.push(path.to_string());
                     }
                 }
                 let new_rpath = new_rpaths.join(":");
-                if let Err(err) = patchelf::set_rpath(&artifact.path, &new_rpath) {
+                if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
                     eprintln!(
                         "⚠️ Warning: Failed to set rpath for {}: {}",
-                        artifact.path.display(),
+                        aa.artifact.path.display(),
                         err
                     );
                 }
@@ -135,32 +130,27 @@ impl BuildContext {
         Ok(())
     }
 
-    pub(crate) fn add_external_libs<A>(
+    pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
-        artifacts: &[A],
-        ext_libs: &[Vec<Library>],
-    ) -> Result<()>
-    where
-        A: Borrow<BuildArtifact>,
-    {
+        audited: &[AuditedArtifact],
+    ) -> Result<()> {
         if self.project.editable {
-            return self.add_rpath(artifacts);
+            return self.add_rpath(audited);
         }
-        if ext_libs.iter().all(|libs| libs.is_empty()) {
+        if audited.iter().all(|a| a.external_libs.is_empty()) {
             return Ok(());
         }
 
         // Log which libraries need to be copied and which artifacts require them
         // before calling patchelf, so users can see this even if patchelf is missing.
         eprintln!("🔗 External shared libraries to be copied into the wheel:");
-        for (artifact, artifact_ext_libs) in artifacts.iter().zip(ext_libs) {
-            let artifact = artifact.borrow();
-            if artifact_ext_libs.is_empty() {
+        for aa in audited {
+            if aa.external_libs.is_empty() {
                 continue;
             }
-            eprintln!("  {} requires:", artifact.path.display());
-            for lib in artifact_ext_libs {
+            eprintln!("  {} requires:", aa.artifact.path.display());
+            for lib in &aa.external_libs {
                 if let Some(path) = lib.realpath.as_ref() {
                     eprintln!("    {} => {}", lib.name, path.display());
                 } else {
@@ -188,11 +178,10 @@ impl BuildContext {
         let libs_dir = repairer.libs_dir(&dist_name);
 
         let temp_dir = writer.temp_dir()?;
-        let (grafted, libs_copied) = prepare_grafted_libs(ext_libs, temp_dir.path())?;
+        let (grafted, libs_copied) = prepare_grafted_libs(audited, temp_dir.path())?;
 
         let artifact_dir = self.get_artifact_dir();
-        let artifact_refs: Vec<&BuildArtifact> = artifacts.iter().map(|a| a.borrow()).collect();
-        repairer.patch(&artifact_refs, ext_libs, &grafted, &libs_dir, &artifact_dir)?;
+        repairer.patch(audited, &grafted, &libs_dir, &artifact_dir)?;
 
         // Add grafted libraries to the wheel
         for lib in &grafted {

@@ -14,4 +14,4 @@ pub use audit::*;
 pub use linux::ElfRepairer;
 pub use platform_tag::PlatformTag;
 pub use policy::Policy;
-pub use repair::{WheelRepairer, log_grafted_libs, prepare_grafted_libs};
+pub use repair::{AuditedArtifact, WheelRepairer, log_grafted_libs, prepare_grafted_libs};

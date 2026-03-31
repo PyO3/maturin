@@ -148,6 +148,10 @@ which = { version = "8.0.0", optional = true }
 memmap2 = "0.9.9"
 reflink-copy = "0.1.29"
 
+# auditwheel repair (macOS delocate)
+arwen = { version = "0.0.5", optional = true }
+arwen-codesign = { version = "0.0.1-alpha.1", optional = true }
+
 [dev-dependencies]
 expect-test = "1.4.1"
 fs4 = { version = "0.13.1", features = ["fs-err3"] }
@@ -165,7 +169,9 @@ which = "8.0.0"
 [features]
 default = ["full", "rustls"]
 
-full = ["cli-completion", "cross-compile", "scaffolding", "upload", "sbom"]
+full = ["cli-completion", "cross-compile", "scaffolding", "upload", "sbom", "auditwheel"]
+
+auditwheel = ["dep:arwen", "dep:arwen-codesign"]
 
 cli-completion = ["dep:clap_complete_command"]
 

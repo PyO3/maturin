@@ -116,7 +116,7 @@ impl PythonInterpreter {
             false
         } else {
             match self.interpreter_kind {
-                // Free-threaded python does not have stable api support yet
+                // Free-threaded python does not have stable api support until 3.15
                 InterpreterKind::CPython => {
                     !(self.config.gil_disabled && self.config.major == 3 && self.config.minor < 15)
                 }

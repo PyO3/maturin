@@ -453,7 +453,8 @@ impl<'a> BuildOrchestrator<'a> {
                 .map(|interp| interp.to_string())
                 .collect();
             eprintln!(
-                "⚠️ Warning: {} does not yet support abi3 so the build artifacts will be version-specific.",
+                "⚠️ Warning: {} does not yet support {} so the build artifacts will be version-specific.",
+                stable_abi.kind,
                 interp_names.iter().join(", ")
             );
             built_wheels.extend(self.build_pyo3_wheels(&version_specific_abi_interps, sbom_data)?);

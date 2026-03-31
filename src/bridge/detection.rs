@@ -198,7 +198,8 @@ fn has_stable_abi_from_kind(
         if let Some(&pyo3_crate) = deps.get(lib) {
             let extra = extra_features.get(lib);
             // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
-            // This parser abi3-py{major}{minor} and returns the minimal (major, minor) tuple
+// Find the minimal stable abi python version. If there is none, stable abi hasn't been selected
+// This parses abi3-py{major}{minor} and returns the minimal (major, minor) tuple
             let all_features: Vec<&str> = pyo3_crate
                 .features
                 .iter()

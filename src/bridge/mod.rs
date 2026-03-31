@@ -149,7 +149,7 @@ impl StableAbiVersion {
     pub fn min_version(&self) -> Option<(u8, u8)> {
         match self {
             StableAbiVersion::CurrentPython => None,
-            StableAbiVersion::Version(min, max) => Some((*min, *max)),
+            StableAbiVersion::Version(major, minor) => Some((*major, *minor)),
         }
     }
 }

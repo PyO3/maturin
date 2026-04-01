@@ -457,13 +457,19 @@ impl WheelRepairer for ElfRepairer {
     fn audit(
         &self,
         artifact: &BuildArtifact,
-        _ld_paths: Vec<PathBuf>,
+        mut ld_paths: Vec<PathBuf>,
     ) -> Result<(Policy, Vec<Library>)> {
+        // Extend caller-provided paths with RUSTFLAGS library search paths
+        if let Some(rustflags_paths) =
+            extract_rustflags_library_paths(&self.manifest_path, &self.target)
+        {
+            ld_paths.extend(rustflags_paths);
+        }
         get_policy_and_libs(
             artifact,
             self.platform_tag,
             &self.target,
-            &self.manifest_path,
+            ld_paths,
             self.allow_linking_libpython,
         )
     }
@@ -541,6 +547,30 @@ impl WheelRepairer for ElfRepairer {
 
         Ok(())
     }
+
+    fn patch_editable(&self, audited: &[AuditedArtifact]) -> Result<()> {
+        for aa in audited {
+            if aa.artifact.linked_paths.is_empty() {
+                continue;
+            }
+            let old_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
+            let mut new_rpaths = old_rpaths.clone();
+            for path in &aa.artifact.linked_paths {
+                if !old_rpaths.contains(path) {
+                    new_rpaths.push(path.to_string());
+                }
+            }
+            let new_rpath = new_rpaths.join(":");
+            if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
+                eprintln!(
+                    "⚠️ Warning: Failed to set rpath for {}: {}",
+                    aa.artifact.path.display(),
+                    err
+                );
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Find external shared library dependencies (Linux/ELF specific).
@@ -579,7 +609,7 @@ fn get_policy_and_libs(
     artifact: &BuildArtifact,
     platform_tag: Option<PlatformTag>,
     target: &Target,
-    manifest_path: &Path,
+    ld_paths: Vec<PathBuf>,
     allow_linking_libpython: bool,
 ) -> Result<(Policy, Vec<Library>)> {
     let (policy, should_repair) =
@@ -594,12 +624,6 @@ fn get_policy_and_libs(
         )?;
     let external_libs = if should_repair {
         let sysroot = get_sysroot_path(target).unwrap_or_else(|_| PathBuf::from("/"));
-        let mut ld_paths: Vec<PathBuf> = artifact.linked_paths.iter().map(PathBuf::from).collect();
-
-        // Add library search paths from RUSTFLAGS
-        if let Some(rustflags_paths) = extract_rustflags_library_paths(manifest_path, target) {
-            ld_paths.extend(rustflags_paths);
-        }
 
         let external_libs = find_external_libs(&artifact.path, &policy, sysroot, ld_paths)
             .with_context(|| {

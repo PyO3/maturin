@@ -2,7 +2,7 @@
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
     AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
-    log_grafted_libs, patchelf, prepare_grafted_libs,
+    log_grafted_libs, prepare_grafted_libs,
 };
 #[cfg(feature = "sbom")]
 use crate::module_writer::ModuleWriter;
@@ -103,40 +103,16 @@ impl BuildContext {
         }
     }
 
-    /// Add library search paths in Cargo target directory rpath when building in editable mode
-    fn add_rpath(&self, audited: &[AuditedArtifact]) -> Result<()> {
-        if self.project.editable && self.project.target.is_linux() && !audited.is_empty() {
-            for aa in audited {
-                if aa.artifact.linked_paths.is_empty() {
-                    continue;
-                }
-                let old_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
-                let mut new_rpaths = old_rpaths.clone();
-                for path in &aa.artifact.linked_paths {
-                    if !old_rpaths.contains(path) {
-                        new_rpaths.push(path.to_string());
-                    }
-                }
-                let new_rpath = new_rpaths.join(":");
-                if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
-                    eprintln!(
-                        "⚠️ Warning: Failed to set rpath for {}: {}",
-                        aa.artifact.path.display(),
-                        err
-                    );
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
         audited: &[AuditedArtifact],
     ) -> Result<()> {
         if self.project.editable {
-            return self.add_rpath(audited);
+            if let Some(repairer) = self.make_repairer(&self.python.platform_tag) {
+                return repairer.patch_editable(audited);
+            }
+            return Ok(());
         }
         if audited.iter().all(|a| a.external_libs.is_empty()) {
             return Ok(());

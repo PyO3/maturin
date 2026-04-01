@@ -91,6 +91,14 @@ pub trait WheelRepairer {
         artifact_dir: &Path,
     ) -> Result<()>;
 
+    /// Patch artifacts for editable installs (e.g., set RPATH to Cargo target dir).
+    ///
+    /// The default implementation is a no-op. Platform-specific repairers can
+    /// override this to add runtime library search paths for editable mode.
+    fn patch_editable(&self, _audited: &[AuditedArtifact]) -> Result<()> {
+        Ok(())
+    }
+
     /// Return the wheel-internal directory name for grafted libraries.
     ///
     /// macOS uses `.dylibs` (matching delocate convention),
@@ -135,7 +143,6 @@ pub fn prepare_grafted_libs(
             if lib.name != existing.original_name && !existing.aliases.contains(&lib.name) {
                 existing.aliases.push(lib.name.clone());
             }
-            libs_copied.insert(source_path);
             continue;
         }
 

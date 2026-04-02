@@ -1,36 +1,22 @@
 //! Pure-Rust ad-hoc code signing for Mach-O binaries.
 //!
 //! This module provides ad-hoc code signing for both thin and fat (universal) Mach-O
-//! binaries using `arwen-codesign`. The signatures produced are functionally equivalent
-//! to those created by Apple's `codesign -s -` command and pass all verification checks.
+//! binaries. On macOS, it uses Apple's `codesign` CLI tool directly. For cross-compilation
+//! from other platforms, it uses `arwen-codesign` as a pure-Rust fallback.
 //!
-//! ## Differences from `codesign` CLI
-//!
-//! The signatures produced by this module differ slightly from Apple's `codesign` tool:
-//!
-//! - **Page size**: `arwen-codesign` uses 4KB pages, while `codesign` uses 16KB pages.
-//!   This results in more hash entries but is valid on all macOS architectures.
-//! - **Identifier**: We use the filename as identifier; `codesign` appends a content hash.
-//!
-//! These differences do not affect functionality - both signatures pass `codesign --verify`
-//! and the signed binaries execute correctly on both Intel and Apple Silicon Macs.
+//! The signatures produced are functionally equivalent to those created by Apple's
+//! `codesign -s -` command and pass all verification checks.
 
 use anyhow::{Context, Result};
+#[cfg(not(target_os = "macos"))]
 use arwen_codesign::{AdhocSignOptions, adhoc_sign};
+#[cfg(not(target_os = "macos"))]
 use fat_macho::{Error as FatMachoError, FatReader, FatWriter};
 use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::process::Command;
+#[cfg(not(target_os = "macos"))]
 use tempfile::NamedTempFile;
-
-/// Check if the given bytes represent a fat (universal) Mach-O binary.
-///
-/// Fat binaries use magic `0xcafebabe` (big-endian) or `0xbebafeca` (little-endian).
-#[cfg(test)]
-fn is_fat_macho(data: &[u8]) -> bool {
-    matches!(
-        data.get(..4),
-        Some([0xca, 0xfe, 0xba, 0xbe] | [0xbe, 0xba, 0xfe, 0xca])
-    )
-}
 
 /// Ad-hoc codesign Mach-O bytes, handling both thin and fat (universal) binaries.
 ///
@@ -38,7 +24,8 @@ fn is_fat_macho(data: &[u8]) -> bool {
 /// the slices are reassembled into a new fat binary. This approach requires that
 /// each thin slice has an existing `LC_CODE_SIGNATURE` load command (which is the
 /// case for binaries produced by modern Apple toolchains with `-Wl,-adhoc_codesign`).
-pub(crate) fn ad_hoc_sign_macho_bytes(data: Vec<u8>, identifier: &str) -> Result<Vec<u8>> {
+#[cfg(not(target_os = "macos"))]
+fn ad_hoc_sign_macho_bytes(data: Vec<u8>, identifier: &str) -> Result<Vec<u8>> {
     match FatReader::new(&data) {
         Ok(reader) => {
             let mut writer = FatWriter::new();
@@ -65,17 +52,46 @@ pub(crate) fn ad_hoc_sign_macho_bytes(data: Vec<u8>, identifier: &str) -> Result
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn sign_thin_macho_slice(data: Vec<u8>, identifier: &str) -> Result<Vec<u8>> {
     adhoc_sign(data, &AdhocSignOptions::new(identifier))
         .with_context(|| format!("Failed to ad-hoc codesign Mach-O slice {identifier}"))
 }
 
+/// Ad-hoc codesign a Mach-O file at the given path.
+///
+/// On macOS, uses Apple's `codesign` CLI tool directly. For cross-compilation
+/// from other platforms, uses the pure-Rust `arwen-codesign` library.
+#[cfg(target_os = "macos")]
+pub(crate) fn ad_hoc_sign(path: &Path) -> Result<()> {
+    let output = Command::new("codesign")
+        .args(["-s", "-", "-f"])
+        .arg(path)
+        .output()
+        .context("Failed to run codesign command")?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "codesign failed for {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(())
+}
+
+/// Ad-hoc codesign a Mach-O file at the given path.
+///
+/// Uses the pure-Rust `arwen-codesign` library for cross-compilation scenarios
+/// where Apple's `codesign` tool is not available.
+#[cfg(not(target_os = "macos"))]
 pub(crate) fn ad_hoc_sign(path: &Path) -> Result<()> {
     let data = fs_err::read(path)?;
     let identifier = path
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("unknown");
+
     let signed = ad_hoc_sign_macho_bytes(data, identifier)?;
     let metadata = fs_err::metadata(path)?;
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
@@ -90,15 +106,24 @@ pub(crate) fn ad_hoc_sign(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(target_os = "macos")]
     use std::process::Command;
+
+    /// Check if the given bytes represent a fat (universal) Mach-O binary.
+    ///
+    /// Fat binaries use magic `0xcafebabe` (big-endian) or `0xbebafeca` (little-endian).
+    fn is_fat_macho(data: &[u8]) -> bool {
+        matches!(
+            data.get(..4),
+            Some([0xca, 0xfe, 0xba, 0xbe] | [0xbe, 0xba, 0xfe, 0xca])
+        )
+    }
 
     /// Compile a minimal Mach-O binary for the given architecture.
     /// Returns the path to the compiled binary.
-    #[cfg(target_os = "macos")]
     fn compile_thin_macho(dir: &Path, arch: &str) -> std::path::PathBuf {
         /// Minimal C source that compiles to a tiny Mach-O executable.
         const MINIMAL_C_SOURCE: &str = "int main(){return 0;}";
@@ -124,23 +149,6 @@ mod tests {
     }
 
     #[test]
-    fn detects_thin_macho_magic() {
-        // MH_MAGIC_64 little-endian (most common on x86_64/arm64)
-        assert!(!is_fat_macho(&[0xcf, 0xfa, 0xed, 0xfe]));
-        // MH_MAGIC big-endian
-        assert!(!is_fat_macho(&[0xfe, 0xed, 0xfa, 0xce]));
-    }
-
-    #[test]
-    fn detects_fat_macho_magic() {
-        // FAT_MAGIC big-endian
-        assert!(is_fat_macho(&[0xca, 0xfe, 0xba, 0xbe]));
-        // FAT_MAGIC little-endian (rare but valid)
-        assert!(is_fat_macho(&[0xbe, 0xba, 0xfe, 0xca]));
-    }
-
-    #[test]
-    #[cfg(target_os = "macos")]
     fn signs_thin_binary_and_verifies() {
         let temp_dir = tempfile::tempdir().unwrap();
         let thin = compile_thin_macho(temp_dir.path(), "arm64");
@@ -160,7 +168,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "macos")]
     fn signs_thin_x86_64_binary_and_verifies() {
         let temp_dir = tempfile::tempdir().unwrap();
         let thin = compile_thin_macho(temp_dir.path(), "x86_64");
@@ -180,8 +187,9 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "macos")]
     fn signs_fat_binary_from_thin_slices() {
+        use fat_macho::{FatReader, FatWriter};
+
         // Test the fat binary signing flow by building thin binaries,
         // manually creating a fat binary with FatWriter, and signing it.
         // This simulates what happens when bundling dylibs from different
@@ -205,18 +213,19 @@ mod tests {
         // Verify it's a fat binary
         assert!(is_fat_macho(&fat), "Expected fat binary");
 
-        // Sign each slice and rebuild
-        let signed = ad_hoc_sign_macho_bytes(fat, "test-universal").unwrap();
+        // Write to file and sign with codesign CLI
+        let fat_path = temp_dir.path().join("universal");
+        fs_err::write(&fat_path, &fat).unwrap();
 
-        // Verify both slices are present
+        ad_hoc_sign(&fat_path).unwrap();
+
+        // Verify both slices are present after signing
+        let signed = fs_err::read(&fat_path).unwrap();
         let reader = FatReader::new(&signed).unwrap();
         assert!(reader.extract("arm64").is_some(), "arm64 slice missing");
         assert!(reader.extract("x86_64").is_some(), "x86_64 slice missing");
 
-        // Write to file and verify with codesign
-        let fat_path = temp_dir.path().join("universal");
-        fs_err::write(&fat_path, &signed).unwrap();
-
+        // Verify with codesign
         let output = Command::new("codesign")
             .args(["--verify", "--verbose"])
             .arg(&fat_path)

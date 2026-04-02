@@ -1,4 +1,4 @@
-use crate::auditwheel::{PlatformTag, Policy};
+use crate::auditwheel::{AuditedArtifact, PlatformTag, Policy};
 use crate::binding_generator::{
     BinBindingGenerator, BindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator,
     UniFfiBindingGenerator, generate_binding,
@@ -19,7 +19,6 @@ use cargo_metadata::CrateType;
 use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
 use itertools::Itertools;
-use lddtree::Library;
 use normpath::PathExt;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -468,8 +467,7 @@ impl<'a> BuildOrchestrator<'a> {
     fn write_wheel<'b, F>(
         &'b self,
         tag: &str,
-        artifacts: &[&BuildArtifact],
-        ext_libs: &[Vec<Library>],
+        audited: &[AuditedArtifact],
         make_generator: F,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
@@ -490,8 +488,7 @@ impl<'a> BuildOrchestrator<'a> {
             file_options,
         )?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.context
-            .add_external_libs(&mut writer, artifacts, ext_libs)?;
+        self.context.add_external_libs(&mut writer, audited)?;
 
         let temp_dir = writer.temp_dir()?;
         let mut generator = make_generator(temp_dir)?;
@@ -499,7 +496,7 @@ impl<'a> BuildOrchestrator<'a> {
             &mut writer,
             generator.as_mut(),
             self.context,
-            artifacts,
+            audited,
             out_dirs,
         )
         .context("Failed to add the files to the wheel")?;
@@ -554,10 +551,13 @@ impl<'a> BuildOrchestrator<'a> {
         let abi_tag = stable_abi_kind.wheel_tag();
         let tag = format!("cp{major}{min_minor}-{abi_tag}-{platform}");
 
+        let audited = [AuditedArtifact {
+            artifact,
+            external_libs,
+        }];
         let wheel_path = self.write_wheel(
             &tag,
-            &[&artifact],
-            &[external_libs],
+            &audited,
             |temp_dir| {
                 Ok(Box::new(
                     Pyo3BindingGenerator::new(Some(stable_abi_kind), python_interpreter, temp_dir)
@@ -583,9 +583,8 @@ impl<'a> BuildOrchestrator<'a> {
     fn write_pyo3_wheel(
         &self,
         python_interpreter: &PythonInterpreter,
-        artifact: BuildArtifact,
+        audited: &[AuditedArtifact],
         platform_tags: &[PlatformTag],
-        ext_libs: Vec<Library>,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<PathBuf> {
@@ -593,8 +592,7 @@ impl<'a> BuildOrchestrator<'a> {
 
         self.write_wheel(
             &tag,
-            &[&artifact],
-            &[ext_libs],
+            audited,
             |temp_dir| {
                 Ok(Box::new(
                     Pyo3BindingGenerator::new(None, Some(python_interpreter), temp_dir)
@@ -623,11 +621,14 @@ impl<'a> BuildOrchestrator<'a> {
             Some(python_interpreter),
         )?;
         let platform_tags = self.resolve_platform_tags(&policy);
+        let audited = [AuditedArtifact {
+            artifact,
+            external_libs,
+        }];
         let wheel_path = self.write_pyo3_wheel(
             python_interpreter,
-            artifact,
+            &audited,
             &platform_tags,
-            external_libs,
             sbom_data,
             &out_dirs,
         )?;
@@ -705,14 +706,11 @@ impl<'a> BuildOrchestrator<'a> {
                 .auditwheel(&artifact, &self.context.python.platform_tag, None)?;
         let platform_tags = self.resolve_platform_tags(&policy);
         let tag = self.get_universal_tag(&platform_tags)?;
-        let wheel_path = self.write_wheel(
-            &tag,
-            &[&artifact],
-            &[external_libs],
-            make_generator,
-            sbom_data,
-            &out_dirs,
-        )?;
+        let audited = [AuditedArtifact {
+            artifact,
+            external_libs,
+        }];
+        let wheel_path = self.write_wheel(&tag, &audited, make_generator, sbom_data, &out_dirs)?;
         Ok((wheel_path, out_dirs))
     }
 
@@ -766,9 +764,8 @@ impl<'a> BuildOrchestrator<'a> {
     fn write_bin_wheel(
         &self,
         python_interpreter: Option<&PythonInterpreter>,
-        artifacts: &[BuildArtifact],
+        audited: &[AuditedArtifact],
         platform_tags: &[PlatformTag],
-        ext_libs: &[Vec<Library>],
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<PathBuf> {
@@ -805,19 +802,11 @@ impl<'a> BuildOrchestrator<'a> {
         let writer = WheelWriter::new(&tag, &self.context.artifact.out, &metadata24, file_options)?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
 
-        let artifact_refs: Vec<&BuildArtifact> = artifacts.iter().collect();
-        self.context
-            .add_external_libs(&mut writer, &artifact_refs, ext_libs)?;
+        self.context.add_external_libs(&mut writer, audited)?;
 
         let mut generator = BinBindingGenerator::new(&mut metadata24);
-        generate_binding(
-            &mut writer,
-            &mut generator,
-            self.context,
-            artifacts,
-            out_dirs,
-        )
-        .context("Failed to add the files to the wheel")?;
+        generate_binding(&mut writer, &mut generator, self.context, audited, out_dirs)
+            .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
         add_data(
@@ -860,8 +849,7 @@ impl<'a> BuildOrchestrator<'a> {
         }
 
         let mut policies = Vec::with_capacity(result.artifacts.len());
-        let mut ext_libs = Vec::new();
-        let mut artifact_paths = Vec::with_capacity(result.artifacts.len());
+        let mut audited_artifacts = Vec::new();
         for artifact in result.artifacts {
             let mut artifact = artifact
                 .get(&CrateType::Bin)
@@ -872,19 +860,20 @@ impl<'a> BuildOrchestrator<'a> {
                 self.context
                     .auditwheel(&artifact, &self.context.python.platform_tag, None)?;
             policies.push(policy);
-            ext_libs.push(external_libs);
 
             self.context.stage_artifact(&mut artifact)?;
-            artifact_paths.push(artifact);
+            audited_artifacts.push(AuditedArtifact {
+                artifact,
+                external_libs,
+            });
         }
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();
         let platform_tags = self.resolve_platform_tags(policy);
 
         let wheel_path = self.write_bin_wheel(
             python_interpreter,
-            &artifact_paths,
+            &audited_artifacts,
             &platform_tags,
-            &ext_libs,
             sbom_data,
             &result.out_dirs,
         )?;

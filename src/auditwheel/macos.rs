@@ -4,15 +4,15 @@
 //! providing the Rust equivalent of [delocate](https://github.com/matthew-brett/delocate).
 //!
 //! Uses `arwen` for Mach-O install name / rpath manipulation and
-//! `arwen-codesign` for pure-Rust ad-hoc code signing (no macOS tools needed).
+//! pure-Rust signing helpers from `macos_sign` for both thin and fat binaries.
 
 use super::Policy;
 use super::audit::relpath;
+use super::macos_sign::ad_hoc_sign;
 use super::repair::{AuditedArtifact, GraftedLib, WheelRepairer, leaf_filename};
 use crate::compile::BuildArtifact;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use arwen::macho::MachoContainer;
-use arwen_codesign::{AdhocSignOptions, adhoc_sign_file};
 use lddtree::Library;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -120,10 +120,38 @@ fn is_system_library(path: &Path) -> bool {
     s.starts_with("/usr/lib/") || s.starts_with("/System/")
 }
 
-/// Check if a library name refers to libpython, which should never be bundled.
+/// Check if a library name refers to libpython or Python.framework, which should never be bundled.
+///
+/// This catches both:
+/// - Traditional libpython: `/usr/local/lib/libpython3.12.dylib`, `@rpath/libpython3.10.dylib`
+/// - Python framework: `/Library/Frameworks/Python.framework/Versions/3.14/Python`
 fn is_libpython(name: &str) -> bool {
+    // Check for Python.framework (macOS framework-style Python)
+    if name.contains("Python.framework") {
+        return true;
+    }
+    // Check for traditional libpython dylib
     let leaf = leaf_filename(name);
     leaf.starts_with("libpython3")
+}
+
+/// Decide whether a dependency should be bundled or ignored.
+///
+/// Unlike Linux, unresolved non-system Mach-O dependencies must fail the repair
+/// because the resulting wheel would still be broken on another machine.
+fn should_bundle_library(lib: &Library) -> Result<bool> {
+    if is_system_library(&lib.path) || is_libpython(&lib.name) {
+        return Ok(false);
+    }
+
+    if lib.realpath.is_none() {
+        bail!(
+            "Cannot repair wheel, because required library {} could not be located.",
+            lib.path.display()
+        );
+    }
+
+    Ok(true)
 }
 
 /// Find external shared library dependencies for a macOS artifact.
@@ -139,19 +167,9 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
 
     let mut ext_libs = Vec::new();
     for (_, lib) in deps.libraries {
-        // Skip libraries that couldn't be resolved
-        if lib.realpath.is_none() {
-            continue;
+        if should_bundle_library(&lib)? {
+            ext_libs.push(lib);
         }
-        // Skip system libraries
-        if is_system_library(&lib.path) {
-            continue;
-        }
-        // Skip libpython
-        if is_libpython(&lib.name) {
-            continue;
-        }
-        ext_libs.push(lib);
     }
     Ok(ext_libs)
 }
@@ -201,19 +219,19 @@ fn patch_macho(
     Ok(())
 }
 
-/// Ad-hoc codesign a Mach-O binary using pure-Rust arwen-codesign.
-fn ad_hoc_sign(file: &Path) -> Result<()> {
-    let identifier = file
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown");
-    adhoc_sign_file(file, &AdhocSignOptions::new(identifier))
-        .with_context(|| format!("Failed to ad-hoc codesign {}", file.display()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn library(name: &str, path: &str, realpath: Option<&str>) -> Library {
+        Library {
+            name: name.to_string(),
+            path: PathBuf::from(path),
+            realpath: realpath.map(PathBuf::from),
+            needed: Vec::new(),
+            rpath: Vec::new(),
+        }
+    }
 
     #[test]
     fn test_is_system_library() {
@@ -229,10 +247,43 @@ mod tests {
 
     #[test]
     fn test_is_libpython() {
+        // Traditional libpython dylibs
         assert!(is_libpython("libpython3.12.dylib"));
         assert!(is_libpython("/usr/local/lib/libpython3.11.dylib"));
         assert!(is_libpython("@rpath/libpython3.10.dylib"));
+        // Python.framework (macOS framework-style Python)
+        assert!(is_libpython(
+            "/Library/Frameworks/Python.framework/Versions/3.14/Python"
+        ));
+        assert!(is_libpython(
+            "/opt/homebrew/Frameworks/Python.framework/Versions/3.12/Python"
+        ));
+        // Non-Python libraries
         assert!(!is_libpython("libfoo.dylib"));
         assert!(!is_libpython("libpython2.7.dylib"));
+    }
+
+    #[test]
+    fn test_missing_non_system_dependency_errors() {
+        let err =
+            should_bundle_library(&library("@rpath/libfoo.dylib", "@rpath/libfoo.dylib", None))
+                .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "Cannot repair wheel, because required library @rpath/libfoo.dylib could not be located."
+        );
+    }
+
+    #[test]
+    fn test_missing_system_dependency_is_ignored() {
+        assert!(
+            !should_bundle_library(&library(
+                "/usr/lib/libSystem.B.dylib",
+                "/usr/lib/libSystem.B.dylib",
+                None,
+            ))
+            .unwrap()
+        );
     }
 }

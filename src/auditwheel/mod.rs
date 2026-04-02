@@ -2,6 +2,8 @@ mod audit;
 mod linux;
 #[cfg(feature = "auditwheel")]
 mod macos;
+#[cfg(feature = "auditwheel")]
+mod macos_sign;
 mod musllinux;
 pub mod patchelf;
 mod platform_tag;

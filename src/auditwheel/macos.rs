@@ -125,9 +125,11 @@ fn is_system_library(path: &Path) -> bool {
 /// This catches both:
 /// - Traditional libpython: `/usr/local/lib/libpython3.12.dylib`, `@rpath/libpython3.10.dylib`
 /// - Python framework: `/Library/Frameworks/Python.framework/Versions/3.14/Python`
+/// - Free-threaded Python framework: `/Library/Frameworks/PythonT.framework/Versions/3.14/PythonT`
 fn is_libpython(name: &str) -> bool {
-    // Check for Python.framework (macOS framework-style Python)
-    if name.contains("Python.framework") {
+    // Check for Python.framework or PythonT.framework (macOS framework-style Python)
+    // PythonT.framework is used by free-threaded Python builds (e.g., Python 3.13t, 3.14t)
+    if name.contains("Python.framework") || name.contains("PythonT.framework") {
         return true;
     }
     // Check for traditional libpython dylib
@@ -268,6 +270,13 @@ mod tests {
         ));
         assert!(is_libpython(
             "/opt/homebrew/Frameworks/Python.framework/Versions/3.12/Python"
+        ));
+        // PythonT.framework (free-threaded Python builds, e.g., 3.13t, 3.14t)
+        assert!(is_libpython(
+            "/Library/Frameworks/PythonT.framework/Versions/3.14/PythonT"
+        ));
+        assert!(is_libpython(
+            "/opt/homebrew/Frameworks/PythonT.framework/Versions/3.13/PythonT"
         ));
         // Non-Python libraries
         assert!(!is_libpython("libfoo.dylib"));

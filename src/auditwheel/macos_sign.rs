@@ -93,15 +93,16 @@ pub(crate) fn ad_hoc_sign(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "macos")]
     use std::process::Command;
-
-    /// Minimal C source that compiles to a tiny Mach-O executable.
-    const MINIMAL_C_SOURCE: &str = "int main(){return 0;}";
 
     /// Compile a minimal Mach-O binary for the given architecture.
     /// Returns the path to the compiled binary.
     #[cfg(target_os = "macos")]
     fn compile_thin_macho(dir: &Path, arch: &str) -> std::path::PathBuf {
+        /// Minimal C source that compiles to a tiny Mach-O executable.
+        const MINIMAL_C_SOURCE: &str = "int main(){return 0;}";
+
         let src = dir.join("main.c");
         let out = dir.join(format!("main_{arch}"));
         fs_err::write(&src, MINIMAL_C_SOURCE).unwrap();

@@ -174,31 +174,37 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
     Ok(ext_libs)
 }
 
-/// Batch Mach-O patching: parse once, apply all changes, write once.
+/// Batch Mach-O patching: apply changes, re-parsing between operations to handle
+/// offset shifts from install name changes.
 fn patch_macho(
     file: &Path,
     install_name_changes: &[(&str, String)],
     new_install_id: Option<&str>,
     rpaths_to_remove: &[&str],
 ) -> Result<()> {
-    let data = fs_err::read(file)?;
-    let mut container =
-        MachoContainer::parse(&data).context("Failed to parse Mach-O for patching")?;
-
+    // Change install ID first (this can shift load command offsets)
     if let Some(id) = new_install_id {
-        // Ignore DylibIdMissing — the file may not be a dylib (e.g., a .so extension module).
+        let data = fs_err::read(file)?;
+        let mut container =
+            MachoContainer::parse(&data).context("Failed to parse Mach-O for install_id change")?;
         match container.change_install_id(id) {
-            Ok(()) => {}
+            Ok(()) => {
+                fs_err::write(file, &container.data)?;
+            }
             Err(arwen::macho::MachoError::DylibIdMissing) => {}
             Err(e) => return Err(e).context("Failed to change install id"),
         }
     }
 
+    // Change install names (each can shift offsets, so re-parse between each)
     for (old, new) in install_name_changes {
-        // Ignore DylibNameMissing — the binary may not reference this name
-        // (e.g., an alias that only appears in a different binary).
+        let data = fs_err::read(file)?;
+        let mut container = MachoContainer::parse(&data)
+            .context("Failed to parse Mach-O for install_name change")?;
         match container.change_install_name(old, new) {
-            Ok(()) => {}
+            Ok(()) => {
+                fs_err::write(file, &container.data)?;
+            }
             Err(arwen::macho::MachoError::DylibNameMissing(_)) => {}
             Err(e) => {
                 return Err(e)
@@ -207,15 +213,20 @@ fn patch_macho(
         }
     }
 
+    // Remove rpaths
     for rpath in rpaths_to_remove {
+        let data = fs_err::read(file)?;
+        let mut container =
+            MachoContainer::parse(&data).context("Failed to parse Mach-O for rpath removal")?;
         match container.remove_rpath(rpath) {
-            Ok(()) => {}
+            Ok(()) => {
+                fs_err::write(file, &container.data)?;
+            }
             Err(arwen::macho::MachoError::RpathMissing(_)) => {}
             Err(e) => return Err(e).with_context(|| format!("Failed to remove rpath {rpath}")),
         }
     }
 
-    fs_err::write(file, &container.data)?;
     Ok(())
 }
 

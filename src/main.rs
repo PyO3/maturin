@@ -14,7 +14,7 @@ use clap::Parser;
 use maturin::GenerateJsonSchemaOptions;
 #[cfg(feature = "upload")]
 use maturin::PublishOpt;
-use maturin::{BuildOptions, DevelopOptions, TargetTriple};
+use maturin::{BuildOptions, CargoOptions, DevelopOptions, PythonOptions, TargetTriple};
 #[cfg(feature = "scaffolding")]
 use maturin::{GenerateProjectOptions, ci::GenerateCI};
 use std::env;
@@ -163,6 +163,19 @@ enum Command {
         #[arg(value_name = "FILE")]
         files: Vec<PathBuf>,
     },
+    /// Autogenerate type stubs
+    #[command(name = "generate-stubs")]
+    GenerateStub {
+        /// The directory to store the type stubs in
+        #[arg(short, long)]
+        out: PathBuf,
+        /// Python and bindings options
+        #[command(flatten)]
+        python: PythonOptions,
+        /// Cargo build options
+        #[command(flatten)]
+        cargo: CargoOptions,
+    },
     /// Backend for the PEP 517 integration. Not for human consumption
     ///
     /// The commands are meant to be called from the python PEP 517
@@ -254,6 +267,9 @@ fn run() -> Result<()> {
         Command::GenerateCI(generate_ci) => commands::generate_ci(generate_ci)?,
         #[cfg(feature = "upload")]
         Command::Upload { publish, files } => commands::upload(publish, files)?,
+        Command::GenerateStub { out, python, cargo } => {
+            commands::generate_stubs::generate_stubs(out, python, cargo)?
+        }
         #[cfg(feature = "cli-completion")]
         Command::Completions { shell } => {
             commands::completions(shell, &mut Opt::command());

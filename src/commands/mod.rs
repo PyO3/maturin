@@ -14,6 +14,7 @@ use tracing::instrument;
 
 pub(crate) mod build;
 pub(crate) mod develop;
+pub(crate) mod generate_stubs;
 pub(crate) mod pep517;
 #[cfg(feature = "upload")]
 pub(crate) mod publish;

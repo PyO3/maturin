@@ -157,6 +157,12 @@ fn should_bundle_library(lib: &Library) -> Result<bool> {
 }
 
 /// Find external shared library dependencies for a macOS artifact.
+///
+/// Uses a reachability analysis to avoid bundling libraries that are only
+/// transitive dependencies of skipped libraries (e.g., `libintl` is a
+/// dependency of `Python.framework` which we skip — so `libintl` should
+/// not be bundled either unless something else we *are* bundling also
+/// needs it).
 fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Result<Vec<Library>> {
     let analyzer = if ld_paths.is_empty() {
         lddtree::DependencyAnalyzer::default()
@@ -167,10 +173,41 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
         .analyze(artifact.as_ref())
         .context("Failed to analyze Mach-O dependencies")?;
 
+    // First pass: determine which libraries should be skipped.
+    let skipped: std::collections::HashSet<&str> = deps
+        .libraries
+        .iter()
+        .filter(|(_, lib)| is_system_library(&lib.path) || is_libpython(&lib.name))
+        .map(|(name, _)| name.as_str())
+        .collect();
+
+    // Reachability: walk from the artifact's direct deps, only following
+    // non-skipped libraries. A library is reachable if there's a path to it
+    // from the artifact that doesn't go through a skipped library.
+    let mut reachable = std::collections::HashSet::new();
+    let mut queue: std::collections::VecDeque<&str> = deps
+        .needed
+        .iter()
+        .filter(|n| !skipped.contains(n.as_str()))
+        .map(String::as_str)
+        .collect();
+    while let Some(name) = queue.pop_front() {
+        if !reachable.insert(name) {
+            continue;
+        }
+        if let Some(lib) = deps.libraries.get(name) {
+            for needed in &lib.needed {
+                if !skipped.contains(needed.as_str()) && !reachable.contains(needed.as_str()) {
+                    queue.push_back(needed);
+                }
+            }
+        }
+    }
+
     let mut ext_libs = Vec::new();
-    for (_, lib) in deps.libraries {
-        if should_bundle_library(&lib)? {
-            ext_libs.push(lib);
+    for (name, lib) in &deps.libraries {
+        if reachable.contains(name.as_str()) && should_bundle_library(lib)? {
+            ext_libs.push(lib.clone());
         }
     }
     Ok(ext_libs)

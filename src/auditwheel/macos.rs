@@ -53,6 +53,13 @@ impl WheelRepairer for MacOSRepairer {
         // 1. Patch each grafted library: set install id, rewrite cross-references,
         //    remove absolute rpaths, then ad-hoc codesign.
         for lib in grafted {
+            // Use a synthetic `/DLC/` (DeLoCated) install ID. This is a
+            // non-existent absolute path used intentionally — matching the
+            // convention from Python's `delocate` tool — so that any
+            // un-patched reference will fail loudly at load time rather than
+            // silently loading a different version of the library from the
+            // system. All actual consumers are rewritten to use
+            // `@loader_path`-relative references.
             let new_install_id = format!("/DLC/{}/{}", libs_dir.display(), lib.new_name);
 
             // Collect rpaths to remove (all non-relative rpaths).
@@ -173,7 +180,7 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
         .analyze(artifact.as_ref())
         .context("Failed to analyze Mach-O dependencies")?;
 
-    // First pass: determine which libraries should be skipped.
+    // Determine which libraries should be skipped.
     let skipped: std::collections::HashSet<&str> = deps
         .libraries
         .iter()
@@ -181,28 +188,7 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
         .map(|(name, _)| name.as_str())
         .collect();
 
-    // Reachability: walk from the artifact's direct deps, only following
-    // non-skipped libraries. A library is reachable if there's a path to it
-    // from the artifact that doesn't go through a skipped library.
-    let mut reachable = std::collections::HashSet::new();
-    let mut queue: std::collections::VecDeque<&str> = deps
-        .needed
-        .iter()
-        .filter(|n| !skipped.contains(n.as_str()))
-        .map(String::as_str)
-        .collect();
-    while let Some(name) = queue.pop_front() {
-        if !reachable.insert(name) {
-            continue;
-        }
-        if let Some(lib) = deps.libraries.get(name) {
-            for needed in &lib.needed {
-                if !skipped.contains(needed.as_str()) && !reachable.contains(needed.as_str()) {
-                    queue.push_back(needed);
-                }
-            }
-        }
-    }
+    let reachable = reachable_libs(&deps.needed, &deps.libraries, &skipped);
 
     let mut ext_libs = Vec::new();
     for (name, lib) in &deps.libraries {
@@ -211,6 +197,34 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
         }
     }
     Ok(ext_libs)
+}
+
+/// BFS walk from `roots`, following `needed` edges in `libraries`, skipping
+/// any node in `skipped`. Returns the set of reachable library names.
+fn reachable_libs<'a>(
+    roots: &'a [String],
+    libraries: &'a std::collections::HashMap<String, Library>,
+    skipped: &std::collections::HashSet<&str>,
+) -> std::collections::HashSet<&'a str> {
+    let mut reachable = std::collections::HashSet::new();
+    let mut queue: std::collections::VecDeque<&str> = roots
+        .iter()
+        .filter(|n| !skipped.contains(n.as_str()))
+        .map(String::as_str)
+        .collect();
+    while let Some(name) = queue.pop_front() {
+        if !reachable.insert(name) {
+            continue;
+        }
+        if let Some(lib) = libraries.get(name) {
+            for needed in &lib.needed {
+                if !skipped.contains(needed.as_str()) && !reachable.contains(needed.as_str()) {
+                    queue.push_back(needed);
+                }
+            }
+        }
+    }
+    reachable
 }
 
 /// Batch Mach-O patching: apply changes, re-parsing between operations to handle
@@ -342,5 +356,125 @@ mod tests {
             ))
             .unwrap()
         );
+    }
+
+    fn lib_with_needed(name: &str, path: &str, needed: &[&str]) -> Library {
+        Library {
+            name: name.to_string(),
+            path: PathBuf::from(path),
+            realpath: Some(PathBuf::from(path)),
+            needed: needed.iter().map(|s| s.to_string()).collect(),
+            rpath: Vec::new(),
+        }
+    }
+
+    fn make_graph(libs: Vec<Library>) -> std::collections::HashMap<String, Library> {
+        libs.into_iter().map(|l| (l.name.clone(), l)).collect()
+    }
+
+    #[test]
+    fn skips_transitive_deps_of_skipped_libs() {
+        // Graph: binary -> [libfoo, Python.framework]
+        //        Python.framework -> [libintl]
+        // libintl should NOT be reachable because it's only via a skipped lib.
+        let libraries = make_graph(vec![
+            lib_with_needed("libfoo.dylib", "/usr/local/lib/libfoo.dylib", &[]),
+            lib_with_needed(
+                "/Library/Frameworks/Python.framework/Versions/3.14/Python",
+                "/Library/Frameworks/Python.framework/Versions/3.14/Python",
+                &["libintl.8.dylib"],
+            ),
+            lib_with_needed("libintl.8.dylib", "/usr/local/lib/libintl.8.dylib", &[]),
+        ]);
+        let roots = vec![
+            "libfoo.dylib".to_string(),
+            "/Library/Frameworks/Python.framework/Versions/3.14/Python".to_string(),
+        ];
+        let skipped: std::collections::HashSet<&str> =
+            ["/Library/Frameworks/Python.framework/Versions/3.14/Python"].into();
+
+        let reachable = reachable_libs(&roots, &libraries, &skipped);
+        assert!(reachable.contains("libfoo.dylib"));
+        assert!(!reachable.contains("libintl.8.dylib"));
+        assert!(!reachable.contains("/Library/Frameworks/Python.framework/Versions/3.14/Python"));
+    }
+
+    #[test]
+    fn keeps_shared_dep_via_non_skipped_path() {
+        // Graph: binary -> [libfoo, Python.framework]
+        //        Python.framework -> [libintl]
+        //        libfoo -> [libintl]
+        // libintl IS reachable because libfoo (non-skipped) also needs it.
+        let libraries = make_graph(vec![
+            lib_with_needed(
+                "libfoo.dylib",
+                "/usr/local/lib/libfoo.dylib",
+                &["libintl.8.dylib"],
+            ),
+            lib_with_needed(
+                "/Library/Frameworks/Python.framework/Versions/3.14/Python",
+                "/Library/Frameworks/Python.framework/Versions/3.14/Python",
+                &["libintl.8.dylib"],
+            ),
+            lib_with_needed("libintl.8.dylib", "/usr/local/lib/libintl.8.dylib", &[]),
+        ]);
+        let roots = vec![
+            "libfoo.dylib".to_string(),
+            "/Library/Frameworks/Python.framework/Versions/3.14/Python".to_string(),
+        ];
+        let skipped: std::collections::HashSet<&str> =
+            ["/Library/Frameworks/Python.framework/Versions/3.14/Python"].into();
+
+        let reachable = reachable_libs(&roots, &libraries, &skipped);
+        assert!(reachable.contains("libfoo.dylib"));
+        assert!(reachable.contains("libintl.8.dylib"));
+    }
+
+    #[test]
+    fn follows_transitive_chain() {
+        // Graph: binary -> [libA]
+        //        libA -> [libB]
+        //        libB -> [libC]
+        // All should be reachable.
+        let libraries = make_graph(vec![
+            lib_with_needed("libA.dylib", "/usr/local/lib/libA.dylib", &["libB.dylib"]),
+            lib_with_needed("libB.dylib", "/usr/local/lib/libB.dylib", &["libC.dylib"]),
+            lib_with_needed("libC.dylib", "/usr/local/lib/libC.dylib", &[]),
+        ]);
+        let roots = vec!["libA.dylib".to_string()];
+        let skipped = std::collections::HashSet::new();
+
+        let reachable = reachable_libs(&roots, &libraries, &skipped);
+        assert!(reachable.contains("libA.dylib"));
+        assert!(reachable.contains("libB.dylib"));
+        assert!(reachable.contains("libC.dylib"));
+    }
+
+    #[test]
+    fn skipped_mid_chain_blocks_descendants() {
+        // Graph: binary -> [libA]
+        //        libA -> [libSkip]
+        //        libSkip -> [libC]
+        // libC should NOT be reachable because libSkip blocks the path.
+        let libraries = make_graph(vec![
+            lib_with_needed(
+                "libA.dylib",
+                "/usr/local/lib/libA.dylib",
+                &["/usr/lib/libSkip.dylib"],
+            ),
+            lib_with_needed(
+                "/usr/lib/libSkip.dylib",
+                "/usr/lib/libSkip.dylib",
+                &["libC.dylib"],
+            ),
+            lib_with_needed("libC.dylib", "/usr/local/lib/libC.dylib", &[]),
+        ]);
+        let roots = vec!["libA.dylib".to_string()];
+        let skipped: std::collections::HashSet<&str> = ["/usr/lib/libSkip.dylib"].into();
+
+        let reachable = reachable_libs(&roots, &libraries, &skipped);
+        assert!(reachable.contains("libA.dylib"));
+        assert!(!reachable.contains("/usr/lib/libSkip.dylib"));
+        assert!(!reachable.contains("libC.dylib"));
     }
 }

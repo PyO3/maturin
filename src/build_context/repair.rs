@@ -1,7 +1,9 @@
+#[cfg(feature = "auditwheel")]
+use crate::auditwheel::MacOSRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
-    AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
+    AuditResult, AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
     log_grafted_libs, prepare_grafted_libs,
 };
 #[cfg(feature = "sbom")]
@@ -10,8 +12,8 @@ use crate::module_writer::WheelWriter;
 use crate::{BridgeModel, BuildArtifact, PythonInterpreter, VirtualWriter};
 use anyhow::{Context, Result, bail};
 use fs_err as fs;
-use lddtree::Library;
 use normpath::PathExt;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use super::BuildContext;
@@ -48,8 +50,16 @@ impl BuildContext {
                 allow_linking_libpython,
             }))
         } else if self.project.target.is_macos() {
-            // TODO: MacOSRepairer (Phase 2)
-            None
+            #[cfg(feature = "auditwheel")]
+            {
+                Some(Box::new(MacOSRepairer {
+                    target: self.project.target.clone(),
+                }))
+            }
+            #[cfg(not(feature = "auditwheel"))]
+            {
+                None
+            }
         } else {
             None
         }
@@ -60,9 +70,9 @@ impl BuildContext {
         artifact: &BuildArtifact,
         platform_tag: &[PlatformTag],
         python_interpreter: Option<&PythonInterpreter>,
-    ) -> Result<(Policy, Vec<Library>)> {
+    ) -> Result<AuditResult> {
         if matches!(self.python.auditwheel, AuditWheelMode::Skip) {
-            return Ok((Policy::default(), Vec::new()));
+            return Ok(AuditResult::new(Policy::default(), Vec::new()));
         }
 
         if let Some(python_interpreter) = python_interpreter
@@ -73,12 +83,12 @@ impl BuildContext {
             eprintln!(
                 "🐍 Skipping auditwheel because {python_interpreter} does not support manylinux/musllinux wheels"
             );
-            return Ok((Policy::default(), Vec::new()));
+            return Ok(AuditResult::new(Policy::default(), Vec::new()));
         }
 
         let repairer = match self.make_repairer(platform_tag) {
             Some(r) => r,
-            None => return Ok((Policy::default(), Vec::new())),
+            None => return Ok(AuditResult::new(Policy::default(), Vec::new())),
         };
 
         let ld_paths: Vec<PathBuf> = artifact.linked_paths.iter().map(PathBuf::from).collect();
@@ -153,8 +163,29 @@ impl BuildContext {
         let dist_name = self.project.metadata24.get_distribution_escaped();
         let libs_dir = repairer.libs_dir(&dist_name);
 
+        // Merge arch_requirements from all audited artifacts (universal2 only).
+        // Each artifact may have analyzed different architecture slices.
+        let merged_arch_requirements: HashMap<PathBuf, HashSet<String>> = {
+            let mut merged: HashMap<PathBuf, HashSet<String>> = HashMap::new();
+            for aa in audited {
+                for (realpath, archs) in &aa.arch_requirements {
+                    merged
+                        .entry(realpath.clone())
+                        .or_default()
+                        .extend(archs.iter().cloned());
+                }
+            }
+            merged
+        };
+        let arch_requirements = if merged_arch_requirements.is_empty() {
+            None
+        } else {
+            Some(&merged_arch_requirements)
+        };
+
         let temp_dir = writer.temp_dir()?;
-        let (grafted, libs_copied) = prepare_grafted_libs(audited, temp_dir.path())?;
+        let (grafted, libs_copied) =
+            prepare_grafted_libs(audited, temp_dir.path(), arch_requirements)?;
 
         let artifact_dir = self.get_artifact_dir();
         repairer.patch(audited, &grafted, &libs_dir, &artifact_dir)?;

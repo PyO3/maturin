@@ -10,7 +10,7 @@
 use super::audit::{get_sysroot_path, relpath};
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{MANYLINUX_POLICIES, MUSLLINUX_POLICIES, Policy};
-use super::repair::{AuditedArtifact, GraftedLib, WheelRepairer};
+use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer};
 use super::{PlatformTag, patchelf};
 use crate::compile::BuildArtifact;
 use crate::target::{Arch, Target};
@@ -454,24 +454,21 @@ pub struct ElfRepairer {
 }
 
 impl WheelRepairer for ElfRepairer {
-    fn audit(
-        &self,
-        artifact: &BuildArtifact,
-        mut ld_paths: Vec<PathBuf>,
-    ) -> Result<(Policy, Vec<Library>)> {
+    fn audit(&self, artifact: &BuildArtifact, mut ld_paths: Vec<PathBuf>) -> Result<AuditResult> {
         // Extend caller-provided paths with RUSTFLAGS library search paths
         if let Some(rustflags_paths) =
             extract_rustflags_library_paths(&self.manifest_path, &self.target)
         {
             ld_paths.extend(rustflags_paths);
         }
-        get_policy_and_libs(
+        let (policy, external_libs) = get_policy_and_libs(
             artifact,
             self.platform_tag,
             &self.target,
             ld_paths,
             self.allow_linking_libpython,
-        )
+        )?;
+        Ok(AuditResult::new(policy, external_libs))
     }
 
     fn patch(

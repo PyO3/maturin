@@ -11,7 +11,7 @@ use crate::compile::BuildArtifact;
 use crate::util::hash_file;
 use anyhow::{Context, Result};
 use std::borrow::Borrow;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
@@ -27,6 +27,16 @@ pub struct AuditedArtifact {
     /// External shared libraries this artifact depends on that must be
     /// bundled into the wheel.
     pub external_libs: Vec<lddtree::Library>,
+    /// **Universal2 only**: CPU architectures that require each library.
+    ///
+    /// Maps library realpath to the set of architectures (e.g., "arm64", "x86_64")
+    /// that depend on it. Used during wheel repair to verify grafted dylibs
+    /// contain all necessary architecture slices.
+    ///
+    /// Empty for single-arch builds and Linux builds.
+    ///
+    /// Note: Universal2 support may be removed when Apple drops x86_64 support
+    pub arch_requirements: HashMap<PathBuf, HashSet<String>>,
 }
 
 impl Borrow<BuildArtifact> for AuditedArtifact {
@@ -56,6 +66,47 @@ pub struct GraftedLib {
     pub needed: Vec<String>,
     /// Runtime library search paths from the original library.
     pub rpath: Vec<String>,
+    /// **Universal2 only**: CPU architectures that require this library.
+    ///
+    /// For universal2 macOS wheels, each architecture (arm64, x86_64) may have
+    /// different dependencies. This field tracks which architectures actually
+    /// need this library, so we can verify the grafted dylib contains (at least)
+    /// those architectures.
+    ///
+    /// Empty for single-arch builds and Linux builds.
+    ///
+    /// Note: Universal2 support may be removed when Apple drops x86_64 support
+    /// (expected ~2025-2026).
+    pub required_archs: HashSet<String>,
+}
+
+/// Result of auditing a build artifact for external dependencies.
+///
+/// Contains the platform policy, discovered external libraries, and
+/// (for universal2 macOS builds) architecture requirements.
+pub struct AuditResult {
+    /// The determined platform policy (e.g., manylinux tag).
+    pub policy: super::Policy,
+    /// External shared libraries that need to be bundled.
+    pub external_libs: Vec<lddtree::Library>,
+    /// **Universal2 only**: CPU architectures that require each library.
+    ///
+    /// Maps library realpath to the set of architectures (e.g., "arm64", "x86_64")
+    /// that depend on it. Empty for single-arch builds and Linux builds.
+    ///
+    /// Note: Universal2 support may be removed when Apple drops x86_64 support
+    pub arch_requirements: HashMap<PathBuf, HashSet<String>>,
+}
+
+impl AuditResult {
+    /// Create a new AuditResult with no arch requirements (for single-arch/Linux).
+    pub fn new(policy: super::Policy, external_libs: Vec<lddtree::Library>) -> Self {
+        Self {
+            policy,
+            external_libs,
+            arch_requirements: HashMap::new(),
+        }
+    }
 }
 
 /// Platform-specific wheel repair operations.
@@ -66,13 +117,9 @@ pub trait WheelRepairer {
     /// Audit an artifact for platform compliance and find external libraries
     /// that need to be bundled.
     ///
-    /// Returns the determined platform policy and the list of external shared
-    /// library dependencies.
-    fn audit(
-        &self,
-        artifact: &BuildArtifact,
-        ld_paths: Vec<PathBuf>,
-    ) -> Result<(super::Policy, Vec<lddtree::Library>)>;
+    /// Returns an [`AuditResult`] containing the platform policy, external
+    /// library dependencies, and (for universal2) architecture requirements.
+    fn audit(&self, artifact: &BuildArtifact, ld_paths: Vec<PathBuf>) -> Result<AuditResult>;
 
     /// Patch binary references after libraries have been grafted.
     ///
@@ -120,14 +167,19 @@ pub trait WheelRepairer {
 /// Deduplication is by `realpath` (the actual file on disk). When the same
 /// file is referenced via multiple install names (common on macOS), only one
 /// copy is made, but all original names are recorded as aliases.
+///
+/// The optional `arch_requirements` parameter is used for universal2 macOS builds
+/// to track which CPU architectures require each library (by realpath). This
+/// enables verification that grafted dylibs contain all necessary architecture
+/// slices. For single-arch builds or Linux, pass `None`.
 pub fn prepare_grafted_libs(
     audited: &[AuditedArtifact],
     temp_dir: &Path,
+    arch_requirements: Option<&HashMap<PathBuf, HashSet<String>>>,
 ) -> Result<(Vec<GraftedLib>, HashSet<PathBuf>)> {
     let mut grafted = Vec::new();
     let mut libs_copied = HashSet::new();
-    let mut realpath_to_idx: std::collections::HashMap<PathBuf, usize> =
-        std::collections::HashMap::new();
+    let mut realpath_to_idx: HashMap<PathBuf, usize> = HashMap::new();
 
     for lib in audited.iter().flat_map(|a| &a.external_libs) {
         let source_path = lib.realpath.clone().with_context(|| {
@@ -158,7 +210,13 @@ pub fn prepare_grafted_libs(
 
         let idx = grafted.len();
         realpath_to_idx.insert(source_path.clone(), idx);
-        libs_copied.insert(source_path);
+        libs_copied.insert(source_path.clone());
+
+        // Get required architectures for this library (universal2 only).
+        let required_archs = arch_requirements
+            .and_then(|reqs| reqs.get(&source_path))
+            .cloned()
+            .unwrap_or_default();
 
         grafted.push(GraftedLib {
             original_name: lib.name.clone(),
@@ -167,6 +225,7 @@ pub fn prepare_grafted_libs(
             dest_path,
             needed: lib.needed.clone(),
             rpath: lib.rpath.clone(),
+            required_archs,
         });
     }
 

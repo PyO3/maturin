@@ -540,12 +540,12 @@ impl<'a> BuildOrchestrator<'a> {
             python_interpreter,
             Some(&self.context.project.project_layout.extension_name),
         )?;
-        let (policy, external_libs) = self.context.auditwheel(
+        let audit_result = self.context.auditwheel(
             &artifact,
             &self.context.python.platform_tag,
             python_interpreter,
         )?;
-        let platform_tags = self.resolve_platform_tags(&policy);
+        let platform_tags = self.resolve_platform_tags(&audit_result.policy);
 
         let platform = self.context.project.get_platform_tag(&platform_tags)?;
         let abi_tag = stable_abi_kind.wheel_tag();
@@ -553,7 +553,8 @@ impl<'a> BuildOrchestrator<'a> {
 
         let audited = [AuditedArtifact {
             artifact,
-            external_libs,
+            external_libs: audit_result.external_libs,
+            arch_requirements: audit_result.arch_requirements,
         }];
         let wheel_path = self.write_wheel(
             &tag,
@@ -615,15 +616,16 @@ impl<'a> BuildOrchestrator<'a> {
             Some(python_interpreter),
             Some(&self.context.project.project_layout.extension_name),
         )?;
-        let (policy, external_libs) = self.context.auditwheel(
+        let audit_result = self.context.auditwheel(
             &artifact,
             &self.context.python.platform_tag,
             Some(python_interpreter),
         )?;
-        let platform_tags = self.resolve_platform_tags(&policy);
+        let platform_tags = self.resolve_platform_tags(&audit_result.policy);
         let audited = [AuditedArtifact {
             artifact,
-            external_libs,
+            external_libs: audit_result.external_libs,
+            arch_requirements: audit_result.arch_requirements,
         }];
         let wheel_path = self.write_pyo3_wheel(
             python_interpreter,
@@ -701,14 +703,15 @@ impl<'a> BuildOrchestrator<'a> {
         F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'b>>,
     {
         let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
-        let (policy, external_libs) =
+        let audit_result =
             self.context
                 .auditwheel(&artifact, &self.context.python.platform_tag, None)?;
-        let platform_tags = self.resolve_platform_tags(&policy);
+        let platform_tags = self.resolve_platform_tags(&audit_result.policy);
         let tag = self.get_universal_tag(&platform_tags)?;
         let audited = [AuditedArtifact {
             artifact,
-            external_libs,
+            external_libs: audit_result.external_libs,
+            arch_requirements: audit_result.arch_requirements,
         }];
         let wheel_path = self.write_wheel(&tag, &audited, make_generator, sbom_data, &out_dirs)?;
         Ok((wheel_path, out_dirs))
@@ -856,15 +859,16 @@ impl<'a> BuildOrchestrator<'a> {
                 .cloned()
                 .ok_or_else(|| anyhow!("Cargo didn't build a binary"))?;
 
-            let (policy, external_libs) =
+            let audit_result =
                 self.context
                     .auditwheel(&artifact, &self.context.python.platform_tag, None)?;
-            policies.push(policy);
+            policies.push(audit_result.policy);
 
             self.context.stage_artifact(&mut artifact)?;
             audited_artifacts.push(AuditedArtifact {
                 artifact,
-                external_libs,
+                external_libs: audit_result.external_libs,
+                arch_requirements: audit_result.arch_requirements,
             });
         }
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();

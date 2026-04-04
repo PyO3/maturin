@@ -136,7 +136,14 @@ fn is_system_library(path: &Path) -> bool {
 fn is_libpython(name: &str) -> bool {
     // Check for Python.framework or PythonT.framework (macOS framework-style Python)
     // PythonT.framework is used by free-threaded Python builds (e.g., Python 3.13t, 3.14t)
-    if name.contains("Python.framework") || name.contains("PythonT.framework") {
+    // Use path-component matching to avoid false positives on paths that merely
+    // contain the substring (e.g., `/tmp/not-Python.framework-related/libfoo.dylib`).
+    if Path::new(name).components().any(|c| {
+        matches!(
+            c.as_os_str().to_str(),
+            Some("Python.framework" | "PythonT.framework")
+        )
+    }) {
         return true;
     }
     // Check for traditional libpython dylib
@@ -332,6 +339,10 @@ mod tests {
         // Non-Python libraries
         assert!(!is_libpython("libfoo.dylib"));
         assert!(!is_libpython("libpython2.7.dylib"));
+        // Paths that contain the substring but are not actual framework paths
+        assert!(!is_libpython(
+            "/tmp/not-Python.framework-related/libfoo.dylib"
+        ));
     }
 
     #[test]

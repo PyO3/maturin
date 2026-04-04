@@ -150,7 +150,6 @@ reflink-copy = "0.1.29"
 
 # auditwheel repair (macOS delocate)
 arwen = { version = "0.0.5", optional = true }
-arwen-codesign = { version = "0.0.1-alpha.1", optional = true }
 
 [dev-dependencies]
 expect-test = "1.4.1"
@@ -221,6 +220,10 @@ faster-tests = []
 # Deprecated features, keep them now for compatibility
 human-panic = []
 log = []
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+# Pure-Rust ad-hoc codesigning, only needed for cross-compilation from non-macOS
+arwen-codesign = { version = "0.0.1-alpha.1", optional = true }
 
 [profile.profiling]
 inherits = "release"

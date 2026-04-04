@@ -7,10 +7,11 @@
 //! pure-Rust signing helpers from `macos_sign` for both thin and fat binaries.
 
 use super::Policy;
-use super::audit::relpath;
+use super::audit::{get_sysroot_path, relpath};
 use super::macos_sign::ad_hoc_sign;
 use super::repair::{AuditedArtifact, GraftedLib, WheelRepairer, leaf_filename};
 use crate::compile::BuildArtifact;
+use crate::target::Target;
 use anyhow::{Context, Result, bail};
 use arwen::macho::MachoContainer;
 use lddtree::Library;
@@ -22,7 +23,10 @@ use std::path::{Path, PathBuf};
 /// Bundles external `.dylib` files and rewrites Mach-O install names
 /// and rpaths so that `@loader_path`-relative references resolve to
 /// the bundled copies in the `.dylibs/` directory.
-pub struct MacOSRepairer;
+pub struct MacOSRepairer {
+    /// The build target, used to determine the sysroot for cross-compilation.
+    pub target: Target,
+}
 
 impl WheelRepairer for MacOSRepairer {
     fn audit(
@@ -30,7 +34,8 @@ impl WheelRepairer for MacOSRepairer {
         artifact: &BuildArtifact,
         ld_paths: Vec<PathBuf>,
     ) -> Result<(Policy, Vec<Library>)> {
-        let ext_libs = find_external_libs(&artifact.path, ld_paths)?;
+        let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
+        let ext_libs = find_external_libs(&artifact.path, ld_paths, &sysroot)?;
         Ok((Policy::default(), ext_libs))
     }
 
@@ -122,8 +127,16 @@ impl WheelRepairer for MacOSRepairer {
 /// System libraries live under `/usr/lib/` and `/System/`. Notably,
 /// `/usr/local/lib/` (Homebrew) is NOT considered system — those libs
 /// get bundled, matching Python delocate behaviour.
-fn is_system_library(path: &Path) -> bool {
-    let s = path.to_string_lossy();
+///
+/// When cross-compiling, resolved library paths may be prefixed with the SDK
+/// sysroot (e.g., `/opt/osxcross/SDK/MacOSX.sdk/usr/lib/…`). The `sysroot`
+/// parameter is stripped before checking.
+fn is_system_library(path: &Path, sysroot: &Path) -> bool {
+    let effective = path
+        .strip_prefix(sysroot)
+        .map(|p| Path::new("/").join(p))
+        .unwrap_or_else(|_| path.to_path_buf());
+    let s = effective.to_string_lossy();
     s.starts_with("/usr/lib/") || s.starts_with("/System/")
 }
 
@@ -155,8 +168,8 @@ fn is_libpython(name: &str) -> bool {
 ///
 /// Unlike Linux, unresolved non-system Mach-O dependencies must fail the repair
 /// because the resulting wheel would still be broken on another machine.
-fn should_bundle_library(lib: &Library) -> Result<bool> {
-    if is_system_library(&lib.path) || is_libpython(&lib.name) {
+fn should_bundle_library(lib: &Library, sysroot: &Path) -> Result<bool> {
+    if is_system_library(&lib.path, sysroot) || is_libpython(&lib.name) {
         return Ok(false);
     }
 
@@ -177,7 +190,11 @@ fn should_bundle_library(lib: &Library) -> Result<bool> {
 /// dependency of `Python.framework` which we skip — so `libintl` should
 /// not be bundled either unless something else we *are* bundling also
 /// needs it).
-fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Result<Vec<Library>> {
+fn find_external_libs(
+    artifact: impl AsRef<Path>,
+    ld_paths: Vec<PathBuf>,
+    sysroot: &Path,
+) -> Result<Vec<Library>> {
     let analyzer = if ld_paths.is_empty() {
         lddtree::DependencyAnalyzer::default()
     } else {
@@ -191,7 +208,7 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
     let skipped: std::collections::HashSet<&str> = deps
         .libraries
         .iter()
-        .filter(|(_, lib)| is_system_library(&lib.path) || is_libpython(&lib.name))
+        .filter(|(_, lib)| is_system_library(&lib.path, sysroot) || is_libpython(&lib.name))
         .map(|(name, _)| name.as_str())
         .collect();
 
@@ -199,7 +216,7 @@ fn find_external_libs(artifact: impl AsRef<Path>, ld_paths: Vec<PathBuf>) -> Res
 
     let mut ext_libs = Vec::new();
     for (name, lib) in &deps.libraries {
-        if reachable.contains(name.as_str()) && should_bundle_library(lib)? {
+        if reachable.contains(name.as_str()) && should_bundle_library(lib, sysroot)? {
             ext_libs.push(lib.clone());
         }
     }
@@ -306,14 +323,42 @@ mod tests {
 
     #[test]
     fn test_is_system_library() {
-        assert!(is_system_library(Path::new("/usr/lib/libSystem.B.dylib")));
-        assert!(is_system_library(Path::new(
-            "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
-        )));
-        assert!(!is_system_library(Path::new("/usr/local/lib/libfoo.dylib")));
-        assert!(!is_system_library(Path::new(
-            "/opt/homebrew/lib/libbar.dylib"
-        )));
+        let root = Path::new("/");
+        assert!(is_system_library(
+            Path::new("/usr/lib/libSystem.B.dylib"),
+            root
+        ));
+        assert!(is_system_library(
+            Path::new("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"),
+            root,
+        ));
+        assert!(!is_system_library(
+            Path::new("/usr/local/lib/libfoo.dylib"),
+            root
+        ));
+        assert!(!is_system_library(
+            Path::new("/opt/homebrew/lib/libbar.dylib"),
+            root,
+        ));
+    }
+
+    #[test]
+    fn test_is_system_library_with_sysroot() {
+        let sysroot = Path::new("/opt/osxcross/SDK/MacOSX.sdk");
+        assert!(is_system_library(
+            Path::new("/opt/osxcross/SDK/MacOSX.sdk/usr/lib/libSystem.B.dylib"),
+            sysroot,
+        ));
+        assert!(is_system_library(
+            Path::new(
+                "/opt/osxcross/SDK/MacOSX.sdk/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
+            ),
+            sysroot,
+        ));
+        assert!(!is_system_library(
+            Path::new("/opt/osxcross/SDK/MacOSX.sdk/usr/local/lib/libfoo.dylib"),
+            sysroot,
+        ));
     }
 
     #[test]
@@ -347,9 +392,12 @@ mod tests {
 
     #[test]
     fn test_missing_non_system_dependency_errors() {
-        let err =
-            should_bundle_library(&library("@rpath/libfoo.dylib", "@rpath/libfoo.dylib", None))
-                .unwrap_err();
+        let root = Path::new("/");
+        let err = should_bundle_library(
+            &library("@rpath/libfoo.dylib", "@rpath/libfoo.dylib", None),
+            root,
+        )
+        .unwrap_err();
 
         assert_eq!(
             err.to_string(),
@@ -359,12 +407,16 @@ mod tests {
 
     #[test]
     fn test_missing_system_dependency_is_ignored() {
+        let root = Path::new("/");
         assert!(
-            !should_bundle_library(&library(
-                "/usr/lib/libSystem.B.dylib",
-                "/usr/lib/libSystem.B.dylib",
-                None,
-            ))
+            !should_bundle_library(
+                &library(
+                    "/usr/lib/libSystem.B.dylib",
+                    "/usr/lib/libSystem.B.dylib",
+                    None,
+                ),
+                root,
+            )
             .unwrap()
         );
     }

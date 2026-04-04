@@ -52,7 +52,9 @@ impl BuildContext {
         } else if self.project.target.is_macos() {
             #[cfg(feature = "auditwheel")]
             {
-                Some(Box::new(MacOSRepairer))
+                Some(Box::new(MacOSRepairer {
+                    target: self.project.target.clone(),
+                }))
             }
             #[cfg(not(feature = "auditwheel"))]
             {

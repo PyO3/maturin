@@ -20,4 +20,6 @@ pub use linux::ElfRepairer;
 pub use macos::MacOSRepairer;
 pub use platform_tag::PlatformTag;
 pub use policy::Policy;
-pub use repair::{AuditedArtifact, WheelRepairer, log_grafted_libs, prepare_grafted_libs};
+pub use repair::{
+    AuditResult, AuditedArtifact, WheelRepairer, log_grafted_libs, prepare_grafted_libs,
+};

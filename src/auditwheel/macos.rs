@@ -9,13 +9,14 @@
 use super::Policy;
 use super::audit::{get_sysroot_path, relpath};
 use super::macos_sign::ad_hoc_sign;
-use super::repair::{AuditedArtifact, GraftedLib, WheelRepairer, leaf_filename};
+use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer, leaf_filename};
 use crate::compile::BuildArtifact;
 use crate::target::Target;
 use anyhow::{Context, Result, bail};
 use arwen::macho::MachoContainer;
+use fat_macho::{Error as FatMachoError, FatReader};
 use lddtree::Library;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 /// macOS/Mach-O wheel repairer (delocate equivalent).
@@ -28,15 +29,65 @@ pub struct MacOSRepairer {
     pub target: Target,
 }
 
+/// Architecture names for universal2 builds, matching the order of `thin_artifacts`.
+///
+/// - Index 0: aarch64-apple-darwin → "arm64"
+/// - Index 1: x86_64-apple-darwin → "x86_64"
+///
+/// IMPORTANT: This order must match `compile_universal2` in `compile.rs` which
+/// populates `thin_artifacts` in this exact order.
+const UNIVERSAL2_ARCHS: [&str; 2] = ["arm64", "x86_64"];
+
 impl WheelRepairer for MacOSRepairer {
-    fn audit(
-        &self,
-        artifact: &BuildArtifact,
-        ld_paths: Vec<PathBuf>,
-    ) -> Result<(Policy, Vec<Library>)> {
+    fn audit(&self, artifact: &BuildArtifact, _ld_paths: Vec<PathBuf>) -> Result<AuditResult> {
         let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
-        let ext_libs = find_external_libs(&artifact.path, ld_paths, &sysroot)?;
-        Ok((Policy::default(), ext_libs))
+
+        // For universal2 builds, analyze each thin binary separately with its
+        // own linked_paths. This ensures we discover dependencies that may
+        // only exist in one architecture (e.g., arch-specific native libs).
+        // lddtree can only analyze one arch at a time from a fat binary.
+        if !artifact.thin_artifacts.is_empty() {
+            let mut all_libs: Vec<Library> = Vec::new();
+            let mut seen_realpaths: HashMap<PathBuf, usize> = HashMap::new();
+            let mut arch_requirements: HashMap<PathBuf, HashSet<String>> = HashMap::new();
+
+            for (i, (thin_path, thin_ld_paths)) in artifact.thin_artifacts.iter().enumerate() {
+                let arch = UNIVERSAL2_ARCHS[i];
+                let ld_paths: Vec<PathBuf> = thin_ld_paths.iter().map(PathBuf::from).collect();
+                let libs = find_external_libs(thin_path, ld_paths, &sysroot)?;
+                for lib in libs {
+                    if let Some(ref realpath) = lib.realpath {
+                        // Track which architectures require this library.
+                        arch_requirements
+                            .entry(realpath.clone())
+                            .or_default()
+                            .insert(arch.to_string());
+
+                        // Deduplicate by realpath — the same dylib may be needed
+                        // by both arches but should only be bundled once.
+                        if !seen_realpaths.contains_key(realpath) {
+                            seen_realpaths.insert(realpath.clone(), all_libs.len());
+                            all_libs.push(lib);
+                        }
+                    } else {
+                        // Library not found on disk; include it so the error
+                        // propagates later in prepare_grafted_libs.
+                        all_libs.push(lib);
+                    }
+                }
+            }
+
+            Ok(AuditResult {
+                policy: Policy::default(),
+                external_libs: all_libs,
+                arch_requirements,
+            })
+        } else {
+            // Single-arch build: analyze the artifact directly.
+            let ld_paths: Vec<PathBuf> = artifact.linked_paths.iter().map(PathBuf::from).collect();
+            let ext_libs = find_external_libs(&artifact.path, ld_paths, &sysroot)?;
+            Ok(AuditResult::new(Policy::default(), ext_libs))
+        }
     }
 
     fn patch(
@@ -46,6 +97,14 @@ impl WheelRepairer for MacOSRepairer {
         libs_dir: &Path,
         artifact_dir: &Path,
     ) -> Result<()> {
+        // Verify universal2 architecture requirements before patching.
+        // Each grafted library must contain all CPU architectures that depend on it.
+        for lib in grafted {
+            if !lib.required_archs.is_empty() {
+                verify_universal_archs(&lib.dest_path, &lib.required_archs, &lib.original_name)?;
+            }
+        }
+
         // Build a lookup from all known install names → new leaf name.
         let mut name_map: BTreeMap<&str, &str> = BTreeMap::new();
         for lib in grafted {
@@ -120,6 +179,74 @@ impl WheelRepairer for MacOSRepairer {
     fn libs_dir(&self, dist_name: &str) -> PathBuf {
         PathBuf::from(format!("{dist_name}.dylibs"))
     }
+}
+
+/// **Universal2 only**: Verify that a dylib contains all required CPU architectures.
+///
+/// For universal2 macOS wheels, each bundled dylib must contain the architecture
+/// slices that depend on it. For example, if both arm64 and x86_64 binaries link
+/// against libfoo.dylib, then libfoo.dylib must be a fat binary containing both
+/// arm64 and x86_64 slices.
+///
+/// This mirrors Python delocate's `check_archs` behavior — it assumes that
+/// external dylibs on the build system are already fat/universal. If a dylib
+/// is thin (single-architecture), the wheel repair will fail with an error
+/// explaining which architecture is missing.
+///
+/// Note: Universal2 support may be removed when Apple drops x86_64 support
+fn verify_universal_archs(
+    path: &Path,
+    required_archs: &HashSet<String>,
+    lib_name: &str,
+) -> Result<()> {
+    let data = fs_err::read(path).with_context(|| {
+        format!(
+            "Failed to read library for arch verification: {}",
+            path.display()
+        )
+    })?;
+
+    match FatReader::new(&data) {
+        Ok(reader) => {
+            // Fat binary: check each required arch is present
+            for arch in required_archs {
+                if reader.extract(arch).is_none() {
+                    bail!(
+                        "Library '{}' is missing architecture '{}'. \
+                         Universal2 wheels require fat/universal dylibs containing all \
+                         required architectures. The wheel's arm64 and/or x86_64 binaries \
+                         depend on this library, but it doesn't contain a '{}' slice.",
+                        lib_name,
+                        arch,
+                        arch
+                    );
+                }
+            }
+        }
+        Err(FatMachoError::NotFatBinary) => {
+            // Thin binary: fails if more than one arch is required
+            if required_archs.len() > 1 {
+                let archs: Vec<&str> = required_archs.iter().map(|s| s.as_str()).collect();
+                bail!(
+                    "Library '{}' is a thin (single-architecture) binary, but the universal2 \
+                     wheel requires architectures: {}. Universal2 wheels need fat/universal \
+                     dylibs. Install a universal version of this library or build separate \
+                     wheels for each architecture instead of universal2.",
+                    lib_name,
+                    archs.join(", ")
+                );
+            }
+            // Single arch required and it's a thin binary — we assume it matches.
+            // (If it didn't match, the build would have failed earlier.)
+        }
+        Err(e) => {
+            return Err(e).with_context(|| {
+                format!("Failed to parse Mach-O for arch verification: {lib_name}")
+            });
+        }
+    }
+
+    Ok(())
 }
 
 /// Check if a library path is a macOS system library that should not be bundled.
@@ -205,7 +332,7 @@ fn find_external_libs(
         .context("Failed to analyze Mach-O dependencies")?;
 
     // Determine which libraries should be skipped.
-    let skipped: std::collections::HashSet<&str> = deps
+    let skipped: HashSet<&str> = deps
         .libraries
         .iter()
         .filter(|(_, lib)| is_system_library(&lib.path, sysroot) || is_libpython(&lib.name))
@@ -227,11 +354,11 @@ fn find_external_libs(
 /// any node in `skipped`. Returns the set of reachable library names.
 fn reachable_libs<'a>(
     roots: &'a [String],
-    libraries: &'a std::collections::HashMap<String, Library>,
-    skipped: &std::collections::HashSet<&str>,
-) -> std::collections::HashSet<&'a str> {
-    let mut reachable = std::collections::HashSet::new();
-    let mut queue: std::collections::VecDeque<&str> = roots
+    libraries: &'a HashMap<String, Library>,
+    skipped: &HashSet<&str>,
+) -> HashSet<&'a str> {
+    let mut reachable = HashSet::new();
+    let mut queue: VecDeque<&str> = roots
         .iter()
         .filter(|n| !skipped.contains(n.as_str()))
         .map(String::as_str)
@@ -431,7 +558,7 @@ mod tests {
         }
     }
 
-    fn make_graph(libs: Vec<Library>) -> std::collections::HashMap<String, Library> {
+    fn make_graph(libs: Vec<Library>) -> HashMap<String, Library> {
         libs.into_iter().map(|l| (l.name.clone(), l)).collect()
     }
 
@@ -453,7 +580,7 @@ mod tests {
             "libfoo.dylib".to_string(),
             "/Library/Frameworks/Python.framework/Versions/3.14/Python".to_string(),
         ];
-        let skipped: std::collections::HashSet<&str> =
+        let skipped: HashSet<&str> =
             ["/Library/Frameworks/Python.framework/Versions/3.14/Python"].into();
 
         let reachable = reachable_libs(&roots, &libraries, &skipped);
@@ -485,7 +612,7 @@ mod tests {
             "libfoo.dylib".to_string(),
             "/Library/Frameworks/Python.framework/Versions/3.14/Python".to_string(),
         ];
-        let skipped: std::collections::HashSet<&str> =
+        let skipped: HashSet<&str> =
             ["/Library/Frameworks/Python.framework/Versions/3.14/Python"].into();
 
         let reachable = reachable_libs(&roots, &libraries, &skipped);
@@ -505,7 +632,7 @@ mod tests {
             lib_with_needed("libC.dylib", "/usr/local/lib/libC.dylib", &[]),
         ]);
         let roots = vec!["libA.dylib".to_string()];
-        let skipped = std::collections::HashSet::new();
+        let skipped = HashSet::new();
 
         let reachable = reachable_libs(&roots, &libraries, &skipped);
         assert!(reachable.contains("libA.dylib"));

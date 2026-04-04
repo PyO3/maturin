@@ -48,6 +48,10 @@ pub struct BuildArtifact {
     /// Array of paths to include in the library search path, as indicated by
     /// the `cargo:rustc-link-search` instruction.
     pub linked_paths: Vec<String>,
+    /// For universal2 builds: per-architecture thin binaries with their
+    /// respective library search paths, used for accurate per-arch dependency
+    /// analysis. Each entry is `(thin_binary_path, linked_paths)`.
+    pub thin_artifacts: Vec<(PathBuf, Vec<String>)>,
 }
 
 /// Result of compiling one or more cargo targets.
@@ -232,11 +236,37 @@ fn compile_universal2(
             .map_err(|e| anyhow!("Failed to create universal cdylib: {:?}", e))?;
 
         let mut result = HashMap::new();
+        // Union linked_paths from both architectures for editable installs
+        // (patch_editable uses these to set RPATH to cargo target dirs).
+        let mut linked_paths = aarch64_artifact.linked_paths.clone();
+        for p in &x86_64_artifact.linked_paths {
+            if !linked_paths.contains(p) {
+                linked_paths.push(p.clone());
+            }
+        }
+        // Store per-arch thin binaries for accurate dependency analysis.
+        // Each arch may have different dependencies (e.g., arch-specific
+        // native libraries), and lddtree can only analyze one arch at a time.
+        //
+        // IMPORTANT: The order here (aarch64 first, x86_64 second) must match
+        // `UNIVERSAL2_ARCHS` in `auditwheel/macos.rs` which maps indices to
+        // architecture names for verification.
+        let thin_artifacts = vec![
+            (
+                aarch64_artifact.path.clone(),
+                aarch64_artifact.linked_paths.clone(),
+            ),
+            (
+                x86_64_artifact.path.clone(),
+                x86_64_artifact.linked_paths.clone(),
+            ),
+        ];
         let universal_artifact = BuildArtifact {
             path: PathBuf::from(output_path),
             import_lib_path: None,
             debuginfo_path: None,
-            linked_paths: x86_64_artifact.linked_paths.clone(),
+            linked_paths,
+            thin_artifacts,
         };
         result.insert(build_type, universal_artifact);
         universal_artifacts.push(result);
@@ -921,6 +951,7 @@ fn compile_target(
                                 import_lib_path: None,
                                 debuginfo_path: None,
                                 linked_paths: Vec::new(),
+                                thin_artifacts: Vec::new(),
                             };
                             artifacts.insert(crate_type, artifact);
                         }

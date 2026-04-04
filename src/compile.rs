@@ -7,7 +7,7 @@ use cargo_metadata::CrateType;
 use fat_macho::FatWriter;
 use fs_err::{self as fs, File};
 use normpath::PathExt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -252,7 +252,7 @@ fn compile_universal2(
         // Union linked_paths from both architectures for editable installs
         // (patch_editable uses these to set RPATH to cargo target dirs).
         // Use a HashSet to deduplicate in O(n) instead of O(n²).
-        let mut seen_paths: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut seen_paths: HashSet<&str> = HashSet::new();
         let mut linked_paths = Vec::new();
         for p in aarch64_artifact
             .linked_paths

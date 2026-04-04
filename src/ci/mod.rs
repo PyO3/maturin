@@ -1,6 +1,7 @@
 /// GitHub Actions CI generation
 pub mod github;
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -161,7 +162,7 @@ pub(crate) struct ResolvedCIConfig {
     pub pytest: bool,
     pub zig: bool,
     pub skip_attestation: bool,
-    pub platform_targets: std::collections::BTreeMap<Platform, Vec<ResolvedTarget>>,
+    pub platform_targets: BTreeMap<Platform, Vec<ResolvedTarget>>,
 }
 
 /// Generate CI configuration

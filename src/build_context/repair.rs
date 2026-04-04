@@ -13,6 +13,7 @@ use crate::{BridgeModel, BuildArtifact, PythonInterpreter, VirtualWriter};
 use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use normpath::PathExt;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use super::BuildContext;
@@ -164,12 +165,8 @@ impl BuildContext {
 
         // Merge arch_requirements from all audited artifacts (universal2 only).
         // Each artifact may have analyzed different architecture slices.
-        let merged_arch_requirements: std::collections::HashMap<
-            PathBuf,
-            std::collections::HashSet<String>,
-        > = {
-            let mut merged: std::collections::HashMap<PathBuf, std::collections::HashSet<String>> =
-                std::collections::HashMap::new();
+        let merged_arch_requirements: HashMap<PathBuf, HashSet<String>> = {
+            let mut merged: HashMap<PathBuf, HashSet<String>> = HashMap::new();
             for aa in audited {
                 for (realpath, archs) in &aa.arch_requirements {
                     merged

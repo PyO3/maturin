@@ -658,7 +658,7 @@ mod tests {
             lib_with_needed("libC.dylib", "/usr/local/lib/libC.dylib", &[]),
         ]);
         let roots = vec!["libA.dylib".to_string()];
-        let skipped: std::collections::HashSet<&str> = ["/usr/lib/libSkip.dylib"].into();
+        let skipped: HashSet<&str> = ["/usr/lib/libSkip.dylib"].into();
 
         let reachable = reachable_libs(&roots, &libraries, &skipped);
         assert!(reachable.contains("libA.dylib"));

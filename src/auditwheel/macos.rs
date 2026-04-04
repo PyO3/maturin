@@ -51,6 +51,15 @@ impl WheelRepairer for MacOSRepairer {
             let mut seen_realpaths: HashMap<PathBuf, usize> = HashMap::new();
             let mut arch_requirements: HashMap<PathBuf, HashSet<String>> = HashMap::new();
 
+            if artifact.thin_artifacts.len() != UNIVERSAL2_ARCHS.len() {
+                bail!(
+                    "Universal2 build expected {} architectures but got {}. \
+                     This is an internal error.",
+                    UNIVERSAL2_ARCHS.len(),
+                    artifact.thin_artifacts.len()
+                );
+            }
+
             for (i, (thin_path, thin_ld_paths)) in artifact.thin_artifacts.iter().enumerate() {
                 let arch = UNIVERSAL2_ARCHS[i];
                 let ld_paths: Vec<PathBuf> = thin_ld_paths.iter().map(PathBuf::from).collect();
@@ -126,11 +135,11 @@ impl WheelRepairer for MacOSRepairer {
             // `@loader_path`-relative references.
             let new_install_id = format!("/DLC/{}/{}", libs_dir.display(), lib.new_name);
 
-            // Collect rpaths to remove (all non-relative rpaths).
+            // Collect rpaths to remove (absolute rpaths only).
             let rpaths_to_remove: Vec<&str> = lib
                 .rpath
                 .iter()
-                .filter(|r| !r.starts_with("@loader_path") && !r.starts_with("@executable_path"))
+                .filter(|r| r.starts_with('/'))
                 .map(String::as_str)
                 .collect();
 
@@ -378,22 +387,25 @@ fn reachable_libs<'a>(
     reachable
 }
 
-/// Batch Mach-O patching: apply changes, re-parsing between operations to handle
-/// offset shifts from install name changes.
+/// Batch Mach-O patching: apply changes in-memory, re-parsing between operations
+/// to handle offset shifts from install name changes, then write once at the end.
 fn patch_macho(
     file: &Path,
     install_name_changes: &[(&str, String)],
     new_install_id: Option<&str>,
     rpaths_to_remove: &[&str],
 ) -> Result<()> {
+    let mut data = fs_err::read(file)?;
+    let mut modified = false;
+
     // Change install ID first (this can shift load command offsets)
     if let Some(id) = new_install_id {
-        let data = fs_err::read(file)?;
         let mut container =
             MachoContainer::parse(&data).context("Failed to parse Mach-O for install_id change")?;
         match container.change_install_id(id) {
             Ok(()) => {
-                fs_err::write(file, &container.data)?;
+                data = container.data;
+                modified = true;
             }
             Err(arwen::macho::MachoError::DylibIdMissing) => {}
             Err(e) => return Err(e).context("Failed to change install id"),
@@ -402,12 +414,12 @@ fn patch_macho(
 
     // Change install names (each can shift offsets, so re-parse between each)
     for (old, new) in install_name_changes {
-        let data = fs_err::read(file)?;
         let mut container = MachoContainer::parse(&data)
             .context("Failed to parse Mach-O for install_name change")?;
         match container.change_install_name(old, new) {
             Ok(()) => {
-                fs_err::write(file, &container.data)?;
+                data = container.data;
+                modified = true;
             }
             Err(arwen::macho::MachoError::DylibNameMissing(_)) => {}
             Err(e) => {
@@ -419,16 +431,21 @@ fn patch_macho(
 
     // Remove rpaths
     for rpath in rpaths_to_remove {
-        let data = fs_err::read(file)?;
         let mut container =
             MachoContainer::parse(&data).context("Failed to parse Mach-O for rpath removal")?;
         match container.remove_rpath(rpath) {
             Ok(()) => {
-                fs_err::write(file, &container.data)?;
+                data = container.data;
+                modified = true;
             }
             Err(arwen::macho::MachoError::RpathMissing(_)) => {}
             Err(e) => return Err(e).with_context(|| format!("Failed to remove rpath {rpath}")),
         }
+    }
+
+    // Write once at the end if any modifications were made
+    if modified {
+        fs_err::write(file, &data)?;
     }
 
     Ok(())
@@ -666,5 +683,149 @@ mod tests {
         assert!(reachable.contains("libA.dylib"));
         assert!(!reachable.contains("/usr/lib/libSkip.dylib"));
         assert!(!reachable.contains("libC.dylib"));
+    }
+
+    // Tests for verify_universal_archs
+    mod verify_universal_archs_tests {
+        use super::*;
+        use fat_macho::FatWriter;
+        use std::io::Write;
+
+        /// Minimal Mach-O header for arm64 (enough to be recognized as valid thin Mach-O)
+        fn minimal_arm64_macho() -> Vec<u8> {
+            // MH_MAGIC_64 + CPU_TYPE_ARM64 + minimal header
+            let mut data = Vec::new();
+            // MH_MAGIC_64 = 0xfeedfacf (little-endian)
+            data.extend_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+            // CPU_TYPE_ARM64 = 0x0100000c (little-endian)
+            data.extend_from_slice(&[0x0c, 0x00, 0x00, 0x01]);
+            // CPU_SUBTYPE_ARM64_ALL = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // MH_EXECUTE = 2
+            data.extend_from_slice(&[0x02, 0x00, 0x00, 0x00]);
+            // ncmds = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // sizeofcmds = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // flags = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // reserved = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            data
+        }
+
+        /// Minimal Mach-O header for x86_64
+        fn minimal_x86_64_macho() -> Vec<u8> {
+            let mut data = Vec::new();
+            // MH_MAGIC_64 = 0xfeedfacf (little-endian)
+            data.extend_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+            // CPU_TYPE_X86_64 = 0x01000007 (little-endian)
+            data.extend_from_slice(&[0x07, 0x00, 0x00, 0x01]);
+            // CPU_SUBTYPE_X86_64_ALL = 3
+            data.extend_from_slice(&[0x03, 0x00, 0x00, 0x00]);
+            // MH_EXECUTE = 2
+            data.extend_from_slice(&[0x02, 0x00, 0x00, 0x00]);
+            // ncmds = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // sizeofcmds = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // flags = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            // reserved = 0
+            data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            data
+        }
+
+        /// Create a fat binary from arm64 and x86_64 slices
+        fn create_fat_binary(arm64: Vec<u8>, x86_64: Vec<u8>) -> Vec<u8> {
+            let mut writer = FatWriter::new();
+            writer.add(arm64).unwrap();
+            writer.add(x86_64).unwrap();
+            let mut output = Vec::new();
+            writer.write_to(&mut output).unwrap();
+            output
+        }
+
+        #[test]
+        fn fat_binary_with_both_archs_passes() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let lib_path = tmp_dir.path().join("libfoo.dylib");
+
+            let fat_binary = create_fat_binary(minimal_arm64_macho(), minimal_x86_64_macho());
+            fs_err::write(&lib_path, fat_binary).unwrap();
+
+            let required: HashSet<String> =
+                ["arm64", "x86_64"].iter().map(|s| s.to_string()).collect();
+            let result = verify_universal_archs(&lib_path, &required, "libfoo.dylib");
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn fat_binary_missing_arch_fails() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let lib_path = tmp_dir.path().join("libfoo.dylib");
+
+            // Create fat binary with only arm64 (not a real fat, just arm64 thin)
+            // For this test, we use a fat binary with only arm64
+            let mut writer = FatWriter::new();
+            writer.add(minimal_arm64_macho()).unwrap();
+            let mut output = Vec::new();
+            writer.write_to(&mut output).unwrap();
+            fs_err::write(&lib_path, output).unwrap();
+
+            let required: HashSet<String> =
+                ["arm64", "x86_64"].iter().map(|s| s.to_string()).collect();
+            let result = verify_universal_archs(&lib_path, &required, "libfoo.dylib");
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("missing architecture"));
+            assert!(err_msg.contains("x86_64"));
+        }
+
+        #[test]
+        fn thin_binary_with_multiple_required_archs_fails() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let lib_path = tmp_dir.path().join("libfoo.dylib");
+
+            // Write a thin arm64 binary
+            fs_err::write(&lib_path, minimal_arm64_macho()).unwrap();
+
+            let required: HashSet<String> =
+                ["arm64", "x86_64"].iter().map(|s| s.to_string()).collect();
+            let result = verify_universal_archs(&lib_path, &required, "libfoo.dylib");
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("thin (single-architecture)"));
+        }
+
+        #[test]
+        fn thin_binary_with_single_required_arch_passes() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let lib_path = tmp_dir.path().join("libfoo.dylib");
+
+            // Write a thin arm64 binary
+            fs_err::write(&lib_path, minimal_arm64_macho()).unwrap();
+
+            // Only arm64 required - should pass (we assume it matches)
+            let required: HashSet<String> = ["arm64"].iter().map(|s| s.to_string()).collect();
+            let result = verify_universal_archs(&lib_path, &required, "libfoo.dylib");
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn invalid_macho_fails_with_parse_error() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let lib_path = tmp_dir.path().join("libfoo.dylib");
+
+            // Write invalid data (not a Mach-O)
+            let mut f = fs_err::File::create(&lib_path).unwrap();
+            f.write_all(b"not a macho file").unwrap();
+
+            let required: HashSet<String> = ["arm64"].iter().map(|s| s.to_string()).collect();
+            let result = verify_universal_archs(&lib_path, &required, "libfoo.dylib");
+            assert!(result.is_err());
+            let err_msg = result.unwrap_err().to_string();
+            assert!(err_msg.contains("Failed to parse Mach-O"));
+        }
     }
 }

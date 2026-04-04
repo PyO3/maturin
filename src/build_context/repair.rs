@@ -175,7 +175,7 @@ impl BuildContext {
                     merged
                         .entry(realpath.clone())
                         .or_default()
-                        .extend(archs.clone());
+                        .extend(archs.iter().cloned());
                 }
             }
             merged

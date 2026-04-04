@@ -36,6 +36,20 @@ pub struct CompileTarget {
     pub bridge_model: BridgeModel,
 }
 
+/// A single-architecture thin binary artifact for universal2 builds.
+///
+/// Used during macOS wheel repair to analyze dependencies per-architecture,
+/// since lddtree can only analyze one arch at a time from a fat binary.
+#[derive(Debug, Clone)]
+pub struct ThinArtifact {
+    /// Target architecture name (e.g., "arm64", "x86_64")
+    pub arch: String,
+    /// Path to the thin binary
+    pub path: PathBuf,
+    /// Library search paths for this architecture
+    pub linked_paths: Vec<String>,
+}
+
 /// A cargo build artifact
 #[derive(Debug, Clone)]
 pub struct BuildArtifact {
@@ -48,10 +62,9 @@ pub struct BuildArtifact {
     /// Array of paths to include in the library search path, as indicated by
     /// the `cargo:rustc-link-search` instruction.
     pub linked_paths: Vec<String>,
-    /// For universal2 builds: per-architecture thin binaries with their
-    /// respective library search paths, used for accurate per-arch dependency
-    /// analysis. Each entry is `(thin_binary_path, linked_paths)`.
-    pub thin_artifacts: Vec<(PathBuf, Vec<String>)>,
+    /// For universal2 builds: per-architecture thin binaries used for accurate
+    /// per-arch dependency analysis during macOS wheel repair.
+    pub thin_artifacts: Vec<ThinArtifact>,
 }
 
 /// Result of compiling one or more cargo targets.
@@ -238,28 +251,32 @@ fn compile_universal2(
         let mut result = HashMap::new();
         // Union linked_paths from both architectures for editable installs
         // (patch_editable uses these to set RPATH to cargo target dirs).
-        let mut linked_paths = aarch64_artifact.linked_paths.clone();
-        for p in &x86_64_artifact.linked_paths {
-            if !linked_paths.contains(p) {
+        // Use a HashSet to deduplicate in O(n) instead of O(n²).
+        let mut seen_paths: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut linked_paths = Vec::new();
+        for p in aarch64_artifact
+            .linked_paths
+            .iter()
+            .chain(&x86_64_artifact.linked_paths)
+        {
+            if seen_paths.insert(p.as_str()) {
                 linked_paths.push(p.clone());
             }
         }
         // Store per-arch thin binaries for accurate dependency analysis.
         // Each arch may have different dependencies (e.g., arch-specific
         // native libraries), and lddtree can only analyze one arch at a time.
-        //
-        // IMPORTANT: The order here (aarch64 first, x86_64 second) must match
-        // `UNIVERSAL2_ARCHS` in `auditwheel/macos.rs` which maps indices to
-        // architecture names for verification.
         let thin_artifacts = vec![
-            (
-                aarch64_artifact.path.clone(),
-                aarch64_artifact.linked_paths.clone(),
-            ),
-            (
-                x86_64_artifact.path.clone(),
-                x86_64_artifact.linked_paths.clone(),
-            ),
+            ThinArtifact {
+                arch: "arm64".to_string(),
+                path: aarch64_artifact.path.clone(),
+                linked_paths: aarch64_artifact.linked_paths.clone(),
+            },
+            ThinArtifact {
+                arch: "x86_64".to_string(),
+                path: x86_64_artifact.path.clone(),
+                linked_paths: x86_64_artifact.linked_paths.clone(),
+            },
         ];
         let universal_artifact = BuildArtifact {
             path: PathBuf::from(output_path),

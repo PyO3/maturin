@@ -29,15 +29,6 @@ pub struct MacOSRepairer {
     pub target: Target,
 }
 
-/// Architecture names for universal2 builds, matching the order of `thin_artifacts`.
-///
-/// - Index 0: aarch64-apple-darwin → "arm64"
-/// - Index 1: x86_64-apple-darwin → "x86_64"
-///
-/// IMPORTANT: This order must match `compile_universal2` in `compile.rs` which
-/// populates `thin_artifacts` in this exact order.
-const UNIVERSAL2_ARCHS: [&str; 2] = ["arm64", "x86_64"];
-
 impl WheelRepairer for MacOSRepairer {
     fn audit(&self, artifact: &BuildArtifact, _ld_paths: Vec<PathBuf>) -> Result<AuditResult> {
         let sysroot = get_sysroot_path(&self.target).unwrap_or_else(|_| PathBuf::from("/"));
@@ -51,26 +42,16 @@ impl WheelRepairer for MacOSRepairer {
             let mut seen_realpaths: HashMap<PathBuf, usize> = HashMap::new();
             let mut arch_requirements: HashMap<PathBuf, HashSet<String>> = HashMap::new();
 
-            if artifact.thin_artifacts.len() != UNIVERSAL2_ARCHS.len() {
-                bail!(
-                    "Universal2 build expected {} architectures but got {}. \
-                     This is an internal error.",
-                    UNIVERSAL2_ARCHS.len(),
-                    artifact.thin_artifacts.len()
-                );
-            }
-
-            for (i, (thin_path, thin_ld_paths)) in artifact.thin_artifacts.iter().enumerate() {
-                let arch = UNIVERSAL2_ARCHS[i];
-                let ld_paths: Vec<PathBuf> = thin_ld_paths.iter().map(PathBuf::from).collect();
-                let libs = find_external_libs(thin_path, ld_paths, &sysroot)?;
+            for thin in &artifact.thin_artifacts {
+                let ld_paths: Vec<PathBuf> = thin.linked_paths.iter().map(PathBuf::from).collect();
+                let libs = find_external_libs(&thin.path, ld_paths, &sysroot)?;
                 for lib in libs {
                     if let Some(ref realpath) = lib.realpath {
                         // Track which architectures require this library.
                         arch_requirements
                             .entry(realpath.clone())
                             .or_default()
-                            .insert(arch.to_string());
+                            .insert(thin.arch.clone());
 
                         // Deduplicate by realpath — the same dylib may be needed
                         // by both arches but should only be bundled once.

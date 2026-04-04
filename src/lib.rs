@@ -31,7 +31,7 @@ pub use crate::build_options::{BuildOptions, OutputOptions, PlatformOptions, Pyt
 pub use crate::build_orchestrator::BuildOrchestrator;
 pub use crate::cargo_options::{CargoOptions, TargetTriple};
 pub use crate::cargo_toml::CargoToml;
-pub use crate::compile::{BuildArtifact, CompileResult, compile};
+pub use crate::compile::{BuildArtifact, CompileResult, ThinArtifact, compile};
 pub use crate::compression::{CompressionMethod, CompressionOptions};
 pub use crate::develop::{DevelopOptions, develop};
 #[cfg(feature = "schemars")]

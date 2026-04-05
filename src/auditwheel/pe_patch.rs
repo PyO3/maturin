@@ -592,12 +592,16 @@ fn add_new_section_with_names(
     let section_table_end =
         layout.section_table_offset + layout.sections.len() * SECTION_HEADER_SIZE;
     let size_of_headers = read_u32_le(data, layout.size_of_headers_offset);
-    if size_of_headers as usize - section_table_end < SECTION_HEADER_SIZE {
-        bail!(
-            "Not enough space in PE headers for a new section header, and not enough \
-             internal padding for new DLL names. This is very rare with 8-character hashes."
-        );
-    }
+
+    // Determine how much extra header space is needed for the new section header.
+    // If there's a gap between the last section header and SizeOfHeaders, use it.
+    // Otherwise, expand headers by FileAlignment bytes and shift all section data.
+    let header_space_needed = if size_of_headers as usize - section_table_end >= SECTION_HEADER_SIZE
+    {
+        0u32
+    } else {
+        round_up(SECTION_HEADER_SIZE as u32, layout.file_alignment)
+    };
 
     let pe_data_end = layout
         .sections
@@ -606,21 +610,59 @@ fn add_new_section_with_names(
         .max()
         .unwrap_or(size_of_headers);
 
+    // Check for non-Authenticode overlay (Authenticode was already removed
+    // by remove_authenticode before we get here). Overlays contain data like
+    // debug symbols that we cannot safely remove.
+    if data.len() > pe_data_end as usize {
+        bail!(
+            "PE file contains a {}-byte overlay beyond section data that cannot be \
+             safely removed. This is usually debug symbols or other appended data. \
+             Strip the DLL with `strip -s` before building.",
+            data.len() - pe_data_end as usize
+        );
+    }
+
+    if header_space_needed > 0 {
+        // Insert zero bytes at the section table end to make room for the new
+        // section header. This shifts all section data forward, so we must
+        // update every section's PointerToRawData.
+        let extra = header_space_needed as usize;
+        data.splice(section_table_end..section_table_end, vec![0u8; extra]);
+
+        for i in 0..layout.sections.len() {
+            let hdr_off = layout.section_table_offset + i * SECTION_HEADER_SIZE;
+            let old_ptr = read_u32_le(data, hdr_off + 20);
+            write_u32_le(data, hdr_off + 20, old_ptr + header_space_needed);
+        }
+
+        write_u32_le(
+            data,
+            layout.size_of_headers_offset,
+            size_of_headers + header_space_needed,
+        );
+    }
+
+    // PointerToRawData for the new section accounts for any header expansion
+    let new_section_file_offset = pe_data_end + header_space_needed;
+
     // Build the section header (40 bytes)
     let mut header = [0u8; SECTION_HEADER_SIZE];
     header[..6].copy_from_slice(b"dlvwhl");
     write_u32_le(&mut header, 8, section_data_size); // VirtualSize
     write_u32_le(&mut header, 12, new_section_rva); // VirtualAddress
     write_u32_le(&mut header, 16, section_data_padded); // SizeOfRawData
-    write_u32_le(&mut header, 20, pe_data_end); // PointerToRawData
+    write_u32_le(&mut header, 20, new_section_file_offset); // PointerToRawData
     write_u32_le(&mut header, 36, NEW_SECTION_CHARS); // Characteristics
 
     data[section_table_end..section_table_end + SECTION_HEADER_SIZE].copy_from_slice(&header);
 
-    // Append section data + padding
-    data.resize(pe_data_end as usize, 0);
+    // Append section data + padding at the end of file
+    data.resize(new_section_file_offset as usize, 0);
     data.extend_from_slice(&section_data);
-    data.resize(pe_data_end as usize + section_data_padded as usize, 0);
+    data.resize(
+        new_section_file_offset as usize + section_data_padded as usize,
+        0,
+    );
 
     // Update PE headers
     let new_num_sections = layout.sections.len() as u16 + 1;
@@ -639,10 +681,12 @@ fn add_new_section_with_names(
         current_init_data + section_data_padded,
     );
 
-    // Update import table RVAs
+    // Update import table RVAs. If we shifted headers, the import descriptor
+    // file offsets moved too, so we must account for that.
     for ((imp_idx, _), name_off) in to_replace.iter().zip(name_offsets.iter()) {
         let new_rva = new_section_rva + *name_off as u32;
-        write_u32_le(data, imports[*imp_idx].name_field_offset, new_rva);
+        let adjusted_offset = imports[*imp_idx].name_field_offset + header_space_needed as usize;
+        write_u32_le(data, adjusted_offset, new_rva);
     }
 
     Ok(())

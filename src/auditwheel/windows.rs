@@ -117,9 +117,35 @@ fn is_api_set_dll(name: &str) -> bool {
     name.starts_with("api-") || name.starts_with("ext-ms-")
 }
 
-/// Check if a DLL name matches the Python DLL pattern (pythonXY.dll, python3.dll).
+/// Check if a DLL name matches the Python runtime DLL pattern.
+///
+/// Matches CPython (`python311.dll`, `python313t.dll`, `python312_d.dll`)
+/// and PyPy (`libpypy39-c.dll`) interpreter DLLs that should never be bundled.
 fn is_python_dll(name: &str) -> bool {
-    name.starts_with("python3") && name.ends_with(".dll")
+    // CPython: python followed by digits, optional 't' (free-threaded),
+    // optional '_d' (debug), then '.dll'
+    if let Some(rest) = name.strip_prefix("python") {
+        let rest = rest.as_bytes();
+        let mut i = 0;
+        while i < rest.len() && rest[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == 0 {
+            return false;
+        }
+        if i < rest.len() && rest[i] == b't' {
+            i += 1;
+        }
+        if i + 1 < rest.len() && rest[i] == b'_' && rest[i + 1] == b'd' {
+            i += 2;
+        }
+        return rest[i..] == *b".dll";
+    }
+    // PyPy: libpypy followed by version, then '-c.dll'
+    if let Some(rest) = name.strip_prefix("libpypy") {
+        return rest.ends_with("-c.dll");
+    }
+    false
 }
 
 /// Check if a DLL name matches the Visual C++ runtime redistributable pattern.
@@ -138,8 +164,22 @@ fn is_vc_runtime_dll(name: &str) -> bool {
 /// Well-known Windows system DLLs that should never be bundled.
 ///
 /// This is a curated fallback list for when path-based detection isn't
-/// possible (e.g., cross-compilation, or DLL found via PATH outside the
-/// Windows directory).
+/// possible (e.g., cross-compilation, or a DLL found via `PATH` outside
+/// the Windows directory).
+///
+/// In practice, most system DLLs are caught by earlier checks:
+/// - API set DLLs (`api-*`, `ext-ms-*`) by prefix match
+/// - Python and VC runtime DLLs by prefix match
+/// - DLLs resolved to `%WINDIR%` by path check
+/// - Unfound DLLs during cross-compilation (lddtree skips them)
+///
+/// This list catches the remaining edge case: a system DLL found on
+/// `PATH` in a non-standard location when building on Windows.
+///
+/// Delvewheel maintains exhaustive per-architecture lists (~1200–2700 DLLs)
+/// derived from Windows installation media. We take a curated approach
+/// covering the DLLs most likely to appear as dependencies of native
+/// extensions via common C/C++ libraries (OpenSSL, libcurl, Qt, etc.).
 const KNOWN_SYSTEM_DLLS: &[&str] = &[
     // Core OS
     "kernel32.dll",
@@ -147,6 +187,7 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "ntdll.dll",
     "advapi32.dll",
     "user32.dll",
+    "win32u.dll",
     "gdi32.dll",
     "gdi32full.dll",
     "shell32.dll",
@@ -154,6 +195,7 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "oleaut32.dll",
     "rpcrt4.dll",
     "msvcrt.dll",
+    "nsi.dll",
     // Networking
     "ws2_32.dll",
     "wsock32.dll",
@@ -164,6 +206,8 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "dnsapi.dll",
     "netapi32.dll",
     "wldap32.dll",
+    "sechost.dll",
+    "sspicli.dll",
     // Security/Crypto
     "secur32.dll",
     "crypt32.dll",
@@ -171,6 +215,10 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "bcryptprimitives.dll",
     "ncrypt.dll",
     "wintrust.dll",
+    "rsaenh.dll",
+    "dpapi.dll",
+    "cryptsp.dll",
+    "cryptbase.dll",
     // Shell/UI
     "shlwapi.dll",
     "comctl32.dll",
@@ -178,6 +226,8 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "imm32.dll",
     "uxtheme.dll",
     "shcore.dll",
+    "dwmapi.dll",
+    "msimg32.dll",
     // System services
     "userenv.dll",
     "dbghelp.dll",
@@ -191,9 +241,20 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "msi.dll",
     "imagehlp.dll",
     "normaliz.dll",
+    "profapi.dll",
+    "wevtapi.dll",
+    "pdh.dll",
+    "avrt.dll",
+    "synchronization.dll",
     // COM/OLE
     "combase.dll",
     "propsys.dll",
+    // IO / Storage
+    "devobj.dll",
+    "wtsapi32.dll",
+    "credui.dll",
+    "netutils.dll",
+    "samcli.dll",
     // Graphics/DirectX
     "d3d9.dll",
     "d3d10.dll",
@@ -205,13 +266,23 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "dwrite.dll",
     "opengl32.dll",
     "glu32.dll",
-    // WinRT/Modern
+    "dxcore.dll",
+    // Audio/Media
     "windowscodecs.dll",
     "mfplat.dll",
     "mf.dll",
     "mfreadwrite.dll",
+    "ole32.dll",
+    "mmdevapi.dll",
+    "winmm.dll",
+    "avrt.dll",
     // CRT
     "ucrtbase.dll",
+    // Misc frequently linked by native extensions
+    "hid.dll",
+    "winspool.drv",
+    "cldapi.dll",
+    "authz.dll",
 ];
 
 /// Check if a resolved library path is inside a Windows system directory.
@@ -314,7 +385,12 @@ mod tests {
         assert!(is_python_dll("python3.dll"));
         assert!(is_python_dll("python311.dll"));
         assert!(is_python_dll("python312.dll"));
+        assert!(is_python_dll("python313t.dll"));
+        assert!(is_python_dll("python312_d.dll"));
+        assert!(is_python_dll("python313t_d.dll"));
+        assert!(is_python_dll("libpypy39-c.dll"));
         assert!(!is_python_dll("pythoncom.dll"));
+        assert!(!is_python_dll("python3_bindings.dll"));
     }
 
     #[test]

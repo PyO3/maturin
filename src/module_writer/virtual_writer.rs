@@ -44,6 +44,7 @@ pub struct VirtualWriter<W> {
     excludes: Override,
     target_exclusion_warning_emitted: bool,
     temp_dir: OnceCell<Rc<TempDir>>,
+    pending_prepends: HashMap<PathBuf, Vec<u8>>,
 }
 
 impl<W: ModuleWriterInternal> VirtualWriter<W> {
@@ -56,6 +57,7 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
             excludes,
             target_exclusion_warning_emitted: false,
             temp_dir: OnceCell::new(),
+            pending_prepends: HashMap::new(),
         }
     }
 
@@ -203,43 +205,65 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         Ok(())
     }
 
-    /// Prepend data to an already-tracked file entry.
+    /// Register data to be prepended to a file entry.
     ///
-    /// If the target path exists in the tracker as a `Generated` entry, the
-    /// data is prepended to its existing bytes. If it exists as a `File`
-    /// entry, the file is read, data is prepended, and the entry is converted
-    /// to `Generated`. If the target does not exist, a new `Generated` entry
-    /// is created containing only the prepended data.
+    /// The prepend is deferred until `finish_internal()` runs, after all files
+    /// have been tracked. This avoids conflicts when `prepend_to` is called
+    /// before the target file has been added (e.g., `__init__.py` patching
+    /// during wheel repair runs before Python source files are collected).
+    ///
+    /// For Python files, the data is inserted after any `from __future__`
+    /// import lines rather than at byte position 0, to avoid SyntaxErrors.
     pub(crate) fn prepend_to(&mut self, target: impl AsRef<Path>, data: Vec<u8>) -> Result<()> {
-        let target = target.as_ref();
-        match self.tracker.entry(target.to_path_buf()) {
-            Entry::Occupied(mut entry) => {
-                let existing = entry.get_mut();
+        self.pending_prepends
+            .entry(target.as_ref().to_path_buf())
+            .or_default()
+            .extend_from_slice(&data);
+        Ok(())
+    }
+
+    /// Apply all pending prepends to their corresponding tracked entries.
+    ///
+    /// For Python files (`.py`), the prepend data is inserted after any
+    /// `from __future__` import lines to avoid SyntaxErrors. For entries
+    /// that were never tracked (no corresponding `add_file`/`add_bytes`),
+    /// a new `Generated` entry is created containing only the prepend data.
+    fn apply_pending_prepends(&mut self) -> Result<()> {
+        for (target, prepend_data) in std::mem::take(&mut self.pending_prepends) {
+            let is_python = target
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("py"));
+
+            let (file_content, path, executable) = if let Some(existing) =
+                self.tracker.remove(&target)
+            {
                 match existing {
-                    ArchiveSource::Generated(generated) => {
-                        let mut new_data = data;
-                        new_data.extend_from_slice(&generated.data);
-                        generated.data = new_data;
-                    }
-                    ArchiveSource::File(file_source) => {
-                        let file_data = fs_err::read(&file_source.path)?;
-                        let mut new_data = data;
-                        new_data.extend_from_slice(&file_data);
-                        *existing = ArchiveSource::Generated(GeneratedSourceData {
-                            data: new_data,
-                            path: Some(file_source.path.clone()),
-                            executable: file_source.executable,
-                        });
-                    }
+                    ArchiveSource::Generated(g) => (g.data, g.path, g.executable),
+                    ArchiveSource::File(f) => (fs_err::read(&f.path)?, Some(f.path), f.executable),
                 }
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(ArchiveSource::Generated(GeneratedSourceData {
-                    data,
-                    path: None,
-                    executable: false,
-                }));
-            }
+            } else {
+                (Vec::new(), None, false)
+            };
+
+            let insert_pos = if is_python {
+                find_python_insertion_point(&file_content)
+            } else {
+                0
+            };
+
+            let mut new_data = Vec::with_capacity(file_content.len() + prepend_data.len());
+            new_data.extend_from_slice(&file_content[..insert_pos]);
+            new_data.extend_from_slice(&prepend_data);
+            new_data.extend_from_slice(&file_content[insert_pos..]);
+
+            self.tracker.insert(
+                target,
+                ArchiveSource::Generated(GeneratedSourceData {
+                    data: new_data,
+                    path,
+                    executable,
+                }),
+            );
         }
         Ok(())
     }
@@ -250,6 +274,8 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         mut self,
         comparator: &mut impl FnMut(&PathBuf, &PathBuf) -> Ordering,
     ) -> Result<W> {
+        self.apply_pending_prepends()?;
+
         let mut entries: Vec<_> = self.tracker.into_iter().collect();
         entries.sort_unstable_by(|(p1, _), (p2, _)| comparator(p1, p2));
 
@@ -259,6 +285,38 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
 
         Ok(self.inner)
     }
+}
+
+/// Find the byte position in a Python file where injected code should be inserted.
+///
+/// Returns the byte offset right after the last `from __future__` import line,
+/// so that injected code (e.g., DLL loader patches) doesn't violate Python's
+/// requirement that `from __future__` imports precede all other statements.
+/// Returns 0 if no `from __future__` import is found.
+fn find_python_insertion_point(content: &[u8]) -> usize {
+    let mut pos = 0;
+    let mut last_future_end = 0;
+
+    while pos < content.len() {
+        let line_end = content[pos..]
+            .iter()
+            .position(|&b| b == b'\n')
+            .map(|i| pos + i + 1)
+            .unwrap_or(content.len());
+
+        let trimmed_start = content[pos..line_end]
+            .iter()
+            .position(|b| !b.is_ascii_whitespace())
+            .unwrap_or(0);
+
+        if content[pos + trimmed_start..line_end].starts_with(b"from __future__") {
+            last_future_end = line_end;
+        }
+
+        pos = line_end;
+    }
+
+    last_future_end
 }
 
 impl<W: ModuleWriterInternal> super::private::Sealed for VirtualWriter<W> {}
@@ -431,6 +489,30 @@ mod tests {
 
         tmp_dir.close()?;
         Ok(())
+    }
+
+    #[test]
+    fn test_find_python_insertion_point() {
+        use super::find_python_insertion_point;
+
+        // No __future__ imports
+        assert_eq!(find_python_insertion_point(b"import os\n"), 0);
+
+        // With __future__ import
+        let content = b"from __future__ import annotations\nimport os\n";
+        assert_eq!(find_python_insertion_point(content), 35); // after the newline
+
+        // Multiple __future__ imports
+        let content =
+            b"from __future__ import annotations\nfrom __future__ import division\nimport os\n";
+        assert_eq!(find_python_insertion_point(content), 67);
+
+        // Docstring then __future__
+        let content = b"\"\"\"Docstring.\"\"\"\nfrom __future__ import annotations\nimport os\n";
+        assert_eq!(find_python_insertion_point(content), 52);
+
+        // Empty content
+        assert_eq!(find_python_insertion_point(b""), 0);
     }
 
     #[test]

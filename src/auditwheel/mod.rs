@@ -6,6 +6,8 @@ mod macos;
 mod macos_sign;
 mod musllinux;
 pub mod patchelf;
+#[cfg(feature = "auditwheel")]
+pub(crate) mod pe_patch;
 mod platform_tag;
 mod policy;
 mod repair;

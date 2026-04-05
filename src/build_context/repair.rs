@@ -210,11 +210,15 @@ impl BuildContext {
 
         // Apply __init__.py patch for runtime DLL discovery (Windows only).
         // The patch registers the .libs/ directory via os.add_dll_directory().
-        let libs_dir_name = libs_dir.to_string_lossy().into_owned();
-        let depth = artifact_dir.components().count().max(1);
-        if let Some(patch) = repairer.init_py_patch(&libs_dir_name, depth) {
-            let init_py_path = artifact_dir.join("__init__.py");
-            writer.prepend_to(init_py_path, patch.into_bytes())?;
+        // Skip for root-level artifacts (e.g., bin bridge) where there's no
+        // package __init__.py to patch.
+        let depth = artifact_dir.components().count();
+        if depth > 0 {
+            let libs_dir_name = libs_dir.to_string_lossy().into_owned();
+            if let Some(patch) = repairer.init_py_patch(&libs_dir_name, depth) {
+                let init_py_path = artifact_dir.join("__init__.py");
+                writer.prepend_to(init_py_path, patch.into_bytes())?;
+            }
         }
 
         // Generate auditwheel SBOM for the grafted libraries.

@@ -213,8 +213,18 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
 
 fn rva_to_offset(rva: u32, sections: &[SectionInfo]) -> Option<usize> {
     for s in sections {
-        if rva >= s.virtual_address && rva < s.virtual_address + s.raw_data_size {
-            return Some((s.raw_data_pointer + (rva - s.virtual_address)) as usize);
+        // Use max of virtual_size and raw_data_size for section ownership.
+        // This handles BSS sections where virtual_size > raw_data_size.
+        let span = s.virtual_size.max(s.raw_data_size);
+        if rva >= s.virtual_address && rva < s.virtual_address.saturating_add(span) {
+            let delta = rva - s.virtual_address;
+            // Only return a file offset if within the raw data on disk.
+            // RVAs in the zero-fill/BSS tail have no file backing.
+            if delta < s.raw_data_size {
+                return Some((s.raw_data_pointer + delta) as usize);
+            } else {
+                return None;
+            }
         }
     }
     None
@@ -524,20 +534,22 @@ fn clear_certificate_table(data: &mut [u8], layout: &PeLayout) {
 }
 
 fn remove_authenticode(data: &mut Vec<u8>, layout: &PeLayout) {
-    let Some((cert_rva, cert_size)) = get_data_dir(data, layout, DD_SECURITY) else {
+    // The security directory is special: it uses raw file offsets, not RVAs
+    let Some((cert_file_offset, cert_size)) = get_data_dir(data, layout, DD_SECURITY) else {
         return;
     };
 
-    // The certificate table uses raw file offsets, not RVAs
     let pe_size = layout
         .sections
         .iter()
-        .map(|s| (s.raw_data_pointer + s.raw_data_size) as usize)
+        .map(|s| s.raw_data_pointer.saturating_add(s.raw_data_size) as usize)
         .max()
         .unwrap_or(0);
 
     let cert_start = round_up(pe_size as u32, 8) as usize;
-    if cert_rva as usize == cert_start && (cert_rva + cert_size) as usize == data.len() {
+    if cert_file_offset as usize == cert_start
+        && cert_file_offset.saturating_add(cert_size) as usize == data.len()
+    {
         data.truncate(pe_size);
     }
 }
@@ -832,6 +844,27 @@ mod tests {
         assert_eq!(rva_to_offset(0x1000, &sections), Some(0x400));
         assert_eq!(rva_to_offset(0x1050, &sections), Some(0x450));
         assert_eq!(rva_to_offset(0x2000, &sections), None);
+    }
+
+    #[test]
+    fn test_rva_to_offset_bss_section() {
+        // BSS section where virtual_size > raw_data_size
+        let sections = vec![SectionInfo {
+            virtual_size: 0x1000,
+            virtual_address: 0x2000,
+            raw_data_size: 0x200,
+            raw_data_pointer: 0x600,
+            characteristics: 0,
+            header_offset: 0,
+        }];
+
+        // Within raw data — should resolve
+        assert_eq!(rva_to_offset(0x2000, &sections), Some(0x600));
+        assert_eq!(rva_to_offset(0x2100, &sections), Some(0x700));
+        // Within virtual range but beyond raw data (BSS zero-fill) — no file backing
+        assert_eq!(rva_to_offset(0x2500, &sections), None);
+        // Beyond the section entirely
+        assert_eq!(rva_to_offset(0x4000, &sections), None);
     }
 
     #[test]

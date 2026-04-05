@@ -242,6 +242,11 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
                     ArchiveSource::File(f) => (fs_err::read(&f.path)?, Some(f.path), f.executable),
                 }
             } else {
+                tracing::warn!(
+                    "Prepending to {} which was not tracked; creating new entry. \
+                     If this is a namespace package, the DLL loader patch may cause issues.",
+                    target.display()
+                );
                 (Vec::new(), None, false)
             };
 
@@ -293,9 +298,15 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
 /// so that injected code (e.g., DLL loader patches) doesn't violate Python's
 /// requirement that `from __future__` imports precede all other statements.
 /// Returns 0 if no `from __future__` import is found.
+///
+/// Handles multi-line `from __future__` imports using parentheses or
+/// backslash continuation, matching delvewheel's AST-based approach
+/// for correctness.
 fn find_python_insertion_point(content: &[u8]) -> usize {
     let mut pos = 0;
     let mut last_future_end = 0;
+    let mut in_future_import = false;
+    let mut paren_depth: usize = 0;
 
     while pos < content.len() {
         let line_end = content[pos..]
@@ -304,13 +315,49 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
             .map(|i| pos + i + 1)
             .unwrap_or(content.len());
 
-        let trimmed_start = content[pos..line_end]
-            .iter()
-            .position(|b| !b.is_ascii_whitespace())
-            .unwrap_or(0);
+        let line = &content[pos..line_end];
 
-        if content[pos + trimmed_start..line_end].starts_with(b"from __future__") {
-            last_future_end = line_end;
+        if in_future_import {
+            // Count parentheses in this continuation line
+            for &b in line {
+                match b {
+                    b'(' => paren_depth += 1,
+                    b')' => paren_depth = paren_depth.saturating_sub(1),
+                    _ => {}
+                }
+            }
+            let trimmed = line.iter().rev().skip_while(|b| b.is_ascii_whitespace());
+            let ends_with_backslash =
+                trimmed.clone().next() == Some(&b'\\') || trimmed.skip(1).next() == Some(&b'\\');
+            if paren_depth == 0 && !ends_with_backslash {
+                in_future_import = false;
+                last_future_end = line_end;
+            }
+        } else {
+            let trimmed_start = line
+                .iter()
+                .position(|b| !b.is_ascii_whitespace())
+                .unwrap_or(0);
+
+            if line[trimmed_start..].starts_with(b"from __future__") {
+                // Check if this is a multi-line import
+                paren_depth = 0;
+                for &b in line {
+                    match b {
+                        b'(' => paren_depth += 1,
+                        b')' => paren_depth = paren_depth.saturating_sub(1),
+                        _ => {}
+                    }
+                }
+                let trimmed = line.iter().rev().skip_while(|b| b.is_ascii_whitespace());
+                let ends_with_backslash = trimmed.clone().next() == Some(&b'\\')
+                    || trimmed.skip(1).next() == Some(&b'\\');
+                if paren_depth > 0 || ends_with_backslash {
+                    in_future_import = true;
+                } else {
+                    last_future_end = line_end;
+                }
+            }
         }
 
         pos = line_end;
@@ -513,6 +560,14 @@ mod tests {
 
         // Empty content
         assert_eq!(find_python_insertion_point(b""), 0);
+
+        // Multi-line parenthesized __future__ import
+        let content = b"from __future__ import (\n    annotations,\n)\nimport os\n";
+        assert_eq!(find_python_insertion_point(content), 44); // after closing paren line
+
+        // Backslash-continued __future__ import
+        let content = b"from __future__ import annotations, \\\n    division\nimport os\n";
+        assert_eq!(find_python_insertion_point(content), 51); // after continuation line
     }
 
     #[test]

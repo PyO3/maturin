@@ -272,12 +272,7 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
     "mfplat.dll",
     "mf.dll",
     "mfreadwrite.dll",
-    "ole32.dll",
     "mmdevapi.dll",
-    "winmm.dll",
-    "avrt.dll",
-    // CRT
-    "ucrtbase.dll",
     // Misc frequently linked by native extensions
     "hid.dll",
     "winspool.drv",

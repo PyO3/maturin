@@ -203,6 +203,47 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         Ok(())
     }
 
+    /// Prepend data to an already-tracked file entry.
+    ///
+    /// If the target path exists in the tracker as a `Generated` entry, the
+    /// data is prepended to its existing bytes. If it exists as a `File`
+    /// entry, the file is read, data is prepended, and the entry is converted
+    /// to `Generated`. If the target does not exist, a new `Generated` entry
+    /// is created containing only the prepended data.
+    pub(crate) fn prepend_to(&mut self, target: impl AsRef<Path>, data: Vec<u8>) -> Result<()> {
+        let target = target.as_ref();
+        match self.tracker.entry(target.to_path_buf()) {
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                match existing {
+                    ArchiveSource::Generated(generated) => {
+                        let mut new_data = data;
+                        new_data.extend_from_slice(&generated.data);
+                        generated.data = new_data;
+                    }
+                    ArchiveSource::File(file_source) => {
+                        let file_data = fs_err::read(&file_source.path)?;
+                        let mut new_data = data;
+                        new_data.extend_from_slice(&file_data);
+                        *existing = ArchiveSource::Generated(GeneratedSourceData {
+                            data: new_data,
+                            path: Some(file_source.path.clone()),
+                            executable: file_source.executable,
+                        });
+                    }
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(ArchiveSource::Generated(GeneratedSourceData {
+                    data,
+                    path: None,
+                    executable: false,
+                }));
+            }
+        }
+        Ok(())
+    }
+
     /// Actually write the entries to the underlying archive using the provided comparator
     /// to order the entries
     fn finish_internal(

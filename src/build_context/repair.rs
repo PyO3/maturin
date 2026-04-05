@@ -1,5 +1,7 @@
 #[cfg(feature = "auditwheel")]
 use crate::auditwheel::MacOSRepairer;
+#[cfg(feature = "auditwheel")]
+use crate::auditwheel::WindowsRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
@@ -55,6 +57,15 @@ impl BuildContext {
                 Some(Box::new(MacOSRepairer {
                     target: self.project.target.clone(),
                 }))
+            }
+            #[cfg(not(feature = "auditwheel"))]
+            {
+                None
+            }
+        } else if self.project.target.is_windows() {
+            #[cfg(feature = "auditwheel")]
+            {
+                Some(Box::new(WindowsRepairer))
             }
             #[cfg(not(feature = "auditwheel"))]
             {
@@ -196,6 +207,15 @@ impl BuildContext {
         }
 
         log_grafted_libs(&libs_copied, &libs_dir);
+
+        // Apply __init__.py patch for runtime DLL discovery (Windows only).
+        // The patch registers the .libs/ directory via os.add_dll_directory().
+        let libs_dir_name = libs_dir.to_string_lossy().into_owned();
+        let depth = artifact_dir.components().count().max(1);
+        if let Some(patch) = repairer.init_py_patch(&libs_dir_name, depth) {
+            let init_py_path = artifact_dir.join("__init__.py");
+            writer.prepend_to(init_py_path, patch.into_bytes())?;
+        }
 
         // Generate auditwheel SBOM for the grafted libraries.
         // This mirrors Python auditwheel's behaviour of writing a CycloneDX

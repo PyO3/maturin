@@ -334,9 +334,21 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
     };
 
     // Helper to check for encoding declaration (PEP 263)
+    // Must be a comment line containing "coding" followed by ":" or "="
     let is_encoding_line = |line: &[u8]| -> bool {
-        // coding[:=]\s*([-\w.]+)
-        line.windows(6).any(|w| w == b"coding") && line.iter().any(|&b| b == b':' || b == b'=')
+        let trimmed = line
+            .iter()
+            .position(|b| !b.is_ascii_whitespace())
+            .map(|i| &line[i..])
+            .unwrap_or(&[]);
+        if !trimmed.starts_with(b"#") {
+            return false;
+        }
+        let comment = &trimmed[1..];
+        // Match PEP 263 pattern: "coding" followed by ":" or "="
+        comment
+            .windows(7)
+            .any(|w| &w[..6] == b"coding" && (w[6] == b':' || w[6] == b'='))
     };
 
     // Skip shebang (must be first line)

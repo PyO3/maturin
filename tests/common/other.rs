@@ -12,8 +12,10 @@ use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use tar::Archive;
 use time::PrimitiveDateTime;
+use walkdir::WalkDir;
 use zip::ZipArchive;
 
 pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -624,5 +626,44 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         "Expected at least one wheel to be built"
     );
 
+    Ok(())
+}
+
+pub fn generate_stubs(
+    package: impl AsRef<Path>,
+    unique_name: &str,
+    expected_files: &[&str],
+) -> Result<()> {
+    let package = package.as_ref();
+    let output_dir = tempfile::tempdir()?;
+    assert!(
+        Command::new(env!("CARGO_BIN_EXE_maturin"))
+            .arg("generate-stubs")
+            .arg("-m")
+            .arg(package.join("Cargo.toml"))
+            .arg("--target-dir")
+            .arg(format!("test-crates/targets/{unique_name}"))
+            .arg("--out")
+            .arg(output_dir.path())
+            .status()?
+            .success()
+    );
+    let found_files = WalkDir::new(output_dir.path())
+        .sort_by_file_name()
+        .into_iter()
+        .filter(|e| match e {
+            Ok(e) => e.file_type().is_file(),
+            Err(_) => true,
+        })
+        .map(|e| {
+            Ok(e?
+                .path()
+                .strip_prefix(output_dir.path())?
+                .to_str()
+                .unwrap()
+                .replace('\\', "/"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    assert_eq!(found_files, expected_files);
     Ok(())
 }

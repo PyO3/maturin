@@ -20,6 +20,7 @@ use fs_err as fs;
 use ignore::overrides::{Override, OverrideBuilder};
 use itertools::Itertools;
 use normpath::PathExt;
+use pyo3_introspection::{introspect_cdylib, module_stub_files};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -914,5 +915,21 @@ impl<'a> BuildOrchestrator<'a> {
         dist_info_dir: &Path,
     ) -> Result<()> {
         SbomData::write(sbom_data, self.context, writer, dist_info_dir)
+    }
+
+    /// Generate stub files by building the project then extracting the stubs from the build output
+    #[instrument(skip_all)]
+    pub fn generate_stubs(&self) -> Result<HashMap<PathBuf, String>> {
+        match self.context.project.bridge() {
+            BridgeModel::PyO3(_) => {
+                let python_interpreter = self.context.python.interpreter.first();
+                let extension_name = &self.context.project.project_layout.extension_name;
+                let (artifact, _) =
+                    self.compile_cdylib(python_interpreter, Some(extension_name))?;
+                let module_introspection = introspect_cdylib(&artifact.path, extension_name).context("Failed to introspect the built libraries to generate type stubs, have you enabled the \"experimental-inspect\" PyO3 Cargo feature?")?;
+                Ok(module_stub_files(&module_introspection))
+            }
+            _ => bail!("Stub generation  is only possible in PyO3 projects"),
+        }
     }
 }

@@ -164,3 +164,15 @@ fn abi3_without_version() {
 fn abi3_python_interpreter_args() {
     handle_result(other::abi3_python_interpreter_args());
 }
+
+#[test]
+fn abi3_generate_stubs() {
+    handle_result(other::generate_stubs(
+        "test-crates/pyo3-stub-generation",
+        "integration-pyo3-stub-generation-generate-stubs",
+        &[
+            "pyo3_stub_generation/__init__.pyi",
+            "pyo3_stub_generation/submodule.pyi",
+        ],
+    ));
+}

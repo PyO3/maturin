@@ -225,29 +225,28 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
     /// Apply all pending prepends to their corresponding tracked entries.
     ///
     /// For Python files (`.py`), the prepend data is inserted after any
-    /// `from __future__` import lines to avoid SyntaxErrors. For entries
-    /// that were never tracked (no corresponding `add_file`/`add_bytes`),
-    /// a new `Generated` entry is created containing only the prepend data.
+    /// `from __future__` import lines to avoid SyntaxErrors. Targets that
+    /// were never tracked (no corresponding `add_file`/`add_bytes`) are
+    /// skipped to avoid unexpectedly creating files like `__init__.py` in
+    /// namespace packages or binary wheels.
     fn apply_pending_prepends(&mut self) -> Result<()> {
         for (target, prepend_data) in std::mem::take(&mut self.pending_prepends) {
             let is_python = target
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("py"));
 
-            let (file_content, path, executable) = if let Some(existing) =
-                self.tracker.remove(&target)
-            {
-                match existing {
-                    ArchiveSource::Generated(g) => (g.data, g.path, g.executable),
-                    ArchiveSource::File(f) => (fs_err::read(&f.path)?, Some(f.path), f.executable),
-                }
-            } else {
+            let Some(existing) = self.tracker.remove(&target) else {
                 tracing::warn!(
-                    "Prepending to {} which was not tracked; creating new entry. \
-                     If this is a namespace package, the DLL loader patch may cause issues.",
+                    "Skipping prepend for {} because it was not tracked. \
+                     This avoids creating a new file such as __init__.py unexpectedly.",
                     target.display()
                 );
-                (Vec::new(), None, false)
+                continue;
+            };
+
+            let (file_content, path, executable) = match existing {
+                ArchiveSource::Generated(g) => (g.data, g.path, g.executable),
+                ArchiveSource::File(f) => (fs_err::read(&f.path)?, Some(f.path), f.executable),
             };
 
             let insert_pos = if is_python {
@@ -299,9 +298,9 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
 /// requirement that `from __future__` imports precede all other statements.
 /// Returns 0 if no `from __future__` import is found.
 ///
-/// Handles multi-line `from __future__` imports using parentheses or
-/// backslash continuation, matching delvewheel's AST-based approach
-/// for correctness.
+/// This uses a line-oriented byte heuristic rather than parsing Python syntax.
+/// It recognizes simple multi-line `from __future__` imports continued with
+/// parentheses or a trailing backslash, but it is not AST- or token-based.
 fn find_python_insertion_point(content: &[u8]) -> usize {
     let mut pos = 0;
     let mut last_future_end = 0;

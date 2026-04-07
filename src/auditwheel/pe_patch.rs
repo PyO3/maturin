@@ -27,12 +27,18 @@ use fs_err as fs;
 
 // -- Byte reading/writing helpers --
 
-fn read_u16_le(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap())
+fn read_u16_le(data: &[u8], offset: usize) -> Result<u16> {
+    let bytes = data
+        .get(offset..offset + 2)
+        .ok_or_else(|| anyhow::anyhow!("PE read out of bounds at offset {offset}"))?;
+    Ok(u16::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-fn read_u32_le(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
+fn read_u32_le(data: &[u8], offset: usize) -> Result<u32> {
+    let bytes = data
+        .get(offset..offset + 4)
+        .ok_or_else(|| anyhow::anyhow!("PE read out of bounds at offset {offset}"))?;
+    Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
 fn write_u16_le(data: &mut [u8], offset: usize, value: u16) {
@@ -135,7 +141,7 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
         bail!("File too small to be a valid PE");
     }
     // DOS header: e_lfanew at offset 0x3C
-    let pe_offset = read_u32_le(data, 0x3C) as usize;
+    let pe_offset = read_u32_le(data, 0x3C)? as usize;
     if pe_offset + 4 > data.len() {
         bail!("Invalid PE offset");
     }
@@ -145,15 +151,15 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
     }
 
     let coff_offset = pe_offset + 4;
-    let num_sections = read_u16_le(data, coff_offset + 2) as usize;
+    let num_sections = read_u16_le(data, coff_offset + 2)? as usize;
     let num_sections_offset = coff_offset + 2;
-    let opt_hdr_size = read_u16_le(data, coff_offset + 16) as usize;
+    let opt_hdr_size = read_u16_le(data, coff_offset + 16)? as usize;
     let opt_hdr_offset = coff_offset + COFF_HEADER_SIZE;
 
     if opt_hdr_offset + 2 > data.len() {
         bail!("Optional header extends beyond file");
     }
-    let magic = read_u16_le(data, opt_hdr_offset);
+    let magic = read_u16_le(data, opt_hdr_offset)?;
     let is_64bit = match magic {
         PE32_MAGIC => false,
         PE32PLUS_MAGIC => true,
@@ -164,8 +170,8 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
     let size_of_init_data_offset = opt_hdr_offset + 8;
     let size_of_image_offset = opt_hdr_offset + 56;
     let size_of_headers_offset = opt_hdr_offset + 60;
-    let file_alignment = read_u32_le(data, opt_hdr_offset + 36);
-    let section_alignment = read_u32_le(data, opt_hdr_offset + 32);
+    let file_alignment = read_u32_le(data, opt_hdr_offset + 36)?;
+    let section_alignment = read_u32_le(data, opt_hdr_offset + 32)?;
 
     let data_dirs_offset = if is_64bit {
         opt_hdr_offset + 112
@@ -174,7 +180,7 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
     };
 
     let num_rva_and_sizes_offset = data_dirs_offset - 4;
-    let num_data_dirs = read_u32_le(data, num_rva_and_sizes_offset);
+    let num_data_dirs = read_u32_le(data, num_rva_and_sizes_offset)?;
 
     let section_table_offset = opt_hdr_offset + opt_hdr_size;
 
@@ -185,11 +191,11 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
             bail!("Section header {} extends beyond file", i);
         }
         sections.push(SectionInfo {
-            virtual_size: read_u32_le(data, off + 8),
-            virtual_address: read_u32_le(data, off + 12),
-            raw_data_size: read_u32_le(data, off + 16),
-            raw_data_pointer: read_u32_le(data, off + 20),
-            characteristics: read_u32_le(data, off + 36),
+            virtual_size: read_u32_le(data, off + 8)?,
+            virtual_address: read_u32_le(data, off + 12)?,
+            raw_data_size: read_u32_le(data, off + 16)?,
+            raw_data_pointer: read_u32_le(data, off + 20)?,
+            characteristics: read_u32_le(data, off + 36)?,
             header_offset: off,
         });
     }
@@ -230,20 +236,20 @@ fn rva_to_offset(rva: u32, sections: &[SectionInfo]) -> Option<usize> {
     None
 }
 
-fn get_data_dir(data: &[u8], layout: &PeLayout, index: usize) -> Option<(u32, u32)> {
+fn get_data_dir(data: &[u8], layout: &PeLayout, index: usize) -> Result<Option<(u32, u32)>> {
     if index as u32 >= layout.num_data_dirs {
-        return None;
+        return Ok(None);
     }
     let off = layout.data_dirs_offset + index * 8;
     if off + 8 > data.len() {
-        return None;
+        return Ok(None);
     }
-    let rva = read_u32_le(data, off);
-    let size = read_u32_le(data, off + 4);
+    let rva = read_u32_le(data, off)?;
+    let size = read_u32_le(data, off + 4)?;
     if rva == 0 && size == 0 {
-        None
+        Ok(None)
     } else {
-        Some((rva, size))
+        Ok(Some((rva, size)))
     }
 }
 
@@ -251,7 +257,7 @@ fn parse_imports(data: &[u8], layout: &PeLayout) -> Result<Vec<ImportRef>> {
     let mut imports = Vec::new();
 
     // Regular imports (DataDir[1])
-    if let Some((rva, _size)) = get_data_dir(data, layout, DD_IMPORT)
+    if let Some((rva, _size)) = get_data_dir(data, layout, DD_IMPORT)?
         && let Some(table_offset) = rva_to_offset(rva, &layout.sections)
     {
         let mut off = table_offset;
@@ -259,7 +265,7 @@ fn parse_imports(data: &[u8], layout: &PeLayout) -> Result<Vec<ImportRef>> {
             if off + IMPORT_DESC_SIZE > data.len() {
                 break;
             }
-            let name_rva = read_u32_le(data, off + IMPORT_DESC_NAME_OFFSET);
+            let name_rva = read_u32_le(data, off + IMPORT_DESC_NAME_OFFSET)?;
             if name_rva == 0 {
                 break;
             }
@@ -276,7 +282,7 @@ fn parse_imports(data: &[u8], layout: &PeLayout) -> Result<Vec<ImportRef>> {
     }
 
     // Delay-load imports (DataDir[13])
-    if let Some((rva, _size)) = get_data_dir(data, layout, DD_DELAY_IMPORT)
+    if let Some((rva, _size)) = get_data_dir(data, layout, DD_DELAY_IMPORT)?
         && let Some(table_offset) = rva_to_offset(rva, &layout.sections)
     {
         let mut off = table_offset;
@@ -284,7 +290,7 @@ fn parse_imports(data: &[u8], layout: &PeLayout) -> Result<Vec<ImportRef>> {
             if off + DELAY_IMPORT_DESC_SIZE > data.len() {
                 break;
             }
-            let name_rva = read_u32_le(data, off + DELAY_IMPORT_NAME_OFFSET);
+            let name_rva = read_u32_le(data, off + DELAY_IMPORT_NAME_OFFSET)?;
             if name_rva == 0 {
                 break;
             }
@@ -430,7 +436,7 @@ pub fn replace_needed(file_path: &Path, replacements: &[(&str, &str)]) -> Result
 
     // Remove Authenticode signature if it's an appended overlay
     let layout = parse_pe_layout(&data)?;
-    remove_authenticode(&mut data, &layout);
+    remove_authenticode(&mut data, &layout)?;
 
     let imports = parse_imports(&data, &layout)?;
 
@@ -460,7 +466,7 @@ pub fn replace_needed(file_path: &Path, replacements: &[(&str, &str)]) -> Result
             data[end] = 0;
             write_u32_le(&mut data, imports[*imp_idx].name_field_offset, *rva);
         }
-        update_section_virtual_sizes(&mut data, &layout, &new_name_bytes, &slots);
+        update_section_virtual_sizes(&mut data, &layout, &new_name_bytes, &slots)?;
     } else {
         add_new_section_with_names(&mut data, &layout, &imports, &to_replace)?;
     }
@@ -494,7 +500,7 @@ pub fn clear_dependent_load_flags(file_path: &Path) -> Result<bool> {
 // -- Internal helpers --
 
 fn clear_dependent_load_flags_in_data(data: &mut [u8], layout: &PeLayout) -> Result<bool> {
-    let Some((lc_rva, lc_size)) = get_data_dir(data, layout, DD_LOAD_CONFIG) else {
+    let Some((lc_rva, lc_size)) = get_data_dir(data, layout, DD_LOAD_CONFIG)? else {
         return Ok(false);
     };
     let Some(lc_offset) = rva_to_offset(lc_rva, &layout.sections) else {
@@ -513,7 +519,7 @@ fn clear_dependent_load_flags_in_data(data: &mut [u8], layout: &PeLayout) -> Res
         return Ok(false);
     }
 
-    let flags = read_u16_le(data, dlf_file_offset);
+    let flags = read_u16_le(data, dlf_file_offset)?;
     if flags != 0 {
         tracing::debug!("Clearing DependentLoadFlags={:#x}", flags);
         write_u16_le(data, dlf_file_offset, 0);
@@ -533,10 +539,10 @@ fn clear_certificate_table(data: &mut [u8], layout: &PeLayout) {
     }
 }
 
-fn remove_authenticode(data: &mut Vec<u8>, layout: &PeLayout) {
+fn remove_authenticode(data: &mut Vec<u8>, layout: &PeLayout) -> Result<()> {
     // The security directory is special: it uses raw file offsets, not RVAs
-    let Some((cert_file_offset, cert_size)) = get_data_dir(data, layout, DD_SECURITY) else {
-        return;
+    let Some((cert_file_offset, cert_size)) = get_data_dir(data, layout, DD_SECURITY)? else {
+        return Ok(());
     };
 
     let pe_size = layout
@@ -552,6 +558,7 @@ fn remove_authenticode(data: &mut Vec<u8>, layout: &PeLayout) {
     {
         data.truncate(pe_size);
     }
+    Ok(())
 }
 
 fn update_section_virtual_sizes(
@@ -559,7 +566,7 @@ fn update_section_virtual_sizes(
     layout: &PeLayout,
     new_names: &[&[u8]],
     slots: &[(usize, u32)],
-) {
+) -> Result<()> {
     for (name_bytes, &(_file_off, rva)) in new_names.iter().zip(slots) {
         let name_len = name_bytes.len() as u32 + 1;
         for section in &layout.sections {
@@ -567,7 +574,7 @@ fn update_section_virtual_sizes(
                 && rva < section.virtual_address + section.raw_data_size
             {
                 let new_end = (rva - section.virtual_address) + name_len;
-                let current_vs = read_u32_le(data, section.header_offset + 8);
+                let current_vs = read_u32_le(data, section.header_offset + 8)?;
                 if new_end > current_vs {
                     write_u32_le(data, section.header_offset + 8, new_end);
                 }
@@ -575,6 +582,7 @@ fn update_section_virtual_sizes(
             }
         }
     }
+    Ok(())
 }
 
 fn add_new_section_with_names(
@@ -603,7 +611,7 @@ fn add_new_section_with_names(
 
     let section_table_end =
         layout.section_table_offset + layout.sections.len() * SECTION_HEADER_SIZE;
-    let size_of_headers = read_u32_le(data, layout.size_of_headers_offset);
+    let size_of_headers = read_u32_le(data, layout.size_of_headers_offset)?;
 
     // Determine how much extra header space is needed for the new section header.
     // If there's a gap between the last section header and SizeOfHeaders, use it.
@@ -643,7 +651,7 @@ fn add_new_section_with_names(
 
         for i in 0..layout.sections.len() {
             let hdr_off = layout.section_table_offset + i * SECTION_HEADER_SIZE;
-            let old_ptr = read_u32_le(data, hdr_off + 20);
+            let old_ptr = read_u32_le(data, hdr_off + 20)?;
             write_u32_le(data, hdr_off + 20, old_ptr + header_space_needed);
         }
 
@@ -686,7 +694,7 @@ fn add_new_section_with_names(
     );
     write_u32_le(data, layout.size_of_image_offset, new_size_of_image);
 
-    let current_init_data = read_u32_le(data, layout.size_of_init_data_offset);
+    let current_init_data = read_u32_le(data, layout.size_of_init_data_offset)?;
     write_u32_le(
         data,
         layout.size_of_init_data_offset,
@@ -705,7 +713,7 @@ fn add_new_section_with_names(
 }
 
 fn fix_and_write(data: &mut Vec<u8>, layout: &PeLayout, file_path: &Path) -> Result<()> {
-    let old_checksum = read_u32_le(data, layout.checksum_offset);
+    let old_checksum = read_u32_le(data, layout.checksum_offset)?;
     let new_checksum = pe_checksum(data, layout.checksum_offset);
     if old_checksum != 0 {
         write_u32_le(data, layout.checksum_offset, new_checksum);

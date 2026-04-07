@@ -325,9 +325,8 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
                     _ => {}
                 }
             }
-            let mut trimmed = line.iter().rev().skip_while(|b| b.is_ascii_whitespace());
             let ends_with_backslash =
-                trimmed.next() == Some(&b'\\') || trimmed.next() == Some(&b'\\');
+                line.iter().rev().find(|b| !b.is_ascii_whitespace()) == Some(&b'\\');
             if paren_depth == 0 && !ends_with_backslash {
                 in_future_import = false;
                 last_future_end = line_end;
@@ -348,9 +347,8 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
                         _ => {}
                     }
                 }
-                let mut trimmed = line.iter().rev().skip_while(|b| b.is_ascii_whitespace());
                 let ends_with_backslash =
-                    trimmed.next() == Some(&b'\\') || trimmed.next() == Some(&b'\\');
+                    line.iter().rev().find(|b| !b.is_ascii_whitespace()) == Some(&b'\\');
                 if paren_depth > 0 || ends_with_backslash {
                     in_future_import = true;
                 } else {

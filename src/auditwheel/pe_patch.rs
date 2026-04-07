@@ -50,7 +50,8 @@ fn write_u32_le(data: &mut [u8], offset: usize, value: u32) {
 }
 
 fn read_cstring(data: &[u8], offset: usize) -> Option<String> {
-    let end = data[offset..].iter().position(|&b| b == 0)?;
+    let tail = data.get(offset..)?;
+    let end = tail.iter().position(|&b| b == 0)?;
     String::from_utf8(data[offset..offset + end].to_vec()).ok()
 }
 
@@ -616,12 +617,12 @@ fn add_new_section_with_names(
     // Determine how much extra header space is needed for the new section header.
     // If there's a gap between the last section header and SizeOfHeaders, use it.
     // Otherwise, expand headers by FileAlignment bytes and shift all section data.
-    let header_space_needed = if size_of_headers as usize - section_table_end >= SECTION_HEADER_SIZE
-    {
-        0u32
-    } else {
-        round_up(SECTION_HEADER_SIZE as u32, layout.file_alignment)
-    };
+    let header_space_needed =
+        if (size_of_headers as usize).saturating_sub(section_table_end) >= SECTION_HEADER_SIZE {
+            0u32
+        } else {
+            round_up(SECTION_HEADER_SIZE as u32, layout.file_alignment)
+        };
 
     let pe_data_end = layout
         .sections

@@ -15,8 +15,8 @@
 
 use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer};
 use crate::compile::BuildArtifact;
-use anyhow::{Context, Result};
-use std::collections::HashSet;
+use anyhow::{Context, Result, bail};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Windows wheel repairer (delvewheel equivalent).
@@ -297,6 +297,10 @@ const KNOWN_SYSTEM_DLLS: &[&str] = &[
 ];
 
 /// Check if a resolved library path is inside a Windows system directory.
+///
+/// Only checks specific system directories (System32, SysWOW64, WinSxS,
+/// SysArm32) rather than all of `%WINDIR%`, to avoid incorrectly excluding
+/// DLLs that happen to be under `C:\Windows\Temp` or similar.
 fn is_in_windows_system_dir(realpath: &Path) -> bool {
     let path_str = realpath.to_string_lossy().to_lowercase();
     let path_normalized = path_str.replace('\\', "/");
@@ -307,14 +311,21 @@ fn is_in_windows_system_dir(realpath: &Path) -> bool {
         .to_lowercase()
         .replace('\\', "/");
 
-    if !windir.is_empty() && path_normalized.starts_with(&format!("{windir}/")) {
-        return true;
+    // Check specific system directories under %WINDIR%
+    if !windir.is_empty() {
+        let system_subdirs = ["system32", "syswow64", "winsxs", "sysarm32"];
+        for subdir in system_subdirs {
+            if path_normalized.starts_with(&format!("{windir}/{subdir}/")) {
+                return true;
+            }
+        }
     }
 
     // Fallback heuristic for cross-compilation or unusual environments
     path_normalized.contains("/windows/system32/")
         || path_normalized.contains("/windows/syswow64/")
         || path_normalized.contains("/windows/winsxs/")
+        || path_normalized.contains("/windows/sysarm32/")
 }
 
 /// Check if a DLL should be excluded from bundling.
@@ -358,6 +369,12 @@ fn is_system_dll(name: &str, realpath: Option<&Path>, is_pypy: bool) -> bool {
 ///
 /// When `is_pypy` is true, PyPy runtime dependencies like `libffi` are
 /// also excluded since they ship with the PyPy distribution.
+///
+/// # Errors
+///
+/// Returns an error if two different DLLs share the same basename (case-insensitive),
+/// as this would cause ambiguous patching. This can happen when dependencies pull
+/// in different versions of the same library from different paths.
 pub fn find_external_libs(
     artifact: impl AsRef<Path>,
     ld_paths: Vec<PathBuf>,
@@ -371,7 +388,8 @@ pub fn find_external_libs(
         )
     })?;
     let mut ext_libs = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
+    // Track (lowercase_name -> realpath) to detect collisions
+    let mut seen: HashMap<String, PathBuf> = HashMap::new();
     for (_name, lib) in deps.libraries {
         if is_system_dll(&lib.name, lib.realpath.as_deref(), is_pypy) {
             continue;
@@ -380,9 +398,27 @@ pub fn find_external_libs(
             continue;
         }
         let lower_name = lib.name.to_lowercase();
-        if seen.insert(lower_name) {
-            ext_libs.push(lib);
+        let realpath = lib.realpath.as_ref().expect("lib.found() was true");
+        if let Some(existing_path) = seen.get(&lower_name) {
+            // Check if they're actually different files
+            if existing_path != realpath {
+                bail!(
+                    "DLL basename collision: found two different DLLs named '{}'\n\
+                     - {}\n\
+                     - {}\n\
+                     This is unsupported because PE import tables reference DLLs by \
+                     basename only. Consider renaming one of the libraries or \
+                     restructuring your dependencies.",
+                    lib.name,
+                    existing_path.display(),
+                    realpath.display()
+                );
+            }
+            // Same file via different paths/aliases, skip duplicate
+            continue;
         }
+        seen.insert(lower_name, realpath.clone());
+        ext_libs.push(lib);
     }
     Ok(ext_libs)
 }
@@ -467,6 +503,10 @@ mod tests {
 
         let user_path = PathBuf::from(r"C:\Users\me\libs\mylib.dll");
         assert!(!is_system_dll("mylib.dll", Some(&user_path), false));
+
+        // Temp directory under Windows should NOT be treated as system
+        let temp_path = PathBuf::from(r"C:\Windows\Temp\mylib.dll");
+        assert!(!is_system_dll("mylib.dll", Some(&temp_path), false));
     }
 
     #[test]

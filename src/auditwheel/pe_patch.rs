@@ -21,6 +21,12 @@
 //! approach using the `pefile` Python library.
 
 use anyhow::{Context, Result, bail};
+use goblin::pe::header::{SIZEOF_COFF_HEADER, SIZEOF_PE_MAGIC};
+use goblin::pe::import::SIZEOF_IMPORT_DIRECTORY_ENTRY;
+use goblin::pe::section_table::{
+    self, IMAGE_SCN_CNT_CODE, IMAGE_SCN_CNT_INITIALIZED_DATA, IMAGE_SCN_CNT_UNINITIALIZED_DATA,
+    IMAGE_SCN_MEM_DISCARDABLE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ, SectionTable,
+};
 use std::path::Path;
 
 use fs_err as fs;
@@ -57,10 +63,7 @@ fn read_cstring(data: &[u8], offset: usize) -> Option<String> {
 
 // -- PE format constants --
 
-const PE32_MAGIC: u16 = 0x10B;
-const PE32PLUS_MAGIC: u16 = 0x20B;
-const COFF_HEADER_SIZE: usize = 20;
-const SECTION_HEADER_SIZE: usize = 40;
+const SECTION_HEADER_SIZE: usize = section_table::SIZEOF_SECTION_TABLE;
 
 // Data directory indices
 const DD_IMPORT: usize = 1;
@@ -68,9 +71,7 @@ const DD_SECURITY: usize = 4;
 const DD_LOAD_CONFIG: usize = 10;
 const DD_DELAY_IMPORT: usize = 13;
 
-// Import descriptor size (5 × u32)
-const IMPORT_DESC_SIZE: usize = 20;
-// Name RVA field offset within IMAGE_IMPORT_DESCRIPTOR
+// Import descriptor name RVA field offset within IMAGE_IMPORT_DESCRIPTOR
 const IMPORT_DESC_NAME_OFFSET: usize = 12;
 
 // Delay import descriptor size (8 × u32)
@@ -78,24 +79,19 @@ const DELAY_IMPORT_DESC_SIZE: usize = 32;
 // DllNameRVA field offset within IMAGE_DELAYLOAD_DESCRIPTOR
 const DELAY_IMPORT_NAME_OFFSET: usize = 4;
 
-// Section characteristics
-const IMAGE_SCN_CNT_CODE: u32 = 0x0000_0020;
-const IMAGE_SCN_CNT_INITIALIZED_DATA: u32 = 0x0000_0040;
-const IMAGE_SCN_CNT_UNINITIALIZED_DATA: u32 = 0x0000_0080;
-const IMAGE_SCN_MEM_DISCARDABLE: u32 = 0x0200_0000;
-const IMAGE_SCN_MEM_EXECUTE: u32 = 0x2000_0000;
-const IMAGE_SCN_MEM_READ: u32 = 0x4000_0000;
-
 // New section characteristics: readable initialized data
 const NEW_SECTION_CHARS: u32 = IMAGE_SCN_MEM_READ | IMAGE_SCN_CNT_INITIALIZED_DATA;
 
 // -- Parsed PE structures --
 
+struct SectionEntry {
+    table: SectionTable,
+    /// File offset of this section's header entry
+    header_offset: usize,
+}
+
 struct PeLayout {
     is_64bit: bool,
-    /// Offset to the Optional Header (right after PE signature + COFF header)
-    #[allow(dead_code)]
-    opt_hdr_offset: usize,
     /// Offset to the CheckSum field within the file
     checksum_offset: usize,
     /// Offset to the SizeOfInitializedData field
@@ -114,18 +110,13 @@ struct PeLayout {
     section_table_offset: usize,
     file_alignment: u32,
     section_alignment: u32,
-    sections: Vec<SectionInfo>,
+    sections: Vec<SectionEntry>,
 }
 
-#[derive(Clone)]
-struct SectionInfo {
-    virtual_size: u32,
-    virtual_address: u32,
-    raw_data_size: u32,
-    raw_data_pointer: u32,
-    characteristics: u32,
-    /// File offset of this section's header entry
-    header_offset: usize,
+impl PeLayout {
+    fn section_tables(&self) -> impl Iterator<Item = &SectionTable> {
+        self.sections.iter().map(|s| &s.table)
+    }
 }
 
 struct ImportRef {
@@ -138,72 +129,53 @@ struct ImportRef {
 // -- PE parsing --
 
 fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
-    if data.len() < 64 {
-        bail!("File too small to be a valid PE");
-    }
-    // DOS header: e_lfanew at offset 0x3C
-    let pe_offset = read_u32_le(data, 0x3C)? as usize;
-    if pe_offset + 4 > data.len() {
-        bail!("Invalid PE offset");
-    }
-    // Verify PE signature
-    if &data[pe_offset..pe_offset + 4] != b"PE\0\0" {
-        bail!("Invalid PE signature");
-    }
+    let pe = goblin::pe::PE::parse(data).context("Failed to parse PE file")?;
+    let header = &pe.header;
+    let opt = header
+        .optional_header
+        .ok_or_else(|| anyhow::anyhow!("PE file has no optional header"))?;
 
-    let coff_offset = pe_offset + 4;
-    let num_sections = read_u16_le(data, coff_offset + 2)? as usize;
+    let is_64bit = pe.is_64;
+    let pe_offset = header.dos_header.pe_pointer as usize;
+    let coff_offset = pe_offset + SIZEOF_PE_MAGIC;
     let num_sections_offset = coff_offset + 2;
-    let opt_hdr_size = read_u16_le(data, coff_offset + 16)? as usize;
-    let opt_hdr_offset = coff_offset + COFF_HEADER_SIZE;
+    let opt_hdr_offset = coff_offset + SIZEOF_COFF_HEADER;
+    let opt_hdr_size = header.coff_header.size_of_optional_header as usize;
 
-    if opt_hdr_offset + 2 > data.len() {
-        bail!("Optional header extends beyond file");
-    }
-    let magic = read_u16_le(data, opt_hdr_offset)?;
-    let is_64bit = match magic {
-        PE32_MAGIC => false,
-        PE32PLUS_MAGIC => true,
-        _ => bail!("Unknown PE magic: {:#x}", magic),
-    };
-
-    let checksum_offset = opt_hdr_offset + 64;
+    // Compute raw byte offsets for fields we need to patch.
+    // The standard fields start at opt_hdr_offset, followed by windows fields,
+    // then data directories.
+    // SizeOfInitializedData is at offset 8 in the optional header (both PE32 and PE32+)
     let size_of_init_data_offset = opt_hdr_offset + 8;
+    // SizeOfImage is at windows_fields_offset + 24 (PE32) or windows_fields_offset + 28 (PE32+)
+    // In the raw optional header: offset 56 for both PE32 and PE32+
     let size_of_image_offset = opt_hdr_offset + 56;
+    // SizeOfHeaders: offset 60
     let size_of_headers_offset = opt_hdr_offset + 60;
-    let file_alignment = read_u32_le(data, opt_hdr_offset + 36)?;
-    let section_alignment = read_u32_le(data, opt_hdr_offset + 32)?;
+    // CheckSum: offset 64
+    let checksum_offset = opt_hdr_offset + 64;
 
     let data_dirs_offset = if is_64bit {
         opt_hdr_offset + 112
     } else {
         opt_hdr_offset + 96
     };
-
-    let num_rva_and_sizes_offset = data_dirs_offset - 4;
-    let num_data_dirs = read_u32_le(data, num_rva_and_sizes_offset)?;
+    let num_data_dirs = opt.windows_fields.number_of_rva_and_sizes;
 
     let section_table_offset = opt_hdr_offset + opt_hdr_size;
 
-    let mut sections = Vec::with_capacity(num_sections);
-    for i in 0..num_sections {
-        let off = section_table_offset + i * SECTION_HEADER_SIZE;
-        if off + SECTION_HEADER_SIZE > data.len() {
-            bail!("Section header {} extends beyond file", i);
-        }
-        sections.push(SectionInfo {
-            virtual_size: read_u32_le(data, off + 8)?,
-            virtual_address: read_u32_le(data, off + 12)?,
-            raw_data_size: read_u32_le(data, off + 16)?,
-            raw_data_pointer: read_u32_le(data, off + 20)?,
-            characteristics: read_u32_le(data, off + 36)?,
-            header_offset: off,
-        });
-    }
+    let sections = pe
+        .sections
+        .iter()
+        .enumerate()
+        .map(|(i, s)| SectionEntry {
+            table: s.clone(),
+            header_offset: section_table_offset + i * SECTION_HEADER_SIZE,
+        })
+        .collect();
 
     Ok(PeLayout {
         is_64bit,
-        opt_hdr_offset,
         checksum_offset,
         size_of_init_data_offset,
         size_of_image_offset,
@@ -212,23 +184,23 @@ fn parse_pe_layout(data: &[u8]) -> Result<PeLayout> {
         data_dirs_offset,
         num_data_dirs,
         section_table_offset,
-        file_alignment,
-        section_alignment,
+        file_alignment: opt.windows_fields.file_alignment,
+        section_alignment: opt.windows_fields.section_alignment,
         sections,
     })
 }
 
-fn rva_to_offset(rva: u32, sections: &[SectionInfo]) -> Option<usize> {
+fn rva_to_offset(rva: u32, sections: &[SectionTable]) -> Option<usize> {
     for s in sections {
-        // Use max of virtual_size and raw_data_size for section ownership.
-        // This handles BSS sections where virtual_size > raw_data_size.
-        let span = s.virtual_size.max(s.raw_data_size);
+        // Use max of virtual_size and size_of_raw_data for section ownership.
+        // This handles BSS sections where virtual_size > size_of_raw_data.
+        let span = s.virtual_size.max(s.size_of_raw_data);
         if rva >= s.virtual_address && rva < s.virtual_address.saturating_add(span) {
             let delta = rva - s.virtual_address;
             // Only return a file offset if within the raw data on disk.
             // RVAs in the zero-fill/BSS tail have no file backing.
-            if delta < s.raw_data_size {
-                return Some((s.raw_data_pointer + delta) as usize);
+            if delta < s.size_of_raw_data {
+                return Some((s.pointer_to_raw_data + delta) as usize);
             } else {
                 return None;
             }
@@ -254,57 +226,65 @@ fn get_data_dir(data: &[u8], layout: &PeLayout, index: usize) -> Result<Option<(
     }
 }
 
+fn parse_import_descriptors(
+    data: &[u8],
+    sections: &[SectionTable],
+    table_rva: u32,
+    desc_size: usize,
+    name_field_offset: usize,
+    imports: &mut Vec<ImportRef>,
+) -> Result<()> {
+    let Some(table_offset) = rva_to_offset(table_rva, sections) else {
+        return Ok(());
+    };
+    let mut off = table_offset;
+    loop {
+        if off + desc_size > data.len() {
+            break;
+        }
+        let name_rva = read_u32_le(data, off + name_field_offset)?;
+        if name_rva == 0 {
+            break;
+        }
+        if let Some(name_offset) = rva_to_offset(name_rva, sections)
+            && let Some(name) = read_cstring(data, name_offset)
+        {
+            imports.push(ImportRef {
+                dll_name: name,
+                name_field_offset: off + name_field_offset,
+            });
+        }
+        off += desc_size;
+    }
+    Ok(())
+}
+
 fn parse_imports(data: &[u8], layout: &PeLayout) -> Result<Vec<ImportRef>> {
     let mut imports = Vec::new();
+    let sections: Vec<_> = layout.section_tables().cloned().collect();
 
     // Regular imports (DataDir[1])
-    if let Some((rva, _size)) = get_data_dir(data, layout, DD_IMPORT)?
-        && let Some(table_offset) = rva_to_offset(rva, &layout.sections)
-    {
-        let mut off = table_offset;
-        loop {
-            if off + IMPORT_DESC_SIZE > data.len() {
-                break;
-            }
-            let name_rva = read_u32_le(data, off + IMPORT_DESC_NAME_OFFSET)?;
-            if name_rva == 0 {
-                break;
-            }
-            if let Some(name_offset) = rva_to_offset(name_rva, &layout.sections)
-                && let Some(name) = read_cstring(data, name_offset)
-            {
-                imports.push(ImportRef {
-                    dll_name: name,
-                    name_field_offset: off + IMPORT_DESC_NAME_OFFSET,
-                });
-            }
-            off += IMPORT_DESC_SIZE;
-        }
+    if let Some((rva, _size)) = get_data_dir(data, layout, DD_IMPORT)? {
+        parse_import_descriptors(
+            data,
+            &sections,
+            rva,
+            SIZEOF_IMPORT_DIRECTORY_ENTRY,
+            IMPORT_DESC_NAME_OFFSET,
+            &mut imports,
+        )?;
     }
 
     // Delay-load imports (DataDir[13])
-    if let Some((rva, _size)) = get_data_dir(data, layout, DD_DELAY_IMPORT)?
-        && let Some(table_offset) = rva_to_offset(rva, &layout.sections)
-    {
-        let mut off = table_offset;
-        loop {
-            if off + DELAY_IMPORT_DESC_SIZE > data.len() {
-                break;
-            }
-            let name_rva = read_u32_le(data, off + DELAY_IMPORT_NAME_OFFSET)?;
-            if name_rva == 0 {
-                break;
-            }
-            if let Some(name_offset) = rva_to_offset(name_rva, &layout.sections)
-                && let Some(name) = read_cstring(data, name_offset)
-            {
-                imports.push(ImportRef {
-                    dll_name: name,
-                    name_field_offset: off + DELAY_IMPORT_NAME_OFFSET,
-                });
-            }
-            off += DELAY_IMPORT_DESC_SIZE;
-        }
+    if let Some((rva, _size)) = get_data_dir(data, layout, DD_DELAY_IMPORT)? {
+        parse_import_descriptors(
+            data,
+            &sections,
+            rva,
+            DELAY_IMPORT_DESC_SIZE,
+            DELAY_IMPORT_NAME_OFFSET,
+            &mut imports,
+        )?;
     }
 
     Ok(imports)
@@ -313,7 +293,7 @@ fn parse_imports(data: &[u8], layout: &PeLayout) -> Result<Vec<ImportRef>> {
 // -- Section padding utilities --
 
 /// Check if a section is suitable for writing new DLL name strings.
-fn is_section_writable(s: &SectionInfo) -> bool {
+fn is_section_writable(s: &SectionTable) -> bool {
     s.characteristics & IMAGE_SCN_CNT_CODE == 0
         && s.characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA != 0
         && s.characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA == 0
@@ -326,27 +306,28 @@ fn is_section_writable(s: &SectionInfo) -> bool {
 ///
 /// Uses the Next Fit bin packing algorithm (same as delvewheel).
 /// Returns a mapping from new name index → (file_offset, rva) if all names fit.
-fn find_padding_slots(sections: &[SectionInfo], new_names: &[&[u8]]) -> Option<Vec<(usize, u32)>> {
+fn find_padding_slots(sections: &[SectionEntry], new_names: &[&[u8]]) -> Option<Vec<(usize, u32)>> {
     let mut slots = Vec::with_capacity(new_names.len());
     let mut name_idx = 0;
 
-    let mut sorted_sections: Vec<(usize, &SectionInfo)> = sections.iter().enumerate().collect();
-    sorted_sections.sort_by_key(|(_, s)| s.virtual_address);
+    let mut sorted_sections: Vec<(usize, &SectionEntry)> = sections.iter().enumerate().collect();
+    sorted_sections.sort_by_key(|(_, s)| s.table.virtual_address);
 
-    for (si, (_, section)) in sorted_sections.iter().enumerate() {
+    for (si, (_, entry)) in sorted_sections.iter().enumerate() {
         if name_idx >= new_names.len() {
             break;
         }
-        if !is_section_writable(section) || section.virtual_size >= section.raw_data_size {
+        let section = &entry.table;
+        if !is_section_writable(section) || section.virtual_size >= section.size_of_raw_data {
             continue;
         }
 
         let mut padding_start = section.virtual_size;
-        let padding_end = section.raw_data_size;
+        let padding_end = section.size_of_raw_data;
 
         let next_va_limit = sorted_sections
             .get(si + 1)
-            .map(|(_, s)| s.virtual_address - section.virtual_address)
+            .map(|(_, s)| s.table.virtual_address - section.virtual_address)
             .unwrap_or(u32::MAX);
 
         while name_idx < new_names.len() {
@@ -359,7 +340,7 @@ fn find_padding_slots(sections: &[SectionInfo], new_names: &[&[u8]]) -> Option<V
                 break;
             }
 
-            let file_off = section.raw_data_pointer as usize + padding_start as usize;
+            let file_off = section.pointer_to_raw_data as usize + padding_start as usize;
             let rva = section.virtual_address + padding_start;
             slots.push((file_off, rva));
 
@@ -504,7 +485,8 @@ fn clear_dependent_load_flags_in_data(data: &mut [u8], layout: &PeLayout) -> Res
     let Some((lc_rva, lc_size)) = get_data_dir(data, layout, DD_LOAD_CONFIG)? else {
         return Ok(false);
     };
-    let Some(lc_offset) = rva_to_offset(lc_rva, &layout.sections) else {
+    let sections: Vec<_> = layout.section_tables().cloned().collect();
+    let Some(lc_offset) = rva_to_offset(lc_rva, &sections) else {
         return Ok(false);
     };
 
@@ -547,9 +529,8 @@ fn remove_authenticode(data: &mut Vec<u8>, layout: &PeLayout) -> Result<()> {
     };
 
     let pe_size = layout
-        .sections
-        .iter()
-        .map(|s| s.raw_data_pointer.saturating_add(s.raw_data_size) as usize)
+        .section_tables()
+        .map(|s| s.pointer_to_raw_data.saturating_add(s.size_of_raw_data) as usize)
         .max()
         .unwrap_or(0);
 
@@ -570,14 +551,14 @@ fn update_section_virtual_sizes(
 ) -> Result<()> {
     for (name_bytes, &(_file_off, rva)) in new_names.iter().zip(slots) {
         let name_len = name_bytes.len() as u32 + 1;
-        for section in &layout.sections {
-            if rva >= section.virtual_address
-                && rva < section.virtual_address + section.raw_data_size
+        for entry in &layout.sections {
+            if rva >= entry.table.virtual_address
+                && rva < entry.table.virtual_address + entry.table.size_of_raw_data
             {
-                let new_end = (rva - section.virtual_address) + name_len;
-                let current_vs = read_u32_le(data, section.header_offset + 8)?;
+                let new_end = (rva - entry.table.virtual_address) + name_len;
+                let current_vs = read_u32_le(data, entry.header_offset + 8)?;
                 if new_end > current_vs {
-                    write_u32_le(data, section.header_offset + 8, new_end);
+                    write_u32_le(data, entry.header_offset + 8, new_end);
                 }
                 break;
             }
@@ -604,8 +585,7 @@ fn add_new_section_with_names(
     let section_data_padded = round_up(section_data_size, layout.file_alignment);
 
     let new_section_rva = layout
-        .sections
-        .iter()
+        .section_tables()
         .map(|s| round_up(s.virtual_address + s.virtual_size, layout.section_alignment))
         .max()
         .unwrap_or(0);
@@ -625,9 +605,8 @@ fn add_new_section_with_names(
         };
 
     let pe_data_end = layout
-        .sections
-        .iter()
-        .map(|s| s.raw_data_pointer + s.raw_data_size)
+        .section_tables()
+        .map(|s| s.pointer_to_raw_data + s.size_of_raw_data)
         .max()
         .unwrap_or(size_of_headers);
 
@@ -650,10 +629,13 @@ fn add_new_section_with_names(
         let extra = header_space_needed as usize;
         data.splice(section_table_end..section_table_end, vec![0u8; extra]);
 
-        for i in 0..layout.sections.len() {
-            let hdr_off = layout.section_table_offset + i * SECTION_HEADER_SIZE;
-            let old_ptr = read_u32_le(data, hdr_off + 20)?;
-            write_u32_le(data, hdr_off + 20, old_ptr + header_space_needed);
+        for entry in &layout.sections {
+            let old_ptr = read_u32_le(data, entry.header_offset + 20)?;
+            write_u32_le(
+                data,
+                entry.header_offset + 20,
+                old_ptr + header_space_needed,
+            );
         }
 
         write_u32_le(
@@ -749,7 +731,7 @@ mod tests {
         let file_alignment: u32 = 0x200;
 
         let import_dir_rva = section_rva;
-        let import_dir_size = (dll_names.len() + 1) * IMPORT_DESC_SIZE;
+        let import_dir_size = (dll_names.len() + 1) * SIZEOF_IMPORT_DIRECTORY_ENTRY;
 
         let names_start = import_dir_size;
         let mut name_offsets = Vec::new();
@@ -778,7 +760,7 @@ mod tests {
         write_u16_le(&mut data, coff_offset + 16, opt_hdr_size as u16);
 
         // Optional header
-        write_u16_le(&mut data, opt_hdr_offset, PE32PLUS_MAGIC);
+        write_u16_le(&mut data, opt_hdr_offset, 0x20B); // PE32+ magic
         data[opt_hdr_offset + 2] = 14; // MajorLinkerVersion
         data[opt_hdr_offset + 3] = 30; // MinorLinkerVersion
 
@@ -817,7 +799,7 @@ mod tests {
         // Write import directory entries
         let section_data_offset = section_file_offset as usize;
         for (i, _name) in dll_names.iter().enumerate() {
-            let entry_offset = section_data_offset + i * IMPORT_DESC_SIZE;
+            let entry_offset = section_data_offset + i * SIZEOF_IMPORT_DIRECTORY_ENTRY;
             let name_rva = section_rva + name_offsets[i] as u32;
             write_u32_le(&mut data, entry_offset + IMPORT_DESC_NAME_OFFSET, name_rva);
         }
@@ -841,14 +823,12 @@ mod tests {
 
     #[test]
     fn test_rva_to_offset() {
-        let sections = vec![SectionInfo {
-            virtual_size: 100,
-            virtual_address: 0x1000,
-            raw_data_size: 200,
-            raw_data_pointer: 0x400,
-            characteristics: 0,
-            header_offset: 0,
-        }];
+        let mut section = SectionTable::default();
+        section.virtual_size = 100;
+        section.virtual_address = 0x1000;
+        section.size_of_raw_data = 200;
+        section.pointer_to_raw_data = 0x400;
+        let sections = vec![section];
 
         assert_eq!(rva_to_offset(0x1000, &sections), Some(0x400));
         assert_eq!(rva_to_offset(0x1050, &sections), Some(0x450));
@@ -857,15 +837,13 @@ mod tests {
 
     #[test]
     fn test_rva_to_offset_bss_section() {
-        // BSS section where virtual_size > raw_data_size
-        let sections = vec![SectionInfo {
-            virtual_size: 0x1000,
-            virtual_address: 0x2000,
-            raw_data_size: 0x200,
-            raw_data_pointer: 0x600,
-            characteristics: 0,
-            header_offset: 0,
-        }];
+        // BSS section where virtual_size > size_of_raw_data
+        let mut section = SectionTable::default();
+        section.virtual_size = 0x1000;
+        section.virtual_address = 0x2000;
+        section.size_of_raw_data = 0x200;
+        section.pointer_to_raw_data = 0x600;
+        let sections = vec![section];
 
         // Within raw data — should resolve
         assert_eq!(rva_to_offset(0x2000, &sections), Some(0x600));

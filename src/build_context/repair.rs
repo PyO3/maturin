@@ -22,7 +22,11 @@ use super::BuildContext;
 
 impl BuildContext {
     /// Create the appropriate platform-specific wheel repairer.
-    fn make_repairer(&self, platform_tag: &[PlatformTag]) -> Option<Box<dyn WheelRepairer>> {
+    fn make_repairer(
+        &self,
+        platform_tag: &[PlatformTag],
+        python_interpreter: Option<&PythonInterpreter>,
+    ) -> Option<Box<dyn WheelRepairer>> {
         if self.project.target.is_linux() {
             let mut musllinux: Vec<_> = platform_tag
                 .iter()
@@ -65,7 +69,10 @@ impl BuildContext {
         } else if self.project.target.is_windows() {
             #[cfg(feature = "auditwheel")]
             {
-                Some(Box::new(WindowsRepairer))
+                let is_pypy = python_interpreter
+                    .map(|p| p.interpreter_kind.is_pypy())
+                    .unwrap_or(false);
+                Some(Box::new(WindowsRepairer { is_pypy }))
             }
             #[cfg(not(feature = "auditwheel"))]
             {
@@ -97,7 +104,7 @@ impl BuildContext {
             return Ok(AuditResult::new(Policy::default(), Vec::new()));
         }
 
-        let repairer = match self.make_repairer(platform_tag) {
+        let repairer = match self.make_repairer(platform_tag, python_interpreter) {
             Some(r) => r,
             None => return Ok(AuditResult::new(Policy::default(), Vec::new())),
         };
@@ -130,7 +137,7 @@ impl BuildContext {
         audited: &[AuditedArtifact],
     ) -> Result<()> {
         if self.project.editable {
-            if let Some(repairer) = self.make_repairer(&self.python.platform_tag) {
+            if let Some(repairer) = self.make_repairer(&self.python.platform_tag, None) {
                 return repairer.patch_editable(audited);
             }
             return Ok(());
@@ -164,7 +171,7 @@ impl BuildContext {
         }
 
         let repairer = self
-            .make_repairer(&self.python.platform_tag)
+            .make_repairer(&self.python.platform_tag, None)
             .context("No wheel repairer available for this platform")?;
 
         // Put external libs to ${distribution_name}.libs directory

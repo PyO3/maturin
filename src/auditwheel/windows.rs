@@ -27,11 +27,18 @@ use std::path::{Path, PathBuf};
 /// Like [delvewheel](https://github.com/adang1345/delvewheel), this does not
 /// modify the wheel's platform tag — Windows tags (`win_amd64`, `win32`,
 /// `win_arm64`) have no version component.
-pub struct WindowsRepairer;
+pub struct WindowsRepairer {
+    /// Whether the target interpreter is PyPy.
+    ///
+    /// When true, `libffi*.dll` is excluded from bundling because PyPy
+    /// ships it as part of its distribution (it's a runtime prerequisite
+    /// for PyPy's ctypes/cffi support).
+    pub is_pypy: bool,
+}
 
 impl WheelRepairer for WindowsRepairer {
     fn audit(&self, artifact: &BuildArtifact, ld_paths: Vec<PathBuf>) -> Result<AuditResult> {
-        let external_libs = find_external_libs(&artifact.path, ld_paths)
+        let external_libs = find_external_libs(&artifact.path, ld_paths, self.is_pypy)
             .context("Failed to find external libraries for Windows wheel")?;
         Ok(AuditResult::new(super::Policy::default(), external_libs))
     }
@@ -146,6 +153,15 @@ fn is_python_dll(name: &str) -> bool {
         return rest.ends_with("-c.dll");
     }
     false
+}
+
+/// Check if a DLL is a PyPy runtime dependency that ships with the PyPy distribution.
+///
+/// PyPy bundles `libffi-8.dll` (used by ctypes/cffi) alongside
+/// `libpypy3.x-c.dll` in its Windows distribution, so it is always
+/// available wherever PyPy is installed and should not be vendored.
+fn is_pypy_runtime_dll(name: &str) -> bool {
+    name.starts_with("libffi")
 }
 
 /// Check if a DLL name matches the Visual C++ runtime redistributable pattern.
@@ -306,16 +322,20 @@ fn is_in_windows_system_dir(realpath: &Path) -> bool {
 /// Uses a layered approach:
 /// 1. API set DLLs (virtual, never real files) — by name prefix
 /// 2. Python DLLs — by name pattern
-/// 3. VC runtime redistributables — by name pattern
-/// 4. Path-based check — if resolved to a Windows system directory
-/// 5. Name-based fallback — curated list for cross-compilation
-fn is_system_dll(name: &str, realpath: Option<&Path>) -> bool {
+/// 3. PyPy runtime DLLs (only when `is_pypy` is true) — by name prefix
+/// 4. VC runtime redistributables — by name pattern
+/// 5. Path-based check — if resolved to a Windows system directory
+/// 6. Name-based fallback — curated list for cross-compilation
+fn is_system_dll(name: &str, realpath: Option<&Path>, is_pypy: bool) -> bool {
     let lower = name.to_lowercase();
 
     if is_api_set_dll(&lower) {
         return true;
     }
     if is_python_dll(&lower) {
+        return true;
+    }
+    if is_pypy && is_pypy_runtime_dll(&lower) {
         return true;
     }
     if is_vc_runtime_dll(&lower) {
@@ -335,9 +355,13 @@ fn is_system_dll(name: &str, realpath: Option<&Path>) -> bool {
 ///
 /// Returns DLLs that are NOT system/known DLLs and need to be bundled
 /// into the wheel for it to work on other machines.
+///
+/// When `is_pypy` is true, PyPy runtime dependencies like `libffi` are
+/// also excluded since they ship with the PyPy distribution.
 pub fn find_external_libs(
     artifact: impl AsRef<Path>,
     ld_paths: Vec<PathBuf>,
+    is_pypy: bool,
 ) -> Result<Vec<lddtree::Library>> {
     let dep_analyzer = lddtree::DependencyAnalyzer::default().library_paths(ld_paths);
     let deps = dep_analyzer.analyze(&artifact).with_context(|| {
@@ -349,7 +373,7 @@ pub fn find_external_libs(
     let mut ext_libs = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
     for (_name, lib) in deps.libraries {
-        if is_system_dll(&lib.name, lib.realpath.as_deref()) {
+        if is_system_dll(&lib.name, lib.realpath.as_deref(), is_pypy) {
             continue;
         }
         if !lib.found() {
@@ -402,30 +426,52 @@ mod tests {
     }
 
     #[test]
+    fn test_pypy_runtime_dlls() {
+        assert!(is_pypy_runtime_dll("libffi-8.dll"));
+        assert!(is_pypy_runtime_dll("libffi.dll"));
+        assert!(!is_pypy_runtime_dll("libcrypto-3-x64.dll"));
+    }
+
+    #[test]
     fn test_system_dll_by_name() {
-        assert!(is_system_dll("kernel32.dll", None));
-        assert!(is_system_dll("KERNEL32.DLL", None));
-        assert!(is_system_dll("api-ms-win-crt-runtime-l1-1-0.dll", None));
-        assert!(is_system_dll("python311.dll", None));
-        assert!(is_system_dll("vcruntime140.dll", None));
-        assert!(!is_system_dll("libcrypto-3-x64.dll", None));
+        assert!(is_system_dll("kernel32.dll", None, false));
+        assert!(is_system_dll("KERNEL32.DLL", None, false));
+        assert!(is_system_dll(
+            "api-ms-win-crt-runtime-l1-1-0.dll",
+            None,
+            false
+        ));
+        assert!(is_system_dll("python311.dll", None, false));
+        assert!(is_system_dll("vcruntime140.dll", None, false));
+        assert!(!is_system_dll("libcrypto-3-x64.dll", None, false));
+    }
+
+    #[test]
+    fn test_system_dll_pypy_libffi() {
+        // libffi should only be excluded for PyPy
+        assert!(!is_system_dll("libffi-8.dll", None, false));
+        assert!(is_system_dll("libffi-8.dll", None, true));
     }
 
     #[test]
     fn test_system_dll_by_path() {
         let system32_path = PathBuf::from(r"C:\Windows\System32\obscure_system.dll");
-        assert!(is_system_dll("obscure_system.dll", Some(&system32_path)));
+        assert!(is_system_dll(
+            "obscure_system.dll",
+            Some(&system32_path),
+            false
+        ));
 
         let syswow64_path = PathBuf::from(r"C:\Windows\SysWOW64\another.dll");
-        assert!(is_system_dll("another.dll", Some(&syswow64_path)));
+        assert!(is_system_dll("another.dll", Some(&syswow64_path), false));
 
         let user_path = PathBuf::from(r"C:\Users\me\libs\mylib.dll");
-        assert!(!is_system_dll("mylib.dll", Some(&user_path)));
+        assert!(!is_system_dll("mylib.dll", Some(&user_path), false));
     }
 
     #[test]
     fn test_init_py_patch_depth_1() {
-        let repairer = WindowsRepairer;
+        let repairer = WindowsRepairer { is_pypy: false };
         let patch = repairer.init_py_patch("mypackage.libs", 1).unwrap();
         assert!(patch.contains("# start maturin patch"));
         assert!(patch.contains("# end maturin patch"));
@@ -436,7 +482,7 @@ mod tests {
 
     #[test]
     fn test_init_py_patch_depth_2() {
-        let repairer = WindowsRepairer;
+        let repairer = WindowsRepairer { is_pypy: false };
         let patch = repairer.init_py_patch("mypackage.libs", 2).unwrap();
         assert!(patch.contains(r#"os.pardir, os.pardir, "mypackage.libs""#));
     }

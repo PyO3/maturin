@@ -1,8 +1,7 @@
-use anyhow::{Context, Result, ensure};
+use anyhow::Result;
 use fs_err as fs;
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, PythonOptions};
-use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use tracing::instrument;
 
@@ -27,36 +26,32 @@ pub fn generate_stubs(
     .build()?;
 
     let orchestrator = BuildOrchestrator::new(&build_context);
-    let wheels = orchestrator.build_wheels()?;
-    let mut found_stubs = false;
-    for wheel in wheels {
-        let mut archive = zip::ZipArchive::new(fs::File::open(&wheel.0)?)
-            .with_context(|| format!("Failed to open wheel {}", wheel.0.display()))?;
-        for idx in 0..archive.len() {
-            let mut entry = archive.by_index(idx)?;
-            if entry.name().ends_with(".pyi") {
-                let output_path = output.join(entry.name());
-                if let Some(output_parent) = output_path.parent() {
-                    fs::create_dir_all(output_parent)?;
-                }
-                io::copy(&mut entry, &mut fs::File::create_new(&output_path)?).with_context(
-                    || {
-                        format!(
-                            "Failed to copy {} from {} to {}",
-                            entry.name(),
-                            wheel.0.display(),
-                            output_path.display()
-                        )
-                    },
-                )?;
-                found_stubs = true;
+    let stubs = orchestrator.generate_stubs()?;
+    let extension_name = &build_context.project.project_layout.extension_name;
+    if stubs.len() == 1
+        && let Some(stub) = stubs.get(Path::new("__init__.pyi"))
+    {
+        // Special case, we generate just a `extension_name.pyi` file instead of a __init__.pyi file
+        let output_path = output.join(format!("{}.pyi", extension_name));
+        if let Some(output_parent) = output_path.parent() {
+            fs::create_dir_all(output_parent)?;
+        }
+        fs::write(&output_path, stub)?;
+    } else {
+        // We copy the file into a `extension_name` directory
+        let output_dir = output.join(extension_name);
+        if output_dir.exists() {
+            // We want to replace the stubs so we remove the directory
+            fs::remove_dir_all(&output_dir)?;
+        }
+        fs::create_dir_all(&output_dir)?;
+        for (path, content) in &stubs {
+            let output_path = output_dir.join(path);
+            if let Some(output_parent) = output_path.parent() {
+                fs::create_dir_all(output_parent)?;
             }
+            fs::write(&output_path, content)?;
         }
     }
-    ensure!(
-        found_stubs,
-        "No auto-generated stubs found for package {}",
-        build_context.project.module_name
-    );
     Ok(())
 }

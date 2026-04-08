@@ -219,10 +219,11 @@ impl BuildContext {
 
         // Apply __init__.py patch for runtime DLL discovery (Windows only).
         // The patch registers the .libs/ directory via os.add_dll_directory().
-        // Skip for bin bridge wheels (no package __init__.py to patch) and
+        // Skip when no libraries were actually grafted (nothing to discover),
+        // for bin bridge wheels (no package __init__.py to patch), and
         // root-level artifacts.
         let depth = artifact_dir.components().count();
-        if depth > 0 && !self.project.bridge().is_bin() {
+        if !grafted.is_empty() && depth > 0 && !self.project.bridge().is_bin() {
             let libs_dir_name = libs_dir.to_string_lossy().into_owned();
             if let Some(patch) = repairer.init_py_patch(&libs_dir_name, depth) {
                 let init_py_path = artifact_dir.join("__init__.py");

@@ -119,6 +119,9 @@ Options:
       --compression-level <COMPRESSION_LEVEL>
           Zip compression level. Defaults to method default
 
+      --compression-enable-large-file-support
+          Whether to use large file support for ZIP files. Defaults to false
+
       --generate-stubs
           Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its
           "experimental-inspect" feature

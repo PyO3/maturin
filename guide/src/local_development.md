@@ -28,6 +28,11 @@ Options:
 
           Use as `--extras=extra1,extra2`
 
+  -G, --group <GROUP>
+          Install dependency groups defined in pyproject.toml (PEP 735)
+
+          Use as `--group=test,docs`
+
       --skip-install
           Skip installation, only build the extension module inplace
 
@@ -63,14 +68,24 @@ Options:
           Use `uv` to install packages instead of `pip`
 
       --compression-method <COMPRESSION_METHOD>
-          Zip compression method to use
+          Zip compression method. Only Stored and Deflated are currently compatible with all package managers
+
+          Possible values:
+          - deflated: Deflate compression (levels 0-9, default 6)
+          - stored:   No compression
+          - bzip2:    BZIP2 compression (levels 0-9, default 6)
+          - zstd:     Zstandard compression (supported from Python 3.14; levels -7-22, default 3)
 
           [default: deflated]
 
-          Possible values:
-          - deflated: Deflate compression
-          - stored:   No compression
-          - zstd:     Zstandard compression
+      --compression-level <COMPRESSION_LEVEL>
+          Zip compression level. Defaults to method default
+
+      --compression-enable-large-file-support
+          Whether to use large file support for ZIP files. Defaults to false
+
+      --generate-stubs
+          Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its "experimental-inspect" feature
 
   -h, --help
           Print help (see a summary with '-h')

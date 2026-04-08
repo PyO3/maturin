@@ -160,7 +160,7 @@ impl BuildContextBuilder {
         }
 
         let (strip, include_debuginfo, auditwheel) =
-            Self::resolve_build_flags(strip, &build_options, pyproject);
+            Self::resolve_build_flags(strip, &build_options, pyproject, &target);
 
         let sbom = Self::resolve_sbom_config(&build_options, pyproject);
 
@@ -319,6 +319,7 @@ impl BuildContextBuilder {
         strip: Option<bool>,
         build_options: &BuildOptions,
         pyproject: Option<&PyProjectToml>,
+        target: &Target,
     ) -> (bool, bool, AuditWheelMode) {
         let strip = strip.unwrap_or_else(|| pyproject.map(|x| x.strip()).unwrap_or_default());
         let include_debuginfo = if strip && build_options.output.include_debuginfo {
@@ -331,15 +332,20 @@ impl BuildContextBuilder {
         };
         let skip_auditwheel = pyproject.map(|x| x.skip_auditwheel()).unwrap_or_default()
             || build_options.platform.skip_auditwheel;
+        let default_mode = if skip_auditwheel {
+            AuditWheelMode::Skip
+        } else if target.is_linux() {
+            AuditWheelMode::Repair
+        } else {
+            // macOS and Windows repair support is newer;
+            // default to Warn so we don't break existing workflows.
+            AuditWheelMode::Warn
+        };
         let auditwheel = build_options
             .platform
             .auditwheel
             .or_else(|| pyproject.and_then(|x| x.auditwheel()))
-            .unwrap_or(if skip_auditwheel {
-                AuditWheelMode::Skip
-            } else {
-                AuditWheelMode::Repair
-            });
+            .unwrap_or(default_mode);
         (strip, include_debuginfo, auditwheel)
     }
 

@@ -165,11 +165,21 @@ impl BuildContext {
             }
         }
 
-        if matches!(self.python.auditwheel, AuditWheelMode::Check) {
-            bail!(
-                "Your library requires copying the above external libraries. \
-                 Re-run with `--auditwheel=repair` to copy them."
-            );
+        match self.python.auditwheel {
+            AuditWheelMode::Warn => {
+                eprintln!(
+                    "⚠️  Warning: Your library requires copying the above external libraries. \
+                     Re-run with `--auditwheel=repair` to copy them into the wheel."
+                );
+                return Ok(());
+            }
+            AuditWheelMode::Check => {
+                bail!(
+                    "Your library requires copying the above external libraries. \
+                     Re-run with `--auditwheel=repair` to copy them."
+                );
+            }
+            _ => {}
         }
 
         let repairer = self

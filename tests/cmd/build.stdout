@@ -61,6 +61,7 @@ Options:
           Possible values:
           - repair: Audit and repair wheel for manylinux compliance
           - check:  Check wheel for manylinux compliance, but do not repair
+          - warn:   Audit wheel and warn about external libraries, but do not fail or repair
           - skip:   Don't check for manylinux compliance
 
       --zig

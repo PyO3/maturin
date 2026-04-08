@@ -15,7 +15,7 @@
 //! 1. Parse the PE import directory table to find DLL name references
 //! 2. Find space for new (longer) names in section padding
 //! 3. Write new names and update import table RVAs
-//! 4. Fix PE checksum and remove Authenticode signatures
+//! 4. Fix PE checksum (if non-zero) and remove Authenticode signatures
 //!
 //! This matches [delvewheel](https://github.com/adang1345/delvewheel)'s
 //! approach using the `pefile` Python library.
@@ -823,11 +823,13 @@ mod tests {
 
     #[test]
     fn test_rva_to_offset() {
-        let mut section = SectionTable::default();
-        section.virtual_size = 100;
-        section.virtual_address = 0x1000;
-        section.size_of_raw_data = 200;
-        section.pointer_to_raw_data = 0x400;
+        let section = SectionTable {
+            virtual_size: 100,
+            virtual_address: 0x1000,
+            size_of_raw_data: 200,
+            pointer_to_raw_data: 0x400,
+            ..Default::default()
+        };
         let sections = vec![section];
 
         assert_eq!(rva_to_offset(0x1000, &sections), Some(0x400));
@@ -838,11 +840,13 @@ mod tests {
     #[test]
     fn test_rva_to_offset_bss_section() {
         // BSS section where virtual_size > size_of_raw_data
-        let mut section = SectionTable::default();
-        section.virtual_size = 0x1000;
-        section.virtual_address = 0x2000;
-        section.size_of_raw_data = 0x200;
-        section.pointer_to_raw_data = 0x600;
+        let section = SectionTable {
+            virtual_size: 0x1000,
+            virtual_address: 0x2000,
+            size_of_raw_data: 0x200,
+            pointer_to_raw_data: 0x600,
+            ..Default::default()
+        };
         let sections = vec![section];
 
         // Within raw data — should resolve

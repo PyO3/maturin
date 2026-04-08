@@ -352,6 +352,7 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
     };
 
     // Skip shebang (must be first line)
+    let pos_after_bom = pos;
     if pos < content.len() {
         let line_end = find_line_end(pos);
         let line = &content[pos..line_end];
@@ -360,13 +361,19 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
         }
     }
 
-    // Skip encoding declaration (must be in first two lines per PEP 263)
-    // We already potentially consumed line 1 (shebang), so check current line
-    if pos < content.len() {
+    // Skip encoding declaration if present in the first two physical lines (PEP 263).
+    // If we consumed a shebang above, we only need to check the next line.
+    // Otherwise check both the current and next line.
+    let lines_to_check: usize = if pos > pos_after_bom { 1 } else { 2 };
+    for _ in 0..lines_to_check {
+        if pos >= content.len() {
+            break;
+        }
         let line_end = find_line_end(pos);
         let line = &content[pos..line_end];
         if is_encoding_line(line) {
             pos = line_end;
+            break;
         }
     }
 
@@ -398,9 +405,17 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
             Some(b"\"\"\"".as_slice())
         } else if rest.starts_with(b"'''") {
             Some(b"'''".as_slice())
-        } else if rest.starts_with(b"r\"\"\"") || rest.starts_with(b"R\"\"\"") {
+        } else if rest.starts_with(b"r\"\"\"")
+            || rest.starts_with(b"R\"\"\"")
+            || rest.starts_with(b"u\"\"\"")
+            || rest.starts_with(b"U\"\"\"")
+        {
             Some(b"\"\"\"".as_slice())
-        } else if rest.starts_with(b"r'''") || rest.starts_with(b"R'''") {
+        } else if rest.starts_with(b"r'''")
+            || rest.starts_with(b"R'''")
+            || rest.starts_with(b"u'''")
+            || rest.starts_with(b"U'''")
+        {
             Some(b"'''".as_slice())
         } else {
             None
@@ -408,7 +423,11 @@ fn find_python_insertion_point(content: &[u8]) -> usize {
 
         if let Some(q) = quote {
             // Find the closing triple quote
-            let start_offset = if rest.starts_with(b"r") || rest.starts_with(b"R") {
+            let start_offset = if rest.starts_with(b"r")
+                || rest.starts_with(b"R")
+                || rest.starts_with(b"u")
+                || rest.starts_with(b"U")
+            {
                 4
             } else {
                 3

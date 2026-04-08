@@ -137,7 +137,9 @@ impl BuildContext {
         audited: &[AuditedArtifact],
     ) -> Result<()> {
         if self.project.editable {
-            if let Some(repairer) = self.make_repairer(&self.python.platform_tag, None) {
+            if let Some(repairer) =
+                self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
+            {
                 return repairer.patch_editable(audited);
             }
             return Ok(());
@@ -171,7 +173,7 @@ impl BuildContext {
         }
 
         let repairer = self
-            .make_repairer(&self.python.platform_tag, None)
+            .make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             .context("No wheel repairer available for this platform")?;
 
         // Put external libs to ${distribution_name}.libs directory

@@ -146,10 +146,26 @@ pub trait WheelRepairer {
         Ok(())
     }
 
+    /// Return a Python code snippet to prepend to `__init__.py` for runtime
+    /// shared library discovery.
+    ///
+    /// `libs_dir_name` is the leaf directory name for bundled libraries (e.g.
+    /// `"mypackage.libs"`). `depth` is the number of parent directories from
+    /// the package's `__init__.py` to the site-packages root where `.libs/`
+    /// lives.
+    ///
+    /// Returns `None` on platforms that don't need runtime patching:
+    /// - Linux/ELF uses RPATH (`$ORIGIN`)
+    /// - macOS/Mach-O uses `@loader_path`
+    /// - Windows/PE needs `os.add_dll_directory()` injected into `__init__.py`
+    fn init_py_patch(&self, _libs_dir_name: &str, _depth: usize) -> Option<String> {
+        None
+    }
+
     /// Return the wheel-internal directory name for grafted libraries.
     ///
     /// macOS uses `.dylibs` (matching delocate convention),
-    /// Linux uses `.libs` (matching auditwheel convention).
+    /// Linux and Windows use `.libs` (matching auditwheel/delvewheel convention).
     fn libs_dir(&self, dist_name: &str) -> PathBuf {
         PathBuf::from(format!("{dist_name}.libs"))
     }

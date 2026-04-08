@@ -1,5 +1,7 @@
 #[cfg(feature = "auditwheel")]
 use crate::auditwheel::MacOSRepairer;
+#[cfg(feature = "auditwheel")]
+use crate::auditwheel::WindowsRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
@@ -20,7 +22,11 @@ use super::BuildContext;
 
 impl BuildContext {
     /// Create the appropriate platform-specific wheel repairer.
-    fn make_repairer(&self, platform_tag: &[PlatformTag]) -> Option<Box<dyn WheelRepairer>> {
+    fn make_repairer(
+        &self,
+        platform_tag: &[PlatformTag],
+        python_interpreter: Option<&PythonInterpreter>,
+    ) -> Option<Box<dyn WheelRepairer>> {
         if self.project.target.is_linux() {
             let mut musllinux: Vec<_> = platform_tag
                 .iter()
@@ -60,6 +66,18 @@ impl BuildContext {
             {
                 None
             }
+        } else if self.project.target.is_windows() {
+            #[cfg(feature = "auditwheel")]
+            {
+                let is_pypy = python_interpreter
+                    .map(|p| p.interpreter_kind.is_pypy())
+                    .unwrap_or(false);
+                Some(Box::new(WindowsRepairer { is_pypy }))
+            }
+            #[cfg(not(feature = "auditwheel"))]
+            {
+                None
+            }
         } else {
             None
         }
@@ -86,7 +104,7 @@ impl BuildContext {
             return Ok(AuditResult::new(Policy::default(), Vec::new()));
         }
 
-        let repairer = match self.make_repairer(platform_tag) {
+        let repairer = match self.make_repairer(platform_tag, python_interpreter) {
             Some(r) => r,
             None => return Ok(AuditResult::new(Policy::default(), Vec::new())),
         };
@@ -119,7 +137,9 @@ impl BuildContext {
         audited: &[AuditedArtifact],
     ) -> Result<()> {
         if self.project.editable {
-            if let Some(repairer) = self.make_repairer(&self.python.platform_tag) {
+            if let Some(repairer) =
+                self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
+            {
                 return repairer.patch_editable(audited);
             }
             return Ok(());
@@ -153,7 +173,7 @@ impl BuildContext {
         }
 
         let repairer = self
-            .make_repairer(&self.python.platform_tag)
+            .make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             .context("No wheel repairer available for this platform")?;
 
         // Put external libs to ${distribution_name}.libs directory
@@ -196,6 +216,20 @@ impl BuildContext {
         }
 
         log_grafted_libs(&libs_copied, &libs_dir);
+
+        // Apply __init__.py patch for runtime DLL discovery (Windows only).
+        // The patch registers the .libs/ directory via os.add_dll_directory().
+        // Skip when no libraries were actually grafted (nothing to discover),
+        // for bin bridge wheels (no package __init__.py to patch), and
+        // root-level artifacts.
+        let depth = artifact_dir.components().count();
+        if !grafted.is_empty() && depth > 0 && !self.project.bridge().is_bin() {
+            let libs_dir_name = libs_dir.to_string_lossy().into_owned();
+            if let Some(patch) = repairer.init_py_patch(&libs_dir_name, depth) {
+                let init_py_path = artifact_dir.join("__init__.py");
+                writer.prepend_to(init_py_path, patch.into_bytes())?;
+            }
+        }
 
         // Generate auditwheel SBOM for the grafted libraries.
         // This mirrors Python auditwheel's behaviour of writing a CycloneDX

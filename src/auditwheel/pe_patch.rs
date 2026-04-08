@@ -549,6 +549,7 @@ fn update_section_virtual_sizes(
     new_names: &[&[u8]],
     slots: &[(usize, u32)],
 ) -> Result<()> {
+    // Update each section's VirtualSize if we wrote past it
     for (name_bytes, &(_file_off, rva)) in new_names.iter().zip(slots) {
         let name_len = name_bytes.len() as u32 + 1;
         for entry in &layout.sections {
@@ -564,6 +565,31 @@ fn update_section_virtual_sizes(
             }
         }
     }
+
+    // Recalculate SizeOfInitializedData as sum of SizeOfRawData for all
+    // sections with IMAGE_SCN_CNT_INITIALIZED_DATA. This matches delvewheel's
+    // approach which recalculates after modifying virtual sizes.
+    let mut size_of_init_data = 0u32;
+    for entry in &layout.sections {
+        if entry.table.characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA != 0 {
+            // Use max of SizeOfRawData and aligned VirtualSize
+            let vs = read_u32_le(data, entry.header_offset + 8)?;
+            let aligned_vs = round_up(vs, layout.file_alignment);
+            size_of_init_data += entry.table.size_of_raw_data.max(aligned_vs);
+        }
+    }
+    write_u32_le(data, layout.size_of_init_data_offset, size_of_init_data);
+
+    // Update SizeOfImage based on new virtual sizes
+    let mut max_va_end = 0u32;
+    for entry in &layout.sections {
+        let vs = read_u32_le(data, entry.header_offset + 8)?;
+        let va_end = entry.table.virtual_address.saturating_add(vs);
+        max_va_end = max_va_end.max(va_end);
+    }
+    let new_size_of_image = round_up(max_va_end, layout.section_alignment);
+    write_u32_le(data, layout.size_of_image_offset, new_size_of_image);
+
     Ok(())
 }
 

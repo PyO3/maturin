@@ -102,13 +102,22 @@ impl WheelRepairer for WindowsRepairer {
 
     fn init_py_patch(&self, libs_dir_name: &str, depth: usize) -> Option<String> {
         let pardir_chain = "os.pardir, ".repeat(depth);
+        // Note: Conda CPython 3.8-3.9 has a bug where os.add_dll_directory() doesn't
+        // work correctly. Delvewheel detects Conda via `Anaconda_GetVersion` or
+        // "packaged by conda-forge" in sys.version and falls back to LoadLibraryExW.
+        // For simplicity, we only use os.add_dll_directory() which works on:
+        // - CPython 3.10+ (including Conda)
+        // - Non-Conda CPython 3.8-3.9
+        // Conda users on Python 3.8-3.9 should upgrade to 3.10+ or use delvewheel.
         Some(format!(
             "# start maturin patch\n\
              def _maturin_dll_patch():\n\
              \x20   import os\n\
+             \x20   import sys\n\
              \x20   libs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), {pardir_chain}\"{libs_dir_name}\"))\n\
-             \x20   if os.path.isdir(libs_dir) and hasattr(os, 'add_dll_directory'):\n\
-             \x20       os.add_dll_directory(libs_dir)\n\
+             \x20   if os.path.isdir(libs_dir):\n\
+             \x20       if sys.version_info >= (3, 8) and hasattr(os, 'add_dll_directory'):\n\
+             \x20           os.add_dll_directory(libs_dir)\n\
              _maturin_dll_patch()\n\
              del _maturin_dll_patch\n\
              # end maturin patch\n"
@@ -517,6 +526,7 @@ mod tests {
         assert!(patch.contains("# end maturin patch"));
         assert!(patch.contains("os.add_dll_directory(libs_dir)"));
         assert!(patch.contains("hasattr(os, 'add_dll_directory')"));
+        assert!(patch.contains("sys.version_info >= (3, 8)"));
         assert!(patch.contains(r#"os.pardir, "mypackage.libs""#));
     }
 

@@ -106,7 +106,7 @@ fn resolve_and_add_manifest_asset(
 }
 
 /// Run `cargo package --list --allow-dirty` and return the list of files.
-fn cargo_package_file_list(manifest_path: &Path) -> Result<Vec<String>> {
+fn cargo_package_file_list(manifest_path: &Path, target_dir: &Path) -> Result<Vec<String>> {
     debug!(
         "Getting cargo package file list for {}",
         manifest_path.display()
@@ -115,6 +115,8 @@ fn cargo_package_file_list(manifest_path: &Path) -> Result<Vec<String>> {
     let output = Command::new("cargo")
         .args(args)
         .arg(manifest_path)
+        .arg("--target-dir")
+        .arg(target_dir)
         .output()
         .with_context(|| {
             format!(
@@ -183,8 +185,9 @@ fn add_crate_to_source_distribution(
     readme: Option<&ManifestAsset>,
     license_file: Option<&ManifestAsset>,
     opts: &AddCrateOptions<'_>,
+    target_dir: &Path,
 ) -> Result<()> {
-    let file_list = cargo_package_file_list(manifest_path)?;
+    let file_list = cargo_package_file_list(manifest_path, target_dir)?;
 
     trace!("File list: {:?}", file_list);
 
@@ -575,6 +578,7 @@ fn add_path_dep(
                     .expect("workspace inheritance cache missing entry")
             }),
         },
+        &ctx.project.target_dir,
     )
     .with_context(|| {
         format!(
@@ -687,6 +691,7 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
             package_metadata: main_crate,
             workspace_inheritance: None,
         },
+        &ctx.project.target_dir,
     )?;
 
     Ok(())

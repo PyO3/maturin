@@ -358,6 +358,22 @@ fn emcc_version() -> Result<String> {
     Ok(trimmed.into())
 }
 
+fn extract_android_api_level(value: &str) -> Option<String> {
+    static ANDROID_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"android(\d+)").unwrap());
+    ANDROID_RE.captures(value).map(|caps| caps[1].to_string())
+}
+
+fn clang_target_triple() -> Result<String> {
+    use std::process::Command;
+
+    let output = Command::new(if cfg!(windows) { "clang.exe" } else { "clang" })
+        .arg("-dumpmachine")
+        .output()
+        .context("Failed to run clang to get the target triple")?;
+    let target_triple = String::from_utf8(output.stdout)?;
+    Ok(target_triple.trim().to_string())
+}
+
 fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<String> {
     if let Ok(val) = env::var("ANDROID_API_LEVEL") {
         return Ok(val);
@@ -381,12 +397,21 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
         clues.push(cc);
     }
 
-    // Search for android(\d+) in clues
-    static ANDROID_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"android(\d+)").unwrap());
     for clue in clues {
-        if let Some(caps) = ANDROID_RE.captures(&clue) {
-            return Ok(caps[1].to_string());
+        if let Some(api_level) = extract_android_api_level(&clue) {
+            return Ok(api_level);
         }
+    }
+
+    // 3. Check if running on Android (e.g. Termux), then use clang's default target triple
+    let is_android = PlatformInfo::new()
+        .map(|info| info.release().to_string_lossy().contains("android"))
+        .unwrap_or(false);
+    if is_android
+        && let Ok(target_triple) = clang_target_triple()
+        && let Some(api_level) = extract_android_api_level(&target_triple)
+    {
+        return Ok(api_level);
     }
 
     bail!(
@@ -396,7 +421,7 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
 
 #[cfg(test)]
 mod tests {
-    use super::{iphoneos_deployment_target, macosx_deployment_target};
+    use super::{extract_android_api_level, iphoneos_deployment_target, macosx_deployment_target};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -455,5 +480,18 @@ mod tests {
         assert!(iphoneos_deployment_target(Some("abc.def")).is_err());
         assert!(iphoneos_deployment_target(Some("13.abc")).is_err());
         assert!(iphoneos_deployment_target(Some("")).is_err());
+    }
+
+    #[test]
+    fn test_extract_android_api_level() {
+        assert_eq!(
+            extract_android_api_level("aarch64-linux-android24-clang"),
+            Some("24".to_string())
+        );
+        assert_eq!(
+            extract_android_api_level("aarch64-unknown-linux-android30"),
+            Some("30".to_string())
+        );
+        assert_eq!(extract_android_api_level("clang"), None);
     }
 }

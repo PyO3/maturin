@@ -39,22 +39,21 @@ Arguments:
           Rustc flags
 
 Options:
-      --strip
-          Strip the library for minimum file size
+      --strip [<STRIP>]
+          Strip the library for minimum file size. Can be set to `true` or `false`, or used as a flag (`--strip` implies `true`)
 
-      --include-debuginfo
-          Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux) in the wheel.
-          When enabled, maturin automatically configures split-debuginfo=packed so that separate
-          debug info files are produced. Cannot be used with --strip.
+          [env: MATURIN_STRIP=]
+          [possible values: true, false]
 
       --sdist
-          Build a source distribution
+          Build a source distribution and build wheels from it.
 
-      --compatibility [<compatibility>...]
-          Control platform tags. Use `pypi` to ensure PyPI compatibility, or specify platform-specific
-          tags like `manylinux2014`, `musllinux_1_2`, or `linux`.
+          This verifies that the source distribution is complete and can be used to build the project from source.
 
-          The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched
+      --pgo
+          Build with Profile-Guided Optimization (PGO).
+
+          Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml. This performs a three-phase build: instrumented build, profile training, and optimized rebuild.
 
   -i, --interpreter [<INTERPRETER>...]
           The python versions to build wheels for, given as the executables of interpreters such as `python3.9` or `/usr/bin/python3.8`
@@ -67,8 +66,17 @@ Options:
 
           [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
 
-  -o, --out <OUT>
-          The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target directory
+      --compatibility [<compatibility>...]
+          Control the platform tag and PyPI compatibility.
+
+          This options offers both fine-grained control over the linux libc tag and a more automatic PyPI-compatibility option.
+
+          The `pypi` option applies on all platforms and ensure that only tags that can be uploaded to PyPI are used. The linux-specific options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`), and `linux` for the native linux tag. They are
+          ignored on non-linux platforms.
+
+          Note that `manylinux1` and `manylinux2010` are unsupported by the rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
+
+          The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched.
 
       --auditwheel <AUDITWHEEL>
           Audit wheel for manylinux compliance
@@ -84,6 +92,15 @@ Options:
           Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
 
           Make sure you installed zig with `pip install maturin[zig]`
+
+  -o, --out <OUT>
+          The directory to store the built wheels in. Defaults to a new "wheels" directory in the project's target directory
+
+      --include-debuginfo
+          Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux) in the wheel. When enabled, maturin automatically configures split-debuginfo=packed so that separate debug info files are produced
+
+      --sbom-include <SBOM_INCLUDE>...
+          Additional SBOM files to include in the `.dist-info/sboms` directory. Can be specified multiple times
 
   -q, --quiet
           Do not print cargo log messages
@@ -107,14 +124,24 @@ Options:
           Outputs a future incompatibility report at the end of the build (unstable)
 
       --compression-method <COMPRESSION_METHOD>
-          Zip compression method to use
+          Zip compression method. Only Stored and Deflated are currently compatible with all package managers
+
+          Possible values:
+          - deflated: Deflate compression (levels 0-9, default 6)
+          - stored:   No compression
+          - bzip2:    BZIP2 compression (levels 0-9, default 6)
+          - zstd:     Zstandard compression (supported from Python 3.14; levels -7-22, default 3)
 
           [default: deflated]
 
-          Possible values:
-          - deflated: Deflate compression
-          - stored:   No compression
-          - zstd:     Zstandard compression
+      --compression-level <COMPRESSION_LEVEL>
+          Zip compression level. Defaults to method default
+
+      --compression-enable-large-file-support
+          Whether to use large file support for ZIP files. Defaults to false
+
+      --generate-stubs
+          Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its "experimental-inspect" feature
 
   -h, --help
           Print help (see a summary with '-h')

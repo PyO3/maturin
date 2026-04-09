@@ -58,6 +58,13 @@ pub struct CompressionOptions {
     /// Zip compression level. Defaults to method default.
     #[arg(long, allow_negative_numbers = true)]
     pub compression_level: Option<i64>,
+
+    /// Whether to use large file support for ZIP files. Defaults to false.
+    #[arg(
+        long = "compression-enable-large-file-support",
+        default_value_t = false
+    )]
+    pub large_file: bool,
 }
 impl CompressionOptions {
     /// Validate arguments, exit on error
@@ -83,6 +90,7 @@ impl CompressionOptions {
         Self {
             compression_method: method,
             compression_level: Some(method.default_level()),
+            large_file: Default::default(),
         }
     }
 
@@ -105,6 +113,9 @@ impl CompressionOptions {
         } else {
             Some(self.compression_level.unwrap_or(method.default_level()))
         });
+
+        options = options.large_file(self.large_file);
+
         options
     }
 }

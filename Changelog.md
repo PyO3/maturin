@@ -2,6 +2,10 @@
 
 ## 1.13.0
 
+* Fix: fall back to placeholder for abi3 when found interpreters are too old ([#3126](https://github.com/pyo3/maturin/pull/3126))
+
+## 1.13.0
+
 * Refactor: unified interpreter resolution pipeline ([#3032](https://github.com/pyo3/maturin/pull/3032))
 * Refactor: decompose large modules into focused submodules ([#3052](https://github.com/pyo3/maturin/pull/3052))
 * Keep cargo build artifact at original path after staging ([#3054](https://github.com/pyo3/maturin/pull/3054))

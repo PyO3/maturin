@@ -628,8 +628,26 @@ impl<'a> InterpreterResolver<'a> {
         }
 
         if !candidates.is_empty() {
-            Self::print_found_candidates(&candidates);
-            Ok(Self::candidates_to_interpreters(candidates))
+            // Check if any candidate meets the abi3 minimum version.
+            // If none do and the user didn't explicitly request interpreters,
+            // fall back to a placeholder so the build can proceed without a
+            // compatible interpreter on PATH (e.g. manylinux containers where
+            // the system Python is older than the abi3 minimum).
+            let has_compatible = candidates.iter().any(|c| {
+                c.interpreter.has_stable_api()
+                    && (c.interpreter.major as u8, c.interpreter.minor as u8) >= (major, minor)
+            });
+            if has_compatible || !self.user_interpreters.is_empty() {
+                Self::print_found_candidates(&candidates);
+                Ok(Self::candidates_to_interpreters(candidates))
+            } else {
+                eprintln!("🐍 Not using a specific python interpreter");
+                Ok(vec![PythonInterpreter::placeholder(
+                    major as usize,
+                    minor as usize,
+                    self.target,
+                )])
+            }
         } else if self.user_interpreters.is_empty() {
             eprintln!("🐍 Not using a specific python interpreter");
             Ok(vec![PythonInterpreter::placeholder(

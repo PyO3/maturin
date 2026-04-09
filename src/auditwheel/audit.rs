@@ -14,6 +14,8 @@ pub enum AuditWheelMode {
     Repair,
     /// Check wheel for manylinux compliance, but do not repair
     Check,
+    /// Audit wheel and warn about external libraries, but do not fail or repair
+    Warn,
     /// Don't check for manylinux compliance
     Skip,
 }
@@ -23,6 +25,7 @@ impl fmt::Display for AuditWheelMode {
         match self {
             AuditWheelMode::Repair => write!(f, "repair"),
             AuditWheelMode::Check => write!(f, "check"),
+            AuditWheelMode::Warn => write!(f, "warn"),
             AuditWheelMode::Skip => write!(f, "skip"),
         }
     }

@@ -254,6 +254,11 @@
           "const": "check"
         },
         {
+          "description": "Audit wheel and warn about external libraries, but do not fail or repair",
+          "type": "string",
+          "const": "warn"
+        },
+        {
           "description": "Don't check for manylinux compliance",
           "type": "string",
           "const": "skip"

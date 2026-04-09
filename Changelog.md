@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.13.0
+
+* Refactor: unified interpreter resolution pipeline ([#3032](https://github.com/pyo3/maturin/pull/3032))
+* Refactor: decompose large modules into focused submodules ([#3052](https://github.com/pyo3/maturin/pull/3052))
+* Keep cargo build artifact at original path after staging ([#3054](https://github.com/pyo3/maturin/pull/3054))
+* Fix `--strip` conflicting with `--include-debuginfo` in develop ([#3057](https://github.com/pyo3/maturin/pull/3057))
+* Fix abi3 wheel producing version-specific tags for CPython below minimum ([#3061](https://github.com/pyo3/maturin/pull/3061))
+* Generate-ci: use uv pip for pytest steps to fix local wheel preference ([#3063](https://github.com/pyo3/maturin/pull/3063))
+* Update reflink-copy to 0.1.29 to fix sparc Linux builds
+* Add `[tool.maturin.generate-ci.github]` config support ([#3066](https://github.com/pyo3/maturin/pull/3066))
+* Fix(sdist): handle parent workspaces and refactor sdist generation ([#3055](https://github.com/pyo3/maturin/pull/3055))
+* Test: refactor integration suite and switch mixed fixtures to cffi ([#3068](https://github.com/pyo3/maturin/pull/3068))
+* Fix `data` symlink permission handling ([#3069](https://github.com/pyo3/maturin/pull/3069))
+* Fix: correct bugs in audit.rs typo and module_writer ([#3070](https://github.com/pyo3/maturin/pull/3070))
+* Perf: use lazy-initialized regexes instead of per-call compilation ([#3071](https://github.com/pyo3/maturin/pull/3071))
+* Refactor: extract duplicated helpers and reduce code repetition ([#3072](https://github.com/pyo3/maturin/pull/3072))
+* Refactor: split monster functions into focused methods ([#3073](https://github.com/pyo3/maturin/pull/3073))
+* Refactor: improve type safety and API clarity ([#3074](https://github.com/pyo3/maturin/pull/3074))
+* Refactor: cleanup anti-patterns ([#3075](https://github.com/pyo3/maturin/pull/3075))
+* Refactor: decompose `build_context` into focused submodules ([#3076](https://github.com/pyo3/maturin/pull/3076))
+* Fix: skip legacy manylinux aliases not in PyPI allow-list ([#3078](https://github.com/pyo3/maturin/pull/3078))
+* Fix: auto-generate `.def` file for zig + windows-gnu to export `PyInit` symbol ([#3079](https://github.com/pyo3/maturin/pull/3079))
+* Ci: upgrade run-on-arch-action to ubuntu24.04, add deadsnakes PPA for newer Python ([#3081](https://github.com/pyo3/maturin/pull/3081))
+* Fix: pass `-undefined dynamic_lookup` via `CARGO_ENCODED_RUSTFLAGS` on macOS ([#3083](https://github.com/pyo3/maturin/pull/3083))
+* Feat: add Profile-Guided Optimization (PGO) support ([#3085](https://github.com/pyo3/maturin/pull/3085))
+* Respect `metadata_directory` in `build_wheel` per PEP 517 ([#3086](https://github.com/pyo3/maturin/pull/3086))
+* Update lddtree to 0.5.0
+* Fix cargo path with puccinialin for Windows ([#3093](https://github.com/pyo3/maturin/pull/3093))
+* Update and pin cargo-cyclonedx to 0.5.9
+* Ci: improve GitHub Actions generation logic ([#3097](https://github.com/pyo3/maturin/pull/3097))
+* Refactor: split BuildOptions and BuildContext into logical sub-groups ([#3098](https://github.com/pyo3/maturin/pull/3098))
+* Refactor: move subcommands to separate modules ([#3099](https://github.com/pyo3/maturin/pull/3099))
+* Refactor: decouple build orchestration from BuildContext ([#3100](https://github.com/pyo3/maturin/pull/3100))
+* Upgrade pyo3 to 0.28 ([#3101](https://github.com/pyo3/maturin/pull/3101))
+* Fix: only enable include_debuginfo by default on Windows in develop command
+* PyO3: Adds `--generate_stubs` build options ([#3105](https://github.com/pyo3/maturin/pull/3105))
+* Fix: prevent panic when no interpreters match abi3 minimum version ([#3108](https://github.com/pyo3/maturin/pull/3108))
+* Refactor to store CPython ABI metadata in a struct combining two enums ([#3110](https://github.com/pyo3/maturin/pull/3110))
+* Refactor: introduce `WheelRepairer` trait ([#3112](https://github.com/pyo3/maturin/pull/3112))
+* Feat: re-implement delocate for repairing macOS wheels ([#3114](https://github.com/pyo3/maturin/pull/3114))
+* PyO3: Adds generate-stubs command ([#3115](https://github.com/pyo3/maturin/pull/3115))
+* Feat: re-implement delvewheel for repairing Windows wheels ([#3116](https://github.com/pyo3/maturin/pull/3116))
+* Add auditwheel Warn mode, default to Warn on macOS/Windows ([#3121](https://github.com/pyo3/maturin/pull/3121))
+* Feat: Support large zip files ([#3118](https://github.com/pyo3/maturin/pull/3118))
+
 ## 1.12.6
 
 * Sync legacy_py.rs with upstream PyPI warehouse legacy.py ([#3053](https://github.com/PyO3/maturin/pull/3053))

@@ -320,6 +320,10 @@ fn setup_logging(verbose: u8) -> Result<()> {
         .context("Invalid RUST_LOG directives")?;
 
     let logger = tracing_subscriber::fmt::layer()
+        // fmt::layer() defaults to stdout; redirect to stderr so that
+        // structured stdout output (e.g. PEP 517 directory names) is not
+        // polluted by tracing spans.
+        .with_writer(std::io::stderr)
         // Avoid showing all the details from the spans
         .compact()
         // Log the timing of each span

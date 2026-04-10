@@ -111,6 +111,7 @@ fn metadata_hello_world_pep639() -> Result<()> {
 }
 
 #[test]
+#[serial_test::serial]
 fn write_dist_info_uses_license_file_sources() -> Result<()> {
     use pep440_rs::Version;
     use std::str::FromStr;

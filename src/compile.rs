@@ -842,7 +842,7 @@ fn configure_pyo3_env(
             // and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
-            let pyo3_config = interpreter.pyo3_config_file();
+            let pyo3_config = interpreter.pyo3_config_file(target, bridge_model.is_abi3());
             let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",

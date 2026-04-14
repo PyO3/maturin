@@ -11,5 +11,5 @@ version = "0.1.0"
 [workspace.dependencies]
 cfg-if = "1.0.0"
 libc = { version = "0.2", features = ["std"] }
-rand = "0.8"
+rand = "0.9"
 generic_lib = { path = "generic_lib" }

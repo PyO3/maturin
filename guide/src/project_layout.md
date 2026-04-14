@@ -125,6 +125,18 @@ my-rust-and-python-project
     └── src
         └── lib.rs
 ```
+
+Since the `Cargo.toml` is not in the project root, you need to set `manifest-path`
+in `pyproject.toml` so that maturin can find it, especially for source distribution
+(`sdist`) builds:
+
+**pyproject.toml**
+
+```toml
+[tool.maturin]
+manifest-path = "rust/Cargo.toml"
+```
+
 #### Import Rust as a submodule of your project
 
 If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused.

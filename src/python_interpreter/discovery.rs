@@ -297,8 +297,23 @@ pub(super) fn check_executable(
                     "pyenv: {}: command not found",
                     executable.as_ref().display()
                 )) {
+                    // pyenv shim reports "command not found" when the actual interpreter
+                    // doesn't exist (e.g. pyenv install version was never installed)
                     eprintln!(
                         "⚠️  Warning: skipped unavailable python interpreter '{}' from pyenv",
+                        executable.as_ref().display()
+                    );
+                    return Ok(None);
+                } else if stderr.is_empty() {
+                    // Empty stderr typically indicates a stub/placeholder executable that
+                    // fails silently without producing any output. This happens on WSL2
+                    // when PATH includes Windows Store Python stubs at:
+                    //   /mnt/c/Users/<user>/AppData/Local/Microsoft/WindowsApps/python.exe
+                    // These stubs exist but don't function as real Python interpreters -
+                    // they just exit with an error code and no output.
+                    // Skip them gracefully instead of failing the build.
+                    eprintln!(
+                        "⚠️  Warning: skipped python interpreter '{}' with empty output",
                         executable.as_ref().display()
                     );
                     return Ok(None);

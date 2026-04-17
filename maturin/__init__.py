@@ -108,9 +108,15 @@ def _build_wheel(
 
     command = [*base_command, *options]
 
+    env = _get_env()
+    if metadata_directory is not None:
+        if env is None:
+            env = os.environ.copy()
+        env["MATURIN_PEP517_METADATA_DIR"] = metadata_directory
+
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
-    result = subprocess.run(command, stdout=subprocess.PIPE, env=_get_env())
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=env)
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
@@ -186,12 +192,17 @@ def prepare_metadata_for_build_wheel(
 ) -> str:
     print("Checking for Rust toolchain....")
     is_cargo_installed = False
-    try:
-        output = subprocess.check_output(["cargo", "--version"], env=_get_env()).decode("utf-8", "ignore")
-        if "cargo" in output:
-            is_cargo_installed = True
-    except (FileNotFoundError, SubprocessError):
-        pass
+    env = _get_env()
+    # On Windows, the `PATH` in `env` doesn't influence PATH resolution for the spawned
+    # process, so we resolve manually.
+    cargo = shutil.which("cargo", path=env.get("PATH") if env else None)
+    if cargo is not None:
+        try:
+            output = subprocess.check_output([cargo, "--version"], env=env).decode("utf-8", "ignore")
+            if "cargo" in output:
+                is_cargo_installed = True
+        except (FileNotFoundError, SubprocessError):
+            pass
 
     if not is_cargo_installed:
         sys.stderr.write(
@@ -219,7 +230,7 @@ def prepare_metadata_for_build_wheel(
 
     print("Running `{}`".format(" ".join(command)))
     try:
-        _output = subprocess.check_output(command, env=_get_env())
+        _output = subprocess.check_output(command, env=env)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(f"Error running maturin: {e}\n")
         sys.exit(1)

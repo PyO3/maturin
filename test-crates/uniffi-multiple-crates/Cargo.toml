@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/a", "crates/b", "crates/uniffi-bindgen"]
+resolver = "2"

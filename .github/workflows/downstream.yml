@@ -1,3 +1,5 @@
+name: Test Downstream
+
 on:
   workflow_call:
     inputs:
@@ -12,18 +14,18 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Sccache Setup
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
         with:
-          version: "v0.10.0"
+          version: "v0.14.0"
       - name: Build maturin
         env:
           RUST_BACKTRACE: "1"
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
         run: cargo build
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           repository: ${{ inputs.repository }}
           submodules: "recursive"
@@ -35,4 +37,6 @@ jobs:
       - name: Build from sdist
         working-directory: downstream
         run: |
-          ../target/debug/maturin build --manifest-path ${{ inputs.manifest-dir }}/Cargo.toml
+          mkdir -p target/sdist-extract
+          tar -xzf target/sdist/*.tar.gz -C target/sdist-extract --strip-components=1
+          ../target/debug/maturin build --manifest-path target/sdist-extract/${{ inputs.manifest-dir }}/Cargo.toml

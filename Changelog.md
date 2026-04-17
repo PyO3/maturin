@@ -1,8 +1,201 @@
 # Changelog
 
-## Unreleased
+## 1.13.0
 
+* Fix: fall back to placeholder for abi3 when found interpreters are too old ([#3126](https://github.com/pyo3/maturin/pull/3126))
+
+## 1.13.0
+
+* Refactor: unified interpreter resolution pipeline ([#3032](https://github.com/pyo3/maturin/pull/3032))
+* Refactor: decompose large modules into focused submodules ([#3052](https://github.com/pyo3/maturin/pull/3052))
+* Keep cargo build artifact at original path after staging ([#3054](https://github.com/pyo3/maturin/pull/3054))
+* Fix `--strip` conflicting with `--include-debuginfo` in develop ([#3057](https://github.com/pyo3/maturin/pull/3057))
+* Fix abi3 wheel producing version-specific tags for CPython below minimum ([#3061](https://github.com/pyo3/maturin/pull/3061))
+* Generate-ci: use uv pip for pytest steps to fix local wheel preference ([#3063](https://github.com/pyo3/maturin/pull/3063))
+* Update reflink-copy to 0.1.29 to fix sparc Linux builds
+* Add `[tool.maturin.generate-ci.github]` config support ([#3066](https://github.com/pyo3/maturin/pull/3066))
+* Fix(sdist): handle parent workspaces and refactor sdist generation ([#3055](https://github.com/pyo3/maturin/pull/3055))
+* Test: refactor integration suite and switch mixed fixtures to cffi ([#3068](https://github.com/pyo3/maturin/pull/3068))
+* Fix `data` symlink permission handling ([#3069](https://github.com/pyo3/maturin/pull/3069))
+* Fix: correct bugs in audit.rs typo and module_writer ([#3070](https://github.com/pyo3/maturin/pull/3070))
+* Perf: use lazy-initialized regexes instead of per-call compilation ([#3071](https://github.com/pyo3/maturin/pull/3071))
+* Refactor: extract duplicated helpers and reduce code repetition ([#3072](https://github.com/pyo3/maturin/pull/3072))
+* Refactor: split monster functions into focused methods ([#3073](https://github.com/pyo3/maturin/pull/3073))
+* Refactor: improve type safety and API clarity ([#3074](https://github.com/pyo3/maturin/pull/3074))
+* Refactor: cleanup anti-patterns ([#3075](https://github.com/pyo3/maturin/pull/3075))
+* Refactor: decompose `build_context` into focused submodules ([#3076](https://github.com/pyo3/maturin/pull/3076))
+* Fix: skip legacy manylinux aliases not in PyPI allow-list ([#3078](https://github.com/pyo3/maturin/pull/3078))
+* Fix: auto-generate `.def` file for zig + windows-gnu to export `PyInit` symbol ([#3079](https://github.com/pyo3/maturin/pull/3079))
+* Ci: upgrade run-on-arch-action to ubuntu24.04, add deadsnakes PPA for newer Python ([#3081](https://github.com/pyo3/maturin/pull/3081))
+* Fix: pass `-undefined dynamic_lookup` via `CARGO_ENCODED_RUSTFLAGS` on macOS ([#3083](https://github.com/pyo3/maturin/pull/3083))
+* Feat: add Profile-Guided Optimization (PGO) support ([#3085](https://github.com/pyo3/maturin/pull/3085))
+* Respect `metadata_directory` in `build_wheel` per PEP 517 ([#3086](https://github.com/pyo3/maturin/pull/3086))
+* Update lddtree to 0.5.0
+* Fix cargo path with puccinialin for Windows ([#3093](https://github.com/pyo3/maturin/pull/3093))
+* Update and pin cargo-cyclonedx to 0.5.9
+* Ci: improve GitHub Actions generation logic ([#3097](https://github.com/pyo3/maturin/pull/3097))
+* Refactor: split BuildOptions and BuildContext into logical sub-groups ([#3098](https://github.com/pyo3/maturin/pull/3098))
+* Refactor: move subcommands to separate modules ([#3099](https://github.com/pyo3/maturin/pull/3099))
+* Refactor: decouple build orchestration from BuildContext ([#3100](https://github.com/pyo3/maturin/pull/3100))
+* Upgrade pyo3 to 0.28 ([#3101](https://github.com/pyo3/maturin/pull/3101))
+* Fix: only enable include_debuginfo by default on Windows in develop command
+* PyO3: Adds `--generate_stubs` build options ([#3105](https://github.com/pyo3/maturin/pull/3105))
+* Fix: prevent panic when no interpreters match abi3 minimum version ([#3108](https://github.com/pyo3/maturin/pull/3108))
+* Refactor to store CPython ABI metadata in a struct combining two enums ([#3110](https://github.com/pyo3/maturin/pull/3110))
+* Refactor: introduce `WheelRepairer` trait ([#3112](https://github.com/pyo3/maturin/pull/3112))
+* Feat: re-implement delocate for repairing macOS wheels ([#3114](https://github.com/pyo3/maturin/pull/3114))
+* PyO3: Adds generate-stubs command ([#3115](https://github.com/pyo3/maturin/pull/3115))
+* Feat: re-implement delvewheel for repairing Windows wheels ([#3116](https://github.com/pyo3/maturin/pull/3116))
+* Add auditwheel Warn mode, default to Warn on macOS/Windows ([#3121](https://github.com/pyo3/maturin/pull/3121))
+* Feat: Support large zip files ([#3118](https://github.com/pyo3/maturin/pull/3118))
+
+## 1.12.6
+
+* Sync legacy_py.rs with upstream PyPI warehouse legacy.py ([#3053](https://github.com/PyO3/maturin/pull/3053))
+* Keep cargo build artifact at original path after staging ([#3054](https://github.com/PyO3/maturin/pull/3054))
+
+## 1.12.5
+
+* Feat: include debug info files (.pdb, .dSYM, .dwp) in wheels ([#3024](https://github.com/pyo3/maturin/pull/3024))
+* Fix wrong abi3 tag for conditional cargo features enabled pyo3 abi3 feature ([#3029](https://github.com/pyo3/maturin/pull/3029))
+* Fix: `maturin build --sdist` wheel name/layout for excluded workspace crates ([#3031](https://github.com/pyo3/maturin/pull/3031))
+* Fix: preserve wheel output dir when building from unpacked sdist ([#3036](https://github.com/pyo3/maturin/pull/3036))
+* Feat: add python-implementation condition to conditional features ([#3038](https://github.com/pyo3/maturin/pull/3038))
+* Update zip to 8.1 ([#3039](https://github.com/pyo3/maturin/pull/3039))
+* Use the latest version of github actions ([#3040](https://github.com/pyo3/maturin/pull/3040))
+* Use renovate and pinned hashes for GitHub Actions ([#3043](https://github.com/pyo3/maturin/pull/3043))
+* Chore(deps): update taiki-e/install-action digest to 7410117 ([#3046](https://github.com/pyo3/maturin/pull/3046))
+* Chore(deps): update dtolnay/rust-toolchain digest to efa25f7 ([#3045](https://github.com/pyo3/maturin/pull/3045))
+* Chore(deps): update actions/attest-build-provenance action to v4 ([#3047](https://github.com/pyo3/maturin/pull/3047))
+* Use mmap for faster warn_missing_py_init ([#2950](https://github.com/pyo3/maturin/pull/2950))
+
+## 1.12.4
+
+* Upgrade memmap2 version ([#3021](https://github.com/pyo3/maturin/pull/3021))
+* Fix: platform tag detection for Android targets ([#3023](https://github.com/pyo3/maturin/pull/3023))
+* Fix: only ignore maturin-generated native libraries on all platforms ([#3025](https://github.com/pyo3/maturin/pull/3025))
+* Fix: ignore develop artifacts for all binding types during build ([#3026](https://github.com/pyo3/maturin/pull/3026))
+* Feat: support conditional cargo features based on Python version ([#3027](https://github.com/pyo3/maturin/pull/3027))
+
+## 1.12.3
+
+* Ci: set crt-static for riscv64 and loongarch64 musl targets ([#3009](https://github.com/pyo3/maturin/pull/3009))
+* Fix: support `maturin develop` on Windows ARM with x86 Python ([#3011](https://github.com/pyo3/maturin/pull/3011))
+* Fix: exclude `external_packages` bindings from uniffi wheels ([#3013](https://github.com/pyo3/maturin/pull/3013))
+* Update cargo-zigbuild to 0.22.1 ([#3015](https://github.com/pyo3/maturin/pull/3015))
+* Feat: build wheels from sdist with `--sdist` flag ([#3014](https://github.com/pyo3/maturin/pull/3014))
+* Feat: add `include-import-lib` option to bundle Windows import libraries in wheels ([#3017](https://github.com/pyo3/maturin/pull/3017))
+* Fix: auditwheel external lib check respects musllinux and reports symbol versions ([#3019](https://github.com/pyo3/maturin/pull/3019))
+
+## 1.12.2
+
+* Fix: allow absolute paths for `--sbom-include` ([#3004](https://github.com/pyo3/maturin/pull/3004))
+
+## 1.12.1
+
+* Fix crates.io trusted publishing
+* Replace addnab/docker-run-action with direct docker run command
+* Document SBOM support in user guide
+* Add `--sbom-include` CLI argument for additional SBOM files ([#2999](https://github.com/pyo3/maturin/pull/2999))
+* Fix: resolve include patterns relative to python-source for sdist and wheel ([#3000](https://github.com/pyo3/maturin/pull/3000))
+* Feat: log external shared libraries and their dependents before patchelf
+* Feat: support including `OUT_DIR` assets in wheel builds ([#3001](https://github.com/pyo3/maturin/pull/3001))
+* Add test case for uniffi with multiple crates ([#2839](https://github.com/pyo3/maturin/pull/2839))
+
+## 1.12.0
+
+* Use pypi compatibility validation for own CI ([#2929](https://github.com/pyo3/maturin/pull/2929))
+* Update toml crates for toml 1.1 support ([#2934](https://github.com/pyo3/maturin/pull/2934))
+* Fix editable install for binary projects with Python modules ([#2938](https://github.com/pyo3/maturin/pull/2938))
+* Release to crates.io only after the builds passed ([#2939](https://github.com/pyo3/maturin/pull/2939))
+* Use `mymindstorm/setup-emsdk@v14` in generated GitHub Actions workflow ([#2941](https://github.com/pyo3/maturin/pull/2941))
+* Filter linked_paths by KIND and linked_libs ([#2949](https://github.com/pyo3/maturin/pull/2949))
+* Update bytes to 1.11.1 ([#2960](https://github.com/pyo3/maturin/pull/2960))
+* Normalize wheel distribution names to match the PyPA spec ([#2954](https://github.com/pyo3/maturin/pull/2954))
+* Allow build loongarch64 and riscv64 for musllinux ([#2963](https://github.com/pyo3/maturin/pull/2963))
+* Strip excluded cargo targets in sdist ([#2964](https://github.com/pyo3/maturin/pull/2964))
+* Normalize wheel `RECORD` paths (on Windows) ([#2965](https://github.com/pyo3/maturin/pull/2965))
+* Bump MSRV to 1.88.0 ([#2966](https://github.com/pyo3/maturin/pull/2966))
+* Support MATURIN_STRIP env var and --strip true/false to override pyproject.toml ([#2968](https://github.com/pyo3/maturin/pull/2968))
+* Fix: copy bin artifacts before auditwheel repair to avoid rerun failures ([#2969](https://github.com/pyo3/maturin/pull/2969))
+* Fix: rewrite python-source in pyproject.toml when building sdist ([#2972](https://github.com/pyo3/maturin/pull/2972))
+* Fix: resolve wheel include patterns relative to project root ([#2973](https://github.com/pyo3/maturin/pull/2973))
+* Fix: always include workspace Cargo.toml in sdist ([#2974](https://github.com/pyo3/maturin/pull/2974))
+* Refactor: simplify source_distribution.rs ([#2976](https://github.com/pyo3/maturin/pull/2976))
+* Feat: support PEP 735 dependency groups in develop command ([#2978](https://github.com/pyo3/maturin/pull/2978))
+* Fix license file handling for workspace-level license files ([#2970](https://github.com/pyo3/maturin/pull/2970))
+* Support PEP 739 build-details.json when cross compiling ([#2979](https://github.com/pyo3/maturin/pull/2979))
+* Fix .libs directory name for namespace packages ([#2981](https://github.com/pyo3/maturin/pull/2981))
+* Fix: exclude duplicate python source files from sdist for workspace members ([#2982](https://github.com/pyo3/maturin/pull/2982))
+* Fix: remove default-members from workspace Cargo.toml in sdist ([#2983](https://github.com/pyo3/maturin/pull/2983))
+* Fix: correctly filter workspace members in sdist by directory path ([#2984](https://github.com/pyo3/maturin/pull/2984))
+* Feat: Add PEP 770 SBOM support ([#2980](https://github.com/pyo3/maturin/pull/2980))
+* Error when python-source is set but Python module is missing ([#2986](https://github.com/pyo3/maturin/pull/2986))
+* Feat: add auditwheel SBOM for grafted shared libraries ([#2985](https://github.com/pyo3/maturin/pull/2985))
+* Fix sdist duplicate README error when readme is in both Cargo.toml and pyproject.toml ([#2987](https://github.com/pyo3/maturin/pull/2987))
+* Fix: support python-source pointing outside Rust source directory ([#2988](https://github.com/pyo3/maturin/pull/2988))
+* Relax ziglang dependency version requirement ([#2990](https://github.com/pyo3/maturin/pull/2990))
+* Stop adding link-native-libraries flag by default in Emscripten platform in latest Rust ([#2991](https://github.com/pyo3/maturin/pull/2991))
+* Fix: platform.system() on Android for Python 3.13+ ([#2992](https://github.com/pyo3/maturin/pull/2992))
+* Document more environment variables in user guide
+* Fix: check external libs for glibc version when determining platform tag ([#2993](https://github.com/pyo3/maturin/pull/2993))
+* Update cargo-zigbuild to 0.22.0 ([#2994](https://github.com/pyo3/maturin/pull/2994))
+* Sbom: filter to bindings crate only and upgrade to CycloneDX v1.5 ([#2995](https://github.com/pyo3/maturin/pull/2995))
+* Upgrade ureq to 3.2.0 and migrate to built-in multipart ([#2997](https://github.com/pyo3/maturin/pull/2997))
+
+## 1.11.5
+
+* Allow combining `--compatibility pypi` with other `--compatibility` values ([#2928](https://github.com/pyo3/maturin/pull/2928))
+
+## 1.11.4
+
+* Support armv6l and armv7l in pypi compatibility ([#2926](https://github.com/pyo3/maturin/pull/2926))
+* Improve the reliability of maturin's own CI
+
+## 1.11.3
+
+* Fix manylinux2014 compliance check ([#2922](https://github.com/pyo3/maturin/pull/2922))
+
+## 1.11.2
+
+* Fix failed release
+
+## 1.11.1
+
+* Fix compiled artifacts being excluded by source path matching ([#2910](https://github.com/pyo3/maturin/pull/2910))
+* Better error reporting for missing interpreters ([#2918](https://github.com/pyo3/maturin/pull/2918))
+* Ignore unreadable excluded directories ([#2916](https://github.com/pyo3/maturin/pull/2916))
+
+## [1.11.0] - Yanked
+
+Note: This release was yanked to a regression: https://github.com/PyO3/maturin/issues/2909
+
+* Refactor `ModuleWriter` to be easier to implement and use
+* Add Android cross compilation support, fix wheel tags for Android
+* Update generate-ci to macos-15-intel and add windows arm support
+* Deprecate 'upload' and 'publish' CLI commands
+
+## [1.10.2]
+
+* Fix tagging for iOS x86_64 simulator wheels.
+* Set entry type when adding to the tar file.
+
+## [1.10.1]
+
+* Fix wrong dependency on Homebrew liblzma on macOS by static linking liblama
+
+## [1.10.0]
+
+* Add `tool.maturin.editable-profile` option to override profile for editable package installations.
+* Add support for Cygwin.
+* When building `abi3` wheels on non-Windows platforms that aren't cross-compiling, the `sysconfigdata` of the interpreter used to run maturin will now be used, rather than a dummy interpreter.
+* Allow iOS cross-platform virtual environments, such as those used by cibuildwheel, to imply an iOS target.
+* Fix iOS wheel naming to be compliant with PEP 730.
 * Fix generated WHEEL Tag metadata to be spec compliant.
+* Fix incorrect warning about missing `extension-module` feature on PyO3 0.26+.
+* Remove `add_directory()` from ModuleWriter and make it an implementation detail for the specific impl.
+* Clear out uid/gid and set deterministic mtime for files in sdist.
+* Always use "library" mode to build uniffi bindings.
 
 ## [1.9.6]
 
@@ -37,7 +230,7 @@
 ## [1.9.0]
 
 * Add full PEP 639 support for `project.license` and `project.license-files` in [#2647](https://github.com/PyO3/maturin/pull/2647).
-* Add `--compatiblity pypi` to only build wheels with platform tags that can also be uploaded to PyPI. This blocks e.g. building for riscv64, which is supported by manylinux, but not by PyPI.
+* Add `--compatibility pypi` to only build wheels with platform tags that can also be uploaded to PyPI. This blocks e.g. building for riscv64, which is supported by manylinux, but not by PyPI.
 
 ## [1.8.7]
 
@@ -1113,7 +1306,10 @@ points-0.1.0-py2.py3-none-manylinux1_x86_64.whl | 2,8M | 752K | 85K
 
  * Initial Release
 
-[Unreleased]: https://github.com/pyo3/maturin/compare/v1.9.6...HEAD
+[1.11.0]: https://github.com/pyo3/maturin/compare/v1.10.2...v1.11.0
+[1.10.2]: https://github.com/pyo3/maturin/compare/v1.10.1...v1.10.2
+[1.10.1]: https://github.com/pyo3/maturin/compare/v1.10.0...v1.10.1
+[1.10.0]: https://github.com/pyo3/maturin/compare/v1.9.6...v1.10.0
 [1.9.6]: https://github.com/pyo3/maturin/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/pyo3/maturin/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/pyo3/maturin/compare/v1.9.3...v1.9.4

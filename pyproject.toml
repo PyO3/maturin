@@ -30,7 +30,7 @@ dependencies = ["tomli>=1.1.0 ; python_version<'3.11'"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-zig = ["ziglang>=0.10.0,<0.13.0"]
+zig = ["ziglang>=0.10.0"]
 patchelf = ["patchelf"]
 
 [project.urls]

@@ -3,6 +3,7 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_TERM_COLOR: always
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  MATURIN_TEST_CLEANUP: 1
 
 build_and_test:
   &BUILD_AND_TEST # only run tasks on pull request or github merge queue branches
@@ -14,12 +15,13 @@ build_and_test:
   build_script:
     - cargo build
   test_script:
-    - cargo test
+    - curl -LsSf https://get.nexte.st/latest/freebsd | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+    - cargo nextest run
 
 freebsd_task:
   name: Test (x86_64 FreeBSD)
   freebsd_instance:
-    image_family: freebsd-14-2
+    image_family: freebsd-15-0-amd64-zfs
   env:
     PATH: $HOME/.cargo/bin:$PATH
   target_cache:

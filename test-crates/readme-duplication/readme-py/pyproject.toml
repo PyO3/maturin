@@ -5,6 +5,3 @@ build-backend = "maturin"
 [project]
 name = "readme-py"
 version = "0.2.0"
-
-[tool.maturin]
-features = ["pyo3/extension-module"]

@@ -8,3 +8,15 @@ readme = "../../README.md"
 default-run = "hello-world"
 
 [dependencies]
+
+[[bench]]
+name = "excluded_bench"
+
+[[bench]]
+name = "included_bench"
+
+[[example]]
+name = "excluded_example"
+
+[[example]]
+name = "included_example"

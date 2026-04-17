@@ -1,15 +1,15 @@
 //! The uploading logic was mostly reverse engineered; I wrote it down as
 //! documentation at https://warehouse.readthedocs.io/api-reference/legacy/#upload-api
 
-use crate::build_context::hash_file;
-use anyhow::{bail, Context, Result};
-use base64::engine::general_purpose::STANDARD;
+use crate::util::hash_file;
+use anyhow::{Context, Result, bail};
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use bytesize::ByteSize;
 use configparser::ini::Ini;
 use fs_err as fs;
-use fs_err::File;
-use multipart::client::lazy::Multipart;
+
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -65,6 +65,16 @@ impl PublishOpt {
 
     /// Set to non interactive mode if we're running on CI
     pub fn non_interactive_on_ci(&mut self) {
+        let msg = "⚠️  Warning: The maturin upload and publish commands are deprecated and will be removed in the future. For more information see: https://github.com/PyO3/maturin/issues/2334";
+        eprintln!("{msg}");
+        if env::var("GITHUB_ACTIONS")
+            .map(|v| v == "true")
+            .unwrap_or_default()
+        {
+            // Also emit a warning annotation on the GH action
+            println!("::warning::{msg}");
+        }
+
         if !self.non_interactive && env::var("CI").map(|v| v == "true").unwrap_or_default() {
             eprintln!("🎛️ Running in non-interactive mode on CI");
             self.non_interactive = true;
@@ -275,25 +285,32 @@ fn resolve_pypi_token_via_oidc(registry_url: &str) -> Result<Option<String>> {
         let mut audience_url = registry_url.clone();
         audience_url.set_path("_/oidc/audience");
         debug!("Requesting OIDC audience from {}", audience_url);
-        let agent = http_agent()?;
-        let audience_res = agent
-            .get(audience_url.as_str())
-            .timeout(Duration::from_secs(30))
-            .call()?;
+
+        // Create agent with timeout configuration
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .proxy(ureq::Proxy::try_from_env())
+            .timeout_global(Some(Duration::from_secs(30)))
+            .build()
+            .into();
+
+        let mut audience_res = agent.get(audience_url.as_str()).call()?;
         if audience_res.status() == 404 {
             // OIDC is not enabled/supported on this registry
             return Ok(None);
         }
-        let audience = audience_res.into_json::<OidcAudienceResponse>()?.audience;
+        let audience = audience_res
+            .body_mut()
+            .read_json::<OidcAudienceResponse>()?
+            .audience;
 
         debug!("Requesting OIDC token for {} from {}", audience, req_url);
         let request_token_res: OidcTokenResponse = agent
             .get(&req_url)
             .query("audience", &audience)
-            .set("Authorization", &format!("bearer {req_token}"))
-            .timeout(Duration::from_secs(30))
+            .header("Authorization", &format!("bearer {req_token}"))
             .call()?
-            .into_json()?;
+            .body_mut()
+            .read_json()?;
         let oidc_token = request_token_res.value;
 
         let mut mint_token_url = registry_url;
@@ -303,9 +320,9 @@ fn resolve_pypi_token_via_oidc(registry_url: &str) -> Result<Option<String>> {
         mint_token_req.insert("token", oidc_token);
         let mint_token_res = agent
             .post(mint_token_url.as_str())
-            .timeout(Duration::from_secs(30))
             .send_json(mint_token_req)?
-            .into_json::<MintTokenResponse>()?;
+            .body_mut()
+            .read_json::<MintTokenResponse>()?;
         return Ok(Some(mint_token_res.token));
     }
     Ok(None)
@@ -362,10 +379,8 @@ fn complete_registry(opt: &PublishOpt) -> Result<Registry> {
 /// Port of pip's `canonicalize_name`
 /// https://github.com/pypa/pip/blob/b33e791742570215f15663410c3ed987d2253d5b/src/pip/_vendor/packaging/utils.py#L18-L25
 fn canonicalize_name(name: &str) -> String {
-    Regex::new("[-_.]+")
-        .unwrap()
-        .replace_all(name, "-")
-        .to_lowercase()
+    static RE: Lazy<Regex> = Lazy::new(|| Regex::new("[-_.]+").unwrap());
+    RE.replace_all(name, "-").to_lowercase()
 }
 
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
@@ -376,53 +391,72 @@ fn tls_ca_bundle() -> Option<OsString> {
 }
 
 // Prefer rustls if both native-tls and rustls features are enabled
-#[cfg(all(feature = "native-tls", not(feature = "rustls")))]
-#[allow(clippy::result_large_err)]
-fn http_agent() -> Result<ureq::Agent, UploadError> {
-    use std::sync::Arc;
+/// Load certificates from a CA bundle file
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+fn load_ca_certs(
+    ca_bundle: impl AsRef<std::path::Path>,
+) -> Result<Vec<ureq::tls::Certificate<'static>>, UploadError> {
+    use rustls_pki_types::pem::PemObject;
 
-    let mut builder = ureq::builder().try_proxy_from_env(true);
-    let mut tls_builder = native_tls::TlsConnector::builder();
+    let certs = rustls_pki_types::CertificateDer::pem_file_iter(ca_bundle)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+    Ok(certs
+        .into_iter()
+        .map(|cert| {
+            let owned = cert.into_owned();
+            ureq::tls::Certificate::from_der(owned.as_ref()).to_owned()
+        })
+        .collect())
+}
+
+#[cfg(all(feature = "native-tls", not(feature = "rustls")))]
+fn http_agent() -> Result<ureq::Agent, UploadError> {
+    let mut tls_config =
+        ureq::tls::TlsConfig::builder().provider(ureq::tls::TlsProvider::NativeTls);
+
     if let Some(ca_bundle) = tls_ca_bundle() {
-        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
-        for cert in rustls_pemfile::certs(&mut reader) {
-            let cert = cert?;
-            tls_builder.add_root_certificate(native_tls::Certificate::from_pem(&cert)?);
-        }
+        let certs = load_ca_certs(ca_bundle)?;
+        tls_config = tls_config.root_certs(ureq::tls::RootCerts::new_with_certs(&certs));
     }
-    builder = builder.tls_connector(Arc::new(tls_builder.build()?));
-    Ok(builder.build())
+
+    Ok(ureq::Agent::config_builder()
+        .proxy(ureq::Proxy::try_from_env())
+        .http_status_as_error(false)
+        .tls_config(tls_config.build())
+        .build()
+        .into())
 }
 
 #[cfg(feature = "rustls")]
-#[allow(clippy::result_large_err)]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
-    use std::sync::Arc;
+    let mut builder = ureq::Agent::config_builder()
+        .proxy(ureq::Proxy::try_from_env())
+        .http_status_as_error(false);
 
-    let builder = ureq::builder().try_proxy_from_env(true);
     if let Some(ca_bundle) = tls_ca_bundle() {
-        let mut reader = io::BufReader::new(File::open(ca_bundle)?);
-        let certs = rustls_pemfile::certs(&mut reader).collect::<Result<Vec<_>, _>>()?;
-        let mut root_certs = rustls::RootCertStore::empty();
-        root_certs.add_parsable_certificates(certs);
-        let client_config = rustls::ClientConfig::builder()
-            .with_root_certificates(root_certs)
-            .with_no_client_auth();
-        Ok(builder.tls_config(Arc::new(client_config)).build())
-    } else {
-        Ok(builder.build())
+        let certs = load_ca_certs(ca_bundle)?;
+        let tls_config = ureq::tls::TlsConfig::builder()
+            .root_certs(ureq::tls::RootCerts::new_with_certs(&certs))
+            .build();
+        builder = builder.tls_config(tls_config);
     }
+
+    Ok(builder.build().into())
 }
 
 #[cfg(not(any(feature = "native-tls", feature = "rustls")))]
-#[allow(clippy::result_large_err)]
 fn http_agent() -> Result<ureq::Agent, UploadError> {
-    let builder = ureq::builder().try_proxy_from_env(true);
-    Ok(builder.build())
+    Ok(ureq::Agent::config_builder()
+        .proxy(ureq::Proxy::try_from_env())
+        .http_status_as_error(false)
+        .build()
+        .into())
 }
 
 /// Uploads a single wheel to the registry
-#[allow(clippy::result_large_err)]
 pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError> {
     let hash_hex = hash_file(wheel_path)?;
 
@@ -484,76 +518,80 @@ pub fn upload(registry: &Registry, wheel_path: &Path) -> Result<(), UploadError>
     add_vec("requires_external", &metadata.requires_external);
     add_vec("project_urls", &metadata.project_urls);
 
-    let wheel = File::open(wheel_path)?;
     let wheel_name = wheel_path
         .file_name()
         .expect("Wheel path has a file name")
         .to_string_lossy();
 
-    let mut form = Multipart::new();
-    for (key, value) in api_metadata {
-        form.add_text(key, value);
+    let mut form = ureq::unversioned::multipart::Form::new();
+    for (key, value) in &api_metadata {
+        form = form.text(key, value.as_str());
     }
 
-    form.add_stream("content", &wheel, Some(wheel_name), None);
-    let multipart_data = form.prepare().map_err(|e| e.error)?;
+    form = form.part(
+        "content",
+        ureq::unversioned::multipart::Part::file(wheel_path)?.file_name(&wheel_name),
+    );
+
     let encoded = STANDARD.encode(format!("{}:{}", registry.username, registry.password));
 
     let agent = http_agent()?;
 
-    let response = agent
+    let mut response = agent
         .post(registry.url.as_str())
-        .set(
-            "Content-Type",
-            &format!(
-                "multipart/form-data; boundary={}",
-                multipart_data.boundary()
-            ),
-        )
-        .set(
+        .header(
             "User-Agent",
             &format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
         )
-        .set("Authorization", &format!("Basic {encoded}"))
-        .send(multipart_data);
+        .header("Authorization", &format!("Basic {encoded}"))
+        .send(form)?;
 
-    match response {
-        Ok(_) => Ok(()),
-        Err(ureq::Error::Status(status, response)) => {
-            let err_text = response.into_string().unwrap_or_else(|e| {
-                format!(
-                    "The registry should return some text, \
-                    even in case of an error, but didn't ({e})"
-                )
-            });
-            debug!("Upload error response: {}", err_text);
-            // Detect FileExistsError the way twine does
-            // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
-            if status == 403 {
-                if err_text.contains("overwrite artifact") {
-                    // Artifactory (https://jfrog.com/artifactory/)
-                    Err(UploadError::FileExistsError(err_text))
-                } else {
-                    Err(UploadError::AuthenticationError(err_text))
-                }
+    let status = response.status();
+    if status.is_success() {
+        return Ok(());
+    }
+
+    let err_text = response.body_mut().read_to_string().unwrap_or_else(|e| {
+        format!(
+            "The registry should return some text, \
+            even in case of an error, but didn't ({e})"
+        )
+    });
+    debug!("Upload error response: {}", err_text);
+
+    handle_upload_error(status.as_u16(), err_text)
+}
+
+/// Classify upload error based on status code and response text
+fn handle_upload_error(status_code: u16, err_text: String) -> Result<(), UploadError> {
+    // Detect FileExistsError the way twine does
+    // https://github.com/pypa/twine/blob/87846e5777b380d4704704a69e1f9a7a1231451c/twine/commands/upload.py#L30
+    match status_code {
+        403 => {
+            if err_text.contains("overwrite artifact") {
+                // Artifactory (https://jfrog.com/artifactory/)
+                Err(UploadError::FileExistsError(err_text))
             } else {
-                let status_string = status.to_string();
-                if status == 409 // conflict, pypiserver (https://pypi.org/project/pypiserver)
-            // PyPI / TestPyPI
-            || (status == 400 && err_text.contains("already exists"))
-            // Nexus Repository OSS (https://www.sonatype.com/nexus-repository-oss)
-            || (status == 400 && err_text.contains("updating asset"))
-            // # Gitlab Enterprise Edition (https://about.gitlab.com)
-            || (status == 400 && err_text.contains("already been taken"))
-                {
-                    Err(UploadError::FileExistsError(err_text))
-                } else {
-                    Err(UploadError::StatusCodeError(status_string, err_text))
-                }
+                Err(UploadError::AuthenticationError(err_text))
             }
         }
-        Err(err) => Err(UploadError::UreqError(err.into())),
+        409 => {
+            // conflict, pypiserver (https://pypi.org/project/pypiserver)
+            Err(UploadError::FileExistsError(err_text))
+        }
+        400 if is_file_exists_error(&err_text) => Err(UploadError::FileExistsError(err_text)),
+        _ => Err(UploadError::StatusCodeError(
+            status_code.to_string(),
+            err_text,
+        )),
     }
+}
+
+/// Check if error text indicates file already exists
+fn is_file_exists_error(err_text: &str) -> bool {
+    err_text.contains("already exists")        // PyPI / TestPyPI
+        || err_text.contains("updating asset") // Nexus Repository OSS
+        || err_text.contains("already been taken") // GitLab Enterprise Edition
 }
 
 /// Handles authentication/keyring integration and retrying of the publish subcommand
@@ -562,14 +600,14 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
 
     eprintln!("🚀 Uploading {} packages", items.len());
 
-    let title_re = regex::Regex::new(r"<title>(.+?)</title>").unwrap();
+    static TITLE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"<title>(.+?)</title>").unwrap());
     for i in items {
         let upload_result = upload(&registry, i);
 
         match upload_result {
             Ok(()) => (),
             Err(UploadError::AuthenticationError(msg)) => {
-                let title = title_re
+                let title = TITLE_RE
                     .captures(&msg)
                     .and_then(|c| c.get(1))
                     .map(|m| m.as_str());
@@ -603,13 +641,11 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
             }
             Err(err) => {
                 let filename = i.file_name().unwrap_or(i.as_os_str());
-                if let UploadError::FileExistsError(_) = err {
-                    if publish.skip_existing {
-                        eprintln!(
-                            "⚠️ Note: Skipping {filename:?} because it appears to already exist"
-                        );
-                        continue;
-                    }
+                if let UploadError::FileExistsError(_) = err
+                    && publish.skip_existing
+                {
+                    eprintln!("⚠️ Note: Skipping {filename:?} because it appears to already exist");
+                    continue;
                 }
                 let filesize = fs::metadata(i)
                     .map(|x| ByteSize(x.len()).to_string())

@@ -58,6 +58,13 @@ pub struct CompressionOptions {
     /// Zip compression level. Defaults to method default.
     #[arg(long, allow_negative_numbers = true)]
     pub compression_level: Option<i64>,
+
+    /// Whether to use large file support for ZIP files. Defaults to false.
+    #[arg(
+        long = "compression-enable-large-file-support",
+        default_value_t = false
+    )]
+    pub large_file: bool,
 }
 impl CompressionOptions {
     /// Validate arguments, exit on error
@@ -83,6 +90,32 @@ impl CompressionOptions {
         Self {
             compression_method: method,
             compression_level: Some(method.default_level()),
+            large_file: Default::default(),
         }
+    }
+
+    pub(crate) fn get_file_options(&self) -> zip::write::FileOptions<'static, ()> {
+        let method = if cfg!(feature = "faster-tests") {
+            // Unlike users which can use the develop subcommand, the tests have to go through
+            // packing a zip which pip than has to unpack. This makes this 2-3 times faster
+            CompressionMethod::Stored
+        } else {
+            self.compression_method
+        };
+
+        let mut options =
+            zip::write::SimpleFileOptions::default().compression_method(method.into());
+        // `zip` also has default compression levels, which should match our own, but we pass them
+        // explicitly to ensure consistency. The exception is the `Stored` method, which must have
+        // a `compression_level` of `None`.
+        options = options.compression_level(if method == CompressionMethod::Stored {
+            None
+        } else {
+            Some(self.compression_level.unwrap_or(method.default_level()))
+        });
+
+        options = options.large_file(self.large_file);
+
+        options
     }
 }

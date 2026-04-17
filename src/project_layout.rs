@@ -1,6 +1,6 @@
-use crate::build_options::{extract_cargo_metadata_args, CargoOptions};
+use crate::cargo_options::CargoOptions;
 use crate::{CargoToml, Metadata24, PyProjectToml};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{Context, Result, bail, format_err};
 use cargo_metadata::{Metadata, MetadataCommand};
 use normpath::PathExt as _;
 use std::collections::HashSet;
@@ -62,9 +62,30 @@ impl ProjectResolver {
     pub fn resolve(
         cargo_manifest_path: Option<PathBuf>,
         mut cargo_options: CargoOptions,
+        editable_install: bool,
+        pyproject_toml_path: Option<PathBuf>,
     ) -> Result<Self> {
-        let (manifest_file, pyproject_file) =
-            Self::resolve_manifest_paths(cargo_manifest_path, &cargo_options)?;
+        let (manifest_file, pyproject_file) = if let Some(pyproject_path) = pyproject_toml_path {
+            // When an explicit pyproject.toml path is provided (e.g. from an
+            // unpacked sdist), use it directly instead of discovering it by
+            // walking up from the manifest.  This is needed when the Cargo
+            // crate is excluded from the workspace and the pyproject.toml
+            // lives outside the cargo workspace boundary.
+            let cargo_toml = cargo_manifest_path
+                .expect("manifest_path must be set when pyproject_toml_path is provided");
+            let cargo_toml = cargo_toml
+                .normalize()
+                .with_context(|| {
+                    format!(
+                        "manifest path `{}` does not exist or is invalid",
+                        cargo_toml.display()
+                    )
+                })?
+                .into_path_buf();
+            (cargo_toml, pyproject_path)
+        } else {
+            Self::resolve_manifest_paths(cargo_manifest_path, &cargo_options)?
+        };
         if !manifest_file.is_file() {
             bail!(
                 "{} is not the path to a Cargo.toml",
@@ -102,7 +123,7 @@ impl ProjectResolver {
         let tool_maturin = pyproject.and_then(|p| p.maturin());
 
         let pyproject_toml_maturin_options = if let Some(tool_maturin) = tool_maturin {
-            cargo_options.merge_with_pyproject_toml(tool_maturin.clone())
+            cargo_options.merge_with_pyproject_toml(tool_maturin.clone(), editable_install)
         } else {
             Vec::new()
         };
@@ -149,7 +170,9 @@ impl ProjectResolver {
                 .normalize()
                 .with_context(|| {
                     format!(
-                        "python source path `{}` does not exist or is invalid",
+                        "python-source is set to `{}` but the directory does not exist. \
+                        Either create the directory or remove the `python-source` setting \
+                        from pyproject.toml.",
                         py_src.display()
                     )
                 })?
@@ -337,7 +360,7 @@ impl ProjectResolver {
         cargo_options: &CargoOptions,
     ) -> Result<Metadata> {
         debug!("Resolving cargo metadata from {:?}", manifest_path);
-        let cargo_metadata_extra_args = extract_cargo_metadata_args(cargo_options)?;
+        let cargo_metadata_extra_args = cargo_options.cargo_metadata_args()?;
         let result = MetadataCommand::new()
             // Force resolving metadata using cargo instead of instead of $CARGO env var
             // to avoid getting wrong file path like target directory, for example `cross` would
@@ -437,9 +460,10 @@ impl ProjectLayout {
                 })
             } else {
                 if custom_python_source {
-                    eprintln!(
-                        "⚠️ Warning: You specified the python source as {}, but the python module at \
-                        {} is missing. No python module will be included.",
+                    bail!(
+                        "python-source is set to `{}`, but the python module at `{}` \
+                        does not exist. Either create the Python module or remove the \
+                        `python-source` setting from pyproject.toml.",
                         python_root.display(),
                         python_module.display()
                     );

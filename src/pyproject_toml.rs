@@ -1,10 +1,10 @@
 //! A pyproject.toml as specified in PEP 517
 
-use crate::auditwheel::AuditWheelMode;
 use crate::PlatformTag;
+use crate::auditwheel::AuditWheelMode;
 use anyhow::{Context, Result};
 use fs_err as fs;
-use pep440_rs::Version;
+use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::VersionOrUrl;
 use pyproject_toml::{BuildSystem, Project};
 use serde::{Deserialize, Serialize};
@@ -73,6 +73,37 @@ pub enum GlobPattern {
         /// One or more [Format] values
         format: Formats,
     },
+    /// A glob `path` relative to a crate's OUT_DIR
+    WithOutDir {
+        /// A glob pattern relative to OUT_DIR
+        path: String,
+        /// Source: must be "out-dir"
+        from: IncludeFrom,
+        /// Target path in wheel (e.g. "my_package/")
+        to: String,
+        /// Optional crate name (defaults to the root crate)
+        #[serde(default)]
+        crate_name: Option<String>,
+    },
+}
+
+/// Supported values for the `from` field in include patterns.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum IncludeFrom {
+    /// Include files from the crate's OUT_DIR
+    OutDir,
+}
+
+/// Information about an out-dir include pattern.
+pub struct OutDirInclude<'a> {
+    /// Glob pattern relative to OUT_DIR
+    pub path: &'a str,
+    /// Target path prefix in wheel
+    pub to: &'a str,
+    /// Optional crate name (defaults to root crate)
+    pub crate_name: Option<&'a str>,
 }
 
 impl GlobPattern {
@@ -80,11 +111,30 @@ impl GlobPattern {
     pub fn targets(&self, format: Format) -> Option<&str> {
         match self {
             // Not specified defaults to both
-            Self::Path(ref glob) => Some(glob),
+            Self::Path(glob) => Some(glob),
             Self::WithFormat {
                 path,
                 format: formats,
             } if formats.targets(format) => Some(path),
+            // WithOutDir is handled separately, never matched here
+            Self::WithOutDir { .. } => None,
+            _ => None,
+        }
+    }
+
+    /// Returns the out-dir include info if this is a `WithOutDir` pattern.
+    pub fn as_out_dir_include(&self) -> Option<OutDirInclude<'_>> {
+        match self {
+            Self::WithOutDir {
+                path,
+                to,
+                crate_name,
+                ..
+            } => Some(OutDirInclude {
+                path,
+                to,
+                crate_name: crate_name.as_deref(),
+            }),
             _ => None,
         }
     }
@@ -163,6 +213,142 @@ pub enum SdistGenerator {
     Git,
 }
 
+/// SBOM configuration
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct SbomConfig {
+    /// Generate an SBOM for Rust crates. Defaults to `true`.
+    pub rust: Option<bool>,
+    /// Generate a CycloneDX SBOM for external shared libraries grafted during
+    /// auditwheel repair. Defaults to `true` when repair copies libraries.
+    ///
+    /// The SBOM is written to `<dist-info>/sboms/auditwheel.cdx.json` and
+    /// records which OS packages (deb, rpm, apk) provided the grafted
+    /// libraries, following the same convention as Python's auditwheel.
+    pub auditwheel: Option<bool>,
+    /// Additional SBOM files to include in the `.dist-info/sboms` directory.
+    pub include: Option<Vec<PathBuf>>,
+}
+
+/// A cargo feature specification that can be either a plain feature name
+/// or a conditional feature that is only enabled for certain Python versions.
+///
+/// # Examples
+///
+/// ```toml
+/// [tool.maturin]
+/// features = [
+///   "some-feature",
+///   { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
+///   { feature = "pyo3/abi3-py38", python-version = "<3.11" },
+///   { feature = "pyo3/abi3-py311", python-version = ">=3.11", python-implementation = "cpython" },
+///   { feature = "pypy-compat", python-implementation = "pypy" },
+/// ]
+/// ```
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FeatureSpec {
+    /// A plain feature name, always enabled
+    Plain(String),
+    /// A feature enabled only when the conditions match
+    Conditional {
+        /// The cargo feature to enable
+        feature: String,
+        /// PEP 440 version specifier for the target Python version, e.g. ">=3.11"
+        #[serde(
+            rename = "python-version",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        #[cfg_attr(feature = "schemars", schemars(with = "Option<String>"))]
+        python_version: Option<VersionSpecifiers>,
+        /// Python implementation name, e.g. "cpython", "pypy", "graalpy"
+        #[serde(
+            rename = "python-implementation",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        python_implementation: Option<String>,
+    },
+}
+
+/// A conditional feature with its matching criteria.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConditionalFeature {
+    /// The cargo feature to enable
+    pub feature: String,
+    /// PEP 440 version specifier for the target Python version
+    pub python_version: Option<VersionSpecifiers>,
+    /// Python implementation name, e.g. "cpython", "pypy", "graalpy"
+    pub python_implementation: Option<String>,
+}
+
+impl FeatureSpec {
+    /// Split a list of feature specs into plain features and conditional features.
+    pub fn split(specs: Vec<FeatureSpec>) -> (Vec<String>, Vec<ConditionalFeature>) {
+        let mut plain = Vec::new();
+        let mut conditional = Vec::new();
+        for spec in specs {
+            match spec {
+                FeatureSpec::Plain(f) => plain.push(f),
+                FeatureSpec::Conditional {
+                    feature,
+                    python_version: None,
+                    python_implementation: None,
+                } => plain.push(feature),
+                FeatureSpec::Conditional {
+                    feature,
+                    python_version,
+                    python_implementation,
+                } => conditional.push(ConditionalFeature {
+                    feature,
+                    python_version,
+                    python_implementation,
+                }),
+            }
+        }
+        (plain, conditional)
+    }
+
+    /// Resolve which conditional features should be enabled for the given
+    /// build environment.
+    pub fn resolve_conditional(
+        conditional_features: &[ConditionalFeature],
+        env: &FeatureConditionEnv,
+    ) -> Vec<String> {
+        let python_version = Version::new([env.major as u64, env.minor as u64]);
+        conditional_features
+            .iter()
+            .filter(|f| {
+                f.python_version
+                    .as_ref()
+                    .is_none_or(|s| s.contains(&python_version))
+            })
+            .filter(|f| {
+                f.python_implementation
+                    .as_ref()
+                    .is_none_or(|i| i.eq_ignore_ascii_case(env.implementation_name))
+            })
+            .map(|f| f.feature.clone())
+            .collect()
+    }
+}
+
+/// The build environment used to evaluate conditional features.
+///
+/// TODO: add fields like `target_os`, `target_arch`, etc. for
+/// Rust target-based conditions.
+pub struct FeatureConditionEnv<'a> {
+    /// Python major version
+    pub major: usize,
+    /// Python minor version
+    pub minor: usize,
+    /// Python implementation name, e.g. "cpython", "pypy"
+    pub implementation_name: &'a str,
+}
+
 /// The `[tool.maturin]` section of a pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -171,9 +357,13 @@ pub struct ToolMaturin {
     // maturin specific options
     /// Module name, accepts setuptools style import name like `foo.bar`
     pub module_name: Option<String>,
-    /// Include files matching the given glob pattern(s)
+    /// Include files matching the given glob pattern(s).
+    /// Patterns are resolved relative to the directory containing `pyproject.toml`.
+    /// When `python-source` is configured, patterns are also tried relative to
+    /// that directory if no matches are found.
     pub include: Option<Vec<GlobPattern>>,
-    /// Exclude files matching the given glob pattern(s)
+    /// Exclude files matching the given glob pattern(s).
+    /// Patterns are resolved relative to the directory containing `pyproject.toml`.
     pub exclude: Option<Vec<GlobPattern>>,
     /// Bindings type
     pub bindings: Option<String>,
@@ -205,8 +395,12 @@ pub struct ToolMaturin {
     // Some customizable cargo options
     /// Build artifacts with the specified Cargo profile
     pub profile: Option<String>,
-    /// Space or comma separated list of features to activate
-    pub features: Option<Vec<String>>,
+    /// Same as `profile` but for "editable" builds
+    pub editable_profile: Option<String>,
+    /// List of features to activate.
+    /// Each entry can be a plain feature name string, or a conditional object
+    /// with `feature` and `python-version` keys.
+    pub features: Option<Vec<FeatureSpec>>,
     /// Activate all available features
     pub all_features: Option<bool>,
     /// Do not activate the `default` feature
@@ -230,6 +424,103 @@ pub struct ToolMaturin {
     // in venv.
     #[serde(default)]
     pub use_base_python: bool,
+    /// SBOM configuration
+    pub sbom: Option<SbomConfig>,
+    /// Include the import library (.dll.lib) in the wheel on Windows
+    #[serde(default)]
+    pub include_import_lib: bool,
+    /// Command to run for PGO profile generation.
+    /// Executed in a temporary virtualenv with the instrumented wheel installed.
+    /// Example: `python -m pytest tests/benchmarks`
+    pub pgo_command: Option<String>,
+    /// CI generation configuration
+    pub generate_ci: Option<GenerateCIConfig>,
+}
+
+/// The `[tool.maturin.generate-ci]` section
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct GenerateCIConfig {
+    /// GitHub Actions configuration
+    pub github: Option<GitHubCIConfig>,
+}
+
+/// The `[tool.maturin.generate-ci.github]` section
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct GitHubCIConfig {
+    /// Enable pytest
+    pub pytest: Option<bool>,
+    /// Use zig for cross compilation
+    pub zig: Option<bool>,
+    /// Skip artifact attestation
+    pub skip_attestation: Option<bool>,
+    /// Extra arguments to pass to maturin (applies to all platforms)
+    pub args: Option<String>,
+    /// Linux (manylinux) platform configuration
+    pub linux: Option<PlatformCIConfig>,
+    /// Musllinux platform configuration
+    pub musllinux: Option<PlatformCIConfig>,
+    /// Windows platform configuration
+    pub windows: Option<PlatformCIConfig>,
+    /// macOS platform configuration
+    pub macos: Option<PlatformCIConfig>,
+    /// Emscripten platform configuration
+    pub emscripten: Option<PlatformCIConfig>,
+    /// Android platform configuration
+    pub android: Option<PlatformCIConfig>,
+}
+
+/// Shared CI configuration overrides used by both platform-level and
+/// per-target CI configuration.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct CIConfigOverrides {
+    /// Runner override
+    pub runner: Option<String>,
+    /// Manylinux version (e.g. "auto", "2_28", "musllinux_1_2")
+    pub manylinux: Option<String>,
+    /// Container image to use
+    pub container: Option<String>,
+    /// Docker options
+    pub docker_options: Option<String>,
+    /// Rust toolchain (e.g. "nightly", "stable")
+    pub rust_toolchain: Option<String>,
+    /// Rustup components to install
+    pub rustup_components: Option<String>,
+    /// Script to run before build on Linux
+    pub before_script_linux: Option<String>,
+    /// Extra arguments to pass to maturin
+    pub args: Option<String>,
+}
+
+/// Per-platform CI configuration
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PlatformCIConfig {
+    /// Simple list of target architectures (mutually exclusive with `target`)
+    pub targets: Option<Vec<String>>,
+    /// Detailed per-target configuration (mutually exclusive with `targets`)
+    pub target: Option<Vec<TargetCIConfig>>,
+    /// Platform-level overrides
+    #[serde(flatten)]
+    pub overrides: CIConfigOverrides,
+}
+
+/// Per-target CI configuration within a platform
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct TargetCIConfig {
+    /// Target architecture (e.g. "x86_64", "aarch64")
+    pub arch: String,
+    /// Per-target overrides
+    #[serde(flatten)]
+    pub overrides: CIConfigOverrides,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -246,6 +537,8 @@ pub struct PyProjectToml {
     ///
     /// We use it for `[tool.maturin]`
     pub tool: Option<Tool>,
+    /// PEP 735: Dependency groups
+    pub dependency_groups: Option<pyproject_toml::DependencyGroups>,
 }
 
 impl PyProjectToml {
@@ -294,6 +587,11 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.bindings]` in pyproject.toml
     pub fn bindings(&self) -> Option<&str> {
         self.maturin()?.bindings.as_deref()
+    }
+
+    /// Returns the PGO training command from `[tool.maturin]`
+    pub fn pgo_command(&self) -> Option<&str> {
+        self.maturin().and_then(|m| m.pgo_command.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
@@ -347,8 +645,9 @@ impl PyProjectToml {
     }
 
     /// Returns the value of `[tool.maturin.targets]` in pyproject.toml
-    pub fn targets(&self) -> Option<Vec<CargoTarget>> {
-        self.maturin().and_then(|maturin| maturin.targets.clone())
+    pub fn targets(&self) -> Option<&[CargoTarget]> {
+        self.maturin()
+            .and_then(|maturin| maturin.targets.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.target.<target>]` in pyproject.toml
@@ -360,6 +659,18 @@ impl PyProjectToml {
     /// Returns the value of `[tool.maturin.manifest-path]` in pyproject.toml
     pub fn manifest_path(&self) -> Option<&Path> {
         self.maturin()?.manifest_path.as_deref()
+    }
+
+    /// Returns the value of `[tool.maturin.include-import-lib]` in pyproject.toml
+    pub fn include_import_lib(&self) -> bool {
+        self.maturin()
+            .map(|maturin| maturin.include_import_lib)
+            .unwrap_or_default()
+    }
+
+    /// Returns the value of `[tool.maturin.generate-ci]` in pyproject.toml
+    pub fn generate_ci(&self) -> Option<&GenerateCIConfig> {
+        self.maturin()?.generate_ci.as_ref()
     }
 
     /// Warn about `build-system.requires` mismatching expectations.
@@ -445,11 +756,15 @@ impl PyProjectToml {
             .as_ref()
             .is_some_and(|d| d.iter().any(|s| s == "version"));
         if has_static_version && has_dynamic_version {
-            eprintln!("⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml");
+            eprintln!(
+                "⚠️  Warning: `project.dynamic` must not specify `version` when `project.version` is present in pyproject.toml"
+            );
             return false;
         }
         if !has_static_version && !has_dynamic_version {
-            eprintln!("⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list");
+            eprintln!(
+                "⚠️  Warning: `project.version` field is required in pyproject.toml unless it is present in the `project.dynamic` list"
+            );
             return false;
         }
         true
@@ -458,9 +773,12 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::test_crate_path;
     use crate::{
-        pyproject_toml::{Format, Formats, GlobPattern, ToolMaturin},
         PyProjectToml,
+        pyproject_toml::{
+            FeatureConditionEnv, FeatureSpec, Format, Formats, GlobPattern, ToolMaturin,
+        },
     };
     use expect_test::expect;
     use fs_err as fs;
@@ -507,7 +825,10 @@ mod tests {
         assert_eq!(maturin.profile.as_deref(), Some("dev"));
         assert_eq!(
             maturin.features,
-            Some(vec!["foo".to_string(), "bar".to_string()])
+            Some(vec![
+                FeatureSpec::Plain("foo".to_string()),
+                FeatureSpec::Plain("bar".to_string()),
+            ])
         );
         assert!(maturin.all_features.is_none());
         assert_eq!(maturin.no_default_features, Some(true));
@@ -532,7 +853,8 @@ mod tests {
 
     #[test]
     fn test_warn_missing_maturin_version() {
-        let with_constraint = PyProjectToml::new("test-crates/pyo3-pure/pyproject.toml").unwrap();
+        let with_constraint =
+            PyProjectToml::new(test_crate_path("pyo3-pure").join("pyproject.toml")).unwrap();
         assert!(with_constraint.warn_bad_maturin_version());
         let without_constraint_dir = TempDir::new().unwrap();
         let pyproject_file = without_constraint_dir.path().join("pyproject.toml");
@@ -720,5 +1042,262 @@ mod tests {
             ^^^
         "#]];
         expected.assert_eq(&inner_error.to_string());
+    }
+
+    #[test]
+    fn test_resolve_conditional_features() {
+        let specs = vec![
+            FeatureSpec::Conditional {
+                feature: "pyo3/abi3-py311".to_string(),
+                python_version: Some(">=3.11".parse().unwrap()),
+                python_implementation: None,
+            },
+            FeatureSpec::Conditional {
+                feature: "pyo3/abi3-py38".to_string(),
+                python_version: Some("<3.11".parse().unwrap()),
+                python_implementation: None,
+            },
+            FeatureSpec::Conditional {
+                feature: "fast-buffer".to_string(),
+                python_version: Some(">=3.11".parse().unwrap()),
+                python_implementation: None,
+            },
+        ];
+        let (_plain, conditional) = FeatureSpec::split(specs);
+
+        let cpython = |major, minor| FeatureConditionEnv {
+            major,
+            minor,
+            implementation_name: "cpython",
+        };
+
+        // Python 3.12 should match >=3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 12));
+        assert_eq!(resolved, vec!["pyo3/abi3-py311", "fast-buffer"]);
+
+        // Python 3.11 should match >=3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 11));
+        assert_eq!(resolved, vec!["pyo3/abi3-py311", "fast-buffer"]);
+
+        // Python 3.9 should match <3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 9));
+        assert_eq!(resolved, vec!["pyo3/abi3-py38"]);
+
+        // Python 3.8 should match <3.11
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &cpython(3, 8));
+        assert_eq!(resolved, vec!["pyo3/abi3-py38"]);
+    }
+
+    #[test]
+    fn test_resolve_conditional_features_with_implementation() {
+        let specs = vec![
+            FeatureSpec::Conditional {
+                feature: "pyo3/abi3-py311".to_string(),
+                python_version: Some(">=3.11".parse().unwrap()),
+                python_implementation: Some("cpython".to_string()),
+            },
+            FeatureSpec::Conditional {
+                feature: "pypy-compat".to_string(),
+                python_version: None,
+                python_implementation: Some("pypy".to_string()),
+            },
+            FeatureSpec::Conditional {
+                feature: "always-conditional".to_string(),
+                python_version: Some(">=3.10".parse().unwrap()),
+                python_implementation: None,
+            },
+        ];
+        let (_plain, conditional) = FeatureSpec::split(specs);
+
+        let env = |major, minor, impl_name| FeatureConditionEnv {
+            major,
+            minor,
+            implementation_name: impl_name,
+        };
+
+        // CPython 3.12 should match abi3 and always-conditional
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 12, "cpython"));
+        assert_eq!(resolved, vec!["pyo3/abi3-py311", "always-conditional"]);
+
+        // PyPy 3.10 should match pypy-compat and always-conditional
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 10, "pypy"));
+        assert_eq!(resolved, vec!["pypy-compat", "always-conditional"]);
+
+        // CPython 3.10 should only match always-conditional (not abi3 due to version)
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 10, "cpython"));
+        assert_eq!(resolved, vec!["always-conditional"]);
+
+        // PyPy 3.9 should only match pypy-compat (version too low for always-conditional)
+        let resolved = FeatureSpec::resolve_conditional(&conditional, &env(3, 9, "pypy"));
+        assert_eq!(resolved, vec!["pypy-compat"]);
+    }
+
+    #[test]
+    fn test_feature_spec_deserialize_mixed() {
+        let toml_str = r#"
+            features = [
+                "plain-feature",
+                { feature = "pyo3/abi3-py311", python-version = ">=3.11" },
+            ]
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            maturin.features,
+            Some(vec![
+                FeatureSpec::Plain("plain-feature".to_string()),
+                FeatureSpec::Conditional {
+                    feature: "pyo3/abi3-py311".to_string(),
+                    python_version: Some(">=3.11".parse().unwrap()),
+                    python_implementation: None,
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn test_feature_spec_deserialize_with_implementation() {
+        let toml_str = r#"
+            features = [
+                { feature = "pyo3/abi3-py311", python-version = ">=3.11", python-implementation = "cpython" },
+                { feature = "pypy-compat", python-implementation = "pypy" },
+            ]
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            maturin.features,
+            Some(vec![
+                FeatureSpec::Conditional {
+                    feature: "pyo3/abi3-py311".to_string(),
+                    python_version: Some(">=3.11".parse().unwrap()),
+                    python_implementation: Some("cpython".to_string()),
+                },
+                FeatureSpec::Conditional {
+                    feature: "pypy-compat".to_string(),
+                    python_version: None,
+                    python_implementation: Some("pypy".to_string()),
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn test_feature_spec_deserialize_invalid_specifier() {
+        let toml_str = r#"
+            features = [
+                { feature = "foo", python-version = "not-a-version" },
+            ]
+        "#;
+        let result: Result<ToolMaturin, _> = toml::from_str(toml_str);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_ci_config_deserialization() {
+        let toml_str = r#"
+            [generate-ci.github]
+            pytest = true
+            zig = true
+            skip-attestation = false
+
+            [generate-ci.github.linux]
+            runner = "ubuntu-22.04"
+            manylinux = "2_28"
+            targets = ["x86_64", "aarch64"]
+
+            [generate-ci.github.macos]
+            targets = ["aarch64"]
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        let ci = maturin.generate_ci.unwrap();
+        let gh = ci.github.unwrap();
+        assert_eq!(gh.pytest, Some(true));
+        assert_eq!(gh.zig, Some(true));
+        assert_eq!(gh.skip_attestation, Some(false));
+        let linux = gh.linux.unwrap();
+        assert_eq!(linux.overrides.runner, Some("ubuntu-22.04".to_string()));
+        assert_eq!(linux.overrides.manylinux, Some("2_28".to_string()));
+        assert_eq!(
+            linux.targets,
+            Some(vec!["x86_64".to_string(), "aarch64".to_string()])
+        );
+        let macos = gh.macos.unwrap();
+        assert_eq!(macos.targets, Some(vec!["aarch64".to_string()]));
+        assert!(gh.windows.is_none());
+    }
+
+    #[test]
+    fn test_generate_ci_config_detailed_targets() {
+        let toml_str = r#"
+            [[generate-ci.github.linux.target]]
+            arch = "x86_64"
+            manylinux = "2_28"
+
+            [[generate-ci.github.linux.target]]
+            arch = "aarch64"
+            runner = "self-hosted-arm64"
+            manylinux = "2_17"
+            before-script-linux = "yum install -y openssl-devel"
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        let ci = maturin.generate_ci.unwrap();
+        let gh = ci.github.unwrap();
+        let linux = gh.linux.unwrap();
+        assert!(linux.targets.is_none());
+        let detailed = linux.target.unwrap();
+        assert_eq!(detailed.len(), 2);
+        assert_eq!(detailed[0].arch, "x86_64");
+        assert_eq!(detailed[0].overrides.manylinux, Some("2_28".to_string()));
+        assert_eq!(detailed[1].arch, "aarch64");
+        assert_eq!(
+            detailed[1].overrides.runner,
+            Some("self-hosted-arm64".to_string())
+        );
+        assert_eq!(
+            detailed[1].overrides.before_script_linux,
+            Some("yum install -y openssl-devel".to_string())
+        );
+    }
+
+    #[test]
+    fn test_pgo_command() {
+        let tmp_dir = TempDir::new().unwrap();
+        let pyproject_file = tmp_dir.path().join("pyproject.toml");
+
+        fs::write(
+            &pyproject_file,
+            r#"[build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            pgo-command = "python -m pytest tests/benchmarks"
+            "#,
+        )
+        .unwrap();
+        let pyproject = PyProjectToml::new(pyproject_file).unwrap();
+        assert_eq!(
+            pyproject.pgo_command(),
+            Some("python -m pytest tests/benchmarks")
+        );
+    }
+
+    #[test]
+    fn test_pgo_command_absent() {
+        let tmp_dir = TempDir::new().unwrap();
+        let pyproject_file = tmp_dir.path().join("pyproject.toml");
+
+        fs::write(
+            &pyproject_file,
+            r#"[build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            manylinux = "2010"
+            "#,
+        )
+        .unwrap();
+        let pyproject = PyProjectToml::new(pyproject_file).unwrap();
+        assert_eq!(pyproject.pgo_command(), None);
     }
 }

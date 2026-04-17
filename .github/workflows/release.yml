@@ -4,30 +4,35 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+  pull_request:
+    paths:
+      # Dry run the release pipeline when changing the version of maturin or of its dependencies
+      - pyproject.toml
+      - Cargo.toml
+      # Dry run the release pipeline when it's changed
+      - .github/workflows/release.yml
 
 permissions:
   contents: read
 
 jobs:
-  release-crates-io:
-    name: Release crates.io
+  sdist:
+    name: Build sdist
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    environment:
-      name: crates.io
-      url: ${{ steps.set_url.outputs.env_url }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: cargo publish
-        run: cargo publish
-      - name: Set environment url
-        id: set_url
-        run: |
-          VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
-          echo "env_url=https://crates.io/crates/maturin/$VERSION" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
+        with:
+          # No need to take cache size for maturin in the release pipeline
+          enable-cache: "false"
+      - name: Build sdist
+        run: uvx maturin sdist -o dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: wheels-sdist
+          path: dist/*.tar.gz
 
   build:
     name: Build ${{ matrix.target }}
@@ -61,10 +66,8 @@ jobs:
       CARGO_PROFILE_RELEASE_LTO: "fat"
     steps:
       # Largely inspired by https://github.com/starship/starship/blob/35a0a20f5c4fea6a08e1b91ff631b089eef8fc50/.github/workflows/deploy.yml
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - run: rustup target add ${{ matrix.target }}
 
       - name: Install musl tools
         if: matrix.os == 'ubuntu-latest'
@@ -78,20 +81,20 @@ jobs:
           brew install gnu-tar
           echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
 
-      # Those two will also create target/${{ matrix.target }}/maturin
-      - name: Build wheel (with sdist)
+      # Those two will also create target/maturin/maturin
+      - name: Build wheel (linux x86_64)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          cargo run -- build --release -b bin --sdist -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1
+          cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage --compatibility manylinux2010 musllinux_1_1 --compatibility pypi
 
       # ring doesn't support aarch64 windows yet
       - name: Build wheel (windows aarch64)
         if: matrix.target == 'aarch64-pc-windows-msvc'
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features full,native-tls
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --no-default-features --features full,native-tls --compatibility pypi
 
-      - name: Build wheel (without sdist)
+      - name: Build wheel
         if: ${{ matrix.target != 'x86_64-unknown-linux-musl' && matrix.target != 'aarch64-pc-windows-msvc' }}
-        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage
+        run: cargo run -- build --release -b bin -o dist --target ${{ matrix.target }} --features password-storage,static --compatibility pypi
 
       - name: Build wheel (macOS universal2)
         if: matrix.target == 'x86_64-apple-darwin'
@@ -99,20 +102,28 @@ jobs:
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           MACOSX_DEPLOYMENT_TARGET: "10.12"
         run: |
+          set -euo pipefail
           # set SDKROOT for C dependencies like ring and bzip2
           export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           rustup target add aarch64-apple-darwin
-          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage
+          cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage,static --compatibility pypi
 
       - name: Archive binary (windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
+          cd target/maturin
+          7z a ../../${{ matrix.name }} ${{ github.event.repository.name }}.exe
           cd -
 
-      - name: Archive binary (linux and macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Archive binary (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd target/maturin
+          tar czvf ../../${{ matrix.name }} ${{ github.event.repository.name }}
+          cd -
+
+      - name: Archive binary (macOS x86_64)
+        if: matrix.os == 'macos-latest'
         run: |
           cd target/${{ matrix.target }}/release
           tar czvf ../../../${{ matrix.name }} ${{ github.event.repository.name }}
@@ -126,13 +137,13 @@ jobs:
           cd -
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheels-${{ matrix.target }}
           path: dist
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: binaries-${{ matrix.target }}
           path: |
@@ -165,12 +176,14 @@ jobs:
           - target: "s390x-unknown-linux-gnu"
             image: "manylinux2014-cross:s390x"
             compatibility: "manylinux2014"
-          - target: "loongarch64-unknown-linux-gnu"
-            image: "manylinux_2_36-cross:loongarch64"
-            compatibility: "manylinux_2_36"
-          - target: "riscv64gc-unknown-linux-gnu"
-            image: "manylinux_2_31-cross:riscv64"
-            compatibility: "manylinux_2_31"
+          - target: "loongarch64-unknown-linux-musl"
+            image: "rust-musl-cross:loongarch64-musl"
+            compatibility: "manylinux_2_36 musllinux_1_2"
+            rustflags: "-C target-feature=+crt-static"
+          - target: "riscv64gc-unknown-linux-musl"
+            image: "rust-musl-cross:riscv64gc-musl"
+            compatibility: "manylinux_2_31 musllinux_1_1"
+            rustflags: "-C target-feature=+crt-static"
     container:
       image: docker://ghcr.io/rust-cross/${{ matrix.platform.image }}
       env:
@@ -178,35 +191,45 @@ jobs:
         CARGO_HOME: /root/.cargo
         CARGO_PROFILE_RELEASE_LTO: "${{ matrix.platform.lto || 'fat' }}"
     steps:
-      - uses: actions/checkout@v5
-      # powerpc64le-unknown-linux-musl doesn't have official std library release
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: rustup target add --toolchain stable ${{ matrix.platform.target }}
-        if: ${{ !contains(fromJson('["powerpc64le-unknown-linux-musl", "s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target) }}
-      - uses: dtolnay/rust-toolchain@stable
-        if: contains(fromJson('["s390x-unknown-linux-gnu", "loongarch64-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu"]'), matrix.platform.target)
+        if: ${{ !contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target) }}
+      - uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        if: contains(fromJson('["s390x-unknown-linux-gnu"]'), matrix.platform.target)
         with:
+          toolchain: stable
           targets: ${{ matrix.platform.target }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
+        with:
+          # No need to take cache size for maturin in the release pipeline
+          enable-cache: "false"
+      - name: Install patchelf
+        if: contains(fromJson('["loongarch64-unknown-linux-musl", "riscv64gc-unknown-linux-musl"]'), matrix.platform.target)
+        run: |
+          pip install patchelf
       - name: Build wheel
         env:
           # Make psm compile, see https://github.com/rust-lang/stacker/issues/79
           CFLAGS_s390x_unknown_linux_gnu: "-march=z10"
+          RUSTFLAGS: ${{ matrix.platform.rustflags || '' }}
         run: |
-          sudo python3 -m pip install -U --pre maturin
-          maturin build --release -b bin -o dist \
+          uvx maturin build --release -b bin -o dist \
             --target ${{ matrix.platform.target }} \
+            ${{ !contains(fromJson('["loongarch64-unknown-linux-musl", "riscv64gc-unknown-linux-musl"]'), matrix.platform.target) && '--compatibility pypi' || '' }} \
             --compatibility ${{ matrix.platform.compatibility }} \
             --features password-storage
       - name: Archive binary
-        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/${{ matrix.platform.target }}/release maturin
+        run: tar czvf target/release/maturin-${{ matrix.platform.target }}.tar.gz -C target/maturin maturin
       - name: Upload wheel artifacts
         # loongarch64 is not allowed to publish to pypi currently, see https://github.com/pypi/warehouse/blob/348117529910181cb8c14e9b5fb00fcf4dbaf07c/warehouse/forklift/legacy.py#L114-L185
-        if: matrix.platform.target != 'loongarch64-unknown-linux-gnu'
-        uses: actions/upload-artifact@v4
+        if: ${{ !contains(fromJson('["loongarch64-unknown-linux-musl"]'), matrix.platform.target) }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: binaries-${{ matrix.platform.target }}
           path: target/release/maturin-${{ matrix.platform.target }}.tar.gz
@@ -225,27 +248,26 @@ jobs:
     environment:
       name: PyPI
       url: ${{ steps.set_url.outputs.env_url }}
-    needs: [build, build-musl]
+    needs: [sdist, build, build-musl]
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: wheels-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           subject-path: |
             ./*.tar.gz
             ./*.whl
-      - uses: actions/setup-python@v6
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          python-version: "3.10"
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
+      - name: Publish (dry run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: uv publish --dry-run '*'
       - name: Publish
         if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          pip install maturin
-          maturin upload --skip-existing *
+        run: uv publish '*'
       - name: Set environment url
         id: set_url
         run: |
@@ -264,12 +286,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, build-musl]
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: binaries-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           subject-path: |
             ./*.tar.gz
@@ -277,7 +300,7 @@ jobs:
             ./*.deb
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           files: |
             *.tar.gz
@@ -285,3 +308,32 @@ jobs:
             *.deb
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
           generate_release_notes: true
+
+  release-crates-io:
+    name: Release crates.io
+    runs-on: ubuntu-latest
+    needs: [build, build-musl]
+    permissions:
+      id-token: write
+    environment:
+      name: crates.io
+      url: ${{ steps.set_url.outputs.env_url }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: cargo publish (dry run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: cargo publish --dry-run
+      - name: Authenticate with crates.io
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1.0.3
+        id: auth
+      - name: cargo publish
+        if: startsWith(github.ref, 'refs/tags/')
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - name: Set environment url
+        id: set_url
+        run: |
+          VERSION=$(echo $GITHUB_REF | sed -e "s#refs/tags/v##g")
+          echo "env_url=https://crates.io/crates/maturin/$VERSION" >> $GITHUB_OUTPUT

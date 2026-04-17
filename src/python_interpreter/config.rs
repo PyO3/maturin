@@ -2,9 +2,9 @@ use super::{
     InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
     MINIMUM_PYTHON_MINOR,
 };
-use crate::target::{Arch, Os};
 use crate::Target;
-use anyhow::{format_err, Context, Result};
+use crate::target::{Arch, Os};
+use anyhow::{Context, Result, format_err};
 use fs_err as fs;
 use serde::Deserialize;
 use std::fmt::Write as _;
@@ -56,6 +56,23 @@ pub struct InterpreterConfig {
 }
 
 impl InterpreterConfig {
+    /// Derive SOABI from an extension suffix.
+    ///
+    /// For example, `.cpython-314-x86_64-linux-gnu.so` becomes
+    /// `cpython-314-x86_64-linux-gnu`.
+    pub fn soabi_from_ext_suffix(ext_suffix: &str) -> Option<String> {
+        let s = ext_suffix.strip_prefix('.')?;
+        let s = s
+            .strip_suffix(".so")
+            .or_else(|| s.strip_suffix(".pyd"))
+            .unwrap_or(s);
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    }
+
     /// Lookup a wellknown sysconfig for a given Python interpreter
     pub fn lookup_one(
         target: &Target,
@@ -109,7 +126,9 @@ impl InterpreterConfig {
             (Os::Linux, GraalPy) => {
                 let (graalpy_major, graalpy_minor) =
                     graalpy_version_for_python_version(major, minor)?;
-                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-linux.so");
+                let ext_suffix = format!(
+                    ".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-linux.so"
+                );
                 Some(Self {
                     major,
                     minor,
@@ -153,7 +172,9 @@ impl InterpreterConfig {
             (Os::Macos, GraalPy) => {
                 let (graalpy_major, graalpy_minor) =
                     graalpy_version_for_python_version(major, minor)?;
-                let ext_suffix = format!(".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-darwin.so");
+                let ext_suffix = format!(
+                    ".graalpy{graalpy_major}{graalpy_minor}-{major}{minor}-native-{python_ext_arch}-darwin.so"
+                );
                 Some(Self {
                     major,
                     minor,
@@ -368,57 +389,59 @@ impl InterpreterConfig {
             }),
         };
         let file_ext = if target.is_windows() { "pyd" } else { "so" };
-        let ext_suffix = if target.is_linux() || target.is_macos() || target.is_hurd() {
-            let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
-            match interpreter_kind {
-                InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
-                    // Eg: .cpython-38-x86_64-linux-gnu.so
+        let ext_suffix =
+            if target.is_linux() || target.is_android() || target.is_macos() || target.is_hurd() {
+                let target_env = target.get_python_target_env(interpreter_kind, (major, minor));
+                match interpreter_kind {
+                    InterpreterKind::CPython => ext_suffix.unwrap_or_else(|| {
+                        // Eg: .cpython-38-x86_64-linux-gnu.so
+                        format!(
+                            ".cpython-{}-{}-{}-{}.{}",
+                            abi_tag,
+                            target.get_python_ext_arch(interpreter_kind),
+                            target.get_python_os(),
+                            target_env,
+                            file_ext,
+                        )
+                    }),
+                    InterpreterKind::PyPy => ext_suffix.unwrap_or_else(|| {
+                        // Eg: .pypy38-pp73-x86_64-linux-gnu.so
+                        format!(
+                            ".pypy{}{}-{}-{}-{}-{}.{}",
+                            major,
+                            minor,
+                            abi_tag,
+                            target.get_python_ext_arch(interpreter_kind),
+                            target.get_python_os(),
+                            target_env,
+                            file_ext,
+                        )
+                    }),
+                    InterpreterKind::GraalPy => ext_suffix.unwrap_or_else(|| {
+                        // e.g. .graalpy230-310-native-x86_64-linux.so
+                        format!(
+                            ".{}-{}-{}.{}",
+                            abi_tag.replace('_', "-"),
+                            target.get_python_ext_arch(interpreter_kind),
+                            target.get_python_os(),
+                            file_ext,
+                        )
+                    }),
+                }
+            } else if target.is_emscripten() && matches!(interpreter_kind, InterpreterKind::CPython)
+            {
+                ext_suffix.unwrap_or_else(|| {
                     format!(
-                        ".cpython-{}-{}-{}-{}.{}",
+                        ".cpython-{}-{}-{}.{}",
                         abi_tag,
                         target.get_python_ext_arch(interpreter_kind),
                         target.get_python_os(),
-                        target_env,
-                        file_ext,
+                        file_ext
                     )
-                }),
-                InterpreterKind::PyPy => ext_suffix.unwrap_or_else(|| {
-                    // Eg: .pypy38-pp73-x86_64-linux-gnu.so
-                    format!(
-                        ".pypy{}{}-{}-{}-{}-{}.{}",
-                        major,
-                        minor,
-                        abi_tag,
-                        target.get_python_ext_arch(interpreter_kind),
-                        target.get_python_os(),
-                        target_env,
-                        file_ext,
-                    )
-                }),
-                InterpreterKind::GraalPy => ext_suffix.unwrap_or_else(|| {
-                    // e.g. .graalpy230-310-native-x86_64-linux.so
-                    format!(
-                        ".{}-{}-{}.{}",
-                        abi_tag.replace('_', "-"),
-                        target.get_python_ext_arch(interpreter_kind),
-                        target.get_python_os(),
-                        file_ext,
-                    )
-                }),
-            }
-        } else if target.is_emscripten() && matches!(interpreter_kind, InterpreterKind::CPython) {
-            ext_suffix.unwrap_or_else(|| {
-                format!(
-                    ".cpython-{}-{}-{}.{}",
-                    abi_tag,
-                    target.get_python_ext_arch(interpreter_kind),
-                    target.get_python_os(),
-                    file_ext
-                )
-            })
-        } else {
-            ext_suffix.context("missing value for ext_suffix")?
-        };
+                })
+            } else {
+                ext_suffix.context("missing value for ext_suffix")?
+            };
         let gil_disabled = build_flags
             .map(|flags| flags.contains("Py_GIL_DISABLED"))
             .unwrap_or(false);
@@ -434,7 +457,7 @@ impl InterpreterConfig {
     }
 
     /// Generate pyo3 config file content
-    pub fn pyo3_config_file(&self) -> String {
+    pub fn pyo3_config_file(&self, target: &Target, abi3: bool) -> String {
         let build_flags = if self.gil_disabled {
             "Py_GIL_DISABLED"
         } else {
@@ -444,15 +467,34 @@ impl InterpreterConfig {
             r#"implementation={implementation}
 version={major}.{minor}
 shared=true
-abi3=false
+abi3={abi3}
 build_flags={build_flags}
 suppress_build_script_link_lines=false"#,
             implementation = self.interpreter_kind,
             major = self.major,
             minor = self.minor,
         );
+        // On Android, pyo3 forces linking libpython. When abi3 is enabled,
+        // pyo3's fixup_for_abi3_version downgrades the version to the abi3
+        // minimum (e.g. 3.7) and derives a wrong lib_name like "python3.7m".
+        // Set lib_name explicitly so pyo3 uses the correct library.
+        // For abi3, link against the unversioned libpython3.so (stable ABI).
+        // For non-abi3, link against the version-specific libpython3.X.so.
+        // See https://github.com/PyO3/pyo3/issues/5960
+        // See https://github.com/python/cpython/issues/148544
+        if target.is_android() && self.interpreter_kind == InterpreterKind::CPython {
+            let lib_name = if abi3 {
+                format!("python{}", self.major)
+            } else {
+                format!("python{}.{}{}", self.major, self.minor, self.abiflags)
+            };
+            write!(content, "\nlib_name={lib_name}").unwrap();
+        }
         if let Some(pointer_width) = self.pointer_width {
             write!(content, "\npointer_width={pointer_width}").unwrap();
+        }
+        if let Ok(lib_dir) = std::env::var("PYO3_CROSS_LIB_DIR") {
+            write!(content, "\nlib_dir={}", lib_dir).unwrap();
         }
         content
     }
@@ -843,14 +885,10 @@ mod tests {
 
     #[test]
     fn test_pyo3_config_file() {
-        let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
-            InterpreterKind::CPython,
-            (3, 10),
-            "",
-        )
-        .unwrap();
-        let config_file = sysconfig.pyo3_config_file();
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+        let sysconfig =
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 10), "").unwrap();
+        let config_file = sysconfig.pyo3_config_file(&target, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.10
@@ -864,15 +902,11 @@ mod tests {
 
     #[test]
     fn test_pyo3_config_file_free_threaded_python_3_13() {
-        let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
-            InterpreterKind::CPython,
-            (3, 13),
-            "t",
-        )
-        .unwrap();
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+        let sysconfig =
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 13), "t").unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-313t-x86_64-linux-gnu.so");
-        let config_file = sysconfig.pyo3_config_file();
+        let config_file = sysconfig.pyo3_config_file(&target, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.13
@@ -886,15 +920,11 @@ mod tests {
 
     #[test]
     fn test_pyo3_config_file_musl_python_3_11() {
-        let sysconfig = InterpreterConfig::lookup_one(
-            &Target::from_resolved_target_triple("x86_64-unknown-linux-musl").unwrap(),
-            InterpreterKind::CPython,
-            (3, 11),
-            "",
-        )
-        .unwrap();
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-musl").unwrap();
+        let sysconfig =
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 11), "").unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-311-x86_64-linux-musl.so");
-        let config_file = sysconfig.pyo3_config_file();
+        let config_file = sysconfig.pyo3_config_file(&target, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.11
@@ -902,6 +932,46 @@ mod tests {
             abi3=false
             build_flags=
             suppress_build_script_link_lines=false
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+    }
+
+    #[test]
+    fn test_pyo3_config_file_android() {
+        let target = Target::from_resolved_target_triple("aarch64-linux-android").unwrap();
+        let config = InterpreterConfig {
+            major: 3,
+            minor: 14,
+            interpreter_kind: InterpreterKind::CPython,
+            abiflags: String::new(),
+            ext_suffix: ".cpython-314-aarch64-linux-android.so".to_string(),
+            pointer_width: Some(64),
+            gil_disabled: false,
+        };
+        // Non-abi3: links against version-specific libpython3.14.so
+        let config_file = config.pyo3_config_file(&target, false);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.14
+            shared=true
+            abi3=false
+            build_flags=
+            suppress_build_script_link_lines=false
+            lib_name=python3.14
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+
+        // Abi3: links against unversioned libpython3.so (stable ABI)
+        // See https://github.com/python/cpython/issues/148544
+        let config_file = config.pyo3_config_file(&target, true);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.14
+            shared=true
+            abi3=true
+            build_flags=
+            suppress_build_script_link_lines=false
+            lib_name=python3
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
     }

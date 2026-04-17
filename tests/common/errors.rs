@@ -1,7 +1,7 @@
 use anyhow::format_err;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
-use maturin::BuildOptions;
+use maturin::{BuildOptions, BuildOrchestrator};
 use pretty_assertions::assert_eq;
 use std::path::Path;
 use std::process::Command;
@@ -19,15 +19,17 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "test-crates/targets/pyo3_no_extension_module",
         "--out",
         "test-crates/targets/pyo3_no_extension_module",
+        "--auditwheel",
+        "check",
     ];
 
     let options = BuildOptions::try_parse_from(cli)?;
-    let result = options
+    let build_context = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
-        .build()?
-        .build_wheels();
+        .build()?;
+    let result = BuildOrchestrator::new(&build_context).build_wheels();
     if let Err(err) = result {
         if !(err
             .source()
@@ -61,7 +63,7 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
     if let Err(err) = result {
@@ -96,19 +98,22 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "test-crates/targets/invalid_manylinux_does_not_panic",
     ];
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let result = options
+    let build_context = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
-        .build()?
-        .build_wheels();
+        .build()?;
+    let result = BuildOrchestrator::new(&build_context).build_wheels();
     if let Err(err) = result {
         assert_eq!(err.to_string(), "Error ensuring manylinux_2_99 compliance");
         let err_string = err
             .source()
             .ok_or_else(|| format_err!("{}", err))?
             .to_string();
-        assert_eq!(err_string, "manylinux_2_99 compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway");
+        assert_eq!(
+            err_string,
+            "manylinux_2_99 compatibility policy is not defined by auditwheel yet, pass `--auditwheel=skip` to proceed anyway"
+        );
     } else {
         bail!("Should have errored");
     }
@@ -117,7 +122,7 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
 }
 
 /// The user set `python-source` in pyproject.toml, but there is no python module in there
-pub fn warn_on_missing_python_source() -> Result<()> {
+pub fn error_on_missing_python_source() -> Result<()> {
     let output = Command::new(env!("CARGO_BIN_EXE_maturin"))
         .arg("build")
         .arg("-m")
@@ -128,16 +133,15 @@ pub fn warn_on_missing_python_source() -> Result<()> {
         )
         .output()
         .unwrap();
-    if !output.status.success() {
-        bail!(
-            "Failed to run: {}\n---stdout:\n{}---stderr:\n{}",
-            output.status,
-            str::from_utf8(&output.stdout)?,
-            str::from_utf8(&output.stderr)?
-        );
-    }
-
-    assert!(str::from_utf8(&output.stderr)?.contains("Warning: You specified the python source as"));
+    assert!(
+        !output.status.success(),
+        "Expected build to fail when python-source is set but module is missing"
+    );
+    let stderr = str::from_utf8(&output.stderr)?;
+    assert!(
+        stderr.contains("python-source is set to"),
+        "Expected error about missing python-source, got: {stderr}"
+    );
     Ok(())
 }
 
@@ -166,16 +170,14 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
         .build();
 
     if let Err(err) = result {
         let err_string = err.to_string();
         assert!(
-            err_string.contains(
-                "Target riscv32gc-unknown-linux-gnu architecture is not supported by PyPI"
-            ),
+            err_string.contains("Rust target riscv32gc-unknown-linux-gnu is not supported by PyPI"),
             "{err_string}",
         );
     } else {
@@ -185,37 +187,37 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
     Ok(())
 }
 
-/// Test that --compatibility pypi cannot be combined with other platform tags
-pub fn pypi_compatibility_mixed_tags() -> Result<()> {
+/// Test that `--compatibility pypi` cannot be used with the linux tag.
+#[cfg(target_os = "linux")]
+pub fn pypi_compatibility_linux_tag() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![
         "build",
         "-m",
-        "test-crates/pyo3-mixed/Cargo.toml",
+        "test-crates/hello-world/Cargo.toml",
         "--compatibility",
         "pypi",
         "--compatibility",
-        "manylinux2014", // Should fail when combined with pypi
+        "linux", // Should fail when combined with pypi
         "--target-dir",
-        "test-crates/targets/pypi_compatibility_mixed_tags",
+        "test-crates/targets/pypi_compatibility_linux_tag",
         "--out",
-        "test-crates/targets/pypi_compatibility_mixed_tags",
+        "test-crates/targets/pypi_compatibility_linux_tag",
         "-i",
         "python3.12", // Add interpreter to bypass interpreter detection
     ];
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
-    let result = options
+    let build_context = options
         .into_build_context()
-        .strip(cfg!(feature = "faster-tests"))
+        .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
-        .build();
+        .build()?;
+    let result = BuildOrchestrator::new(&build_context).build_wheels();
 
     if let Err(err) = result {
         let err_string = err.to_string();
         assert!(
-            err_string.contains(
-                "The 'pypi' compatibility option cannot be combined with other platform tags"
-            ),
+            err_string.contains("PyPI validation failed"),
             "{err_string}",
         );
     } else {

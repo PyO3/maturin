@@ -57,8 +57,15 @@
         "null"
       ]
     },
+    "editable-profile": {
+      "description": "Same as `profile` but for \"editable\" builds",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "exclude": {
-      "description": "Exclude files matching the given glob pattern(s)",
+      "description": "Exclude files matching the given glob pattern(s).\nPatterns are resolved relative to the directory containing `pyproject.toml`.",
       "type": [
         "array",
         "null"
@@ -68,13 +75,13 @@
       }
     },
     "features": {
-      "description": "Space or comma separated list of features to activate",
+      "description": "List of features to activate.\nEach entry can be a plain feature name string, or a conditional object\nwith `feature` and `python-version` keys.",
       "type": [
         "array",
         "null"
       ],
       "items": {
-        "type": "string"
+        "$ref": "#/$defs/FeatureSpec"
       }
     },
     "frozen": {
@@ -84,8 +91,19 @@
         "null"
       ]
     },
+    "generate-ci": {
+      "description": "CI generation configuration",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GenerateCIConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "include": {
-      "description": "Include files matching the given glob pattern(s)",
+      "description": "Include files matching the given glob pattern(s).\nPatterns are resolved relative to the directory containing `pyproject.toml`.\nWhen `python-source` is configured, patterns are also tried relative to\nthat directory if no matches are found.",
       "type": [
         "array",
         "null"
@@ -93,6 +111,11 @@
       "items": {
         "$ref": "#/$defs/GlobPattern"
       }
+    },
+    "include-import-lib": {
+      "description": "Include the import library (.dll.lib) in the wheel on Windows",
+      "type": "boolean",
+      "default": false
     },
     "locked": {
       "description": "Require Cargo.lock is up to date",
@@ -156,6 +179,17 @@
         "type": "string"
       }
     },
+    "sbom": {
+      "description": "SBOM configuration",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SbomConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "sdist-generator": {
       "description": "Source distribution generator",
       "$ref": "#/$defs/SdistGenerator",
@@ -218,6 +252,11 @@
           "description": "Check wheel for manylinux compliance, but do not repair",
           "type": "string",
           "const": "check"
+        },
+        {
+          "description": "Audit wheel and warn about external libraries, but do not fail or repair",
+          "type": "string",
+          "const": "warn"
         },
         {
           "description": "Don't check for manylinux compliance",
@@ -285,6 +324,42 @@
         "name"
       ]
     },
+    "FeatureSpec": {
+      "description": "A cargo feature specification that can be either a plain feature name\nor a conditional feature that is only enabled for certain Python versions.\n\n# Examples\n\n```toml\n[tool.maturin]\nfeatures = [\n  \"some-feature\",\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\" },\n  { feature = \"pyo3/abi3-py38\", python-version = \"<3.11\" },\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\", python-implementation = \"cpython\" },\n  { feature = \"pypy-compat\", python-implementation = \"pypy\" },\n]\n```",
+      "anyOf": [
+        {
+          "description": "A plain feature name, always enabled",
+          "type": "string"
+        },
+        {
+          "description": "A feature enabled only when the conditions match",
+          "type": "object",
+          "properties": {
+            "feature": {
+              "description": "The cargo feature to enable",
+              "type": "string"
+            },
+            "python-implementation": {
+              "description": "Python implementation name, e.g. \"cpython\", \"pypy\", \"graalpy\"",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "python-version": {
+              "description": "PEP 440 version specifier for the target Python version, e.g. \">=3.11\"",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "feature"
+          ]
+        }
+      ]
+    },
     "Format": {
       "description": "The target format for the include or exclude [GlobPattern].\n\nSee [Formats].",
       "oneOf": [
@@ -316,6 +391,123 @@
         }
       ]
     },
+    "GenerateCIConfig": {
+      "description": "The `[tool.maturin.generate-ci]` section",
+      "type": "object",
+      "properties": {
+        "github": {
+          "description": "GitHub Actions configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitHubCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "GitHubCIConfig": {
+      "description": "The `[tool.maturin.generate-ci.github]` section",
+      "type": "object",
+      "properties": {
+        "android": {
+          "description": "Android platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "args": {
+          "description": "Extra arguments to pass to maturin (applies to all platforms)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emscripten": {
+          "description": "Emscripten platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linux": {
+          "description": "Linux (manylinux) platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "macos": {
+          "description": "macOS platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "musllinux": {
+          "description": "Musllinux platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pytest": {
+          "description": "Enable pytest",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "skip-attestation": {
+          "description": "Skip artifact attestation",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "windows": {
+          "description": "Windows platform configuration",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlatformCIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zig": {
+          "description": "Use zig for cross compilation",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
     "GlobPattern": {
       "description": "A glob pattern for the include and exclude configuration.\n\nSee [PyProjectToml::include] and [PyProject::exclude].\n\nBased on <https://python-poetry.org/docs/pyproject/#include-and-exclude>.",
       "anyOf": [
@@ -340,8 +532,131 @@
             "path",
             "format"
           ]
+        },
+        {
+          "description": "A glob `path` relative to a crate's OUT_DIR",
+          "type": "object",
+          "properties": {
+            "crate_name": {
+              "description": "Optional crate name (defaults to the root crate)",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "from": {
+              "description": "Source: must be \"out-dir\"",
+              "$ref": "#/$defs/IncludeFrom"
+            },
+            "path": {
+              "description": "A glob pattern relative to OUT_DIR",
+              "type": "string"
+            },
+            "to": {
+              "description": "Target path in wheel (e.g. \"my_package/\")",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "from",
+            "to"
+          ]
         }
       ]
+    },
+    "IncludeFrom": {
+      "description": "Supported values for the `from` field in include patterns.",
+      "oneOf": [
+        {
+          "description": "Include files from the crate's OUT_DIR",
+          "type": "string",
+          "const": "out-dir"
+        }
+      ]
+    },
+    "PlatformCIConfig": {
+      "description": "Per-platform CI configuration",
+      "type": "object",
+      "properties": {
+        "args": {
+          "description": "Extra arguments to pass to maturin",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "before-script-linux": {
+          "description": "Script to run before build on Linux",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "container": {
+          "description": "Container image to use",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "docker-options": {
+          "description": "Docker options",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manylinux": {
+          "description": "Manylinux version (e.g. \"auto\", \"2_28\", \"musllinux_1_2\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner": {
+          "description": "Default runner for this platform",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rust-toolchain": {
+          "description": "Rust toolchain (e.g. \"nightly\", \"stable\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rustup-components": {
+          "description": "Rustup components to install",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "description": "Detailed per-target configuration (mutually exclusive with `targets`)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/TargetCIConfig"
+          }
+        },
+        "targets": {
+          "description": "Simple list of target architectures (mutually exclusive with `target`)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "PlatformTag": {
       "description": "Decides how to handle manylinux and musllinux compliance",
@@ -424,6 +739,36 @@
         }
       ]
     },
+    "SbomConfig": {
+      "description": "SBOM configuration",
+      "type": "object",
+      "properties": {
+        "auditwheel": {
+          "description": "Generate a CycloneDX SBOM for external shared libraries grafted during\nauditwheel repair. Defaults to `true` when repair copies libraries.\n\nThe SBOM is written to `<dist-info>/sboms/auditwheel.cdx.json` and\nrecords which OS packages (deb, rpm, apk) provided the grafted\nlibraries, following the same convention as Python's auditwheel.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "include": {
+          "description": "Additional SBOM files to include in the `.dist-info/sboms` directory.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "rust": {
+          "description": "Generate an SBOM for Rust crates. Defaults to `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
     "SdistGenerator": {
       "description": "Source distribution generator",
       "oneOf": [
@@ -437,6 +782,75 @@
           "type": "string",
           "const": "git"
         }
+      ]
+    },
+    "TargetCIConfig": {
+      "description": "Per-target CI configuration within a platform",
+      "type": "object",
+      "properties": {
+        "arch": {
+          "description": "Target architecture (e.g. \"x86_64\", \"aarch64\")",
+          "type": "string"
+        },
+        "args": {
+          "description": "Extra arguments to pass to maturin",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "before-script-linux": {
+          "description": "Before-script-linux override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "container": {
+          "description": "Container image override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "docker-options": {
+          "description": "Docker options override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manylinux": {
+          "description": "Manylinux version override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runner": {
+          "description": "Runner override for this target",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rust-toolchain": {
+          "description": "Rust toolchain override",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rustup-components": {
+          "description": "Rustup components override",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "arch"
       ]
     },
     "TargetConfig": {

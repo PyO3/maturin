@@ -1,0 +1,12 @@
+[project]
+name = "external-python-source"
+version = "0.1.0"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "bin"
+python-source = "../python"
+module-name = "external_python_source"

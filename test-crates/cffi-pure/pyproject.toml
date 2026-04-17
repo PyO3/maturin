@@ -9,3 +9,4 @@ dynamic = ["version"]
 
 [tool.maturin]
 bindings = "cffi"
+include-import-lib = true

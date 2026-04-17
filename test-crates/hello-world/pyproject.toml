@@ -10,6 +10,10 @@ build-backend = "maturin"
 
 [tool.maturin]
 bindings = "bin"
+exclude = [
+  "benches/excluded_bench.rs",
+  "examples/excluded_example.rs",
+]
 
 [[tool.maturin.targets]]
 name = "hello-world"

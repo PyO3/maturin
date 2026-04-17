@@ -36,21 +36,23 @@ crate-type = ["cdylib"]
 rand = "0.9.0"
 
 [dependencies.pyo3]
-version = "0.27.0"
+version = "0.28.2"
 # "abi3-py38" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.8
 features = ["abi3-py38"]
 ```
 
-Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements
-and enable the `extension-module` feature of pyo3.
+Add a `pyproject.toml` to configure [PEP 518](https://peps.python.org/pep-0518/) build system requirements.
 
 ```toml
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
+```
 
+If you are using pyo3 0.26 or earlier you need to enable the `extension-module` feature of pyo3 to skip linking against libpython.so (this is automatically done in pyo3 0.27):
+
+```toml
 [tool.maturin]
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
 features = ["pyo3/extension-module"]
 ```
 
@@ -286,8 +288,8 @@ wheels compatible with a wide range of Linux distros.
 📦 Built wheel for abi3 Python ≥ 3.8 to /Users/ferris/src/rust/guessing-game/target/wheels/guessing_game-0.1.0-cp37-abi3-macosx_10_7_x86_64.whl
 ```
 
-maturin can even publish wheels directly to [PyPI](https://pypi.org) with
-`maturin publish`!
+To make your package available to others on [PyPI](https://pypi.org), use [`uv publish`](https://docs.astral.sh/uv/guides/package/#publishing-your-package)
+or [`twine upload`](https://twine.readthedocs.io/en/stable/).
 
 ## Summary
 

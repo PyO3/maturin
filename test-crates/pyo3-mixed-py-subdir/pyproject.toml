@@ -17,3 +17,4 @@ get_42 = "pyo3_mixed_py_subdir:get_42"
 [tool.maturin]
 module-name = "pyo3_mixed_py_subdir._pyo3_mixed"
 python-source = "python"
+include = ["assets/extra_data.txt"]

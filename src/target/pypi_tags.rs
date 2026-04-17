@@ -23,27 +23,35 @@ use crate::target::legacy_py::{
     LINUX_PLATFORM_RE, MACOS_ARCHES, MACOS_MAJOR_VERSIONS, MACOS_PLATFORM_RE, MANYLINUX_ARCHES,
     MUSLLINUX_ARCHES, WINDOWS_ARCHES,
 };
-use crate::target::{Os, Target};
-use anyhow::{anyhow, bail, Result};
+use crate::target::{Arch, Os, Target};
+use anyhow::{Result, anyhow, bail};
 use target_lexicon::Environment;
 
 /// Check for target architectures that we know aren't supported by PyPI to error early.
 pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
-    let arch = target.target_arch().to_string();
+    let arch = target.target_arch();
     match target.target_os() {
         Os::Windows => WINDOWS_ARCHES.contains(&arch.as_str()),
         Os::Macos => {
             // macOS uses arm64 in platform tags, but target triple uses aarch64
-            let normalized_arch = if arch == "aarch64" { "arm64" } else { &arch };
+            let normalized_arch = if arch == Arch::Aarch64 {
+                "arm64"
+            } else {
+                arch.as_str()
+            };
             MACOS_ARCHES.contains(&normalized_arch)
         }
         Os::Ios => {
             // iOS uses arm64 in platform tags, but target triple uses aarch64
-            let normalized_arch = if arch == "aarch64" { "arm64" } else { &arch };
+            let normalized_arch = if arch == Arch::Aarch64 {
+                "arm64"
+            } else {
+                arch.as_str()
+            };
             // PyPI allows iOS with arm64 and x86_64 (simulator)
             matches!(normalized_arch, "arm64" | "x86_64")
         }
-        Os::Linux if target.target_triple().contains("android") => {
+        Os::Android => {
             // Android target triples map to specific platform tag architectures
             let android_arch = match arch.as_str() {
                 "armv7l" => "armeabi_v7a", // armv7 little-endian
@@ -54,23 +62,25 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
             };
             ANDROID_ARCHES.contains(&android_arch)
         }
-        Os::Linux => match target.target_env() {
-            Environment::Gnu
-            | Environment::Gnuabi64
-            | Environment::Gnueabi
-            | Environment::Gnueabihf => {
-                let arch1 = arch.as_str();
-                MANYLINUX_ARCHES.contains(&arch1)
+        Os::Linux => {
+            // Old arm versions
+            // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
+            if arch == Arch::Armv6L || arch == Arch::Armv7L {
+                return true;
             }
-            Environment::Musl
-            | Environment::Musleabi
-            | Environment::Musleabihf
-            | Environment::Muslabi64 => {
-                let arch1 = arch.as_str();
-                MUSLLINUX_ARCHES.contains(&arch1)
+
+            match target.target_env() {
+                Environment::Gnu
+                | Environment::Gnuabi64
+                | Environment::Gnueabi
+                | Environment::Gnueabihf => MANYLINUX_ARCHES.contains(&arch.as_str()),
+                Environment::Musl
+                | Environment::Musleabi
+                | Environment::Musleabihf
+                | Environment::Muslabi64 => MUSLLINUX_ARCHES.contains(&arch.as_str()),
+                _ => false,
             }
-            _ => false,
-        },
+        }
         _ => false,
     }
 }
@@ -103,6 +113,12 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
             "many" => MANYLINUX_ARCHES.contains(&arch),
             _ => false,
         };
+    }
+
+    // Old arm versions
+    // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
+    if platform_tag == "linux_armv6l" || platform_tag == "linux_armv7l" {
+        return true;
     }
 
     // iOS
@@ -175,11 +191,16 @@ mod tests {
             ("manylinux_2_39_riscv64", true),
             // musllinux platforms
             ("musllinux_1_1_x86_64", true),
-            ("musllinux_1_1_riscv64", false),
+            ("musllinux_1_1_riscv64", true),
+            // Old arm versions
+            // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
+            ("linux_armv6l", true),
+            ("linux_armv7l", true),
             // macOS platforms
             ("macosx_9_0_x86_64", false), // Invalid major version
             ("macosx_10_9_x86_64", true),
             ("macosx_11_0_arm64", true),
+            ("macosx_26_0_arm64", true),
             // iOS platforms
             ("ios_14_0_arm64_iphoneos", true),
             ("ios_14_0_x86_64_iphonesimulator", true),
@@ -225,6 +246,9 @@ mod tests {
             ("aarch64-linux-android", true),
             ("armv7-linux-androideabi", true),
             ("riscv64gc-unknown-linux-gnu", true),
+            ("aarch64-apple-ios", true),
+            ("aarch64-apple-ios-sim", true),
+            ("x86_64-apple-ios", true),
             ("x86_64-unknown-freebsd", false), // Now unsupported (no lazy validation)
             ("powerpc64-unknown-linux-gnu", true), // PPC64 on Linux is supported
             ("s390x-unknown-linux-gnu", true), // s390x on Linux is supported

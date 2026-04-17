@@ -20,6 +20,11 @@ Options:
           
           Use as `--extras=extra1,extra2`
 
+  -G, --group <GROUP>
+          Install dependency groups defined in pyproject.toml (PEP 735)
+          
+          Use as `--group=test,docs`
+
       --skip-install
           Skip installation, only build the extension module inplace
           
@@ -69,6 +74,13 @@ Options:
 
       --compression-level <COMPRESSION_LEVEL>
           Zip compression level. Defaults to method default
+
+      --compression-enable-large-file-support
+          Whether to use large file support for ZIP files. Defaults to false
+
+      --generate-stubs
+          Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its
+          "experimental-inspect" feature
 
   -h, --help
           Print help (see a summary with '-h')

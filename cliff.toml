@@ -1,0 +1,34 @@
+[changelog]
+header = """
+# Changelog
+
+"""
+body = """
+{% if version %}\
+    ## {{ version | trim_start_matches(pat="v") }}
+{% else %}\
+    ## Unreleased
+{% endif %}\
+{% for commit in commits %}
+    * {% if commit.remote.pr_title %}\
+          {{ commit.remote.pr_title | upper_first }}\
+      {% else %}\
+          {{ commit.message | split(pat="\n") | first | upper_first }}\
+      {% endif %}\
+      {% if commit.remote.pr_number %} ([#{{ commit.remote.pr_number }}](https://github.com/pyo3/maturin/pull/{{ commit.remote.pr_number }})){%- endif %}\
+{% endfor %}\n
+"""
+
+[git]
+conventional_commits = false
+filter_unconventional = false
+commit_parsers = [
+    { field = "github.pr_labels", pattern = "internal", skip = true },
+    { field = "github.pr_labels", pattern = "dependencies", skip = true },
+    { message = ".*pre-commit autoupdate.*", skip = true },
+    { message = ".*", group = "Other" },
+]
+
+[remote.github]
+owner = "pyo3"
+repo = "maturin"

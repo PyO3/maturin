@@ -1,11 +1,11 @@
 use self::package_name_validations::{cargo_check_name, pypi_check_name};
 use crate::ci::GenerateCI;
 use crate::{BridgeModel, PyO3};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::{Select, theme::ColorfulTheme};
 use fs_err as fs;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use semver::Version;
 use std::path::Path;
 
@@ -56,12 +56,16 @@ impl ProjectGenerator<'_> {
             _ => BridgeModel::PyO3(PyO3 {
                 crate_name: bindings.parse()?,
                 version: Version::new(0, 23, 1),
-                abi3: None,
+                stable_abi: None,
                 metadata: None,
             }),
         };
-        let ci_config =
-            GenerateCI::default().generate_github(&project_name, &bridge_model, true)?;
+        let ci_config = crate::ci::github::generate_github_from_cli(
+            &GenerateCI::default(),
+            &project_name,
+            &bridge_model,
+            true,
+        )?;
 
         Ok(Self {
             env,
@@ -264,12 +268,16 @@ fn generate_project(
 }
 
 mod package_name_validations {
+    use once_cell::sync::Lazy;
+    use regex::Regex;
+
     // based on: https://github.com/pypi/warehouse/blob/8f79d90a310f0243ab15f52c41de093708a61dfd/warehouse/packaging/models.py#L211C9-L214C10
     pub fn pypi_check_name(name: &str) -> anyhow::Result<()> {
         // The `(?i)` flag was added to make the regex case-insensitive
-        let pattern = regex::Regex::new(r"^((?i)[A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$").unwrap();
+        static PATTERN: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"^((?i)[A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$").unwrap());
 
-        if !pattern.is_match(name) {
+        if !PATTERN.is_match(name) {
             anyhow::bail!("The name `{}` is not a valid package name", name)
         }
         Ok(())

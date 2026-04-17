@@ -12,9 +12,13 @@ crate-type = ["cdylib"]
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
 
 [dependencies]
-uniffi = { version = "0.28.0", features = ["cli"] }
+uniffi = "0.28.0"
 
 [build-dependencies]
 uniffi = { version = "0.28.0", features = ["build"] }

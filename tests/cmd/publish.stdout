@@ -16,6 +16,11 @@ Options:
       --no-sdist
           Don't build a source distribution
 
+      --pgo
+          Build with Profile-Guided Optimization (PGO).
+          
+          Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
+
   -r, --repository <REPOSITORY>
           The repository (package index) to upload the package to. Should be a section in the config
           file.
@@ -59,6 +64,18 @@ Options:
           
           [env: MATURIN_NON_INTERACTIVE=]
 
+  -i, --interpreter [<INTERPRETER>...]
+          The python versions to build wheels for, given as the executables of interpreters such as
+          `python3.9` or `/usr/bin/python3.8`
+
+  -f, --find-interpreter
+          Find interpreters from the host machine
+
+  -b, --bindings <BINDINGS>
+          Which kind of bindings to use
+          
+          [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
+
       --compatibility [<compatibility>...]
           Control the platform tag and PyPI compatibility.
           
@@ -76,28 +93,13 @@ Options:
           
           The default is the lowest compatible `manylinux` tag, or plain `linux` if nothing matched.
 
-  -i, --interpreter [<INTERPRETER>...]
-          The python versions to build wheels for, given as the executables of interpreters such as
-          `python3.9` or `/usr/bin/python3.8`
-
-  -f, --find-interpreter
-          Find interpreters from the host machine
-
-  -b, --bindings <BINDINGS>
-          Which kind of bindings to use
-          
-          [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
-
-  -o, --out <OUT>
-          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
-          project's target directory
-
       --auditwheel <AUDITWHEEL>
           Audit wheel for manylinux compliance
 
           Possible values:
           - repair: Audit and repair wheel for manylinux compliance
           - check:  Check wheel for manylinux compliance, but do not repair
+          - warn:   Audit wheel and warn about external libraries, but do not fail or repair
           - skip:   Don't check for manylinux compliance
 
       --zig
@@ -106,6 +108,19 @@ Options:
           Default to manylinux2014/manylinux_2_17 if you do not specify an `--compatibility`
           
           Make sure you installed zig with `pip install maturin[zig]`
+
+  -o, --out <OUT>
+          The directory to store the built wheels in. Defaults to a new "wheels" directory in the
+          project's target directory
+
+      --include-debuginfo
+          Include debug info files (.pdb on Windows, .dSYM on macOS, .dwp on Linux) in the wheel.
+          When enabled, maturin automatically configures split-debuginfo=packed so that separate
+          debug info files are produced
+
+      --sbom-include <SBOM_INCLUDE>...
+          Additional SBOM files to include in the `.dist-info/sboms` directory. Can be specified
+          multiple times
 
   -q, --quiet
           Do not print cargo log messages
@@ -142,6 +157,13 @@ Options:
 
       --compression-level <COMPRESSION_LEVEL>
           Zip compression level. Defaults to method default
+
+      --compression-enable-large-file-support
+          Whether to use large file support for ZIP files. Defaults to false
+
+      --generate-stubs
+          Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its
+          "experimental-inspect" feature
 
   -h, --help
           Print help (see a summary with '-h')

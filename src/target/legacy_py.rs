@@ -50,7 +50,7 @@ pub(super) static WINDOWS_ARCHES: &[&str] = &["x86_64", "i686", "aarch64"];
 pub(super) static MACOS_ARCHES: &[&str] = &["x86_64", "arm64", "i686", "universal2"];
 
 /// Those are actually hardcoded in warehouse in the same way.
-pub(super) static MACOS_MAJOR_VERSIONS: &[&str] = &["10", "11", "12", "13", "14", "15"];
+pub(super) static MACOS_MAJOR_VERSIONS: &[&str] = &["10", "11", "12", "13", "14", "15", "26"];
 
 pub(super) static IOS_ARCHES: &[&str] = &["arm64", "x86_64"];
 
@@ -60,5 +60,6 @@ pub(super) static MANYLINUX_ARCHES: &[&str] = &[
     "x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x", "ppc64", "riscv64",
 ];
 
-pub(super) static MUSLLINUX_ARCHES: &[&str] =
-    &["x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x"];
+pub(super) static MUSLLINUX_ARCHES: &[&str] = &[
+    "x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64",
+];

@@ -12,7 +12,7 @@ mod config;
 mod discovery;
 mod resolver;
 
-pub(crate) use self::resolver::InterpreterResolver;
+pub(crate) use self::resolver::{InterpreterResolver, InterpreterSpec};
 
 /// Minimum supported CPython minor version.
 pub const MINIMUM_PYTHON_MINOR: usize = 7;

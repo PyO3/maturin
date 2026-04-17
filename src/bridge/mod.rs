@@ -1,6 +1,7 @@
 mod detection;
 
 pub use detection::{find_bridge, is_generating_import_lib};
+pub(crate) use detection::{find_bridge_silent, find_bridge_with_interpreters};
 
 use std::{fmt, str::FromStr};
 

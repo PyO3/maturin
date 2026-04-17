@@ -1,0 +1,11 @@
+[package]
+name = "pyo3-conditional-abi3"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pyo3 = { version = "0.28.2", features = ["generate-import-lib"] }
+
+[lib]
+name = "pyo3_conditional_abi3"
+crate-type = ["cdylib"]

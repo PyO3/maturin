@@ -464,6 +464,38 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     Ok(())
 }
 
+pub fn conditional_abi3_python_version_predicate() -> Result<()> {
+    let build_context = BuildOptions::try_parse_from([
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-conditional-abi3/Cargo.toml",
+        "--quiet",
+        "-i",
+        "python3.10",
+    ])?
+    .into_build_context()
+    .strip(Some(cfg!(feature = "faster-tests")))
+    .editable(false)
+    .build()?;
+    assert!(!build_context.project.bridge().is_abi3());
+
+    let build_context = BuildOptions::try_parse_from([
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-conditional-abi3/Cargo.toml",
+        "--quiet",
+        "-i",
+        "python3.11",
+    ])?
+    .into_build_context()
+    .strip(Some(cfg!(feature = "faster-tests")))
+    .editable(false)
+    .build()?;
+    assert!(build_context.project.bridge().is_abi3());
+
+    Ok(())
+}
+
 pub fn abi3_without_version() -> Result<()> {
     // The first argument is ignored by clap
     let cli = vec![

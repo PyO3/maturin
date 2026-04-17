@@ -89,11 +89,11 @@ type DiscoveryResult = (Vec<Candidate>, Option<PythonInterpreter>);
 ///
 /// Handles formats like `"python3.14t"`, `"pypy3.11"`, `"graalpy-3.10"`, `"3.9"`.
 #[derive(Debug, Clone)]
-struct InterpreterSpec {
-    kind: InterpreterKind,
-    major: usize,
-    minor: usize,
-    abiflags: String,
+pub(crate) struct InterpreterSpec {
+    pub(crate) kind: InterpreterKind,
+    pub(crate) major: usize,
+    pub(crate) minor: usize,
+    pub(crate) abiflags: String,
 }
 
 impl InterpreterSpec {
@@ -107,7 +107,7 @@ impl InterpreterSpec {
     ///
     /// Returns `None` for version-less names like `"pypy"` or `"python"`.
     /// Returns `Ok(None)` for file paths or unrecognized formats.
-    fn parse(s: &str) -> Result<Option<Self>> {
+    pub(crate) fn parse(s: &str) -> Result<Option<Self>> {
         let (kind, ver_str) = if let Some(ver) = s.strip_prefix("pypy") {
             (InterpreterKind::PyPy, ver.strip_prefix('-').unwrap_or(ver))
         } else if let Some(ver) = s.strip_prefix("graalpy") {

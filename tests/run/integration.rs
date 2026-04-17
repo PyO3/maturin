@@ -166,6 +166,11 @@ fn abi3_python_interpreter_args() {
 }
 
 #[test]
+fn conditional_abi3_python_version_predicate() {
+    handle_result(other::conditional_abi3_python_version_predicate());
+}
+
+#[test]
 fn abi3_generate_stubs() {
     handle_result(other::generate_stubs(
         "test-crates/pyo3-stub-generation",

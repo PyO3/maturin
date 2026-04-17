@@ -8,7 +8,8 @@ use super::{
     BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi, StableAbiKind, StableAbiVersion,
 };
 use crate::PyProjectToml;
-use crate::pyproject_toml::FeatureSpec;
+use crate::PythonInterpreter;
+use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
 use anyhow::{Context, Result, bail};
 use cargo_metadata::{CrateType, Metadata, Node, PackageId, TargetKind};
 use std::collections::{HashMap, HashSet};
@@ -26,7 +27,35 @@ pub fn find_bridge(
     bridge: Option<&str>,
     pyproject: Option<&PyProjectToml>,
 ) -> Result<BridgeModel> {
-    let extra_pyo3_features = pyo3_features_from_conditional(pyproject);
+    find_bridge_impl(cargo_metadata, bridge, pyproject, None, true)
+}
+
+pub(crate) fn find_bridge_silent(
+    cargo_metadata: &Metadata,
+    bridge: Option<&str>,
+    pyproject: Option<&PyProjectToml>,
+) -> Result<BridgeModel> {
+    find_bridge_impl(cargo_metadata, bridge, pyproject, None, false)
+}
+
+pub(crate) fn find_bridge_with_interpreters(
+    cargo_metadata: &Metadata,
+    bridge: Option<&str>,
+    pyproject: Option<&PyProjectToml>,
+    interpreters: &[PythonInterpreter],
+) -> Result<BridgeModel> {
+    find_bridge_impl(cargo_metadata, bridge, pyproject, Some(interpreters), true)
+}
+
+fn find_bridge_impl(
+    cargo_metadata: &Metadata,
+    bridge: Option<&str>,
+    pyproject: Option<&PyProjectToml>,
+    conditional_feature_interpreters: Option<&[PythonInterpreter]>,
+    emit_status: bool,
+) -> Result<BridgeModel> {
+    let extra_pyo3_features =
+        pyo3_features_from_conditional(pyproject, conditional_feature_interpreters);
     let deps = current_crate_dependencies(cargo_metadata)?;
     let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
         .packages
@@ -99,7 +128,9 @@ pub fn find_bridge(
     };
 
     if !bridge.is_pyo3() {
-        eprintln!("🔗 Found {bridge} bindings");
+        if emit_status {
+            eprintln!("🔗 Found {bridge} bindings");
+        }
         return Ok(bridge);
     }
 
@@ -126,7 +157,9 @@ pub fn find_bridge(
 
             return if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features)? {
                 let kind = stable_abi.kind;
-                eprintln!("🔗 Found {lib} bindings with {kind} support");
+                if emit_status {
+                    eprintln!("🔗 Found {lib} bindings with {kind} support");
+                }
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
@@ -136,7 +169,9 @@ pub fn find_bridge(
                 };
                 Ok(BridgeModel::PyO3(bindings))
             } else {
-                eprintln!("🔗 Found {lib} bindings");
+                if emit_status {
+                    eprintln!("🔗 Found {lib} bindings");
+                }
                 Ok(bridge)
             };
         }
@@ -335,6 +370,7 @@ fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str,
 /// for the corresponding binding crate.
 fn pyo3_features_from_conditional(
     pyproject: Option<&PyProjectToml>,
+    interpreters: Option<&[PythonInterpreter]>,
 ) -> HashMap<&'static str, Vec<String>> {
     let mut extra: HashMap<&'static str, Vec<String>> = HashMap::new();
     let features = match pyproject
@@ -347,6 +383,29 @@ fn pyo3_features_from_conditional(
     let (_plain, conditional) = FeatureSpec::split(features);
     let crate_names: &[&'static str] = &["pyo3", "pyo3-ffi"];
     for cond in &conditional {
+        let matches_known_interpreter = interpreters.is_some_and(|interpreters| {
+            interpreters.iter().any(|interpreter| {
+                let env = FeatureConditionEnv {
+                    major: interpreter.major,
+                    minor: interpreter.minor,
+                    implementation_name: &interpreter.implementation_name,
+                };
+                cond.python_version.as_ref().is_none_or(|specifier| {
+                    specifier.contains(&pep440_rs::Version::new([
+                        env.major as u64,
+                        env.minor as u64,
+                    ]))
+                }) && cond
+                    .python_implementation
+                    .as_ref()
+                    .is_none_or(|implementation| {
+                        implementation.eq_ignore_ascii_case(env.implementation_name)
+                    })
+            })
+        });
+        if interpreters.is_some() && !matches_known_interpreter {
+            continue;
+        }
         for &crate_name in crate_names {
             let prefix = format!("{crate_name}/");
             if let Some(feat_name) = cond.feature.strip_prefix(&prefix) {

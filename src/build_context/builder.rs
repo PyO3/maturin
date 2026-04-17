@@ -1,11 +1,15 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::bridge::{find_bridge, is_generating_import_lib};
+use crate::bridge::{
+    find_bridge, find_bridge_silent, find_bridge_with_interpreters, is_generating_import_lib,
+};
 use crate::build_options::{BuildOptions, TargetTriple};
 use crate::compile::filter_cargo_targets;
 use crate::metadata::Metadata24;
 use crate::project_layout::ProjectResolver;
 use crate::pyproject_toml::{FeatureSpec, SbomConfig};
-use crate::python_interpreter::{InterpreterResolver, PythonInterpreter};
+use crate::python_interpreter::{
+    InterpreterConfig, InterpreterResolver, InterpreterSpec, PythonInterpreter,
+};
 use crate::target::{
     detect_arch_from_python, detect_target_from_cross_python, is_arch_supported_by_pypi,
 };
@@ -100,18 +104,45 @@ impl BuildContextBuilder {
         )?;
         let pyproject = pyproject_toml.as_ref();
 
-        let bridge = find_bridge(
-            &cargo_metadata,
-            build_options.python.bindings.as_deref().or_else(|| {
-                pyproject.and_then(|x| {
-                    if x.bindings().is_some() {
-                        pyproject_toml_maturin_options.push("bindings");
-                    }
-                    x.bindings()
-                })
-            }),
-            pyproject,
+        let (target, universal2) = resolve_target(
+            build_options.target.clone(),
+            build_options.python.interpreter.first(),
         )?;
+
+        let bindings = build_options.python.bindings.as_deref().or_else(|| {
+            pyproject.and_then(|x| {
+                if x.bindings().is_some() {
+                    pyproject_toml_maturin_options.push("bindings");
+                }
+                x.bindings()
+            })
+        });
+        let has_conditional_pyo3_features = pyproject
+            .and_then(|p| p.maturin())
+            .and_then(|m| m.features.clone())
+            .map(|specs| {
+                FeatureSpec::split(specs).1.iter().any(|feature| {
+                    feature.feature.starts_with("pyo3/") || feature.feature.starts_with("pyo3-ffi/")
+                })
+            })
+            .unwrap_or(false);
+        let bridge = if has_conditional_pyo3_features {
+            let base_bridge = find_bridge_silent(&cargo_metadata, bindings, pyproject)?;
+            let feature_interpreters = Self::resolve_feature_condition_interpreters(
+                &build_options,
+                &target,
+                &base_bridge,
+                metadata24.requires_python.as_ref(),
+            )?;
+            find_bridge_with_interpreters(
+                &cargo_metadata,
+                bindings,
+                pyproject,
+                &feature_interpreters,
+            )?
+        } else {
+            find_bridge(&cargo_metadata, bindings, pyproject)?
+        };
         debug!("Resolved bridge model: {:?}", bridge);
 
         if !bridge.is_bin() && project_layout.extension_name.contains('-') {
@@ -121,11 +152,6 @@ impl BuildContextBuilder {
                  [tool.maturin] module-name in your pyproject.toml)"
             );
         }
-
-        let (target, universal2) = resolve_target(
-            build_options.target.clone(),
-            build_options.python.interpreter.first(),
-        )?;
 
         let wheel_dir = match build_options.output.out {
             Some(ref dir) => dir.clone(),
@@ -312,6 +338,59 @@ impl BuildContextBuilder {
             generate_import_lib,
         );
         resolver.resolve()
+    }
+
+    /// Resolve just enough interpreter metadata to evaluate conditional
+    /// pyproject features without emitting user-facing discovery logs twice.
+    fn resolve_feature_condition_interpreters(
+        build_options: &BuildOptions,
+        target: &Target,
+        bridge: &BridgeModel,
+        requires_python: Option<&pep440_rs::VersionSpecifiers>,
+    ) -> Result<Vec<PythonInterpreter>> {
+        let mut interpreters = Vec::new();
+
+        if build_options.python.find_interpreter {
+            return PythonInterpreter::find_all(target, bridge, requires_python);
+        }
+
+        if build_options.python.interpreter.is_empty() {
+            if !build_options.python.find_interpreter
+                && let Some(interpreter) =
+                    PythonInterpreter::check_executable(target.get_python(), target, bridge)?
+            {
+                interpreters.push(interpreter);
+            }
+            return Ok(interpreters);
+        }
+
+        for requested in &build_options.python.interpreter {
+            if let Some(interpreter) =
+                PythonInterpreter::check_executable(requested, target, bridge)?
+            {
+                interpreters.push(interpreter);
+                continue;
+            }
+
+            let requested_display = requested.display().to_string();
+            let requested_name = requested
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(&requested_display);
+            let Some(spec) = InterpreterSpec::parse(requested_name)? else {
+                continue;
+            };
+            if let Some(config) = InterpreterConfig::lookup_one(
+                target,
+                spec.kind,
+                (spec.major, spec.minor),
+                &spec.abiflags,
+            ) {
+                interpreters.push(PythonInterpreter::from_config(config.clone()));
+            }
+        }
+
+        Ok(interpreters)
     }
 
     /// Resolve strip, debuginfo, and auditwheel mode from CLI + pyproject.toml.

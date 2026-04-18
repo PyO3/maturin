@@ -317,7 +317,7 @@ fn emit_python_setup(y: &mut Yaml, platform: Platform, min_python_minor: Option<
         .indent()
         .line("with:")
         .indent()
-        .line(format!("python-version: {python_version}"));
+        .line(format!("python-version: \"{python_version}\""));
     if matches!(platform, Platform::Windows) {
         y.line(format!(
             "architecture: {}",
@@ -342,7 +342,7 @@ fn emit_free_threaded_setup(y: &mut Yaml, platform: Platform, min_python_minor: 
         .indent()
         .line("with:")
         .indent()
-        .line(format!("python-version: {python_version}"));
+        .line(format!("python-version: \"{python_version}\""));
     if matches!(platform, Platform::Windows) {
         y.line(format!(
             "architecture: {}",

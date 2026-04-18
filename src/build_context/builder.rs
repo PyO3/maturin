@@ -1,5 +1,5 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::bridge::{find_bridge, is_generating_import_lib};
+use crate::bridge::{find_bridge, is_generating_import_lib, upgrade_bridge_abi3};
 use crate::build_options::{BuildOptions, TargetTriple};
 use crate::compile::filter_cargo_targets;
 use crate::metadata::Metadata24;
@@ -100,19 +100,37 @@ impl BuildContextBuilder {
         )?;
         let pyproject = pyproject_toml.as_ref();
 
-        let bridge = find_bridge(
-            &cargo_metadata,
-            build_options.python.bindings.as_deref().or_else(|| {
-                pyproject.and_then(|x| {
-                    if x.bindings().is_some() {
-                        pyproject_toml_maturin_options.push("bindings");
-                    }
-                    x.bindings()
-                })
-            }),
-            pyproject,
-        )?;
-        debug!("Resolved bridge model: {:?}", bridge);
+        let bindings = build_options.python.bindings.as_deref().or_else(|| {
+            pyproject.and_then(|x| {
+                if x.bindings().is_some() {
+                    pyproject_toml_maturin_options.push("bindings");
+                }
+                x.bindings()
+            })
+        });
+
+        // Check whether conditional pyo3/pyo3-ffi features exist in pyproject.toml
+        // AND pyproject features are actually active (not overridden by CLI --features).
+        // When CLI --features is set, pyproject features are ignored at compile time
+        // (see cargo_options.merge_with_pyproject_toml), so bridge inference must
+        // ignore them too to stay in sync.
+        let has_conditional_pyo3_features = pyproject
+            .and_then(|p| p.maturin())
+            .and_then(|m| m.features.as_ref())
+            .is_some_and(|specs| {
+                // Only consider conditional features when pyproject features
+                // were actually adopted (not overridden by CLI).
+                let cli_overrides = !cargo_options.features.is_empty()
+                    && !pyproject_toml_maturin_options.contains(&"features");
+                !cli_overrides
+                    && FeatureSpec::split(specs.clone()).1.iter().any(|c| {
+                        c.feature.starts_with("pyo3/") || c.feature.starts_with("pyo3-ffi/")
+                    })
+            });
+
+        // Detect bridge without conditional pyo3 features — those are
+        // evaluated after interpreter resolution via upgrade_bridge_abi3.
+        let bridge = find_bridge(&cargo_metadata, bindings)?;
 
         if !bridge.is_bin() && project_layout.extension_name.contains('-') {
             bail!(
@@ -140,6 +158,24 @@ impl BuildContextBuilder {
             &metadata24,
             &cargo_metadata,
         )?;
+
+        // Upgrade bridge to abi3 if conditional pyo3 features
+        // (e.g. abi3-py311 gated on python-version>=3.11) match any
+        // of the resolved interpreters.
+        let bridge = if has_conditional_pyo3_features {
+            upgrade_bridge_abi3(bridge, &cargo_metadata, pyproject, &interpreter)?
+        } else {
+            bridge
+        };
+        debug!("Resolved bridge model: {:?}", bridge);
+        if let Some(stable_abi) = bridge.pyo3().and_then(|p| p.stable_abi.as_ref()) {
+            eprintln!(
+                "🔗 Found {bridge} bindings with {} support",
+                stable_abi.kind
+            );
+        } else {
+            eprintln!("🔗 Found {bridge} bindings");
+        }
 
         // Set PYO3_PYTHON for cross-compilation so pyo3's build script
         // can find the host interpreter.

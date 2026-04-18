@@ -1,6 +1,6 @@
 mod detection;
 
-pub use detection::{find_bridge, is_generating_import_lib};
+pub use detection::{find_bridge, is_generating_import_lib, upgrade_bridge_abi3};
 
 use std::{fmt, str::FromStr};
 

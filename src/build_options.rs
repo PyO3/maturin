@@ -171,11 +171,11 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            find_bridge(&pyo3_mixed, None, None),
+            find_bridge(&pyo3_mixed, None),
             Ok(BridgeModel::PyO3 { .. })
         ));
         assert!(matches!(
-            find_bridge(&pyo3_mixed, Some("pyo3"), None),
+            find_bridge(&pyo3_mixed, Some("pyo3")),
             Ok(BridgeModel::PyO3 { .. })
         ));
     }
@@ -204,8 +204,8 @@ mod tests {
                 },
             }),
         });
-        assert_eq!(find_bridge(&pyo3_pure, None, None).unwrap(), bridge);
-        assert_eq!(find_bridge(&pyo3_pure, Some("pyo3"), None).unwrap(), bridge);
+        assert_eq!(find_bridge(&pyo3_pure, None).unwrap(), bridge);
+        assert_eq!(find_bridge(&pyo3_pure, Some("pyo3")).unwrap(), bridge);
     }
 
     #[test]
@@ -215,7 +215,7 @@ mod tests {
             .exec()
             .unwrap();
 
-        assert!(find_bridge(&pyo3_pure, None, None).is_err());
+        assert!(find_bridge(&pyo3_pure, None).is_err());
 
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(test_crate_path("pyo3-feature").join("Cargo.toml"))
@@ -224,7 +224,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            find_bridge(&pyo3_pure, None, None).unwrap(),
+            find_bridge(&pyo3_pure, None).unwrap(),
             BridgeModel::PyO3 { .. }
         ));
     }
@@ -237,15 +237,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            find_bridge(&cffi_pure, Some("cffi"), None).unwrap(),
+            find_bridge(&cffi_pure, Some("cffi")).unwrap(),
             BridgeModel::Cffi
         );
-        assert_eq!(
-            find_bridge(&cffi_pure, None, None).unwrap(),
-            BridgeModel::Cffi
-        );
+        assert_eq!(find_bridge(&cffi_pure, None).unwrap(), BridgeModel::Cffi);
 
-        assert!(find_bridge(&cffi_pure, Some("pyo3"), None).is_err());
+        assert!(find_bridge(&cffi_pure, Some("pyo3")).is_err());
     }
 
     #[test]
@@ -256,28 +253,114 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            find_bridge(&hello_world, Some("bin"), None).unwrap(),
+            find_bridge(&hello_world, Some("bin")).unwrap(),
             BridgeModel::Bin(None)
         );
         assert_eq!(
-            find_bridge(&hello_world, None, None).unwrap(),
+            find_bridge(&hello_world, None).unwrap(),
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("pyo3"), None).is_err());
+        assert!(find_bridge(&hello_world, Some("pyo3")).is_err());
 
         let pyo3_bin = MetadataCommand::new()
             .manifest_path(test_crate_path("pyo3-bin").join("Cargo.toml"))
             .exec()
             .unwrap();
         assert!(matches!(
-            find_bridge(&pyo3_bin, Some("bin"), None).unwrap(),
+            find_bridge(&pyo3_bin, Some("bin")).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
         assert!(matches!(
-            find_bridge(&pyo3_bin, None, None).unwrap(),
+            find_bridge(&pyo3_bin, None).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
+    }
+
+    #[test]
+    fn test_find_bridge_conditional_abi3_filtered_by_interpreter() {
+        use crate::bridge::upgrade_bridge_abi3;
+        use crate::python_interpreter::InterpreterConfig;
+
+        // A pyproject.toml with pyo3/abi3-py311 gated on python-version >= 3.11
+        let pyproject: crate::PyProjectToml = toml::from_str(
+            r#"
+            [build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            features = [{ feature = "pyo3/abi3-py311", python-version = ">=3.11" }]
+            "#,
+        )
+        .unwrap();
+
+        // Use pyo3-mixed which has no abi3 in Cargo.toml, so abi3 inference
+        // depends entirely on the conditional pyproject feature.
+        let metadata = MetadataCommand::new()
+            .manifest_path(test_crate_path("pyo3-mixed").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+
+        // find_bridge alone never includes conditional features → no abi3
+        let bridge = find_bridge(&metadata, None).unwrap();
+        assert!(
+            !bridge.is_abi3(),
+            "find_bridge should not infer abi3 from conditional features"
+        );
+
+        // With a Python 3.10 interpreter, condition doesn't match → no abi3
+        let py310 = crate::PythonInterpreter::from_config(
+            InterpreterConfig::lookup_one(
+                &target,
+                crate::python_interpreter::InterpreterKind::CPython,
+                (3, 10),
+                "",
+            )
+            .unwrap(),
+        );
+        let bridge = upgrade_bridge_abi3(
+            bridge,
+            &metadata,
+            Some(&pyproject),
+            std::slice::from_ref(&py310),
+        )
+        .unwrap();
+        assert!(!bridge.is_abi3(), "should not infer abi3 for Python 3.10");
+
+        // With a Python 3.11 interpreter, condition matches → abi3
+        let py311 = crate::PythonInterpreter::from_config(
+            InterpreterConfig::lookup_one(
+                &target,
+                crate::python_interpreter::InterpreterKind::CPython,
+                (3, 11),
+                "",
+            )
+            .unwrap(),
+        );
+        let base_bridge = find_bridge(&metadata, None).unwrap();
+        let bridge = upgrade_bridge_abi3(
+            base_bridge,
+            &metadata,
+            Some(&pyproject),
+            std::slice::from_ref(&py311),
+        )
+        .unwrap();
+        assert!(bridge.is_abi3(), "should infer abi3 for Python 3.11");
+
+        // With mixed interpreters [3.10, 3.11], abi3 IS inferred because
+        // at least one interpreter (3.11) matches the condition. This is safe
+        // because build_stable_abi_wheels splits interpreters by min_version:
+        // 3.10 gets a version-specific wheel, 3.11+ gets the abi3 wheel.
+        let base_bridge = find_bridge(&metadata, None).unwrap();
+        let bridge =
+            upgrade_bridge_abi3(base_bridge, &metadata, Some(&pyproject), &[py310, py311]).unwrap();
+        assert!(
+            bridge.is_abi3(),
+            "should infer abi3 for mixed [3.10, 3.11] (build_stable_abi_wheels handles the split)"
+        );
     }
 
     #[test]

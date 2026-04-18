@@ -403,7 +403,12 @@ impl<'a> BuildOrchestrator<'a> {
             .python
             .interpreter
             .iter()
-            .filter(|interp| !interp.has_stable_api())
+            .filter(|interp| {
+                !interp.has_stable_api()
+                    || min_version.is_some_and(|(major, minor)| {
+                        (interp.major as u8, interp.minor as u8) < (major, minor)
+                    })
+            })
             .collect();
 
         if stable_abi_interps.is_empty() && version_specific_abi_interps.is_empty() {

@@ -186,7 +186,9 @@ pub fn upgrade_bridge_abi3(
 ///
 /// pyo3 0.16.4+ supports building abi3 wheels without a working Python interpreter
 /// for Windows when `generate-import-lib` feature is enabled.
-pub fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
+/// pyo3 0.29.0+ uses raw-dylib linking on Windows, so import library generation
+/// is no longer needed and this effectively always returns true.
+pub fn has_windows_import_lib_support(cargo_metadata: &Metadata) -> Result<bool> {
     let resolve = cargo_metadata
         .resolve
         .as_ref()
@@ -200,6 +202,10 @@ pub fn is_generating_import_lib(cargo_metadata: &Metadata) -> Result<bool> {
             .collect::<Vec<_>>();
         match pyo3_packages.as_slice() {
             &[pyo3_crate] => {
+                let pyo3_version = &cargo_metadata[&pyo3_crate.id].version;
+                if pyo3_version >= &semver::Version::new(0, 29, 0) {
+                    return Ok(true);
+                }
                 let generate_import_lib = pyo3_crate
                     .features
                     .iter()

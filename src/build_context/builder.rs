@@ -1,5 +1,5 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::bridge::{find_bridge, is_generating_import_lib, upgrade_bridge_abi3};
+use crate::bridge::{find_bridge, has_windows_import_lib_support, upgrade_bridge_abi3};
 use crate::build_options::{BuildOptions, TargetTriple};
 use crate::compile::filter_cargo_targets;
 use crate::metadata::Metadata24;
@@ -325,7 +325,7 @@ impl BuildContextBuilder {
         metadata24: &Metadata24,
         cargo_metadata: &cargo_metadata::Metadata,
     ) -> Result<(Vec<PythonInterpreter>, Option<PathBuf>)> {
-        let generate_import_lib = is_generating_import_lib(cargo_metadata)?;
+        let has_import_lib_support = has_windows_import_lib_support(cargo_metadata)?;
         if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
             return Ok((Vec::new(), None));
         }
@@ -345,7 +345,7 @@ impl BuildContextBuilder {
             metadata24.requires_python.as_ref(),
             &user_interpreters,
             build_options.python.find_interpreter,
-            generate_import_lib,
+            has_import_lib_support,
         );
         resolver.resolve()
     }

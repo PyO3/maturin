@@ -8,7 +8,7 @@ use super::{
     BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi, StableAbiKind, StableAbiVersion,
 };
 use crate::PyProjectToml;
-use crate::pyproject_toml::FeatureSpec;
+use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
 use anyhow::{Context, Result, bail};
 use cargo_metadata::{CrateType, Metadata, Node, PackageId, TargetKind};
 use std::collections::{HashMap, HashSet};
@@ -21,12 +21,12 @@ const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3
 /// Inspects cargo metadata to detect pyo3/cffi/uniffi bindings, abi3 support,
 /// and extension-module feature usage. If `bridge` is `Some`, the binding type
 /// is forced; otherwise it's auto-detected from dependencies and target types.
-pub fn find_bridge(
-    cargo_metadata: &Metadata,
-    bridge: Option<&str>,
-    pyproject: Option<&PyProjectToml>,
-) -> Result<BridgeModel> {
-    let extra_pyo3_features = pyo3_features_from_conditional(pyproject);
+///
+/// Conditional pyo3/pyo3-ffi features from pyproject.toml are excluded from
+/// abi3 inference here. Use [`upgrade_bridge_abi3`] after interpreter resolution
+/// to evaluate them.
+pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
+    let no_extra_features = HashMap::new();
     let deps = current_crate_dependencies(cargo_metadata)?;
     let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
         .packages
@@ -99,7 +99,6 @@ pub fn find_bridge(
     };
 
     if !bridge.is_pyo3() {
-        eprintln!("🔗 Found {bridge} bindings");
         return Ok(bridge);
     }
 
@@ -124,9 +123,7 @@ pub fn find_bridge(
                 }
             }
 
-            return if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features)? {
-                let kind = stable_abi.kind;
-                eprintln!("🔗 Found {lib} bindings with {kind} support");
+            return if let Some(stable_abi) = has_stable_abi(&deps, &no_extra_features)? {
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
@@ -136,10 +133,50 @@ pub fn find_bridge(
                 };
                 Ok(BridgeModel::PyO3(bindings))
             } else {
-                eprintln!("🔗 Found {lib} bindings");
                 Ok(bridge)
             };
         }
+    }
+
+    Ok(bridge)
+}
+
+/// Upgrade a bridge model to abi3 if conditional pyo3/pyo3-ffi features
+/// from pyproject.toml match at least one of the given interpreters.
+///
+/// This is the second phase of bridge detection: [`find_bridge`] excludes
+/// conditional features, then after interpreter resolution this function
+/// re-checks whether any conditional abi3 feature applies.
+pub fn upgrade_bridge_abi3(
+    bridge: BridgeModel,
+    cargo_metadata: &Metadata,
+    pyproject: Option<&PyProjectToml>,
+    interpreters: &[crate::PythonInterpreter],
+) -> Result<BridgeModel> {
+    // Only relevant for pyo3 bridges without abi3 already set
+    let Some(pyo3) = bridge.pyo3() else {
+        return Ok(bridge);
+    };
+    if pyo3.stable_abi.is_some() {
+        return Ok(bridge);
+    }
+
+    let extra_pyo3_features = pyo3_features_from_conditional(pyproject, interpreters);
+    if extra_pyo3_features.is_empty() {
+        return Ok(bridge);
+    }
+
+    let deps = current_crate_dependencies(cargo_metadata)?;
+    if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features)? {
+        let upgraded = PyO3 {
+            stable_abi: Some(stable_abi),
+            ..pyo3.clone()
+        };
+        return Ok(match bridge {
+            BridgeModel::PyO3(_) => BridgeModel::PyO3(upgraded),
+            BridgeModel::Bin(Some(_)) => BridgeModel::Bin(Some(upgraded)),
+            _ => return Ok(bridge),
+        });
     }
 
     Ok(bridge)
@@ -335,6 +372,7 @@ fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str,
 /// for the corresponding binding crate.
 fn pyo3_features_from_conditional(
     pyproject: Option<&PyProjectToml>,
+    interpreters: &[crate::PythonInterpreter],
 ) -> HashMap<&'static str, Vec<String>> {
     let mut extra: HashMap<&'static str, Vec<String>> = HashMap::new();
     let features = match pyproject
@@ -345,15 +383,31 @@ fn pyo3_features_from_conditional(
         None => return extra,
     };
     let (_plain, conditional) = FeatureSpec::split(features);
-    let crate_names: &[&'static str] = &["pyo3", "pyo3-ffi"];
-    for cond in &conditional {
-        for &crate_name in crate_names {
-            let prefix = format!("{crate_name}/");
-            if let Some(feat_name) = cond.feature.strip_prefix(&prefix) {
-                extra
-                    .entry(crate_name)
-                    .or_default()
-                    .push(feat_name.to_string());
+    let crate_names: &[&str] = &["pyo3", "pyo3-ffi"];
+
+    // Collect the union of conditional features across all interpreters.
+    // A feature is included if ANY interpreter satisfies its condition.
+    // This is safe because build_stable_abi_wheels splits interpreters
+    // into abi3-capable vs version-specific groups based on min_version,
+    // so interpreters that don't qualify get version-specific wheels.
+    let mut seen = HashSet::new();
+    for interp in interpreters {
+        let env = FeatureConditionEnv {
+            major: interp.major,
+            minor: interp.minor,
+            implementation_name: &interp.implementation_name,
+        };
+        for feature in FeatureSpec::resolve_conditional(&conditional, &env) {
+            if seen.insert(feature.clone()) {
+                for &crate_name in crate_names {
+                    let prefix = format!("{crate_name}/");
+                    if let Some(feat_name) = feature.strip_prefix(&prefix) {
+                        extra
+                            .entry(crate_name)
+                            .or_default()
+                            .push(feat_name.to_string());
+                    }
+                }
             }
         }
     }

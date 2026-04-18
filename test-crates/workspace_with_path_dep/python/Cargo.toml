@@ -8,5 +8,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.28.2"
+pyo3 = "0.28.3"
 generic_lib = { path = "../generic_lib" }

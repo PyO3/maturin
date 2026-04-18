@@ -193,7 +193,7 @@ pub struct InterpreterResolver<'a> {
     requires_python: Option<&'a VersionSpecifiers>,
     user_interpreters: &'a [PathBuf],
     find_interpreter: bool,
-    generate_import_lib: bool,
+    has_import_lib_support: bool,
 }
 
 impl<'a> InterpreterResolver<'a> {
@@ -204,7 +204,7 @@ impl<'a> InterpreterResolver<'a> {
         requires_python: Option<&'a VersionSpecifiers>,
         user_interpreters: &'a [PathBuf],
         find_interpreter: bool,
-        generate_import_lib: bool,
+        has_import_lib_support: bool,
     ) -> Self {
         Self {
             target,
@@ -212,7 +212,7 @@ impl<'a> InterpreterResolver<'a> {
             requires_python,
             user_interpreters,
             find_interpreter,
-            generate_import_lib,
+            has_import_lib_support,
         }
     }
 
@@ -424,7 +424,7 @@ impl<'a> InterpreterResolver<'a> {
 
         // --- Step 3: Nothing found — try abi3 sysconfig fallback ---
         if fixed_abi3.is_some() {
-            if self.target.is_windows() && !self.generate_import_lib {
+            if self.target.is_windows() && !self.has_import_lib_support {
                 bail!(
                     "Need a Python interpreter to compile for Windows without \
                      PyO3's `generate-import-lib` feature"
@@ -509,7 +509,7 @@ impl<'a> InterpreterResolver<'a> {
             let sysconfig_interps = self.find_in_sysconfig(&missing)?;
             if !sysconfig_interps.is_empty()
                 && self.target.is_windows()
-                && !self.generate_import_lib
+                && !self.has_import_lib_support
             {
                 let names = sysconfig_interps
                     .iter()
@@ -700,7 +700,7 @@ impl<'a> InterpreterResolver<'a> {
     ) -> Result<Vec<PythonInterpreter>> {
         let interpreters = Self::candidates_to_interpreters(candidates);
 
-        if self.generate_import_lib {
+        if self.has_import_lib_support {
             eprintln!(
                 "🐍 Not using a specific python interpreter \
                  (automatically generating windows import library)"

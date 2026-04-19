@@ -135,6 +135,7 @@ impl BuildContext {
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
         audited: &[AuditedArtifact],
+        use_shim: bool,
     ) -> Result<()> {
         if self.project.editable {
             if let Some(repairer) =
@@ -217,7 +218,14 @@ impl BuildContext {
         let (grafted, libs_copied) =
             prepare_grafted_libs(audited, temp_dir.path(), arch_requirements)?;
 
-        let artifact_dir = self.get_artifact_dir();
+        // For bin bindings with external deps (shim mode), the real binary
+        // lives in {dist_name}.scripts/ in platlib rather than .data/scripts/.
+        // This gives us a predictable relative path to the bundled libs directory.
+        let artifact_dir = if use_shim {
+            self.project.metadata24.get_scripts_platlib_dir()
+        } else {
+            self.get_artifact_dir()
+        };
         repairer.patch(audited, &grafted, &libs_dir, &artifact_dir)?;
 
         // Add grafted libraries to the wheel

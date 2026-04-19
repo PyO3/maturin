@@ -765,6 +765,19 @@ impl Metadata24 {
             &self.get_version_escaped()
         ))
     }
+
+    /// Returns the platlib directory for relocated scripts.
+    ///
+    /// When bin bindings have external shared library dependencies, the real
+    /// binary is moved from `.data/scripts/` into this directory in platlib
+    /// so that it has a predictable relative path to the bundled shared
+    /// libraries directory (`.libs/` on Linux/Windows, `.dylibs/` on macOS).
+    /// A Python shim replaces the original script entry.
+    ///
+    /// See <https://github.com/pypa/auditwheel/pull/443>.
+    pub fn get_scripts_platlib_dir(&self) -> PathBuf {
+        PathBuf::from(format!("{}.scripts", &self.get_distribution_escaped()))
+    }
 }
 
 /// Split a list of contacts (authors or maintainers) into separate

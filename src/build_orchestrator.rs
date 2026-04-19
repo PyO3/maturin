@@ -494,7 +494,8 @@ impl<'a> BuildOrchestrator<'a> {
             file_options,
         )?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.context.add_external_libs(&mut writer, audited)?;
+        self.context
+            .add_external_libs(&mut writer, audited, false)?;
 
         let temp_dir = writer.temp_dir()?;
         let mut generator = make_generator(temp_dir)?;
@@ -811,9 +812,18 @@ impl<'a> BuildOrchestrator<'a> {
         let writer = WheelWriter::new(&tag, &self.context.artifact.out, &metadata24, file_options)?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
 
-        self.context.add_external_libs(&mut writer, audited)?;
+        // If any artifact has external shared library dependencies, use the
+        // shim approach: move the real binary to {dist}.scripts/ in platlib
+        // (where it has a predictable relative path to the bundled libs
+        // directory) and place a Python shim in .data/scripts/ that execs
+        // the real binary.
+        // WASI targets use their own launcher mechanism and cannot be shimmed.
+        let use_shim = !self.context.project.target.is_wasi()
+            && audited.iter().any(|a| !a.external_libs.is_empty());
+        self.context
+            .add_external_libs(&mut writer, audited, use_shim)?;
 
-        let mut generator = BinBindingGenerator::new(&mut metadata24);
+        let mut generator = BinBindingGenerator::new(&mut metadata24, use_shim);
         generate_binding(&mut writer, &mut generator, self.context, audited, out_dirs)
             .context("Failed to add the files to the wheel")?;
 

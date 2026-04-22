@@ -30,7 +30,7 @@ categories = [
     "command-line-utilities",
 ]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [[bin]]
 name = "maturin"
@@ -53,11 +53,11 @@ regex = "1.7.0"
 rustflags = "0.1.6"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
-sha2 = "0.10.3"
+sha2 = "0.11.0"
 tar = "0.4.45"
 tempfile = "3.2.0"
-toml = "0.9.11"
-toml_edit = "0.24.0"
+toml = "1.1.2"
+toml_edit = "0.25.0"
 zip = { version = "8.1.0", default-features = false, features = [
     "bzip2",
     "deflate",
@@ -102,7 +102,7 @@ clap_complete_command = { version = "0.6.1", optional = true }
 
 # cross compile
 cargo-zigbuild = { version = "0.22.2", default-features = false, optional = true }
-cargo-xwin = { version = "0.19.2", default-features = false, optional = true }
+cargo-xwin = { version = "0.22.0", default-features = false, optional = true }
 xz2 = { version = "0.1", optional = true }
 
 # log
@@ -132,8 +132,10 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ], optional = true }
 rustls-pki-types = { version = "1.14.0", optional = true }
-keyring = { version = "2.3.2", default-features = false, features = [
-    "linux-no-secret-service",
+keyring = { version = "3.6.3", default-features = false, features = [
+    "apple-native",
+    "windows-native",
+    "linux-native",
 ], optional = true }
 wild = { version = "2.1.0", optional = true }
 
@@ -162,7 +164,7 @@ rstest = "0.26.1"
 rustversion = "1.0.9"
 serial_test = { version = "3.2.0", default-features = false }
 time = { version = "0.3.34", features = ["macros"] }
-trycmd = "0.15.0"
+trycmd = "1.2.0"
 which = "8.0.0"
 
 [features]

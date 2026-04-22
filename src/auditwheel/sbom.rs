@@ -77,9 +77,8 @@ pub fn create_auditwheel_sbom(
     for (filepath, provided_by) in sorted_packages {
         // Use a hash of the filepath to disambiguate components from the same
         // package (matching Python auditwheel's approach).
-        let hash = format!(
-            "{:x}",
-            Sha256::digest(filepath.to_string_lossy().as_bytes())
+        let hash = crate::util::sha256_hex(
+            Sha256::digest(filepath.to_string_lossy().as_bytes()).as_slice(),
         );
         let bom_ref = format!("{}#{hash}", provided_by.purl());
 

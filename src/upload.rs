@@ -623,7 +623,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                     // Delete the wrong password from the keyring
                     let old_username = registry.username;
                     match keyring::Entry::new(env!("CARGO_PKG_NAME"), &old_username)
-                        .and_then(|keyring| keyring.delete_password())
+                        .and_then(|keyring| keyring.delete_credential())
                     {
                         Ok(()) => {
                             eprintln!("🔑 Removed wrong password from keyring")

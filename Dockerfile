@@ -45,14 +45,23 @@ ENV PATH=/opt/python/cp39-cp39/bin:/opt/python/cp310-cp310/bin:/opt/python/cp311
 # Otherwise `cargo new` errors
 ENV USER=root
 
-RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && [ "$MANYLINUX" -eq 'manylinux2014' ] && yum install -y libffi-devel openssh-clients || apk add --no-cache libffi-dev \
-    && python3.8 -m pip install --no-cache-dir cffi \
-    && python3.9 -m pip install --no-cache-dir cffi \
-    && python3.10 -m pip install --no-cache-dir cffi \
-    && python3.11 -m pip install --no-cache-dir cffi \
-    && python3.12 -m pip install --no-cache-dir cffi \
-    && mkdir /io
+ARG MANYLINUX
+RUN <<EOL
+    set -xeu
+    curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    if [ "$MANYLINUX" = 'manylinux2014' ]
+    then
+        yum install -y libffi-devel openssh-clients
+    else
+        apk add --no-cache libffi-dev
+    fi
+    python3.8 -m pip install --no-cache-dir cffi
+    python3.9 -m pip install --no-cache-dir cffi
+    python3.10 -m pip install --no-cache-dir cffi
+    python3.11 -m pip install --no-cache-dir cffi
+    python3.12 -m pip install --no-cache-dir cffi
+    mkdir /io
+EOL
 
 COPY --from=builder /usr/bin/maturin /usr/bin/maturin
 

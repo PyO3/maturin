@@ -15,11 +15,9 @@ jobs:
       matrix:
         compatibility:
           - name: manylinux
-            containerfile: Dockerfile
             tag-suffix: ''
             manylinux: manylinux2014
           - name: musllinux
-            containerfile: musllinux.Dockerfile
             tag-suffix: '-musllinux'
             manylinux: musllinux_1_1
     environment:
@@ -65,7 +63,6 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          file: ${{ matrix.compatibility.containerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

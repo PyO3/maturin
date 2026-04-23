@@ -10,6 +10,16 @@ jobs:
   publish-docker:
     name: Publish Docker Images
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compatibility:
+          - name: manylinux
+            containerfile: Dockerfile
+            tag-suffix: ''
+          - name: musllinux
+            containerfile: musllinux.Dockerfile
+            tag-suffix: '-musllinux'
     environment:
       name: Docker Hub
       url: https://ghcr.io/pyo3/maturin
@@ -36,6 +46,8 @@ jobs:
         id: meta
         with:
           images: ghcr.io/pyo3/maturin
+          flavor: |
+            suffix=${{ matrix.compatibility.tag-suffix }},onlatest=true
       - name: Login to GitHub Container Registry
         if: ${{ steps.changes.outputs.changed == 'true' || startsWith(github.ref, 'refs/tags/') }}
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -48,10 +60,11 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
+          file: ${{ matrix.compatibility.containerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # https://github.com/docker/build-push-action/blob/master/docs/advanced/cache.md#registry-cache
-          cache-from: type=registry,ref=ghcr.io/pyo3/maturin:buildcache
-          cache-to: type=registry,ref=ghcr.io/pyo3/maturin:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/pyo3/maturin:buildcache${{ matrix.compatibility.tag-suffix }}
+          cache-to: type=registry,ref=ghcr.io/pyo3/maturin:buildcache${{ matrix.compatibility.tag-suffix }},mode=max

@@ -17,9 +17,11 @@ jobs:
           - name: manylinux
             containerfile: Dockerfile
             tag-suffix: ''
+            manylinux: manylinux2014
           - name: musllinux
             containerfile: musllinux.Dockerfile
             tag-suffix: '-musllinux'
+            manylinux: musllinux_1_1
     environment:
       name: Docker Hub
       url: https://ghcr.io/pyo3/maturin
@@ -68,6 +70,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: MANYLINUX=${{ matrix.compatibility.manylinux }}
           # https://github.com/docker/build-push-action/blob/master/docs/advanced/cache.md#registry-cache
           cache-from: type=registry,ref=${{ steps.image.outputs.image }}:buildcache${{ matrix.compatibility.tag-suffix }}
           cache-to: type=registry,ref=${{ steps.image.outputs.image }}:buildcache${{ matrix.compatibility.tag-suffix }},mode=max

@@ -1,10 +1,12 @@
+ARG MANYLINUX=manylinux2014
+
 # x86_64 base
-FROM quay.io/pypa/manylinux2014_x86_64 AS base-amd64
+FROM quay.io/pypa/${MANYLINUX}_x86_64 AS base-amd64
 # x86_64 builder
 FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:x86_64-musl AS builder-amd64
 
 # aarch64 base
-FROM quay.io/pypa/manylinux2014_aarch64 AS base-arm64
+FROM quay.io/pypa/${MANYLINUX}_aarch64 AS base-arm64
 # aarch64 cross compile builder
 FROM --platform=$BUILDPLATFORM ghcr.io/rust-cross/rust-musl-cross:aarch64-musl AS builder-arm64
 
@@ -44,7 +46,7 @@ ENV PATH=/opt/python/cp39-cp39/bin:/opt/python/cp310-cp310/bin:/opt/python/cp311
 ENV USER=root
 
 RUN curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && yum install -y libffi-devel openssh-clients \
+    && [ "$MANYLINUX" -eq 'manylinux2014' ] && yum install -y libffi-devel openssh-clients || apk add --no-cache libffi-dev \
     && python3.8 -m pip install --no-cache-dir cffi \
     && python3.9 -m pip install --no-cache-dir cffi \
     && python3.10 -m pip install --no-cache-dir cffi \

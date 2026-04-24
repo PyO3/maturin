@@ -3,6 +3,7 @@
 ## 1.13.0
 
 * Fix: fall back to placeholder for abi3 when found interpreters are too old ([#3126](https://github.com/pyo3/maturin/pull/3126))
+* Perf: hard-link instead of copy for `stage_artifact` copy-back and editable installs, avoiding a full artifact copy on ext4 and other non-CoW filesystems ([#3111](https://github.com/PyO3/maturin/issues/3111))
 
 ## 1.13.0
 

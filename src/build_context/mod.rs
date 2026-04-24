@@ -2,6 +2,7 @@ mod builder;
 mod repair;
 
 pub use builder::BuildContextBuilder;
+pub(crate) use repair::link_or_copy;
 
 use crate::auditwheel::AuditWheelMode;
 use crate::auditwheel::PlatformTag;

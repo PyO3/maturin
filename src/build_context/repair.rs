@@ -131,22 +131,31 @@ impl BuildContext {
         }
     }
 
+    /// Patch the audited artifacts to bundle their external shared library
+    /// dependencies into the wheel.
+    ///
+    /// Returns `true` if any artifact was patched in place by patchelf /
+    /// patch_macho / pe_patch, `false` otherwise. The caller uses this to
+    /// decide whether to restore the staged artifact to the cargo output
+    /// path post-wheel-write — see [`finalize_staged_artifact`] and #3111.
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
         audited: &[AuditedArtifact],
         use_shim: bool,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if self.project.editable {
             if let Some(repairer) =
                 self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             {
-                return repairer.patch_editable(audited);
+                repairer.patch_editable(audited)?;
+                // Editable patching modifies the staged artifact in place.
+                return Ok(true);
             }
-            return Ok(());
+            return Ok(false);
         }
         if audited.iter().all(|a| a.external_libs.is_empty()) {
-            return Ok(());
+            return Ok(false);
         }
 
         // Log which libraries need to be copied and which artifacts require them
@@ -172,7 +181,8 @@ impl BuildContext {
                     "⚠️  Warning: Your library requires copying the above external libraries. \
                      Re-run with `--auditwheel=repair` to copy them into the wheel."
                 );
-                return Ok(());
+                // Warn mode does not modify the artifact.
+                return Ok(false);
             }
             AuditWheelMode::Check => {
                 bail!(
@@ -284,58 +294,76 @@ impl BuildContext {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     /// Stage an artifact into a private directory so that:
     /// 1. `warn_missing_py_init` can safely mmap the file without risk of
     ///    concurrent modification by cargo / rust-analyzer.
     /// 2. Auditwheel repair can modify it in-place without altering the
-    ///    original cargo build output.
+    ///    original cargo build output (see #2969 / #2680).
     ///
-    /// Uses `fs::rename` for an atomic move into the staging directory,
-    /// then copies the staged file back to the original location so that
-    /// users can still find the artifact at the standard cargo output
-    /// path. The copy-back uses reflink (copy-on-write) when available
-    /// for near-instant, zero-cost copies, and falls back to a regular
-    /// `fs::copy` otherwise.
-    ///
-    /// When `fs::rename` fails (e.g. cross-device), falls back to
-    /// reflink-or-copy directly; the concurrent-modification window is
-    /// unlikely in cross-device setups.
+    /// `fs::rename` is atomic on the same filesystem; on cross-device it
+    /// falls back to `reflink_or_copy` + `fs::remove_file`. The original
+    /// cargo output path is recorded on the artifact so it can be
+    /// restored after the wheel is written via [`finalize_staged_artifact`]
+    /// when no auditwheel patching occurred — see #3111.
     pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
-        let artifact_path = &artifact.path;
+        let artifact_path = artifact.path.clone();
         let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
         // Remove any stale file at the destination so that `fs::rename`
         // succeeds on Windows (where rename fails if the destination
         // already exists).
         let _ = fs::remove_file(&new_artifact_path);
-        if fs::rename(artifact_path, &new_artifact_path).is_ok() {
-            // Rename succeeded — we now own the only copy.  Put a copy
-            // back at the original location for users who expect the
-            // artifact at the standard cargo output path.  Skip if a
-            // new file already appeared (cargo / rust-analyzer rebuilt).
-            if artifact_path.exists() {
-                tracing::debug!(
-                    "Skipping copy-back: {} was recreated by another process",
-                    artifact_path.display()
-                );
-            } else if let Err(err) = reflink_or_copy(&new_artifact_path, artifact_path) {
-                eprintln!(
-                    "⚠️  Warning: failed to copy artifact back to {}: {err:#}. The staged artifact is available at {}",
-                    artifact_path.display(),
-                    new_artifact_path.display()
-                );
-            }
-        } else {
-            // Rename failed (cross-device).  Fall back to reflink/copy;
-            // concurrent modification is unlikely in this scenario.
-            reflink_or_copy(artifact_path, &new_artifact_path)?;
+        if fs::rename(&artifact_path, &new_artifact_path).is_err() {
+            // Rename failed (cross-device).  Fall back to reflink/copy
+            // and then remove the original so the post-wheel-write
+            // finalize step doesn't see a stale unpatched file there.
+            reflink_or_copy(&artifact_path, &new_artifact_path)?;
+            let _ = fs::remove_file(&artifact_path);
         }
         artifact.path = new_artifact_path.normalize()?.into_path_buf();
+        artifact.cargo_output_path = Some(artifact_path);
         Ok(())
     }
+}
+
+/// Restore a staged artifact to the cargo output path after the wheel is
+/// written.  Must only be called when the staged artifact has not been
+/// modified by auditwheel / patchelf / patch_macho / pe_patch — see #2969.
+///
+/// O(1) `fs::rename` on every mainstream filesystem (ext4, xfs, btrfs,
+/// zfs, ntfs, refs, apfs, hfs+).  On cross-device, falls back to
+/// `reflink_or_copy` + `fs::remove_file`.  Returns an error so the caller
+/// can decide how to surface the failure; both call sites in
+/// `build_orchestrator` log and swallow because the wheel is the
+/// deliverable and the cargo-path restore is a UX convenience — the
+/// staged artifact is still recoverable from `target/maturin/`.
+pub(crate) fn finalize_staged_artifact(staged: &Path, cargo_output: &Path) -> Result<()> {
+    // `fs::rename` overwrites the destination on Unix; on Windows it
+    // fails if the destination already exists, so remove anything that
+    // might be there from a prior partial build.
+    let _ = fs::remove_file(cargo_output);
+    if fs::rename(staged, cargo_output).is_ok() {
+        tracing::debug!(
+            "Restored {} to {}",
+            staged.display(),
+            cargo_output.display()
+        );
+        return Ok(());
+    }
+    // Cross-device or permission error: fall back to reflink/copy and
+    // remove the staged file so it doesn't accumulate in target/maturin.
+    reflink_or_copy(staged, cargo_output).with_context(|| {
+        format!(
+            "Failed to restore staged artifact from {} to {}",
+            staged.display(),
+            cargo_output.display(),
+        )
+    })?;
+    let _ = fs::remove_file(staged);
+    Ok(())
 }
 
 /// Reflink (copy-on-write) a file, preserving permissions, and fall back to
@@ -379,4 +407,48 @@ fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
 #[cfg(not(target_os = "linux"))]
 fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
     reflink_copy::reflink(from, to)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finalize_renames_atomically_on_same_device() {
+        let tmp = tempfile::tempdir().unwrap();
+        let staged = tmp.path().join("staged.bin");
+        let cargo_out = tmp.path().join("release.bin");
+        fs::write(&staged, b"contents").unwrap();
+
+        finalize_staged_artifact(&staged, &cargo_out).unwrap();
+
+        assert!(
+            !staged.exists(),
+            "staged path must be removed after finalize"
+        );
+        assert_eq!(fs::read(&cargo_out).unwrap(), b"contents");
+    }
+
+    #[test]
+    fn finalize_overwrites_existing_destination() {
+        let tmp = tempfile::tempdir().unwrap();
+        let staged = tmp.path().join("staged.bin");
+        let cargo_out = tmp.path().join("release.bin");
+        fs::write(&staged, b"new").unwrap();
+        fs::write(&cargo_out, b"old").unwrap();
+
+        finalize_staged_artifact(&staged, &cargo_out).unwrap();
+
+        assert_eq!(fs::read(&cargo_out).unwrap(), b"new");
+        assert!(!staged.exists());
+    }
+
+    #[test]
+    fn finalize_errors_when_source_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let staged = tmp.path().join("missing.bin");
+        let cargo_out = tmp.path().join("release.bin");
+
+        assert!(finalize_staged_artifact(&staged, &cargo_out).is_err());
+    }
 }

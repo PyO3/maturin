@@ -65,6 +65,14 @@ pub struct BuildArtifact {
     /// For universal2 builds: per-architecture thin binaries used for accurate
     /// per-arch dependency analysis during macOS wheel repair.
     pub thin_artifacts: Vec<ThinArtifact>,
+    /// Original cargo output path before staging.
+    ///
+    /// Populated by `stage_artifact` after the file is moved into the maturin
+    /// staging directory; `path` is mutated to the staged location while this
+    /// field remembers where cargo originally placed the artifact, so the
+    /// build orchestrator can rename it back after the wheel is written when
+    /// no auditwheel patching occurred (see #3111).
+    pub cargo_output_path: Option<PathBuf>,
 }
 
 /// Result of compiling one or more cargo targets.
@@ -284,6 +292,7 @@ fn compile_universal2(
             debuginfo_path: None,
             linked_paths,
             thin_artifacts,
+            cargo_output_path: None,
         };
         result.insert(build_type, universal_artifact);
         universal_artifacts.push(result);
@@ -969,6 +978,7 @@ fn compile_target(
                                 debuginfo_path: None,
                                 linked_paths: Vec::new(),
                                 thin_artifacts: Vec::new(),
+                                cargo_output_path: None,
                             };
                             artifacts.insert(crate_type, artifact);
                         }

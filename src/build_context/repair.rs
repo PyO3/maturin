@@ -16,7 +16,6 @@ use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use normpath::PathExt;
 use std::collections::{HashMap, HashSet};
-use std::io;
 use std::path::{Path, PathBuf};
 
 use super::BuildContext;
@@ -295,17 +294,15 @@ impl BuildContext {
     ///    original cargo build output.
     ///
     /// Uses `fs::rename` for an atomic move into the staging directory,
-    /// then re-materialises the staged file at the original location so
-    /// that users can still find the artifact at the standard cargo
-    /// output path. The copy-back prefers a hard link (O(1) on ext4,
-    /// xfs, btrfs, zfs, ntfs, refs, apfs, hfs+), falls back to reflink
-    /// (copy-on-write) on filesystems that disallow hard links, and
-    /// finally to a full `fs::copy`.
+    /// then copies the staged file back to the original location so that
+    /// users can still find the artifact at the standard cargo output
+    /// path. The copy-back uses reflink (copy-on-write) when available
+    /// for near-instant, zero-cost copies, and falls back to a regular
+    /// `fs::copy` otherwise.
     ///
     /// When `fs::rename` fails (e.g. cross-device), falls back to
-    /// reflink-or-copy directly (hard link would fail with `EXDEV` for
-    /// the same reason); the concurrent-modification window is unlikely
-    /// in cross-device setups.
+    /// reflink-or-copy directly; the concurrent-modification window is
+    /// unlikely in cross-device setups.
     pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
         let artifact_path = &artifact.path;
@@ -324,7 +321,7 @@ impl BuildContext {
                     "Skipping copy-back: {} was recreated by another process",
                     artifact_path.display()
                 );
-            } else if let Err(err) = link_or_copy(&new_artifact_path, artifact_path) {
+            } else if let Err(err) = reflink_or_copy(&new_artifact_path, artifact_path) {
                 eprintln!(
                     "⚠️  Warning: failed to copy artifact back to {}: {err:#}. The staged artifact is available at {}",
                     artifact_path.display(),
@@ -341,50 +338,6 @@ impl BuildContext {
     }
 }
 
-/// Install `from` at `to` using the fastest filesystem primitive available.
-///
-/// Fallback order:
-/// 1. `fs::hard_link` — O(1) on ext4, xfs, btrfs, zfs, ntfs, refs, apfs,
-///    hfs+. Fails with `EXDEV` across mount points and with `EPERM`/other
-///    errors on filesystems that don't support hard links (fat/exfat,
-///    some smb shares).
-/// 2. Reflink (`ioctl_ficlone` / `clonefile`) — O(1) on CoW filesystems
-///    (btrfs, xfs with `reflink=1`, apfs). On Linux, `ioctl_ficlone`
-///    does not copy metadata, so `reflink_with_permissions` fixes the
-///    mode bits.
-/// 3. `fs::copy` — full byte copy; always available.
-///
-/// Caller invariants:
-/// * The parent directory of `to` must exist.
-/// * `to` should not already exist — both `fs::hard_link` and reflink
-///   fail with `EEXIST` if it does, so an existing destination forces
-///   the slow `fs::copy` fallback (which overwrites). Both in-tree
-///   callers (`stage_artifact` and the editable install) remove the
-///   destination explicitly before calling this helper, both to
-///   guarantee the fast path and — in the editable case — to avoid
-///   SIGSEGV in processes that have the previous build `dlopen`ed
-///   (see PyO3/maturin#758).
-pub(crate) fn link_or_copy(from: &Path, to: &Path) -> io::Result<()> {
-    match fs::hard_link(from, to) {
-        Ok(()) => {
-            tracing::debug!(
-                "Installed {} -> {} via hard link",
-                from.display(),
-                to.display()
-            );
-            Ok(())
-        }
-        Err(err) => {
-            tracing::debug!(
-                "Hard link {} -> {} failed ({err}); falling back to reflink/copy",
-                from.display(),
-                to.display()
-            );
-            reflink_or_copy(from, to)
-        }
-    }
-}
-
 /// Reflink (copy-on-write) a file, preserving permissions, and fall back to
 /// a regular copy if reflink fails for any reason.
 ///
@@ -395,7 +348,7 @@ pub(crate) fn link_or_copy(from: &Path, to: &Path) -> io::Result<()> {
 /// Adapted from uv's `reflink_with_permissions` implementation:
 /// <https://github.com/astral-sh/uv/blob/main/crates/uv-fs/src/link.rs>
 /// See also: <https://github.com/astral-sh/uv/issues/18181>
-fn reflink_or_copy(from: &Path, to: &Path) -> io::Result<()> {
+fn reflink_or_copy(from: &Path, to: &Path) -> Result<()> {
     if reflink_with_permissions(from, to).is_err() {
         fs::copy(from, to)?;
     }
@@ -426,49 +379,4 @@ fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
 #[cfg(not(target_os = "linux"))]
 fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
     reflink_copy::reflink(from, to)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn link_or_copy_installs_file_contents() {
-        let tmp = tempfile::tempdir().unwrap();
-        let src = tmp.path().join("src.bin");
-        let dst = tmp.path().join("dst.bin");
-        fs::write(&src, b"hello").unwrap();
-
-        link_or_copy(&src, &dst).unwrap();
-
-        assert_eq!(fs::read(&dst).unwrap(), b"hello");
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn link_or_copy_hardlinks_on_same_device() {
-        use std::os::unix::fs::MetadataExt as _;
-
-        let tmp = tempfile::tempdir().unwrap();
-        let src = tmp.path().join("src.bin");
-        let dst = tmp.path().join("dst.bin");
-        fs::write(&src, b"hello").unwrap();
-
-        link_or_copy(&src, &dst).unwrap();
-
-        assert_eq!(
-            fs::metadata(&src).unwrap().ino(),
-            fs::metadata(&dst).unwrap().ino(),
-            "link_or_copy should hard-link when source and destination are on the same filesystem",
-        );
-    }
-
-    #[test]
-    fn link_or_copy_errors_when_source_missing() {
-        let tmp = tempfile::tempdir().unwrap();
-        let src = tmp.path().join("missing.bin");
-        let dst = tmp.path().join("dst.bin");
-
-        assert!(link_or_copy(&src, &dst).is_err());
-    }
 }

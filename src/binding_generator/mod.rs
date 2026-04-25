@@ -21,7 +21,6 @@ use crate::ModuleWriter;
 use crate::VirtualWriter;
 use crate::WheelWriter;
 use crate::archive_source::ArchiveSource;
-use crate::build_context::link_or_copy;
 #[cfg(unix)]
 use crate::module_writer::default_permission;
 use crate::module_writer::write_python_part;
@@ -188,16 +187,11 @@ where
                         // See https://github.com/PyO3/maturin/issues/758
                         let _ = fs::remove_file(&target);
 
-                        // 2a. Install the artifact.  Prefer a hard link
-                        // (O(1) on every mainstream filesystem, including
-                        // ext4 where reflink is unavailable), then reflink,
-                        // then a full copy — see `link_or_copy` for the
-                        // fallback chain.  The prior `remove_file` above
-                        // guarantees the destination is absent.
+                        // 2a. Install the artifact
                         debug!("Installing {} from {}", target.display(), source.display());
-                        link_or_copy(&source, &target).with_context(|| {
+                        fs::copy(&source, &target).with_context(|| {
                             format!(
-                                "Failed to install {} to {}",
+                                "Failed to copy {} to {}",
                                 source.display(),
                                 target.display(),
                             )

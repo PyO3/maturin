@@ -134,36 +134,32 @@ impl BuildContext {
     /// Patch the audited artifacts to bundle their external shared library
     /// dependencies into the wheel.
     ///
-    /// For each artifact whose bytes are modified in place by patchelf /
-    /// patch_macho / pe_patch, `cargo_output_path` is cleared so
-    /// [`finalize_staged_artifacts`] knows not to rename the staged file
-    /// back to the cargo output path — see #3111. Artifacts that are not
-    /// modified keep `cargo_output_path` set and are restored.
+    /// Returns `true` if any artifact was patched in place by patchelf /
+    /// patch_macho / pe_patch, `false` otherwise. The caller uses this to
+    /// decide whether to restore the staged artifact to the cargo output
+    /// path post-wheel-write — see [`finalize_staged_artifacts`] and #3111.
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
-        audited: &mut [AuditedArtifact],
+        audited: &[AuditedArtifact],
         use_shim: bool,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if self.project.editable {
             if let Some(repairer) =
                 self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             {
-                let patched_indices = repairer.patch_editable(audited)?;
-                for i in patched_indices {
-                    audited[i].artifact.cargo_output_path = None;
-                }
+                return repairer.patch_editable(audited);
             }
-            return Ok(());
+            return Ok(false);
         }
         if audited.iter().all(|a| a.external_libs.is_empty()) {
-            return Ok(());
+            return Ok(false);
         }
 
         // Log which libraries need to be copied and which artifacts require them
         // before calling patchelf, so users can see this even if patchelf is missing.
         eprintln!("🔗 External shared libraries to be copied into the wheel:");
-        for aa in audited.iter() {
+        for aa in audited {
             if aa.external_libs.is_empty() {
                 continue;
             }
@@ -183,8 +179,8 @@ impl BuildContext {
                     "⚠️  Warning: Your library requires copying the above external libraries. \
                      Re-run with `--auditwheel=repair` to copy them into the wheel."
                 );
-                // Warn mode does not modify any artifact.
-                return Ok(());
+                // Warn mode does not modify the artifact.
+                return Ok(false);
             }
             AuditWheelMode::Check => {
                 bail!(
@@ -210,7 +206,7 @@ impl BuildContext {
         // Each artifact may have analyzed different architecture slices.
         let merged_arch_requirements: HashMap<PathBuf, HashSet<String>> = {
             let mut merged: HashMap<PathBuf, HashSet<String>> = HashMap::new();
-            for aa in audited.iter() {
+            for aa in audited {
                 for (realpath, archs) in &aa.arch_requirements {
                     merged
                         .entry(realpath.clone())
@@ -239,13 +235,6 @@ impl BuildContext {
             self.get_artifact_dir()
         };
         repairer.patch(audited, &grafted, &libs_dir, &artifact_dir)?;
-        // The non-editable repair path always patches every audited
-        // artifact (DT_NEEDED / Mach-O load commands / PE imports rewritten
-        // to point at the grafted libs), so none can be safely renamed back
-        // to the cargo output path — clear the marker on each.
-        for aa in audited.iter_mut() {
-            aa.artifact.cargo_output_path = None;
-        }
 
         // Add grafted libraries to the wheel
         for lib in &grafted {
@@ -303,7 +292,7 @@ impl BuildContext {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     /// Stage an artifact into a private directory so that:
@@ -364,22 +353,23 @@ fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
     Ok(new_path.normalize()?.into_path_buf())
 }
 
-/// Restore staged artifacts to their original cargo output paths after a
-/// successful wheel write.
+/// Restore each staged artifact to its original cargo output path after a
+/// successful wheel write — but only when no auditwheel patching occurred.
 ///
-/// Decision is per-artifact: only those that still have
-/// `cargo_output_path: Some(...)` are restored. The marker is cleared in
-/// [`BuildContext::add_external_libs`] for any artifact whose bytes were
-/// modified in place by auditwheel / patchelf / patch_macho / pe_patch,
-/// because restoring patched bytes would re-introduce the bug fixed by
-/// #2969 / #2680 (cargo's incremental cache and lddtree confused on the
-/// next build). For unmodified artifacts the rename is O(1) and avoids the
-/// multi-second post-compile copy on ext4 — see #3111.
+/// When patches were applied, the staged artifact has rewritten `DT_NEEDED`
+/// / Mach-O load commands / PE imports that don't match cargo's view of the
+/// world; restoring it would re-introduce the bug fixed by #2969 / #2680
+/// (patched bytes confusing cargo's incremental cache and lddtree on a
+/// subsequent build). In that case the cargo output path is left empty —
+/// cargo will recompile on the next build, which it had to do anyway.
 ///
 /// Failures are logged and swallowed: the wheel is the deliverable, the
-/// cargo-path restore is a UX convenience, and the staged artifact stays
-/// recoverable from `target/maturin/`.
-pub(crate) fn finalize_staged_artifacts(audited: &[AuditedArtifact]) {
+/// cargo-path restore is a UX convenience, and the staged artifact is
+/// still recoverable from `target/maturin/`.
+pub(crate) fn finalize_staged_artifacts(audited: &[AuditedArtifact], was_patched: bool) {
+    if was_patched {
+        return;
+    }
     for aa in audited {
         let Some(cargo_output) = aa.artifact.cargo_output_path.as_deref() else {
             continue;

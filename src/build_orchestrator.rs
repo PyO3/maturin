@@ -3,7 +3,7 @@ use crate::binding_generator::{
     BinBindingGenerator, BindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator,
     UniFfiBindingGenerator, generate_binding,
 };
-use crate::build_context::finalize_staged_artifact;
+use crate::build_context::finalize_staged_artifacts;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
@@ -950,36 +950,6 @@ impl<'a> BuildOrchestrator<'a> {
                 Ok(module_stub_files(&module_introspection))
             }
             _ => bail!("Stub generation  is only possible in PyO3 projects"),
-        }
-    }
-}
-
-/// Restore each staged artifact to its original cargo output path after a
-/// successful wheel write — but only when no auditwheel patching occurred.
-///
-/// When patches were applied, the staged artifact has rewritten `DT_NEEDED`
-/// / Mach-O load commands / PE imports that don't match cargo's view of the
-/// world; restoring it would re-introduce the bug fixed by #2969 / #2680
-/// (patched bytes confusing cargo's incremental cache and lddtree on a
-/// subsequent build). In that case the cargo output path is left empty —
-/// cargo will recompile on the next build, which it had to do anyway.
-///
-/// Failures are logged and swallowed: the wheel is the deliverable, the
-/// cargo-path restore is a UX convenience, and the staged artifact is
-/// still recoverable from `target/maturin/`.
-fn finalize_staged_artifacts(audited: &[AuditedArtifact], was_patched: bool) {
-    if was_patched {
-        return;
-    }
-    for aa in audited {
-        let Some(cargo_output) = aa.artifact.cargo_output_path.as_deref() else {
-            continue;
-        };
-        if let Err(err) = finalize_staged_artifact(&aa.artifact.path, cargo_output) {
-            tracing::warn!(
-                "Could not restore artifact to cargo output path {}: {err:#}",
-                cargo_output.display()
-            );
         }
     }
 }

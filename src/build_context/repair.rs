@@ -137,7 +137,7 @@ impl BuildContext {
     /// Returns `true` if any artifact was patched in place by patchelf /
     /// patch_macho / pe_patch, `false` otherwise. The caller uses this to
     /// decide whether to restore the staged artifact to the cargo output
-    /// path post-wheel-write — see [`finalize_staged_artifact`] and #3111.
+    /// path post-wheel-write — see [`finalize_staged_artifacts`] and #3111.
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
@@ -148,9 +148,7 @@ impl BuildContext {
             if let Some(repairer) =
                 self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             {
-                repairer.patch_editable(audited)?;
-                // Editable patching modifies the staged artifact in place.
-                return Ok(true);
+                return repairer.patch_editable(audited);
             }
             return Ok(false);
         }
@@ -306,8 +304,26 @@ impl BuildContext {
     /// `fs::rename` is atomic on the same filesystem; on cross-device it
     /// falls back to `reflink_or_copy` + `fs::remove_file`. The original
     /// cargo output path is recorded on the artifact so it can be
-    /// restored after the wheel is written via [`finalize_staged_artifact`]
+    /// restored after the wheel is written via [`finalize_staged_artifacts`]
     /// when no auditwheel patching occurred — see #3111.
+    ///
+    /// Tradeoffs vs. the previous "copy back immediately" behavior:
+    ///
+    /// - **Cross-device:** the unpatched/finalize path does
+    ///   `reflink_or_copy` + `remove_file` here and again in
+    ///   [`finalize_staged_artifacts`], i.e. two full copies instead of one.
+    ///   This is the expected cost of moving the cargo-path restore to
+    ///   after the wheel is written, and only matters when the cargo
+    ///   target dir and the maturin staging dir are on different
+    ///   filesystems — uncommon in practice.
+    /// - **Build errors before finalize:** if the build errors after
+    ///   `stage_artifact` but before [`finalize_staged_artifacts`] runs
+    ///   (e.g. `auditwheel`, `writer.finish`, or any step in between
+    ///   fails), the cargo output path stays absent. The wheel is the
+    ///   deliverable so this is not a correctness bug, and the staged
+    ///   artifact remains recoverable from `target/maturin/`. Cargo will
+    ///   recompile on the next build — which it had to do anyway because
+    ///   the source-of-truth file moved.
     pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
         let artifact_path = artifact.path.clone();
@@ -329,18 +345,44 @@ impl BuildContext {
     }
 }
 
-/// Restore a staged artifact to the cargo output path after the wheel is
-/// written.  Must only be called when the staged artifact has not been
-/// modified by auditwheel / patchelf / patch_macho / pe_patch — see #2969.
+/// Restore each staged artifact to its original cargo output path after a
+/// successful wheel write — but only when no auditwheel patching occurred.
+///
+/// When patches were applied, the staged artifact has rewritten `DT_NEEDED`
+/// / Mach-O load commands / PE imports that don't match cargo's view of the
+/// world; restoring it would re-introduce the bug fixed by #2969 / #2680
+/// (patched bytes confusing cargo's incremental cache and lddtree on a
+/// subsequent build). In that case the cargo output path is left empty —
+/// cargo will recompile on the next build, which it had to do anyway.
+///
+/// Failures are logged and swallowed: the wheel is the deliverable, the
+/// cargo-path restore is a UX convenience, and the staged artifact is
+/// still recoverable from `target/maturin/`.
+pub(crate) fn finalize_staged_artifacts(audited: &[AuditedArtifact], was_patched: bool) {
+    if was_patched {
+        return;
+    }
+    for aa in audited {
+        let Some(cargo_output) = aa.artifact.cargo_output_path.as_deref() else {
+            continue;
+        };
+        if let Err(err) = finalize_staged_artifact(&aa.artifact.path, cargo_output) {
+            tracing::warn!(
+                "Could not restore artifact to cargo output path {}: {err:#}",
+                cargo_output.display()
+            );
+        }
+    }
+}
+
+/// Restore a single staged artifact to the cargo output path. Must only be
+/// called when the staged artifact has not been modified by auditwheel /
+/// patchelf / patch_macho / pe_patch — see #2969.
 ///
 /// O(1) `fs::rename` on every mainstream filesystem (ext4, xfs, btrfs,
-/// zfs, ntfs, refs, apfs, hfs+).  On cross-device, falls back to
-/// `reflink_or_copy` + `fs::remove_file`.  Returns an error so the caller
-/// can decide how to surface the failure; both call sites in
-/// `build_orchestrator` log and swallow because the wheel is the
-/// deliverable and the cargo-path restore is a UX convenience — the
-/// staged artifact is still recoverable from `target/maturin/`.
-pub(crate) fn finalize_staged_artifact(staged: &Path, cargo_output: &Path) -> Result<()> {
+/// zfs, ntfs, refs, apfs, hfs+). On cross-device, falls back to
+/// `reflink_or_copy` + `fs::remove_file`.
+fn finalize_staged_artifact(staged: &Path, cargo_output: &Path) -> Result<()> {
     // `fs::rename` overwrites the destination on Unix; on Windows it
     // fails if the destination already exists, so remove anything that
     // might be there from a prior partial build.

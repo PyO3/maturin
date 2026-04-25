@@ -545,7 +545,8 @@ impl WheelRepairer for ElfRepairer {
         Ok(())
     }
 
-    fn patch_editable(&self, audited: &[AuditedArtifact]) -> Result<()> {
+    fn patch_editable(&self, audited: &[AuditedArtifact]) -> Result<bool> {
+        let mut patched = false;
         for aa in audited {
             if aa.artifact.linked_paths.is_empty() {
                 continue;
@@ -558,6 +559,10 @@ impl WheelRepairer for ElfRepairer {
                 }
             }
             let new_rpath = new_rpaths.join(":");
+            // Conservatively flag as patched even if set_rpath errors — the
+            // binary may have been partially written and is no longer a clean
+            // cargo output.
+            patched = true;
             if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
                 eprintln!(
                     "⚠️ Warning: Failed to set rpath for {}: {}",
@@ -566,7 +571,7 @@ impl WheelRepairer for ElfRepairer {
                 );
             }
         }
-        Ok(())
+        Ok(patched)
     }
 }
 

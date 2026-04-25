@@ -337,23 +337,31 @@ impl BuildContext {
     ///   the source-of-truth file moved.
     pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
-        let artifact_path = artifact.path.clone();
-        let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
-        // Remove any stale file at the destination so that `fs::rename`
-        // succeeds on Windows (where rename fails if the destination
-        // already exists).
-        let _ = fs::remove_file(&new_artifact_path);
-        if fs::rename(&artifact_path, &new_artifact_path).is_err() {
-            // Rename failed (cross-device).  Fall back to reflink/copy
-            // and then remove the original so the post-wheel-write
-            // finalize step doesn't see a stale unpatched file there.
-            reflink_or_copy(&artifact_path, &new_artifact_path)?;
-            let _ = fs::remove_file(&artifact_path);
-        }
-        artifact.path = new_artifact_path.normalize()?.into_path_buf();
-        artifact.cargo_output_path = Some(artifact_path);
+        let cargo_output = artifact.path.clone();
+        artifact.path = stage_file(&cargo_output, &maturin_build)?;
+        artifact.cargo_output_path = Some(cargo_output);
         Ok(())
     }
+}
+
+/// Move `artifact_path` into `staging_dir` and return the new normalized
+/// path. Uses `fs::rename` (atomic on the same filesystem) and falls back
+/// to `reflink_or_copy` + `fs::remove_file` on cross-device. After this
+/// returns, `artifact_path` no longer exists.
+fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
+    let new_path = staging_dir.join(artifact_path.file_name().unwrap());
+    // Remove any stale file at the destination so that `fs::rename`
+    // succeeds on Windows (where rename fails if the destination
+    // already exists).
+    let _ = fs::remove_file(&new_path);
+    if fs::rename(artifact_path, &new_path).is_err() {
+        // Cross-device. Reflink/copy and remove the original so the
+        // post-wheel-write finalize step doesn't see a stale unpatched
+        // file there.
+        reflink_or_copy(artifact_path, &new_path)?;
+        let _ = fs::remove_file(artifact_path);
+    }
+    Ok(new_path.normalize()?.into_path_buf())
 }
 
 /// Restore staged artifacts to their original cargo output paths after a
@@ -502,5 +510,49 @@ mod tests {
         let cargo_out = tmp.path().join("release.bin");
 
         assert!(finalize_staged_artifact(&staged, &cargo_out).is_err());
+    }
+
+    #[test]
+    fn stage_file_removes_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        let staging = tmp.path().join("staging");
+        fs::create_dir(&staging).unwrap();
+        let cargo_out = tmp.path().join("release.bin");
+        fs::write(&cargo_out, b"contents").unwrap();
+
+        let staged = stage_file(&cargo_out, &staging).unwrap();
+
+        assert!(!cargo_out.exists(), "cargo output must be moved");
+        assert_eq!(fs::read(&staged).unwrap(), b"contents");
+    }
+
+    #[test]
+    fn stage_file_overwrites_stale_destination() {
+        let tmp = tempfile::tempdir().unwrap();
+        let staging = tmp.path().join("staging");
+        fs::create_dir(&staging).unwrap();
+        let cargo_out = tmp.path().join("release.bin");
+        fs::write(&cargo_out, b"new").unwrap();
+        fs::write(staging.join("release.bin"), b"old").unwrap();
+
+        let staged = stage_file(&cargo_out, &staging).unwrap();
+
+        assert_eq!(fs::read(&staged).unwrap(), b"new");
+    }
+
+    #[test]
+    fn stage_then_finalize_roundtrips_contents() {
+        let tmp = tempfile::tempdir().unwrap();
+        let staging = tmp.path().join("staging");
+        fs::create_dir(&staging).unwrap();
+        let cargo_out = tmp.path().join("release.bin");
+        fs::write(&cargo_out, b"binary").unwrap();
+
+        let staged = stage_file(&cargo_out, &staging).unwrap();
+        assert!(!cargo_out.exists());
+        finalize_staged_artifact(&staged, &cargo_out).unwrap();
+
+        assert_eq!(fs::read(&cargo_out).unwrap(), b"binary");
+        assert!(!staged.exists());
     }
 }

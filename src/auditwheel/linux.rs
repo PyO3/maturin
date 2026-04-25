@@ -545,9 +545,9 @@ impl WheelRepairer for ElfRepairer {
         Ok(())
     }
 
-    fn patch_editable(&self, audited: &[AuditedArtifact]) -> Result<bool> {
-        let mut patched = false;
-        for aa in audited {
+    fn patch_editable(&self, audited: &[AuditedArtifact]) -> Result<Vec<usize>> {
+        let mut patched = Vec::new();
+        for (i, aa) in audited.iter().enumerate() {
             if aa.artifact.linked_paths.is_empty() {
                 continue;
             }
@@ -559,16 +559,16 @@ impl WheelRepairer for ElfRepairer {
                 }
             }
             let new_rpath = new_rpaths.join(":");
-            // Conservatively flag as patched even if set_rpath errors — the
-            // binary may have been partially written and is no longer a clean
-            // cargo output.
-            patched = true;
-            if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
-                eprintln!(
+            // patchelf writes via temp-file + rename; an error here almost
+            // always means the original is untouched, so don't flag the
+            // artifact as patched (the cargo output can still be restored).
+            match patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
+                Ok(()) => patched.push(i),
+                Err(err) => eprintln!(
                     "⚠️ Warning: Failed to set rpath for {}: {}",
                     aa.artifact.path.display(),
                     err
-                );
+                ),
             }
         }
         Ok(patched)

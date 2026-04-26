@@ -131,22 +131,29 @@ impl BuildContext {
         }
     }
 
+    /// Patch the audited artifacts to bundle their external shared library
+    /// dependencies into the wheel.
+    ///
+    /// Returns `true` if any artifact was patched in place by patchelf /
+    /// patch_macho / pe_patch, `false` otherwise. The caller uses this to
+    /// decide whether to restore the staged artifact to the cargo output
+    /// path post-wheel-write — see [`finalize_staged_artifacts`] and #3111.
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
         audited: &[AuditedArtifact],
         use_shim: bool,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if self.project.editable {
             if let Some(repairer) =
                 self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             {
                 return repairer.patch_editable(audited);
             }
-            return Ok(());
+            return Ok(false);
         }
         if audited.iter().all(|a| a.external_libs.is_empty()) {
-            return Ok(());
+            return Ok(false);
         }
 
         // Log which libraries need to be copied and which artifacts require them
@@ -172,7 +179,8 @@ impl BuildContext {
                     "⚠️  Warning: Your library requires copying the above external libraries. \
                      Re-run with `--auditwheel=repair` to copy them into the wheel."
                 );
-                return Ok(());
+                // Warn mode does not modify the artifact.
+                return Ok(false);
             }
             AuditWheelMode::Check => {
                 bail!(
@@ -284,58 +292,136 @@ impl BuildContext {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     /// Stage an artifact into a private directory so that:
     /// 1. `warn_missing_py_init` can safely mmap the file without risk of
     ///    concurrent modification by cargo / rust-analyzer.
     /// 2. Auditwheel repair can modify it in-place without altering the
-    ///    original cargo build output.
+    ///    original cargo build output (see #2969 / #2680).
     ///
-    /// Uses `fs::rename` for an atomic move into the staging directory,
-    /// then copies the staged file back to the original location so that
-    /// users can still find the artifact at the standard cargo output
-    /// path. The copy-back uses reflink (copy-on-write) when available
-    /// for near-instant, zero-cost copies, and falls back to a regular
-    /// `fs::copy` otherwise.
+    /// `fs::rename` is atomic on the same filesystem; on cross-device it
+    /// falls back to `reflink_or_copy` + `fs::remove_file`. The original
+    /// cargo output path is recorded on the artifact so it can be
+    /// restored after the wheel is written via [`finalize_staged_artifacts`]
+    /// when no auditwheel patching occurred — see #3111.
     ///
-    /// When `fs::rename` fails (e.g. cross-device), falls back to
-    /// reflink-or-copy directly; the concurrent-modification window is
-    /// unlikely in cross-device setups.
+    /// Tradeoffs vs. the previous "copy back immediately" behavior:
+    ///
+    /// - **Cross-device:** the unpatched/finalize path does
+    ///   `reflink_or_copy` + `remove_file` here and again in
+    ///   [`finalize_staged_artifacts`], i.e. two full copies instead of one.
+    ///   This is the expected cost of moving the cargo-path restore to
+    ///   after the wheel is written, and only matters when the cargo
+    ///   target dir and the maturin staging dir are on different
+    ///   filesystems — uncommon in practice.
+    /// - **Build errors before finalize:** if the build errors after
+    ///   `stage_artifact` but before [`finalize_staged_artifacts`] runs
+    ///   (e.g. `auditwheel`, `writer.finish`, or any step in between
+    ///   fails), the cargo output path stays absent. The wheel is the
+    ///   deliverable so this is not a correctness bug, and the staged
+    ///   artifact remains recoverable from `target/maturin/`. Cargo will
+    ///   recompile on the next build — which it had to do anyway because
+    ///   the source-of-truth file moved.
     pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
-        let artifact_path = &artifact.path;
-        let new_artifact_path = maturin_build.join(artifact_path.file_name().unwrap());
-        // Remove any stale file at the destination so that `fs::rename`
-        // succeeds on Windows (where rename fails if the destination
-        // already exists).
-        let _ = fs::remove_file(&new_artifact_path);
-        if fs::rename(artifact_path, &new_artifact_path).is_ok() {
-            // Rename succeeded — we now own the only copy.  Put a copy
-            // back at the original location for users who expect the
-            // artifact at the standard cargo output path.  Skip if a
-            // new file already appeared (cargo / rust-analyzer rebuilt).
-            if artifact_path.exists() {
-                tracing::debug!(
-                    "Skipping copy-back: {} was recreated by another process",
-                    artifact_path.display()
-                );
-            } else if let Err(err) = reflink_or_copy(&new_artifact_path, artifact_path) {
-                eprintln!(
-                    "⚠️  Warning: failed to copy artifact back to {}: {err:#}. The staged artifact is available at {}",
-                    artifact_path.display(),
-                    new_artifact_path.display()
-                );
-            }
-        } else {
-            // Rename failed (cross-device).  Fall back to reflink/copy;
-            // concurrent modification is unlikely in this scenario.
-            reflink_or_copy(artifact_path, &new_artifact_path)?;
-        }
-        artifact.path = new_artifact_path.normalize()?.into_path_buf();
+        let cargo_output = artifact.path.clone();
+        artifact.path = stage_file(&cargo_output, &maturin_build)?;
+        artifact.cargo_output_path = Some(cargo_output);
         Ok(())
     }
+}
+
+/// Move `artifact_path` into `staging_dir` and return the new normalized
+/// path. Uses `fs::rename` (atomic on the same filesystem) and falls back
+/// to `reflink_or_copy` + `fs::remove_file` on cross-device. After this
+/// returns, `artifact_path` no longer exists.
+fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
+    let new_path = staging_dir.join(artifact_path.file_name().unwrap());
+    // Remove any stale file at the destination so that `fs::rename`
+    // succeeds on Windows (where rename fails if the destination
+    // already exists).
+    let _ = fs::remove_file(&new_path);
+    if fs::rename(artifact_path, &new_path).is_err() {
+        // Cross-device. Reflink/copy and remove the original so the
+        // post-wheel-write finalize step doesn't see a stale unpatched
+        // file there.
+        reflink_or_copy(artifact_path, &new_path)?;
+        let _ = fs::remove_file(artifact_path);
+    }
+    Ok(new_path.normalize()?.into_path_buf())
+}
+
+/// Restore each staged artifact to its original cargo output path after a
+/// successful wheel write — but only when no auditwheel patching occurred.
+///
+/// When patches were applied, the staged artifact has rewritten `DT_NEEDED`
+/// / Mach-O load commands / PE imports that don't match cargo's view of the
+/// world; restoring it would re-introduce the bug fixed by #2969 / #2680
+/// (patched bytes confusing cargo's incremental cache and lddtree on a
+/// subsequent build). In that case the cargo output path is left empty —
+/// cargo will recompile on the next build, which it had to do anyway.
+///
+/// `was_patched` is build-wide rather than per-artifact: in a multi-bin
+/// project where some bins were patched and others weren't, the unpatched
+/// bins are also skipped from rename-back and will be recompiled by cargo
+/// next time. This is intentional — the only call site that can produce
+/// multiple artifacts is `build_bin_wheel`, and a project with multiple
+/// `[[bin]]` targets where some bundle external libs and others don't is
+/// rare enough that per-artifact tracking isn't worth the complexity.
+///
+/// Failures are logged and swallowed: the wheel is the deliverable, the
+/// cargo-path restore is a UX convenience, and the staged artifact is
+/// still recoverable from `target/maturin/`.
+pub(crate) fn finalize_staged_artifacts(audited: &[AuditedArtifact], was_patched: bool) {
+    if was_patched {
+        return;
+    }
+    for aa in audited {
+        let Some(cargo_output) = aa.artifact.cargo_output_path.as_deref() else {
+            continue;
+        };
+        if let Err(err) = finalize_staged_artifact(&aa.artifact.path, cargo_output) {
+            tracing::warn!(
+                "Could not restore artifact to cargo output path {}: {err:#}",
+                cargo_output.display()
+            );
+        }
+    }
+}
+
+/// Restore a single staged artifact to the cargo output path. Must only be
+/// called when the staged artifact has not been modified by auditwheel /
+/// patchelf / patch_macho / pe_patch — see #2969.
+///
+/// O(1) `fs::rename` on every mainstream filesystem (ext4, xfs, btrfs,
+/// zfs, ntfs, refs, apfs, hfs+). On cross-device, falls back to
+/// `reflink_or_copy` + `fs::remove_file`.
+fn finalize_staged_artifact(staged: &Path, cargo_output: &Path) -> Result<()> {
+    // `fs::rename` overwrites the destination on Unix; on Windows it
+    // fails if the destination already exists, so remove anything that
+    // might be there from a prior partial build.
+    let _ = fs::remove_file(cargo_output);
+    if fs::rename(staged, cargo_output).is_ok() {
+        tracing::debug!(
+            "Restored {} to {}",
+            staged.display(),
+            cargo_output.display()
+        );
+        return Ok(());
+    }
+    // Cross-device or permission error: fall back to reflink/copy and
+    // remove the staged file so it doesn't accumulate in target/maturin.
+    reflink_or_copy(staged, cargo_output).with_context(|| {
+        format!(
+            "Failed to restore staged artifact from {} to {}",
+            staged.display(),
+            cargo_output.display(),
+        )
+    })?;
+    let _ = fs::remove_file(staged);
+    Ok(())
 }
 
 /// Reflink (copy-on-write) a file, preserving permissions, and fall back to

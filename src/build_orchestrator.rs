@@ -3,6 +3,7 @@ use crate::binding_generator::{
     BinBindingGenerator, BindingGenerator, CffiBindingGenerator, Pyo3BindingGenerator,
     UniFfiBindingGenerator, generate_binding,
 };
+use crate::build_context::finalize_staged_artifacts;
 use crate::compile::warn_missing_py_init;
 use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
@@ -494,7 +495,8 @@ impl<'a> BuildOrchestrator<'a> {
             file_options,
         )?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-        self.context
+        let was_patched = self
+            .context
             .add_external_libs(&mut writer, audited, false)?;
 
         let temp_dir = writer.temp_dir()?;
@@ -527,6 +529,7 @@ impl<'a> BuildOrchestrator<'a> {
             &self.context.project.project_layout.project_root,
             &tags,
         )?;
+        finalize_staged_artifacts(audited, was_patched);
         Ok(wheel_path)
     }
 
@@ -820,7 +823,8 @@ impl<'a> BuildOrchestrator<'a> {
         // WASI targets use their own launcher mechanism and cannot be shimmed.
         let use_shim = !self.context.project.target.is_wasi()
             && audited.iter().any(|a| !a.external_libs.is_empty());
-        self.context
+        let was_patched = self
+            .context
             .add_external_libs(&mut writer, audited, use_shim)?;
 
         let mut generator = BinBindingGenerator::new(&mut metadata24, use_shim);
@@ -846,6 +850,7 @@ impl<'a> BuildOrchestrator<'a> {
             &self.context.project.project_layout.project_root,
             &tags,
         )?;
+        finalize_staged_artifacts(audited, was_patched);
         Ok(wheel_path)
     }
 

@@ -2,6 +2,7 @@ mod builder;
 mod repair;
 
 pub use builder::BuildContextBuilder;
+pub(crate) use repair::finalize_staged_artifacts;
 
 use crate::auditwheel::AuditWheelMode;
 use crate::auditwheel::PlatformTag;

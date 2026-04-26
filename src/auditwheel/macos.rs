@@ -161,6 +161,20 @@ impl WheelRepairer for MacOSRepairer {
         // incremental cache (#2969). The skip mirrors the corresponding
         // `patch_required` prediction so `copy_back_cargo_outputs`
         // doesn't pay an unnecessary reflink/copy for them either.
+        //
+        // The per-artifact filter relies on a `lddtree` invariant: the
+        // `Library::name` it stores in `external_libs` is the exact
+        // install-name string read from the binary's `LC_LOAD_DYLIB`
+        // (see `lddtree::find_macho_library` -> `try_single_candidate`,
+        // which sets `name: lib_name.to_string()` from the unmodified
+        // load-command bytes). The grafted `name_map` is keyed by the
+        // same field via `prepare_grafted_libs`, so equality is
+        // byte-exact. If `lddtree` ever normalizes leaf-vs-`@rpath/`
+        // forms, this filter would start being narrower than
+        // `patch_macho`'s `change_install_name` lookup (which itself
+        // searches `LC_LOAD_DYLIB` for the exact `old` string and
+        // silently no-ops on `DylibNameMissing`); add a regression
+        // fixture before bumping `lddtree` past 0.5.x if so.
         let rel = relpath(libs_dir, artifact_dir);
         for audited in artifacts {
             let artifact_deps: HashSet<&str> = audited

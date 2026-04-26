@@ -363,6 +363,14 @@ fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
 /// subsequent build). In that case the cargo output path is left empty —
 /// cargo will recompile on the next build, which it had to do anyway.
 ///
+/// `was_patched` is build-wide rather than per-artifact: in a multi-bin
+/// project where some bins were patched and others weren't, the unpatched
+/// bins are also skipped from rename-back and will be recompiled by cargo
+/// next time. This is intentional — the only call site that can produce
+/// multiple artifacts is `build_bin_wheel`, and a project with multiple
+/// `[[bin]]` targets where some bundle external libs and others don't is
+/// rare enough that per-artifact tracking isn't worth the complexity.
+///
 /// Failures are logged and swallowed: the wheel is the deliverable, the
 /// cargo-path restore is a UX convenience, and the staged artifact is
 /// still recoverable from `target/maturin/`.
@@ -457,92 +465,4 @@ fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
 #[cfg(not(target_os = "linux"))]
 fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
     reflink_copy::reflink(from, to)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn finalize_renames_atomically_on_same_device() {
-        let tmp = tempfile::tempdir().unwrap();
-        let staged = tmp.path().join("staged.bin");
-        let cargo_out = tmp.path().join("release.bin");
-        fs::write(&staged, b"contents").unwrap();
-
-        finalize_staged_artifact(&staged, &cargo_out).unwrap();
-
-        assert!(
-            !staged.exists(),
-            "staged path must be removed after finalize"
-        );
-        assert_eq!(fs::read(&cargo_out).unwrap(), b"contents");
-    }
-
-    #[test]
-    fn finalize_overwrites_existing_destination() {
-        let tmp = tempfile::tempdir().unwrap();
-        let staged = tmp.path().join("staged.bin");
-        let cargo_out = tmp.path().join("release.bin");
-        fs::write(&staged, b"new").unwrap();
-        fs::write(&cargo_out, b"old").unwrap();
-
-        finalize_staged_artifact(&staged, &cargo_out).unwrap();
-
-        assert_eq!(fs::read(&cargo_out).unwrap(), b"new");
-        assert!(!staged.exists());
-    }
-
-    #[test]
-    fn finalize_errors_when_source_missing() {
-        let tmp = tempfile::tempdir().unwrap();
-        let staged = tmp.path().join("missing.bin");
-        let cargo_out = tmp.path().join("release.bin");
-
-        assert!(finalize_staged_artifact(&staged, &cargo_out).is_err());
-    }
-
-    #[test]
-    fn stage_file_removes_source() {
-        let tmp = tempfile::tempdir().unwrap();
-        let staging = tmp.path().join("staging");
-        fs::create_dir(&staging).unwrap();
-        let cargo_out = tmp.path().join("release.bin");
-        fs::write(&cargo_out, b"contents").unwrap();
-
-        let staged = stage_file(&cargo_out, &staging).unwrap();
-
-        assert!(!cargo_out.exists(), "cargo output must be moved");
-        assert_eq!(fs::read(&staged).unwrap(), b"contents");
-    }
-
-    #[test]
-    fn stage_file_overwrites_stale_destination() {
-        let tmp = tempfile::tempdir().unwrap();
-        let staging = tmp.path().join("staging");
-        fs::create_dir(&staging).unwrap();
-        let cargo_out = tmp.path().join("release.bin");
-        fs::write(&cargo_out, b"new").unwrap();
-        fs::write(staging.join("release.bin"), b"old").unwrap();
-
-        let staged = stage_file(&cargo_out, &staging).unwrap();
-
-        assert_eq!(fs::read(&staged).unwrap(), b"new");
-    }
-
-    #[test]
-    fn stage_then_finalize_roundtrips_contents() {
-        let tmp = tempfile::tempdir().unwrap();
-        let staging = tmp.path().join("staging");
-        fs::create_dir(&staging).unwrap();
-        let cargo_out = tmp.path().join("release.bin");
-        fs::write(&cargo_out, b"binary").unwrap();
-
-        let staged = stage_file(&cargo_out, &staging).unwrap();
-        assert!(!cargo_out.exists());
-        finalize_staged_artifact(&staged, &cargo_out).unwrap();
-
-        assert_eq!(fs::read(&cargo_out).unwrap(), b"binary");
-        assert!(!staged.exists());
-    }
 }

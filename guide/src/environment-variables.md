@@ -56,7 +56,21 @@ Config-settings take priority over `MATURIN_PEP517_ARGS`; the environment variab
 * `MACOSX_DEPLOYMENT_TARGET`: The minimum macOS version to target
 * `IPHONEOS_DEPLOYMENT_TARGET`: The minimum iOS version to target
 * `SOURCE_DATE_EPOCH`: The time to use for the timestamp in the wheel metadata
-* `MATURIN_EMSCRIPTEN_VERSION`: The version of emscripten to use for emscripten builds
+* `MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION` / `PYEMSCRIPTEN_PLATFORM_VERSION`: The
+  [PEP 783](https://peps.python.org/pep-0783/) PyEmscripten platform version
+  (e.g. `2026_0`) used to derive the `pyemscripten_<year>_<patch>_wasm32`
+  wheel platform tag. Pyodide 0.30+ exposes this via
+  `sysconfig.get_config_var("PYEMSCRIPTEN_PLATFORM_VERSION")` and `pyodide
+  config get pyemscripten_platform_version`.
+* `MATURIN_PYODIDE_ABI_VERSION` / `PYODIDE_ABI_VERSION`: Pre-PEP 783 Pyodide
+  ABI version (e.g. `2025_0`) used to derive the
+  `pyodide_<year>_<patch>_wasm32` tag. Used when targeting Pyodide
+  0.28 / 0.29. Available via `pyodide config get pyodide_abi_version`.
+* `MATURIN_EMSCRIPTEN_VERSION`: The version of emscripten to use for emscripten
+  builds (legacy `emscripten_<emcc-version>_wasm32` tag, used for Pyodide
+  &le; 0.27 only). Prefer `MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION` /
+  `MATURIN_PYODIDE_ABI_VERSION` when possible — wheels built with the legacy
+  tag are not installable on PEP 783-compliant runtimes.
 * `MATURIN_STRIP`: Strip the library for minimum file size
 * `MATURIN_NO_MISSING_BUILD_BACKEND_WARNING`: Suppress missing build backend warning
 * `MATURIN_USE_XWIN`: Set to `1` to force to use `xwin` for cross compiling even on Windows that supports native compilation

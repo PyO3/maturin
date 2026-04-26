@@ -284,6 +284,16 @@ fn emit_emscripten_setup(y: &mut Yaml) {
         .indent();
     y.line("echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV");
     y.line("echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV");
+    // PEP 783 / pre-PEP 783 platform tag inputs. `pyodide config get` exits
+    // 0 with an empty value when the key is unknown, so older Pyodide
+    // releases simply leave these unset and maturin falls back to the
+    // legacy `emscripten_*` tag.
+    y.line(
+        "echo PYEMSCRIPTEN_PLATFORM_VERSION=$(pyodide config get pyemscripten_platform_version 2>/dev/null || true) >> $GITHUB_ENV",
+    );
+    y.line(
+        "echo PYODIDE_ABI_VERSION=$(pyodide config get pyodide_abi_version 2>/dev/null || true) >> $GITHUB_ENV",
+    );
     y.line("pip uninstall -y pyodide-build");
     y.dedent_by(2)
         .line("- uses: mymindstorm/setup-emsdk@v14")

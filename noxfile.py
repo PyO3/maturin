@@ -25,7 +25,7 @@ def append_to_github_env(name: str, value: str):
     if not GITHUB_ACTIONS or not GITHUB_ENV:
         return
 
-    with open(GITHUB_ENV, "w+") as f:
+    with open(GITHUB_ENV, "a") as f:
         f.write(f"{name}={value}\n")
 
 
@@ -91,6 +91,55 @@ def update_pyo3(session: nox.Session):
                             session.run("cargo", f"+{MSRV}", "update", "-p", crate, external=True)
 
 
+def _resolve_pyodide_platform_inputs(info: dict) -> dict:
+    """Map a `pyodide-lock.json` `info` block to the env vars and expected
+    wheel platform tag that maturin should produce when targeting that
+    Pyodide release.
+
+    Pyodide encodes platform metadata across (overlapping) fields:
+
+    * `info.platform` is `emscripten_<X>_<Y>_<Z>` and contains the emcc
+      version that built the runtime (used by `setup-emsdk`).
+    * `info.abi_version` (Pyodide >= 0.28) is `<year>_<patch>` and drives either
+      the pre-PEP 783 `pyodide_<year>_<patch>_wasm32` wheel tag, or the PEP 783
+      `pyemscripten_<year>_<patch>_wasm32` tag for Python 3.14+ lock files.
+    * A future `info.pyemscripten_platform_version` (Pyodide >= 0.30) drives
+      the PEP 783 `pyemscripten_<year>_<patch>_wasm32` wheel tag.
+
+    See https://peps.python.org/pep-0783/.
+    """
+    platform = info.get("platform", "")
+    if platform.startswith("emscripten_"):
+        emscripten_version = platform.removeprefix("emscripten_").replace("_", ".")
+    else:
+        emscripten_version = info.get("emscripten_version", "")
+
+    pyemscripten = info.get("pyemscripten_platform_version", "")
+    abi_version = info.get("abi_version", "")
+
+    env = {"EMSCRIPTEN_VERSION": emscripten_version}
+    if pyemscripten:
+        env["PYEMSCRIPTEN_PLATFORM_VERSION"] = pyemscripten
+        env["EXPECTED_PLATFORM_TAG"] = f"pyemscripten_{pyemscripten}_wasm32"
+    elif abi_version and _pyodide_python_at_least(info, 3, 14):
+        env["PYEMSCRIPTEN_PLATFORM_VERSION"] = abi_version
+        env["EXPECTED_PLATFORM_TAG"] = f"pyemscripten_{abi_version}_wasm32"
+    elif abi_version:
+        env["PYODIDE_ABI_VERSION"] = abi_version
+        env["EXPECTED_PLATFORM_TAG"] = f"pyodide_{abi_version}_wasm32"
+    elif emscripten_version:
+        legacy = emscripten_version.replace(".", "_").replace("-", "_")
+        env["EXPECTED_PLATFORM_TAG"] = f"emscripten_{legacy}_wasm32"
+    return env
+
+
+def _pyodide_python_at_least(info: dict, major: int, minor: int) -> bool:
+    match = re.match(r"^(\d+)\.(\d+)", info.get("python", ""))
+    if not match:
+        return False
+    return (int(match.group(1)), int(match.group(2))) >= (major, minor)
+
+
 @nox.session(name="setup-pyodide", python=False)
 def setup_pyodide(session: nox.Session):
     tests_dir = Path("./tests").resolve()
@@ -112,13 +161,16 @@ def setup_pyodide(session: nox.Session):
                 external=True,
             )
             with open("pyodide-lock.json") as f:
-                emscripten_version = json.load(f)["info"]["platform"].split("_", 1)[1].replace("_", ".")
-                append_to_github_env("EMSCRIPTEN_VERSION", emscripten_version)
+                info = json.load(f)["info"]
+            for name, value in _resolve_pyodide_platform_inputs(info).items():
+                session.log(f"Pyodide {PYODIDE_VERSION}: {name}={value}")
+                append_to_github_env(name, value)
 
 
 @nox.session(name="test-emscripten", python=False)
 def test_emscripten(session: nox.Session):
     tests_dir = Path("./tests").resolve()
+    expected_tag = os.getenv("EXPECTED_PLATFORM_TAG")
 
     test_crates = [
         "test-crates/pyo3-pure",
@@ -140,6 +192,17 @@ def test_emscripten(session: nox.Session):
             env={"RUSTUP_TOOLCHAIN": "nightly"},
             external=True,
         )
+
+        if expected_tag:
+            wheels_dir = crate / "target" / "wheels"
+            wheels = sorted(wheels_dir.glob("*.whl"))
+            if not wheels:
+                session.error(f"No wheel produced in {wheels_dir}")
+            mismatched = [w for w in wheels if expected_tag not in w.name]
+            if mismatched:
+                names = ", ".join(w.name for w in mismatched)
+                session.error(f"Expected platform tag {expected_tag} in wheel name(s): {names}")
+            session.log(f"Verified {len(wheels)} wheel(s) carry platform tag {expected_tag}")
 
         with session.chdir(tests_dir):
             session.run("node", "emscripten_runner.js", str(crate), external=True)

@@ -206,8 +206,9 @@ pub trait WheelRepairer {
     /// editable builds for free.
     ///
     /// Implementations must not modify the [`AuditedArtifact`] structs
-    /// themselves — `cargo_output_path` is cleared by the caller via
-    /// `copy_back_cargo_outputs` *before* this method runs.
+    /// themselves — the per-artifact `staging` state is transitioned to
+    /// `Patched` by the caller via `copy_back_cargo_outputs` *before*
+    /// this method runs.
     fn patch(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Result<()>;
 
     /// Return a Python code snippet to prepend to `__init__.py` for runtime

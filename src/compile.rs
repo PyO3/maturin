@@ -50,6 +50,49 @@ pub struct ThinArtifact {
     pub linked_paths: Vec<String>,
 }
 
+/// State of the artifact's cargo output path during the wheel build.
+///
+/// `BuildArtifact::path` always points at the file the build pipeline is
+/// currently working with (initially the cargo output path itself, then
+/// the staged copy in `target/maturin/`). This enum tracks the state of
+/// the *original* cargo output path — the one cargo wrote to and that
+/// cargo's incremental cache, IDEs, and CI scripts will read after the
+/// build completes — so [`finalize_staged_artifacts`] and
+/// [`copy_back_cargo_outputs`] can dispatch on a typed state instead of
+/// stat-ing the filesystem and inferring the staging mode from
+/// `cargo_output.exists()`. The typed state makes the contract between
+/// `stage_file`, `copy_back_cargo_outputs`, and `finalize_staged_artifacts`
+/// impossible to violate silently — see #2969 / #3111.
+///
+/// [`copy_back_cargo_outputs`]: crate::build_context::repair::copy_back_cargo_outputs
+/// [`finalize_staged_artifacts`]: crate::build_context::repair::finalize_staged_artifacts
+#[derive(Debug, Clone)]
+pub enum CargoOutputState {
+    /// The artifact has not been staged: it is still at its original
+    /// cargo output path. Initial state set by every `BuildArtifact`
+    /// constructor.
+    NotStaged,
+    /// `stage_file` renamed the artifact away from cargo's path; the
+    /// cargo output path is currently empty and finalize must rename
+    /// the staged file back to it.
+    Renamed {
+        /// The cargo output path the staged artifact must be returned to.
+        cargo_output: PathBuf,
+    },
+    /// `stage_file` reflinked/copied to staging because rename hit
+    /// `ErrorKind::CrossesDevices`; the cargo output path still holds
+    /// the unpatched original. Finalize just drops the staged duplicate.
+    Mirrored {
+        /// The cargo output path that already holds the unpatched bytes.
+        cargo_output: PathBuf,
+    },
+    /// `copy_back_cargo_outputs` has restored unpatched bytes at the
+    /// cargo output path and the staged artifact is about to be (or has
+    /// been) rewritten in place by the platform repairer. Finalize must
+    /// NOT touch the cargo output path on this artifact — see #2969.
+    Patched,
+}
+
 /// A cargo build artifact
 #[derive(Debug, Clone)]
 pub struct BuildArtifact {
@@ -65,20 +108,12 @@ pub struct BuildArtifact {
     /// For universal2 builds: per-architecture thin binaries used for accurate
     /// per-arch dependency analysis during macOS wheel repair.
     pub thin_artifacts: Vec<ThinArtifact>,
-    /// Original cargo output path before staging.
-    ///
-    /// Populated by `stage_artifact` after the file is moved into the maturin
-    /// staging directory; `path` is mutated to the staged location while this
-    /// field remembers where cargo originally placed the artifact.
-    ///
-    /// `copy_back_cargo_outputs` (called from `add_external_libs` before
-    /// any in-place patching) clears this back to `None` on every artifact
-    /// whose bytes the repairer is about to rewrite, signalling to
-    /// `finalize_staged_artifacts` that the staged (now patched) file must
-    /// not be moved back to the cargo output path — see #2969 / #3111.
-    /// On the same call it also restores a clean unpatched copy at this
-    /// path so cargo's incremental cache always sees pre-patch bytes.
-    pub cargo_output_path: Option<PathBuf>,
+    /// Tracks where the artifact lives relative to its original cargo
+    /// output path. Initially `NotStaged`; transitioned by `stage_file`
+    /// (to `Renamed` or `Mirrored`), `copy_back_cargo_outputs` (to
+    /// `Patched`), and consumed by `finalize_staged_artifacts`. See
+    /// [`CargoOutputState`] for the per-variant meaning.
+    pub staging: CargoOutputState,
 }
 
 /// Result of compiling one or more cargo targets.
@@ -298,7 +333,7 @@ fn compile_universal2(
             debuginfo_path: None,
             linked_paths,
             thin_artifacts,
-            cargo_output_path: None,
+            staging: CargoOutputState::NotStaged,
         };
         result.insert(build_type, universal_artifact);
         universal_artifacts.push(result);
@@ -984,7 +1019,7 @@ fn compile_target(
                                 debuginfo_path: None,
                                 linked_paths: Vec::new(),
                                 thin_artifacts: Vec::new(),
-                                cargo_output_path: None,
+                                staging: CargoOutputState::NotStaged,
                             };
                             artifacts.insert(crate_type, artifact);
                         }

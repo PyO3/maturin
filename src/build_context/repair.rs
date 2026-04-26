@@ -16,6 +16,7 @@ use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use normpath::PathExt;
 use std::collections::{HashMap, HashSet};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use super::BuildContext;
@@ -349,12 +350,28 @@ impl BuildContext {
 /// and drop the staged duplicate, so the bytes are only copied once. The
 /// pre-clean is needed here because `reflink_copy::reflink` refuses to
 /// overwrite on some platforms.
+///
+/// Only `ErrorKind::CrossesDevices` triggers the fallback — every other
+/// rename error (permission denied, I/O failure, etc.) is surfaced
+/// instead of being silently masked by the copy path.
 fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
     let new_path = staging_dir.join(artifact_path.file_name().unwrap());
-    if fs::rename(artifact_path, &new_path).is_err() {
-        // Cross-device: copy into staging and leave the original alone.
-        let _ = fs::remove_file(&new_path);
-        reflink_or_copy(artifact_path, &new_path)?;
+    match fs::rename(artifact_path, &new_path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == io::ErrorKind::CrossesDevices => {
+            // Cross-device: copy into staging and leave the original alone.
+            let _ = fs::remove_file(&new_path);
+            reflink_or_copy(artifact_path, &new_path)?;
+        }
+        Err(err) => {
+            return Err(err).with_context(|| {
+                format!(
+                    "Failed to stage {} -> {}",
+                    artifact_path.display(),
+                    new_path.display(),
+                )
+            });
+        }
     }
     Ok(new_path.normalize()?.into_path_buf())
 }

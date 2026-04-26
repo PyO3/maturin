@@ -5,16 +5,18 @@
 //!
 //! It contains all ELF-specific logic: manylinux/musllinux compliance
 //! auditing, external dependency discovery via lddtree, versioned symbol
-//! checking, and binary patching via `patchelf` (SONAME, DT_NEEDED, RPATH).
+//! checking, and binary patching via the `arwen` crate (SONAME, DT_NEEDED,
+//! RPATH).
 
 use super::audit::{get_sysroot_path, relpath};
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{MANYLINUX_POLICIES, MUSLLINUX_POLICIES, Policy};
 use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer};
-use super::{PlatformTag, patchelf};
+use super::PlatformTag;
 use crate::compile::BuildArtifact;
 use crate::target::{Arch, Target};
 use anyhow::{Context, Result, bail};
+use arwen::elf::ElfContainer;
 use fs_err::File;
 use goblin::elf::{Elf, sym::STB_WEAK, sym::STT_FUNC};
 use lddtree::Library;
@@ -435,8 +437,8 @@ fn auditwheel_rs(
 /// Linux/ELF wheel repairer (auditwheel equivalent).
 ///
 /// Bundles external `.so` files and rewrites ELF metadata (SONAME, DT_NEEDED,
-/// RPATH) using `patchelf` so that `$ORIGIN`-relative references resolve to
-/// the bundled copies in the `.libs/` directory.
+/// RPATH) using the `arwen` crate so that `$ORIGIN`-relative references
+/// resolve to the bundled copies in the `.libs/` directory.
 ///
 /// Unlike the macOS repairer, `audit()` performs full
 /// manylinux/musllinux compliance checking — the returned [`Policy`]
@@ -478,8 +480,6 @@ impl WheelRepairer for ElfRepairer {
         libs_dir: &Path,
         artifact_dir: &Path,
     ) -> Result<()> {
-        patchelf::verify_patchelf()?;
-
         // Build a lookup from original name → new soname for rewriting references.
         let mut name_map: BTreeMap<&str, &str> = BTreeMap::new();
         for l in grafted {
@@ -491,55 +491,70 @@ impl WheelRepairer for ElfRepairer {
 
         // Set soname and rpath on each grafted library.
         for lib in grafted {
-            patchelf::set_soname(&lib.dest_path, &lib.new_name)?;
+            let contents = fs_err::read(&lib.dest_path)?;
+            let mut elf = ElfContainer::parse(&contents)?;
+            elf.set_soname(&lib.new_name)?;
             if !lib.rpath.is_empty() {
-                patchelf::set_rpath(&lib.dest_path, &"$ORIGIN".to_string())?;
+                elf.remove_runpath()?;
+                elf.add_runpath("$ORIGIN")?;
+                elf.force_rpath()?;
             }
+            elf.write_to_path(&lib.dest_path)?;
         }
 
         // Rewrite DT_NEEDED in each artifact to reference new sonames.
         // Only replace entries that the artifact actually depends on to avoid
-        // unnecessary patchelf invocations and errors when an old name is
-        // absent from a given binary.
+        // unnecessary work when an old name is absent from a given binary.
         for aa in audited {
             let artifact_deps: HashSet<&str> = aa
                 .external_libs
                 .iter()
                 .map(|lib| lib.name.as_str())
                 .collect();
-            let replacements: Vec<_> = name_map
+            let replacements: HashMap<String, String> = name_map
                 .iter()
                 .filter(|(old, _)| artifact_deps.contains(**old))
-                .map(|(k, v)| (*k, v.to_string()))
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
                 .collect();
             if !replacements.is_empty() {
-                patchelf::replace_needed(&aa.artifact.path, &replacements)?;
+                let contents = fs_err::read(&aa.artifact.path)?;
+                let mut elf = ElfContainer::parse(&contents)?;
+                elf.replace_needed(&replacements)?;
+                elf.write_to_path(&aa.artifact.path)?;
             }
         }
 
         // Update cross-references between grafted libraries
         for lib in grafted {
-            let lib_replacements: Vec<_> = lib
+            let lib_replacements: HashMap<String, String> = lib
                 .needed
                 .iter()
                 .filter_map(|n| {
                     name_map
                         .get(n.as_str())
-                        .map(|new| (n.as_str(), new.to_string()))
+                        .map(|new| (n.clone(), (*new).to_string()))
                 })
                 .collect();
             if !lib_replacements.is_empty() {
-                patchelf::replace_needed(&lib.dest_path, &lib_replacements)?;
+                let contents = fs_err::read(&lib.dest_path)?;
+                let mut elf = ElfContainer::parse(&contents)?;
+                elf.replace_needed(&lib_replacements)?;
+                elf.write_to_path(&lib.dest_path)?;
             }
         }
 
         // Set RPATH on artifacts to find the libs directory
         for aa in audited {
-            let mut new_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
+            let contents = fs_err::read(&aa.artifact.path)?;
+            let mut elf = ElfContainer::parse(&contents)?;
+            let mut new_rpaths = elf.get_rpath();
             let new_rpath = Path::new("$ORIGIN").join(relpath(libs_dir, artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
             let new_rpath = new_rpaths.join(":");
-            patchelf::set_rpath(&aa.artifact.path, &new_rpath)?;
+            elf.remove_runpath()?;
+            elf.add_runpath(new_rpath)?;
+            elf.force_rpath()?;
+            elf.write_to_path(&aa.artifact.path)?;
         }
 
         Ok(())
@@ -550,7 +565,19 @@ impl WheelRepairer for ElfRepairer {
             if aa.artifact.linked_paths.is_empty() {
                 continue;
             }
-            let old_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
+            let contents = fs_err::read(&aa.artifact.path)?;
+            let mut elf = match ElfContainer::parse(&contents) {
+                Ok(elf) => elf,
+                Err(err) => {
+                    eprintln!(
+                        "⚠️ Warning: Failed to parse {}: {}",
+                        aa.artifact.path.display(),
+                        err
+                    );
+                    continue;
+                }
+            };
+            let old_rpaths = elf.get_rpath();
             let mut new_rpaths = old_rpaths.clone();
             for path in &aa.artifact.linked_paths {
                 if !old_rpaths.contains(path) {
@@ -562,7 +589,16 @@ impl WheelRepairer for ElfRepairer {
             // binary may have been partially written and is no longer a
             // clean cargo output.
             aa.artifact.cargo_output_path = None;
-            if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
+
+            // Pseudo-try-block
+            let result: arwen::elf::Result<()> = (|| {
+                elf.remove_runpath()?;
+                elf.add_runpath(new_rpath)?;
+                elf.force_rpath()?;
+                elf.write_to_path(&aa.artifact.path)?;
+                Ok(())
+            })();
+            if let Err(err) = result {
                 eprintln!(
                     "⚠️ Warning: Failed to set rpath for {}: {}",
                     aa.artifact.path.display(),

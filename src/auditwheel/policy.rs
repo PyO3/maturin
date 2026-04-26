@@ -98,6 +98,7 @@ impl Policy {
         }
     }
 
+    #[cfg_attr(not(feature = "auditwheel"), allow(dead_code))]
     pub(crate) fn fixup_musl_libc_so_name(&mut self, target_arch: Arch) {
         // Fixup musl libc lib_whitelist
         if self.name.starts_with("musllinux") && self.lib_whitelist.remove("libc.so") {

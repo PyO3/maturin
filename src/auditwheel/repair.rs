@@ -63,8 +63,10 @@ pub struct GraftedLib {
     /// Path to the writable temporary copy (ready for patching).
     pub dest_path: PathBuf,
     /// Libraries this one depends on (from lddtree's `needed` field).
+    #[cfg_attr(not(feature = "auditwheel"), allow(dead_code))]
     pub needed: Vec<String>,
     /// Runtime library search paths from the original library.
+    #[cfg_attr(not(feature = "auditwheel"), allow(dead_code))]
     pub rpath: Vec<String>,
     /// **Universal2 only**: CPU architectures that require this library.
     ///
@@ -77,6 +79,7 @@ pub struct GraftedLib {
     ///
     /// Note: Universal2 support may be removed when Apple drops x86_64 support
     /// (expected ~2025-2026).
+    #[cfg_attr(not(feature = "auditwheel"), allow(dead_code))]
     pub required_archs: HashSet<String>,
 }
 

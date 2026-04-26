@@ -1,11 +1,12 @@
 mod audit;
+#[cfg(feature = "auditwheel")]
 mod linux;
 #[cfg(feature = "auditwheel")]
 mod macos;
 #[cfg(feature = "auditwheel")]
 mod macos_sign;
+#[cfg(feature = "auditwheel")]
 mod musllinux;
-pub mod patchelf;
 #[cfg(feature = "auditwheel")]
 pub(crate) mod pe_patch;
 mod platform_tag;
@@ -19,6 +20,7 @@ mod whichprovides;
 mod windows;
 
 pub use audit::*;
+#[cfg(feature = "auditwheel")]
 pub use linux::ElfRepairer;
 #[cfg(feature = "auditwheel")]
 pub use macos::MacOSRepairer;

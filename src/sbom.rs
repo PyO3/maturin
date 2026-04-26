@@ -1,10 +1,12 @@
 use crate::BuildContext;
 use crate::module_writer::ModuleWriter;
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tracing::instrument;
 
+#[cfg(feature = "sbom")]
+use anyhow::anyhow;
 #[cfg(feature = "sbom")]
 use cargo_cyclonedx::config::SbomConfig as CyclonedxConfig;
 #[cfg(feature = "sbom")]

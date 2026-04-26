@@ -1,11 +1,13 @@
 #[cfg(feature = "auditwheel")]
 use crate::auditwheel::MacOSRepairer;
 #[cfg(feature = "auditwheel")]
+use crate::auditwheel::ElfRepairer;
+#[cfg(feature = "auditwheel")]
 use crate::auditwheel::WindowsRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
-    AuditResult, AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
+    AuditResult, AuditWheelMode, AuditedArtifact, PlatformTag, Policy, WheelRepairer,
     log_grafted_libs, prepare_grafted_libs,
 };
 #[cfg(feature = "sbom")]
@@ -23,39 +25,47 @@ use super::BuildContext;
 
 impl BuildContext {
     /// Create the appropriate platform-specific wheel repairer.
+    #[cfg_attr(not(feature = "auditwheel"), allow(unused_variables))]
     fn make_repairer(
         &self,
         platform_tag: &[PlatformTag],
         python_interpreter: Option<&PythonInterpreter>,
     ) -> Option<Box<dyn WheelRepairer>> {
         if self.project.target.is_linux() {
-            let mut musllinux: Vec<_> = platform_tag
-                .iter()
-                .filter(|tag| tag.is_musllinux())
-                .copied()
-                .collect();
-            musllinux.sort();
-            let mut others: Vec<_> = platform_tag
-                .iter()
-                .filter(|tag| !tag.is_musllinux())
-                .copied()
-                .collect();
-            others.sort();
+            #[cfg(feature = "auditwheel")]
+            {
+                let mut musllinux: Vec<_> = platform_tag
+                    .iter()
+                    .filter(|tag| tag.is_musllinux())
+                    .copied()
+                    .collect();
+                musllinux.sort();
+                let mut others: Vec<_> = platform_tag
+                    .iter()
+                    .filter(|tag| !tag.is_musllinux())
+                    .copied()
+                    .collect();
+                others.sort();
 
-            let allow_linking_libpython = self.project.bridge().is_bin();
+                let allow_linking_libpython = self.project.bridge().is_bin();
 
-            let effective_tag = if self.project.bridge().is_bin() && !musllinux.is_empty() {
-                Some(musllinux[0])
-            } else {
-                others.first().or_else(|| musllinux.first()).copied()
-            };
+                let effective_tag = if self.project.bridge().is_bin() && !musllinux.is_empty() {
+                    Some(musllinux[0])
+                } else {
+                    others.first().or_else(|| musllinux.first()).copied()
+                };
 
-            Some(Box::new(ElfRepairer {
-                platform_tag: effective_tag,
-                target: self.project.target.clone(),
-                manifest_path: self.project.manifest_path.clone(),
-                allow_linking_libpython,
-            }))
+                Some(Box::new(ElfRepairer {
+                    platform_tag: effective_tag,
+                    target: self.project.target.clone(),
+                    manifest_path: self.project.manifest_path.clone(),
+                    allow_linking_libpython,
+                }))
+            }
+            #[cfg(not(feature = "auditwheel"))]
+            {
+                None
+            }
         } else if self.project.target.is_macos() {
             #[cfg(feature = "auditwheel")]
             {
@@ -157,8 +167,7 @@ impl BuildContext {
             return Ok(());
         }
 
-        // Log which libraries need to be copied and which artifacts require them
-        // before calling patchelf, so users can see this even if patchelf is missing.
+        // Log which libraries need to be copied and which artifacts require them.
         eprintln!("🔗 External shared libraries to be copied into the wheel:");
         for aa in audited.iter() {
             if aa.external_libs.is_empty() {

@@ -34,6 +34,10 @@ impl fmt::Display for AuditWheelMode {
 /// Get sysroot path from target C compiler
 ///
 /// Currently only gcc is supported, clang doesn't have a `--print-sysroot` option
+#[cfg_attr(
+    not(any(feature = "auditwheel", feature = "sbom")),
+    allow(dead_code)
+)]
 pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
     use std::process::{Command, Stdio};
 
@@ -86,6 +90,7 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
     Ok(PathBuf::from("/"))
 }
 
+#[cfg_attr(not(feature = "auditwheel"), allow(dead_code))]
 pub fn relpath(to: &Path, from: &Path) -> PathBuf {
     let mut suffix_pos = 0;
     for (f, t) in from.components().zip(to.components()) {

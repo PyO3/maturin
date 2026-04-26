@@ -41,7 +41,8 @@ Python code uses `ruff` and `black` (line length 120, target py37) and `mypy` wi
 ## Conventions
 
 - Rust edition and MSRV are pinned in `Cargo.toml` (`rust-version`); do not bump casually.
-- Keep public CLI flags and `pyproject.toml` `[tool.maturin]` keys backward compatible; document changes in `Changelog.md` under the Unreleased section.
+- Keep public CLI flags and `pyproject.toml` `[tool.maturin]` keys backward compatible.
 - When adding a CLI option, regenerate the JSON schema via `cargo run --bin generate_json_schema` (see `src/generate_json_schema.rs`) so `maturin.schema.json` stays in sync.
 - Do not edit files under `src/templates/` to satisfy formatters; they are intentionally excluded.
 - Do not modify `sysconfig/` snapshots by hand.
+- Document what & why in git commit message instead of just a list of changes, use backtick for code snippets in commit message.

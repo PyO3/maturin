@@ -5,9 +5,10 @@ use crate::auditwheel::WindowsRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
-    AuditResult, AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
-    log_grafted_libs, prepare_grafted_libs,
+    AuditResult, AuditWheelMode, AuditedArtifact, ElfRepairer, PatchKind, PlatformTag, Policy,
+    WheelRepairer, log_grafted_libs, prepare_grafted_libs,
 };
+use crate::compile::CargoOutputState;
 #[cfg(feature = "sbom")]
 use crate::module_writer::ModuleWriter;
 use crate::module_writer::WheelWriter;
@@ -135,10 +136,14 @@ impl BuildContext {
     /// Patch the audited artifacts to bundle their external shared library
     /// dependencies into the wheel.
     ///
-    /// Any artifact whose bytes are modified in place by patchelf /
-    /// patch_macho / pe_patch has its `cargo_output_path` cleared so that
-    /// [`finalize_staged_artifacts`] won't restore the patched bytes back
-    /// to the cargo output path (see #2969 / #3111).
+    /// Before any in-place patching runs, [`copy_back_cargo_outputs`]
+    /// reflinks/copies a clean copy of every artifact that the upcoming
+    /// [`WheelRepairer::patch`] call will rewrite back to its cargo output
+    /// path and transitions its [`CargoOutputState`] to `Patched`, so
+    /// [`finalize_staged_artifacts`] knows not to overwrite the unpatched
+    /// bytes with the patched ones (see #2969 / #3111). Artifacts that
+    /// will not be patched keep their `Renamed` / `Mirrored` state and
+    /// get the cheap rename-back in finalize as usual.
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
@@ -149,7 +154,10 @@ impl BuildContext {
             if let Some(repairer) =
                 self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             {
-                return repairer.patch_editable(audited);
+                let kind = PatchKind::Editable;
+                let will_patch = repairer.patch_required(audited, &kind);
+                copy_back_cargo_outputs(audited, &will_patch)?;
+                return repairer.patch(audited, &kind);
             }
             return Ok(());
         }
@@ -235,15 +243,19 @@ impl BuildContext {
         } else {
             self.get_artifact_dir()
         };
-        // Mark every artifact as "no longer a clean cargo output" before we
-        // hand it to the platform-specific repairer. `repairer.patch` rewrites
-        // bytes in place (DT_NEEDED / Mach-O load commands / PE imports), so
-        // the staged file must not be moved back to the cargo output path —
-        // see #2969.
-        for aa in audited.iter_mut() {
-            aa.artifact.cargo_output_path = None;
-        }
-        repairer.patch(audited, &grafted, &libs_dir, &artifact_dir)?;
+        // Reflink/copy a clean unpatched copy of every artifact that the
+        // upcoming `repairer.patch` call will rewrite back to its cargo
+        // output path before any bytes are touched, then transition its
+        // staging state to `Patched` so finalize doesn't try to overwrite
+        // with the patched bytes — see #2969.
+        let kind = PatchKind::Repair {
+            grafted: &grafted,
+            libs_dir: &libs_dir,
+            artifact_dir: &artifact_dir,
+        };
+        let will_patch = repairer.patch_required(audited, &kind);
+        copy_back_cargo_outputs(audited, &will_patch)?;
+        repairer.patch(audited, &kind)?;
 
         // Add grafted libraries to the wheel
         for lib in &grafted {
@@ -317,11 +329,13 @@ impl BuildContext {
     /// duplicate, avoiding the second full copy that the previous
     /// implementation performed.
     ///
-    /// The original cargo output path is recorded on the artifact so it
-    /// survives auditwheel patching: `add_external_libs` clears
-    /// `cargo_output_path` on every artifact whose bytes it rewrites,
-    /// signalling to [`finalize_staged_artifacts`] that the staged file
-    /// must not be moved back (see #2969 / #3111).
+    /// The post-stage state is recorded on the artifact as a
+    /// [`CargoOutputState`] (`Renamed` / `Mirrored`) so it can be restored
+    /// either by [`finalize_staged_artifacts`] (cheap rename or duplicate
+    /// drop, when no patching happened) or transitioned to `Patched` by
+    /// [`copy_back_cargo_outputs`] (which puts a clean unpatched copy at
+    /// the cargo output path before the repairer rewrites bytes in place
+    /// — see #2969 / #3111).
     ///
     /// **Build errors before finalize:** if the build errors after
     /// `stage_artifact` but before [`finalize_staged_artifacts`] runs, the
@@ -331,37 +345,46 @@ impl BuildContext {
     pub(crate) fn stage_artifact(&self, artifact: &mut BuildArtifact) -> Result<()> {
         let maturin_build = crate::compile::ensure_target_maturin_dir(&self.project.target_dir);
         let cargo_output = artifact.path.clone();
-        artifact.path = stage_file(&cargo_output, &maturin_build)?;
-        artifact.cargo_output_path = Some(cargo_output);
+        let (staged_path, staging) = stage_file(&cargo_output, &maturin_build)?;
+        artifact.path = staged_path;
+        artifact.staging = staging;
         Ok(())
     }
 }
 
 /// Place a copy of `artifact_path` into `staging_dir` and return the new
-/// normalized path.
+/// normalized path along with the [`CargoOutputState`] describing how the
+/// move was performed.
 ///
-/// Same-filesystem fast path: `fs::rename` atomically moves the file (and
-/// overwrites any stale leftover from a previous build on both Unix and
-/// Windows); the cargo output path is empty until
-/// [`finalize_staged_artifacts`] renames it back.
+/// Same-filesystem fast path (returns [`CargoOutputState::Renamed`]):
+/// `fs::rename` atomically moves the file (and overwrites any stale
+/// leftover from a previous build on both Unix and Windows); the cargo
+/// output path is empty until [`finalize_staged_artifacts`] renames it
+/// back.
 ///
-/// Cross-device fallback: reflink/copy into staging and **leave the
-/// original at the cargo output path**; finalize will see it already there
-/// and drop the staged duplicate, so the bytes are only copied once. The
-/// pre-clean is needed here because `reflink_copy::reflink` refuses to
-/// overwrite on some platforms.
+/// Cross-device fallback (returns [`CargoOutputState::Mirrored`]):
+/// reflink/copy into staging and **leave the original at the cargo output
+/// path**; finalize will see the typed `Mirrored` state and drop the
+/// staged duplicate, so the bytes are only copied once. The pre-clean is
+/// needed here because `reflink_copy::reflink` refuses to overwrite on
+/// some platforms.
 ///
 /// Only `ErrorKind::CrossesDevices` triggers the fallback — every other
 /// rename error (permission denied, I/O failure, etc.) is surfaced
 /// instead of being silently masked by the copy path.
-fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
+fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<(PathBuf, CargoOutputState)> {
     let new_path = staging_dir.join(artifact_path.file_name().unwrap());
-    match fs::rename(artifact_path, &new_path) {
-        Ok(()) => {}
+    let staging = match fs::rename(artifact_path, &new_path) {
+        Ok(()) => CargoOutputState::Renamed {
+            cargo_output: artifact_path.to_path_buf(),
+        },
         Err(err) if err.kind() == io::ErrorKind::CrossesDevices => {
             // Cross-device: copy into staging and leave the original alone.
             let _ = fs::remove_file(&new_path);
             reflink_or_copy(artifact_path, &new_path)?;
+            CargoOutputState::Mirrored {
+                cargo_output: artifact_path.to_path_buf(),
+            }
         }
         Err(err) => {
             return Err(err).with_context(|| {
@@ -372,64 +395,134 @@ fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
                 )
             });
         }
+    };
+    Ok((new_path.normalize()?.into_path_buf(), staging))
+}
+
+/// Copy the clean unpatched bytes back to every artifact's cargo output
+/// path **before** the platform-specific repairer rewrites bytes in place,
+/// then transition the artifact's [`CargoOutputState`] to `Patched` so
+/// [`finalize_staged_artifacts`] doesn't try to overwrite the unpatched
+/// bytes with the patched ones.
+///
+/// `will_patch[i] == false` artifacts are left alone — they keep their
+/// `Renamed` / `Mirrored` state and get the cheap rename-back (or
+/// duplicate drop) in finalize.
+///
+/// For artifacts marked `will_patch[i] == true`:
+///
+/// - **Mirrored** ([`stage_file`] was cross-device): the cargo output
+///   path already holds the unpatched original, so we only flip the
+///   state — no I/O needed.
+/// - **Renamed** ([`stage_file`] used `fs::rename`): the cargo output
+///   path is empty; reflink/copy the still-clean staged artifact back
+///   to it before the repairer rewrites bytes in place. This is one
+///   reflink (O(1) on apfs/btrfs/xfs/refs, a real copy on ext4) per
+///   patched artifact, scoped only to artifacts that genuinely need
+///   patching — multi-bin projects where some bins are unpatched still
+///   pay only the rename-back for those bins.
+/// - **NotStaged** / **Patched**: no-op. `NotStaged` shouldn't happen on
+///   an audited artifact (we always stage before auditing) but we
+///   degrade gracefully; `Patched` means a previous call already did
+///   the work.
+fn copy_back_cargo_outputs(audited: &mut [AuditedArtifact], will_patch: &[bool]) -> Result<()> {
+    for (aa, &will_patch) in audited.iter_mut().zip(will_patch) {
+        if !will_patch {
+            continue;
+        }
+        match &aa.artifact.staging {
+            CargoOutputState::Renamed { cargo_output } => {
+                let cargo_output = cargo_output.clone();
+                reflink_or_copy(&aa.artifact.path, &cargo_output).with_context(|| {
+                    format!(
+                        "Failed to restore unpatched cargo output {} from staged artifact {}",
+                        cargo_output.display(),
+                        aa.artifact.path.display(),
+                    )
+                })?;
+                tracing::debug!(
+                    "copy_back_cargo_outputs: copied unpatched {} -> {}",
+                    aa.artifact.path.display(),
+                    cargo_output.display()
+                );
+                aa.artifact.staging = CargoOutputState::Patched;
+            }
+            CargoOutputState::Mirrored { cargo_output } => {
+                tracing::debug!(
+                    "copy_back_cargo_outputs: {} already holds unpatched original (cross-device staging), no-op",
+                    cargo_output.display()
+                );
+                aa.artifact.staging = CargoOutputState::Patched;
+            }
+            CargoOutputState::NotStaged | CargoOutputState::Patched => {}
+        }
     }
-    Ok(new_path.normalize()?.into_path_buf())
+    Ok(())
 }
 
 /// Restore staged artifacts to their cargo output paths after a successful
 /// wheel write.
 ///
-/// An artifact is restored only when it still carries a `cargo_output_path`.
-/// `add_external_libs` clears that field on every artifact it patches in
-/// place, so patched bytes never end up at the cargo output path — see
-/// #2969 (lddtree / cargo's incremental cache misbehaving when fed patched
-/// binaries). Per-artifact precision means a multi-bin project where only
-/// some bins bundle external libraries still gets the cheap rename-back
-/// for the unpatched bins.
+/// Dispatches on the artifact's [`CargoOutputState`] (set deterministically
+/// by [`stage_file`] / [`copy_back_cargo_outputs`]) so the staging mode is
+/// never re-inferred from `cargo_output.exists()`:
+///
+/// - `NotStaged`: no staging happened, nothing to do.
+/// - `Renamed { cargo_output }`: rename the staged file back to
+///   `cargo_output`. If rename fails (extremely rare — e.g. `target/`
+///   was relocated to a different mount point mid-build), fall back to
+///   reflink+remove.
+/// - `Mirrored { cargo_output }`: `cargo_output` already holds the
+///   unpatched original from the cross-device branch of `stage_file`;
+///   drop the staged duplicate.
+/// - `Patched`: [`copy_back_cargo_outputs`] already restored unpatched
+///   bytes at the cargo output path; the staged artifact (which now
+///   holds patched bytes) must NOT be moved back. Leave the staged
+///   file in `target/maturin/` (overwritten on the next build) — see
+///   #2969 for why patched bytes must not flow back to cargo's
+///   incremental cache.
+///
+/// Per-artifact precision means a multi-bin project where only some
+/// bins bundle external libraries still gets the cheap rename-back for
+/// the unpatched bins.
 ///
 /// Failures are logged and swallowed: the wheel is the deliverable, the
 /// cargo-path restore is a UX convenience, and the staged artifact is
 /// still recoverable from `target/maturin/`.
 pub(crate) fn finalize_staged_artifacts(audited: &[AuditedArtifact]) {
     for aa in audited {
-        let Some(cargo_output) = aa.artifact.cargo_output_path.as_deref() else {
-            continue;
-        };
-        if let Err(err) = finalize_staged_artifact(&aa.artifact.path, cargo_output) {
-            tracing::warn!(
-                "Could not restore artifact to cargo output path {}: {err:#}",
-                cargo_output.display()
-            );
+        match &aa.artifact.staging {
+            CargoOutputState::NotStaged | CargoOutputState::Patched => continue,
+            CargoOutputState::Renamed { cargo_output } => {
+                if let Err(err) = restore_renamed(&aa.artifact.path, cargo_output) {
+                    tracing::warn!(
+                        "Could not restore artifact to cargo output path {}: {err:#}",
+                        cargo_output.display()
+                    );
+                }
+            }
+            CargoOutputState::Mirrored { cargo_output } => {
+                let _ = fs::remove_file(&aa.artifact.path);
+                tracing::debug!(
+                    "Dropped staged duplicate of cross-device artifact at {}",
+                    cargo_output.display()
+                );
+            }
         }
     }
 }
 
-/// Restore a single staged artifact to the cargo output path. Must only be
-/// called when the staged artifact has not been modified by auditwheel /
-/// patchelf / patch_macho / pe_patch — see #2969.
+/// Restore a `Renamed` staged artifact back to its cargo output path.
 ///
-/// Three cases, in order:
-/// 1. `cargo_output` already exists — either the cross-device branch of
-///    [`stage_file`] left the original there, or cargo / rust-analyzer
-///    rebuilt the artifact while the wheel was being written. Either way,
-///    the file at `cargo_output` is at least as fresh as the staged copy;
-///    drop the duplicate and leave cargo's view of its own output alone.
-///    A concurrent build that crashed mid-write would in principle also
-///    win this branch, but cargo / rustc emit binaries via temp-file +
-///    atomic rename, so a partial file at `cargo_output` is not a real
-///    concern.
-/// 2. Same-filesystem: O(1) `fs::rename` puts the staged file back.
-/// 3. Cross-device with `cargo_output` cleared (rare — e.g. the user wiped
-///    `target/`): fall back to `reflink_or_copy` + `remove_file`.
-fn finalize_staged_artifact(staged: &Path, cargo_output: &Path) -> Result<()> {
-    if cargo_output.exists() {
-        let _ = fs::remove_file(staged);
-        tracing::debug!(
-            "Skipping rename-back: {} already exists",
-            cargo_output.display()
-        );
-        return Ok(());
-    }
+/// Must only be called when the staged artifact has not been modified by
+/// auditwheel / patchelf / patch_macho / pe_patch — see #2969. The typed
+/// `Renamed` state guarantees that: `copy_back_cargo_outputs` transitions
+/// to `Patched` *before* the repairer rewrites bytes.
+///
+/// 1. Same-filesystem: O(1) `fs::rename` puts the staged file back.
+/// 2. Fallback (rare — e.g. `target/` straddles a mount point added
+///    after staging): `reflink_or_copy` + `remove_file`.
+fn restore_renamed(staged: &Path, cargo_output: &Path) -> Result<()> {
     if fs::rename(staged, cargo_output).is_ok() {
         tracing::debug!(
             "Restored {} to {}",

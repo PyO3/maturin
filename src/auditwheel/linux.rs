@@ -10,7 +10,7 @@
 use super::audit::{get_sysroot_path, relpath};
 use super::musllinux::{find_musl_libc, get_musl_version};
 use super::policy::{MANYLINUX_POLICIES, MUSLLINUX_POLICIES, Policy};
-use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer};
+use super::repair::{AuditResult, AuditedArtifact, GraftedLib, PatchKind, WheelRepairer};
 use super::{PlatformTag, patchelf};
 use crate::compile::BuildArtifact;
 use crate::target::{Arch, Target};
@@ -471,7 +471,39 @@ impl WheelRepairer for ElfRepairer {
         Ok(AuditResult::new(policy, external_libs))
     }
 
-    fn patch(
+    fn patch_required(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Vec<bool> {
+        match kind {
+            // Inherit the default rule for `Repair` (only artifacts with
+            // non-empty `external_libs`). The Repair arm is duplicated
+            // here rather than delegated because Rust traits can't
+            // override a single match arm of a default method.
+            PatchKind::Repair { .. } => audited
+                .iter()
+                .map(|aa| !aa.external_libs.is_empty())
+                .collect(),
+            // Editable installs only patch artifacts that actually carry
+            // cargo-target search paths.
+            PatchKind::Editable => audited
+                .iter()
+                .map(|aa| !aa.artifact.linked_paths.is_empty())
+                .collect(),
+        }
+    }
+
+    fn patch(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Result<()> {
+        match kind {
+            PatchKind::Repair {
+                grafted,
+                libs_dir,
+                artifact_dir,
+            } => self.patch_repair(audited, grafted, libs_dir, artifact_dir),
+            PatchKind::Editable => self.patch_editable(audited),
+        }
+    }
+}
+
+impl ElfRepairer {
+    fn patch_repair(
         &self,
         audited: &[AuditedArtifact],
         grafted: &[GraftedLib],
@@ -533,8 +565,18 @@ impl WheelRepairer for ElfRepairer {
             }
         }
 
-        // Set RPATH on artifacts to find the libs directory
+        // Set RPATH on artifacts to find the libs directory.
+        //
+        // Skip artifacts that don't depend on any grafted library: the
+        // RPATH would be dead code, and rewriting bytes for them would
+        // pollute cargo's incremental cache (#2969). The skip mirrors
+        // the corresponding `patch_required` prediction so
+        // `copy_back_cargo_outputs` doesn't pay an unnecessary
+        // reflink/copy for them either.
         for aa in audited {
+            if aa.external_libs.is_empty() {
+                continue;
+            }
             let mut new_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
             let new_rpath = Path::new("$ORIGIN").join(relpath(libs_dir, artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());
@@ -545,7 +587,7 @@ impl WheelRepairer for ElfRepairer {
         Ok(())
     }
 
-    fn patch_editable(&self, audited: &mut [AuditedArtifact]) -> Result<()> {
+    fn patch_editable(&self, audited: &[AuditedArtifact]) -> Result<()> {
         for aa in audited {
             if aa.artifact.linked_paths.is_empty() {
                 continue;
@@ -558,10 +600,6 @@ impl WheelRepairer for ElfRepairer {
                 }
             }
             let new_rpath = new_rpaths.join(":");
-            // Conservatively mark as patched even if set_rpath errors — the
-            // binary may have been partially written and is no longer a
-            // clean cargo output.
-            aa.artifact.cargo_output_path = None;
             if let Err(err) = patchelf::set_rpath(&aa.artifact.path, &new_rpath) {
                 eprintln!(
                     "⚠️ Warning: Failed to set rpath for {}: {}",

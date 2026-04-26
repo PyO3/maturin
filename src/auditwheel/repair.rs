@@ -21,6 +21,7 @@ use fs_err as fs;
 /// Keeps the artifact and its per-artifact dependency list together so they
 /// cannot accidentally get out of sync when passed through the wheel-writing
 /// pipeline.
+#[derive(Debug)]
 pub struct AuditedArtifact {
     /// The build artifact.
     pub artifact: BuildArtifact,
@@ -49,6 +50,7 @@ impl Borrow<BuildArtifact> for AuditedArtifact {
 ///
 /// Created by [`prepare_grafted_libs`] with a hash-suffixed filename and a
 /// writable temporary copy ready for platform-specific patching.
+#[derive(Debug)]
 pub struct GraftedLib {
     /// Original library name as it appears in dependency records.
     /// For ELF this is a leaf name like `libfoo.so.1`.
@@ -84,6 +86,7 @@ pub struct GraftedLib {
 ///
 /// Contains the platform policy, discovered external libraries, and
 /// (for universal2 macOS builds) architecture requirements.
+#[derive(Debug)]
 pub struct AuditResult {
     /// The determined platform policy (e.g., manylinux tag).
     pub policy: super::Policy,
@@ -109,6 +112,42 @@ impl AuditResult {
     }
 }
 
+/// What kind of in-place patching `WheelRepairer::patch` is being asked to
+/// perform.
+///
+/// `Repair` is the wheel-build path: external libraries have been grafted
+/// and the artifact's references / RPATH must be rewritten to point at the
+/// bundled copies. `Editable` is the editable-install path: only the
+/// runtime library search path is extended with the cargo target dirs so
+/// the still-on-disk dependencies resolve at load time.
+///
+/// The discriminant is also used by `WheelRepairer::patch_required` to
+/// predict, *before* any bytes are rewritten, which audited artifacts the
+/// upcoming `patch` call will modify in place. The build pipeline uses
+/// that prediction to keep a clean, unpatched copy at every artifact's
+/// cargo output path (see `copy_back_cargo_outputs` in
+/// `build_context/repair.rs` and #2969 / #3111).
+#[derive(Debug)]
+pub enum PatchKind<'a> {
+    /// Wheel-build patching after `prepare_grafted_libs` has staged the
+    /// external libraries.
+    Repair {
+        /// Libraries staged into a temporary directory ready to be added
+        /// to the wheel and referenced from the patched artifacts.
+        grafted: &'a [GraftedLib],
+        /// Wheel-internal directory where the grafted libraries will live
+        /// (e.g. `mypkg.libs/` on Linux/Windows, `mypkg.dylibs/` on macOS).
+        libs_dir: &'a Path,
+        /// Wheel-internal directory the artifact resides in. Used to
+        /// compute a relative RPATH / `@loader_path` from the artifact to
+        /// `libs_dir`.
+        artifact_dir: &'a Path,
+    },
+    /// Editable-install patching: extend the artifact's RPATH with the
+    /// cargo target directories captured in `BuildArtifact::linked_paths`.
+    Editable,
+}
+
 /// Platform-specific wheel repair operations.
 ///
 /// Each platform (Linux/ELF, macOS/Mach-O) implements this trait to provide
@@ -121,34 +160,56 @@ pub trait WheelRepairer {
     /// library dependencies, and (for universal2) architecture requirements.
     fn audit(&self, artifact: &BuildArtifact, ld_paths: Vec<PathBuf>) -> Result<AuditResult>;
 
-    /// Patch binary references after libraries have been grafted.
+    /// Predict, per audited artifact, whether the next [`Self::patch`] call
+    /// with the same `kind` will rewrite that artifact's bytes in place.
     ///
-    /// This is called after [`prepare_grafted_libs`] has copied and
-    /// hash-renamed all external libraries. Implementations should:
+    /// Used by `add_external_libs` to reflink/copy the staged artifact back
+    /// to its cargo output path *before* any in-place patching occurs, so
+    /// cargo's incremental cache always sees the unpatched bytes (see
+    /// #2969 / #3111).
+    ///
+    /// The default implementation is `!external_libs.is_empty()` for
+    /// `Repair` and `false` for `Editable`. The `Repair` rule relies on
+    /// the invariant that [`prepare_grafted_libs`] builds `grafted` from
+    /// `audited.iter().flat_map(|a| &a.external_libs)`, so an artifact
+    /// with empty `external_libs` is guaranteed to share no install
+    /// names with the grafted set and is therefore left untouched by
+    /// every current `patch` implementation. Repairers that touch
+    /// artifacts beyond what their own `external_libs` would predict
+    /// (e.g. an editable build with non-empty `linked_paths`) should
+    /// override this.
+    fn patch_required(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Vec<bool> {
+        match kind {
+            PatchKind::Repair { .. } => audited
+                .iter()
+                .map(|aa| !aa.external_libs.is_empty())
+                .collect(),
+            PatchKind::Editable => vec![false; audited.len()],
+        }
+    }
+
+    /// Patch binary references in place.
+    ///
+    /// For [`PatchKind::Repair`], this runs after [`prepare_grafted_libs`]
+    /// has copied and hash-renamed all external libraries. Implementations
+    /// should:
     ///
     /// 1. Rewrite references in each artifact to point to the new names
     /// 2. Set appropriate metadata on grafted libraries (soname, install ID, etc.)
     /// 3. Update cross-references between grafted libraries
     /// 4. Perform any final steps (e.g., code signing on macOS)
-    fn patch(
-        &self,
-        audited: &[AuditedArtifact],
-        grafted: &[GraftedLib],
-        libs_dir: &Path,
-        artifact_dir: &Path,
-    ) -> Result<()>;
-
-    /// Patch artifacts for editable installs (e.g., set RPATH to Cargo target dir).
     ///
-    /// Implementations must clear `cargo_output_path` on every artifact whose
-    /// bytes they rewrite in place, so that `finalize_staged_artifacts` does
-    /// not move the patched bytes back to the cargo output path (see #2969).
+    /// For [`PatchKind::Editable`], implementations should append the
+    /// per-artifact `linked_paths` to the runtime library search path so
+    /// that out-of-tree dependencies still resolve at load time. The
+    /// default trait implementation is a no-op so non-Linux platforms get
+    /// editable builds for free.
     ///
-    /// The default implementation is a no-op. Platform-specific repairers can
-    /// override this to add runtime library search paths for editable mode.
-    fn patch_editable(&self, _audited: &mut [AuditedArtifact]) -> Result<()> {
-        Ok(())
-    }
+    /// Implementations must not modify the [`AuditedArtifact`] structs
+    /// themselves — the per-artifact `staging` state is transitioned to
+    /// `Patched` by the caller via `copy_back_cargo_outputs` *before*
+    /// this method runs.
+    fn patch(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Result<()>;
 
     /// Return a Python code snippet to prepend to `__init__.py` for runtime
     /// shared library discovery.

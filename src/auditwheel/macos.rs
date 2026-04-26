@@ -9,7 +9,7 @@
 use super::Policy;
 use super::audit::{get_sysroot_path, relpath};
 use super::macos_sign::ad_hoc_sign;
-use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer, leaf_filename};
+use super::repair::{AuditResult, AuditedArtifact, PatchKind, WheelRepairer, leaf_filename};
 use crate::compile::BuildArtifact;
 use crate::target::Target;
 use anyhow::{Context, Result, bail};
@@ -80,13 +80,19 @@ impl WheelRepairer for MacOSRepairer {
         }
     }
 
-    fn patch(
-        &self,
-        artifacts: &[AuditedArtifact],
-        grafted: &[GraftedLib],
-        libs_dir: &Path,
-        artifact_dir: &Path,
-    ) -> Result<()> {
+    fn patch(&self, artifacts: &[AuditedArtifact], kind: &PatchKind<'_>) -> Result<()> {
+        let (grafted, libs_dir, artifact_dir) = match kind {
+            PatchKind::Repair {
+                grafted,
+                libs_dir,
+                artifact_dir,
+            } => (*grafted, *libs_dir, *artifact_dir),
+            // macOS has no editable-mode patching today; the default
+            // `patch_required` returns all-false for `Editable` so this
+            // arm is unreachable in practice, but we still degrade
+            // gracefully if a future caller invokes it.
+            PatchKind::Editable => return Ok(()),
+        };
         // Verify universal2 architecture requirements before patching.
         // Each grafted library must contain all CPU architectures that depend on it.
         for lib in grafted {
@@ -147,10 +153,38 @@ impl WheelRepairer for MacOSRepairer {
 
         // 2. Patch each artifact: rewrite references to grafted libs using
         //    @loader_path-relative names.
+        //
+        // Skip artifacts whose load commands don't reference any grafted
+        // install name. `patch_macho` + `ad_hoc_sign` would otherwise
+        // rewrite bytes (signature at minimum) for an artifact that
+        // doesn't actually need any rewrite, polluting cargo's
+        // incremental cache (#2969). The skip mirrors the corresponding
+        // `patch_required` prediction so `copy_back_cargo_outputs`
+        // doesn't pay an unnecessary reflink/copy for them either.
+        //
+        // The per-artifact filter relies on a `lddtree` invariant: the
+        // `Library::name` it stores in `external_libs` is the exact
+        // install-name string read from the binary's `LC_LOAD_DYLIB`
+        // (see `lddtree::find_macho_library` -> `try_single_candidate`,
+        // which sets `name: lib_name.to_string()` from the unmodified
+        // load-command bytes). The grafted `name_map` is keyed by the
+        // same field via `prepare_grafted_libs`, so equality is
+        // byte-exact. If `lddtree` ever normalizes leaf-vs-`@rpath/`
+        // forms, this filter would start being narrower than
+        // `patch_macho`'s `change_install_name` lookup (which itself
+        // searches `LC_LOAD_DYLIB` for the exact `old` string and
+        // silently no-ops on `DylibNameMissing`); add a regression
+        // fixture before bumping `lddtree` past 0.5.x if so.
         let rel = relpath(libs_dir, artifact_dir);
         for audited in artifacts {
+            let artifact_deps: HashSet<&str> = audited
+                .external_libs
+                .iter()
+                .map(|lib| lib.name.as_str())
+                .collect();
             let install_name_changes: Vec<(&str, String)> = name_map
                 .iter()
+                .filter(|(old, _)| artifact_deps.contains(**old))
                 .map(|(old, new)| {
                     let relative = Path::new("@loader_path").join(&rel).join(new);
                     (*old, relative.to_string_lossy().into_owned())

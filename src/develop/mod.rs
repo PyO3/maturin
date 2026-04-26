@@ -207,17 +207,58 @@ fn install_wheel(
         );
     }
     if !output.stderr.is_empty() && install_backend.stderr_indicates_problem() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = stderr.trim();
+        if let Some(leftover) = detect_pip_in_use_leftover(stderr) {
+            bail!(
+                "{backend} could not overwrite the installed extension module because it is in use \
+                 (most often by a Python process that has already imported the package).\n\
+                 {backend} salvaged the install by renaming the old location to a leftover \
+                 directory, but it could not delete that leftover — and the leftover still holds \
+                 the OLD compiled code. If a Python process imports the package before the \
+                 leftover is removed, the import system can resolve the stale copy and silently \
+                 run pre-build code.\n\n\
+                 To recover:\n  \
+                 1. Stop every Python process that imported this package (this releases the file handle).\n  \
+                 2. Delete the leftover directory: {leftover}\n  \
+                 3. Re-run `maturin develop`.\n\n\
+                 Original {backend} output:\n{stderr}",
+                backend = install_backend.name(),
+            );
+        }
         eprintln!(
             "⚠️ Warning: {} raised a warning running {:?}:\n{}",
             install_backend.name(),
             &cmd.get_args().collect::<Vec<_>>(),
-            String::from_utf8_lossy(&output.stderr).trim(),
+            stderr,
         );
     }
     if let Err(err) = configure_as_editable(build_context, python, install_backend) {
         eprintln!("⚠️ Warning: failed to set package as editable: {err}");
     }
     Ok(())
+}
+
+/// Detect pip's "Failed to remove contents in a temporary directory" warning
+/// when the leftover path looks like an in-use install rename (a basename
+/// prefixed with `~`).
+///
+/// pip handles a locked install file by renaming the old directory to a sibling
+/// whose basename is prefixed with `~`, then writing the new wheel files in
+/// place. If pip later fails to remove that sibling — typically on Windows when
+/// a running Python process still holds the `.pyd` open — it logs this warning
+/// and exits with status 0. The leftover keeps the OLD compiled code, so a
+/// subsequent import can silently load stale code instead of the freshly
+/// installed module.
+///
+/// Returns the leftover path so callers can surface it to the user.
+fn detect_pip_in_use_leftover(stderr: &str) -> Option<&str> {
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"Failed to remove contents in a temporary directory '([^']+)'").unwrap()
+    });
+    let path = RE.captures(stderr)?.get(1)?.as_str();
+    let basename = path.rsplit(['/', '\\']).next().unwrap_or(path);
+    basename.starts_with('~').then_some(path)
 }
 
 /// Each editable-installed python package has a `direct_url.json` file that includes a `file://` URL
@@ -427,7 +468,45 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::parse_direct_url_path;
+    use super::{detect_pip_in_use_leftover, parse_direct_url_path};
+
+    #[test]
+    fn test_detect_pip_in_use_leftover_windows() {
+        let stderr = "WARNING: Failed to remove contents in a temporary directory \
+            'C:\\Users\\me\\venv\\Lib\\site-packages\\~ackage'.\r\n  \
+            You can safely remove it manually.";
+        assert_eq!(
+            detect_pip_in_use_leftover(stderr),
+            Some("C:\\Users\\me\\venv\\Lib\\site-packages\\~ackage"),
+        );
+    }
+
+    #[test]
+    fn test_detect_pip_in_use_leftover_unix() {
+        let stderr = "WARNING: Failed to remove contents in a temporary directory \
+            '/home/me/venv/lib/python3.11/site-packages/~ackage'.\n  \
+            You can safely remove it manually.";
+        assert_eq!(
+            detect_pip_in_use_leftover(stderr),
+            Some("/home/me/venv/lib/python3.11/site-packages/~ackage"),
+        );
+    }
+
+    #[test]
+    fn test_detect_pip_in_use_leftover_ignores_non_tilde_temp_dir() {
+        // Same warning text, but the leftover basename has no `~` prefix — this is
+        // an unrelated cleanup hiccup, not an in-use install. Keep it as a warning.
+        let stderr = "WARNING: Failed to remove contents in a temporary directory \
+            '/tmp/pip-build-xyz'.\n  You can safely remove it manually.";
+        assert_eq!(detect_pip_in_use_leftover(stderr), None);
+    }
+
+    #[test]
+    fn test_detect_pip_in_use_leftover_ignores_unrelated_warnings() {
+        let stderr = "WARNING: You are using pip version 20.0.0; \
+            however, version 24.0 is available.";
+        assert_eq!(detect_pip_in_use_leftover(stderr), None);
+    }
 
     #[test]
     #[cfg(not(target_os = "windows"))]

@@ -25,7 +25,7 @@ pub use macos::MacOSRepairer;
 pub use platform_tag::PlatformTag;
 pub use policy::Policy;
 pub use repair::{
-    AuditResult, AuditedArtifact, WheelRepairer, log_grafted_libs, prepare_grafted_libs,
+    AuditResult, AuditedArtifact, PatchKind, WheelRepairer, log_grafted_libs, prepare_grafted_libs,
 };
 #[cfg(feature = "auditwheel")]
 pub use windows::WindowsRepairer;

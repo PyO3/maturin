@@ -5,8 +5,8 @@ use crate::auditwheel::WindowsRepairer;
 #[cfg(feature = "sbom")]
 use crate::auditwheel::get_sysroot_path;
 use crate::auditwheel::{
-    AuditResult, AuditWheelMode, AuditedArtifact, ElfRepairer, PlatformTag, Policy, WheelRepairer,
-    log_grafted_libs, prepare_grafted_libs,
+    AuditResult, AuditWheelMode, AuditedArtifact, ElfRepairer, PatchKind, PlatformTag, Policy,
+    WheelRepairer, log_grafted_libs, prepare_grafted_libs,
 };
 #[cfg(feature = "sbom")]
 use crate::module_writer::ModuleWriter;
@@ -135,10 +135,14 @@ impl BuildContext {
     /// Patch the audited artifacts to bundle their external shared library
     /// dependencies into the wheel.
     ///
-    /// Any artifact whose bytes are modified in place by patchelf /
-    /// patch_macho / pe_patch has its `cargo_output_path` cleared so that
-    /// [`finalize_staged_artifacts`] won't restore the patched bytes back
-    /// to the cargo output path (see #2969 / #3111).
+    /// Before any in-place patching runs, [`copy_back_cargo_outputs`]
+    /// reflinks/copies a clean copy of every artifact that the upcoming
+    /// [`WheelRepairer::patch`] call will rewrite back to its cargo output
+    /// path, then clears `cargo_output_path` on those artifacts so
+    /// [`finalize_staged_artifacts`] knows not to overwrite the unpatched
+    /// bytes with the patched ones (see #2969 / #3111). Artifacts that
+    /// will not be patched keep their `cargo_output_path` and get the
+    /// cheap rename-back in finalize as usual.
     pub(crate) fn add_external_libs(
         &self,
         writer: &mut VirtualWriter<WheelWriter>,
@@ -149,7 +153,10 @@ impl BuildContext {
             if let Some(repairer) =
                 self.make_repairer(&self.python.platform_tag, self.python.interpreter.first())
             {
-                return repairer.patch_editable(audited);
+                let kind = PatchKind::Editable;
+                let will_patch = repairer.patch_required(audited, &kind);
+                copy_back_cargo_outputs(audited, &will_patch)?;
+                return repairer.patch(audited, &kind);
             }
             return Ok(());
         }
@@ -235,15 +242,19 @@ impl BuildContext {
         } else {
             self.get_artifact_dir()
         };
-        // Mark every artifact as "no longer a clean cargo output" before we
-        // hand it to the platform-specific repairer. `repairer.patch` rewrites
-        // bytes in place (DT_NEEDED / Mach-O load commands / PE imports), so
-        // the staged file must not be moved back to the cargo output path —
-        // see #2969.
-        for aa in audited.iter_mut() {
-            aa.artifact.cargo_output_path = None;
-        }
-        repairer.patch(audited, &grafted, &libs_dir, &artifact_dir)?;
+        // Reflink/copy a clean unpatched copy of every artifact that the
+        // upcoming `repairer.patch` call will rewrite back to its cargo
+        // output path before any bytes are touched, then clear
+        // `cargo_output_path` on those artifacts so finalize doesn't try to
+        // overwrite with the patched bytes — see #2969.
+        let kind = PatchKind::Repair {
+            grafted: &grafted,
+            libs_dir: &libs_dir,
+            artifact_dir: &artifact_dir,
+        };
+        let will_patch = repairer.patch_required(audited, &kind);
+        copy_back_cargo_outputs(audited, &will_patch)?;
+        repairer.patch(audited, &kind)?;
 
         // Add grafted libraries to the wheel
         for lib in &grafted {
@@ -318,10 +329,10 @@ impl BuildContext {
     /// implementation performed.
     ///
     /// The original cargo output path is recorded on the artifact so it
-    /// survives auditwheel patching: `add_external_libs` clears
-    /// `cargo_output_path` on every artifact whose bytes it rewrites,
-    /// signalling to [`finalize_staged_artifacts`] that the staged file
-    /// must not be moved back (see #2969 / #3111).
+    /// can be restored either by [`finalize_staged_artifacts`] (cheap
+    /// rename, when no patching happened) or by [`copy_back_cargo_outputs`]
+    /// (reflink/copy of the still-clean staged file, when the repairer is
+    /// about to rewrite bytes in place — see #2969 / #3111).
     ///
     /// **Build errors before finalize:** if the build errors after
     /// `stage_artifact` but before [`finalize_staged_artifacts`] runs, the
@@ -376,16 +387,68 @@ fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<PathBuf> {
     Ok(new_path.normalize()?.into_path_buf())
 }
 
+/// Copy the clean unpatched bytes back to every artifact's cargo output
+/// path **before** the platform-specific repairer rewrites bytes in place,
+/// then clear `cargo_output_path` on those artifacts so
+/// [`finalize_staged_artifacts`] doesn't try to overwrite the unpatched
+/// bytes with the patched ones.
+///
+/// `will_patch[i] == false` artifacts are left alone — they keep their
+/// `cargo_output_path` and get the cheap rename-back in finalize.
+///
+/// For artifacts marked `will_patch[i] == true`:
+///
+/// - **Cross-device staging:** [`stage_file`] left the unpatched original
+///   at `cargo_output`, so we just clear the marker — no I/O needed.
+/// - **Same-filesystem staging (rename):** `cargo_output` is empty;
+///   reflink/copy the still-clean staged artifact back to it. This is one
+///   reflink (O(1) on apfs/btrfs/xfs/refs, a real copy on ext4) per
+///   patched artifact, scoped only to artifacts that genuinely need
+///   patching — multi-bin projects where some bins are unpatched still
+///   pay only the rename-back for those bins.
+fn copy_back_cargo_outputs(audited: &mut [AuditedArtifact], will_patch: &[bool]) -> Result<()> {
+    for (aa, &will_patch) in audited.iter_mut().zip(will_patch) {
+        if !will_patch {
+            continue;
+        }
+        let Some(cargo_output) = aa.artifact.cargo_output_path.take() else {
+            continue;
+        };
+        if cargo_output.exists() {
+            // Cross-device path: stage_file left the unpatched original
+            // here. Nothing to do besides the `take()` above.
+            tracing::debug!(
+                "copy_back_cargo_outputs: {} already exists, leaving unpatched original in place",
+                cargo_output.display()
+            );
+            continue;
+        }
+        reflink_or_copy(&aa.artifact.path, &cargo_output).with_context(|| {
+            format!(
+                "Failed to restore unpatched cargo output {} from staged artifact {}",
+                cargo_output.display(),
+                aa.artifact.path.display(),
+            )
+        })?;
+        tracing::debug!(
+            "copy_back_cargo_outputs: copied unpatched {} -> {}",
+            aa.artifact.path.display(),
+            cargo_output.display()
+        );
+    }
+    Ok(())
+}
+
 /// Restore staged artifacts to their cargo output paths after a successful
 /// wheel write.
 ///
 /// An artifact is restored only when it still carries a `cargo_output_path`.
-/// `add_external_libs` clears that field on every artifact it patches in
-/// place, so patched bytes never end up at the cargo output path — see
-/// #2969 (lddtree / cargo's incremental cache misbehaving when fed patched
-/// binaries). Per-artifact precision means a multi-bin project where only
-/// some bins bundle external libraries still gets the cheap rename-back
-/// for the unpatched bins.
+/// [`copy_back_cargo_outputs`] clears that field on every artifact whose
+/// bytes are about to be rewritten in place, so patched bytes never end up
+/// at the cargo output path — see #2969 (lddtree / cargo's incremental
+/// cache misbehaving when fed patched binaries). Per-artifact precision
+/// means a multi-bin project where only some bins bundle external libraries
+/// still gets the cheap rename-back for the unpatched bins.
 ///
 /// Failures are logged and swallowed: the wheel is the deliverable, the
 /// cargo-path restore is a UX convenience, and the staged artifact is

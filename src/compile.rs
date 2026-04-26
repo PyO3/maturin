@@ -71,10 +71,13 @@ pub struct BuildArtifact {
     /// staging directory; `path` is mutated to the staged location while this
     /// field remembers where cargo originally placed the artifact.
     ///
-    /// `add_external_libs` clears this back to `None` on every artifact whose
-    /// bytes it rewrites in place, signalling to `finalize_staged_artifacts`
-    /// that the staged (now patched) file must not be moved back to the
-    /// cargo output path — see #2969 / #3111.
+    /// `copy_back_cargo_outputs` (called from `add_external_libs` before
+    /// any in-place patching) clears this back to `None` on every artifact
+    /// whose bytes the repairer is about to rewrite, signalling to
+    /// `finalize_staged_artifacts` that the staged (now patched) file must
+    /// not be moved back to the cargo output path — see #2969 / #3111.
+    /// On the same call it also restores a clean unpatched copy at this
+    /// path so cargo's incremental cache always sees pre-patch bytes.
     pub cargo_output_path: Option<PathBuf>,
 }
 

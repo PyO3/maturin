@@ -13,7 +13,7 @@
 //! 5. Patch `__init__.py` with `os.add_dll_directory()` for runtime DLL
 //!    discovery
 
-use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer};
+use super::repair::{AuditResult, AuditedArtifact, GraftedLib, PatchKind, WheelRepairer};
 use crate::compile::BuildArtifact;
 use anyhow::{Context, Result, bail};
 use std::collections::HashMap;
@@ -43,13 +43,13 @@ impl WheelRepairer for WindowsRepairer {
         Ok(AuditResult::new(super::Policy::default(), external_libs))
     }
 
-    fn patch(
-        &self,
-        audited: &[AuditedArtifact],
-        grafted: &[GraftedLib],
-        _libs_dir: &Path,
-        _artifact_dir: &Path,
-    ) -> Result<()> {
+    fn patch(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Result<()> {
+        let grafted: &[GraftedLib] = match kind {
+            PatchKind::Repair { grafted, .. } => grafted,
+            // Windows has no editable-mode patching today; matches the
+            // default `patch_required` returning all-false for Editable.
+            PatchKind::Editable => return Ok(()),
+        };
         // Build a lookup from original name → new name.
         // Include aliases so all names pointing to the same file are rewritten.
         let mut replacements: Vec<(&str, &str)> = Vec::new();

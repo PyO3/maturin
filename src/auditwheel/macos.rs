@@ -9,7 +9,7 @@
 use super::Policy;
 use super::audit::{get_sysroot_path, relpath};
 use super::macos_sign::ad_hoc_sign;
-use super::repair::{AuditResult, AuditedArtifact, GraftedLib, WheelRepairer, leaf_filename};
+use super::repair::{AuditResult, AuditedArtifact, PatchKind, WheelRepairer, leaf_filename};
 use crate::compile::BuildArtifact;
 use crate::target::Target;
 use anyhow::{Context, Result, bail};
@@ -80,13 +80,19 @@ impl WheelRepairer for MacOSRepairer {
         }
     }
 
-    fn patch(
-        &self,
-        artifacts: &[AuditedArtifact],
-        grafted: &[GraftedLib],
-        libs_dir: &Path,
-        artifact_dir: &Path,
-    ) -> Result<()> {
+    fn patch(&self, artifacts: &[AuditedArtifact], kind: &PatchKind<'_>) -> Result<()> {
+        let (grafted, libs_dir, artifact_dir) = match kind {
+            PatchKind::Repair {
+                grafted,
+                libs_dir,
+                artifact_dir,
+            } => (*grafted, *libs_dir, *artifact_dir),
+            // macOS has no editable-mode patching today; the default
+            // `patch_required` returns all-false for `Editable` so this
+            // arm is unreachable in practice, but we still degrade
+            // gracefully if a future caller invokes it.
+            PatchKind::Editable => return Ok(()),
+        };
         // Verify universal2 architecture requirements before patching.
         // Each grafted library must contain all CPU architectures that depend on it.
         for lib in grafted {

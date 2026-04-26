@@ -140,14 +140,14 @@ pub trait WheelRepairer {
 
     /// Patch artifacts for editable installs (e.g., set RPATH to Cargo target dir).
     ///
-    /// Returns `true` if any artifact was modified in place, `false` otherwise.
-    /// The caller uses this to decide whether the staged artifact can be
-    /// renamed back to the cargo output path after the wheel is written.
+    /// Implementations must clear `cargo_output_path` on every artifact whose
+    /// bytes they rewrite in place, so that `finalize_staged_artifacts` does
+    /// not move the patched bytes back to the cargo output path (see #2969).
     ///
     /// The default implementation is a no-op. Platform-specific repairers can
     /// override this to add runtime library search paths for editable mode.
-    fn patch_editable(&self, _audited: &[AuditedArtifact]) -> Result<bool> {
-        Ok(false)
+    fn patch_editable(&self, _audited: &mut [AuditedArtifact]) -> Result<()> {
+        Ok(())
     }
 
     /// Return a Python code snippet to prepend to `__init__.py` for runtime

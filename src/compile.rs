@@ -69,9 +69,12 @@ pub struct BuildArtifact {
     ///
     /// Populated by `stage_artifact` after the file is moved into the maturin
     /// staging directory; `path` is mutated to the staged location while this
-    /// field remembers where cargo originally placed the artifact, so the
-    /// build orchestrator can rename it back after the wheel is written when
-    /// no auditwheel patching occurred (see #3111).
+    /// field remembers where cargo originally placed the artifact.
+    ///
+    /// `add_external_libs` clears this back to `None` on every artifact whose
+    /// bytes it rewrites in place, signalling to `finalize_staged_artifacts`
+    /// that the staged (now patched) file must not be moved back to the
+    /// cargo output path — see #2969 / #3111.
     pub cargo_output_path: Option<PathBuf>,
 }
 

@@ -473,9 +473,14 @@ impl WheelRepairer for ElfRepairer {
 
     fn patch_required(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Vec<bool> {
         match kind {
-            // Default conservative behaviour: every audited artifact has its
-            // RPATH set unconditionally by `patch_repair` below.
-            PatchKind::Repair { .. } => vec![true; audited.len()],
+            // Inherit the default rule for `Repair` (only artifacts with
+            // non-empty `external_libs`). The Repair arm is duplicated
+            // here rather than delegated because Rust traits can't
+            // override a single match arm of a default method.
+            PatchKind::Repair { .. } => audited
+                .iter()
+                .map(|aa| !aa.external_libs.is_empty())
+                .collect(),
             // Editable installs only patch artifacts that actually carry
             // cargo-target search paths.
             PatchKind::Editable => audited
@@ -560,8 +565,18 @@ impl ElfRepairer {
             }
         }
 
-        // Set RPATH on artifacts to find the libs directory
+        // Set RPATH on artifacts to find the libs directory.
+        //
+        // Skip artifacts that don't depend on any grafted library: the
+        // RPATH would be dead code, and rewriting bytes for them would
+        // pollute cargo's incremental cache (#2969). The skip mirrors
+        // the corresponding `patch_required` prediction so
+        // `copy_back_cargo_outputs` doesn't pay an unnecessary
+        // reflink/copy for them either.
         for aa in audited {
+            if aa.external_libs.is_empty() {
+                continue;
+            }
             let mut new_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
             let new_rpath = Path::new("$ORIGIN").join(relpath(libs_dir, artifact_dir));
             new_rpaths.push(new_rpath.to_str().unwrap().to_string());

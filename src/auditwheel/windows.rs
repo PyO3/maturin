@@ -16,7 +16,7 @@
 use super::repair::{AuditResult, AuditedArtifact, GraftedLib, PatchKind, WheelRepairer};
 use crate::compile::BuildArtifact;
 use anyhow::{Context, Result, bail};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Windows wheel repairer (delvewheel equivalent).
@@ -62,17 +62,31 @@ impl WheelRepairer for WindowsRepairer {
             }
         }
 
-        // Patch each artifact's import table to reference the new names
+        // Patch each artifact's import table to reference the new names.
+        //
+        // Skip artifacts whose import table doesn't reference any grafted
+        // DLL — `pe_patch::replace_needed` would otherwise rewrite the
+        // file even when no entries match, polluting cargo's incremental
+        // cache (#2969). DLL names are case-insensitive on Windows.
         for aa in audited {
-            if !replacements.is_empty() {
-                super::pe_patch::replace_needed(&aa.artifact.path, &replacements).with_context(
-                    || {
+            let artifact_deps: HashSet<String> = aa
+                .external_libs
+                .iter()
+                .map(|lib| lib.name.to_ascii_lowercase())
+                .collect();
+            let artifact_replacements: Vec<(&str, &str)> = replacements
+                .iter()
+                .filter(|(old, _)| artifact_deps.contains(&old.to_ascii_lowercase()))
+                .copied()
+                .collect();
+            if !artifact_replacements.is_empty() {
+                super::pe_patch::replace_needed(&aa.artifact.path, &artifact_replacements)
+                    .with_context(|| {
                         format!(
                             "Failed to patch PE imports in {}",
                             aa.artifact.path.display()
                         )
-                    },
-                )?;
+                    })?;
             }
         }
 

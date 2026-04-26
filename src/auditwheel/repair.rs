@@ -168,12 +168,22 @@ pub trait WheelRepairer {
     /// cargo's incremental cache always sees the unpatched bytes (see
     /// #2969 / #3111).
     ///
-    /// The default implementation is conservative: every artifact is
-    /// assumed to be patched on `Repair`, none on `Editable`. Repairers
-    /// that can prove a tighter prediction should override this.
+    /// The default implementation is `!external_libs.is_empty()` for
+    /// `Repair` and `false` for `Editable`. The `Repair` rule relies on
+    /// the invariant that [`prepare_grafted_libs`] builds `grafted` from
+    /// `audited.iter().flat_map(|a| &a.external_libs)`, so an artifact
+    /// with empty `external_libs` is guaranteed to share no install
+    /// names with the grafted set and is therefore left untouched by
+    /// every current `patch` implementation. Repairers that touch
+    /// artifacts beyond what their own `external_libs` would predict
+    /// (e.g. an editable build with non-empty `linked_paths`) should
+    /// override this.
     fn patch_required(&self, audited: &[AuditedArtifact], kind: &PatchKind<'_>) -> Vec<bool> {
         match kind {
-            PatchKind::Repair { .. } => vec![true; audited.len()],
+            PatchKind::Repair { .. } => audited
+                .iter()
+                .map(|aa| !aa.external_libs.is_empty())
+                .collect(),
             PatchKind::Editable => vec![false; audited.len()],
         }
     }

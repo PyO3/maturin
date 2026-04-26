@@ -153,10 +153,24 @@ impl WheelRepairer for MacOSRepairer {
 
         // 2. Patch each artifact: rewrite references to grafted libs using
         //    @loader_path-relative names.
+        //
+        // Skip artifacts whose load commands don't reference any grafted
+        // install name. `patch_macho` + `ad_hoc_sign` would otherwise
+        // rewrite bytes (signature at minimum) for an artifact that
+        // doesn't actually need any rewrite, polluting cargo's
+        // incremental cache (#2969). The skip mirrors the corresponding
+        // `patch_required` prediction so `copy_back_cargo_outputs`
+        // doesn't pay an unnecessary reflink/copy for them either.
         let rel = relpath(libs_dir, artifact_dir);
         for audited in artifacts {
+            let artifact_deps: HashSet<&str> = audited
+                .external_libs
+                .iter()
+                .map(|lib| lib.name.as_str())
+                .collect();
             let install_name_changes: Vec<(&str, String)> = name_map
                 .iter()
+                .filter(|(old, _)| artifact_deps.contains(**old))
                 .map(|(old, new)| {
                     let relative = Path::new("@loader_path").join(&rel).join(new);
                     (*old, relative.to_string_lossy().into_owned())

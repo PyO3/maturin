@@ -206,7 +206,7 @@ fn install_wheel(
             String::from_utf8_lossy(&output.stderr).trim(),
         );
     }
-    if !output.stderr.is_empty() && install_backend.stderr_indicates_problem() {
+    if !output.stderr.is_empty() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stderr = stderr.trim();
         if let Some(leftover) = detect_pip_in_use_leftover(stderr) {
@@ -226,12 +226,14 @@ fn install_wheel(
                 backend = install_backend.name(),
             );
         }
-        eprintln!(
-            "⚠️ Warning: {} raised a warning running {:?}:\n{}",
-            install_backend.name(),
-            &cmd.get_args().collect::<Vec<_>>(),
-            stderr,
-        );
+        if install_backend.stderr_indicates_problem() {
+            eprintln!(
+                "⚠️ Warning: {} raised a warning running {:?}:\n{}",
+                install_backend.name(),
+                &cmd.get_args().collect::<Vec<_>>(),
+                stderr,
+            );
+        }
     }
     if let Err(err) = configure_as_editable(build_context, python, install_backend) {
         eprintln!("⚠️ Warning: failed to set package as editable: {err}");

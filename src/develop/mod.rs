@@ -13,7 +13,9 @@ use crate::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use cargo_options::heading;
 use fs_err as fs;
-use install_backend::{InstallBackend, check_pip_exists, find_uv_bin, find_uv_python, is_uv_venv};
+use install_backend::{
+    InstallBackend, check_pip_exists, find_uv_bin, find_uv_python, is_pixi_venv, is_uv_venv,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;
@@ -361,7 +363,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
                 anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
             })?;
 
-    let uv_venv = is_uv_venv(venv_dir);
+    let uv_venv = is_uv_venv(venv_dir) || is_pixi_venv(venv_dir);
     let uv_info = if uv || uv_venv {
         match find_uv_python(&interpreter.executable).or_else(|_| find_uv_bin()) {
             Ok(uv_info) => Some(Ok(uv_info)),
@@ -369,7 +371,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
                 if uv {
                     Some(Err(e))
                 } else {
-                    // Ignore error and try pip instead if it's a uv venv but `--uv` is not specified
+                    // Ignore error and try pip instead if it's a uv/pixi venv but `--uv` is not specified
                     None
                 }
             }

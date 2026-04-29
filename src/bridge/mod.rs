@@ -131,6 +131,14 @@ impl StableAbi {
             version: StableAbiVersion::Version(major, minor),
         }
     }
+
+    /// Create a StableAbi instance from a known abi3t version
+    pub fn from_abi3t_version(major: u8, minor: u8) -> StableAbi {
+        StableAbi {
+            kind: StableAbiKind::Abi3t,
+            version: StableAbiVersion::Version(major, minor),
+        }
+    }
 }
 
 /// Python version to use as the abi3/abi3t target.
@@ -145,7 +153,7 @@ pub enum StableAbiVersion {
 }
 
 impl StableAbiVersion {
-    /// Convert `StableAbiVersion` into an Option, where CurrentPython maps None
+    /// Convert `StableAbiVersion` into an Option, where CurrentPython maps to None
     pub fn min_version(&self) -> Option<(u8, u8)> {
         match self {
             StableAbiVersion::CurrentPython => None,
@@ -159,12 +167,15 @@ impl StableAbiVersion {
 pub enum StableAbiKind {
     /// The original stable ABI, supporting Python 3.2 and up
     Abi3,
+    /// The free-threaded stable ABI, supporting Python 3.15 and up
+    Abi3t,
 }
 
 impl fmt::Display for StableAbiKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StableAbiKind::Abi3 => write!(f, "abi3"),
+            StableAbiKind::Abi3t => write!(f, "abi3t"),
         }
     }
 }
@@ -174,6 +185,7 @@ impl StableAbiKind {
     pub fn wheel_tag(&self) -> &str {
         match self {
             StableAbiKind::Abi3 => "abi3",
+            StableAbiKind::Abi3t => "abi3.abi3t",
         }
     }
 }
@@ -341,6 +353,7 @@ impl BridgeModel {
             .and_then(|pyo3| match pyo3.stable_abi {
                 Some(stable_abi) => match stable_abi.kind {
                     StableAbiKind::Abi3 => Some(true),
+                    _ => None,
                 },
                 None => None,
             })

@@ -45,4 +45,5 @@ Python code uses `ruff` and `black` (line length 120, target py37) and `mypy` wi
 - When adding a CLI option, regenerate the JSON schema via `cargo run --bin generate_json_schema` (see `src/generate_json_schema.rs`) so `maturin.schema.json` stays in sync.
 - Do not edit files under `src/templates/` to satisfy formatters; they are intentionally excluded.
 - Do not modify `sysconfig/` snapshots by hand.
+- Do not modify `Changelog` by hand, it's managed by `cargo-cliff`.
 - Document what & why in git commit message instead of just a list of changes, use backtick for code snippets in commit message.

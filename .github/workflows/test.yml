@@ -236,11 +236,24 @@ jobs:
           bin/maturin build -i python3.12 -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-pc-windows-msvc
 
   test-emscripten:
-    name: Test Emscripten
+    name: Test Emscripten (Pyodide ${{ matrix.pyodide-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cover both pre-PEP 783 Pyodide releases that expose
+        # `info.abi_version` in their lock file. Both produce wheels with the
+        # `pyodide_2025_0_wasm32` platform tag (CPython 3.13 ABI).
+        # See https://peps.python.org/pep-0783/ for the new
+        # `pyemscripten_*_wasm32` tag scheme used from Pyodide 0.30 onwards.
+        include:
+          - pyodide-version: "0.28.3"
+            python-version: "3.13"
+          - pyodide-version: "0.29.0"
+            python-version: "3.13"
     env:
-      PYODIDE_VERSION: "0.29.0"
-      PYTHON_VERSION: "3.13"
+      PYODIDE_VERSION: ${{ matrix.pyodide-version }}
+      PYTHON_VERSION: ${{ matrix.python-version }}
       NODE_VERSION: 18
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

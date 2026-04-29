@@ -414,6 +414,21 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
         return Ok(api_level);
     }
 
+    // 4. Termux/On-device fallback: Try getprop as a last resort
+    if is_android {
+        let output = std::process::Command::new("getprop")
+            .arg("ro.build.version.sdk")
+            .output();
+        if let Ok(out) = output {
+            if out.status.success() {
+                let sdk_version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !sdk_version.is_empty() {
+                    return Ok(sdk_version);
+                }
+            }
+        }
+    }
+
     bail!(
         "Failed to determine Android API level. Please set the ANDROID_API_LEVEL environment variable."
     );

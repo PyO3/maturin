@@ -58,7 +58,7 @@ Note that for [publishing for linux](#manylinux-and-auditwheel), you need to use
 
 ## Mixed rust/python projects
 
-To create a mixed rust/python project, create a folder with your module name (i.e. `lib.name` in Cargo.toml) next to your Cargo.toml and add your python sources there:
+To create a mixed rust/python project, create a folder with your module name (i.e. [`lib.name` in Cargo.toml](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#the-name-field)) next to your Cargo.toml and add your python sources there:
 
 ```
 my-project

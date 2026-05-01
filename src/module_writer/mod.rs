@@ -137,6 +137,7 @@ pub fn write_python_part(
         .parents(false)
         .git_global(false)
         .git_exclude(false)
+        .follow_links(true)
         .build()
     {
         let absolute = match absolute {

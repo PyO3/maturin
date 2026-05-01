@@ -72,7 +72,7 @@ pub(super) fn add_python_sources(
     }
 
     for package in python_packages {
-        for entry in ignore::Walk::new(package) {
+        for entry in ignore::WalkBuilder::new(package).follow_links(true).build() {
             let source = entry?.into_path();
             if is_compiled_artifact(&source) {
                 debug!("Ignoring {}", source.display());

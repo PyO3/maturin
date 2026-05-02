@@ -509,7 +509,7 @@ fn emit_release_steps(y: &mut Yaml, resolved: &ResolvedCIConfig) {
 fn emit_release_attestation_step(y: &mut Yaml) {
     y.line("- name: Generate artifact attestation");
     y.indent();
-    y.line("uses: actions/attest-build-provenance@v3");
+    y.line("uses: actions/attest@v4");
     y.line("with:");
     y.indent();
     y.line("subject-path: 'wheels-*/*'");

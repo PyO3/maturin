@@ -254,7 +254,7 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           subject-path: |
@@ -290,7 +290,7 @@ jobs:
           pattern: binaries-*
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           subject-path: |

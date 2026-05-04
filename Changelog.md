@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.13.0
+## 1.13.1
 
 * Fix: fall back to placeholder for abi3 when found interpreters are too old ([#3126](https://github.com/pyo3/maturin/pull/3126))
 

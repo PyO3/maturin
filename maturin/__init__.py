@@ -67,6 +67,14 @@ def _additional_pep517_args() -> List[str]:
     return []
 
 
+def _has_interpreter_arg(args: List[str]) -> bool:
+    """Return True if `args` already contains a `--interpreter`/`-i` flag."""
+    for arg in args:
+        if arg in ("--interpreter", "-i") or arg.startswith("--interpreter="):
+            return True
+    return False
+
+
 def _get_env() -> Optional[Dict[str, str]]:
     if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
         from puccinialin import setup_rust
@@ -87,13 +95,7 @@ def _build_wheel(
 ) -> str:
     # PEP 517 specifies that only `sys.executable` points to the correct
     # python interpreter
-    base_command = [
-        "maturin",
-        "pep517",
-        "build-wheel",
-        "-i",
-        _get_sys_executable(),
-    ]
+    base_command = ["maturin", "pep517", "build-wheel"]
     options = _additional_pep517_args()
     if editable:
         options.append("--editable")
@@ -101,6 +103,11 @@ def _build_wheel(
     pep517_args = get_maturin_pep517_args(config_settings)
     if pep517_args:
         options.extend(pep517_args)
+
+    # Only auto-inject the interpreter if the user has not already supplied one
+    # via MATURIN_PEP517_ARGS / config_settings.
+    if not _has_interpreter_arg(options):
+        base_command.extend(["-i", _get_sys_executable()])
 
     if "--compatibility" not in options and "--manylinux" not in options:
         # default to off if not otherwise specified
@@ -218,15 +225,18 @@ def prepare_metadata_for_build_wheel(
         "write-dist-info",
         "--metadata-directory",
         metadata_directory,
-        # PEP 517 specifies that only `sys.executable` points to the correct
-        # python interpreter
-        "--interpreter",
-        _get_sys_executable(),
     ]
     command.extend(_additional_pep517_args())
     pep517_args = get_maturin_pep517_args(config_settings)
     if pep517_args:
         command.extend(pep517_args)
+
+    # PEP 517 specifies that only `sys.executable` points to the correct python
+    # interpreter. Only auto-inject it if the user has not already supplied one
+    # via MATURIN_PEP517_ARGS / config_settings, otherwise we'd pass
+    # `--interpreter` twice and trip the strict arity check in maturin.
+    if not _has_interpreter_arg(command):
+        command.extend(["--interpreter", _get_sys_executable()])
 
     print("Running `{}`".format(" ".join(command)))
     try:

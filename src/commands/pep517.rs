@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Subcommand;
 use ignore::overrides::Override;
 use maturin::{
@@ -64,11 +64,29 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
 
     match subcommand {
         Pep517Command::WriteDistInfo {
-            build_options,
+            mut build_options,
             metadata_directory,
             strip_opt,
         } => {
-            assert_eq!(build_options.python.interpreter.len(), 1);
+            // PEP 517's `prepare_metadata_for_build_wheel` operates on a single
+            // interpreter (the one running pip). If duplicates of the same path
+            // were supplied (e.g. user-set `MATURIN_PEP517_ARGS=--interpreter ...`
+            // combined with the auto-injected one), collapse them. Otherwise
+            // bail with a clear message instead of panicking.
+            {
+                let mut seen = std::collections::HashSet::new();
+                build_options
+                    .python
+                    .interpreter
+                    .retain(|p| seen.insert(p.clone()));
+            }
+            if build_options.python.interpreter.len() > 1 {
+                bail!(
+                    "`maturin pep517 write-dist-info` expects exactly one --interpreter, got {}: {:?}",
+                    build_options.python.interpreter.len(),
+                    build_options.python.interpreter,
+                );
+            }
             let mut context = build_options
                 .into_build_context()
                 .strip(strip_opt.strip)

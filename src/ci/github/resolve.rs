@@ -173,6 +173,11 @@ pub(crate) fn resolve_config(
         || github_config
             .and_then(|config| config.skip_attestation)
             .unwrap_or(false);
+    let trusted_publishing = github_config
+        .and_then(|config| config.trusted_publishing)
+        .unwrap_or(false);
+    let publishing_environment =
+        github_config.and_then(|config| config.publishing_environment.clone());
 
     let platforms: BTreeSet<Platform> = if !cli.platforms.is_empty() {
         cli.platforms
@@ -213,6 +218,8 @@ pub(crate) fn resolve_config(
         pytest,
         zig,
         skip_attestation,
+        trusted_publishing,
+        publishing_environment,
         platform_targets,
     })
 }

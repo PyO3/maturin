@@ -348,10 +348,21 @@ Options:
 
 By default, the workflow provided by `generate-ci` will publish the release artifacts to PyPI using API token authentication. However, maturin also supports [trusted publishing (OpenID Connect)](https://docs.pypi.org/trusted-publishers/).
 
-To enable it, modify the `release` action in the generated GitHub workflow file:
+You can enable it by adding the following to your `pyproject.toml`:
 
-- remove `MATURIN_PYPI_TOKEN` from the `env` section to make maturin use trusted publishing
-- add `id-token: write` to the action's `permissions` (see [Configuring OpenID Connect in PyPI](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-pypi) from GitHub's documentation).
-- if `Environment name: pypi` was set in PyPI, add `environment: pypi`
+```toml
+[tool.maturin.generate-ci.github]
+trusted-publishing = true
+# Optional: name of the GitHub Actions environment to use for the release job
+publishing-environment = "release"
+```
+
+When `trusted-publishing = true`, the generated workflow will run
+`uv publish --trusted-publishing always` and omit the `UV_PUBLISH_TOKEN`
+environment variable. Setting `publishing-environment` adds an
+`environment:` key to the release job; this is optional but recommended
+when you have configured a [GitHub Actions environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment)
+matching the environment name configured in PyPI's trusted publisher
+settings.
 
 Make sure to follow the steps listed in [PyPI's documentation](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) to set up your GitHub repository as a trusted publisher in the PyPI project settings before attempting to run the workflow.

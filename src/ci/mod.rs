@@ -162,6 +162,8 @@ pub(crate) struct ResolvedCIConfig {
     pub pytest: bool,
     pub zig: bool,
     pub skip_attestation: bool,
+    pub trusted_publishing: bool,
+    pub publishing_environment: Option<String>,
     pub platform_targets: BTreeMap<Platform, Vec<ResolvedTarget>>,
 }
 

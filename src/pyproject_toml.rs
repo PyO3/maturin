@@ -457,6 +457,11 @@ pub struct GitHubCIConfig {
     pub zig: Option<bool>,
     /// Skip artifact attestation
     pub skip_attestation: Option<bool>,
+    /// Use PyPI trusted publishing (OpenID Connect) instead of an API token
+    pub trusted_publishing: Option<bool>,
+    /// Name of the GitHub Actions environment to use for the release job
+    /// (typically used together with `trusted-publishing = true`)
+    pub publishing_environment: Option<String>,
     /// Extra arguments to pass to maturin (applies to all platforms)
     pub args: Option<String>,
     /// Linux (manylinux) platform configuration

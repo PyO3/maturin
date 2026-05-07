@@ -471,6 +471,10 @@ fn emit_release_job(conf: &mut String, resolved: &ResolvedCIConfig, needs: &[Str
     ));
     y.line(format!("needs: [{}]", needs.join(", ")));
 
+    if let Some(environment) = &resolved.publishing_environment {
+        y.line(format!("environment: {environment}"));
+    }
+
     emit_release_permissions(&mut y, resolved);
     emit_release_steps(&mut y, resolved);
 }
@@ -497,7 +501,7 @@ fn emit_release_steps(y: &mut Yaml, resolved: &ResolvedCIConfig) {
     if !resolved.skip_attestation {
         emit_release_attestation_step(y);
     }
-    emit_release_publish_steps(y);
+    emit_release_publish_steps(y, resolved);
     if resolved
         .platform_targets
         .contains_key(&Platform::Emscripten)
@@ -516,7 +520,7 @@ fn emit_release_attestation_step(y: &mut Yaml) {
     y.dedent_by(2);
 }
 
-fn emit_release_publish_steps(y: &mut Yaml) {
+fn emit_release_publish_steps(y: &mut Yaml, resolved: &ResolvedCIConfig) {
     y.line("- name: Install uv");
     y.indent();
     y.line(format!(
@@ -532,14 +536,19 @@ fn emit_release_publish_steps(y: &mut Yaml) {
         "if: {}",
         gha_expr("startsWith(github.ref, 'refs/tags/')")
     ));
-    y.line("run: uv publish 'wheels-*/*'");
-    y.line("env:");
-    y.indent();
-    y.line(format!(
-        "UV_PUBLISH_TOKEN: {}",
-        gha_expr("secrets.PYPI_API_TOKEN")
-    ));
-    y.dedent_by(2);
+    if resolved.trusted_publishing {
+        y.line("run: uv publish --trusted-publishing always 'wheels-*/*'");
+        y.dedent();
+    } else {
+        y.line("run: uv publish 'wheels-*/*'");
+        y.line("env:");
+        y.indent();
+        y.line(format!(
+            "UV_PUBLISH_TOKEN: {}",
+            gha_expr("secrets.PYPI_API_TOKEN")
+        ));
+        y.dedent_by(2);
+    }
 }
 
 fn emit_release_github_upload_step(y: &mut Yaml) {

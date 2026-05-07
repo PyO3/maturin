@@ -145,6 +145,13 @@
         "null"
       ]
     },
+    "pgo-command": {
+      "description": "Command to run for PGO profile generation.\nExecuted in a temporary virtualenv with the instrumented wheel installed.\nExample: `python -m pytest tests/benchmarks`",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "profile": {
       "description": "Build artifacts with the specified Cargo profile",
       "type": [
@@ -474,6 +481,13 @@
             }
           ]
         },
+        "publishing-environment": {
+          "description": "Name of the GitHub Actions environment to use for the release job\n(typically used together with `trusted-publishing = true`)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "pytest": {
           "description": "Enable pytest",
           "type": [
@@ -483,6 +497,13 @@
         },
         "skip-attestation": {
           "description": "Skip artifact attestation",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "trusted-publishing": {
+          "description": "Use PyPI trusted publishing (OpenID Connect) instead of an API token",
           "type": [
             "boolean",
             "null"
@@ -616,7 +637,7 @@
           ]
         },
         "runner": {
-          "description": "Default runner for this platform",
+          "description": "Runner override",
           "type": [
             "string",
             "null"
@@ -800,49 +821,49 @@
           ]
         },
         "before-script-linux": {
-          "description": "Before-script-linux override",
+          "description": "Script to run before build on Linux",
           "type": [
             "string",
             "null"
           ]
         },
         "container": {
-          "description": "Container image override",
+          "description": "Container image to use",
           "type": [
             "string",
             "null"
           ]
         },
         "docker-options": {
-          "description": "Docker options override",
+          "description": "Docker options",
           "type": [
             "string",
             "null"
           ]
         },
         "manylinux": {
-          "description": "Manylinux version override",
+          "description": "Manylinux version (e.g. \"auto\", \"2_28\", \"musllinux_1_2\")",
           "type": [
             "string",
             "null"
           ]
         },
         "runner": {
-          "description": "Runner override for this target",
+          "description": "Runner override",
           "type": [
             "string",
             "null"
           ]
         },
         "rust-toolchain": {
-          "description": "Rust toolchain override",
+          "description": "Rust toolchain (e.g. \"nightly\", \"stable\")",
           "type": [
             "string",
             "null"
           ]
         },
         "rustup-components": {
-          "description": "Rustup components override",
+          "description": "Rustup components to install",
           "type": [
             "string",
             "null"

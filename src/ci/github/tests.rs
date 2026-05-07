@@ -150,6 +150,8 @@ fn test_generate_github_pyproject_simple_targets() {
         pytest: Some(false),
         zig: Some(false),
         skip_attestation: None,
+        trusted_publishing: Some(true),
+        publishing_environment: Some("release".to_string()),
         linux: Some(PlatformCIConfig {
             targets: Some(vec!["x86_64".to_string(), "aarch64".to_string()]),
             ..Default::default()
@@ -384,6 +386,25 @@ fn test_generate_github_android_bin() {
 
     assert!(conf.contains("  android:\n"));
     assert!(conf.contains("  linux:\n"));
+}
+
+#[test]
+fn test_generate_github_trusted_publishing_no_environment() {
+    let github_config = GitHubCIConfig {
+        trusted_publishing: Some(true),
+        ..Default::default()
+    };
+
+    let cli = GenerateCI::default();
+    let bridge = pyo3_bridge(None);
+    let resolved = resolve_config(&cli, Some(&github_config), &bridge).unwrap();
+    assert!(resolved.trusted_publishing);
+    assert!(resolved.publishing_environment.is_none());
+
+    let conf = generate_github(&cli, &resolved, PROJECT_NAME, &bridge, true, None).unwrap();
+    assert!(!conf.contains("environment:"));
+    assert!(conf.contains("uv publish --trusted-publishing always 'wheels-*/*'"));
+    assert!(!conf.contains("UV_PUBLISH_TOKEN"));
 }
 
 #[test]

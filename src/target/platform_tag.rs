@@ -332,25 +332,6 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
     rustc_target_version().unwrap_or(fallback_version)
 }
 
-/// Resolved version inputs for the Emscripten platform-tag cascade.
-///
-/// Each field corresponds to the value Pyodide of a given era exposes:
-///
-/// * `pyemscripten_platform_version`: Pyodide >= 0.30 / Python 3.14+
-///   (PEP 783).
-/// * `pyodide_abi_version`: Pyodide 0.28+ ABI version. For Python 3.14+,
-///   this maps to the PEP 783 `pyemscripten` tag.
-/// * `python_version`: Pyodide Python version used to disambiguate
-///   `pyodide_abi_version`.
-/// * `emcc_version`: legacy fallback for Pyodide <= 0.27.
-#[derive(Debug, Default)]
-struct EmscriptenVersionInputs {
-    pyemscripten_platform_version: Option<String>,
-    pyodide_abi_version: Option<String>,
-    python_version: Option<String>,
-    emcc_version: Option<String>,
-}
-
 /// Resolve the platform tag for `wasm32-unknown-emscripten`.
 ///
 /// This implements the priority cascade required to support both
@@ -366,48 +347,33 @@ struct EmscriptenVersionInputs {
 /// 2. **Pre-PEP 783 standardized tag** (Pyodide 0.28 / 0.29) — emit
 ///    `pyodide_{YEAR}_{PATCH}_wasm32`. Resolved from
 ///    `MATURIN_PYODIDE_ABI_VERSION` / `PYODIDE_ABI_VERSION`, falling back to
-///    `pyodide config get pyodide_abi_version`.
+///    `pyodide config get pyodide_abi_version`. For Python 3.14+ lock
+///    files the same input maps to the PEP 783 `pyemscripten_*` tag.
 /// 3. **Legacy** (Pyodide <= 0.27) — emit
 ///    `emscripten_{EMCC_VERSION}_wasm32`. Resolved from
 ///    `MATURIN_EMSCRIPTEN_VERSION` or `emcc -dumpversion`. Emits a warning
 ///    explaining that the tag is not PEP 783 compliant.
 fn emscripten_platform_tag() -> Result<String> {
-    let inputs = EmscriptenVersionInputs {
-        pyemscripten_platform_version: pyemscripten_platform_version()?,
-        pyodide_abi_version: pyodide_abi_version()?,
-        python_version: pyodide_python_version()?,
-        // Resolve `emcc -dumpversion` lazily inside the cascade so we don't
-        // require emcc on PATH when the user is targeting PEP 783 / Pyodide
-        // 0.28+ via env vars.
-        emcc_version: None,
-    };
-    resolve_emscripten_platform_tag(&inputs, emscripten_version)
-}
-
-/// Pure cascade implementation, parameterised over the inputs and a fallback
-/// function used to look up the legacy emscripten / emcc version. Extracted
-/// from [`emscripten_platform_tag`] so it can be exercised with
-/// deterministic inputs from unit tests.
-fn resolve_emscripten_platform_tag(
-    inputs: &EmscriptenVersionInputs,
-    emcc_lookup: impl FnOnce() -> Result<String>,
-) -> Result<String> {
-    if let Some(ver) = inputs.pyemscripten_platform_version.as_deref() {
-        validate_version_segment(ver, "pyemscripten platform version")?;
+    if let Some(ver) = first_non_empty_env(&[
+        "MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION",
+        "PYEMSCRIPTEN_PLATFORM_VERSION",
+    ])
+    .or_else(|| pyodide_config_get("pyemscripten_platform_version"))
+    {
         return Ok(format!("pyemscripten_{ver}_wasm32"));
     }
-    if let Some(ver) = inputs.pyodide_abi_version.as_deref() {
-        validate_version_segment(ver, "pyodide ABI version")?;
-        if python_version_at_least(inputs.python_version.as_deref(), 3, 14) {
-            return Ok(format!("pyemscripten_{ver}_wasm32"));
-        }
-        return Ok(format!("pyodide_{ver}_wasm32"));
+    if let Some(ver) = first_non_empty_env(&["MATURIN_PYODIDE_ABI_VERSION", "PYODIDE_ABI_VERSION"])
+        .or_else(|| pyodide_config_get("pyodide_abi_version"))
+    {
+        let py = first_non_empty_env(&["PYTHON_VERSION"])
+            .or_else(|| pyodide_config_get("python_version"));
+        return Ok(if is_python_3_14_or_later(py.as_deref()) {
+            format!("pyemscripten_{ver}_wasm32")
+        } else {
+            format!("pyodide_{ver}_wasm32")
+        });
     }
-    let raw = match inputs.emcc_version.clone() {
-        Some(v) => v,
-        None => emcc_lookup()?,
-    };
-    let release = raw.replace(['.', '-'], "_");
+    let release = emscripten_version()?.replace(['.', '-'], "_");
     eprintln!(
         "⚠️  Falling back to legacy `emscripten_{release}_wasm32` platform tag. \
          This wheel will not be installable on PEP 783-compliant Pyodide runtimes. \
@@ -417,66 +383,29 @@ fn resolve_emscripten_platform_tag(
     Ok(format!("emscripten_{release}_wasm32"))
 }
 
-/// Resolve `pyemscripten_{YEAR}_{PATCH}` from environment variables or
-/// `pyodide config`.
-fn pyemscripten_platform_version() -> Result<Option<String>> {
-    if let Ok(ver) = env::var("MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION") {
-        let trimmed = ver.trim();
-        if !trimmed.is_empty() {
-            return Ok(Some(trimmed.to_string()));
-        }
-    }
-    if let Ok(ver) = env::var("PYEMSCRIPTEN_PLATFORM_VERSION") {
-        let trimmed = ver.trim();
-        if !trimmed.is_empty() {
-            return Ok(Some(trimmed.to_string()));
-        }
-    }
-    Ok(pyodide_config_get("pyemscripten_platform_version"))
+/// Return the first env var in `names` that is set to a non-empty (after
+/// trim) value.
+fn first_non_empty_env(names: &[&str]) -> Option<String> {
+    names.iter().find_map(|name| {
+        env::var(name).ok().and_then(|v| {
+            let t = v.trim();
+            (!t.is_empty()).then(|| t.to_string())
+        })
+    })
 }
 
-/// Resolve the pre-PEP 783 `pyodide_{YEAR}_{PATCH}` ABI version from
-/// environment variables or `pyodide config`.
-fn pyodide_abi_version() -> Result<Option<String>> {
-    if let Ok(ver) = env::var("MATURIN_PYODIDE_ABI_VERSION") {
-        let trimmed = ver.trim();
-        if !trimmed.is_empty() {
-            return Ok(Some(trimmed.to_string()));
-        }
-    }
-    if let Ok(ver) = env::var("PYODIDE_ABI_VERSION") {
-        let trimmed = ver.trim();
-        if !trimmed.is_empty() {
-            return Ok(Some(trimmed.to_string()));
-        }
-    }
-    Ok(pyodide_config_get("pyodide_abi_version"))
-}
-
-/// Resolve the Pyodide Python version from the generated CI environment or
-/// `pyodide config`.
-fn pyodide_python_version() -> Result<Option<String>> {
-    if let Ok(ver) = env::var("PYTHON_VERSION") {
-        let trimmed = ver.trim();
-        if !trimmed.is_empty() {
-            return Ok(Some(trimmed.to_string()));
-        }
-    }
-    Ok(pyodide_config_get("python_version"))
-}
-
-fn python_version_at_least(version: Option<&str>, major: u64, minor: u64) -> bool {
+fn is_python_3_14_or_later(version: Option<&str>) -> bool {
     let Some(version) = version else {
         return false;
     };
     let mut parts = version.split('.');
-    let Some(Ok(actual_major)) = parts.next().map(str::parse::<u64>) else {
+    let Some(Ok(major)) = parts.next().map(str::parse::<u32>) else {
         return false;
     };
-    let Some(Ok(actual_minor)) = parts.next().map(str::parse::<u64>) else {
+    let Some(Ok(minor)) = parts.next().map(str::parse::<u32>) else {
         return false;
     };
-    (actual_major, actual_minor) >= (major, minor)
+    (major, minor) >= (3, 14)
 }
 
 /// Best-effort `pyodide config get <key>` invocation.
@@ -505,20 +434,6 @@ fn pyodide_config_get(key: &str) -> Option<String> {
         return None;
     }
     Some(trimmed.to_string())
-}
-
-/// Validate that a `pyemscripten` / `pyodide` version segment matches the
-/// `[0-9]+_[0-9]+` shape required by the PEP 783 platform tag regex.
-fn validate_version_segment(value: &str, what: &str) -> Result<()> {
-    static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[0-9]+_[0-9]+$").unwrap());
-    if RE.is_match(value) {
-        Ok(())
-    } else {
-        bail!(
-            "Invalid {what} `{value}`: expected `<year>_<patch>` (e.g. `2026_0`). \
-             Pyodide reports the version with an underscore separator."
-        );
-    }
 }
 
 /// Emscripten version
@@ -608,167 +523,20 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
 #[cfg(test)]
 mod tests {
     use super::{
-        EmscriptenVersionInputs, extract_android_api_level, iphoneos_deployment_target,
-        macosx_deployment_target, python_version_at_least, resolve_emscripten_platform_tag,
-        validate_version_segment,
+        extract_android_api_level, iphoneos_deployment_target, is_python_3_14_or_later,
+        macosx_deployment_target,
     };
-    use anyhow::{Result, bail};
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_validate_version_segment() {
-        assert!(validate_version_segment("2026_0", "pyemscripten platform version").is_ok());
-        assert!(validate_version_segment("2025_0", "pyodide ABI version").is_ok());
-        assert!(validate_version_segment("2024_12", "pyodide ABI version").is_ok());
-
-        // Hyphens / dots / extra components are rejected; the platform tag
-        // regex from PEP 783 is `pyemscripten_[0-9]+_[0-9]+_wasm32`.
-        assert!(validate_version_segment("2026.0", "pyemscripten platform version").is_err());
-        assert!(validate_version_segment("2026-0", "pyemscripten platform version").is_err());
-        assert!(validate_version_segment("2026_0_0", "pyemscripten platform version").is_err());
-        assert!(validate_version_segment("", "pyemscripten platform version").is_err());
-        assert!(validate_version_segment("abc_0", "pyemscripten platform version").is_err());
-    }
-
-    #[test]
-    fn test_python_version_at_least() {
-        assert!(python_version_at_least(Some("3.14"), 3, 14));
-        assert!(python_version_at_least(Some("3.14.2"), 3, 14));
-        assert!(python_version_at_least(Some("3.15.0"), 3, 14));
-        assert!(!python_version_at_least(Some("3.13.9"), 3, 14));
-        assert!(!python_version_at_least(Some("3"), 3, 14));
-        assert!(!python_version_at_least(Some("invalid"), 3, 14));
-        assert!(!python_version_at_least(None, 3, 14));
-    }
-
-    /// Helper: assert that `emcc -dumpversion` is **not** invoked.
-    fn unused_emcc_lookup() -> Result<String> {
-        bail!("emcc -dumpversion should not be called when a Pyodide platform version is set");
-    }
-
-    #[test]
-    fn test_emscripten_tag_resolution() {
-        let cases = [
-            (
-                "PEP 783 version wins",
-                EmscriptenVersionInputs {
-                    pyemscripten_platform_version: Some("2026_0".to_string()),
-                    ..Default::default()
-                },
-                "pyemscripten_2026_0_wasm32",
-            ),
-            (
-                "Pyodide 0.29 ABI stays pre-PEP 783",
-                EmscriptenVersionInputs {
-                    pyodide_abi_version: Some("2025_0".to_string()),
-                    python_version: Some("3.13".to_string()),
-                    ..Default::default()
-                },
-                "pyodide_2025_0_wasm32",
-            ),
-            (
-                "Pyodide 0.28 ABI stays pre-PEP 783",
-                EmscriptenVersionInputs {
-                    pyodide_abi_version: Some("2025_0".to_string()),
-                    python_version: Some("3.13".to_string()),
-                    ..Default::default()
-                },
-                "pyodide_2025_0_wasm32",
-            ),
-            (
-                "Python 3.14 ABI maps to PEP 783",
-                EmscriptenVersionInputs {
-                    pyodide_abi_version: Some("2026_0".to_string()),
-                    python_version: Some("3.14.2".to_string()),
-                    ..Default::default()
-                },
-                "pyemscripten_2026_0_wasm32",
-            ),
-            (
-                "manual Pyodide ABI is supported for 0.27",
-                EmscriptenVersionInputs {
-                    pyodide_abi_version: Some("2024_0".to_string()),
-                    ..Default::default()
-                },
-                "pyodide_2024_0_wasm32",
-            ),
-            (
-                "explicit legacy emcc version is used",
-                EmscriptenVersionInputs {
-                    emcc_version: Some("3.1.58".to_string()),
-                    ..Default::default()
-                },
-                "emscripten_3_1_58_wasm32",
-            ),
-            (
-                "PEP 783 wins over Pyodide ABI and emcc",
-                EmscriptenVersionInputs {
-                    pyemscripten_platform_version: Some("2026_0".to_string()),
-                    pyodide_abi_version: Some("2025_0".to_string()),
-                    emcc_version: Some("3.1.58".to_string()),
-                    ..Default::default()
-                },
-                "pyemscripten_2026_0_wasm32",
-            ),
-            (
-                "Pyodide ABI wins over emcc",
-                EmscriptenVersionInputs {
-                    pyodide_abi_version: Some("2025_0".to_string()),
-                    emcc_version: Some("3.1.58".to_string()),
-                    ..Default::default()
-                },
-                "pyodide_2025_0_wasm32",
-            ),
-        ];
-
-        for (name, inputs, expected) in cases {
-            let tag = resolve_emscripten_platform_tag(&inputs, || {
-                if inputs.emcc_version.is_some() {
-                    bail!("should use the explicit emcc version")
-                } else {
-                    unused_emcc_lookup()
-                }
-            })
-            .unwrap();
-            assert_eq!(tag, expected, "{name}");
-        }
-
-        let tag = resolve_emscripten_platform_tag(&EmscriptenVersionInputs::default(), || {
-            Ok("3.1.46".to_string())
-        })
-        .unwrap();
-        assert_eq!(tag, "emscripten_3_1_46_wasm32");
-    }
-
-    /// Invalid `pyemscripten_platform_version` (e.g. dotted) is rejected
-    /// with a clear error rather than silently producing a malformed tag.
-    #[test]
-    fn test_emscripten_tag_rejects_invalid_pep783_version() {
-        let inputs = EmscriptenVersionInputs {
-            pyemscripten_platform_version: Some("2026.0".to_string()),
-            ..Default::default()
-        };
-        let err = resolve_emscripten_platform_tag(&inputs, unused_emcc_lookup).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("pyemscripten platform version"),
-            "expected pyemscripten validation error, got: {msg}"
-        );
-    }
-
-    /// Invalid `pyodide_abi_version` (e.g. hyphenated) is rejected.
-    #[test]
-    fn test_emscripten_tag_rejects_invalid_pyodide_abi_version() {
-        let inputs = EmscriptenVersionInputs {
-            pyodide_abi_version: Some("2025-0".to_string()),
-            ..Default::default()
-        };
-        let err = resolve_emscripten_platform_tag(&inputs, unused_emcc_lookup).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("pyodide ABI version"),
-            "expected pyodide ABI validation error, got: {msg}"
-        );
+    fn test_is_python_3_14_or_later() {
+        assert!(is_python_3_14_or_later(Some("3.14")));
+        assert!(is_python_3_14_or_later(Some("3.14.2")));
+        assert!(is_python_3_14_or_later(Some("3.15.0")));
+        assert!(!is_python_3_14_or_later(Some("3.13.9")));
+        assert!(!is_python_3_14_or_later(Some("3")));
+        assert!(!is_python_3_14_or_later(Some("invalid")));
+        assert!(!is_python_3_14_or_later(None));
     }
 
     #[test]

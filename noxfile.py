@@ -96,6 +96,9 @@ def _resolve_pyodide_platform_inputs(info: dict) -> dict:
     wheel platform tag that maturin should produce when targeting that
     Pyodide release.
 
+    Mirrors the cascade in `src/target/platform_tag.rs::emscripten_platform_tag`;
+    keep the two in sync.
+
     Pyodide encodes platform metadata across (overlapping) fields:
 
     * `info.platform` is `emscripten_<X>_<Y>_<Z>` and contains the emcc
@@ -162,16 +165,15 @@ def setup_pyodide(session: nox.Session):
             # named `pyodide.asm.js` (Pyodide <= 0.29) or `pyodide.asm.mjs`
             # (Pyodide >= 314.0.0a1). Prettifying it makes Node-side errors
             # readable. Run prettier on whichever of the two exists.
-            for asm_filename in ("pyodide.asm.js", "pyodide.asm.mjs"):
-                if Path(asm_filename).exists():
-                    session.run(
-                        "node",
-                        "../prettier/bin/prettier.cjs",
-                        "-w",
-                        asm_filename,
-                        external=True,
-                    )
-                    break
+            asm_file = next(Path(".").glob("pyodide.asm.*js"), None)
+            if asm_file is not None:
+                session.run(
+                    "node",
+                    "../prettier/bin/prettier.cjs",
+                    "-w",
+                    asm_file.name,
+                    external=True,
+                )
             with open("pyodide-lock.json") as f:
                 info = json.load(f)["info"]
             for name, value in _resolve_pyodide_platform_inputs(info).items():

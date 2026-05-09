@@ -241,13 +241,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Cover the three Emscripten platform-tag families maturin supports:
+        # Cover the two Emscripten platform-tag families exposed by current
+        # Pyodide releases:
         # - Pyodide 0.29 (Python 3.13) → `pyodide_2025_0_wasm32`
         #   (pre-PEP 783, exposed via `info.abi_version` in pyodide-lock.json).
-        # - Pyodide 314.0.0a1 (Python 3.14) → `pyemscripten_2026_0_wasm32`
+        # - Pyodide 314.0.0-alpha.1 (Python 3.14) → `pyemscripten_2026_0_wasm32`
         #   (PEP 783, see https://peps.python.org/pep-0783/). The lock file
         #   only exposes `info.abi_version = 2026_0`, so noxfile uses the
         #   Python version to pick the new `pyemscripten_*` tag.
+        # The legacy `emscripten_<emcc-version>_wasm32` family (Pyodide
+        # <= 0.27) is no longer exercised end-to-end because no maintained
+        # Pyodide release uses it; it remains covered by the cascade unit
+        # tests in `src/target/platform_tag.rs`.
         include:
           - pyodide-version: "0.29.0"
             python-version: "3.13"

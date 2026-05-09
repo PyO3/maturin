@@ -117,7 +117,12 @@ def _resolve_pyodide_platform_inputs(info: dict) -> dict:
     pyemscripten = info.get("pyemscripten_platform_version", "")
     abi_version = info.get("abi_version", "")
 
-    env = {"EMSCRIPTEN_VERSION": emscripten_version}
+    # Only export `EMSCRIPTEN_VERSION` when we actually resolved one — an
+    # empty value would clobber a previously-set `EMSCRIPTEN_VERSION` in
+    # `$GITHUB_ENV` and break `setup-emsdk`.
+    env: dict[str, str] = {}
+    if emscripten_version:
+        env["EMSCRIPTEN_VERSION"] = emscripten_version
     if pyemscripten:
         env["PYEMSCRIPTEN_PLATFORM_VERSION"] = pyemscripten
         env["EXPECTED_PLATFORM_TAG"] = f"pyemscripten_{pyemscripten}_wasm32"

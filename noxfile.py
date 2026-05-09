@@ -153,13 +153,20 @@ def setup_pyodide(session: nox.Session):
             external=True,
         )
         with session.chdir(tests_dir / "node_modules" / "pyodide"):
-            session.run(
-                "node",
-                "../prettier/bin/prettier.cjs",
-                "-w",
-                "pyodide.asm.js",
-                external=True,
-            )
+            # Pyodide ships its Emscripten output as a single very long line
+            # named `pyodide.asm.js` (Pyodide <= 0.29) or `pyodide.asm.mjs`
+            # (Pyodide >= 314.0.0a1). Prettifying it makes Node-side errors
+            # readable. Run prettier on whichever of the two exists.
+            for asm_filename in ("pyodide.asm.js", "pyodide.asm.mjs"):
+                if Path(asm_filename).exists():
+                    session.run(
+                        "node",
+                        "../prettier/bin/prettier.cjs",
+                        "-w",
+                        asm_filename,
+                        external=True,
+                    )
+                    break
             with open("pyodide-lock.json") as f:
                 info = json.load(f)["info"]
             for name, value in _resolve_pyodide_platform_inputs(info).items():

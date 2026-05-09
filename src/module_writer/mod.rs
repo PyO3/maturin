@@ -10,7 +10,7 @@ use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use itertools::Itertools as _;
 use normpath::PathExt as _;
-use tracing::{debug, trace};
+use tracing::{debug, warn};
 
 use crate::Metadata24;
 use crate::PyProjectToml;
@@ -19,6 +19,7 @@ use crate::archive_source::FileSourceData;
 use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
+use crate::util::is_symlink_loop_error;
 
 pub(crate) mod glob;
 #[cfg(test)]
@@ -148,16 +149,9 @@ pub fn write_python_part(
             let absolute = match absolute {
                 Ok(entry) => entry.into_path(),
                 Err(err) => {
-                    // Skip errors for paths that don't need to be included, e.g. for directories
-                    // that we don't have permissions for.
-                    if let ignore::Error::WithPath { path, .. } = &err
-                        && !python_packages.iter().any(|pkg| path.starts_with(pkg))
-                    {
-                        // Log priority logging, we're only looking at the directory at all due to
-                        // a particularity in how we're doing path traversal.
-                        trace!(
-                            "Skipping inaccessible path {} due to read error: {err}",
-                            path.display()
+                    if is_symlink_loop_error(&err) {
+                        warn!(
+                            "Skipping symlink loop in Python package source tree while building wheel: {err}"
                         );
                         continue;
                     }

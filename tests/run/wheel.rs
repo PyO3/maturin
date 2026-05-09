@@ -1,5 +1,4 @@
 use crate::common::{handle_result, other};
-use std::path::Path;
 
 #[test]
 #[cfg(feature = "sbom")]
@@ -61,33 +60,8 @@ fn pyo3_mixed_py_subdir_include_wheel_files() {
 #[test]
 #[cfg(unix)]
 fn pyo3_mixed_py_subdir_includes_symlinked_python_files() {
-    use std::os::unix::fs::symlink;
-
     handle_result((|| {
-        let temp_dir = tempfile::tempdir()?;
-        let project_dir = temp_dir.path().join("pyo3-mixed-py-subdir");
-        other::copy_dir_recursive(Path::new("test-crates/pyo3-mixed-py-subdir"), &project_dir)?;
-
-        let external_sources = temp_dir.path().join("external-python");
-        fs_err::create_dir_all(external_sources.join("linked_dir"))?;
-        fs_err::write(external_sources.join("linked_file.py"), "VALUE = 1\n")?;
-        fs_err::write(
-            external_sources.join("linked_dir").join("nested.py"),
-            "VALUE = 2\n",
-        )?;
-
-        let package_dir = project_dir
-            .join("python")
-            .join("pyo3_mixed_py_subdir")
-            .join("python_module");
-        symlink(
-            external_sources.join("linked_file.py"),
-            package_dir.join("linked_file.py"),
-        )?;
-        symlink(
-            external_sources.join("linked_dir"),
-            package_dir.join("linked_dir"),
-        )?;
+        let (_temp_dir, project_dir) = other::copy_pyo3_mixed_py_subdir_with_symlinks()?;
 
         let mut expected = vec![
             "assets/extra_data.txt",

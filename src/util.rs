@@ -5,6 +5,17 @@ use zip::DateTime;
 
 use fs_err as fs;
 
+pub(crate) fn is_symlink_loop_error(error: &ignore::Error) -> bool {
+    match error {
+        ignore::Error::Loop { .. } => true,
+        ignore::Error::Partial(errors) => errors.iter().any(is_symlink_loop_error),
+        ignore::Error::WithLineNumber { err, .. }
+        | ignore::Error::WithPath { err, .. }
+        | ignore::Error::WithDepth { err, .. } => is_symlink_loop_error(err),
+        _ => false,
+    }
+}
+
 pub(crate) fn sha256_hex(hash: &[u8]) -> String {
     use std::fmt::Write;
 

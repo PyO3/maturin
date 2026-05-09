@@ -3,6 +3,7 @@ use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 use url::Url;
@@ -1111,4 +1112,60 @@ fn workspace_license_files() {
         "#]],
         Some((Path::new("hello_world-0.1.0/Cargo.toml"), cargo_toml)),
     )
+}
+
+#[test]
+#[cfg(unix)]
+fn pyo3_mixed_py_subdir_includes_symlinked_python_files_sdist() {
+    use std::os::unix::fs::symlink;
+
+    handle_result((|| -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let project_dir = temp_dir.path().join("pyo3-mixed-py-subdir");
+        other::copy_dir_recursive(Path::new("test-crates/pyo3-mixed-py-subdir"), &project_dir)?;
+
+        let external_sources = temp_dir.path().join("external-python");
+        fs_err::create_dir_all(external_sources.join("linked_dir"))?;
+        fs_err::write(external_sources.join("linked_file.py"), "VALUE = 1\n")?;
+        fs_err::write(
+            external_sources.join("linked_dir").join("nested.py"),
+            "VALUE = 2\n",
+        )?;
+
+        let package_dir = project_dir
+            .join("python")
+            .join("pyo3_mixed_py_subdir")
+            .join("python_module");
+        symlink(
+            external_sources.join("linked_file.py"),
+            package_dir.join("linked_file.py"),
+        )?;
+        symlink(
+            external_sources.join("linked_dir"),
+            package_dir.join("linked_dir"),
+        )?;
+
+        let mut archive = other::build_source_distribution(
+            &project_dir,
+            SdistGenerator::Cargo,
+            "sdist-pyo3-mixed-py-subdir-symlinks",
+        )?;
+        let mut files = BTreeSet::new();
+        for entry in archive.entries()? {
+            let entry = entry?;
+            files.insert(format!("{}", entry.path()?.display()));
+        }
+
+        for expected in [
+            "pyo3_mixed_py_subdir-2.1.3/python/pyo3_mixed_py_subdir/python_module/linked_file.py",
+            "pyo3_mixed_py_subdir-2.1.3/python/pyo3_mixed_py_subdir/python_module/linked_dir/nested.py",
+        ] {
+            assert!(
+                files.contains(expected),
+                "expected `{expected}` in sdist, got {files:#?}"
+            );
+        }
+
+        Ok(())
+    })());
 }

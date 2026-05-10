@@ -307,7 +307,7 @@ mod tests {
         // find_bridge alone never includes conditional features → no abi3
         let bridge = find_bridge(&metadata, None).unwrap();
         assert!(
-            !bridge.is_abi3(),
+            !bridge.has_stable_abi(),
             "find_bridge should not infer abi3 from conditional features"
         );
 
@@ -328,7 +328,10 @@ mod tests {
             std::slice::from_ref(&py310),
         )
         .unwrap();
-        assert!(!bridge.is_abi3(), "should not infer abi3 for Python 3.10");
+        assert!(
+            !bridge.has_stable_abi(),
+            "should not infer abi3 for Python 3.10"
+        );
 
         // With a Python 3.11 interpreter, condition matches → abi3
         let py311 = crate::PythonInterpreter::from_config(
@@ -348,7 +351,7 @@ mod tests {
             std::slice::from_ref(&py311),
         )
         .unwrap();
-        assert!(bridge.is_abi3(), "should infer abi3 for Python 3.11");
+        assert!(bridge.has_stable_abi(), "should infer abi3 for Python 3.11");
 
         // With mixed interpreters [3.10, 3.11], abi3 IS inferred because
         // at least one interpreter (3.11) matches the condition. This is safe
@@ -358,7 +361,7 @@ mod tests {
         let bridge =
             upgrade_bridge_abi3(base_bridge, &metadata, Some(&pyproject), &[py310, py311]).unwrap();
         assert!(
-            bridge.is_abi3(),
+            bridge.has_stable_abi(),
             "should infer abi3 for mixed [3.10, 3.11] (build_stable_abi_wheels handles the split)"
         );
     }

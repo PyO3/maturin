@@ -650,6 +650,7 @@ Tag: cp37-abi3-manylinux2014_x86_64
 
     #[cfg(unix)]
     #[test]
+    #[serial_test::serial]
     fn add_data_resolves_symlink_targets_and_uses_source_permissions() -> Result<()> {
         let tmp_dir = TempDir::new()?;
         let source = tmp_dir.path().join("README.md");

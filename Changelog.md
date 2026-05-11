@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.13.3
+
+* Fix: disable abi3 in pyo3 config for version-specific fallback builds ([#3180](https://github.com/pyo3/maturin/pull/3180))
+
+## 1.13.2
+
+* Fix: resolve test failures in distro packaging environments ([#3129](https://github.com/pyo3/maturin/pull/3129))
+* Fix: redirect tracing output to stderr to avoid breaking PEP 517 ([#3131](https://github.com/pyo3/maturin/pull/3131))
+* Fix: skip interpreters with empty output for WSL2 cross-compile ([#3137](https://github.com/pyo3/maturin/pull/3137))
+* Fix: set explicit lib_name in pyo3 config for Android abi3 cross-compilation ([#3130](https://github.com/pyo3/maturin/pull/3130))
+* Chore: add sysconfig/cpython-freebsd-15.0-amd64.txt ([#3140](https://github.com/pyo3/maturin/pull/3140))
+* Quote python-version in generated GitHub Actions workflow
+* Update rustls-webpki
+* Fix: two-phase bridge detection for conditional abi3 features ([#3144](https://github.com/pyo3/maturin/pull/3144))
+* Update cargo-zigbuild to 0.22.2
+* Update pyo3 to 0.28.3
+* Treat pyo3 0.29.0+ as having Windows import lib support (raw-dylib) ([#3145](https://github.com/pyo3/maturin/pull/3145))
+* Fix bin bindings with external shared library dependencies ([#3147](https://github.com/pyo3/maturin/pull/3147))
+* Upgrade MSRV to 1.89.0 ([#3149](https://github.com/pyo3/maturin/pull/3149))
+* Musllinux oci image ([#3152](https://github.com/pyo3/maturin/pull/3152))
+* Remove Cirrus CI for FreeBSD ([#3156](https://github.com/pyo3/maturin/pull/3156))
+* Perf: defer stage_artifact copy-back, finalize via rename when unpatched ([#3155](https://github.com/pyo3/maturin/pull/3155))
+* Perf: eliminate stage_artifact double-copy, drop was_patched flag ([#3157](https://github.com/pyo3/maturin/pull/3157))
+* Fix release pipeline ([#3158](https://github.com/pyo3/maturin/pull/3158))
+* Auditwheel: copy unpatched cargo output back before in-place patching ([#3159](https://github.com/pyo3/maturin/pull/3159))
+* Develop: fail loudly when pip leaves a stale `~` install behind (#1922) ([#3161](https://github.com/pyo3/maturin/pull/3161))
+* Provide a link for the `lib.name` in Cargo.toml ([#3167](https://github.com/pyo3/maturin/pull/3167))
+* Fix duplicated version in changelog ([#3171](https://github.com/pyo3/maturin/pull/3171))
+* Switch to actions/attest from attest-build-provenance ([#3169](https://github.com/pyo3/maturin/pull/3169))
+* Switch generation to actions/attest action, upgrade to v4 ([#3170](https://github.com/pyo3/maturin/pull/3170))
+* Fix: avoid duplicate `--interpreter` panic in PEP 517 backend ([#3175](https://github.com/pyo3/maturin/pull/3175))
+* Add trusted publishing options to `generate-ci` ([#3176](https://github.com/pyo3/maturin/pull/3176))
+* Fix(sdist): handle symlinked `Cargo.toml` pointing outside project root ([#3178](https://github.com/pyo3/maturin/pull/3178))
+* Stop install cffi for Python 3.8 in Dockerfile
+* Fix: support pixi-managed virtualenvs in maturin develop ([#3165](https://github.com/pyo3/maturin/pull/3165))
+* Support PEP 783 `pyemscripten_*_wasm32` wheel platform tag ([#3163](https://github.com/pyo3/maturin/pull/3163))
+
 ## 1.13.1
 
 * Fix: fall back to placeholder for abi3 when found interpreters are too old ([#3126](https://github.com/pyo3/maturin/pull/3126))

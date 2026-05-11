@@ -161,10 +161,7 @@ pub fn get_platform_tag(
             )
         }
         // Emscripten
-        (Os::Emscripten, Arch::Wasm32) => {
-            let release = emscripten_version()?.replace(['.', '-'], "_");
-            format!("emscripten_{release}_wasm32")
-        }
+        (Os::Emscripten, Arch::Wasm32) => emscripten_platform_tag()?,
         (Os::Wasi, Arch::Wasm32) => "any".to_string(),
         // Cygwin
         (Os::Cygwin, _) => {
@@ -335,6 +332,110 @@ pub(crate) fn rustc_macosx_target_version(target: &str) -> (u16, u16) {
     rustc_target_version().unwrap_or(fallback_version)
 }
 
+/// Resolve the platform tag for `wasm32-unknown-emscripten`.
+///
+/// This implements the priority cascade required to support both
+/// [PEP 783](https://peps.python.org/pep-0783/) and pre-PEP 783 Pyodide
+/// releases:
+///
+/// 1. **PEP 783** (Pyodide >= 0.30, Python 3.14+) — emit
+///    `pyemscripten_{YEAR}_{PATCH}_wasm32`. Resolved from
+///    `MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION` /
+///    `PYEMSCRIPTEN_PLATFORM_VERSION` (the sysconfig variable Pyodide 0.30+
+///    exposes), falling back to `pyodide config get
+///    pyemscripten_platform_version`.
+/// 2. **Pre-PEP 783 standardized tag** (Pyodide 0.28 / 0.29) — emit
+///    `pyodide_{YEAR}_{PATCH}_wasm32`. Resolved from
+///    `MATURIN_PYODIDE_ABI_VERSION` / `PYODIDE_ABI_VERSION`, falling back to
+///    `pyodide config get pyodide_abi_version`. For Python 3.14+ lock
+///    files the same input maps to the PEP 783 `pyemscripten_*` tag.
+/// 3. **Legacy** (Pyodide <= 0.27) — emit
+///    `emscripten_{EMCC_VERSION}_wasm32`. Resolved from
+///    `MATURIN_EMSCRIPTEN_VERSION` or `emcc -dumpversion`. Emits a warning
+///    explaining that the tag is not PEP 783 compliant.
+fn emscripten_platform_tag() -> Result<String> {
+    if let Some(ver) = first_non_empty_env(&[
+        "MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION",
+        "PYEMSCRIPTEN_PLATFORM_VERSION",
+    ])
+    .or_else(|| pyodide_config_get("pyemscripten_platform_version"))
+    {
+        return Ok(format!("pyemscripten_{ver}_wasm32"));
+    }
+    if let Some(ver) = first_non_empty_env(&["MATURIN_PYODIDE_ABI_VERSION", "PYODIDE_ABI_VERSION"])
+        .or_else(|| pyodide_config_get("pyodide_abi_version"))
+    {
+        let py = first_non_empty_env(&["PYTHON_VERSION"])
+            .or_else(|| pyodide_config_get("python_version"));
+        return Ok(if is_python_3_14_or_later(py.as_deref()) {
+            format!("pyemscripten_{ver}_wasm32")
+        } else {
+            format!("pyodide_{ver}_wasm32")
+        });
+    }
+    let release = emscripten_version()?.replace(['.', '-'], "_");
+    eprintln!(
+        "⚠️  Falling back to legacy `emscripten_{release}_wasm32` platform tag. \
+         This wheel will not be installable on PEP 783-compliant Pyodide runtimes. \
+         Set `MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION` (PEP 783) or \
+         `MATURIN_PYODIDE_ABI_VERSION` (Pyodide 0.28+) to produce a portable tag."
+    );
+    Ok(format!("emscripten_{release}_wasm32"))
+}
+
+/// Return the first env var in `names` that is set to a non-empty (after
+/// trim) value.
+fn first_non_empty_env(names: &[&str]) -> Option<String> {
+    names.iter().find_map(|name| {
+        env::var(name).ok().and_then(|v| {
+            let t = v.trim();
+            (!t.is_empty()).then(|| t.to_string())
+        })
+    })
+}
+
+fn is_python_3_14_or_later(version: Option<&str>) -> bool {
+    let Some(version) = version else {
+        return false;
+    };
+    let mut parts = version.split('.');
+    let Some(Ok(major)) = parts.next().map(str::parse::<u32>) else {
+        return false;
+    };
+    let Some(Ok(minor)) = parts.next().map(str::parse::<u32>) else {
+        return false;
+    };
+    (major, minor) >= (3, 14)
+}
+
+/// Best-effort `pyodide config get <key>` invocation.
+///
+/// Returns `None` if `pyodide` is not on `PATH`, the command fails, or the
+/// reported value is empty / `None`.
+fn pyodide_config_get(key: &str) -> Option<String> {
+    use std::process::Command;
+
+    let output = Command::new(if cfg!(windows) {
+        "pyodide.bat"
+    } else {
+        "pyodide"
+    })
+    .arg("config")
+    .arg("get")
+    .arg(key)
+    .output()
+    .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8(output.stdout).ok()?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
 /// Emscripten version
 fn emscripten_version() -> Result<String> {
     let os_version = env::var("MATURIN_EMSCRIPTEN_VERSION");
@@ -421,8 +522,22 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_android_api_level, iphoneos_deployment_target, macosx_deployment_target};
+    use super::{
+        extract_android_api_level, iphoneos_deployment_target, is_python_3_14_or_later,
+        macosx_deployment_target,
+    };
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_is_python_3_14_or_later() {
+        assert!(is_python_3_14_or_later(Some("3.14")));
+        assert!(is_python_3_14_or_later(Some("3.14.2")));
+        assert!(is_python_3_14_or_later(Some("3.15.0")));
+        assert!(!is_python_3_14_or_later(Some("3.13.9")));
+        assert!(!is_python_3_14_or_later(Some("3")));
+        assert!(!is_python_3_14_or_later(Some("invalid")));
+        assert!(!is_python_3_14_or_later(None));
+    }
 
     #[test]
     fn test_macosx_deployment_target() {

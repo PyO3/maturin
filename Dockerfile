@@ -55,7 +55,6 @@ RUN <<EOL
     else
         apk add --no-cache libffi-dev
     fi
-    python3.8 -m pip install --no-cache-dir cffi
     python3.9 -m pip install --no-cache-dir cffi
     python3.10 -m pip install --no-cache-dir cffi
     python3.11 -m pip install --no-cache-dir cffi

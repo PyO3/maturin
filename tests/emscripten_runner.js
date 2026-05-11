@@ -2,9 +2,18 @@ const { opendir } = require("node:fs/promises");
 const { loadPyodide } = require("pyodide");
 
 async function findWheel(distDir) {
+  // Match every Emscripten / Pyodide platform tag family in the wheel
+  // filename's *platform tag* field. Wheel filenames are
+  // `{name}-{ver}-{python tag}-{abi tag}-{platform tag}.whl`, so anchor to
+  // the trailing `-{platform tag}.whl` segment to avoid false positives
+  // from a project name that happens to contain `pyodide_` etc.
+  // - `pyemscripten_<year>_<patch>_wasm32` (PEP 783, Pyodide >= 0.30)
+  // - `pyodide_<year>_<patch>_wasm32`     (pre-PEP 783, Pyodide 0.28/0.29)
+  // - `emscripten_<emcc-version>_wasm32`  (legacy, Pyodide <= 0.27)
+  const tagRegex = /-(pyemscripten|pyodide|emscripten)_[^-]+_wasm32\.whl$/;
   const dir = await opendir(distDir);
   for await (const dirent of dir) {
-    if (dirent.name.includes("emscripten") && dirent.name.endsWith("whl")) {
+    if (tagRegex.test(dirent.name)) {
       return dirent.name;
     }
   }

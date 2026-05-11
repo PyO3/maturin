@@ -175,3 +175,40 @@ pub(crate) fn is_uv_venv(venv_dir: &Path) -> bool {
         Err(_) => false,
     }
 }
+
+/// Check if a virtualenv is created by pixi by checking for `conda-meta/pixi_env_prefix`
+pub(crate) fn is_pixi_venv(venv_dir: &Path) -> bool {
+    venv_dir.join("conda-meta").join("pixi_env_prefix").exists()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_pixi_venv;
+    use fs_err as fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_is_pixi_venv_detects_marker() {
+        let tmp = TempDir::new().unwrap();
+        let conda_meta = tmp.path().join("conda-meta");
+        fs::create_dir_all(&conda_meta).unwrap();
+        fs::write(conda_meta.join("pixi_env_prefix"), "").unwrap();
+        assert!(is_pixi_venv(tmp.path()));
+    }
+
+    #[test]
+    fn test_is_pixi_venv_rejects_plain_venv() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("pyvenv.cfg"), "home = /usr/bin\n").unwrap();
+        assert!(!is_pixi_venv(tmp.path()));
+    }
+
+    #[test]
+    fn test_is_pixi_venv_rejects_vanilla_conda() {
+        let tmp = TempDir::new().unwrap();
+        let conda_meta = tmp.path().join("conda-meta");
+        fs::create_dir_all(&conda_meta).unwrap();
+        fs::write(conda_meta.join("python-3.12.0-h12345.json"), "{}").unwrap();
+        assert!(!is_pixi_venv(tmp.path()));
+    }
+}

@@ -620,8 +620,19 @@ fn configure_macos_pyo3_linker_args(
     }
 
     // install_name is specific to the top-level output, so keep it in cargo_rustc.args
-    let so_filename = if bridge_model.is_abi3() {
-        format!("{module_name}.abi3.so")
+    let stable_abi_suffix = python_interpreter.and_then(|i| {
+        if bridge_model.is_stable_abi_for_interpreter(i) {
+            bridge_model.pyo3().and_then(|pyo3| {
+                pyo3.stable_abi
+                    .and_then(|stable_abi| Some(format!("{}", stable_abi)))
+            })
+        } else {
+            None
+        }
+    });
+
+    let so_filename = if let Some(suffix) = stable_abi_suffix {
+        format!("{module_name}.{suffix}.so")
     } else {
         python_interpreter
             .expect("missing python interpreter for non-abi3 wheel build")
@@ -852,7 +863,10 @@ fn configure_pyo3_env(
     target: &Target,
     target_triple: &str,
 ) -> Result<()> {
-    if bridge_model.is_abi3() {
+    // Only set PYO3_NO_PYTHON for true abi3 builds where the interpreter meets
+    // the abi3 minimum version.  Version-specific fallback builds (e.g. Python
+    // 3.10 when abi3 targets ≥ 3.11) must not set PYO3_NO_PYTHON.
+    if python_interpreter.is_some_and(|i| bridge_model.is_abi3_for_interpreter(i)) {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
@@ -892,7 +906,8 @@ fn configure_pyo3_env(
             // and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
-            let pyo3_config = interpreter.pyo3_config_file(target, bridge_model.is_abi3());
+            let use_abi3 = bridge_model.is_abi3_for_interpreter(interpreter);
+            let pyo3_config = interpreter.pyo3_config_file(target, use_abi3);
             let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",

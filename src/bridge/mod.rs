@@ -9,6 +9,7 @@ use serde::Deserialize;
 
 use crate::python_interpreter::{
     MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
+    PythonInterpreter,
 };
 
 /// pyo3 binding crate
@@ -335,16 +336,37 @@ impl BridgeModel {
         }
     }
 
-    /// Is using abi3
-    pub fn is_abi3(&self) -> bool {
+    /// Returns `true` if the bridge model carries stable-ABI metadata (e.g. abi3).
+    ///
+    /// This is a project-level check — it does not consider whether a particular
+    /// interpreter meets the abi3 minimum version.  For per‑interpreter checks
+    /// use [`is_abi3_for_interpreter`](Self::is_abi3_for_interpreter).
+    pub fn has_stable_abi(&self) -> bool {
         self.pyo3()
-            .and_then(|pyo3| match pyo3.stable_abi {
-                Some(stable_abi) => match stable_abi.kind {
-                    StableAbiKind::Abi3 => Some(true),
-                },
-                None => None,
+            .and_then(|pyo3| pyo3.stable_abi.as_ref())
+            .is_some()
+    }
+
+    /// Check whether abi3 should be enabled for a specific interpreter.
+    ///
+    /// Returns `true` only when the bridge model has stable abi support **and**
+    /// the given interpreter supports the stable ABI **and** meets the abi3
+    /// minimum version. Version‑specific fallback builds (e.g. Python 3.10 when
+    /// abi3 targets ≥ 3.11) return `false` so that `Py_LIMITED_API` is not
+    /// defined and interpreter‑specific linker names are used.
+    pub fn is_abi3_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
+        if !interpreter.has_stable_api() {
+            return false;
+        }
+
+        self.pyo3()
+            .and_then(|pyo3| pyo3.stable_abi.as_ref())
+            .is_some_and(|stable_abi| match stable_abi.version.min_version() {
+                Some((major, minor)) => {
+                    (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
+                }
+                None => true, // CurrentPython → compatible when stable ABI is supported
             })
-            .is_some_and(|x| x)
     }
 
     /// free-threaded Python support

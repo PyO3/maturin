@@ -87,7 +87,7 @@ pub(crate) fn generate_github(
     sdist: bool,
     min_python_minor: Option<u8>,
 ) -> Result<String> {
-    let is_abi3 = bridge_model.is_abi3();
+    let is_abi3 = bridge_model.has_stable_abi();
     let is_bin = bridge_model.is_bin();
     let setup_python = resolved.pytest
         || matches!(

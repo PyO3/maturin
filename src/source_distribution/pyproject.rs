@@ -1,15 +1,36 @@
 use crate::pyproject_toml::Format;
 use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use path_slash::PathExt as _;
 use pyproject_toml::check_pep639_glob;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tracing::{debug, trace};
 
 use super::SdistContext;
 use super::cargo_toml_rewrite::parse_toml_file;
 use super::utils::is_compiled_artifact;
+
+/// Reject absolute paths and paths containing `..` components for files
+/// referenced from `pyproject.toml` (e.g. `[project.readme]` `file` or
+/// `[project.license]` `file`). Such paths could otherwise place files at
+/// surprising locations in the sdist or read files outside the project
+/// directory.
+fn check_pyproject_relative_path(path: &Path, field: &str) -> Result<()> {
+    if path.is_absolute() {
+        bail!(
+            "`{field}` path `{}` must be relative to pyproject.toml",
+            path.display()
+        );
+    }
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        bail!(
+            "`{field}` path `{}` must not contain `..` components",
+            path.display()
+        );
+    }
+    Ok(())
+}
 
 /// Add pyproject.toml to the sdist (rewriting paths if necessary).
 pub(super) fn add_pyproject_toml(
@@ -124,15 +145,18 @@ pub(super) fn add_pyproject_metadata(
             _ => None,
         };
         if let Some(readme) = readme_file.map(Path::new) {
+            check_pyproject_relative_path(readme, "project.readme.file")?;
             let target = root_dir.join(readme);
             if !writer.contains_target(&target) {
                 writer.add_file(target, pyproject_dir.join(readme), false)?;
             }
         }
         if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
-            let target = root_dir.join(file);
+            let file_path = Path::new(file);
+            check_pyproject_relative_path(file_path, "project.license.file")?;
+            let target = root_dir.join(file_path);
             if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(file), false)?;
+                writer.add_file(target, pyproject_dir.join(file_path), false)?;
             }
         }
         if let Some(license_files) = &project.license_files {

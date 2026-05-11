@@ -1736,7 +1736,7 @@ dependencies = [
 
 [[package]]
 name = "maturin"
-version = "1.13.2"
+version = "1.13.3"
 dependencies = [
  "anyhow",
  "arwen",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.3
+
+* Fix: disable abi3 in pyo3 config for version-specific fallback builds ([#3180](https://github.com/pyo3/maturin/pull/3180))
+
 ## 1.13.2
 
 * Fix: resolve test failures in distro packaging environments ([#3129](https://github.com/pyo3/maturin/pull/3129))

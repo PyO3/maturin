@@ -11,12 +11,24 @@ use super::SdistContext;
 use super::cargo_toml_rewrite::parse_toml_file;
 use super::utils::is_compiled_artifact;
 
-/// Reject absolute paths and paths containing `..` components for files
-/// referenced from `pyproject.toml` (e.g. `[project.readme]` `file` or
-/// `[project.license]` `file`). Such paths could otherwise place files at
-/// surprising locations in the sdist or read files outside the project
-/// directory.
-fn check_pyproject_relative_path(path: &Path, field: &str) -> Result<()> {
+/// Add a file referenced from `pyproject.toml` (e.g. `project.readme.file`
+/// or `project.license.file`) at the sdist root.
+///
+/// The path must be relative and must not contain `..` components, otherwise
+/// it could place files at surprising locations in the sdist or read files
+/// outside the project directory.
+///
+/// Skip if the target is already in the writer (e.g. added from Cargo.toml
+/// metadata) to avoid duplicates. See
+/// <https://github.com/PyO3/maturin/issues/2358>.
+fn add_pyproject_relative_file(
+    writer: &mut VirtualWriter<SDistWriter>,
+    pyproject_dir: &Path,
+    root_dir: &Path,
+    file: impl AsRef<Path>,
+    field: &str,
+) -> Result<()> {
+    let path = file.as_ref();
     if path.is_absolute() {
         bail!(
             "`{field}` path `{}` must be relative to pyproject.toml",
@@ -28,6 +40,10 @@ fn check_pyproject_relative_path(path: &Path, field: &str) -> Result<()> {
             "`{field}` path `{}` must not contain `..` components",
             path.display()
         );
+    }
+    let target = root_dir.join(path);
+    if !writer.contains_target(&target) {
+        writer.add_file(target, pyproject_dir.join(path), false)?;
     }
     Ok(())
 }
@@ -133,31 +149,34 @@ pub(super) fn add_pyproject_metadata(
     root_dir: &Path,
     python_dir: &Path,
 ) -> Result<()> {
-    // Add readme, license from pyproject.toml
-    // Skip if already added (e.g. from Cargo.toml metadata) to avoid duplicates.
-    // See https://github.com/PyO3/maturin/issues/2358
+    // Add readme, license from pyproject.toml.
     if let Some(project) = pyproject.project.as_ref() {
         let readme_file = match project.readme.as_ref() {
-            Some(pyproject_toml::ReadMe::RelativePath(readme)) => Some(readme.as_str()),
-            Some(pyproject_toml::ReadMe::Table {
-                file: Some(file), ..
-            }) => Some(file.as_str()),
+            Some(
+                pyproject_toml::ReadMe::RelativePath(file)
+                | pyproject_toml::ReadMe::Table {
+                    file: Some(file), ..
+                },
+            ) => Some(file),
             _ => None,
         };
-        if let Some(readme) = readme_file.map(Path::new) {
-            check_pyproject_relative_path(readme, "project.readme.file")?;
-            let target = root_dir.join(readme);
-            if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(readme), false)?;
-            }
+        if let Some(file) = readme_file {
+            add_pyproject_relative_file(
+                writer,
+                pyproject_dir,
+                root_dir,
+                file,
+                "project.readme.file",
+            )?;
         }
         if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
-            let file_path = Path::new(file);
-            check_pyproject_relative_path(file_path, "project.license.file")?;
-            let target = root_dir.join(file_path);
-            if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(file_path), false)?;
-            }
+            add_pyproject_relative_file(
+                writer,
+                pyproject_dir,
+                root_dir,
+                file,
+                "project.license.file",
+            )?;
         }
         if let Some(license_files) = &project.license_files {
             let escaped_pyproject_dir =

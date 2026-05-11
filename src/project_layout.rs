@@ -134,7 +134,17 @@ impl ProjectResolver {
             .context("Failed to parse Cargo.toml into python metadata")?;
         if let Some(pyproject) = pyproject {
             let pyproject_dir = pyproject_file.parent().unwrap();
-            metadata24.merge_pyproject_toml(pyproject_dir, pyproject)?;
+            let workspace_root = cargo_metadata.workspace_root.as_std_path();
+            let allowed_metadata_root = if pyproject_dir.starts_with(workspace_root) {
+                workspace_root
+            } else {
+                pyproject_dir
+            };
+            metadata24.merge_pyproject_toml_with_metadata_root(
+                pyproject_dir,
+                allowed_metadata_root,
+                pyproject,
+            )?;
         }
 
         let crate_name = &cargo_toml.package.name;

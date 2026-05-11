@@ -26,7 +26,10 @@ use self::cargo_toml_rewrite::{
     rewrite_cargo_toml_targets, strip_non_workspace_tables,
 };
 pub use self::path_deps::{PathDependency, find_path_deps};
-use self::pyproject::{add_pyproject_metadata, add_pyproject_toml, add_python_sources};
+use self::pyproject::{
+    add_pyproject_metadata, add_pyproject_metadata_files, add_pyproject_toml, add_python_sources,
+    reject_parent_relative_metadata_paths,
+};
 pub use self::unpack::{UnpackedSdist, unpack_sdist};
 use self::utils::{common_path_prefix, is_compiled_artifact, normalize_path};
 
@@ -831,11 +834,21 @@ fn add_workspace_manifest(
 /// 6. Python sources
 fn add_cargo_package_files_to_sdist(
     project: &crate::ProjectContext,
+    pyproject: &PyProjectToml,
     pyproject_toml_path: &Path,
     writer: &mut VirtualWriter<SDistWriter>,
     root_dir: &Path,
 ) -> Result<()> {
     let ctx = SdistContext::new(project, pyproject_toml_path, root_dir)?;
+    let workspace_root = project.cargo_metadata.workspace_root.as_std_path();
+    let normalized_pyproject_dir = ctx.pyproject_dir.normalize()?.into_path_buf();
+    let normalized_workspace_root = workspace_root.normalize()?.into_path_buf();
+    let allowed_metadata_root = if normalized_pyproject_dir.starts_with(&normalized_workspace_root)
+    {
+        workspace_root
+    } else {
+        &ctx.pyproject_dir
+    };
 
     // 1. Add local path dependencies
     for (name, path_dep) in ctx.known_path_deps.iter() {
@@ -851,10 +864,14 @@ fn add_cargo_package_files_to_sdist(
     // 4. Add workspace Cargo.toml (if applicable)
     add_workspace_manifest(writer, &ctx)?;
 
-    // 5. Add pyproject.toml
-    add_pyproject_toml(writer, &ctx, pyproject_toml_path)?;
+    // 5. Add pyproject.toml metadata files and collect path rewrites.
+    let metadata_rewrites =
+        add_pyproject_metadata_files(writer, pyproject, &ctx, allowed_metadata_root)?;
 
-    // 6. Add python source files
+    // 6. Add pyproject.toml
+    add_pyproject_toml(writer, &ctx, pyproject_toml_path, &metadata_rewrites)?;
+
+    // 7. Add python source files
     add_python_sources(writer, &ctx)?;
 
     Ok(())
@@ -903,16 +920,23 @@ pub fn source_distribution(
         &metadata24.get_version_escaped()
     ));
 
+    let pyproject_dir = pyproject_toml_path.parent().unwrap();
     match pyproject.sdist_generator() {
         SdistGenerator::Cargo => {
-            add_cargo_package_files_to_sdist(project, &pyproject_toml_path, &mut writer, &root_dir)?
+            add_cargo_package_files_to_sdist(
+                project,
+                pyproject,
+                &pyproject_toml_path,
+                &mut writer,
+                &root_dir,
+            )?;
         }
         SdistGenerator::Git => {
-            add_git_tracked_files_to_sdist(&pyproject_toml_path, &mut writer, &root_dir)?
+            reject_parent_relative_metadata_paths(pyproject)?;
+            add_git_tracked_files_to_sdist(&pyproject_toml_path, &mut writer, &root_dir)?;
         }
-    }
+    };
 
-    let pyproject_dir = pyproject_toml_path.parent().unwrap();
     add_pyproject_metadata(
         &mut writer,
         pyproject,

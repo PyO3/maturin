@@ -13,7 +13,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::str;
 use std::str::FromStr;
 use tracing::debug;
@@ -153,21 +153,36 @@ fn normalize_license_file_path(base_dir: &Path, absolute_license_path: &Path) ->
     Ok(relative.to_path_buf())
 }
 
-fn validate_safe_relative_license_path(path: &Path, source: &str) -> Result<()> {
-    if path.components().any(|c| {
-        matches!(
-            c,
-            std::path::Component::ParentDir
-                | std::path::Component::Prefix(_)
-                | std::path::Component::RootDir
-        )
-    }) {
+fn resolve_pyproject_metadata_file(
+    pyproject_dir: &Path,
+    allowed_metadata_root: &Path,
+    field: &str,
+    path: &Path,
+) -> Result<PathBuf> {
+    if path
+        .components()
+        .any(|c| matches!(c, Component::Prefix(_) | Component::RootDir))
+    {
         bail!(
-            "{source} must be a safe relative path inside the project, got `{}`",
+            "`{field}` path `{}` must be relative to pyproject.toml",
             path.display()
         );
     }
-    Ok(())
+    let source = pyproject_dir.join(path);
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        let source = source.normalize()?.into_path_buf();
+        let allowed_metadata_root = allowed_metadata_root.normalize()?.into_path_buf();
+        if !source.starts_with(&allowed_metadata_root) {
+            bail!(
+                "`{field}` path `{}` resolves outside allowed metadata root `{}`",
+                path.display(),
+                allowed_metadata_root.display()
+            );
+        }
+        Ok(source)
+    } else {
+        Ok(source)
+    }
 }
 
 impl Metadata24 {
@@ -179,7 +194,21 @@ impl Metadata24 {
         pyproject_dir: impl AsRef<Path>,
         pyproject_toml: &PyProjectToml,
     ) -> Result<()> {
-        let pyproject_dir = pyproject_dir.as_ref();
+        self.merge_pyproject_toml_with_metadata_root(
+            pyproject_dir.as_ref(),
+            pyproject_dir.as_ref(),
+            pyproject_toml,
+        )
+    }
+
+    /// Merge pyproject metadata while allowing parent-relative metadata files
+    /// under `allowed_metadata_root`.
+    pub(crate) fn merge_pyproject_toml_with_metadata_root(
+        &mut self,
+        pyproject_dir: &Path,
+        allowed_metadata_root: &Path,
+        pyproject_toml: &PyProjectToml,
+    ) -> Result<()> {
         if let Some(project) = &pyproject_toml.project {
             let dynamic: HashSet<&str> = project
                 .dynamic
@@ -194,8 +223,8 @@ impl Metadata24 {
             self.name.clone_from(&project.name);
 
             self.merge_version(pyproject_toml, project)?;
-            self.merge_readme(pyproject_dir, project)?;
-            self.merge_license(pyproject_dir, project)?;
+            self.merge_readme(pyproject_dir, allowed_metadata_root, project)?;
+            self.merge_license(pyproject_dir, allowed_metadata_root, project)?;
             self.merge_people(project);
 
             if let Some(description) = &project.description {
@@ -283,11 +312,17 @@ impl Metadata24 {
     fn merge_readme(
         &mut self,
         pyproject_dir: &Path,
+        allowed_metadata_root: &Path,
         project: &pyproject_toml::Project,
     ) -> Result<()> {
         match &project.readme {
             Some(pyproject_toml::ReadMe::RelativePath(readme_path)) => {
-                let readme_path = pyproject_dir.join(readme_path);
+                let readme_path = resolve_pyproject_metadata_file(
+                    pyproject_dir,
+                    allowed_metadata_root,
+                    "project.readme",
+                    Path::new(readme_path),
+                )?;
                 let description = Some(fs::read_to_string(&readme_path).context(format!(
                     "Failed to read readme specified in pyproject.toml, which should be at {}",
                     readme_path.display()
@@ -306,7 +341,12 @@ impl Metadata24 {
                     );
                 }
                 if let Some(readme_path) = file {
-                    let readme_path = pyproject_dir.join(readme_path);
+                    let readme_path = resolve_pyproject_metadata_file(
+                        pyproject_dir,
+                        allowed_metadata_root,
+                        "project.readme.file",
+                        Path::new(readme_path),
+                    )?;
                     let description = Some(fs::read_to_string(&readme_path).context(format!(
                         "Failed to read readme specified in pyproject.toml, which should be at {}",
                         readme_path.display()
@@ -327,6 +367,7 @@ impl Metadata24 {
     fn merge_license(
         &mut self,
         pyproject_dir: &Path,
+        allowed_metadata_root: &Path,
         project: &pyproject_toml::Project,
     ) -> Result<()> {
         if let Some(license) = &project.license {
@@ -335,11 +376,34 @@ impl Metadata24 {
                 License::Spdx(license_expr) => self.license_expression = Some(license_expr.clone()),
                 // Deprecated by PEP 639
                 License::File { file } => {
-                    let file = file.to_path_buf();
-                    validate_safe_relative_license_path(&file, "`project.license.file`")?;
-                    self.license_file_sources.remove(&file);
-                    if !self.license_files.contains(&file) {
-                        self.license_files.push(file);
+                    let source = resolve_pyproject_metadata_file(
+                        pyproject_dir,
+                        allowed_metadata_root,
+                        "project.license.file",
+                        file,
+                    )?;
+                    let target = if file.components().any(|c| matches!(c, Component::ParentDir)) {
+                        let allowed_metadata_root =
+                            allowed_metadata_root.normalize()?.into_path_buf();
+                        source
+                            .strip_prefix(&allowed_metadata_root)
+                            .with_context(|| {
+                                format!(
+                                    "`project.license.file` path `{}` resolves outside allowed metadata root `{}`",
+                                    file.display(),
+                                    allowed_metadata_root.display()
+                                )
+                            })?
+                            .to_path_buf()
+                    } else {
+                        normalize_license_file_path(pyproject_dir, &source)?
+                    };
+                    self.license_file_sources.remove(&target);
+                    if target != *file {
+                        self.license_file_sources.insert(target.clone(), source);
+                    }
+                    if !self.license_files.contains(&target) {
+                        self.license_files.push(target);
                     }
                 }
                 License::Text { text } => self.license = Some(text.clone()),
@@ -1527,7 +1591,10 @@ A test project
     #[test]
     fn test_reject_unsafe_project_license_file_path() {
         let temp_dir = TempDir::new().unwrap();
-        let crate_dir = temp_dir.path();
+        let workspace_root = temp_dir.path().join("workspace");
+        let crate_dir = workspace_root.join("crate");
+        fs::create_dir_all(&crate_dir).unwrap();
+        fs::write(temp_dir.path().join("LICENSE"), "secret license").unwrap();
 
         let pyproject_toml_content = indoc!(
             r#"
@@ -1538,7 +1605,7 @@ A test project
             [project]
             name = "my-crate"
             version = "0.1.0"
-            license = { file = "../LICENSE" }
+            license = { file = "../../LICENSE" }
             "#
         );
         fs::write(crate_dir.join("pyproject.toml"), pyproject_toml_content).unwrap();
@@ -1550,8 +1617,7 @@ A test project
             .merge_pyproject_toml(crate_dir, &pyproject_toml)
             .unwrap_err();
         assert!(
-            err.to_string()
-                .contains("`project.license.file` must be a safe relative path"),
+            err.to_string().contains("outside allowed metadata root"),
             "unexpected error: {err:#}"
         );
     }

@@ -278,6 +278,91 @@ fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
 }
 
+/// Regression test for https://github.com/PyO3/maturin/issues/...
+///
+/// When `pyproject.toml` lives in a subdirectory of a Cargo workspace and uses
+/// the table form of `[project.readme]` (i.e. `file = "README.md"`), the README
+/// must still be elevated to the sdist root alongside `pyproject.toml`, just as
+/// it is for the string form `readme = "README.md"`.
+#[test]
+fn sdist_workspace_member_table_readme() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path();
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            resolver = "2"
+            members = ["python-pkg"]
+            "#
+        ),
+    )
+    .unwrap();
+
+    let project_dir = workspace_dir.join("python-pkg");
+    fs_err::create_dir_all(project_dir.join("src")).unwrap();
+    fs_err::write(project_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(project_dir.join("README.md"), "# my-pkg\n").unwrap();
+    fs_err::write(
+        project_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [[bin]]
+            name = "python-pkg"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [project.readme]
+            file = "README.md"
+            content-type = "text/markdown"
+
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            bindings = "bin"
+            "#
+        ),
+    )
+    .unwrap();
+
+    handle_result(other::test_source_distribution(
+        &project_dir,
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "python_pkg-0.1.0/Cargo.lock",
+                "python_pkg-0.1.0/Cargo.toml",
+                "python_pkg-0.1.0/PKG-INFO",
+                "python_pkg-0.1.0/README.md",
+                "python_pkg-0.1.0/pyproject.toml",
+                "python_pkg-0.1.0/python-pkg/Cargo.toml",
+                "python_pkg-0.1.0/python-pkg/README.md",
+                "python_pkg-0.1.0/python-pkg/src/main.rs",
+            }
+        "#]],
+        None,
+        "sdist-workspace-member-table-readme",
+    ))
+}
+
 #[test]
 fn build_wheels_from_sdist_hello_world() {
     handle_result(other::test_build_wheels_from_sdist(

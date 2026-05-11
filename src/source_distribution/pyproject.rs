@@ -116,7 +116,14 @@ pub(super) fn add_pyproject_metadata(
     // Skip if already added (e.g. from Cargo.toml metadata) to avoid duplicates.
     // See https://github.com/PyO3/maturin/issues/2358
     if let Some(project) = pyproject.project.as_ref() {
-        if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
+        let readme_file = match project.readme.as_ref() {
+            Some(pyproject_toml::ReadMe::RelativePath(readme)) => Some(readme.as_str()),
+            Some(pyproject_toml::ReadMe::Table {
+                file: Some(file), ..
+            }) => Some(file.as_str()),
+            _ => None,
+        };
+        if let Some(readme) = readme_file.map(Path::new) {
             let target = root_dir.join(readme);
             if !writer.contains_target(&target) {
                 writer.add_file(target, pyproject_dir.join(readme), false)?;

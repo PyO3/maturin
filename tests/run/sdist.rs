@@ -278,12 +278,12 @@ fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
 }
 
-/// Regression test for https://github.com/PyO3/maturin/issues/...
-///
-/// When `pyproject.toml` lives in a subdirectory of a Cargo workspace and uses
-/// the table form of `[project.readme]` (i.e. `file = "README.md"`), the README
-/// must still be elevated to the sdist root alongside `pyproject.toml`, just as
-/// it is for the string form `readme = "README.md"`.
+/// Regression test: when `pyproject.toml` lives in a subdirectory of a Cargo
+/// workspace and uses the table form of `[project.readme]` (i.e.
+/// `file = "README.md"`), the README must still be elevated to the sdist root
+/// alongside `pyproject.toml`, just as it is for the string form
+/// `readme = "README.md"`. Otherwise `pip install <sdist>` fails because the
+/// readme file referenced by the elevated `pyproject.toml` cannot be found.
 #[test]
 fn sdist_workspace_member_table_readme() {
     let temp_dir = tempfile::tempdir().unwrap();

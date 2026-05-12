@@ -3,6 +3,7 @@ use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 use url::Url;
@@ -1111,4 +1112,35 @@ fn workspace_license_files() {
         "#]],
         Some((Path::new("hello_world-0.1.0/Cargo.toml"), cargo_toml)),
     )
+}
+
+#[test]
+#[cfg(unix)]
+fn pyo3_mixed_py_subdir_includes_symlinked_python_files_sdist() {
+    handle_result((|| -> anyhow::Result<()> {
+        let (_temp_dir, project_dir) = other::copy_pyo3_mixed_py_subdir_with_symlinks()?;
+
+        let mut archive = other::build_source_distribution(
+            &project_dir,
+            SdistGenerator::Cargo,
+            "sdist-pyo3-mixed-py-subdir-symlinks",
+        )?;
+        let mut files = BTreeSet::new();
+        for entry in archive.entries()? {
+            let entry = entry?;
+            files.insert(format!("{}", entry.path()?.display()));
+        }
+
+        for expected in [
+            "pyo3_mixed_py_subdir-2.1.3/python/pyo3_mixed_py_subdir/python_module/linked_file.py",
+            "pyo3_mixed_py_subdir-2.1.3/python/pyo3_mixed_py_subdir/python_module/linked_dir/nested.py",
+        ] {
+            assert!(
+                files.contains(expected),
+                "expected `{expected}` in sdist, got {files:#?}"
+            );
+        }
+
+        Ok(())
+    })());
 }

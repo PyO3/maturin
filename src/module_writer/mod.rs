@@ -10,7 +10,7 @@ use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use itertools::Itertools as _;
 use normpath::PathExt as _;
-use tracing::{debug, trace};
+use tracing::{debug, warn};
 
 use crate::Metadata24;
 use crate::PyProjectToml;
@@ -19,6 +19,7 @@ use crate::archive_source::FileSourceData;
 use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
+use crate::util::is_symlink_loop_error;
 
 pub(crate) mod glob;
 #[cfg(test)]
@@ -132,48 +133,42 @@ pub fn write_python_part(
         python_packages.push(package_path);
     }
 
-    for absolute in WalkBuilder::new(&project_layout.project_root)
-        .hidden(false)
-        .parents(false)
-        .git_global(false)
-        .git_exclude(false)
-        .build()
-    {
-        let absolute = match absolute {
-            Ok(entry) => entry.into_path(),
-            Err(err) => {
-                // Skip errors for paths that don't need to be included, e.g. for directories
-                // that we don't have permissions for.
-                if let ignore::Error::WithPath { path, .. } = &err
-                    && !python_packages.iter().any(|pkg| path.starts_with(pkg))
-                {
-                    // Log priority logging, we're only looking at the directory at all due to
-                    // a particularity in how we're doing path traversal.
-                    trace!(
-                        "Skipping inaccessible path {} due to read error: {err}",
-                        path.display()
-                    );
+    // Walk each python package directly (rather than rooting the walker at
+    // `project_root` and filtering): this keeps `follow_links(true)` scoped to
+    // symlinks inside python packages, instead of also descending into unrelated
+    // symlinked trees under the project (e.g. inside `target/` or `.venv/`).
+    for package in &python_packages {
+        for absolute in WalkBuilder::new(package)
+            .hidden(false)
+            .parents(false)
+            .git_global(false)
+            .git_exclude(false)
+            .follow_links(true)
+            .build()
+        {
+            let absolute = match absolute {
+                Ok(entry) => entry.into_path(),
+                Err(err) => {
+                    if is_symlink_loop_error(&err) {
+                        warn!(
+                            "Skipping symlink loop in Python package source tree while building wheel: {err}"
+                        );
+                        continue;
+                    }
+                    return Err(err.into());
+                }
+            };
+            let relative = absolute.strip_prefix(python_dir).unwrap();
+            if !absolute.is_dir() {
+                if is_develop_build_artifact(relative, &project_layout.extension_name) {
+                    debug!("Ignoring develop build artifact {}", relative.display());
                     continue;
                 }
-                return Err(err.into());
+                let mode = file_permission_mode(&absolute)?;
+                writer
+                    .add_file(relative, &absolute, permission_is_executable(mode))
+                    .context(format!("Failed to add file from {}", absolute.display()))?;
             }
-        };
-        if !python_packages
-            .iter()
-            .any(|path| absolute.starts_with(path))
-        {
-            continue;
-        }
-        let relative = absolute.strip_prefix(python_dir).unwrap();
-        if !absolute.is_dir() {
-            if is_develop_build_artifact(relative, &project_layout.extension_name) {
-                debug!("Ignoring develop build artifact {}", relative.display());
-                continue;
-            }
-            let mode = file_permission_mode(&absolute)?;
-            writer
-                .add_file(relative, &absolute, permission_is_executable(mode))
-                .context(format!("Failed to add file from {}", absolute.display()))?;
         }
     }
 

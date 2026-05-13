@@ -3,7 +3,7 @@ use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
 use which::which;
@@ -276,6 +276,156 @@ fn sdist_excludes_explicit_build_script() {
 #[test]
 fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
+}
+
+fn write_workspace_bin_project(
+    workspace_dir: &Path,
+    member: &str,
+    project_metadata: &str,
+) -> PathBuf {
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        format!("[workspace]\nresolver = \"2\"\nmembers = [\"{member}\"]\n"),
+    )
+    .unwrap();
+
+    let project_dir = workspace_dir.join(member);
+    fs_err::create_dir_all(project_dir.join("src")).unwrap();
+    fs_err::write(project_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(
+        project_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [[bin]]
+            name = "python-pkg"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        format!(
+            indoc!(
+                r#"
+                [project]
+                name = "python-pkg"
+                version = "0.1.0"
+
+                {}
+
+                [build-system]
+                requires = ["maturin>=1.0,<2.0"]
+                build-backend = "maturin"
+
+                [tool.maturin]
+                bindings = "bin"
+                "#
+            ),
+            project_metadata.trim_end()
+        ),
+    )
+    .unwrap();
+    project_dir
+}
+
+/// Regression test for https://github.com/PyO3/maturin/issues/3181 +
+/// follow-up: when `pyproject.toml` is in a workspace member subdirectory and
+/// references path metadata outside the member directory, those files must be
+/// included and the elevated `pyproject.toml` must be rewritten to the files'
+/// archive paths.
+#[test]
+fn sdist_workspace_member_readme_in_parent() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path();
+    let crate_group_dir = workspace_dir.join("crates");
+    fs_err::create_dir_all(&crate_group_dir).unwrap();
+    fs_err::write(crate_group_dir.join("README.md"), "# my-pkg\n").unwrap();
+    fs_err::write(crate_group_dir.join("LICENSE"), "MIT\n").unwrap();
+
+    let project_dir = write_workspace_bin_project(
+        workspace_dir,
+        "crates/python-pkg",
+        indoc!(
+            r#"
+            [project.readme]
+            file = "../README.md"
+            content-type = "text/markdown"
+
+            [project.license]
+            file = "../LICENSE"
+            "#
+        ),
+    );
+
+    handle_result(other::test_source_distribution(
+        &project_dir,
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "python_pkg-0.1.0/Cargo.lock",
+                "python_pkg-0.1.0/Cargo.toml",
+                "python_pkg-0.1.0/PKG-INFO",
+                "python_pkg-0.1.0/crates/LICENSE",
+                "python_pkg-0.1.0/crates/README.md",
+                "python_pkg-0.1.0/crates/python-pkg/Cargo.toml",
+                "python_pkg-0.1.0/crates/python-pkg/src/main.rs",
+                "python_pkg-0.1.0/pyproject.toml",
+            }
+        "#]],
+        Some((
+            Path::new("python_pkg-0.1.0/pyproject.toml"),
+            expect![[r#"
+                [project]
+                name = "python-pkg"
+                version = "0.1.0"
+
+                [project.readme]
+                file = "crates/README.md"
+                content-type = "text/markdown"
+
+                [project.license]
+                file = "crates/LICENSE"
+
+                [build-system]
+                requires = ["maturin>=1.0,<2.0"]
+                build-backend = "maturin"
+
+                [tool.maturin]
+                bindings = "bin"
+                manifest-path = "crates/python-pkg/Cargo.toml"
+            "#]],
+        )),
+        "sdist-workspace-member-readme-in-parent",
+    ))
+}
+
+#[test]
+fn git_sdist_rejects_parent_relative_pyproject_metadata_paths() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path();
+    fs_err::write(workspace_dir.join("README.md"), "# my-pkg\n").unwrap();
+    let project_dir =
+        write_workspace_bin_project(workspace_dir, "python-pkg", "readme = \"../README.md\"");
+
+    let err = match other::build_source_distribution(
+        &project_dir,
+        SdistGenerator::Git,
+        "git-sdist-rejects-parent-relative-pyproject-metadata-paths",
+    ) {
+        Ok(_) => panic!("expected git sdist generator to reject parent-relative readme"),
+        Err(err) => err,
+    };
+    let err = format!("{err:#}");
+    assert!(
+        err.contains("must not contain `..` when using the git sdist generator"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]

@@ -71,8 +71,8 @@ Options:
 
           This options offers both fine-grained control over the linux libc tag and a more automatic PyPI-compatibility option.
 
-          The `pypi` option applies on all platforms and ensure that only tags that can be uploaded to PyPI are used. The linux-specific options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`), and `linux` for the native linux tag. They are
-          ignored on non-linux platforms.
+          The `pypi` option applies on all platforms and ensure that only tags that can be uploaded to PyPI are used. The linux-specific options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`), and
+          `linux` for the native linux tag. They are ignored on non-linux platforms.
 
           Note that `manylinux1` and `manylinux2010` are unsupported by the rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
@@ -84,6 +84,7 @@ Options:
           Possible values:
           - repair: Audit and repair wheel for manylinux compliance
           - check:  Check wheel for manylinux compliance, but do not repair
+          - warn:   Audit wheel and warn about external libraries, but do not fail or repair
           - skip:   Don't check for manylinux compliance
 
       --zig
@@ -307,11 +308,9 @@ Options:
   -v, --verbose...
           Use verbose output.
 
-          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`.
-          * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`. * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
 
-          You can configure fine-grained logging using the `RUST_LOG` environment variable.
-          (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+          You can configure fine-grained logging using the `RUST_LOG` environment variable. (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
 
   -o, --output <PATH>
           Output path
@@ -319,9 +318,7 @@ Options:
           [default: -]
 
       --platform <platform>...
-          Platform support
-
-          [default: linux musllinux windows macos]
+          Platform support [deprecated: use [tool.maturin.generate-ci.github] and set 'platforms' in pyproject.toml]
 
           Possible values:
           - all:        All
@@ -330,15 +327,16 @@ Options:
           - windows:    Windows
           - macos:      macOS
           - emscripten: Emscripten
+          - android:    Android
 
       --pytest
-          Enable pytest
+          Enable pytest [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
 
       --zig
-          Use zig to do cross compilation
+          Use zig to do cross compilation [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
 
       --skip-attestation
-          Skip artifact attestation
+          Skip artifact attestation [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
 
   -h, --help
           Print help (see a summary with '-h')

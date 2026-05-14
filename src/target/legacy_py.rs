@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 pub(super) static MACOS_PLATFORM_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^macosx_(?P<major>\d+)_(?:\d+)_(?P<arch>.+)$").unwrap());
+    Lazy::new(|| Regex::new(r"^macosx_(?P<major>\d+)_(?P<minor>\d+)_(?P<arch>.+)$").unwrap());
 
 pub(super) static IOS_PLATFORM_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^ios_(?:\d+)_(?:\d+)_(?P<arch>.+)_(?:iphoneos|iphonesimulator)$").unwrap()
@@ -18,6 +18,9 @@ pub(super) static ANDROID_PLATFORM_RE: Lazy<Regex> =
 pub(super) static LINUX_PLATFORM_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(?P<libc>(?:many|musl))linux_(?:\d+)_(?:\d+)_(?P<arch>.+)$").unwrap()
 });
+
+pub(super) static PYEMSCRIPTEN_PLATFORM_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^pyemscripten_(?:\d+)_(?:\d+)_wasm32$").unwrap());
 
 /// Contains also non-Rust platforms to match `legacy.py` verbatim.
 pub(super) static ALLOWED_PLATFORMS: &[&str] = &[
@@ -49,8 +52,8 @@ pub(super) static WINDOWS_ARCHES: &[&str] = &["x86_64", "i686", "aarch64"];
 /// Reduced list only containing targets support by both Rust/maturin and PyPI.
 pub(super) static MACOS_ARCHES: &[&str] = &["x86_64", "arm64", "i686", "universal2"];
 
-/// Those are actually hardcoded in warehouse in the same way.
-pub(super) static MACOS_MAJOR_VERSIONS: &[&str] = &["10", "11", "12", "13", "14", "15", "26"];
+/// macOS 10 is handled separately because `macosx_10_{minor}` tags allow any minor version.
+pub(super) static MACOS_MAJOR_VERSIONS: &[&str] = &["11", "12", "13", "14", "15", "26"];
 
 pub(super) static IOS_ARCHES: &[&str] = &["arm64", "x86_64"];
 

@@ -622,9 +622,9 @@ fn configure_macos_pyo3_linker_args(
     // install_name is specific to the top-level output, so keep it in cargo_rustc.args
     let stable_abi_suffix = python_interpreter.and_then(|i| {
         if bridge_model.is_stable_abi_for_interpreter(i) {
-            bridge_model.pyo3().and_then(|pyo3| {
-                pyo3.stable_abi.map(|stable_abi| format!("{}", stable_abi))
-            })
+            bridge_model
+                .pyo3()
+                .and_then(|pyo3| pyo3.stable_abi.map(|stable_abi| format!("{}", stable_abi)))
         } else {
             None
         }

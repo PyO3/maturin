@@ -17,11 +17,12 @@
 //! - macOS: x86_64, arm64, i686 (Tier 3), universal2 (maturin special target)
 //! - iOS: arm64, x86_64 (simulator)
 //! - Android: armeabi_v7a (armv7l), arm64_v8a (aarch64), x86 (i686), x86_64
+//! - Emscripten: wasm32
 
 use crate::target::legacy_py::{
     ALLOWED_PLATFORMS, ANDROID_ARCHES, ANDROID_PLATFORM_RE, IOS_ARCHES, IOS_PLATFORM_RE,
     LINUX_PLATFORM_RE, MACOS_ARCHES, MACOS_MAJOR_VERSIONS, MACOS_PLATFORM_RE, MANYLINUX_ARCHES,
-    MUSLLINUX_ARCHES, WINDOWS_ARCHES,
+    MUSLLINUX_ARCHES, PYEMSCRIPTEN_PLATFORM_RE, WINDOWS_ARCHES,
 };
 use crate::target::{Arch, Os, Target};
 use anyhow::{Result, anyhow, bail};
@@ -62,6 +63,7 @@ pub fn is_arch_supported_by_pypi(target: &Target) -> bool {
             };
             ANDROID_ARCHES.contains(&android_arch)
         }
+        Os::Emscripten => arch == Arch::Wasm32,
         Os::Linux => {
             // Old arm versions
             // https://github.com/pypi/warehouse/blob/556e1e3390999381c382873b003a779a1363cb4d/warehouse/forklift/legacy.py#L122-L123
@@ -98,9 +100,16 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     // macOS
     if let Some(captures) = MACOS_PLATFORM_RE.captures(platform_tag) {
         let major = captures.name("major").unwrap().as_str();
+        let minor = captures.name("minor").unwrap().as_str();
         let arch = captures.name("arch").unwrap().as_str();
 
-        return MACOS_MAJOR_VERSIONS.contains(&major) && MACOS_ARCHES.contains(&arch);
+        if major == "10" && MACOS_ARCHES.contains(&arch) {
+            return true;
+        }
+
+        return MACOS_MAJOR_VERSIONS.contains(&major)
+            && minor == "0"
+            && MACOS_ARCHES.contains(&arch);
     }
 
     // manylinux/musllinux
@@ -131,6 +140,11 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     if let Some(captures) = ANDROID_PLATFORM_RE.captures(platform_tag) {
         let arch = captures.name("arch").unwrap().as_str();
         return ANDROID_ARCHES.contains(&arch);
+    }
+
+    // Emscripten / Pyodide, PEP 783
+    if PYEMSCRIPTEN_PLATFORM_RE.is_match(platform_tag) {
+        return true;
     }
 
     false
@@ -200,6 +214,7 @@ mod tests {
             ("macosx_9_0_x86_64", false), // Invalid major version
             ("macosx_10_9_x86_64", true),
             ("macosx_11_0_arm64", true),
+            ("macosx_11_1_arm64", false), // Only macOS 10 allows arbitrary minor versions
             ("macosx_26_0_arm64", true),
             // iOS platforms
             ("ios_14_0_arm64_iphoneos", true),
@@ -211,6 +226,9 @@ mod tests {
             ("android_21_x86", true),
             ("android_21_x86_64", true),
             ("android_21_mips", false), // Unsupported architecture
+            // Emscripten / Pyodide, PEP 783
+            ("pyemscripten_2025_0_wasm32", true),
+            ("pyodide_2025_0_wasm32", false),
         ];
 
         for (platform_tag, expected) in tags {
@@ -252,7 +270,7 @@ mod tests {
             ("x86_64-unknown-freebsd", false), // Now unsupported (no lazy validation)
             ("powerpc64-unknown-linux-gnu", true), // PPC64 on Linux is supported
             ("s390x-unknown-linux-gnu", true), // s390x on Linux is supported
-            ("wasm32-unknown-emscripten", false), // Emscripten is unsupported
+            ("wasm32-unknown-emscripten", true), // Emscripten uses PEP 783 pyemscripten tags
             ("i686-pc-windows-msvc", true),    // i686 Windows is supported
         ];
 

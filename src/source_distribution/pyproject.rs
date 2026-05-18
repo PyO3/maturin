@@ -1,23 +1,149 @@
 use crate::pyproject_toml::Format;
 use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+use normpath::PathExt as _;
 use path_slash::PathExt as _;
 use pyproject_toml::check_pep639_glob;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tracing::{debug, trace};
 
 use super::SdistContext;
 use super::cargo_toml_rewrite::parse_toml_file;
 use super::utils::is_compiled_artifact;
 
+pub(super) type PyprojectPathRewrite = (&'static str, String);
+
+fn parent_relative_metadata_path(field: &str, path: &Path) -> Result<bool> {
+    if path
+        .components()
+        .any(|c| matches!(c, Component::Prefix(_) | Component::RootDir))
+    {
+        bail!(
+            "`project.{field}.file` path `{}` must be relative to pyproject.toml",
+            path.display()
+        );
+    }
+    Ok(path.components().any(|c| matches!(c, Component::ParentDir)))
+}
+
+fn project_metadata_paths(
+    project: &pyproject_toml::Project,
+) -> Vec<(&'static str, &'static str, &Path)> {
+    let mut paths = Vec::new();
+    match project.readme.as_ref() {
+        Some(pyproject_toml::ReadMe::RelativePath(file)) => {
+            paths.push(("readme", "project.readme", Path::new(file.as_str())));
+        }
+        Some(pyproject_toml::ReadMe::Table {
+            file: Some(file), ..
+        }) => {
+            paths.push(("readme", "project.readme.file", Path::new(file.as_str())));
+        }
+        _ => {}
+    }
+    if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
+        paths.push(("license", "project.license.file", file.as_path()));
+    }
+    paths
+}
+
+/// Add readme/license files referenced from `[project]` metadata.
+///
+/// Because the generated `pyproject.toml` always lives at the sdist root, any
+/// parent-relative metadata path must be rewritten to the referenced file's
+/// archive path. The source is still constrained by `allowed_metadata_root`.
+pub(super) fn add_pyproject_metadata_files(
+    writer: &mut VirtualWriter<SDistWriter>,
+    pyproject: &PyProjectToml,
+    ctx: &SdistContext<'_>,
+    allowed_metadata_root: &Path,
+) -> Result<Vec<PyprojectPathRewrite>> {
+    let mut rewrites = Vec::new();
+    let Some(project) = pyproject.project.as_ref() else {
+        return Ok(rewrites);
+    };
+    let allowed_metadata_root = allowed_metadata_root.normalize()?.into_path_buf();
+    let project_root = ctx.project_root.normalize()?.into_path_buf();
+
+    for (field, field_name, path) in project_metadata_paths(project) {
+        let mut source = ctx.pyproject_dir.join(path);
+        let mut target_relative = path.to_path_buf();
+        if parent_relative_metadata_path(field_name, path)? {
+            if ctx.pyproject_dir == ctx.sdist_root {
+                bail!(
+                    "`{field_name}` path `{}` must not contain `..` when pyproject.toml is already at the sdist root",
+                    path.display()
+                );
+            }
+            source = source.normalize()?.into_path_buf();
+            if !source.starts_with(allowed_metadata_root.as_path()) {
+                bail!(
+                    "`{field_name}` path `{}` resolves outside allowed metadata root `{}`",
+                    path.display(),
+                    allowed_metadata_root.display()
+                );
+            }
+            target_relative = source
+                .strip_prefix(&project_root)
+                .with_context(|| {
+                    format!(
+                        "`{field_name}` path `{}` resolves outside sdist project root `{}`",
+                        path.display(),
+                        project_root.display()
+                    )
+                })?
+                .to_path_buf();
+            let rewrite_path = target_relative
+                .to_slash()
+                .with_context(|| {
+                    format!(
+                        "`{field_name}` path `{}` is not valid UTF-8",
+                        path.display()
+                    )
+                })?
+                .into_owned();
+            rewrites.push((field, rewrite_path));
+        }
+
+        let target = ctx.root_dir.join(target_relative);
+        if !writer.contains_target(&target) {
+            writer.add_file(target, source, false)?;
+        }
+    }
+    Ok(rewrites)
+}
+
+/// Reject parent-relative pyproject metadata paths for the git sdist generator.
+///
+/// Git sdists are intentionally faithful to `git ls-files` from the
+/// `pyproject.toml` directory. Since `pyproject.toml` must be placed at the
+/// sdist root, parent-relative metadata paths cannot remain valid without
+/// copying and rewriting extra files outside that file list.
+pub(super) fn reject_parent_relative_metadata_paths(pyproject: &PyProjectToml) -> Result<()> {
+    let Some(project) = pyproject.project.as_ref() else {
+        return Ok(());
+    };
+    for (_, field_name, path) in project_metadata_paths(project) {
+        if parent_relative_metadata_path(field_name, path)? {
+            bail!(
+                "`{field_name}` path `{}` must not contain `..` when using the git sdist generator",
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Add pyproject.toml to the sdist (rewriting paths if necessary).
 pub(super) fn add_pyproject_toml(
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
     pyproject_toml_path: &Path,
+    metadata_rewrites: &[PyprojectPathRewrite],
 ) -> Result<()> {
     if ctx.pyproject_dir != ctx.sdist_root {
+        let relative_manifest_path = ctx.relative_main_crate_manifest_dir.join("Cargo.toml");
         let python_dir = &ctx.project.project_layout.python_dir;
         // Compute python-source relative to pyproject_dir.  When python_dir is
         // outside pyproject_dir, compute the path relative to project_root instead.
@@ -32,8 +158,9 @@ pub(super) fn add_pyproject_toml(
         };
         let rewritten = rewrite_pyproject_toml(
             pyproject_toml_path,
-            &ctx.relative_main_crate_manifest_dir.join("Cargo.toml"),
+            &relative_manifest_path,
             relative_python_source.as_deref(),
+            metadata_rewrites,
         )?;
         writer.add_bytes(
             ctx.root_dir.join("pyproject.toml"),
@@ -99,12 +226,11 @@ pub(super) fn add_python_sources(
     Ok(())
 }
 
-/// Add readme, license files, and include patterns from pyproject.toml metadata.
+/// Add `license-files` globs and explicit include patterns from
+/// `pyproject.toml` metadata.
 ///
-/// This covers files referenced by `[project]` fields (readme, license,
-/// license-files with PEP 639 glob handling) as well as explicit `include`
-/// patterns from `[tool.maturin]`.  Files already present in the writer
-/// (e.g. from Cargo.toml metadata) are skipped to avoid duplicates.
+/// Readme and `license.file` references are handled earlier for Cargo sdists;
+/// for git sdists they are expected to come from `git ls-files`.
 pub(super) fn add_pyproject_metadata(
     writer: &mut VirtualWriter<SDistWriter>,
     pyproject: &PyProjectToml,
@@ -112,47 +238,32 @@ pub(super) fn add_pyproject_metadata(
     root_dir: &Path,
     python_dir: &Path,
 ) -> Result<()> {
-    // Add readme, license from pyproject.toml
-    // Skip if already added (e.g. from Cargo.toml metadata) to avoid duplicates.
-    // See https://github.com/PyO3/maturin/issues/2358
-    if let Some(project) = pyproject.project.as_ref() {
-        if let Some(pyproject_toml::ReadMe::RelativePath(readme)) = project.readme.as_ref() {
-            let target = root_dir.join(readme);
-            if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(readme), false)?;
-            }
-        }
-        if let Some(pyproject_toml::License::File { file }) = project.license.as_ref() {
-            let target = root_dir.join(file);
-            if !writer.contains_target(&target) {
-                writer.add_file(target, pyproject_dir.join(file), false)?;
-            }
-        }
-        if let Some(license_files) = &project.license_files {
-            let escaped_pyproject_dir =
-                PathBuf::from(glob::Pattern::escape(pyproject_dir.to_str().unwrap()));
-            let mut seen = HashSet::new();
-            for license_glob in license_files {
-                check_pep639_glob(license_glob)?;
-                for license_path in
-                    glob::glob(&escaped_pyproject_dir.join(license_glob).to_string_lossy())?
-                {
-                    let license_path = license_path?;
-                    if !license_path.is_file() {
-                        continue;
-                    }
-                    let license_path = license_path
-                        .strip_prefix(pyproject_dir)
-                        .expect("matched path starts with glob root")
-                        .to_path_buf();
-                    if seen.insert(license_path.clone()) {
-                        debug!("Including license file `{}`", license_path.display());
-                        writer.add_file(
-                            root_dir.join(&license_path),
-                            pyproject_dir.join(&license_path),
-                            false,
-                        )?;
-                    }
+    if let Some(project) = pyproject.project.as_ref()
+        && let Some(license_files) = &project.license_files
+    {
+        let escaped_pyproject_dir =
+            PathBuf::from(glob::Pattern::escape(pyproject_dir.to_str().unwrap()));
+        let mut seen = HashSet::new();
+        for license_glob in license_files {
+            check_pep639_glob(license_glob)?;
+            for license_path in
+                glob::glob(&escaped_pyproject_dir.join(license_glob).to_string_lossy())?
+            {
+                let license_path = license_path?;
+                if !license_path.is_file() {
+                    continue;
+                }
+                let license_path = license_path
+                    .strip_prefix(pyproject_dir)
+                    .expect("matched path starts with glob root")
+                    .to_path_buf();
+                if seen.insert(license_path.clone()) {
+                    debug!("Including license file `{}`", license_path.display());
+                    writer.add_file(
+                        root_dir.join(&license_path),
+                        pyproject_dir.join(&license_path),
+                        false,
+                    )?;
                 }
             }
         }
@@ -185,10 +296,14 @@ pub(super) fn add_pyproject_metadata(
 /// sdist root), we update `tool.maturin.manifest-path` and optionally
 /// `tool.maturin.python-source` so they resolve correctly from the new
 /// relative position inside the archive.
+///
+/// `metadata` provides additional rewrites for `[project.readme]` and
+/// `[project.license]` `file` paths that were elevated to the sdist root.
 fn rewrite_pyproject_toml(
     pyproject_toml_path: &Path,
     relative_manifest_path: &Path,
     relative_python_source: Option<&Path>,
+    metadata_rewrites: &[PyprojectPathRewrite],
 ) -> Result<String> {
     let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
     let tool = data
@@ -238,5 +353,51 @@ fn rewrite_pyproject_toml(
         );
     }
 
+    if !metadata_rewrites.is_empty() {
+        let project = data
+            .entry("project")
+            .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+            .as_table_like_mut()
+            .with_context(|| {
+                format!(
+                    "`[project]` must be a table in {}",
+                    pyproject_toml_path.display()
+                )
+            })?;
+        for rewrite in metadata_rewrites {
+            rewrite_pyproject_field_path(project, rewrite.0, "file", &rewrite.1)?;
+        }
+    }
+
     Ok(data.to_string())
+}
+
+/// Update a path field in `pyproject.toml`. The string form is replaced
+/// wholesale; table or inline-table forms have only their `inner_field`
+/// (e.g. `file`) updated so other keys like `content-type` are preserved.
+fn rewrite_pyproject_field_path(
+    project: &mut dyn toml_edit::TableLike,
+    field: &str,
+    inner_field: &str,
+    new_path: &str,
+) -> Result<()> {
+    let Some(item) = project.get_mut(field) else {
+        return Ok(());
+    };
+    match item {
+        toml_edit::Item::Value(toml_edit::Value::String(s)) => {
+            *s = toml_edit::Formatted::new(new_path.to_string());
+        }
+        toml_edit::Item::Value(toml_edit::Value::InlineTable(table)) => {
+            table.insert(
+                inner_field,
+                toml_edit::Value::String(toml_edit::Formatted::new(new_path.to_string())),
+            );
+        }
+        toml_edit::Item::Table(table) => {
+            table.insert(inner_field, toml_edit::value(new_path));
+        }
+        _ => bail!("unexpected shape for `project.{field}` in pyproject.toml"),
+    }
+    Ok(())
 }

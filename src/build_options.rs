@@ -155,7 +155,7 @@ impl BuildOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::{find_bridge, PyO3, PyO3Crate, StableAbi, StableAbiKind};
+    use crate::bridge::{PyO3, PyO3Crate, StableAbi, StableAbiKind, find_bridge};
     use crate::python_interpreter::InterpreterResolver;
     use crate::test_utils::test_crate_path;
     use crate::{BridgeModel, Target};

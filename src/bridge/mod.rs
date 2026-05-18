@@ -8,8 +8,8 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::python_interpreter::{
-    PythonInterpreter, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
-    MINIMUM_PYTHON_MINOR,
+    MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
+    PythonInterpreter,
 };
 
 /// pyo3 binding crate

@@ -1,7 +1,7 @@
 pub use self::config::InterpreterConfig;
-use crate::auditwheel::PlatformTag;
 use crate::Target;
-use anyhow::{bail, Result};
+use crate::auditwheel::PlatformTag;
+use anyhow::{Result, bail};
 use std::fmt;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};

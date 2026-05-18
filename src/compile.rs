@@ -623,8 +623,7 @@ fn configure_macos_pyo3_linker_args(
     let stable_abi_suffix = python_interpreter.and_then(|i| {
         if bridge_model.is_stable_abi_for_interpreter(i) {
             bridge_model.pyo3().and_then(|pyo3| {
-                pyo3.stable_abi
-                    .and_then(|stable_abi| Some(format!("{}", stable_abi)))
+                pyo3.stable_abi.map(|stable_abi| format!("{}", stable_abi))
             })
         } else {
             None

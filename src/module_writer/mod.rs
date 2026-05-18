@@ -648,6 +648,28 @@ Tag: cp37-abi3-manylinux2014_x86_64
         Ok(())
     }
 
+    #[test]
+    fn wheel_file_abi3t_expands_to_abi3_and_abi3t() -> Result<()> {
+        // abi3t wheels declare a compressed `abi3.abi3t` ABI tag because a single
+        // abi3t shared object is importable on both abi3-capable (GIL-enabled
+        // 3.15+) and free-threaded interpreters. The WHEEL file must expand the
+        // compressed tag into one Tag line per ABI.
+        let expected = format!(
+            "Wheel-Version: 1.0
+Generator: {name} ({version})
+Root-Is-Purelib: false
+Tag: cp315-abi3-manylinux_2_17_x86_64
+Tag: cp315-abi3t-manylinux_2_17_x86_64
+",
+            name = env!("CARGO_PKG_NAME"),
+            version = env!("CARGO_PKG_VERSION"),
+        );
+        let actual = wheel_file(&["cp315-abi3.abi3t-manylinux_2_17_x86_64".to_string()])?;
+        assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
     #[cfg(unix)]
     #[test]
     #[serial_test::serial]

@@ -8,8 +8,8 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::python_interpreter::{
-    MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
-    PythonInterpreter,
+    PythonInterpreter, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
+    MINIMUM_PYTHON_MINOR,
 };
 
 /// pyo3 binding crate
@@ -398,7 +398,7 @@ impl BridgeModel {
     /// abi3 targets ≥ 3.11) return `false` so that `Py_LIMITED_API` is not
     /// defined and interpreter‑specific linker names are used.
     pub fn is_abi3_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
-        if !interpreter.has_stable_api() {
+        if !interpreter.has_abi3() {
             return false;
         }
 
@@ -436,5 +436,41 @@ impl fmt::Display for BridgeModel {
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stable_abi_kind_display() {
+        assert_eq!(StableAbiKind::Abi3.to_string(), "abi3");
+        assert_eq!(StableAbiKind::Abi3t.to_string(), "abi3t");
+    }
+
+    #[test]
+    fn stable_abi_kind_wheel_tag() {
+        assert_eq!(StableAbiKind::Abi3.wheel_tag(), "abi3");
+        // abi3t wheels are also importable on abi3-capable interpreters, so the
+        // wheel tag is the compressed form `abi3.abi3t`.
+        assert_eq!(StableAbiKind::Abi3t.wheel_tag(), "abi3.abi3t");
+    }
+
+    #[test]
+    fn stable_abi_display() {
+        assert_eq!(StableAbi::from_abi3_version(3, 7).to_string(), "abi3");
+        assert_eq!(StableAbi::from_abi3t_version(3, 15).to_string(), "abi3t");
+    }
+
+    #[test]
+    fn stable_abi_constructors() {
+        let abi3 = StableAbi::from_abi3_version(3, 9);
+        assert_eq!(abi3.kind, StableAbiKind::Abi3);
+        assert_eq!(abi3.version, StableAbiVersion::Version(3, 9));
+
+        let abi3t = StableAbi::from_abi3t_version(3, 15);
+        assert_eq!(abi3t.kind, StableAbiKind::Abi3t);
+        assert_eq!(abi3t.version, StableAbiVersion::Version(3, 15));
     }
 }

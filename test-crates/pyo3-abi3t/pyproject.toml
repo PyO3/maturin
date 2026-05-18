@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "pyo3"
+editable-profile = "dev"
+
+[tool.maturin.target."x86_64-apple-darwin"]
+macos-deployment-target = "10.12"
+
+[tool.maturin.target."aarch64-apple-darwin"]
+macos-deployment-target = "11.0"
+
+[project]
+name = "pyo3_abi3t"
+version = "0.1.0"
+classifiers = [
+    "Programming Language :: Rust"
+]
+description = "Implements a dummy function in Rust using the free-threaded stable ABI"
+readme = "README.md"
+license = { text = "MIT" }

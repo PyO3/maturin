@@ -1,7 +1,7 @@
 pub use self::config::InterpreterConfig;
-use crate::Target;
 use crate::auditwheel::PlatformTag;
-use anyhow::{Result, bail};
+use crate::Target;
+use anyhow::{bail, Result};
 use std::fmt;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -111,7 +111,21 @@ impl Deref for PythonInterpreter {
 
 impl PythonInterpreter {
     /// Does this interpreter have PEP 384 stable api aka. abi3 support?
-    pub fn has_stable_api(&self) -> bool {
+    pub fn has_abi3(&self) -> bool {
+        if self.implementation_name.parse::<InterpreterKind>().is_err() {
+            false
+        } else {
+            match self.interpreter_kind {
+                // Free-threaded python does not support abi3. All supported
+                // CPython GIL-enabled versions do support abi3
+                InterpreterKind::CPython => !self.config.gil_disabled,
+                InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
+            }
+        }
+    }
+
+    /// Does this interpreter have PEP 803 stable api aka. abi3t support?
+    pub fn has_abi3t(&self) -> bool {
         if self.implementation_name.parse::<InterpreterKind>().is_err() {
             false
         } else {
@@ -123,6 +137,11 @@ impl PythonInterpreter {
                 InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
             }
         }
+    }
+
+    /// Does this interpreter support either abi3 or abi3t?
+    pub fn has_stable_api(&self) -> bool {
+        self.has_abi3() || self.has_abi3t()
     }
 
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:

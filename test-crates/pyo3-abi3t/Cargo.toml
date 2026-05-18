@@ -1,0 +1,16 @@
+[package]
+name = "pyo3-abi3t"
+version = "0.1.0"
+edition = "2021"
+description = "Free-threaded stable ABI (abi3t) test crate for maturin"
+license = "MIT"
+
+[dependencies]
+pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject", features = [
+    "abi3t-py315",
+    "generate-import-lib",
+] }
+
+[lib]
+name = "pyo3_abi3t"
+crate-type = ["cdylib"]

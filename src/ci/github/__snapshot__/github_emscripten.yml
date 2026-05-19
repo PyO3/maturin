@@ -29,7 +29,7 @@ jobs:
         run: |
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
           echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV
-          if v=$(pyodide config get pyodide_abi_version 2>/dev/null); then echo PYODIDE_ABI_VERSION=$v >> $GITHUB_ENV; fi
+          if v=$(pyodide config get pyemscripten_platform_version 2>/dev/null); then echo PYEMSCRIPTEN_PLATFORM_VERSION=$v >> $GITHUB_ENV; elif v=$(pyodide config get pyodide_abi_version 2>/dev/null); then echo PYODIDE_ABI_VERSION=$v >> $GITHUB_ENV; fi
           pip uninstall -y pyodide-build
       - uses: emscripten-core/setup-emsdk@v16
         with:

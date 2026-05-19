@@ -58,14 +58,15 @@ Config-settings take priority over `MATURIN_PEP517_ARGS`; the environment variab
 * `SOURCE_DATE_EPOCH`: The time to use for the timestamp in the wheel metadata
 * `MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION` / `PYEMSCRIPTEN_PLATFORM_VERSION`: The
   [PEP 783](https://peps.python.org/pep-0783/) PyEmscripten platform version
-  (e.g. `2026_0`) used to derive the `pyemscripten_<year>_<patch>_wasm32`
-  wheel platform tag. Pyodide 0.30+ exposes this via
-  `sysconfig.get_config_var("PYEMSCRIPTEN_PLATFORM_VERSION")` and `pyodide
-  config get pyemscripten_platform_version`.
-* `MATURIN_PYODIDE_ABI_VERSION` / `PYODIDE_ABI_VERSION`: Pre-PEP 783 Pyodide
-  ABI version (e.g. `2025_0`) used to derive the
-  `pyodide_<year>_<patch>_wasm32` tag. Used when targeting Pyodide
-  0.28 / 0.29. Available via `pyodide config get pyodide_abi_version`.
+  (e.g. `2025_0`) used to derive the `pyemscripten_<year>_<patch>_wasm32`
+  wheel platform tag. Pyodide exposes this via
+  `sysconfig.get_config_var("PYEMSCRIPTEN_PLATFORM_VERSION")`; maturin also
+  checks `pyodide config get pyemscripten_platform_version` when available.
+* `MATURIN_PYODIDE_ABI_VERSION` / `PYODIDE_ABI_VERSION`: Historical Pyodide
+  ABI version variable name (e.g. `2025_0`) used to derive the PEP 783
+  `pyemscripten_<year>_<patch>_wasm32` tag. Available via `pyodide config get
+  pyodide_abi_version`. Pyodide previously referred to the same platform as
+  `pyodide_<year>_<patch>`, but PyPI accepts the PEP 783 `pyemscripten_*` tag.
 * `MATURIN_EMSCRIPTEN_VERSION`: The version of emscripten to use for emscripten
   builds (legacy `emscripten_<emcc-version>_wasm32` tag, used for Pyodide
   &le; 0.27 only). Prefer `MATURIN_PYEMSCRIPTEN_PLATFORM_VERSION` /

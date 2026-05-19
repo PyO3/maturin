@@ -103,10 +103,10 @@ def _resolve_pyodide_platform_inputs(info: dict) -> dict:
 
     * `info.platform` is `emscripten_<X>_<Y>_<Z>` and contains the emcc
       version that built the runtime (used by `setup-emsdk`).
-    * `info.abi_version` (Pyodide >= 0.28) is `<year>_<patch>` and drives either
-      the pre-PEP 783 `pyodide_<year>_<patch>_wasm32` wheel tag, or the PEP 783
-      `pyemscripten_<year>_<patch>_wasm32` tag for Python 3.14+ lock files.
-    * A future `info.pyemscripten_platform_version` (Pyodide >= 0.30) drives
+    * `info.abi_version` (Pyodide >= 0.28) is `<year>_<patch>` and drives the
+      PEP 783 `pyemscripten_<year>_<patch>_wasm32` tag through maturin's
+      historical `PYODIDE_ABI_VERSION` env var.
+    * A future `info.pyemscripten_platform_version` drives
       the PEP 783 `pyemscripten_<year>_<patch>_wasm32` wheel tag.
 
     See https://peps.python.org/pep-0783/.
@@ -129,23 +129,13 @@ def _resolve_pyodide_platform_inputs(info: dict) -> dict:
     if pyemscripten:
         env["PYEMSCRIPTEN_PLATFORM_VERSION"] = pyemscripten
         env["EXPECTED_PLATFORM_TAG"] = f"pyemscripten_{pyemscripten}_wasm32"
-    elif abi_version and _pyodide_python_at_least(info, 3, 14):
-        env["PYEMSCRIPTEN_PLATFORM_VERSION"] = abi_version
-        env["EXPECTED_PLATFORM_TAG"] = f"pyemscripten_{abi_version}_wasm32"
     elif abi_version:
         env["PYODIDE_ABI_VERSION"] = abi_version
-        env["EXPECTED_PLATFORM_TAG"] = f"pyodide_{abi_version}_wasm32"
+        env["EXPECTED_PLATFORM_TAG"] = f"pyemscripten_{abi_version}_wasm32"
     elif emscripten_version:
         legacy = emscripten_version.replace(".", "_").replace("-", "_")
         env["EXPECTED_PLATFORM_TAG"] = f"emscripten_{legacy}_wasm32"
     return env
-
-
-def _pyodide_python_at_least(info: dict, major: int, minor: int) -> bool:
-    match = re.match(r"^(\d+)\.(\d+)", info.get("python", ""))
-    if not match:
-        return False
-    return (int(match.group(1)), int(match.group(2))) >= (major, minor)
 
 
 @nox.session(name="setup-pyodide", python=False)

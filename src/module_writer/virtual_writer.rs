@@ -562,6 +562,37 @@ impl VirtualWriter<SDistWriter> {
         let path = inner.finish()?;
         Ok(path)
     }
+
+    /// Write all tracked entries to a directory on disk.
+    pub(crate) fn materialize_to(&self, dir: &Path) -> Result<()> {
+        for (target, source) in &self.tracker {
+            let dest = dir.join(target);
+            if let Some(parent) = dest.parent() {
+                fs_err::create_dir_all(parent)?;
+            }
+            match source {
+                ArchiveSource::Generated(g) => {
+                    fs_err::write(&dest, &g.data)?;
+                }
+                ArchiveSource::File(f) => {
+                    fs_err::copy(&f.path, &dest)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Replace an existing tracker entry with new in-memory bytes.
+    pub(crate) fn replace_bytes(&mut self, target: &Path, data: Vec<u8>) {
+        self.tracker.insert(
+            target.to_path_buf(),
+            ArchiveSource::Generated(GeneratedSourceData {
+                data,
+                path: None,
+                executable: false,
+            }),
+        );
+    }
 }
 
 impl VirtualWriter<WheelWriter> {

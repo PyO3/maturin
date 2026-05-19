@@ -71,8 +71,8 @@ Options:
 
           This options offers both fine-grained control over the linux libc tag and a more automatic PyPI-compatibility option.
 
-          The `pypi` option applies on all platforms and ensure that only tags that can be uploaded to PyPI are used. The linux-specific options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example `musllinux_1_2`), and
-          `linux` for the native linux tag. They are ignored on non-linux platforms.
+          The `pypi` option applies on all platforms and ensure that only tags that can be uploaded to PyPI are used. The linux-specific options are `manylinux` tags (for example `manylinux2014`/`manylinux_2_24`) or `musllinux` tags (for example
+          `musllinux_1_2`), and `linux` for the native linux tag. They are ignored on non-linux platforms.
 
           Note that `manylinux1` and `manylinux2010` are unsupported by the rust compiler. Wheels with the native `linux` tag will be rejected by pypi, unless they are separately validated by `auditwheel`.
 
@@ -318,7 +318,7 @@ Options:
           [default: -]
 
       --platform <platform>...
-          Platform support [deprecated: use [tool.maturin.generate-ci.github] and set 'platforms' in pyproject.toml]
+          Platform support [deprecated: use [tool.maturin.generate-ci.github."PLATFORM NAME"] in pyproject.toml]
 
           Possible values:
           - all:        All

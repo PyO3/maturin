@@ -298,7 +298,7 @@ fn emit_emscripten_setup(y: &mut Yaml) {
     );
     y.line("pip uninstall -y pyodide-build");
     y.dedent_by(2)
-        .line("- uses: mymindstorm/setup-emsdk@v14")
+        .line("- uses: emscripten-core/setup-emsdk@v16")
         .indent()
         .line("with:")
         .indent()

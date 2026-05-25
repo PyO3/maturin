@@ -283,7 +283,7 @@ mod tests {
     /// builds need to fall through to `is_stable_abi_for_interpreter`, which is the
     /// kind-agnostic check used to decide whether to define `Py_LIMITED_API`.
     #[test]
-    fn test_abi3_vs_stable_abi_for_interpreter_distinguishes_kinds() {
+    fn test_stable_abi_for_interpreter_distinguishes_kinds() {
         use crate::bridge::{PyO3Metadata, PyO3VersionMetadata};
         use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
         use crate::{PythonInterpreter, Target};
@@ -341,35 +341,20 @@ mod tests {
             StableAbiKind::Abi3
         ));
 
-        // abi3 bridge with GIL-enabled 3.15: both checks succeed.
         assert!(abi3_bridge.is_stable_abi_for_interpreter(&py315));
-        assert!(abi3_bridge.is_abi3_for_interpreter(&py315));
-
-        // abi3t bridge with GIL-enabled 3.15: stable abi succeeds, but
-        // `is_abi3_for_interpreter` must return false because the kind is Abi3t.
         assert!(abi3t_bridge.is_stable_abi_for_interpreter(&py315));
-        assert!(!abi3t_bridge.is_abi3_for_interpreter(&py315));
-
-        // abi3t bridge with free-threaded 3.15: stable abi succeeds.
         assert!(abi3t_bridge.is_stable_abi_for_interpreter(&py315t));
-        assert!(!abi3t_bridge.is_abi3_for_interpreter(&py315t));
 
-        // abi3 bridge with free-threaded 3.15: stable abi succeeds (free-threaded 3.15+
-        // has stable_api per PEP 803). The kind is abi3, so is_abi3_for_interpreter is true.
-        assert!(abi3_bridge.is_stable_abi_for_interpreter(&py315t));
-        assert!(!abi3_bridge.is_abi3_for_interpreter(&py315t));
+        // abi3 isn't supported for free-threaded interpreters, should fail
+        assert!(!abi3_bridge.is_stable_abi_for_interpreter(&py315t));
 
-        // Free-threaded 3.14: no stable api support, both checks must return false.
+        // Free-threaded 3.14: no stable api support
         assert!(!abi3t_bridge.is_stable_abi_for_interpreter(&py314t));
-        assert!(!abi3t_bridge.is_abi3_for_interpreter(&py314t));
         assert!(!abi3_bridge.is_stable_abi_for_interpreter(&py314t));
-        assert!(!abi3_bridge.is_abi3_for_interpreter(&py314t));
 
-        // GIL-enabled 3.14 supports abi3 but not abi3t:
+        // GIL-enabled 3.14 supports abi3 but not abi3t
         assert!(!abi3t_bridge.is_stable_abi_for_interpreter(&py314));
-        assert!(!abi3t_bridge.is_abi3_for_interpreter(&py314));
         assert!(abi3_bridge.is_stable_abi_for_interpreter(&py314));
-        assert!(abi3_bridge.is_abi3_for_interpreter(&py314));
     }
 
     #[test]

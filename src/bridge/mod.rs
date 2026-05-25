@@ -382,36 +382,16 @@ impl BridgeModel {
 
         self.pyo3()
             .and_then(|pyo3| pyo3.stable_abi.as_ref())
-            .is_some_and(|stable_abi| match stable_abi.version.min_version() {
-                Some((major, minor)) => {
-                    (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
-                }
-                None => true, // CurrentPython → compatible when stable ABI is supported
-            })
-    }
-
-    /// Check whether an abi3 build should be enabled for a specific interpreter.
-    ///
-    /// Returns `true` only when the bridge model has stable abi support **and**
-    /// the given interpreter supports the stable ABI **and** meets the abi3
-    /// minimum version. Version‑specific fallback builds (e.g. Python 3.10 when
-    /// abi3 targets ≥ 3.11) return `false` so that `Py_LIMITED_API` is not
-    /// defined and interpreter‑specific linker names are used.
-    pub fn is_abi3_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
-        if !interpreter.has_abi3() {
-            return false;
-        }
-
-        self.pyo3()
-            .and_then(|pyo3| pyo3.stable_abi.as_ref())
             .is_some_and(|stable_abi| {
-                matches!(stable_abi.kind, StableAbiKind::Abi3)
-                    && match stable_abi.version.min_version() {
-                        Some((major, minor)) => {
-                            (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
-                        }
-                        None => true, // CurrentPython → compatible when stable ABI is supported
+                if matches!(stable_abi.kind, StableAbiKind::Abi3) && interpreter.gil_disabled {
+                    return false;
+                };
+                match stable_abi.version.min_version() {
+                    Some((major, minor)) => {
+                        (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
                     }
+                    None => true, // CurrentPython → compatible when stable ABI is supported
+                }
             })
     }
 

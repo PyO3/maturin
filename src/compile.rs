@@ -19,6 +19,11 @@ use tracing::{debug, instrument, trace};
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
+/// The first version of pyo3 that has a target_abi parameter in build
+/// configuration files
+// TODO: should be 0.29.0 but can't be until that version increment happens
+const PYO3_TARGET_ABI_PARAMETER_VERSION: (u64, u64, u64) = (0, 28, 3);
+
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 pub(crate) const LIB_CRATE_TYPES: [CrateType; 4] = [
     CrateType::Lib,
@@ -862,10 +867,11 @@ fn configure_pyo3_env(
     target: &Target,
     target_triple: &str,
 ) -> Result<()> {
-    // Only set PYO3_NO_PYTHON for true abi3 builds where the interpreter meets
-    // the abi3 minimum version.  Version-specific fallback builds (e.g. Python
-    // 3.10 when abi3 targets ≥ 3.11) must not set PYO3_NO_PYTHON.
-    if python_interpreter.is_some_and(|i| bridge_model.is_abi3_for_interpreter(i)) {
+    // Only set PYO3_NO_PYTHON for stable ABI builds where the interpreter meets
+    // the minimum version supported for stable ABI builds.  Version-specific
+    // fallback builds (e.g. Python 3.10 when abi3 targets ≥ 3.11) must not set
+    // PYO3_NO_PYTHON.
+    if python_interpreter.is_some_and(|i| bridge_model.is_stable_abi_for_interpreter(i)) {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
@@ -905,8 +911,14 @@ fn configure_pyo3_env(
             // and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
-            let use_abi3 = bridge_model.is_abi3_for_interpreter(interpreter);
-            let pyo3_config = interpreter.pyo3_config_file(target, use_abi3);
+            let pyo3_ver = pyo3_version(&context.project.cargo_metadata)
+                .context("Failed to get pyo3 version from cargo metadata")?;
+            let use_stable_abi = bridge_model.is_stable_abi_for_interpreter(interpreter);
+            let pyo3_config = interpreter.pyo3_config_file(
+                target,
+                use_stable_abi,
+                pyo3_ver > PYO3_TARGET_ABI_PARAMETER_VERSION,
+            );
             let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",

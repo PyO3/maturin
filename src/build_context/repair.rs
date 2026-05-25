@@ -599,13 +599,12 @@ fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
     reflink_copy::reflink(from, to)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use crate::compile::BuildArtifact;
     use std::collections::HashMap;
 
-    #[cfg(unix)]
     #[test]
     fn stage_file_unlinks_stale_hardlinked_destination_before_rename() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -632,7 +631,6 @@ mod tests {
         ));
     }
 
-    #[cfg(unix)]
     #[test]
     fn copy_back_cargo_outputs_breaks_accidental_self_hardlink() {
         let temp_dir = tempfile::tempdir().unwrap();

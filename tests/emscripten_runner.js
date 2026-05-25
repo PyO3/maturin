@@ -1,4 +1,7 @@
-const { opendir } = require("node:fs/promises");
+const fs = require("node:fs");
+const { copyFile, mkdtemp, opendir } = require("node:fs/promises");
+const { tmpdir } = require("node:os");
+const { join } = require("node:path");
 const { loadPyodide } = require("pyodide");
 
 async function findWheel(distDir) {
@@ -7,8 +10,8 @@ async function findWheel(distDir) {
   // `{name}-{ver}-{python tag}-{abi tag}-{platform tag}.whl`, so anchor to
   // the trailing `-{platform tag}.whl` segment to avoid false positives
   // from a project name that happens to contain `pyodide_` etc.
-  // - `pyemscripten_<year>_<patch>_wasm32` (PEP 783, Pyodide >= 0.30)
-  // - `pyodide_<year>_<patch>_wasm32`     (pre-PEP 783, Pyodide 0.28/0.29)
+  // - `pyemscripten_<year>_<patch>_wasm32` (PEP 783)
+  // - `pyodide_<year>_<patch>_wasm32`     (legacy pre-PEP 783 naming)
   // - `emscripten_<emcc-version>_wasm32`  (legacy, Pyodide <= 0.27)
   const tagRegex = /-(pyemscripten|pyodide|emscripten)_[^-]+_wasm32\.whl$/;
   const dir = await opendir(distDir);
@@ -17,6 +20,32 @@ async function findWheel(distDir) {
       return dirent.name;
     }
   }
+}
+
+async function wheelPathForRuntime(distDir, wheelName, pyodide) {
+  const pep783PlatformVersion = pyodide.runPython(`
+import sysconfig
+sysconfig.get_config_var("PYEMSCRIPTEN_PLATFORM_VERSION")
+`);
+  if (pep783PlatformVersion) {
+    return `${distDir}/${wheelName}`;
+  }
+
+  // Pyodide 0.28/0.29 runtimes still validate wheel filenames using the
+  // pre-PEP 783 `pyodide_<year>_<patch>_wasm32` spelling. Maturin should build
+  // the PyPI-accepted `pyemscripten_*` filename, but for the runtime smoke test
+  // we need a compatibility copy with the old platform-tag spelling.
+  const legacyName = wheelName.replace(
+    /-pyemscripten_(\d+_\d+)_wasm32\.whl$/,
+    "-pyodide_$1_wasm32.whl",
+  );
+  if (legacyName === wheelName) {
+    return `${distDir}/${wheelName}`;
+  }
+  const runtimeDir = await mkdtemp(join(tmpdir(), "maturin-pyodide-runtime-"));
+  const runtimePath = `${runtimeDir}/${legacyName}`;
+  await copyFile(`${distDir}/${wheelName}`, runtimePath);
+  return runtimePath;
 }
 
 function make_tty_ops(stream){
@@ -89,10 +118,11 @@ const testDir = pkgDir + "/tests";
 
 async function main() {
   const wheelName = await findWheel(distDir);
-  const wheelURL = `file:${distDir}/${wheelName}`;
 
   try {
     pyodide = await loadPyodide();
+    const wheelPath = await wheelPathForRuntime(distDir, wheelName, pyodide);
+    const wheelURL = `file:${wheelPath}`;
     const FS = pyodide.FS;
     setupStreams(FS, pyodide._module.TTY);
     const NODEFS = FS.filesystems.NODEFS;

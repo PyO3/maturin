@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  emscripten:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: wasm32-unknown-emscripten
+    steps:
+      - uses: actions/checkout@v6
+      - run: pip install pyodide-build
+      - name: Get Emscripten and Python version info
+        shell: bash
+        run: |
+          echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
+          echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV
+          if v=$(pyodide config get pyemscripten_platform_version 2>/dev/null); then echo PYEMSCRIPTEN_PLATFORM_VERSION=$v >> $GITHUB_ENV; elif v=$(pyodide config get pyodide_abi_version 2>/dev/null); then echo PYODIDE_ABI_VERSION=$v >> $GITHUB_ENV; fi
+          pip uninstall -y pyodide-build
+      - uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EMSCRIPTEN_VERSION }}
+          actions-cache-folder: emsdk-cache
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install pyodide-build
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist -i ${{ env.PYTHON_VERSION }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          rust-toolchain: nightly
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wasm-wheels
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-sdist
+          path: dist
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    needs: [emscripten, sdist]
+    environment: release
+    permissions:
+      # Use to sign the release artifacts
+      id-token: write
+      # Used to upload release artifacts
+      contents: write
+      # Used to generate artifact attestation
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v7
+      - name: Generate artifact attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'wheels-*/*'
+      - name: Install uv
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: astral-sh/setup-uv@v7
+      - name: Publish to PyPI
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: uv publish --trusted-publishing always 'wheels-*/*'
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            wasm-wheels/*.whl
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}

@@ -284,21 +284,21 @@ fn emit_emscripten_setup(y: &mut Yaml) {
         .indent();
     y.line("echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV");
     y.line("echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV");
-    // Pre-PEP 783 ABI / PEP 783 platform-tag input. Pyodide >= 0.28 exposes
-    // `pyodide_abi_version` (e.g. `2025_0` for 0.28/0.29 on Python 3.13,
-    // `2026_0` for 0.30 / 314.0.0a1 on Python 3.14). `pyodide config get`
-    // exits 1 and prints an error to stdout for unknown keys, so we use an
-    // `if` to only export `PYODIDE_ABI_VERSION` when the key is recognised.
-    // Older Pyodide releases simply leave it unset and maturin falls back to
-    // the legacy `emscripten_*` tag. PEP 783 (pyemscripten_*) is then
-    // selected by the cascade in `src/target/platform_tag.rs` based on
-    // `PYTHON_VERSION` (>= 3.14).
-    y.line(
-        "if v=$(pyodide config get pyodide_abi_version 2>/dev/null); then echo PYODIDE_ABI_VERSION=$v >> $GITHUB_ENV; fi",
-    );
+    // PEP 783 platform-tag input. Current pyodide-build exposes the version
+    // through the historical `pyodide_abi_version` key (e.g. `2025_0` for
+    // Python 3.13 / `pyemscripten_2025_0`). `pyodide config get` exits 1 and
+    // prints an error to stdout for unknown keys, so we only export a value
+    // when a key is recognised. Older Pyodide releases simply leave it unset
+    // and maturin falls back to the legacy `emscripten_*` tag.
+    y.line(concat!(
+        "if v=$(pyodide config get pyemscripten_platform_version 2>/dev/null); then ",
+        "echo PYEMSCRIPTEN_PLATFORM_VERSION=$v >> $GITHUB_ENV; ",
+        "elif v=$(pyodide config get pyodide_abi_version 2>/dev/null); then ",
+        "echo PYODIDE_ABI_VERSION=$v >> $GITHUB_ENV; fi"
+    ));
     y.line("pip uninstall -y pyodide-build");
     y.dedent_by(2)
-        .line("- uses: mymindstorm/setup-emsdk@v14")
+        .line("- uses: emscripten-core/setup-emsdk@v16")
         .indent()
         .line("with:")
         .indent()

@@ -36,6 +36,9 @@ fn assert_snapshot(output: &str, snapshot: &str) {
         "github_pyproject_detailed_targets.yml" => {
             expect_file!["__snapshot__/github_pyproject_detailed_targets.yml"].assert_eq(&conf)
         }
+        "github_emscripten.yml" => {
+            expect_file!["__snapshot__/github_emscripten.yml"].assert_eq(&conf);
+        }
         _ => panic!("unknown snapshot: {snapshot}"),
     }
 }
@@ -142,6 +145,29 @@ fn test_generate_github_bin_skips_cli_emscripten() {
             .platform_targets
             .contains_key(&Platform::Emscripten)
     );
+}
+
+#[test]
+fn test_generate_emscripten() {
+    let github_config = GitHubCIConfig {
+        pytest: Some(false),
+        zig: Some(false),
+        skip_attestation: None,
+        trusted_publishing: Some(true),
+        publishing_environment: Some("release".to_string()),
+        emscripten: Some(PlatformCIConfig {
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let conf = render_with_config(
+        &GenerateCI::default(),
+        Some(&github_config),
+        &pyo3_bridge(None),
+        true,
+    );
+    assert_snapshot(&conf, "github_emscripten.yml");
 }
 
 #[test]

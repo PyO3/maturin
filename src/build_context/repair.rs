@@ -374,13 +374,16 @@ impl BuildContext {
 /// instead of being silently masked by the copy path.
 fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<(PathBuf, CargoOutputState)> {
     let new_path = staging_dir.join(artifact_path.file_name().unwrap());
+    // Break stale hardlinks before rename. If `new_path` and `artifact_path`
+    // already name the same inode, Unix `rename` succeeds as a no-op and the
+    // later copy-back can end up copying the file onto itself.
+    let _ = fs::remove_file(&new_path);
     let staging = match fs::rename(artifact_path, &new_path) {
         Ok(()) => CargoOutputState::Renamed {
             cargo_output: artifact_path.to_path_buf(),
         },
         Err(err) if err.kind() == io::ErrorKind::CrossesDevices => {
             // Cross-device: copy into staging and leave the original alone.
-            let _ = fs::remove_file(&new_path);
             reflink_or_copy(artifact_path, &new_path)?;
             CargoOutputState::Mirrored {
                 cargo_output: artifact_path.to_path_buf(),
@@ -433,6 +436,17 @@ fn copy_back_cargo_outputs(audited: &mut [AuditedArtifact], will_patch: &[bool])
         match &aa.artifact.staging {
             CargoOutputState::Renamed { cargo_output } => {
                 let cargo_output = cargo_output.clone();
+                if cargo_output.exists()
+                    && same_file::is_same_file(&aa.artifact.path, &cargo_output).unwrap_or(false)
+                {
+                    fs::remove_file(&cargo_output).with_context(|| {
+                        format!(
+                            "Failed to unlink hardlinked cargo output {} before restoring it from {}",
+                            cargo_output.display(),
+                            aa.artifact.path.display(),
+                        )
+                    })?;
+                }
                 reflink_or_copy(&aa.artifact.path, &cargo_output).with_context(|| {
                     format!(
                         "Failed to restore unpatched cargo output {} from staged artifact {}",
@@ -583,4 +597,76 @@ fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
 #[cfg(not(target_os = "linux"))]
 fn reflink_with_permissions(from: &Path, to: &Path) -> std::io::Result<()> {
     reflink_copy::reflink(from, to)
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use crate::compile::BuildArtifact;
+    use std::collections::HashMap;
+
+    #[test]
+    fn stage_file_unlinks_stale_hardlinked_destination_before_rename() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cargo_dir = temp_dir.path().join("target/release/deps");
+        let staging_dir = temp_dir.path().join("target/maturin");
+        fs::create_dir_all(&cargo_dir).unwrap();
+        fs::create_dir_all(&staging_dir).unwrap();
+
+        let cargo_output = cargo_dir.join("libdemo.so");
+        let staged_output = staging_dir.join("libdemo.so");
+        fs::write(&cargo_output, b"not empty").unwrap();
+        fs::hard_link(&cargo_output, &staged_output).unwrap();
+
+        let (staged, staging) = stage_file(&cargo_output, &staging_dir).unwrap();
+
+        assert_eq!(staged, staged_output.normalize().unwrap().into_path_buf());
+        assert!(!cargo_output.exists());
+        assert_eq!(fs::read(&staged).unwrap(), b"not empty");
+        assert!(matches!(
+            staging,
+            CargoOutputState::Renamed {
+                cargo_output: restored
+            } if restored == cargo_output
+        ));
+    }
+
+    #[test]
+    fn copy_back_cargo_outputs_breaks_accidental_self_hardlink() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cargo_dir = temp_dir.path().join("target/release/deps");
+        let staging_dir = temp_dir.path().join("target/maturin");
+        fs::create_dir_all(&cargo_dir).unwrap();
+        fs::create_dir_all(&staging_dir).unwrap();
+
+        let staged_output = staging_dir.join("libdemo.so");
+        let cargo_output = cargo_dir.join("libdemo.so");
+        fs::write(&staged_output, b"not empty").unwrap();
+        fs::hard_link(&staged_output, &cargo_output).unwrap();
+
+        let mut audited = [AuditedArtifact {
+            artifact: BuildArtifact {
+                path: staged_output.clone(),
+                import_lib_path: None,
+                debuginfo_path: None,
+                linked_paths: Vec::new(),
+                thin_artifacts: Vec::new(),
+                staging: CargoOutputState::Renamed {
+                    cargo_output: cargo_output.clone(),
+                },
+            },
+            external_libs: Vec::new(),
+            arch_requirements: HashMap::new(),
+        }];
+
+        copy_back_cargo_outputs(&mut audited, &[true]).unwrap();
+
+        assert_eq!(fs::read(&staged_output).unwrap(), b"not empty");
+        assert_eq!(fs::read(&cargo_output).unwrap(), b"not empty");
+        assert!(!same_file::is_same_file(&staged_output, &cargo_output).unwrap());
+        assert!(matches!(
+            audited[0].artifact.staging,
+            CargoOutputState::Patched
+        ));
+    }
 }

@@ -635,8 +635,6 @@ fn configure_macos_pyo3_linker_args(
         }
     });
 
-    dbg!(&stable_abi_suffix);
-
     let so_filename = if let Some(suffix) = stable_abi_suffix {
         format!("{module_name}.{suffix}.so")
     } else {
@@ -644,7 +642,6 @@ fn configure_macos_pyo3_linker_args(
             .expect("missing python interpreter for non-abi3 wheel build")
             .get_library_name(module_name)
     };
-    dbg!(&so_filename);
     let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
     let install_name_args = ["-C".to_string(), macos_dylib_install_name];
     debug!(

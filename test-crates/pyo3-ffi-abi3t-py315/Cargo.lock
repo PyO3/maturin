@@ -11,7 +11,7 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 [[package]]
 name = "pyo3-build-config"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#68ffca078d4f9f6c5f9e9235b945636cf3710127"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#64194227d56e03b94edbe00f5ba85e0cca62285e"
 dependencies = [
  "target-lexicon",
 ]
@@ -19,7 +19,7 @@ dependencies = [
 [[package]]
 name = "pyo3-ffi"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#68ffca078d4f9f6c5f9e9235b945636cf3710127"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#64194227d56e03b94edbe00f5ba85e0cca62285e"
 dependencies = [
  "libc",
  "pyo3-build-config",

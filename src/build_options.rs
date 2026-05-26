@@ -192,10 +192,10 @@ mod tests {
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version: semver::Version::new(0, 28, 3),
-            stable_abi: Some(StableAbi::from_abi3_version(3, 7)),
+            stable_abi: Some(StableAbi::from_abi3_version(3, 9)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {
-                    min_minor: 7,
+                    min_minor: 8,
                     max_minor: 15,
                 },
                 pypy: PyO3VersionMetadata {
@@ -321,7 +321,7 @@ mod tests {
         let abi3_bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
             version: semver::Version::new(0, 28, 3),
-            stable_abi: Some(StableAbi::from_abi3_version(3, 7)),
+            stable_abi: Some(StableAbi::from_abi3_version(3, 9)),
             metadata: Some(metadata.clone()),
         });
         let abi3t_bridge = BridgeModel::PyO3(PyO3 {
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_find_bridge_conditional_abi3_filtered_by_interpreter() {
-        use crate::bridge::upgrade_bridge_abi3;
+        use crate::bridge::upgrade_bridge_stable_abi;
         use crate::python_interpreter::InterpreterConfig;
 
         // A pyproject.toml with pyo3/abi3-py311 gated on python-version >= 3.11
@@ -470,7 +470,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let bridge = upgrade_bridge_abi3(
+        let bridge = upgrade_bridge_stable_abi(
             bridge,
             &metadata,
             Some(&pyproject),
@@ -493,7 +493,7 @@ mod tests {
             .unwrap(),
         );
         let base_bridge = find_bridge(&metadata, None).unwrap();
-        let bridge = upgrade_bridge_abi3(
+        let bridge = upgrade_bridge_stable_abi(
             base_bridge,
             &metadata,
             Some(&pyproject),
@@ -508,7 +508,8 @@ mod tests {
         // 3.10 gets a version-specific wheel, 3.11+ gets the abi3 wheel.
         let base_bridge = find_bridge(&metadata, None).unwrap();
         let bridge =
-            upgrade_bridge_abi3(base_bridge, &metadata, Some(&pyproject), &[py310, py311]).unwrap();
+            upgrade_bridge_stable_abi(base_bridge, &metadata, Some(&pyproject), &[py310, py311])
+                .unwrap();
         assert!(
             bridge.has_stable_abi(),
             "should infer abi3 for mixed [3.10, 3.11] (build_stable_abi_wheels handles the split)"

@@ -18,7 +18,7 @@ use super::{InterpreterConfig, InterpreterKind, PythonInterpreter};
 use crate::cross_compile::{
     find_build_details, find_sysconfigdata, parse_build_details_json_file, parse_sysconfigdata,
 };
-use crate::{BridgeModel, Target};
+use crate::{BridgeModel, Target, StableAbiKind};
 use anyhow::{Context, Result, bail, format_err};
 use pep440_rs::VersionSpecifiers;
 use std::env;
@@ -561,7 +561,7 @@ impl<'a> InterpreterResolver<'a> {
 
         let (abi3_capable, non_abi3): (Vec<_>, Vec<_>) = candidates
             .into_iter()
-            .partition(|c| c.interpreter.has_stable_api());
+            .partition(|c| c.interpreter.has_stable_api(StableAbiKind::Abi3));
 
         let mut result = abi3_capable;
 
@@ -634,7 +634,7 @@ impl<'a> InterpreterResolver<'a> {
             // compatible interpreter on PATH (e.g. manylinux containers where
             // the system Python is older than the abi3 minimum).
             let has_compatible = candidates.iter().any(|c| {
-                c.interpreter.has_stable_api()
+                c.interpreter.has_stable_api(StableAbiKind::Abi3)
                     && (c.interpreter.major as u8, c.interpreter.minor as u8) >= (major, minor)
             });
             if has_compatible || !self.user_interpreters.is_empty() {

@@ -1,6 +1,6 @@
 mod detection;
 
-pub use detection::{find_bridge, has_windows_import_lib_support, upgrade_bridge_abi3};
+pub use detection::{find_bridge, has_windows_import_lib_support, upgrade_bridge_stable_abi};
 
 use std::{fmt, str::FromStr};
 
@@ -8,8 +8,8 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::python_interpreter::{
-    MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
-    PythonInterpreter,
+    PythonInterpreter, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
+    MINIMUM_PYTHON_MINOR,
 };
 
 /// pyo3 binding crate
@@ -376,13 +376,12 @@ impl BridgeModel {
     /// abi3 targets ≥ 3.11) return `false` so that `Py_LIMITED_API` is not
     /// defined and interpreter‑specific linker names are used.
     pub fn is_stable_abi_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
-        if !interpreter.has_stable_api() {
-            return false;
-        }
-
         self.pyo3()
             .and_then(|pyo3| pyo3.stable_abi.as_ref())
             .is_some_and(|stable_abi| {
+                if !interpreter.has_stable_api(stable_abi.kind) {
+                    return false;
+                }
                 if matches!(stable_abi.kind, StableAbiKind::Abi3) && interpreter.gil_disabled {
                     return false;
                 };

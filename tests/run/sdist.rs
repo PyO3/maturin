@@ -2,7 +2,7 @@ use crate::common::{handle_result, other};
 use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
-use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
+use maturin::{unpack_sdist, BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
@@ -486,7 +486,7 @@ fn workspace_members_non_local_dep_sdist() {
         readme = "README.md"
 
         [dependencies]
-        pyo3 = { version = "0.28.3", features = [
+        pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject", features = [
             "abi3-py37",
             "generate-import-lib",
         ] }
@@ -558,7 +558,7 @@ fn lib_with_target_path_dep_sdist() {
         crate-type = ["cdylib"]
 
         [dependencies]
-        pyo3 = "0.28.3"
+        pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject" }
 
         [target.'cfg(not(target_endian = "all-over-the-place"))'.dependencies]
         some_path_dep = { path = "../some_path_dep" }
@@ -661,39 +661,33 @@ fn lib_with_parent_workspace_git_dep_sdist() {
     )
     .unwrap();
     fs_err::write(git_dep_dir.join("src/lib.rs"), "pub fn from_git() {}\n").unwrap();
-    assert!(
-        Command::new("git")
-            .args(["init", "--initial-branch=main", "-q"])
-            .current_dir(&git_dep_dir)
-            .status()
-            .unwrap()
-            .success()
-    );
-    assert!(
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(&git_dep_dir)
-            .status()
-            .unwrap()
-            .success()
-    );
-    assert!(
-        Command::new("git")
-            .args([
-                "-c",
-                "user.name=maturin-tests",
-                "-c",
-                "user.email=maturin-tests@example.com",
-                "commit",
-                "-q",
-                "-m",
-                "init",
-            ])
-            .current_dir(&git_dep_dir)
-            .status()
-            .unwrap()
-            .success()
-    );
+    assert!(Command::new("git")
+        .args(["init", "--initial-branch=main", "-q"])
+        .current_dir(&git_dep_dir)
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("git")
+        .args(["add", "."])
+        .current_dir(&git_dep_dir)
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("git")
+        .args([
+            "-c",
+            "user.name=maturin-tests",
+            "-c",
+            "user.email=maturin-tests@example.com",
+            "commit",
+            "-q",
+            "-m",
+            "init",
+        ])
+        .current_dir(&git_dep_dir)
+        .status()
+        .unwrap()
+        .success());
 
     let git_dep_url = Url::from_directory_path(&git_dep_dir)
         .expect("git dependency path should convert to file:// URL")
@@ -763,7 +757,7 @@ fn lib_with_parent_workspace_git_dep_sdist() {
             crate-type = ["cdylib"]
 
             [dependencies]
-            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject", features = ["extension-module"] }
             shared_crate = { path = "../shared_crate" }
             "#
         ),
@@ -906,7 +900,7 @@ fn lib_with_parent_workspace_lints_sdist() {
             crate-type = ["cdylib"]
 
             [dependencies]
-            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject", features = ["extension-module"] }
             shared_crate = { path = "../shared_crate" }
             "#
         ),

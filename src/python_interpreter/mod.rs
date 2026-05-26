@@ -1,7 +1,8 @@
 pub use self::config::InterpreterConfig;
-use crate::Target;
 use crate::auditwheel::PlatformTag;
-use anyhow::{Result, bail};
+use crate::bridge::StableAbiKind;
+use crate::Target;
+use anyhow::{bail, Result};
 use std::fmt;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -140,8 +141,11 @@ impl PythonInterpreter {
     }
 
     /// Does this interpreter support either abi3 or abi3t?
-    pub fn has_stable_api(&self) -> bool {
-        self.has_abi3() || self.has_abi3t()
+    pub fn has_stable_api(&self, kind: StableAbiKind) -> bool {
+        match kind {
+            StableAbiKind::Abi3 => self.has_abi3(),
+            StableAbiKind::Abi3t => self.has_abi3t(),
+        }
     }
 
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:

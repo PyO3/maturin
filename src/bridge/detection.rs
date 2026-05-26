@@ -23,7 +23,7 @@ const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3
 /// is forced; otherwise it's auto-detected from dependencies and target types.
 ///
 /// Conditional pyo3/pyo3-ffi features from pyproject.toml are excluded from
-/// abi3 inference here. Use [`upgrade_bridge_abi3`] after interpreter resolution
+/// abi3 inference here. Use [`upgrade_bridge_stable_abi`] after interpreter resolution
 /// to evaluate them.
 pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
     let no_extra_features = HashMap::new();
@@ -147,7 +147,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 /// This is the second phase of bridge detection: [`find_bridge`] excludes
 /// conditional features, then after interpreter resolution this function
 /// re-checks whether any conditional abi3 feature applies.
-pub fn upgrade_bridge_abi3(
+pub fn upgrade_bridge_stable_abi(
     bridge: BridgeModel,
     cargo_metadata: &Metadata,
     pyproject: Option<&PyProjectToml>,
@@ -223,11 +223,11 @@ fn has_stable_abi(
     deps: &HashMap<&str, &Node>,
     extra_features: &HashMap<&str, Vec<String>>,
 ) -> Result<Option<StableAbi>> {
-    let abi3 = has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3)?;
-    if abi3.is_some() {
-        return Ok(abi3);
+    let abi3t = has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3t)?;
+    if abi3t.is_some() {
+        return Ok(abi3t);
     }
-    has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3t)
+    has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3)
 }
 
 /// pyo3 supports building stable abi wheels if the unstable-api feature is not selected
@@ -240,7 +240,6 @@ fn has_stable_abi_from_kind(
         let lib = lib.as_str();
         if let Some(&pyo3_crate) = deps.get(lib) {
             let extra = extra_features.get(lib);
-            // Find the minimal abi3 python version. If there is none, abi3 hasn't been selected
             // Find the minimal stable abi python version. If there is none, stable abi hasn't been selected
             // This parses abi3-py{major}{minor} and returns the minimal (major, minor) tuple
             let all_features: Vec<&str> = pyo3_crate

@@ -378,8 +378,9 @@ impl<'a> BuildOrchestrator<'a> {
         }
     }
 
-    /// Split interpreters into abi3-capable and non-abi3 groups, build the
-    /// appropriate wheel type for each group, and return all built wheels.
+    /// Split interpreters into stable-abi-capable and non-stable-abi groups,
+    /// build the appropriate wheel type for each group, and return all built
+    /// wheels.
     #[instrument(skip_all)]
     pub(crate) fn build_stable_abi_wheels(
         &self,
@@ -393,7 +394,7 @@ impl<'a> BuildOrchestrator<'a> {
             .interpreter
             .iter()
             .filter(|interp| {
-                interp.has_stable_api()
+                interp.has_stable_api(stable_abi.kind)
                     && min_version.is_none_or(|(major, minor)| {
                         (interp.major as u8, interp.minor as u8) >= (major, minor)
                     })
@@ -405,7 +406,7 @@ impl<'a> BuildOrchestrator<'a> {
             .interpreter
             .iter()
             .filter(|interp| {
-                !interp.has_stable_api()
+                !interp.has_stable_api(stable_abi.kind)
                     || min_version.is_some_and(|(major, minor)| {
                         (interp.major as u8, interp.minor as u8) < (major, minor)
                     })
@@ -427,16 +428,18 @@ impl<'a> BuildOrchestrator<'a> {
                 .collect();
             if let Some((major, minor)) = min_version {
                 bail!(
-                    "None of the found Python interpreters ({}) are compatible with the abi3 \
+                    "None of the found Python interpreters ({}) are compatible with the {} \
                      minimum version (>= {}.{}). Please install a compatible Python interpreter.",
                     interp_names.join(", "),
+                    stable_abi.kind,
                     major,
                     minor,
                 );
             } else {
                 bail!(
-                    "No compatible Python interpreters found for abi3 build. \
+                    "No compatible Python interpreters found for {} build. \
                      Found: {}",
+                    stable_abi.kind,
                     interp_names.join(", "),
                 );
             }
@@ -532,8 +535,8 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(wheel_path)
     }
 
-    /// For abi3 we only need to build a single wheel and we don't even need a python interpreter
-    /// for it
+    /// For abi3 and abi3t we only need to build a single wheel and we don't
+    /// even need a python interpreter for it
     #[instrument(skip_all)]
     pub(crate) fn build_pyo3_wheel_stable_abi(
         &self,

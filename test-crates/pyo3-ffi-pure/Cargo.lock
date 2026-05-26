@@ -11,8 +11,7 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 [[package]]
 name = "pyo3-build-config"
 version = "0.28.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e368e7ddfdeb98c9bca7f8383be1648fd84ab466bf2bc015e94008db6d35611e"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#f9b50b7a41253297bab1d3993b0059b55d2627a2"
 dependencies = [
  "target-lexicon",
 ]
@@ -20,8 +19,7 @@ dependencies = [
 [[package]]
 name = "pyo3-ffi"
 version = "0.28.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f29e10af80b1f7ccaf7f69eace800a03ecd13e883acfacc1e5d0988605f651e"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#f9b50b7a41253297bab1d3993b0059b55d2627a2"
 dependencies = [
  "libc",
  "pyo3-build-config",

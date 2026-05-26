@@ -1,9 +1,9 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use ignore::overrides::Override;
 use maturin::{
-    BuildContext, BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, PathWriter,
-    VirtualWriter, write_dist_info,
+    write_dist_info, BuildContext, BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions,
+    PathWriter, VirtualWriter,
 };
 use std::path::PathBuf;
 use tracing::instrument;

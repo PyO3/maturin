@@ -635,6 +635,8 @@ fn configure_macos_pyo3_linker_args(
         }
     });
 
+    dbg!(&stable_abi_suffix);
+
     let so_filename = if let Some(suffix) = stable_abi_suffix {
         format!("{module_name}.{suffix}.so")
     } else {
@@ -642,6 +644,7 @@ fn configure_macos_pyo3_linker_args(
             .expect("missing python interpreter for non-abi3 wheel build")
             .get_library_name(module_name)
     };
+    dbg!(&so_filename);
     let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
     let install_name_args = ["-C".to_string(), macos_dylib_install_name];
     debug!(
@@ -1153,6 +1156,7 @@ fn compile_target(
 #[instrument(skip_all)]
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
+    let py_modexport = format!("PyModExport_{module_name}");
     let fd = File::open(artifact)?;
     // SAFETY: The caller stages (moves or copies) the artifact into a
     // private directory before invoking this function, so no concurrent
@@ -1178,11 +1182,19 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
                             found = true;
                             break;
                         }
+                        if py_modexport == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
+                            found = true;
+                            break;
+                        }
                     }
                     if !found {
                         for sym in macho.symbols() {
                             let (sym_name, _) = sym?;
                             if py_init == sym_name.strip_prefix('_').unwrap_or(sym_name) {
+                                found = true;
+                                break;
+                            }
+                            if py_modexport == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
                                 found = true;
                                 break;
                             }
@@ -1199,7 +1211,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
         goblin::Object::PE(pe) => {
             for sym in &pe.exports {
                 if let Some(sym_name) = sym.name
-                    && py_init == sym_name
+                    && (py_init == sym_name || py_modexport == sym_name)
                 {
                     found = true;
                     break;
@@ -1214,7 +1226,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
 
     if !found {
         eprintln!(
-            "⚠️  Warning: Couldn't find the symbol `{py_init}` in the native library. \
+            "⚠️  Warning: Couldn't find the symbol `{py_init}` or `{py_modexport}` in the native library. \
              Python will fail to import this module. \
              If you're using pyo3, check that `#[pymodule]` uses `{module_name}` as module name"
         )

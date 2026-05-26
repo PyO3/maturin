@@ -487,7 +487,7 @@ fn workspace_members_non_local_dep_sdist() {
 
         [dependencies]
         pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject", features = [
-            "abi3-py37",
+            "abi3-py39",
             "generate-import-lib",
         ] }
 

@@ -42,6 +42,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.28.3"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#55023139bfa3a7070600df46afc9da71ed14101d"
 dependencies = [
  "libc",
  "once_cell",
@@ -54,6 +55,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.28.3"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#55023139bfa3a7070600df46afc9da71ed14101d"
 dependencies = [
  "target-lexicon",
 ]
@@ -61,6 +63,7 @@ dependencies = [
 [[package]]
 name = "pyo3-ffi"
 version = "0.28.3"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#55023139bfa3a7070600df46afc9da71ed14101d"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -69,6 +72,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.28.3"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#55023139bfa3a7070600df46afc9da71ed14101d"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -79,6 +83,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.28.3"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#55023139bfa3a7070600df46afc9da71ed14101d"
 dependencies = [
  "heck",
  "proc-macro2",

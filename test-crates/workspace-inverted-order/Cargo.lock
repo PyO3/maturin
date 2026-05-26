@@ -46,7 +46,7 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#abaf0e0cf1e7e78cedf988a51ac4c2336fa81c11"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#e6d31b94ed6182e30b3868559f104d54d1227b21"
 dependencies = [
  "libc",
  "once_cell",
@@ -59,7 +59,7 @@ dependencies = [
 [[package]]
 name = "pyo3-build-config"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#abaf0e0cf1e7e78cedf988a51ac4c2336fa81c11"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#e6d31b94ed6182e30b3868559f104d54d1227b21"
 dependencies = [
  "target-lexicon",
 ]
@@ -67,7 +67,7 @@ dependencies = [
 [[package]]
 name = "pyo3-ffi"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#abaf0e0cf1e7e78cedf988a51ac4c2336fa81c11"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#e6d31b94ed6182e30b3868559f104d54d1227b21"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -76,7 +76,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#abaf0e0cf1e7e78cedf988a51ac4c2336fa81c11"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#e6d31b94ed6182e30b3868559f104d54d1227b21"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -87,7 +87,7 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.28.3"
-source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#abaf0e0cf1e7e78cedf988a51ac4c2336fa81c11"
+source = "git+https://github.com/ngoldbaum/pyo3?branch=opaque-pyobject#e6d31b94ed6182e30b3868559f104d54d1227b21"
 dependencies = [
  "heck",
  "proc-macro2",

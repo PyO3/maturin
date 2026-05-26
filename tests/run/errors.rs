@@ -1,4 +1,4 @@
-use crate::common::{errors, handle_result, test_python_implementation};
+use crate::common::{errors, handle_result, test_python_implementation, test_python_version};
 
 #[test]
 #[cfg_attr(
@@ -17,7 +17,9 @@ use crate::common::{errors, handle_result, test_python_implementation};
     ignore
 )]
 fn pyo3_no_extension_module() {
-    if test_python_implementation().unwrap() == "cpython" {
+    if test_python_implementation().unwrap() == "cpython"
+        && test_python_version().unwrap() < (3, 15)
+    {
         handle_result(errors::pyo3_no_extension_module())
     }
 }

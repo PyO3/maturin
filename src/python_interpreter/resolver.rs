@@ -18,7 +18,7 @@ use super::{InterpreterConfig, InterpreterKind, PythonInterpreter};
 use crate::cross_compile::{
     find_build_details, find_sysconfigdata, parse_build_details_json_file, parse_sysconfigdata,
 };
-use crate::{BridgeModel, Target, StableAbiKind};
+use crate::{BridgeModel, StableAbiKind, Target};
 use anyhow::{Context, Result, bail, format_err};
 use pep440_rs::VersionSpecifiers;
 use std::env;

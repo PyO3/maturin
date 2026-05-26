@@ -1,8 +1,8 @@
 pub use self::config::InterpreterConfig;
+use crate::Target;
 use crate::auditwheel::PlatformTag;
 use crate::bridge::StableAbiKind;
-use crate::Target;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::fmt;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};

@@ -1194,7 +1194,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
                                 found = true;
                                 break;
                             }
-                            if py_modexport == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
+                            if py_modexport == sym_name.strip_prefix('_').unwrap_or(sym_name) {
                                 found = true;
                                 break;
                             }

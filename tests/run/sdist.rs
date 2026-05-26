@@ -2,7 +2,7 @@ use crate::common::{handle_result, other};
 use expect_test::expect;
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
-use maturin::{unpack_sdist, BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions};
+use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
@@ -661,33 +661,39 @@ fn lib_with_parent_workspace_git_dep_sdist() {
     )
     .unwrap();
     fs_err::write(git_dep_dir.join("src/lib.rs"), "pub fn from_git() {}\n").unwrap();
-    assert!(Command::new("git")
-        .args(["init", "--initial-branch=main", "-q"])
-        .current_dir(&git_dep_dir)
-        .status()
-        .unwrap()
-        .success());
-    assert!(Command::new("git")
-        .args(["add", "."])
-        .current_dir(&git_dep_dir)
-        .status()
-        .unwrap()
-        .success());
-    assert!(Command::new("git")
-        .args([
-            "-c",
-            "user.name=maturin-tests",
-            "-c",
-            "user.email=maturin-tests@example.com",
-            "commit",
-            "-q",
-            "-m",
-            "init",
-        ])
-        .current_dir(&git_dep_dir)
-        .status()
-        .unwrap()
-        .success());
+    assert!(
+        Command::new("git")
+            .args(["init", "--initial-branch=main", "-q"])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .args([
+                "-c",
+                "user.name=maturin-tests",
+                "-c",
+                "user.email=maturin-tests@example.com",
+                "commit",
+                "-q",
+                "-m",
+                "init",
+            ])
+            .current_dir(&git_dep_dir)
+            .status()
+            .unwrap()
+            .success()
+    );
 
     let git_dep_url = Url::from_directory_path(&git_dep_dir)
         .expect("git dependency path should convert to file:// URL")

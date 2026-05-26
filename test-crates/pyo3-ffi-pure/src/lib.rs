@@ -70,7 +70,7 @@ static mut SLOTS: [PyModuleDef_Slot; SLOTS_LEN] = [
     },
     PyModuleDef_Slot {
         slot: 0,
-        value: ptr::null_mut(),
+        value: std::ptr::null_mut(),
     },
 ];
 

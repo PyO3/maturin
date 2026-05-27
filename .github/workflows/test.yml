@@ -427,6 +427,11 @@ jobs:
       - name: Build wheels
         run: |
           set -ex
+
+          # pyo3 doesn't support free-threaded 3.13. Remove it from the image
+          # so --find-interpreter doesn't pick it up
+          rm -rf /opt/python/cp313-cp313t
+          
           # Use bundled sysconfig
           bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
 

@@ -154,8 +154,8 @@ impl InterpreterSpec {
             format!("Invalid python interpreter minor version '{minor_str}', expect a digit")
         })?;
 
-        if (major, minor) < (3, 13) && abiflags == "t" {
-            bail!("Free-threaded Python interpreter is only supported on 3.13 and later.");
+        if (major, minor) < (3, 14) && abiflags == "t" {
+            bail!("Free-threaded Python interpreter is only supported on 3.14 and later.");
         }
 
         Ok(Some(InterpreterSpec {

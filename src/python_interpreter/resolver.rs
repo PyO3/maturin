@@ -966,10 +966,10 @@ mod tests {
         assert_eq!(spec.minor, 14);
         assert_eq!(spec.abiflags, "t");
 
-        let spec = InterpreterSpec::parse("3.13t").unwrap().unwrap();
+        let spec = InterpreterSpec::parse("3.14t").unwrap().unwrap();
         assert_eq!(spec.kind, InterpreterKind::CPython);
         assert_eq!(spec.major, 3);
-        assert_eq!(spec.minor, 13);
+        assert_eq!(spec.minor, 14);
         assert_eq!(spec.abiflags, "t");
     }
 
@@ -977,7 +977,7 @@ mod tests {
     fn test_interpreter_spec_free_threaded_too_old() {
         let err = InterpreterSpec::parse("python3.12t").unwrap_err();
         assert!(
-            err.to_string().contains("3.13"),
+            err.to_string().contains("3.14"),
             "expected version constraint in error: {err}"
         );
     }

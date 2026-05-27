@@ -672,7 +672,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        // pyo3 0.23+ should find CPython 3.13t
+        // pyo3 should find CPython 3.14t and newer (dropped support for 3.13t)
         let pythons = lookup_target(
             &target,
             None,
@@ -696,7 +696,6 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
-                "CPython 3.13t",
                 "CPython 3.14t",
                 "PyPy 3.9",
                 "PyPy 3.10",
@@ -774,7 +773,6 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
-                "CPython 3.13t",
                 "CPython 3.14t",
                 "PyPy 3.9",
                 "PyPy 3.10",

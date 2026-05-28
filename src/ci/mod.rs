@@ -179,7 +179,7 @@ pub struct GenerateCI {
     /// Output path
     #[arg(short = 'o', long, value_name = "PATH", default_value = "-")]
     pub output: PathBuf,
-    /// Platform support [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
+    /// Platform support [deprecated: use [tool.maturin.generate-ci.github."PLATFORM NAME"] in pyproject.toml]
     #[arg(
         id = "platform",
         long,

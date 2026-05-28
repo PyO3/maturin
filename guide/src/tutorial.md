@@ -67,14 +67,33 @@ Create a new cargo project
 Usage: maturin new [OPTIONS] <PATH>
 
 Arguments:
-  <PATH>  Project path
+  <PATH>
+          Project path
 
 Options:
-      --name <NAME>          Set the resulting package name, defaults to the directory name
-      --mixed                Use mixed Rust/Python project layout
-      --src                  Use Python first src layout for mixed Rust/Python project
-  -b, --bindings <BINDINGS>  Which kind of bindings to use [possible values: pyo3, cffi, uniffi, bin]
-  -h, --help                 Print help information
+      --name <NAME>
+          Set the resulting package name, defaults to the directory name
+
+  -v, --verbose...
+          Use verbose output.
+
+          * Default: Show build information and `cargo build` output. * `-v`: Use `cargo build -v`. * `-vv`: Show debug logging and use `cargo build -vv`. * `-vvv`: Show trace logging.
+
+          You can configure fine-grained logging using the `RUST_LOG` environment variable. (<https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives>)
+
+      --mixed
+          Use mixed Rust/Python project layout
+
+      --src
+          Use Python first src layout for mixed Rust/Python project
+
+  -b, --bindings <BINDINGS>
+          Which kind of bindings to use
+
+          [possible values: pyo3, cffi, uniffi, bin]
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
 
 The above process can be achieved by running `maturin new -b pyo3 guessing_game`

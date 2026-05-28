@@ -18,7 +18,7 @@ def main():
     for path in FILES:
         content = root.joinpath(path).read_text()
 
-        matcher = re.compile(r"```\nUsage: maturin (\w+) (.*?)```", re.MULTILINE | re.DOTALL)
+        matcher = re.compile(r"Usage: maturin ([\w-]+) (.*?)```", re.MULTILINE | re.DOTALL)
 
         replaces = {}
         for command, old in matcher.findall(content):

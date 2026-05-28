@@ -29,4 +29,9 @@ bindings = "{{ bindings }}"
 {% if mixed_non_src -%}
 python-source = "python"
 {% endif -%}
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo"
+]
 {% endif -%}

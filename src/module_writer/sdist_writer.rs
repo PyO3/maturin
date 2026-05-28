@@ -69,7 +69,7 @@ impl ModuleWriterInternal for SDistWriter {
 
         header.set_size(data.len() as u64);
 
-        if set_ustar_path_or_needs_pax(&mut header, target, &archive_path)? {
+        if set_ustar_path_or_needs_pax(&mut header, &archive_path)? {
             self.append_pax_path(&archive_path)?;
             header.set_path(format!("PaxHeaders/{}", self.pax_header_index))?;
             self.pax_header_index += 1;
@@ -163,7 +163,6 @@ impl SDistWriter {
 /// <https://github.com/python/cpython/blob/8ab7b43a14bed4780febbd7586a41cfe459aa6d5/Lib/tarfile.py#L1069-L1125>
 fn set_ustar_path_or_needs_pax(
     header: &mut tar::Header,
-    target: &Path,
     archive_path: &str,
 ) -> Result<bool, io::Error> {
     // ustar only allows ASCII, but would accept arbitrary bytes without the check.
@@ -172,11 +171,11 @@ fn set_ustar_path_or_needs_pax(
     }
 
     let mut probe = tar::Header::new_ustar();
-    if probe.set_path(target).is_err() {
+    if probe.set_path(archive_path).is_err() {
         return Ok(true);
     }
 
-    header.set_path(target)?;
+    header.set_path(archive_path)?;
     Ok(false)
 }
 
